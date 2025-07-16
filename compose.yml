@@ -1,6 +1,6 @@
 services:
   # 🚀 Claude Relay Service
-  service-pluginsworld-claude-relay:
+  claude-relay-service:
     image: "ccr.ccs.tencentyun.com/pluginsworld/service-pluginsworld-claude-relay:${BUILD_NUMBER}"
     build: .
     container_name: claude-relay-service
