@@ -1,8 +1,7 @@
-version: '3.8'
-
 services:
   # 🚀 Claude Relay Service
-  claude-relay:
+  service-pluginsworld-claude-relay:
+    image: "ccr.ccs.tencentyun.com/pluginsworld/service-pluginsworld-claude-relay:${BUILD_NUMBER}"
     build: .
     container_name: claude-relay-service
     restart: unless-stopped
