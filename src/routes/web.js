@@ -114,7 +114,8 @@ router.post('/auth/login', async (req, res) => {
     res.json({
       success: true,
       token: sessionId,
-      expiresIn: config.security.adminSessionTimeout
+      expiresIn: config.security.adminSessionTimeout,
+      username: adminData.username // 返回真实用户名
     });
 
   } catch (error) {
@@ -141,6 +142,160 @@ router.post('/auth/logout', async (req, res) => {
     logger.error('❌ Logout error:', error);
     res.status(500).json({
       error: 'Logout failed',
+      message: 'Internal server error'
+    });
+  }
+});
+
+// 🔑 修改账户信息
+router.post('/auth/change-password', async (req, res) => {
+  try {
+    const token = req.headers['authorization']?.replace('Bearer ', '') || req.cookies?.adminToken;
+    
+    if (!token) {
+      return res.status(401).json({
+        error: 'No token provided',
+        message: 'Authentication required'
+      });
+    }
+
+    const { newUsername, currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        message: 'Current password and new password are required'
+      });
+    }
+
+    // 验证新密码长度
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        error: 'Password too short',
+        message: 'New password must be at least 8 characters long'
+      });
+    }
+
+    // 获取当前会话
+    const sessionData = await redis.getSession(token);
+    if (!sessionData) {
+      return res.status(401).json({
+        error: 'Invalid token',
+        message: 'Session expired or invalid'
+      });
+    }
+
+    // 获取当前管理员信息
+    const adminData = await redis.getSession('admin_credentials');
+    if (!adminData) {
+      return res.status(500).json({
+        error: 'Admin data not found',
+        message: 'Administrator credentials not found'
+      });
+    }
+
+    // 验证当前密码
+    const isValidPassword = await bcrypt.compare(currentPassword, adminData.passwordHash);
+    if (!isValidPassword) {
+      logger.security(`🔒 Invalid current password attempt for user: ${sessionData.username}`);
+      return res.status(401).json({
+        error: 'Invalid current password',
+        message: 'Current password is incorrect'
+      });
+    }
+
+    // 准备更新的数据
+    const saltRounds = 10;
+    const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
+    
+    const updatedAdminData = {
+      ...adminData,
+      passwordHash: newPasswordHash,
+      updatedAt: new Date().toISOString()
+    };
+
+    // 如果提供了新用户名，则更新用户名
+    if (newUsername && newUsername.trim() && newUsername !== adminData.username) {
+      updatedAdminData.username = newUsername.trim();
+    }
+
+    // 更新Redis中的管理员凭据
+    await redis.setSession('admin_credentials', updatedAdminData);
+
+    // 更新data/init.json文件
+    const initFilePath = path.join(__dirname, '../../data/init.json');
+    if (fs.existsSync(initFilePath)) {
+      const initData = JSON.parse(fs.readFileSync(initFilePath, 'utf8'));
+      initData.adminUsername = updatedAdminData.username;
+      initData.adminPassword = newPassword; // 保存明文密码到init.json
+      initData.updatedAt = new Date().toISOString();
+      
+      fs.writeFileSync(initFilePath, JSON.stringify(initData, null, 2));
+    }
+
+    // 清除当前会话（强制用户重新登录）
+    await redis.deleteSession(token);
+
+    logger.success(`🔐 Admin password changed successfully for user: ${updatedAdminData.username}`);
+
+    res.json({
+      success: true,
+      message: 'Password changed successfully. Please login again.',
+      newUsername: updatedAdminData.username
+    });
+
+  } catch (error) {
+    logger.error('❌ Change password error:', error);
+    res.status(500).json({
+      error: 'Change password failed',
+      message: 'Internal server error'
+    });
+  }
+});
+
+// 👤 获取当前用户信息
+router.get('/auth/user', async (req, res) => {
+  try {
+    const token = req.headers['authorization']?.replace('Bearer ', '') || req.cookies?.adminToken;
+    
+    if (!token) {
+      return res.status(401).json({
+        error: 'No token provided',
+        message: 'Authentication required'
+      });
+    }
+
+    // 获取当前会话
+    const sessionData = await redis.getSession(token);
+    if (!sessionData) {
+      return res.status(401).json({
+        error: 'Invalid token',
+        message: 'Session expired or invalid'
+      });
+    }
+
+    // 获取管理员信息
+    const adminData = await redis.getSession('admin_credentials');
+    if (!adminData) {
+      return res.status(500).json({
+        error: 'Admin data not found',
+        message: 'Administrator credentials not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        username: adminData.username,
+        loginTime: sessionData.loginTime,
+        lastActivity: sessionData.lastActivity
+      }
+    });
+
+  } catch (error) {
+    logger.error('❌ Get user info error:', error);
+    res.status(500).json({
+      error: 'Get user info failed',
       message: 'Internal server error'
     });
   }

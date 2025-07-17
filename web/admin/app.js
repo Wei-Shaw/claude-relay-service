@@ -102,7 +102,9 @@ const app = createApp({
             apiKeyForm: {
                 name: '',
                 tokenLimit: '',
-                description: ''
+                description: '',
+                concurrencyLimit: '',
+                claudeAccountId: ''
             },
             apiKeyModelStats: {}, // 存储每个key的模型统计数据
             expandedApiKeys: {}, // 跟踪展开的API Keys
@@ -131,6 +133,17 @@ const app = createApp({
                 description: '',
                 showFullKey: false
             },
+
+            // 编辑API Key
+            showEditApiKeyModal: false,
+            editApiKeyLoading: false,
+            editApiKeyForm: {
+                id: '',
+                name: '',
+                tokenLimit: '',
+                concurrencyLimit: '',
+                claudeAccountId: ''
+            },
             
             // 账户
             accounts: [],
@@ -141,6 +154,7 @@ const app = createApp({
                 name: '',
                 description: '',
                 addType: 'oauth', // 'oauth' 或 'manual'
+                accountType: 'shared', // 'shared' 或 'dedicated'
                 accessToken: '',
                 refreshToken: '',
                 proxyType: '',
@@ -157,6 +171,8 @@ const app = createApp({
                 id: '',
                 name: '',
                 description: '',
+                accountType: 'shared',
+                originalAccountType: 'shared',
                 accessToken: '',
                 refreshToken: '',
                 proxyType: '',
@@ -175,6 +191,20 @@ const app = createApp({
                 callbackUrl: ''
             },
             
+            // 用户菜单和账户修改相关
+            userMenuOpen: false,
+            currentUser: {
+                username: ''
+            },
+            showChangePasswordModal: false,
+            changePasswordLoading: false,
+            changePasswordForm: {
+                newUsername: '',
+                currentPassword: '',
+                newPassword: '',
+                confirmPassword: ''
+            },
+            
         }
     },
     
@@ -182,6 +212,13 @@ const app = createApp({
         // 动态计算BASE_URL
         currentBaseUrl() {
             return `${window.location.protocol}//${window.location.host}/api/`;
+        },
+        
+        // 获取专属账号列表
+        dedicatedAccounts() {
+            return this.accounts.filter(account => 
+                account.accountType === 'dedicated' && account.isActive === true
+            );
         }
     },
     
@@ -191,8 +228,20 @@ const app = createApp({
         // 初始化防抖函数
         this.setTrendPeriod = this.debounce(this._setTrendPeriod, 300);
         
+        // 添加全局点击事件监听器，用于关闭用户菜单
+        document.addEventListener('click', (event) => {
+            // 检查点击是否在用户菜单外部
+            const userMenuButton = event.target.closest('.relative');
+            if (!userMenuButton || !userMenuButton.querySelector('button[\@click*="userMenuOpen"]')) {
+                this.userMenuOpen = false;
+            }
+        });
+        
         if (this.authToken) {
             this.isLoggedIn = true;
+            
+            // 加载当前用户信息
+            this.loadCurrentUser();
             
             // 初始化日期筛选器和图表数据
             this.initializeDateFilter();
@@ -232,6 +281,17 @@ const app = createApp({
     },
     
     methods: {
+        // 获取绑定账号名称
+        getBoundAccountName(accountId) {
+            const account = this.accounts.find(acc => acc.id === accountId);
+            return account ? account.name : '未知账号';
+        },
+        
+        // 获取绑定到特定账号的API Key数量
+        getBoundApiKeysCount(accountId) {
+            return this.apiKeys.filter(key => key.claudeAccountId === accountId).length;
+        },
+        
         // Toast 通知方法
         showToast(message, type = 'info', title = null, duration = 5000) {
             const id = ++this.toastIdCounter;
@@ -319,6 +379,8 @@ const app = createApp({
                 id: account.id,
                 name: account.name,
                 description: account.description || '',
+                accountType: account.accountType || 'shared',
+                originalAccountType: account.accountType || 'shared',
                 accessToken: '',
                 refreshToken: '',
                 proxyType: account.proxy ? account.proxy.type : '',
@@ -337,6 +399,8 @@ const app = createApp({
                 id: '',
                 name: '',
                 description: '',
+                accountType: 'shared',
+                originalAccountType: 'shared',
                 accessToken: '',
                 refreshToken: '',
                 proxyType: '',
@@ -351,10 +415,21 @@ const app = createApp({
         async updateAccount() {
             this.editAccountLoading = true;
             try {
+                // 验证账户类型切换
+                if (this.editAccountForm.accountType === 'shared' && 
+                    this.editAccountForm.originalAccountType === 'dedicated') {
+                    const boundKeysCount = this.getBoundApiKeysCount(this.editAccountForm.id);
+                    if (boundKeysCount > 0) {
+                        this.showToast(`无法切换到共享账户，该账户绑定了 ${boundKeysCount} 个API Key，请先解绑所有API Key`, 'error', '切换失败');
+                        return;
+                    }
+                }
+
                 // 构建更新数据
                 let updateData = {
                     name: this.editAccountForm.name,
-                    description: this.editAccountForm.description
+                    description: this.editAccountForm.description,
+                    accountType: this.editAccountForm.accountType
                 };
                 
                 // 只在有值时才更新 token
@@ -428,6 +503,7 @@ const app = createApp({
                 name: '',
                 description: '',
                 addType: 'oauth',
+                accountType: 'shared',
                 accessToken: '',
                 refreshToken: '',
                 proxyType: '',
@@ -556,7 +632,8 @@ const app = createApp({
                         name: this.accountForm.name,
                         description: this.accountForm.description,
                         claudeAiOauth: exchangeData.data.claudeAiOauth,
-                        proxy: proxy
+                        proxy: proxy,
+                        accountType: this.accountForm.accountType
                     })
                 });
                 
@@ -628,7 +705,8 @@ const app = createApp({
                         name: this.accountForm.name,
                         description: this.accountForm.description,
                         claudeAiOauth: manualOauthData,
-                        proxy: proxy
+                        proxy: proxy,
+                        accountType: this.accountForm.accountType
                     })
                 });
                 
@@ -773,6 +851,10 @@ const app = createApp({
                     this.authToken = data.token;
                     localStorage.setItem('authToken', this.authToken);
                     this.isLoggedIn = true;
+                    
+                    // 记录当前用户名（使用服务器返回的真实用户名）
+                    this.currentUser.username = data.username;
+                    
                     this.loadDashboard();
                 } else {
                     this.loginError = data.message;
@@ -782,6 +864,95 @@ const app = createApp({
                 this.loginError = '登录失败，请检查网络连接';
             } finally {
                 this.loginLoading = false;
+            }
+        },
+        
+        // 加载当前用户信息
+        async loadCurrentUser() {
+            try {
+                const response = await fetch('/web/auth/user', {
+                    headers: { 'Authorization': 'Bearer ' + this.authToken }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    this.currentUser.username = data.user.username;
+                    console.log('Loaded current user:', data.user.username);
+                } else {
+                    console.warn('Failed to load current user:', data.message);
+                }
+            } catch (error) {
+                console.error('Error loading current user:', error);
+            }
+        },
+        
+        // 用户菜单相关方法
+        openChangePasswordModal() {
+            this.userMenuOpen = false;
+            this.showChangePasswordModal = true;
+        },
+        
+        closeChangePasswordModal() {
+            this.showChangePasswordModal = false;
+            this.changePasswordForm = {
+                newUsername: '',
+                currentPassword: '',
+                newPassword: '',
+                confirmPassword: ''
+            };
+        },
+        
+        async changePassword() {
+            // 验证表单
+            if (this.changePasswordForm.newPassword !== this.changePasswordForm.confirmPassword) {
+                this.showToast('新密码和确认密码不一致', 'error');
+                return;
+            }
+            
+            if (this.changePasswordForm.newPassword.length < 8) {
+                this.showToast('新密码长度至少8位', 'error');
+                return;
+            }
+            
+            this.changePasswordLoading = true;
+            try {
+                const response = await fetch('/web/auth/change-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + this.authToken
+                    },
+                    body: JSON.stringify({
+                        newUsername: this.changePasswordForm.newUsername || undefined,
+                        currentPassword: this.changePasswordForm.currentPassword,
+                        newPassword: this.changePasswordForm.newPassword
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    this.showToast('账户信息修改成功，即将退出登录', 'success');
+                    this.closeChangePasswordModal();
+                    
+                    // 将新的用户名更新到本地状态
+                    if (this.changePasswordForm.newUsername) {
+                        this.currentUser.username = this.changePasswordForm.newUsername;
+                    }
+                    
+                    // 延迟2秒后自动退出登录
+                    setTimeout(() => {
+                        this.logout();
+                    }, 2000);
+                } else {
+                    this.showToast(result.message || '修改失败', 'error');
+                }
+            } catch (error) {
+                console.error('Change password error:', error);
+                this.showToast('网络错误，请稍后再试', 'error');
+            } finally {
+                this.changePasswordLoading = false;
             }
         },
         
@@ -924,6 +1095,10 @@ const app = createApp({
                 
                 if (data.success) {
                     this.accounts = data.data || [];
+                    // 为每个账号计算绑定的API Key数量
+                    this.accounts.forEach(account => {
+                        account.boundApiKeysCount = this.apiKeys.filter(key => key.claudeAccountId === account.id).length;
+                    });
                 }
             } catch (error) {
                 console.error('Failed to load accounts:', error);
@@ -966,7 +1141,9 @@ const app = createApp({
                     body: JSON.stringify({
                         name: this.apiKeyForm.name,
                         tokenLimit: this.apiKeyForm.tokenLimit && this.apiKeyForm.tokenLimit.trim() ? parseInt(this.apiKeyForm.tokenLimit) : null,
-                        description: this.apiKeyForm.description || ''
+                        description: this.apiKeyForm.description || '',
+                        concurrencyLimit: this.apiKeyForm.concurrencyLimit && this.apiKeyForm.concurrencyLimit.trim() ? parseInt(this.apiKeyForm.concurrencyLimit) : 0,
+                        claudeAccountId: this.apiKeyForm.claudeAccountId || null
                     })
                 });
                 
@@ -984,7 +1161,7 @@ const app = createApp({
                     
                     // 关闭创建弹窗并清理表单
                     this.showCreateApiKeyModal = false;
-                    this.apiKeyForm = { name: '', tokenLimit: '', description: '' };
+                    this.apiKeyForm = { name: '', tokenLimit: '', description: '', concurrencyLimit: '', claudeAccountId: '' };
                     
                     // 重新加载API Keys列表
                     await this.loadApiKeys();
@@ -1021,8 +1198,70 @@ const app = createApp({
                 this.showToast('删除失败，请检查网络连接', 'error', '网络错误');
             }
         },
+
+        openEditApiKeyModal(key) {
+            this.editApiKeyForm = {
+                id: key.id,
+                name: key.name,
+                tokenLimit: key.tokenLimit || '',
+                concurrencyLimit: key.concurrencyLimit || '',
+                claudeAccountId: key.claudeAccountId || ''
+            };
+            this.showEditApiKeyModal = true;
+        },
+
+        closeEditApiKeyModal() {
+            this.showEditApiKeyModal = false;
+            this.editApiKeyForm = {
+                id: '',
+                name: '',
+                tokenLimit: '',
+                concurrencyLimit: '',
+                claudeAccountId: ''
+            };
+        },
+
+        async updateApiKey() {
+            this.editApiKeyLoading = true;
+            try {
+                const response = await fetch('/admin/api-keys/' + this.editApiKeyForm.id, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + this.authToken
+                    },
+                    body: JSON.stringify({
+                        tokenLimit: this.editApiKeyForm.tokenLimit && this.editApiKeyForm.tokenLimit.toString().trim() !== '' ? parseInt(this.editApiKeyForm.tokenLimit) : 0,
+                        concurrencyLimit: this.editApiKeyForm.concurrencyLimit && this.editApiKeyForm.concurrencyLimit.toString().trim() !== '' ? parseInt(this.editApiKeyForm.concurrencyLimit) : 0,
+                        claudeAccountId: this.editApiKeyForm.claudeAccountId || null
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    this.showToast('API Key 更新成功', 'success', '更新成功');
+                    this.closeEditApiKeyModal();
+                    await this.loadApiKeys();
+                } else {
+                    this.showToast(data.message || '更新失败', 'error', '更新失败');
+                }
+            } catch (error) {
+                console.error('Error updating API key:', error);
+                this.showToast('更新失败，请检查网络连接', 'error', '网络错误');
+            } finally {
+                this.editApiKeyLoading = false;
+            }
+        },
         
         async deleteAccount(accountId) {
+            // 检查是否有API Key绑定到此账号
+            const boundKeysCount = this.getBoundApiKeysCount(accountId);
+            if (boundKeysCount > 0) {
+                this.showToast(`无法删除此账号，有 ${boundKeysCount} 个API Key绑定到此账号，请先解绑所有API Key`, 'error', '删除失败');
+                return;
+            }
+            
             if (!confirm('确定要删除这个 Claude 账户吗？')) return;
             
             try {

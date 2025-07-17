@@ -27,7 +27,8 @@ class ClaudeAccountService {
       refreshToken = '',
       claudeAiOauth = null, // Claude标准格式的OAuth数据
       proxy = null, // { type: 'socks5', host: 'localhost', port: 1080, username: '', password: '' }
-      isActive = true
+      isActive = true,
+      accountType = 'shared' // 'dedicated' or 'shared'
     } = options;
 
     const accountId = uuidv4();
@@ -49,6 +50,7 @@ class ClaudeAccountService {
         scopes: claudeAiOauth.scopes.join(' '),
         proxy: proxy ? JSON.stringify(proxy) : '',
         isActive: isActive.toString(),
+        accountType: accountType, // 账号类型：'dedicated' 或 'shared'
         createdAt: new Date().toISOString(),
         lastUsedAt: '',
         lastRefreshAt: '',
@@ -69,6 +71,7 @@ class ClaudeAccountService {
         scopes: '',
         proxy: proxy ? JSON.stringify(proxy) : '',
         isActive: isActive.toString(),
+        accountType: accountType, // 账号类型：'dedicated' 或 'shared'
         createdAt: new Date().toISOString(),
         lastUsedAt: '',
         lastRefreshAt: '',
@@ -88,6 +91,7 @@ class ClaudeAccountService {
       email,
       isActive,
       proxy,
+      accountType,
       status: accountData.status,
       createdAt: accountData.createdAt,
       expiresAt: accountData.expiresAt,
@@ -121,7 +125,10 @@ class ClaudeAccountService {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json, text/plain, */*',
-          'User-Agent': 'claude-relay-service/1.0.0'
+          'User-Agent': 'claude-cli/1.0.53 (external, cli)',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Referer': 'https://claude.ai/',
+          'Origin': 'https://claude.ai'
         },
         httpsAgent: agent,
         timeout: 30000
@@ -182,7 +189,7 @@ class ClaudeAccountService {
       const expiresAt = parseInt(accountData.expiresAt);
       const now = Date.now();
       
-      if (!expiresAt || now >= (expiresAt - 10000)) { // 10秒提前刷新
+      if (!expiresAt || now >= (expiresAt - 60000)) { // 60秒提前刷新
         logger.info(`🔄 Token expired/expiring for account ${accountId}, attempting refresh...`);
         try {
           const refreshResult = await this.refreshAccountToken(accountId);
@@ -231,6 +238,7 @@ class ClaudeAccountService {
         proxy: account.proxy ? JSON.parse(account.proxy) : null,
         status: account.status,
         errorMessage: account.errorMessage,
+        accountType: account.accountType || 'shared', // 兼容旧数据，默认为共享
         createdAt: account.createdAt,
         lastUsedAt: account.lastUsedAt,
         lastRefreshAt: account.lastRefreshAt,
@@ -251,7 +259,7 @@ class ClaudeAccountService {
         throw new Error('Account not found');
       }
 
-      const allowedUpdates = ['name', 'description', 'email', 'password', 'refreshToken', 'proxy', 'isActive', 'claudeAiOauth'];
+      const allowedUpdates = ['name', 'description', 'email', 'password', 'refreshToken', 'proxy', 'isActive', 'claudeAiOauth', 'accountType'];
       const updatedData = { ...accountData };
 
       for (const [field, value] of Object.entries(updates)) {
@@ -359,6 +367,72 @@ class ClaudeAccountService {
       return selectedAccountId;
     } catch (error) {
       logger.error('❌ Failed to select available account:', error);
+      throw error;
+    }
+  }
+
+  // 🎯 基于API Key选择账户（支持专属绑定和共享池）
+  async selectAccountForApiKey(apiKeyData, sessionHash = null) {
+    try {
+      // 如果API Key绑定了专属账户，优先使用
+      if (apiKeyData.claudeAccountId) {
+        const boundAccount = await redis.getClaudeAccount(apiKeyData.claudeAccountId);
+        if (boundAccount && boundAccount.isActive === 'true' && boundAccount.status !== 'error') {
+          logger.info(`🎯 Using bound dedicated account: ${boundAccount.name} (${apiKeyData.claudeAccountId}) for API key ${apiKeyData.name}`);
+          return apiKeyData.claudeAccountId;
+        } else {
+          logger.warn(`⚠️ Bound account ${apiKeyData.claudeAccountId} is not available, falling back to shared pool`);
+        }
+      }
+
+      // 如果没有绑定账户或绑定账户不可用，从共享池选择
+      const accounts = await redis.getAllClaudeAccounts();
+      
+      const sharedAccounts = accounts.filter(account => 
+        account.isActive === 'true' && 
+        account.status !== 'error' &&
+        (account.accountType === 'shared' || !account.accountType) // 兼容旧数据
+      );
+
+      if (sharedAccounts.length === 0) {
+        throw new Error('No active shared Claude accounts available');
+      }
+
+      // 如果有会话哈希，检查是否有已映射的账户
+      if (sessionHash) {
+        const mappedAccountId = await redis.getSessionAccountMapping(sessionHash);
+        if (mappedAccountId) {
+          // 验证映射的账户是否仍然在共享池中且可用
+          const mappedAccount = sharedAccounts.find(acc => acc.id === mappedAccountId);
+          if (mappedAccount) {
+            logger.info(`🎯 Using sticky session shared account: ${mappedAccount.name} (${mappedAccountId}) for session ${sessionHash}`);
+            return mappedAccountId;
+          } else {
+            logger.warn(`⚠️ Mapped shared account ${mappedAccountId} is no longer available, selecting new account`);
+            // 清理无效的映射
+            await redis.deleteSessionAccountMapping(sessionHash);
+          }
+        }
+      }
+
+      // 从共享池选择账户（负载均衡）
+      const sortedAccounts = sharedAccounts.sort((a, b) => {
+        const aLastRefresh = new Date(a.lastRefreshAt || 0).getTime();
+        const bLastRefresh = new Date(b.lastRefreshAt || 0).getTime();
+        return bLastRefresh - aLastRefresh;
+      });
+      const selectedAccountId = sortedAccounts[0].id;
+      
+      // 如果有会话哈希，建立新的映射
+      if (sessionHash) {
+        await redis.setSessionAccountMapping(sessionHash, selectedAccountId, 3600); // 1小时过期
+        logger.info(`🎯 Created new sticky session mapping for shared account: ${sortedAccounts[0].name} (${selectedAccountId}) for session ${sessionHash}`);
+      }
+
+      logger.info(`🎯 Selected shared account: ${sortedAccounts[0].name} (${selectedAccountId}) for API key ${apiKeyData.name}`);
+      return selectedAccountId;
+    } catch (error) {
+      logger.error('❌ Failed to select account for API key:', error);
       throw error;
     }
   }

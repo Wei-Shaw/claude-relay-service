@@ -1,4 +1,7 @@
 const https = require('https');
+const zlib = require('zlib');
+const fs = require('fs');
+const path = require('path');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const claudeAccountService = require('./claudeAccountService');
@@ -15,13 +18,15 @@ class ClaudeRelayService {
   }
 
   // 🚀 转发请求到Claude API
-  async relayRequest(requestBody, apiKeyData) {
+  async relayRequest(requestBody, apiKeyData, clientRequest, clientResponse, clientHeaders) {
+    let upstreamRequest = null;
+    
     try {
       // 生成会话哈希用于sticky会话
       const sessionHash = sessionHelper.generateSessionHash(requestBody);
       
-      // 选择可用的Claude账户（支持sticky会话）
-      const accountId = apiKeyData.claudeAccountId || await claudeAccountService.selectAvailableAccount(sessionHash);
+      // 选择可用的Claude账户（支持专属绑定和sticky会话）
+      const accountId = await claudeAccountService.selectAccountForApiKey(apiKeyData, sessionHash);
       
       logger.info(`📤 Processing API request for key: ${apiKeyData.name || apiKeyData.id}, account: ${accountId}${sessionHash ? `, session: ${sessionHash}` : ''}`);
       
@@ -34,8 +39,38 @@ class ClaudeRelayService {
       // 获取代理配置
       const proxyAgent = await this._getProxyAgent(accountId);
       
-      // 发送请求到Claude API
-      const response = await this._makeClaudeRequest(processedBody, accessToken, proxyAgent);
+      // 设置客户端断开监听器
+      const handleClientDisconnect = () => {
+        logger.info('🔌 Client disconnected, aborting upstream request');
+        if (upstreamRequest && !upstreamRequest.destroyed) {
+          upstreamRequest.destroy();
+        }
+      };
+      
+      // 监听客户端断开事件
+      if (clientRequest) {
+        clientRequest.once('close', handleClientDisconnect);
+      }
+      if (clientResponse) {
+        clientResponse.once('close', handleClientDisconnect);
+      }
+      
+      // 发送请求到Claude API（传入回调以获取请求对象）
+      const response = await this._makeClaudeRequest(
+        processedBody, 
+        accessToken, 
+        proxyAgent,
+        clientHeaders,
+        (req) => { upstreamRequest = req; }
+      );
+      
+      // 移除监听器（请求成功完成）
+      if (clientRequest) {
+        clientRequest.removeListener('close', handleClientDisconnect);
+      }
+      if (clientResponse) {
+        clientResponse.removeListener('close', handleClientDisconnect);
+      }
       
       // 记录成功的API调用
       const inputTokens = requestBody.messages ? 
@@ -58,6 +93,9 @@ class ClaudeRelayService {
 
     // 深拷贝请求体
     const processedBody = JSON.parse(JSON.stringify(body));
+
+    // 验证并限制max_tokens参数
+    this._validateAndLimitMaxTokens(processedBody);
 
     // 移除cache_control中的ttl字段
     this._stripTtlFromCacheControl(processedBody);
@@ -99,6 +137,49 @@ class ClaudeRelayService {
     }
 
     return processedBody;
+  }
+
+  // 🔢 验证并限制max_tokens参数
+  _validateAndLimitMaxTokens(body) {
+    if (!body || !body.max_tokens) return;
+
+    try {
+      // 读取模型定价配置文件
+      const pricingFilePath = path.join(__dirname, '../../data/model_pricing.json');
+      
+      if (!fs.existsSync(pricingFilePath)) {
+        logger.warn('⚠️ Model pricing file not found, skipping max_tokens validation');
+        return;
+      }
+
+      const pricingData = JSON.parse(fs.readFileSync(pricingFilePath, 'utf8'));
+      const model = body.model || 'claude-sonnet-4-20250514';
+      
+      // 查找对应模型的配置
+      const modelConfig = pricingData[model];
+      
+      if (!modelConfig) {
+        logger.debug(`🔍 Model ${model} not found in pricing file, skipping max_tokens validation`);
+        return;
+      }
+
+      // 获取模型的最大token限制
+      const maxLimit = modelConfig.max_tokens || modelConfig.max_output_tokens;
+      
+      if (!maxLimit) {
+        logger.debug(`🔍 No max_tokens limit found for model ${model}, skipping validation`);
+        return;
+      }
+
+      // 检查并调整max_tokens
+      if (body.max_tokens > maxLimit) {
+        logger.warn(`⚠️ max_tokens ${body.max_tokens} exceeds limit ${maxLimit} for model ${model}, adjusting to ${maxLimit}`);
+        body.max_tokens = maxLimit;
+      }
+    } catch (error) {
+      logger.error('❌ Failed to validate max_tokens from pricing file:', error);
+      // 如果文件读取失败，不进行校验，让请求继续处理
+    }
   }
 
   // 🧹 移除TTL字段
@@ -159,10 +240,40 @@ class ClaudeRelayService {
     return null;
   }
 
+  // 🔧 过滤客户端请求头
+  _filterClientHeaders(clientHeaders) {
+    // 需要移除的敏感 headers
+    const sensitiveHeaders = [
+      'x-api-key',
+      'authorization',
+      'host',
+      'content-length',
+      'connection',
+      'proxy-authorization',
+      'content-encoding',
+      'transfer-encoding'
+    ];
+    
+    const filteredHeaders = {};
+    
+    // 转发客户端的非敏感 headers
+    Object.keys(clientHeaders || {}).forEach(key => {
+      const lowerKey = key.toLowerCase();
+      if (!sensitiveHeaders.includes(lowerKey)) {
+        filteredHeaders[key] = clientHeaders[key];
+      }
+    });
+    
+    return filteredHeaders;
+  }
+
   // 🔗 发送请求到Claude API
-  async _makeClaudeRequest(body, accessToken, proxyAgent) {
+  async _makeClaudeRequest(body, accessToken, proxyAgent, clientHeaders, onRequest) {
     return new Promise((resolve, reject) => {
       const url = new URL(this.claudeApiUrl);
+      
+      // 获取过滤后的客户端 headers
+      const filteredHeaders = this._filterClientHeaders(clientHeaders);
       
       const options = {
         hostname: url.hostname,
@@ -173,29 +284,56 @@ class ClaudeRelayService {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${accessToken}`,
           'anthropic-version': this.apiVersion,
-          'User-Agent': 'claude-relay-service/1.0.0'
+          ...filteredHeaders
         },
         agent: proxyAgent,
         timeout: config.proxy.timeout
       };
+      
+      // 如果客户端没有提供 User-Agent，使用默认值
+      if (!filteredHeaders['User-Agent'] && !filteredHeaders['user-agent']) {
+        options.headers['User-Agent'] = 'claude-cli/1.0.53 (external, cli)';
+      }
 
       if (this.betaHeader) {
         options.headers['anthropic-beta'] = this.betaHeader;
       }
 
       const req = https.request(options, (res) => {
-        let responseData = '';
+        let responseData = Buffer.alloc(0);
         
         res.on('data', (chunk) => {
-          responseData += chunk;
+          responseData = Buffer.concat([responseData, chunk]);
         });
         
         res.on('end', () => {
           try {
+            let bodyString = '';
+            
+            // 根据Content-Encoding处理响应数据
+            const contentEncoding = res.headers['content-encoding'];
+            if (contentEncoding === 'gzip') {
+              try {
+                bodyString = zlib.gunzipSync(responseData).toString('utf8');
+              } catch (unzipError) {
+                logger.error('❌ Failed to decompress gzip response:', unzipError);
+                bodyString = responseData.toString('utf8');
+              }
+            } else if (contentEncoding === 'deflate') {
+              try {
+                bodyString = zlib.inflateSync(responseData).toString('utf8');
+              } catch (unzipError) {
+                logger.error('❌ Failed to decompress deflate response:', unzipError);
+                bodyString = responseData.toString('utf8');
+              }
+            } else {
+              bodyString = responseData.toString('utf8');
+            }
+            
             const response = {
               statusCode: res.statusCode,
               headers: res.headers,
-              body: responseData
+              body: bodyString
             };
             
             logger.debug(`🔗 Claude API response: ${res.statusCode}`);
@@ -207,10 +345,34 @@ class ClaudeRelayService {
           }
         });
       });
+      
+      // 如果提供了 onRequest 回调，传递请求对象
+      if (onRequest && typeof onRequest === 'function') {
+        onRequest(req);
+      }
 
       req.on('error', (error) => {
-        logger.error('❌ Claude API request error:', error);
-        reject(error);
+        logger.error('❌ Claude API request error:', error.message, {
+          code: error.code,
+          errno: error.errno,
+          syscall: error.syscall,
+          address: error.address,
+          port: error.port
+        });
+        
+        // 根据错误类型提供更具体的错误信息
+        let errorMessage = 'Upstream request failed';
+        if (error.code === 'ECONNRESET') {
+          errorMessage = 'Connection reset by Claude API server';
+        } else if (error.code === 'ENOTFOUND') {
+          errorMessage = 'Unable to resolve Claude API hostname';
+        } else if (error.code === 'ECONNREFUSED') {
+          errorMessage = 'Connection refused by Claude API server';
+        } else if (error.code === 'ETIMEDOUT') {
+          errorMessage = 'Connection timed out to Claude API server';
+        }
+        
+        reject(new Error(errorMessage));
       });
 
       req.on('timeout', () => {
@@ -226,13 +388,13 @@ class ClaudeRelayService {
   }
 
   // 🌊 处理流式响应（带usage数据捕获）
-  async relayStreamRequestWithUsageCapture(requestBody, apiKeyData, responseStream, usageCallback) {
+  async relayStreamRequestWithUsageCapture(requestBody, apiKeyData, responseStream, clientHeaders, usageCallback) {
     try {
       // 生成会话哈希用于sticky会话
       const sessionHash = sessionHelper.generateSessionHash(requestBody);
       
-      // 选择可用的Claude账户（支持sticky会话）
-      const accountId = apiKeyData.claudeAccountId || await claudeAccountService.selectAvailableAccount(sessionHash);
+      // 选择可用的Claude账户（支持专属绑定和sticky会话）
+      const accountId = await claudeAccountService.selectAccountForApiKey(apiKeyData, sessionHash);
       
       logger.info(`📡 Processing streaming API request with usage capture for key: ${apiKeyData.name || apiKeyData.id}, account: ${accountId}${sessionHash ? `, session: ${sessionHash}` : ''}`);
       
@@ -246,7 +408,7 @@ class ClaudeRelayService {
       const proxyAgent = await this._getProxyAgent(accountId);
       
       // 发送流式请求并捕获usage数据
-      return await this._makeClaudeStreamRequestWithUsageCapture(processedBody, accessToken, proxyAgent, responseStream, usageCallback);
+      return await this._makeClaudeStreamRequestWithUsageCapture(processedBody, accessToken, proxyAgent, clientHeaders, responseStream, usageCallback);
     } catch (error) {
       logger.error('❌ Claude stream relay with usage capture failed:', error);
       throw error;
@@ -254,9 +416,12 @@ class ClaudeRelayService {
   }
 
   // 🌊 发送流式请求到Claude API（带usage数据捕获）
-  async _makeClaudeStreamRequestWithUsageCapture(body, accessToken, proxyAgent, responseStream, usageCallback) {
+  async _makeClaudeStreamRequestWithUsageCapture(body, accessToken, proxyAgent, clientHeaders, responseStream, usageCallback) {
     return new Promise((resolve, reject) => {
       const url = new URL(this.claudeApiUrl);
+      
+      // 获取过滤后的客户端 headers
+      const filteredHeaders = this._filterClientHeaders(clientHeaders);
       
       const options = {
         hostname: url.hostname,
@@ -267,11 +432,16 @@ class ClaudeRelayService {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${accessToken}`,
           'anthropic-version': this.apiVersion,
-          'User-Agent': 'claude-relay-service/1.0.0'
+          ...filteredHeaders
         },
         agent: proxyAgent,
         timeout: config.proxy.timeout
       };
+      
+      // 如果客户端没有提供 User-Agent，使用默认值
+      if (!filteredHeaders['User-Agent'] && !filteredHeaders['user-agent']) {
+        options.headers['User-Agent'] = 'claude-cli/1.0.53 (external, cli)';
+      }
 
       if (this.betaHeader) {
         options.headers['anthropic-beta'] = this.betaHeader;
@@ -373,12 +543,46 @@ class ClaudeRelayService {
       });
 
       req.on('error', (error) => {
-        logger.error('❌ Claude stream request error:', error);
-        if (!responseStream.headersSent) {
-          responseStream.writeHead(500, { 'Content-Type': 'application/json' });
+        logger.error('❌ Claude stream request error:', error.message, {
+          code: error.code,
+          errno: error.errno,
+          syscall: error.syscall
+        });
+        
+        // 根据错误类型提供更具体的错误信息
+        let errorMessage = 'Upstream request failed';
+        let statusCode = 500;
+        if (error.code === 'ECONNRESET') {
+          errorMessage = 'Connection reset by Claude API server';
+          statusCode = 502;
+        } else if (error.code === 'ENOTFOUND') {
+          errorMessage = 'Unable to resolve Claude API hostname';
+          statusCode = 502;
+        } else if (error.code === 'ECONNREFUSED') {
+          errorMessage = 'Connection refused by Claude API server';
+          statusCode = 502;
+        } else if (error.code === 'ETIMEDOUT') {
+          errorMessage = 'Connection timed out to Claude API server';
+          statusCode = 504;
         }
+        
+        if (!responseStream.headersSent) {
+          responseStream.writeHead(statusCode, { 
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive'
+          });
+        }
+        
         if (!responseStream.destroyed) {
-          responseStream.end(JSON.stringify({ error: 'Upstream request failed' }));
+          // 发送 SSE 错误事件
+          responseStream.write('event: error\n');
+          responseStream.write(`data: ${JSON.stringify({ 
+            error: errorMessage,
+            code: error.code,
+            timestamp: new Date().toISOString()
+          })}\n\n`);
+          responseStream.end();
         }
         reject(error);
       });
@@ -387,10 +591,21 @@ class ClaudeRelayService {
         req.destroy();
         logger.error('❌ Claude stream request timeout');
         if (!responseStream.headersSent) {
-          responseStream.writeHead(504, { 'Content-Type': 'application/json' });
+          responseStream.writeHead(504, { 
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive'
+          });
         }
         if (!responseStream.destroyed) {
-          responseStream.end(JSON.stringify({ error: 'Request timeout' }));
+          // 发送 SSE 错误事件
+          responseStream.write('event: error\n');
+          responseStream.write(`data: ${JSON.stringify({ 
+            error: 'Request timeout',
+            code: 'TIMEOUT',
+            timestamp: new Date().toISOString()
+          })}\n\n`);
+          responseStream.end();
         }
         reject(new Error('Request timeout'));
       });
@@ -410,9 +625,12 @@ class ClaudeRelayService {
   }
 
   // 🌊 发送流式请求到Claude API
-  async _makeClaudeStreamRequest(body, accessToken, proxyAgent, responseStream) {
+  async _makeClaudeStreamRequest(body, accessToken, proxyAgent, clientHeaders, responseStream) {
     return new Promise((resolve, reject) => {
       const url = new URL(this.claudeApiUrl);
+      
+      // 获取过滤后的客户端 headers
+      const filteredHeaders = this._filterClientHeaders(clientHeaders);
       
       const options = {
         hostname: url.hostname,
@@ -423,11 +641,16 @@ class ClaudeRelayService {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${accessToken}`,
           'anthropic-version': this.apiVersion,
-          'User-Agent': 'claude-relay-service/1.0.0'
+          ...filteredHeaders
         },
         agent: proxyAgent,
         timeout: config.proxy.timeout
       };
+      
+      // 如果客户端没有提供 User-Agent，使用默认值
+      if (!filteredHeaders['User-Agent'] && !filteredHeaders['user-agent']) {
+        options.headers['User-Agent'] = 'claude-cli/1.0.53 (external, cli)';
+      }
 
       if (this.betaHeader) {
         options.headers['anthropic-beta'] = this.betaHeader;
@@ -450,12 +673,46 @@ class ClaudeRelayService {
       });
 
       req.on('error', (error) => {
-        logger.error('❌ Claude stream request error:', error);
-        if (!responseStream.headersSent) {
-          responseStream.writeHead(500, { 'Content-Type': 'application/json' });
+        logger.error('❌ Claude stream request error:', error.message, {
+          code: error.code,
+          errno: error.errno,
+          syscall: error.syscall
+        });
+        
+        // 根据错误类型提供更具体的错误信息
+        let errorMessage = 'Upstream request failed';
+        let statusCode = 500;
+        if (error.code === 'ECONNRESET') {
+          errorMessage = 'Connection reset by Claude API server';
+          statusCode = 502;
+        } else if (error.code === 'ENOTFOUND') {
+          errorMessage = 'Unable to resolve Claude API hostname';
+          statusCode = 502;
+        } else if (error.code === 'ECONNREFUSED') {
+          errorMessage = 'Connection refused by Claude API server';
+          statusCode = 502;
+        } else if (error.code === 'ETIMEDOUT') {
+          errorMessage = 'Connection timed out to Claude API server';
+          statusCode = 504;
         }
+        
+        if (!responseStream.headersSent) {
+          responseStream.writeHead(statusCode, { 
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive'
+          });
+        }
+        
         if (!responseStream.destroyed) {
-          responseStream.end(JSON.stringify({ error: 'Upstream request failed' }));
+          // 发送 SSE 错误事件
+          responseStream.write('event: error\n');
+          responseStream.write(`data: ${JSON.stringify({ 
+            error: errorMessage,
+            code: error.code,
+            timestamp: new Date().toISOString()
+          })}\n\n`);
+          responseStream.end();
         }
         reject(error);
       });
@@ -464,10 +721,21 @@ class ClaudeRelayService {
         req.destroy();
         logger.error('❌ Claude stream request timeout');
         if (!responseStream.headersSent) {
-          responseStream.writeHead(504, { 'Content-Type': 'application/json' });
+          responseStream.writeHead(504, { 
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive'
+          });
         }
         if (!responseStream.destroyed) {
-          responseStream.end(JSON.stringify({ error: 'Request timeout' }));
+          // 发送 SSE 错误事件
+          responseStream.write('event: error\n');
+          responseStream.write(`data: ${JSON.stringify({ 
+            error: 'Request timeout',
+            code: 'TIMEOUT',
+            timestamp: new Date().toISOString()
+          })}\n\n`);
+          responseStream.end();
         }
         reject(new Error('Request timeout'));
       });

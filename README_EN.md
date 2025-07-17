@@ -9,9 +9,16 @@
 
 **🔐 Self-hosted Claude API relay service with multi-account management** 
 
-[English](#english) • [中文文档](#中文文档) • [📸 Interface Preview](docs/preview.md)
+[English](#english) • [中文文档](#中文文档) • [📸 Interface Preview](docs/preview.md) • [📢 Telegram Channel](https://t.me/claude_relay_service)
 
 </div>
+
+---
+
+## ⭐ If You Find It Useful, Please Give It a Star!
+
+> Open source is not easy, your Star is my motivation to continue updating 🚀  
+> Join [Telegram Channel](https://t.me/claude_relay_service) for the latest updates
 
 ---
 
@@ -193,7 +200,7 @@ module.exports = {
 
 ```bash
 # Initialize
-npm run setup # Will randomly generate admin account password info, stored in data/Init.json
+npm run setup # Will randomly generate admin account password info, stored in data/init.json
 
 # Start service
 npm run service:start:daemon   # Run in background (recommended)
@@ -210,7 +217,7 @@ npm run service:status
 
 Browser visit: `http://your-server-IP:3000/web`
 
-Default admin account: Look in data/Init.json
+Default admin account: Look in data/init.json
 
 ### 2. Add Claude Account
 
@@ -277,6 +284,36 @@ npm run service:stop
 - **Health Check**: `http://your-domain:3000/health` - Confirm service is normal
 - **Log Files**: Various log files in `logs/` directory
 
+### Upgrade Guide
+
+When a new version is released, follow these steps to upgrade the service:
+
+```bash
+# 1. Navigate to project directory
+cd claude-relay-service
+
+# 2. Pull latest code
+git pull origin main
+
+# If you encounter package-lock.json conflicts, use the remote version
+git checkout --theirs package-lock.json
+git add package-lock.json
+
+# 3. Install new dependencies (if any)
+npm install
+
+# 4. Restart service
+npm run service:restart:daemon
+
+# 5. Check service status
+npm run service:status
+```
+
+**Important Notes:**
+- Before upgrading, it's recommended to backup important configuration files (.env, config/config.js)
+- Check the changelog to understand if there are any breaking changes
+- Database structure changes will be migrated automatically if needed
+
 ### Common Issue Resolution
 
 **Can't connect to Redis?**
@@ -303,74 +340,69 @@ redis-cli ping
 
 ### Production Deployment Recommendations (Important!)
 
-**Strongly recommend using nginx reverse proxy + SSL certificate**
+**Strongly recommend using Caddy reverse proxy (Automatic HTTPS)**
 
-It's recommended to use nginx reverse proxy and configure SSL certificate: (The following is an nginx example, if you don't want to fiddle with it, you can choose to install a panel for operation, such as Baota, 1panel, etc.)
+Recommend using Caddy as reverse proxy, it will automatically apply and renew SSL certificates with simpler configuration:
 
-**1. Install nginx and obtain SSL certificate**
+**1. Install Caddy**
 ```bash
 # Ubuntu/Debian
-sudo apt install nginx certbot python3-certbot-nginx
+sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo apt update
+sudo apt install caddy
 
-# Get free SSL certificate (using Let's Encrypt as example)
-sudo certbot --nginx -d your-domain.com
+# CentOS/RHEL/Fedora
+sudo yum install yum-plugin-copr
+sudo yum copr enable @caddy/caddy
+sudo yum install caddy
 ```
 
-**2. nginx configuration example**
+**2. Caddy Configuration (Super Simple!)**
 
-Create `/etc/nginx/sites-available/claude-relay` configuration file:
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name your-domain.com;
-    
-    # SSL configuration
-    ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
+Edit `/etc/caddy/Caddyfile`:
+```
+your-domain.com {
+    # Reverse proxy to local service
+    reverse_proxy 127.0.0.1:3000 {
+        # Support streaming responses (SSE)
+        flush_interval -1
+        
+        # Pass real IP
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        
+        # Timeout settings (suitable for long connections)
+        transport http {
+            read_timeout 300s
+            write_timeout 300s
+            dial_timeout 30s
+        }
+    }
     
     # Security headers
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header X-Frame-Options DENY;
-    add_header X-Content-Type-Options nosniff;
-    
-    # Reverse proxy configuration
-    location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-        
-        # Timeout settings
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        -Server
     }
 }
 ```
 
-**3. Enable configuration**
+**3. Start Caddy**
 ```bash
-# Enable site
-sudo ln -s /etc/nginx/sites-available/claude-relay /etc/nginx/sites-enabled/
-
 # Test configuration
-sudo nginx -t
+sudo caddy validate --config /etc/caddy/Caddyfile
 
-# Restart nginx
-sudo systemctl restart nginx
+# Start service
+sudo systemctl start caddy
+sudo systemctl enable caddy
+
+# Check status
+sudo systemctl status caddy
 ```
 
 **4. Update service configuration**
@@ -387,11 +419,12 @@ module.exports = {
 }
 ```
 
-**Security advantages:**
-- 🔒 **Data Encryption**: All API requests transmitted through HTTPS encryption
-- 🛡️ **Hide Ports**: Don't directly expose service ports, reduce attack surface
-- 🚀 **Better Performance**: nginx's static file serving and caching capabilities
-- 📊 **Access Logs**: nginx provides detailed access logs and monitoring
+**Caddy Advantages:**
+- 🔒 **Automatic HTTPS**: Automatically apply and renew Let's Encrypt certificates, zero configuration
+- 🛡️ **Secure by Default**: Modern security protocols and cipher suites enabled by default
+- 🚀 **Streaming Support**: Native support for SSE/WebSocket streaming
+- 📊 **Simple Configuration**: Extremely concise configuration files, easy to maintain
+- ⚡ **HTTP/2**: HTTP/2 enabled by default for improved performance
 
 ---
 
@@ -402,7 +435,7 @@ module.exports = {
 - **Reasonable Allocation**: Can assign different API keys to different people, analyze usage based on different API keys
 
 ### Security Recommendations
-- **Use HTTPS**: Strongly recommend configuring nginx reverse proxy and SSL certificate to ensure secure data transmission
+- **Use HTTPS**: Strongly recommend using Caddy reverse proxy (automatic HTTPS) to ensure secure data transmission
 - **Regular Backups**: Back up important configurations and data
 - **Monitor Logs**: Regularly check exception logs
 - **Update Keys**: Regularly change JWT and encryption keys

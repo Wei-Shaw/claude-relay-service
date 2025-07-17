@@ -31,7 +31,7 @@
                 
                 <form @submit.prevent="login" class="space-y-6">
                     <div>
-                        <label class="block text-sm font-semibold text-white mb-3">用户名</label>
+                        <label class="block text-sm font-semibold text-gray-900 mb-3">用户名</label>
                         <input 
                             v-model="loginForm.username" 
                             type="text" 
@@ -42,7 +42,7 @@
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-semibold text-white mb-3">密码</label>
+                        <label class="block text-sm font-semibold text-gray-900 mb-3">密码</label>
                         <input 
                             v-model="loginForm.password" 
                             type="password" 
@@ -63,7 +63,7 @@
                     </button>
                 </form>
                 
-                <div v-if="loginError" class="mt-6 p-4 bg-red-500/20 border border-red-500/30 rounded-xl text-red-200 text-sm text-center backdrop-blur-sm">
+                <div v-if="loginError" class="mt-6 p-4 bg-red-500/20 border border-red-500/30 rounded-xl text-red-800 text-sm text-center backdrop-blur-sm">
                     <i class="fas fa-exclamation-triangle mr-2"></i>{{ loginError }}
                 </div>
             </div>
@@ -72,7 +72,7 @@
         <!-- 管理界面 -->
         <div v-if="isLoggedIn" class="min-h-screen p-6">
             <!-- 顶部导航 -->
-            <div class="glass-strong rounded-3xl p-6 mb-8 shadow-xl">
+            <div class="glass-strong rounded-3xl p-6 mb-8 shadow-xl" style="z-index: 10; position: relative;">
                 <div class="flex flex-col md:flex-row justify-between items-center gap-4">
                     <div class="flex items-center gap-4">
                         <div class="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-gray-300/30 rounded-xl flex items-center justify-center backdrop-blur-sm flex-shrink-0">
@@ -83,17 +83,48 @@
                             <p class="text-gray-600 text-sm leading-tight mt-0.5">管理后台</p>
                         </div>
                     </div>
-                    <button 
-                        @click="logout" 
-                        class="btn btn-danger px-6 py-3 flex items-center gap-2"
-                    >
-                        <i class="fas fa-sign-out-alt"></i>退出登录
-                    </button>
+                    <!-- 用户菜单 -->
+                    <div class="relative">
+                        <button 
+                            @click="userMenuOpen = !userMenuOpen"
+                            class="btn btn-primary px-4 py-3 flex items-center gap-2 relative"
+                        >
+                            <i class="fas fa-user-circle"></i>
+                            <span>{{ currentUser.username || 'Admin' }}</span>
+                            <i class="fas fa-chevron-down text-xs transition-transform duration-200" :class="{ 'rotate-180': userMenuOpen }"></i>
+                        </button>
+                        
+                        <!-- 悬浮菜单 -->
+                        <div 
+                            v-if="userMenuOpen" 
+                            class="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 py-2"
+                            style="z-index: 999999;"
+                            @click.stop
+                        >
+                            <button 
+                                @click="openChangePasswordModal"
+                                class="w-full px-4 py-3 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                            >
+                                <i class="fas fa-key text-blue-500"></i>
+                                <span>修改账户信息</span>
+                            </button>
+                            
+                            <hr class="my-2 border-gray-200">
+                            
+                            <button 
+                                @click="logout"
+                                class="w-full px-4 py-3 text-left text-red-600 hover:bg-red-50 transition-colors flex items-center gap-3"
+                            >
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span>退出登录</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- 主内容区域 -->
-            <div class="glass-strong rounded-3xl p-6 shadow-xl">
+            <div class="glass-strong rounded-3xl p-6 shadow-xl" style="z-index: 1;">
                 <!-- 标签栏 -->
                 <div class="flex flex-wrap gap-2 mb-8 bg-white/10 rounded-2xl p-2 backdrop-blur-sm">
                     <button 
@@ -392,6 +423,16 @@
                                                     <div>
                                                         <div class="text-sm font-semibold text-gray-900">{{ key.name }}</div>
                                                         <div class="text-xs text-gray-500">{{ key.id }}</div>
+                                                        <div class="text-xs text-gray-500 mt-1">
+                                                            <span v-if="key.claudeAccountId">
+                                                                <i class="fas fa-link mr-1"></i>
+                                                                绑定: {{ getBoundAccountName(key.claudeAccountId) }}
+                                                            </span>
+                                                            <span v-else>
+                                                                <i class="fas fa-share-alt mr-1"></i>
+                                                                使用共享池
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </td>
@@ -425,6 +466,19 @@
                                                         <span class="text-gray-600">费用:</span>
                                                         <span class="font-medium text-green-600">{{ calculateApiKeyCost(key.usage) }}</span>
                                                     </div>
+                                                    <!-- 并发限制 -->
+                                                    <div class="flex justify-between text-sm">
+                                                        <span class="text-gray-600">并发限制:</span>
+                                                        <span class="font-medium text-purple-600">{{ key.concurrencyLimit > 0 ? key.concurrencyLimit : '无限制' }}</span>
+                                                    </div>
+                                                    <!-- 当前并发数 -->
+                                                    <div class="flex justify-between text-sm">
+                                                        <span class="text-gray-600">当前并发:</span>
+                                                        <span :class="['font-medium', key.currentConcurrency > 0 ? 'text-orange-600' : 'text-gray-600']">
+                                                            {{ key.currentConcurrency || 0 }}
+                                                            <span v-if="key.concurrencyLimit > 0" class="text-xs text-gray-500">/ {{ key.concurrencyLimit }}</span>
+                                                        </span>
+                                                    </div>
                                                     <!-- 输入/输出Token -->
                                                     <div class="flex justify-between text-xs text-gray-500">
                                                         <span>输入: {{ formatNumber((key.usage && key.usage.total && key.usage.total.inputTokens) || 0) }}</span>
@@ -455,12 +509,20 @@
                                                 {{ new Date(key.createdAt).toLocaleDateString() }}
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                                <button 
-                                                    @click="deleteApiKey(key.id)" 
-                                                    class="text-red-600 hover:text-red-900 font-medium hover:bg-red-50 px-3 py-1 rounded-lg transition-colors"
-                                                >
-                                                    <i class="fas fa-trash mr-1"></i>删除
-                                                </button>
+                                                <div class="flex gap-2">
+                                                    <button 
+                                                        @click="openEditApiKeyModal(key)" 
+                                                        class="text-blue-600 hover:text-blue-900 font-medium hover:bg-blue-50 px-3 py-1 rounded-lg transition-colors"
+                                                    >
+                                                        <i class="fas fa-edit mr-1"></i>编辑
+                                                    </button>
+                                                    <button 
+                                                        @click="deleteApiKey(key.id)" 
+                                                        class="text-red-600 hover:text-red-900 font-medium hover:bg-red-50 px-3 py-1 rounded-lg transition-colors"
+                                                    >
+                                                        <i class="fas fa-trash mr-1"></i>删除
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                         
@@ -687,7 +749,17 @@
                                                     <i class="fas fa-user-circle text-white text-xs"></i>
                                                 </div>
                                                 <div>
-                                                    <div class="text-sm font-semibold text-gray-900">{{ account.name }}</div>
+                                                    <div class="flex items-center gap-2">
+                                                        <div class="text-sm font-semibold text-gray-900">{{ account.name }}</div>
+                                                        <span v-if="account.accountType === 'dedicated'" 
+                                                              class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                                            <i class="fas fa-lock mr-1"></i>专属
+                                                        </span>
+                                                        <span v-else 
+                                                              class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                            <i class="fas fa-share-alt mr-1"></i>共享
+                                                        </span>
+                                                    </div>
                                                     <div class="text-xs text-gray-500">{{ account.id }}</div>
                                                 </div>
                                             </div>
@@ -703,12 +775,18 @@
                                             </span>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
-                                            <span :class="['inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold', 
-                                                         account.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800']">
-                                                <div :class="['w-2 h-2 rounded-full mr-2', 
-                                                           account.isActive ? 'bg-green-500' : 'bg-red-500']"></div>
-                                                {{ account.isActive ? '正常' : '异常' }}
-                                            </span>
+                                            <div class="flex flex-col gap-1">
+                                                <span :class="['inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold', 
+                                                             account.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800']">
+                                                    <div :class="['w-2 h-2 rounded-full mr-2', 
+                                                               account.isActive ? 'bg-green-500' : 'bg-red-500']"></div>
+                                                    {{ account.isActive ? '正常' : '异常' }}
+                                                </span>
+                                                <span v-if="account.accountType === 'dedicated'" 
+                                                      class="text-xs text-gray-500">
+                                                    绑定: {{ account.boundApiKeysCount || 0 }} 个API Key
+                                                </span>
+                                            </div>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                                             <div v-if="account.proxy" class="text-xs bg-blue-50 px-2 py-1 rounded">
@@ -1665,6 +1743,18 @@
                     </div>
                     
                     <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">并发限制 (可选)</label>
+                        <input 
+                            v-model="apiKeyForm.concurrencyLimit" 
+                            type="number" 
+                            min="0"
+                            placeholder="0 表示无限制" 
+                            class="form-input w-full"
+                        >
+                        <p class="text-xs text-gray-500 mt-2">设置此 API Key 可同时处理的最大请求数，0 或留空表示无限制</p>
+                    </div>
+                    
+                    <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-3">备注 (可选)</label>
                         <textarea 
                             v-model="apiKeyForm.description" 
@@ -1672,6 +1762,24 @@
                             class="form-input w-full resize-none"
                             placeholder="描述此 API Key 的用途..."
                         ></textarea>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">专属账号绑定 (可选)</label>
+                        <select 
+                            v-model="apiKeyForm.claudeAccountId" 
+                            class="form-input w-full"
+                        >
+                            <option value="">使用共享账号池</option>
+                            <option 
+                                v-for="account in dedicatedAccounts" 
+                                :key="account.id" 
+                                :value="account.id"
+                            >
+                                {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
+                            </option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-2">选择专属账号后，此API Key将只使用该账号，不选择则使用共享账号池</p>
                     </div>
                     
                     <div class="flex gap-3 pt-4">
@@ -1690,6 +1798,100 @@
                             <div v-if="createApiKeyLoading" class="loading-spinner mr-2"></div>
                             <i v-else class="fas fa-plus mr-2"></i>
                             {{ createApiKeyLoading ? '创建中...' : '创建' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 编辑 API Key 模态框 -->
+        <div v-if="showEditApiKeyModal" class="fixed inset-0 modal z-50 flex items-center justify-center p-4">
+            <div class="modal-content w-full max-w-md p-8 mx-auto">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                            <i class="fas fa-edit text-white"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-900">编辑 API Key</h3>
+                    </div>
+                    <button 
+                        @click="closeEditApiKeyModal"
+                        class="text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <form @submit.prevent="updateApiKey" class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">名称</label>
+                        <input 
+                            :value="editApiKeyForm.name" 
+                            type="text" 
+                            disabled
+                            class="form-input w-full bg-gray-100 cursor-not-allowed"
+                        >
+                        <p class="text-xs text-gray-500 mt-2">名称不可修改</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">Token 限制</label>
+                        <input 
+                            v-model="editApiKeyForm.tokenLimit" 
+                            type="number" 
+                            min="0"
+                            placeholder="0 表示无限制" 
+                            class="form-input w-full"
+                        >
+                        <p class="text-xs text-gray-500 mt-2">设置此 API Key 的最大 token 使用量，0 或留空表示无限制</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">并发限制</label>
+                        <input 
+                            v-model="editApiKeyForm.concurrencyLimit" 
+                            type="number" 
+                            min="0"
+                            placeholder="0 表示无限制" 
+                            class="form-input w-full"
+                        >
+                        <p class="text-xs text-gray-500 mt-2">设置此 API Key 可同时处理的最大请求数，0 或留空表示无限制</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">专属账号绑定</label>
+                        <select 
+                            v-model="editApiKeyForm.claudeAccountId" 
+                            class="form-input w-full"
+                        >
+                            <option value="">使用共享账号池</option>
+                            <option 
+                                v-for="account in dedicatedAccounts" 
+                                :key="account.id" 
+                                :value="account.id"
+                            >
+                                {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
+                            </option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-2">修改绑定账号将影响此API Key的请求路由</p>
+                    </div>
+                    
+                    <div class="flex gap-3 pt-4">
+                        <button 
+                            type="button" 
+                            @click="closeEditApiKeyModal" 
+                            class="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+                        >
+                            取消
+                        </button>
+                        <button 
+                            type="submit" 
+                            :disabled="editApiKeyLoading"
+                            class="btn btn-primary flex-1 py-3 px-6 font-semibold"
+                        >
+                            <div v-if="editApiKeyLoading" class="loading-spinner mr-2"></div>
+                            <i v-else class="fas fa-save mr-2"></i>
+                            {{ editApiKeyLoading ? '保存中...' : '保存修改' }}
                         </button>
                     </div>
                 </form>
@@ -1877,6 +2079,33 @@
                             ></textarea>
                         </div>
                         
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-3">账户类型</label>
+                            <div class="flex gap-4">
+                                <label class="flex items-center cursor-pointer">
+                                    <input 
+                                        type="radio" 
+                                        v-model="accountForm.accountType" 
+                                        value="shared" 
+                                        class="mr-2"
+                                    >
+                                    <span class="text-sm text-gray-700">共享账户</span>
+                                </label>
+                                <label class="flex items-center cursor-pointer">
+                                    <input 
+                                        type="radio" 
+                                        v-model="accountForm.accountType" 
+                                        value="dedicated" 
+                                        class="mr-2"
+                                    >
+                                    <span class="text-sm text-gray-700">专属账户</span>
+                                </label>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-2">
+                                共享账户：供所有API Key使用；专属账户：仅供特定API Key使用
+                            </p>
+                        </div>
+                        
                         <!-- 手动输入 Token 字段 -->
                         <div v-if="accountForm.addType === 'manual'" class="space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
                             <div class="flex items-start gap-3 mb-4">
@@ -1886,6 +2115,16 @@
                                 <div>
                                     <h5 class="font-semibold text-blue-900 mb-2">手动输入 Token</h5>
                                     <p class="text-sm text-blue-800 mb-2">请输入有效的 Claude Access Token。如果您有 Refresh Token，建议也一并填写以支持自动刷新。</p>
+                                    <div class="bg-white/80 rounded-lg p-3 mt-2 mb-2 border border-blue-300">
+                                        <p class="text-sm text-blue-900 font-medium mb-1">
+                                            <i class="fas fa-folder-open mr-1"></i>
+                                            获取 Access Token 的方法：
+                                        </p>
+                                        <p class="text-xs text-blue-800">
+                                            请从已登录 Claude Code 的机器上获取 <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">~/.claude/.credentials.json</code> 文件中的凭证，
+                                            请勿使用 Claude 官网 API Keys 页面的密钥。
+                                        </p>
+                                    </div>
                                     <p class="text-xs text-blue-600">💡 如果未填写 Refresh Token，Token 过期后需要手动更新。</p>
                                 </div>
                             </div>
@@ -2149,6 +2388,43 @@
                         ></textarea>
                     </div>
                     
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">账户类型</label>
+                        <div class="flex gap-4">
+                            <label class="flex items-center cursor-pointer">
+                                <input 
+                                    type="radio" 
+                                    v-model="editAccountForm.accountType" 
+                                    value="shared" 
+                                    class="mr-2"
+                                >
+                                <span class="text-sm text-gray-700">共享账户</span>
+                            </label>
+                            <label class="flex items-center cursor-pointer">
+                                <input 
+                                    type="radio" 
+                                    v-model="editAccountForm.accountType" 
+                                    value="dedicated" 
+                                    class="mr-2"
+                                >
+                                <span class="text-sm text-gray-700">专属账户</span>
+                            </label>
+                        </div>
+                        <div v-if="editAccountForm.accountType === 'shared' && editAccountForm.originalAccountType === 'dedicated'" 
+                             class="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <div class="flex items-start gap-2">
+                                <i class="fas fa-exclamation-triangle text-yellow-600 mt-0.5"></i>
+                                <div>
+                                    <p class="text-sm text-yellow-800 font-medium">切换到共享账户需要验证</p>
+                                    <p class="text-xs text-yellow-700 mt-1">当前账户绑定了 {{ getBoundApiKeysCount(editAccountForm.id) }} 个API Key，需要先解绑所有API Key才能切换到共享账户。</p>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">
+                            共享账户：供所有API Key使用；专属账户：仅供特定API Key使用
+                        </p>
+                    </div>
+                    
                     <!-- Token 更新区域 -->
                     <div class="bg-amber-50 p-4 rounded-lg border border-amber-200">
                         <div class="flex items-start gap-3 mb-4">
@@ -2263,6 +2539,103 @@
                         {{ editAccountLoading ? '更新中...' : '保存修改' }}
                     </button>
                 </div>
+            </div>
+        </div>
+
+        <!-- 修改账户信息模态框 -->
+        <div v-if="showChangePasswordModal" class="fixed inset-0 modal z-50 flex items-center justify-center p-4">
+            <div class="modal-content w-full max-w-md p-8 mx-auto">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                            <i class="fas fa-key text-white"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-900">修改账户信息</h3>
+                    </div>
+                    <button 
+                        @click="closeChangePasswordModal"
+                        class="text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <form @submit.prevent="changePassword" class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">当前用户名</label>
+                        <input 
+                            :value="currentUser.username || 'Admin'" 
+                            type="text" 
+                            disabled
+                            class="form-input w-full bg-gray-100 cursor-not-allowed"
+                        >
+                        <p class="text-xs text-gray-500 mt-2">当前用户名，输入新用户名以修改</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">新用户名</label>
+                        <input 
+                            v-model="changePasswordForm.newUsername" 
+                            type="text" 
+                            class="form-input w-full"
+                            placeholder="输入新用户名（留空保持不变）"
+                        >
+                        <p class="text-xs text-gray-500 mt-2">留空表示不修改用户名</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">当前密码</label>
+                        <input 
+                            v-model="changePasswordForm.currentPassword" 
+                            type="password" 
+                            required
+                            class="form-input w-full"
+                            placeholder="请输入当前密码"
+                        >
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">新密码</label>
+                        <input 
+                            v-model="changePasswordForm.newPassword" 
+                            type="password" 
+                            required
+                            class="form-input w-full"
+                            placeholder="请输入新密码"
+                        >
+                        <p class="text-xs text-gray-500 mt-2">密码长度至少8位</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">确认新密码</label>
+                        <input 
+                            v-model="changePasswordForm.confirmPassword" 
+                            type="password" 
+                            required
+                            class="form-input w-full"
+                            placeholder="请再次输入新密码"
+                        >
+                    </div>
+                    
+                    <div class="flex gap-3 pt-4">
+                        <button 
+                            type="button" 
+                            @click="closeChangePasswordModal" 
+                            class="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+                        >
+                            取消
+                        </button>
+                        <button 
+                            type="submit" 
+                            :disabled="changePasswordLoading"
+                            class="btn btn-primary flex-1 py-3 px-6 font-semibold"
+                        >
+                            <div v-if="changePasswordLoading" class="loading-spinner mr-2"></div>
+                            <i v-else class="fas fa-save mr-2"></i>
+                            {{ changePasswordLoading ? '保存中...' : '保存修改' }}
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
 

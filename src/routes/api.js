@@ -45,10 +45,12 @@ router.post('/v1/messages', authenticateApiKey, async (req, res) => {
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('Access-Control-Allow-Origin', '*');
       
+      // 流式响应不需要额外处理，中间件已经设置了监听器
+      
       let usageDataCaptured = false;
       
       // 使用自定义流处理器来捕获usage数据
-      await claudeRelayService.relayStreamRequestWithUsageCapture(req.body, req.apiKey, res, (usageData) => {
+      await claudeRelayService.relayStreamRequestWithUsageCapture(req.body, req.apiKey, res, req.headers, (usageData) => {
         // 回调函数：当检测到完整usage数据时记录真实token使用量
         logger.info('🎯 Usage callback triggered with complete data:', JSON.stringify(usageData, null, 2));
         
@@ -84,7 +86,7 @@ router.post('/v1/messages', authenticateApiKey, async (req, res) => {
         apiKeyName: req.apiKey.name
       });
       
-      const response = await claudeRelayService.relayRequest(req.body, req.apiKey);
+      const response = await claudeRelayService.relayRequest(req.body, req.apiKey, req, res, req.headers);
       
       logger.info('📡 Claude API response received', {
         statusCode: response.statusCode,
@@ -143,13 +145,41 @@ router.post('/v1/messages', authenticateApiKey, async (req, res) => {
     logger.api(`✅ Request completed in ${duration}ms for key: ${req.apiKey.name}`);
     
   } catch (error) {
-    logger.error('❌ Claude relay error:', error);
+    logger.error('❌ Claude relay error:', error.message, {
+      code: error.code,
+      stack: error.stack
+    });
     
+    // 确保在任何情况下都能返回有效的JSON响应
     if (!res.headersSent) {
-      res.status(500).json({
-        error: 'Relay service error',
-        message: error.message
+      // 根据错误类型设置适当的状态码
+      let statusCode = 500;
+      let errorType = 'Relay service error';
+      
+      if (error.message.includes('Connection reset') || error.message.includes('socket hang up')) {
+        statusCode = 502;
+        errorType = 'Upstream connection error';
+      } else if (error.message.includes('Connection refused')) {
+        statusCode = 502;
+        errorType = 'Upstream service unavailable';
+      } else if (error.message.includes('timeout')) {
+        statusCode = 504;
+        errorType = 'Upstream timeout';
+      } else if (error.message.includes('resolve') || error.message.includes('ENOTFOUND')) {
+        statusCode = 502;
+        errorType = 'Upstream hostname resolution failed';
+      }
+      
+      res.status(statusCode).json({
+        error: errorType,
+        message: error.message || 'An unexpected error occurred',
+        timestamp: new Date().toISOString()
       });
+    } else {
+      // 如果响应头已经发送，尝试结束响应
+      if (!res.destroyed && !res.finished) {
+        res.end();
+      }
     }
   }
 });
@@ -186,7 +216,6 @@ router.get('/v1/key-info', authenticateApiKey, async (req, res) => {
         id: req.apiKey.id,
         name: req.apiKey.name,
         tokenLimit: req.apiKey.tokenLimit,
-        requestLimit: req.apiKey.requestLimit,
         usage
       },
       timestamp: new Date().toISOString()
@@ -209,7 +238,7 @@ router.get('/v1/usage', authenticateApiKey, async (req, res) => {
       usage,
       limits: {
         tokens: req.apiKey.tokenLimit,
-        requests: req.apiKey.requestLimit
+        requests: 0 // 请求限制已移除
       },
       timestamp: new Date().toISOString()
     });

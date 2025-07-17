@@ -17,7 +17,8 @@ class RedisClient {
         db: config.redis.db,
         retryDelayOnFailover: config.redis.retryDelayOnFailover,
         maxRetriesPerRequest: config.redis.maxRetriesPerRequest,
-        lazyConnect: config.redis.lazyConnect
+        lazyConnect: config.redis.lazyConnect,
+        tls: config.redis.enableTLS ? {} : false
       });
 
       this.client.on('connect', () => {
@@ -71,13 +72,13 @@ class RedisClient {
   async setApiKey(keyId, keyData, hashedKey = null) {
     const key = `apikey:${keyId}`;
     const client = this.getClientSafe();
-    
+
     // 维护哈希映射表（用于快速查找）
     // hashedKey参数是实际的哈希值，用于建立映射
     if (hashedKey) {
       await client.hset('apikey:hash_map', hashedKey, keyId);
     }
-    
+
     await client.hset(key, keyData);
     await client.expire(key, 86400 * 365); // 1年过期
   }
@@ -89,14 +90,14 @@ class RedisClient {
 
   async deleteApiKey(keyId) {
     const key = `apikey:${keyId}`;
-    
+
     // 获取要删除的API Key哈希值，以便从映射表中移除
     const keyData = await this.client.hgetall(key);
     if (keyData && keyData.apiKey) {
       // keyData.apiKey现在存储的是哈希值，直接从映射表删除
       await this.client.hdel('apikey:hash_map', keyData.apiKey);
     }
-    
+
     return await this.client.del(key);
   }
 
@@ -108,7 +109,7 @@ class RedisClient {
       if (key === 'apikey:hash_map') {
         continue;
       }
-      
+
       const keyData = await this.client.hgetall(key);
       if (keyData && Object.keys(keyData).length > 0) {
         apiKeys.push({ id: key.replace('apikey:', ''), ...keyData });
@@ -124,12 +125,12 @@ class RedisClient {
     if (!keyId) {
       return null;
     }
-    
+
     const keyData = await this.client.hgetall(`apikey:${keyId}`);
     if (keyData && Object.keys(keyData).length > 0) {
       return { id: keyId, ...keyData };
     }
-    
+
     // 如果数据不存在，清理映射表
     await this.client.hdel('apikey:hash_map', hashedKey);
     return null;
@@ -142,26 +143,26 @@ class RedisClient {
     const currentMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
     const daily = `usage:daily:${keyId}:${today}`;
     const monthly = `usage:monthly:${keyId}:${currentMonth}`;
-    
+
     // 按模型统计的键
     const modelDaily = `usage:model:daily:${model}:${today}`;
     const modelMonthly = `usage:model:monthly:${model}:${currentMonth}`;
-    
+
     // API Key级别的模型统计
     const keyModelDaily = `usage:${keyId}:model:daily:${model}:${today}`;
     const keyModelMonthly = `usage:${keyId}:model:monthly:${model}:${currentMonth}`;
-    
+
     // 智能处理输入输出token分配
     const finalInputTokens = inputTokens || 0;
     const finalOutputTokens = outputTokens || (finalInputTokens > 0 ? 0 : tokens);
     const finalCacheCreateTokens = cacheCreateTokens || 0;
     const finalCacheReadTokens = cacheReadTokens || 0;
-    
+
     // 重新计算真实的总token数（包括缓存token）
     const totalTokens = finalInputTokens + finalOutputTokens + finalCacheCreateTokens + finalCacheReadTokens;
     // 核心token（不包括缓存）- 用于与历史数据兼容
     const coreTokens = finalInputTokens + finalOutputTokens;
-    
+
     await Promise.all([
       // 核心token统计（保持向后兼容）
       this.client.hincrby(key, 'totalTokens', coreTokens),
@@ -245,10 +246,10 @@ class RedisClient {
     const createdAt = keyData.createdAt ? new Date(keyData.createdAt) : new Date();
     const now = new Date();
     const daysSinceCreated = Math.max(1, Math.ceil((now - createdAt) / (1000 * 60 * 60 * 24)));
-    
+
     const totalTokens = parseInt(total.totalTokens) || 0;
     const totalRequests = parseInt(total.totalRequests) || 0;
-    
+
     // 计算平均RPM (requests per minute) 和 TPM (tokens per minute)
     const totalMinutes = Math.max(1, daysSinceCreated * 24 * 60);
     const avgRPM = totalRequests / totalMinutes;
@@ -261,14 +262,14 @@ class RedisClient {
       const inputTokens = parseInt(data.totalInputTokens) || parseInt(data.inputTokens) || 0;
       const outputTokens = parseInt(data.totalOutputTokens) || parseInt(data.outputTokens) || 0;
       const requests = parseInt(data.totalRequests) || parseInt(data.requests) || 0;
-      
+
       // 新增缓存token字段
       const cacheCreateTokens = parseInt(data.totalCacheCreateTokens) || parseInt(data.cacheCreateTokens) || 0;
       const cacheReadTokens = parseInt(data.totalCacheReadTokens) || parseInt(data.cacheReadTokens) || 0;
       const allTokens = parseInt(data.totalAllTokens) || parseInt(data.allTokens) || 0;
-      
+
       const totalFromSeparate = inputTokens + outputTokens;
-      
+
       if (totalFromSeparate === 0 && tokens > 0) {
         // 旧数据：没有输入输出分离
         return {
@@ -325,7 +326,7 @@ class RedisClient {
       // 获取所有API Key ID
       const apiKeyIds = [];
       const apiKeyKeys = await client.keys('apikey:*');
-      
+
       for (const key of apiKeyKeys) {
         if (key === 'apikey:hash_map') continue; // 跳过哈希映射表
         const keyId = key.replace('apikey:', '');
@@ -444,7 +445,7 @@ class RedisClient {
   // 🔗 OAuth会话管理
   async setOAuthSession(sessionId, sessionData, ttl = 600) { // 10分钟过期
     const key = `oauth:${sessionId}`;
-    
+
     // 序列化复杂对象，特别是 proxy 配置
     const serializedData = {};
     for (const [dataKey, value] of Object.entries(sessionData)) {
@@ -454,7 +455,7 @@ class RedisClient {
         serializedData[dataKey] = value;
       }
     }
-    
+
     await this.client.hset(key, serializedData);
     await this.client.expire(key, ttl);
   }
@@ -462,7 +463,7 @@ class RedisClient {
   async getOAuthSession(sessionId) {
     const key = `oauth:${sessionId}`;
     const data = await this.client.hgetall(key);
-    
+
     // 反序列化 proxy 字段
     if (data.proxy) {
       try {
@@ -472,7 +473,7 @@ class RedisClient {
         data.proxy = null;
       }
     }
-    
+
     return data;
   }
 
@@ -481,22 +482,6 @@ class RedisClient {
     return await this.client.del(key);
   }
 
-  // 🚦 速率限制
-  async checkRateLimit(identifier, limit = 100, window = 60) {
-    const key = `ratelimit:${identifier}`;
-    const current = await this.client.incr(key);
-    
-    if (current === 1) {
-      await this.client.expire(key, window);
-    }
-    
-    return {
-      allowed: current <= limit,
-      current,
-      limit,
-      resetTime: await this.client.ttl(key)
-    };
-  }
 
   // 📈 系统统计
   async getSystemStats() {
@@ -518,34 +503,34 @@ class RedisClient {
     try {
       const today = new Date().toISOString().split('T')[0];
       const dailyKeys = await this.client.keys(`usage:daily:*:${today}`);
-      
+
       let totalRequestsToday = 0;
       let totalTokensToday = 0;
       let totalInputTokensToday = 0;
       let totalOutputTokensToday = 0;
       let totalCacheCreateTokensToday = 0;
       let totalCacheReadTokensToday = 0;
-      
+
       // 批量获取所有今日数据，提高性能
       if (dailyKeys.length > 0) {
         const pipeline = this.client.pipeline();
         dailyKeys.forEach(key => pipeline.hgetall(key));
         const results = await pipeline.exec();
-        
+
         for (const [error, dailyData] of results) {
           if (error || !dailyData) continue;
-          
+
           totalRequestsToday += parseInt(dailyData.requests) || 0;
           const currentDayTokens = parseInt(dailyData.tokens) || 0;
           totalTokensToday += currentDayTokens;
-          
+
           // 处理旧数据兼容性：如果有总token但没有输入输出分离，则使用总token作为输出token
           const inputTokens = parseInt(dailyData.inputTokens) || 0;
           const outputTokens = parseInt(dailyData.outputTokens) || 0;
           const cacheCreateTokens = parseInt(dailyData.cacheCreateTokens) || 0;
           const cacheReadTokens = parseInt(dailyData.cacheReadTokens) || 0;
           const totalTokensFromSeparate = inputTokens + outputTokens;
-          
+
           if (totalTokensFromSeparate === 0 && currentDayTokens > 0) {
             // 旧数据：没有输入输出分离，假设70%为输出，30%为输入（基于一般对话比例）
             totalOutputTokensToday += Math.round(currentDayTokens * 0.7);
@@ -555,7 +540,7 @@ class RedisClient {
             totalInputTokensToday += inputTokens;
             totalOutputTokensToday += outputTokens;
           }
-          
+
           // 添加cache token统计
           totalCacheCreateTokensToday += cacheCreateTokens;
           totalCacheReadTokensToday += cacheReadTokens;
@@ -565,12 +550,12 @@ class RedisClient {
       // 获取今日创建的API Key数量（批量优化）
       const allApiKeys = await this.client.keys('apikey:*');
       let apiKeysCreatedToday = 0;
-      
+
       if (allApiKeys.length > 0) {
         const pipeline = this.client.pipeline();
         allApiKeys.forEach(key => pipeline.hget(key, 'createdAt'));
         const results = await pipeline.exec();
-        
+
         for (const [error, createdAt] of results) {
           if (!error && createdAt && createdAt.startsWith(today)) {
             apiKeysCreatedToday++;
@@ -610,40 +595,40 @@ class RedisClient {
       let totalInputTokens = 0;
       let totalOutputTokens = 0;
       let oldestCreatedAt = new Date();
-      
+
       // 批量获取所有usage数据和key数据，提高性能
       const usageKeys = allApiKeys.map(key => `usage:${key.replace('apikey:', '')}`);
       const pipeline = this.client.pipeline();
-      
+
       // 添加所有usage查询
       usageKeys.forEach(key => pipeline.hgetall(key));
       // 添加所有key数据查询
       allApiKeys.forEach(key => pipeline.hgetall(key));
-      
+
       const results = await pipeline.exec();
       const usageResults = results.slice(0, usageKeys.length);
       const keyResults = results.slice(usageKeys.length);
-      
+
       for (let i = 0; i < allApiKeys.length; i++) {
         const totalData = usageResults[i][1] || {};
         const keyData = keyResults[i][1] || {};
-        
+
         totalRequests += parseInt(totalData.totalRequests) || 0;
         totalTokens += parseInt(totalData.totalTokens) || 0;
         totalInputTokens += parseInt(totalData.totalInputTokens) || 0;
         totalOutputTokens += parseInt(totalData.totalOutputTokens) || 0;
-        
+
         const createdAt = keyData.createdAt ? new Date(keyData.createdAt) : new Date();
         if (createdAt < oldestCreatedAt) {
           oldestCreatedAt = createdAt;
         }
       }
-      
+
       const now = new Date();
       // 保持与个人API Key计算一致的算法：按天计算然后转换为分钟
       const daysSinceOldest = Math.max(1, Math.ceil((now - oldestCreatedAt) / (1000 * 60 * 60 * 24)));
       const totalMinutes = daysSinceOldest * 24 * 60;
-      
+
       return {
         systemRPM: Math.round((totalRequests / totalMinutes) * 100) / 100,
         systemTPM: Math.round((totalTokens / totalMinutes) * 100) / 100,
@@ -693,7 +678,7 @@ class RedisClient {
       for (const pattern of patterns) {
         const keys = await this.client.keys(pattern);
         const pipeline = this.client.pipeline();
-        
+
         for (const key of keys) {
           const ttl = await this.client.ttl(key);
           if (ttl === -1) { // 没有设置过期时间的键
@@ -704,13 +689,77 @@ class RedisClient {
             }
           }
         }
-        
+
         await pipeline.exec();
       }
 
       logger.info('🧹 Redis cleanup completed');
     } catch (error) {
       logger.error('❌ Redis cleanup failed:', error);
+    }
+  }
+
+  // 增加并发计数
+  async incrConcurrency(apiKeyId) {
+    try {
+      const key = `concurrency:${apiKeyId}`;
+      const count = await this.client.incr(key);
+      
+      // 设置过期时间为180秒（3分钟），防止计数器永远不清零
+      // 正常情况下请求会在完成时主动减少计数，这只是一个安全保障
+      // 180秒足够支持较长的流式请求
+      await this.client.expire(key, 180);
+      
+      logger.database(`🔢 Incremented concurrency for key ${apiKeyId}: ${count}`);
+      return count;
+    } catch (error) {
+      logger.error('❌ Failed to increment concurrency:', error);
+      throw error;
+    }
+  }
+
+  // 减少并发计数
+  async decrConcurrency(apiKeyId) {
+    try {
+      const key = `concurrency:${apiKeyId}`;
+      
+      // 使用Lua脚本确保原子性操作，防止计数器变成负数
+      const luaScript = `
+        local key = KEYS[1]
+        local current = tonumber(redis.call('get', key) or "0")
+        
+        if current <= 0 then
+          redis.call('del', key)
+          return 0
+        else
+          local new_value = redis.call('decr', key)
+          if new_value <= 0 then
+            redis.call('del', key)
+            return 0
+          else
+            return new_value
+          end
+        end
+      `;
+      
+      const count = await this.client.eval(luaScript, 1, key);
+      logger.database(`🔢 Decremented concurrency for key ${apiKeyId}: ${count}`);
+      return count;
+    } catch (error) {
+      logger.error('❌ Failed to decrement concurrency:', error);
+      throw error;
+    }
+  }
+
+  // 获取当前并发数
+  async getConcurrency(apiKeyId) {
+    try {
+      const key = `concurrency:${apiKeyId}`;
+      const count = await this.client.get(key);
+      return parseInt(count || 0);
+    } catch (error) {
+      logger.error('❌ Failed to get concurrency:', error);
+      return 0;
     }
   }
 }

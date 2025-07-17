@@ -9,9 +9,16 @@
 
 **🔐 自行搭建Claude API中转服务，支持多账户管理** 
 
-[English](#english) • [中文文档](#中文文档) • [📸 界面预览](docs/preview.md)
+[English](#english) • [中文文档](#中文文档) • [📸 界面预览](docs/preview.md) • [📢 公告频道](https://t.me/claude_relay_service)
 
 </div>
+
+---
+
+## ⭐ 如果觉得有用，点个Star支持一下吧！
+
+> 开源不易，你的Star是我持续更新的动力 🚀  
+> 欢迎加入 [Telegram 公告频道](https://t.me/claude_relay_service) 获取最新动态
 
 ---
 
@@ -194,7 +201,7 @@ module.exports = {
 
 ```bash
 # 初始化
-npm run setup # 会随机生成后台账号密码信息，存储在 data/Init.json
+npm run setup # 会随机生成后台账号密码信息，存储在 data/init.json
 
 # 启动服务
 npm run service:start:daemon   # 后台运行（推荐）
@@ -211,7 +218,7 @@ npm run service:status
 
 浏览器访问：`http://你的服务器IP:3000/web`
 
-默认管理员账号：data/Init.json 中寻找
+默认管理员账号：data/init.json 中寻找
 
 ### 2. 添加Claude账户
 
@@ -278,6 +285,36 @@ npm run service:stop
 - **健康检查**: `http://你的域名:3000/health` - 确认服务正常
 - **日志文件**: `logs/` 目录下的各种日志文件
 
+### 升级指南
+
+当有新版本发布时，按照以下步骤升级服务：
+
+```bash
+# 1. 进入项目目录
+cd claude-relay-service
+
+# 2. 拉取最新代码
+git pull origin main
+
+# 如果遇到 package-lock.json 冲突，使用远程版本
+git checkout --theirs package-lock.json
+git add package-lock.json
+
+# 3. 安装新的依赖（如果有）
+npm install
+
+# 4. 重启服务
+npm run service:restart:daemon
+
+# 5. 检查服务状态
+npm run service:status
+```
+
+**注意事项：**
+- 升级前建议备份重要配置文件（.env, config/config.js）
+- 查看更新日志了解是否有破坏性变更
+- 如果有数据库结构变更，会自动迁移
+
 ### 常见问题处理
 
 **Redis连不上？**
@@ -305,74 +342,69 @@ redis-cli ping
 
 ### 生产环境部署建议（重要！）
 
-**强烈建议使用nginx反向代理 + SSL证书**
+**强烈建议使用Caddy反向代理（自动HTTPS）**
 
-建议使用nginx反向代理并配置SSL证书：（以下为Nginx示例，如不想折腾可以选择安装面板进行操作，比如宝塔、1panel等）
+推荐使用Caddy作为反向代理，它会自动申请和更新SSL证书，配置更简单：
 
-**1. 安装nginx和获取SSL证书**
+**1. 安装Caddy**
 ```bash
 # Ubuntu/Debian
-sudo apt install nginx certbot python3-certbot-nginx
+sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo apt update
+sudo apt install caddy
 
-# 获取免费SSL证书（以Let's Encrypt为例）
-sudo certbot --nginx -d your-domain.com
+# CentOS/RHEL/Fedora
+sudo yum install yum-plugin-copr
+sudo yum copr enable @caddy/caddy
+sudo yum install caddy
 ```
 
-**2. nginx配置示例**
+**2. Caddy配置（超简单！）**
 
-创建 `/etc/nginx/sites-available/claude-relay` 配置文件：
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name your-domain.com;
-    
-    # SSL配置
-    ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    
-    # 安全头
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header X-Frame-Options DENY;
-    add_header X-Content-Type-Options nosniff;
-    
-    # 反向代理配置
-    location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
+编辑 `/etc/caddy/Caddyfile`：
+```
+your-domain.com {
+    # 反向代理到本地服务
+    reverse_proxy 127.0.0.1:3000 {
+        # 支持流式响应（SSE）
+        flush_interval -1
         
-        # 超时设置
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
+        # 传递真实IP
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        
+        # 超时设置（适合长连接）
+        transport http {
+            read_timeout 300s
+            write_timeout 300s
+            dial_timeout 30s
+        }
+    }
+    
+    # 安全头部
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        -Server
     }
 }
 ```
 
-**3. 启用配置**
+**3. 启动Caddy**
 ```bash
-# 启用站点
-sudo ln -s /etc/nginx/sites-available/claude-relay /etc/nginx/sites-enabled/
-
 # 测试配置
-sudo nginx -t
+sudo caddy validate --config /etc/caddy/Caddyfile
 
-# 重启nginx
-sudo systemctl restart nginx
+# 启动服务
+sudo systemctl start caddy
+sudo systemctl enable caddy
+
+# 查看状态
+sudo systemctl status caddy
 ```
 
 **4. 更新服务配置**
@@ -389,11 +421,12 @@ module.exports = {
 }
 ```
 
-**安全优势：**
-- 🔒 **数据加密**: 所有API请求都通过HTTPS加密传输
-- 🛡️ **隐藏端口**: 不直接暴露服务端口，降低攻击面
-- 🚀 **更好性能**: nginx的静态文件服务和缓存能力
-- 📊 **访问日志**: nginx提供详细的访问日志和监控
+**Caddy优势：**
+- 🔒 **自动HTTPS**: 自动申请和续期Let's Encrypt证书，零配置
+- 🛡️ **安全默认**: 默认启用现代安全协议和加密套件
+- 🚀 **流式支持**: 原生支持SSE/WebSocket等流式传输
+- 📊 **简单配置**: 配置文件极其简洁，易于维护
+- ⚡ **HTTP/2**: 默认启用HTTP/2，提升传输性能
 
 
 ---
@@ -405,7 +438,7 @@ module.exports = {
 - **合理分配**: 可以给不同的人分配不同的apikey，可以根据不同的apikey来分析用量
 
 ### 安全建议
-- **使用HTTPS**: 强烈建议配置nginx反向代理和SSL证书，确保数据传输安全
+- **使用HTTPS**: 强烈建议使用Caddy反向代理（自动HTTPS），确保数据传输安全
 - **定期备份**: 重要配置和数据要备份
 - **监控日志**: 定期查看异常日志
 - **更新密钥**: 定期更换JWT和加密密钥

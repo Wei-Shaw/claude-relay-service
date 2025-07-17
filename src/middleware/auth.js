@@ -42,32 +42,74 @@ const authenticateApiKey = async (req, res, next) => {
       });
     }
 
-    // 检查速率限制（优化：只在验证成功后检查）
-    const rateLimitResult = await apiKeyService.checkRateLimit(validation.keyData.id);
-    
-    if (!rateLimitResult.allowed) {
-      logger.security(`🚦 Rate limit exceeded for key: ${validation.keyData.id} (${validation.keyData.name})`);
-      return res.status(429).json({
-        error: 'Rate limit exceeded',
-        message: `Too many requests. Limit: ${rateLimitResult.limit} requests per minute`,
-        resetTime: rateLimitResult.resetTime,
-        retryAfter: rateLimitResult.resetTime
-      });
-    }
 
-    // 设置标准速率限制响应头
-    res.setHeader('X-RateLimit-Limit', rateLimitResult.limit);
-    res.setHeader('X-RateLimit-Remaining', Math.max(0, rateLimitResult.limit - rateLimitResult.current));
-    res.setHeader('X-RateLimit-Reset', rateLimitResult.resetTime);
-    res.setHeader('X-RateLimit-Policy', `${rateLimitResult.limit};w=60`);
+    // 检查并发限制
+    const concurrencyLimit = validation.keyData.concurrencyLimit || 0;
+    if (concurrencyLimit > 0) {
+      const currentConcurrency = await redis.incrConcurrency(validation.keyData.id);
+      logger.api(`📈 Incremented concurrency for key: ${validation.keyData.id} (${validation.keyData.name}), current: ${currentConcurrency}, limit: ${concurrencyLimit}`);
+      
+      if (currentConcurrency > concurrencyLimit) {
+        // 如果超过限制，立即减少计数
+        await redis.decrConcurrency(validation.keyData.id);
+        logger.security(`🚦 Concurrency limit exceeded for key: ${validation.keyData.id} (${validation.keyData.name}), current: ${currentConcurrency - 1}, limit: ${concurrencyLimit}`);
+        return res.status(429).json({
+          error: 'Concurrency limit exceeded',
+          message: `Too many concurrent requests. Limit: ${concurrencyLimit} concurrent requests`,
+          currentConcurrency: currentConcurrency - 1,
+          concurrencyLimit
+        });
+      }
+      
+      // 使用标志位确保只减少一次
+      let concurrencyDecremented = false;
+      
+      const decrementConcurrency = async () => {
+        if (!concurrencyDecremented) {
+          concurrencyDecremented = true;
+          try {
+            const newCount = await redis.decrConcurrency(validation.keyData.id);
+            logger.api(`📉 Decremented concurrency for key: ${validation.keyData.id} (${validation.keyData.name}), new count: ${newCount}`);
+          } catch (error) {
+            logger.error(`Failed to decrement concurrency for key ${validation.keyData.id}:`, error);
+          }
+        }
+      };
+      
+      // 监听最可靠的事件（避免重复监听）
+      // res.on('close') 是最可靠的，会在连接关闭时触发
+      res.once('close', () => {
+        logger.api(`🔌 Response closed for key: ${validation.keyData.id} (${validation.keyData.name})`);
+        decrementConcurrency();
+      });
+      
+      // req.on('close') 作为备用，处理请求端断开
+      req.once('close', () => {
+        logger.api(`🔌 Request closed for key: ${validation.keyData.id} (${validation.keyData.name})`);
+        decrementConcurrency();
+      });
+      
+      // res.on('finish') 处理正常完成的情况
+      res.once('finish', () => {
+        logger.api(`✅ Response finished for key: ${validation.keyData.id} (${validation.keyData.name})`);
+        decrementConcurrency();
+      });
+      
+      // 存储并发信息到请求对象，便于后续处理
+      req.concurrencyInfo = {
+        apiKeyId: validation.keyData.id,
+        apiKeyName: validation.keyData.name,
+        decrementConcurrency
+      };
+    }
 
     // 将验证信息添加到请求对象（只包含必要信息）
     req.apiKey = {
       id: validation.keyData.id,
       name: validation.keyData.name,
       tokenLimit: validation.keyData.tokenLimit,
-      requestLimit: validation.keyData.requestLimit,
-      claudeAccountId: validation.keyData.claudeAccountId
+      claudeAccountId: validation.keyData.claudeAccountId,
+      concurrencyLimit: validation.keyData.concurrencyLimit
     };
     req.usage = validation.keyData.usage;
     
@@ -219,10 +261,8 @@ const corsMiddleware = (req, res, next) => {
   ].join(', '));
   
   res.header('Access-Control-Expose-Headers', [
-    'X-RateLimit-Limit',
-    'X-RateLimit-Remaining', 
-    'X-RateLimit-Reset',
-    'X-RateLimit-Policy'
+    'X-Request-ID',
+    'Content-Type'
   ].join(', '));
   
   res.header('Access-Control-Max-Age', '86400'); // 24小时预检缓存

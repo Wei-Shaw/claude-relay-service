@@ -28,7 +28,8 @@ const config = {
     commandTimeout: 5000,
     retryDelayOnFailover: 100,
     maxRetriesPerRequest: 3,
-    lazyConnect: true
+    lazyConnect: true,
+    enableTLS: process.env.REDIS_ENABLE_TLS === 'true',
   },
 
   // 🎯 Claude API配置
@@ -46,14 +47,7 @@ const config = {
 
   // 📈 使用限制
   limits: {
-    defaultTokenLimit: parseInt(process.env.DEFAULT_TOKEN_LIMIT) || 1000000,
-    defaultRequestLimit: parseInt(process.env.DEFAULT_REQUEST_LIMIT) || 1000
-  },
-
-  // 🚦 速率限制
-  rateLimit: {
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW) || 60000,
-    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100
+    defaultTokenLimit: parseInt(process.env.DEFAULT_TOKEN_LIMIT) || 1000000
   },
 
   // 📝 日志配置

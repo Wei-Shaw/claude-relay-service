@@ -30,9 +30,9 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       name,
       description,
       tokenLimit,
-      requestLimit,
       expiresAt,
-      claudeAccountId
+      claudeAccountId,
+      concurrencyLimit
     } = req.body;
 
     // 输入验证
@@ -52,17 +52,18 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Token limit must be a non-negative integer' });
     }
 
-    if (requestLimit && (!Number.isInteger(Number(requestLimit)) || Number(requestLimit) < 0)) {
-      return res.status(400).json({ error: 'Request limit must be a non-negative integer' });
+
+    if (concurrencyLimit !== undefined && concurrencyLimit !== null && concurrencyLimit !== '' && (!Number.isInteger(Number(concurrencyLimit)) || Number(concurrencyLimit) < 0)) {
+      return res.status(400).json({ error: 'Concurrency limit must be a non-negative integer' });
     }
 
     const newKey = await apiKeyService.generateApiKey({
       name,
       description,
       tokenLimit,
-      requestLimit,
       expiresAt,
-      claudeAccountId
+      claudeAccountId,
+      concurrencyLimit
     });
 
     logger.success(`🔑 Admin created new API key: ${name}`);
@@ -77,7 +78,29 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
 router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
   try {
     const { keyId } = req.params;
-    const updates = req.body;
+    const { tokenLimit, concurrencyLimit, claudeAccountId } = req.body;
+
+    // 只允许更新tokenLimit、concurrencyLimit和claudeAccountId
+    const updates = {};
+    
+    if (tokenLimit !== undefined && tokenLimit !== null && tokenLimit !== '') {
+      if (!Number.isInteger(Number(tokenLimit)) || Number(tokenLimit) < 0) {
+        return res.status(400).json({ error: 'Token limit must be a non-negative integer' });
+      }
+      updates.tokenLimit = Number(tokenLimit);
+    }
+
+    if (concurrencyLimit !== undefined && concurrencyLimit !== null && concurrencyLimit !== '') {
+      if (!Number.isInteger(Number(concurrencyLimit)) || Number(concurrencyLimit) < 0) {
+        return res.status(400).json({ error: 'Concurrency limit must be a non-negative integer' });
+      }
+      updates.concurrencyLimit = Number(concurrencyLimit);
+    }
+
+    if (claudeAccountId !== undefined) {
+      // 空字符串表示解绑，null或空字符串都设置为空字符串
+      updates.claudeAccountId = claudeAccountId || '';
+    }
 
     await apiKeyService.updateApiKey(keyId, updates);
     
@@ -226,11 +249,17 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       password,
       refreshToken,
       claudeAiOauth,
-      proxy
+      proxy,
+      accountType
     } = req.body;
 
     if (!name) {
       return res.status(400).json({ error: 'Name is required' });
+    }
+
+    // 验证accountType的有效性
+    if (accountType && !['shared', 'dedicated'].includes(accountType)) {
+      return res.status(400).json({ error: 'Invalid account type. Must be "shared" or "dedicated"' });
     }
 
     const newAccount = await claudeAccountService.createAccount({
@@ -240,10 +269,11 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       password,
       refreshToken,
       claudeAiOauth,
-      proxy
+      proxy,
+      accountType: accountType || 'shared' // 默认为共享类型
     });
 
-    logger.success(`🏢 Admin created new Claude account: ${name}`);
+    logger.success(`🏢 Admin created new Claude account: ${name} (${accountType || 'shared'})`);
     res.json({ success: true, data: newAccount });
   } catch (error) {
     logger.error('❌ Failed to create Claude account:', error);
@@ -790,23 +820,91 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
     } else if (period === 'monthly') {
       pattern = `usage:model:monthly:*:${currentMonth}`;
     } else {
-      // 全部时间，使用API Key汇总数据
-      for (const apiKey of apiKeys) {
-        if (apiKey.usage && apiKey.usage.total) {
-          const usage = {
-            input_tokens: apiKey.usage.total.inputTokens || 0,
-            output_tokens: apiKey.usage.total.outputTokens || 0,
-            cache_creation_input_tokens: apiKey.usage.total.cacheCreateTokens || 0,
-            cache_read_input_tokens: apiKey.usage.total.cacheReadTokens || 0
+      // 全部时间，先尝试从Redis获取所有历史模型统计数据
+      const allModelKeys = await client.keys('usage:model:*:*');
+      logger.info(`💰 Total period calculation: found ${allModelKeys.length} model keys`);
+      
+      if (allModelKeys.length > 0) {
+        // 如果有详细的模型统计数据，使用模型级别的计算
+        const modelUsageMap = new Map();
+        
+        for (const key of allModelKeys) {
+          // 解析模型名称
+          let modelMatch = key.match(/usage:model:(?:daily|monthly):(.+):\d{4}-\d{2}(?:-\d{2})?$/);
+          if (!modelMatch) continue;
+          
+          const model = modelMatch[1];
+          const data = await client.hgetall(key);
+          
+          if (data && Object.keys(data).length > 0) {
+            if (!modelUsageMap.has(model)) {
+              modelUsageMap.set(model, {
+                inputTokens: 0,
+                outputTokens: 0,
+                cacheCreateTokens: 0,
+                cacheReadTokens: 0
+              });
+            }
+            
+            const modelUsage = modelUsageMap.get(model);
+            modelUsage.inputTokens += parseInt(data.inputTokens) || 0;
+            modelUsage.outputTokens += parseInt(data.outputTokens) || 0;
+            modelUsage.cacheCreateTokens += parseInt(data.cacheCreateTokens) || 0;
+            modelUsage.cacheReadTokens += parseInt(data.cacheReadTokens) || 0;
+          }
+        }
+        
+        // 使用模型级别的数据计算费用
+        logger.info(`💰 Processing ${modelUsageMap.size} unique models for total cost calculation`);
+        
+        for (const [model, usage] of modelUsageMap) {
+          const usageData = {
+            input_tokens: usage.inputTokens,
+            output_tokens: usage.outputTokens,
+            cache_creation_input_tokens: usage.cacheCreateTokens,
+            cache_read_input_tokens: usage.cacheReadTokens
           };
           
-          // 计算未知模型的费用（汇总数据）
-          const costResult = CostCalculator.calculateCost(usage, 'unknown');
+          const costResult = CostCalculator.calculateCost(usageData, model);
           totalCosts.inputCost += costResult.costs.input;
           totalCosts.outputCost += costResult.costs.output;
           totalCosts.cacheCreateCost += costResult.costs.cacheWrite;
           totalCosts.cacheReadCost += costResult.costs.cacheRead;
           totalCosts.totalCost += costResult.costs.total;
+          
+          logger.info(`💰 Model ${model}: ${usage.inputTokens + usage.outputTokens + usage.cacheCreateTokens + usage.cacheReadTokens} tokens, cost: ${costResult.formatted.total}`);
+          
+          // 记录模型费用
+          modelCosts[model] = {
+            model,
+            requests: 0, // 历史汇总数据没有请求数
+            usage: usageData,
+            costs: costResult.costs,
+            formatted: costResult.formatted,
+            usingDynamicPricing: costResult.usingDynamicPricing
+          };
+        }
+      } else {
+        // 如果没有详细的模型统计数据，回退到API Key汇总数据
+        logger.warn('No detailed model statistics found, falling back to API Key aggregated data');
+        
+        for (const apiKey of apiKeys) {
+          if (apiKey.usage && apiKey.usage.total) {
+            const usage = {
+              input_tokens: apiKey.usage.total.inputTokens || 0,
+              output_tokens: apiKey.usage.total.outputTokens || 0,
+              cache_creation_input_tokens: apiKey.usage.total.cacheCreateTokens || 0,
+              cache_read_input_tokens: apiKey.usage.total.cacheReadTokens || 0
+            };
+            
+            // 使用加权平均价格计算（基于当前活跃模型的价格分布）
+            const costResult = CostCalculator.calculateCost(usage, 'claude-3-5-haiku-20241022');
+            totalCosts.inputCost += costResult.costs.input;
+            totalCosts.outputCost += costResult.costs.output;
+            totalCosts.cacheCreateCost += costResult.costs.cacheWrite;
+            totalCosts.cacheReadCost += costResult.costs.cacheRead;
+            totalCosts.totalCost += costResult.costs.total;
+          }
         }
       }
       
@@ -824,7 +922,7 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
               totalCost: CostCalculator.formatCost(totalCosts.totalCost)
             }
           },
-          modelCosts: [],
+          modelCosts: Object.values(modelCosts).sort((a, b) => b.costs.total - a.costs.total),
           pricingServiceStatus: pricingService.getStatus()
         }
       });

@@ -15,10 +15,10 @@ class ApiKeyService {
       name = 'Unnamed Key',
       description = '',
       tokenLimit = config.limits.defaultTokenLimit,
-      requestLimit = config.limits.defaultRequestLimit,
       expiresAt = null,
       claudeAccountId = null,
-      isActive = true
+      isActive = true,
+      concurrencyLimit = 0
     } = options;
 
     // 生成简单的API Key (64字符十六进制)
@@ -32,7 +32,7 @@ class ApiKeyService {
       description,
       apiKey: hashedKey,
       tokenLimit: String(tokenLimit ?? 0),
-      requestLimit: String(requestLimit ?? 0),
+      concurrencyLimit: String(concurrencyLimit ?? 0),
       isActive: String(isActive),
       claudeAccountId: claudeAccountId || '',
       createdAt: new Date().toISOString(),
@@ -52,7 +52,7 @@ class ApiKeyService {
       name: keyData.name,
       description: keyData.description,
       tokenLimit: parseInt(keyData.tokenLimit),
-      requestLimit: parseInt(keyData.requestLimit),
+      concurrencyLimit: parseInt(keyData.concurrencyLimit),
       isActive: keyData.isActive === 'true',
       claudeAccountId: keyData.claudeAccountId,
       createdAt: keyData.createdAt,
@@ -91,15 +91,11 @@ class ApiKeyService {
       // 检查使用限制
       const usage = await redis.getUsageStats(keyData.id);
       const tokenLimit = parseInt(keyData.tokenLimit);
-      const requestLimit = parseInt(keyData.requestLimit);
       
       if (tokenLimit > 0 && usage.total.tokens >= tokenLimit) {
         return { valid: false, error: 'Token limit exceeded' };
       }
 
-      if (requestLimit > 0 && usage.total.requests >= requestLimit) {
-        return { valid: false, error: 'Request limit exceeded' };
-      }
 
       // 更新最后使用时间（优化：只在实际API调用时更新，而不是验证时）
       // 注意：lastUsedAt的更新已移至recordUsage方法中
@@ -113,7 +109,7 @@ class ApiKeyService {
           name: keyData.name,
           claudeAccountId: keyData.claudeAccountId,
           tokenLimit: parseInt(keyData.tokenLimit),
-          requestLimit: parseInt(keyData.requestLimit),
+              concurrencyLimit: parseInt(keyData.concurrencyLimit || 0),
           usage
         }
       };
@@ -128,11 +124,12 @@ class ApiKeyService {
     try {
       const apiKeys = await redis.getAllApiKeys();
       
-      // 为每个key添加使用统计
+      // 为每个key添加使用统计和当前并发数
       for (const key of apiKeys) {
         key.usage = await redis.getUsageStats(key.id);
         key.tokenLimit = parseInt(key.tokenLimit);
-        key.requestLimit = parseInt(key.requestLimit);
+        key.concurrencyLimit = parseInt(key.concurrencyLimit || 0);
+        key.currentConcurrency = await redis.getConcurrency(key.id);
         key.isActive = key.isActive === 'true';
         delete key.apiKey; // 不返回哈希后的key
       }
@@ -153,7 +150,7 @@ class ApiKeyService {
       }
 
       // 允许更新的字段
-      const allowedUpdates = ['name', 'description', 'tokenLimit', 'requestLimit', 'isActive', 'claudeAccountId', 'expiresAt'];
+      const allowedUpdates = ['name', 'description', 'tokenLimit', 'concurrencyLimit', 'isActive', 'claudeAccountId', 'expiresAt'];
       const updatedData = { ...keyData };
 
       for (const [field, value] of Object.entries(updates)) {
@@ -234,13 +231,6 @@ class ApiKeyService {
     return await redis.getUsageStats(keyId);
   }
 
-  // 🚦 检查速率限制
-  async checkRateLimit(keyId, limit = null) {
-    const rateLimit = limit || config.rateLimit.maxRequests;
-    const window = Math.floor(config.rateLimit.windowMs / 1000);
-    
-    return await redis.checkRateLimit(`apikey:${keyId}`, rateLimit, window);
-  }
 
   // 🧹 清理过期的API Keys
   async cleanupExpiredKeys() {
