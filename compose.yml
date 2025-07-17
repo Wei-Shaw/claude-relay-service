@@ -1,10 +1,10 @@
 services:
   # 🚀 Claude Relay Service
-  claude-relay-service:
+  ai-relay:
     platform: linux/amd64
-    image: "ccr.ccs.tencentyun.com/pluginsworld/service-pluginsworld-claude-relay:${BUILD_NUMBER}"
+    image: "ccr.ccs.tencentyun.com/pluginsworld/service-pluginsworld-ai-relay:${BUILD_NUMBER}"
     build: .
-    container_name: claude-relay-service
+    container_name: ai-relay
     restart: unless-stopped
     ports:
       - "${PORT:-3000}:3010"
