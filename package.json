@@ -28,26 +28,13 @@
     "docker:down": "docker-compose down"
   },
   "dependencies": {
+    "@vercel/kv": "^1.0.1",
     "axios": "^1.6.0",
     "bcryptjs": "^2.4.3",
-    "chalk": "^4.1.2",
-    "commander": "^11.1.0",
-    "compression": "^1.7.4",
-    "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
-    "express": "^4.18.2",
-    "helmet": "^7.1.0",
     "https-proxy-agent": "^7.0.2",
-    "inquirer": "^9.2.15",
-    "ioredis": "^5.3.2",
-    "morgan": "^1.10.0",
-    "ora": "^5.4.1",
-    "rate-limiter-flexible": "^5.0.5",
+    "jsonwebtoken": "^9.0.2",
     "socks-proxy-agent": "^8.0.2",
-    "table": "^6.8.1",
-    "uuid": "^9.0.1",
-    "winston": "^3.11.0",
-    "winston-daily-rotate-file": "^4.7.1"
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.8.9",
