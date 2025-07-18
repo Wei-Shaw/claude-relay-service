@@ -7,6 +7,8 @@ const ora = require('ora');
 const Table = require('table').table;
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 
 const config = require('../config/config');
 const redis = require('../src/models/redis');
@@ -104,6 +106,27 @@ program
 async function createInitialAdmin() {
   console.log(styles.title('\n🔐 创建初始管理员账户\n'));
   
+  // 检查是否已存在 init.json
+  const initFilePath = path.join(__dirname, '..', 'data', 'init.json');
+  if (fs.existsSync(initFilePath)) {
+    const existingData = JSON.parse(fs.readFileSync(initFilePath, 'utf8'));
+    console.log(styles.warning('⚠️  检测到已存在管理员账户！'));
+    console.log(`   用户名: ${existingData.adminUsername}`);
+    console.log(`   创建时间: ${new Date(existingData.initializedAt).toLocaleString()}`);
+    
+    const { overwrite } = await inquirer.prompt([{
+      type: 'confirm',
+      name: 'overwrite',
+      message: '是否覆盖现有管理员账户？',
+      default: false
+    }]);
+    
+    if (!overwrite) {
+      console.log(styles.info('ℹ️  已取消创建'));
+      return;
+    }
+  }
+  
   const adminData = await inquirer.prompt([
     {
       type: 'input',
@@ -129,20 +152,43 @@ async function createInitialAdmin() {
   const spinner = ora('正在创建管理员账户...').start();
   
   try {
+    // 1. 先更新 init.json（唯一真实数据源）
+    const initData = {
+      initializedAt: new Date().toISOString(),
+      adminUsername: adminData.username,
+      adminPassword: adminData.password, // 保存明文密码
+      version: '1.0.0',
+      updatedAt: new Date().toISOString()
+    };
+    
+    // 确保 data 目录存在
+    const dataDir = path.join(__dirname, '..', 'data');
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    
+    // 写入文件
+    fs.writeFileSync(initFilePath, JSON.stringify(initData, null, 2));
+    
+    // 2. 再更新 Redis 缓存
     const passwordHash = await bcrypt.hash(adminData.password, 12);
     
     const credentials = {
       username: adminData.username,
       passwordHash,
       createdAt: new Date().toISOString(),
-      id: crypto.randomBytes(16).toString('hex')
+      lastLogin: null,
+      updatedAt: new Date().toISOString()
     };
 
     await redis.setSession('admin_credentials', credentials, 0); // 永不过期
     
     spinner.succeed('管理员账户创建成功');
     console.log(`${styles.success('✅')} 用户名: ${adminData.username}`);
+    console.log(`${styles.success('✅')} 密码: ${adminData.password}`);
     console.log(`${styles.info('ℹ️')} 请妥善保管登录凭据`);
+    console.log(`${styles.info('ℹ️')} 凭据已保存到: ${initFilePath}`);
+    console.log(`${styles.warning('⚠️')} 如果服务正在运行，请重启服务以加载新凭据`);
 
   } catch (error) {
     spinner.fail('创建管理员账户失败');

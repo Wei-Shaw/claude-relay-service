@@ -183,40 +183,37 @@ class Application {
     }
   }
 
-  // 🔧 初始化管理员凭据
+  // 🔧 初始化管理员凭据（总是从 init.json 加载，确保数据一致性）
   async initializeAdmin() {
     try {
-      // 检查Redis中是否已存在管理员凭据
-      const existingAdmin = await redis.getSession('admin_credentials');
+      const initFilePath = path.join(__dirname, '..', 'data', 'init.json');
       
-      if (!existingAdmin || Object.keys(existingAdmin).length === 0) {
-        // 尝试从初始化文件读取
-        const initFilePath = path.join(__dirname, '..', 'data', 'init.json');
-        
-        if (fs.existsSync(initFilePath)) {
-          const initData = JSON.parse(fs.readFileSync(initFilePath, 'utf8'));
-          
-          // 将明文密码哈希化
-          const saltRounds = 10;
-          const passwordHash = await bcrypt.hash(initData.adminPassword, saltRounds);
-          
-          // 存储到Redis
-          const adminCredentials = {
-            username: initData.adminUsername,
-            passwordHash: passwordHash,
-            createdAt: new Date().toISOString(),
-            lastLogin: null
-          };
-          
-          await redis.setSession('admin_credentials', adminCredentials);
-          
-          logger.success('✅ Admin credentials initialized from setup data');
-        } else {
-          logger.warn('⚠️ No admin credentials found. Please run npm run setup first.');
-        }
-      } else {
-        logger.info('ℹ️ Admin credentials already exist in Redis');
+      if (!fs.existsSync(initFilePath)) {
+        logger.warn('⚠️ No admin credentials found. Please run npm run setup first.');
+        return;
       }
+
+      // 从 init.json 读取管理员凭据（作为唯一真实数据源）
+      const initData = JSON.parse(fs.readFileSync(initFilePath, 'utf8'));
+      
+      // 将明文密码哈希化
+      const saltRounds = 10;
+      const passwordHash = await bcrypt.hash(initData.adminPassword, saltRounds);
+      
+      // 存储到Redis（每次启动都覆盖，确保与 init.json 同步）
+      const adminCredentials = {
+        username: initData.adminUsername,
+        passwordHash: passwordHash,
+        createdAt: initData.initializedAt || new Date().toISOString(),
+        lastLogin: null,
+        updatedAt: initData.updatedAt || null
+      };
+      
+      await redis.setSession('admin_credentials', adminCredentials);
+      
+      logger.success('✅ Admin credentials loaded from init.json (single source of truth)');
+      logger.info(`📋 Admin username: ${adminCredentials.username}`);
+      
     } catch (error) {
       logger.error('❌ Failed to initialize admin credentials:', { error: error.message, stack: error.stack });
       throw error;

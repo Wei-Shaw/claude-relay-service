@@ -92,7 +92,11 @@ function checkInitialized() {
     console.log(chalk.yellow('⚠️  服务已经初始化过了！'));
     console.log(`   初始化时间: ${new Date(initData.initializedAt).toLocaleString()}`);
     console.log(`   管理员用户名: ${initData.adminUsername}`);
-    console.log('\n如需重新初始化，请删除 data/init.json 文件。');
+    console.log('\n如需重新初始化，请删除 data/init.json 文件后再运行此命令。');
+    console.log(chalk.red('\n⚠️  重要提示：'));
+    console.log('   1. 删除 init.json 文件后运行 npm run setup');
+    console.log('   2. 生成新的账号密码后，需要重启服务才能生效');
+    console.log('   3. 使用 npm run service:restart 重启服务\n');
     return true;
   }
   return false;

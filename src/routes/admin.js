@@ -552,26 +552,70 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
       let dayCacheReadTokens = 0;
       let dayCost = 0;
       
-      for (const key of keys) {
-        const data = await client.hgetall(key);
-        if (data) {
-          dayInputTokens += parseInt(data.inputTokens) || 0;
-          dayOutputTokens += parseInt(data.outputTokens) || 0;
-          dayRequests += parseInt(data.requests) || 0;
-          dayCacheCreateTokens += parseInt(data.cacheCreateTokens) || 0;
-          dayCacheReadTokens += parseInt(data.cacheReadTokens) || 0;
+      // 按模型统计使用量
+      const modelUsageMap = new Map();
+      
+      // 获取当天所有模型的使用数据
+      const modelPattern = `usage:model:daily:*:${dateStr}`;
+      const modelKeys = await client.keys(modelPattern);
+      
+      for (const modelKey of modelKeys) {
+        // 解析模型名称
+        const modelMatch = modelKey.match(/usage:model:daily:(.+):\d{4}-\d{2}-\d{2}$/);
+        if (!modelMatch) continue;
+        
+        const model = modelMatch[1];
+        const data = await client.hgetall(modelKey);
+        
+        if (data && Object.keys(data).length > 0) {
+          const modelInputTokens = parseInt(data.inputTokens) || 0;
+          const modelOutputTokens = parseInt(data.outputTokens) || 0;
+          const modelCacheCreateTokens = parseInt(data.cacheCreateTokens) || 0;
+          const modelCacheReadTokens = parseInt(data.cacheReadTokens) || 0;
+          const modelRequests = parseInt(data.requests) || 0;
+          
+          // 累加总数
+          dayInputTokens += modelInputTokens;
+          dayOutputTokens += modelOutputTokens;
+          dayCacheCreateTokens += modelCacheCreateTokens;
+          dayCacheReadTokens += modelCacheReadTokens;
+          dayRequests += modelRequests;
+          
+          // 按模型计算费用
+          const modelUsage = {
+            input_tokens: modelInputTokens,
+            output_tokens: modelOutputTokens,
+            cache_creation_input_tokens: modelCacheCreateTokens,
+            cache_read_input_tokens: modelCacheReadTokens
+          };
+          const modelCostResult = CostCalculator.calculateCost(modelUsage, model);
+          dayCost += modelCostResult.costs.total;
         }
       }
       
-      // 计算当天费用（使用通用模型价格估算）
-      const usage = {
-        input_tokens: dayInputTokens,
-        output_tokens: dayOutputTokens,
-        cache_creation_input_tokens: dayCacheCreateTokens,
-        cache_read_input_tokens: dayCacheReadTokens
-      };
-      const costResult = CostCalculator.calculateCost(usage, 'unknown');
-      dayCost = costResult.costs.total;
+      // 如果没有模型级别的数据，回退到原始方法
+      if (modelKeys.length === 0 && keys.length > 0) {
+        for (const key of keys) {
+          const data = await client.hgetall(key);
+          if (data) {
+            dayInputTokens += parseInt(data.inputTokens) || 0;
+            dayOutputTokens += parseInt(data.outputTokens) || 0;
+            dayRequests += parseInt(data.requests) || 0;
+            dayCacheCreateTokens += parseInt(data.cacheCreateTokens) || 0;
+            dayCacheReadTokens += parseInt(data.cacheReadTokens) || 0;
+          }
+        }
+        
+        // 使用默认模型价格计算
+        const usage = {
+          input_tokens: dayInputTokens,
+          output_tokens: dayOutputTokens,
+          cache_creation_input_tokens: dayCacheCreateTokens,
+          cache_read_input_tokens: dayCacheReadTokens
+        };
+        const costResult = CostCalculator.calculateCost(usage, 'unknown');
+        dayCost = costResult.costs.total;
+      }
       
       trendData.push({
         date: dateStr,

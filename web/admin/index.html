@@ -84,7 +84,7 @@
                         </div>
                     </div>
                     <!-- 用户菜单 -->
-                    <div class="relative">
+                    <div class="relative user-menu-container">
                         <button 
                             @click="userMenuOpen = !userMenuOpen"
                             class="btn btn-primary px-4 py-3 flex items-center gap-2 relative"
@@ -97,7 +97,7 @@
                         <!-- 悬浮菜单 -->
                         <div 
                             v-if="userMenuOpen" 
-                            class="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 py-2"
+                            class="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 py-2 user-menu-dropdown"
                             style="z-index: 999999;"
                             @click.stop
                         >

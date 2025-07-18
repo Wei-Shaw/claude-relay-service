@@ -105,9 +105,8 @@ router.post('/auth/login', async (req, res) => {
     
     await redis.setSession(sessionId, sessionData, config.security.adminSessionTimeout);
     
-    // 更新最后登录时间
-    adminData.lastLogin = new Date().toISOString();
-    await redis.setSession('admin_credentials', adminData);
+    // 不再更新 Redis 中的最后登录时间，因为 Redis 只是缓存
+    // init.json 是唯一真实数据源
 
     logger.success(`🔐 Admin login successful: ${username}`);
 
@@ -205,32 +204,49 @@ router.post('/auth/change-password', async (req, res) => {
     }
 
     // 准备更新的数据
-    const saltRounds = 10;
-    const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
+    const updatedUsername = newUsername && newUsername.trim() ? newUsername.trim() : adminData.username;
     
-    const updatedAdminData = {
-      ...adminData,
-      passwordHash: newPasswordHash,
-      updatedAt: new Date().toISOString()
-    };
-
-    // 如果提供了新用户名，则更新用户名
-    if (newUsername && newUsername.trim() && newUsername !== adminData.username) {
-      updatedAdminData.username = newUsername.trim();
-    }
-
-    // 更新Redis中的管理员凭据
-    await redis.setSession('admin_credentials', updatedAdminData);
-
-    // 更新data/init.json文件
+    // 先更新 init.json（唯一真实数据源）
     const initFilePath = path.join(__dirname, '../../data/init.json');
-    if (fs.existsSync(initFilePath)) {
+    if (!fs.existsSync(initFilePath)) {
+      return res.status(500).json({
+        error: 'Configuration file not found',
+        message: 'init.json file is missing'
+      });
+    }
+    
+    try {
       const initData = JSON.parse(fs.readFileSync(initFilePath, 'utf8'));
-      initData.adminUsername = updatedAdminData.username;
+      const oldData = { ...initData }; // 备份旧数据
+      
+      // 更新 init.json
+      initData.adminUsername = updatedUsername;
       initData.adminPassword = newPassword; // 保存明文密码到init.json
       initData.updatedAt = new Date().toISOString();
       
+      // 先写入文件（如果失败则不会影响 Redis）
       fs.writeFileSync(initFilePath, JSON.stringify(initData, null, 2));
+      
+      // 文件写入成功后，更新 Redis 缓存
+      const saltRounds = 10;
+      const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
+      
+      const updatedAdminData = {
+        username: updatedUsername,
+        passwordHash: newPasswordHash,
+        createdAt: adminData.createdAt,
+        lastLogin: adminData.lastLogin,
+        updatedAt: new Date().toISOString()
+      };
+      
+      await redis.setSession('admin_credentials', updatedAdminData);
+      
+    } catch (fileError) {
+      logger.error('❌ Failed to update init.json:', fileError);
+      return res.status(500).json({
+        error: 'Update failed',
+        message: 'Failed to update configuration file'
+      });
     }
 
     // 清除当前会话（强制用户重新登录）
