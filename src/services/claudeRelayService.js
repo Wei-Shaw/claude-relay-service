@@ -22,6 +22,34 @@ class ClaudeRelayService {
     let upstreamRequest = null;
     
     try {
+      // 调试日志：查看API Key数据
+      logger.info(`🔍 API Key data received:`, {
+        apiKeyName: apiKeyData.name,
+        enableModelRestriction: apiKeyData.enableModelRestriction,
+        restrictedModels: apiKeyData.restrictedModels,
+        requestedModel: requestBody.model
+      });
+
+      // 检查模型限制
+      if (apiKeyData.enableModelRestriction && apiKeyData.restrictedModels && apiKeyData.restrictedModels.length > 0) {
+        const requestedModel = requestBody.model;
+        logger.info(`🔒 Model restriction check - Requested model: ${requestedModel}, Restricted models: ${JSON.stringify(apiKeyData.restrictedModels)}`);
+        
+        if (requestedModel && apiKeyData.restrictedModels.includes(requestedModel)) {
+          logger.warn(`🚫 Model restriction violation for key ${apiKeyData.name}: Attempted to use restricted model ${requestedModel}`);
+          return {
+            statusCode: 403,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              error: {
+                type: 'forbidden',
+                message: '暂无该模型访问权限'
+              }
+            })
+          };
+        }
+      }
+      
       // 生成会话哈希用于sticky会话
       const sessionHash = sessionHelper.generateSessionHash(requestBody);
       
@@ -70,6 +98,35 @@ class ClaudeRelayService {
       }
       if (clientResponse) {
         clientResponse.removeListener('close', handleClientDisconnect);
+      }
+      
+      // 检查响应是否为限流错误
+      if (response.statusCode !== 200 && response.statusCode !== 201) {
+        let isRateLimited = false;
+        try {
+          const responseBody = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;
+          if (responseBody && responseBody.error && responseBody.error.message && 
+              responseBody.error.message.toLowerCase().includes('exceed your account\'s rate limit')) {
+            isRateLimited = true;
+          }
+        } catch (e) {
+          // 如果解析失败，检查原始字符串
+          if (response.body && response.body.toLowerCase().includes('exceed your account\'s rate limit')) {
+            isRateLimited = true;
+          }
+        }
+        
+        if (isRateLimited) {
+          logger.warn(`🚫 Rate limit detected for account ${accountId}, status: ${response.statusCode}`);
+          // 标记账号为限流状态并删除粘性会话映射
+          await claudeAccountService.markAccountRateLimited(accountId, sessionHash);
+        }
+      } else if (response.statusCode === 200 || response.statusCode === 201) {
+        // 如果请求成功，检查并移除限流状态
+        const isRateLimited = await claudeAccountService.isAccountRateLimited(accountId);
+        if (isRateLimited) {
+          await claudeAccountService.removeAccountRateLimit(accountId);
+        }
       }
       
       // 记录成功的API调用
@@ -390,6 +447,36 @@ class ClaudeRelayService {
   // 🌊 处理流式响应（带usage数据捕获）
   async relayStreamRequestWithUsageCapture(requestBody, apiKeyData, responseStream, clientHeaders, usageCallback) {
     try {
+      // 调试日志：查看API Key数据（流式请求）
+      logger.info(`🔍 [Stream] API Key data received:`, {
+        apiKeyName: apiKeyData.name,
+        enableModelRestriction: apiKeyData.enableModelRestriction,
+        restrictedModels: apiKeyData.restrictedModels,
+        requestedModel: requestBody.model
+      });
+
+      // 检查模型限制
+      if (apiKeyData.enableModelRestriction && apiKeyData.restrictedModels && apiKeyData.restrictedModels.length > 0) {
+        const requestedModel = requestBody.model;
+        logger.info(`🔒 [Stream] Model restriction check - Requested model: ${requestedModel}, Restricted models: ${JSON.stringify(apiKeyData.restrictedModels)}`);
+        
+        if (requestedModel && apiKeyData.restrictedModels.includes(requestedModel)) {
+          logger.warn(`🚫 Model restriction violation for key ${apiKeyData.name}: Attempted to use restricted model ${requestedModel}`);
+          
+          // 对于流式响应，需要写入错误并结束流
+          const errorResponse = JSON.stringify({
+            error: {
+              type: 'forbidden',
+              message: '暂无该模型访问权限'
+            }
+          });
+          
+          responseStream.writeHead(403, { 'Content-Type': 'application/json' });
+          responseStream.end(errorResponse);
+          return;
+        }
+      }
+      
       // 生成会话哈希用于sticky会话
       const sessionHash = sessionHelper.generateSessionHash(requestBody);
       
@@ -408,7 +495,7 @@ class ClaudeRelayService {
       const proxyAgent = await this._getProxyAgent(accountId);
       
       // 发送流式请求并捕获usage数据
-      return await this._makeClaudeStreamRequestWithUsageCapture(processedBody, accessToken, proxyAgent, clientHeaders, responseStream, usageCallback);
+      return await this._makeClaudeStreamRequestWithUsageCapture(processedBody, accessToken, proxyAgent, clientHeaders, responseStream, usageCallback, accountId, sessionHash);
     } catch (error) {
       logger.error('❌ Claude stream relay with usage capture failed:', error);
       throw error;
@@ -416,7 +503,7 @@ class ClaudeRelayService {
   }
 
   // 🌊 发送流式请求到Claude API（带usage数据捕获）
-  async _makeClaudeStreamRequestWithUsageCapture(body, accessToken, proxyAgent, clientHeaders, responseStream, usageCallback) {
+  async _makeClaudeStreamRequestWithUsageCapture(body, accessToken, proxyAgent, clientHeaders, responseStream, usageCallback, accountId, sessionHash) {
     return new Promise((resolve, reject) => {
       const url = new URL(this.claudeApiUrl);
       
@@ -457,16 +544,11 @@ class ClaudeRelayService {
         let buffer = '';
         let finalUsageReported = false; // 防止重复统计的标志
         let collectedUsageData = {}; // 收集来自不同事件的usage数据
+        let rateLimitDetected = false; // 限流检测标志
         
         // 监听数据块，解析SSE并寻找usage信息
         res.on('data', (chunk) => {
           const chunkStr = chunk.toString();
-          
-          // 记录原始SSE数据块
-          logger.info('📡 Raw SSE chunk received:', {
-            length: chunkStr.length,
-            content: chunkStr
-          });
           
           buffer += chunkStr;
           
@@ -481,11 +563,6 @@ class ClaudeRelayService {
           }
           
           for (const line of lines) {
-            // 记录每个SSE行
-            if (line.trim()) {
-              logger.info('📄 SSE Line:', line);
-            }
-            
             // 解析SSE数据寻找usage信息
             if (line.startsWith('data: ') && line.length > 6) {
               try {
@@ -517,6 +594,13 @@ class ClaudeRelayService {
                   }
                 }
                 
+                // 检查是否有限流错误
+                if (data.type === 'error' && data.error && data.error.message && 
+                    data.error.message.toLowerCase().includes('exceed your account\'s rate limit')) {
+                  rateLimitDetected = true;
+                  logger.warn(`🚫 Rate limit detected in stream for account ${accountId}`);
+                }
+                
               } catch (parseError) {
                 // 忽略JSON解析错误，继续处理
                 logger.debug('🔍 SSE line not JSON or no usage data:', line.slice(0, 100));
@@ -525,7 +609,7 @@ class ClaudeRelayService {
           }
         });
         
-        res.on('end', () => {
+        res.on('end', async () => {
           // 处理缓冲区中剩余的数据
           if (buffer.trim()) {
             responseStream.write(buffer);
@@ -535,6 +619,18 @@ class ClaudeRelayService {
           // 检查是否捕获到usage数据
           if (!finalUsageReported) {
             logger.warn('⚠️ Stream completed but no usage data was captured! This indicates a problem with SSE parsing or Claude API response format.');
+          }
+          
+          // 处理限流状态
+          if (rateLimitDetected || res.statusCode === 429) {
+            // 标记账号为限流状态并删除粘性会话映射
+            await claudeAccountService.markAccountRateLimited(accountId, sessionHash);
+          } else if (res.statusCode === 200) {
+            // 如果请求成功，检查并移除限流状态
+            const isRateLimited = await claudeAccountService.isAccountRateLimited(accountId);
+            if (isRateLimited) {
+              await claudeAccountService.removeAccountRateLimit(accountId);
+            }
           }
           
           logger.debug('🌊 Claude stream response with usage capture completed');

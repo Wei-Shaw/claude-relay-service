@@ -2,6 +2,26 @@ const Redis = require('ioredis');
 const config = require('../../config/config');
 const logger = require('../utils/logger');
 
+// 时区辅助函数
+function getDateInTimezone(date = new Date()) {
+  const offset = config.system.timezoneOffset || 8; // 默认UTC+8
+  const utcTime = date.getTime() + (date.getTimezoneOffset() * 60000);
+  const targetTime = new Date(utcTime + (offset * 3600000));
+  return targetTime;
+}
+
+// 获取配置时区的日期字符串 (YYYY-MM-DD)
+function getDateStringInTimezone(date = new Date()) {
+  const tzDate = getDateInTimezone(date);
+  return `${tzDate.getFullYear()}-${String(tzDate.getMonth() + 1).padStart(2, '0')}-${String(tzDate.getDate()).padStart(2, '0')}`;
+}
+
+// 获取配置时区的小时 (0-23)
+function getHourInTimezone(date = new Date()) {
+  const tzDate = getDateInTimezone(date);
+  return tzDate.getHours();
+}
+
 class RedisClient {
   constructor() {
     this.client = null;
@@ -139,18 +159,25 @@ class RedisClient {
   // 📊 使用统计相关操作（支持缓存token统计和模型信息）
   async incrementTokenUsage(keyId, tokens, inputTokens = 0, outputTokens = 0, cacheCreateTokens = 0, cacheReadTokens = 0, model = 'unknown') {
     const key = `usage:${keyId}`;
-    const today = new Date().toISOString().split('T')[0];
-    const currentMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+    const now = new Date();
+    const today = getDateStringInTimezone(now);
+    const tzDate = getDateInTimezone(now);
+    const currentMonth = `${tzDate.getFullYear()}-${String(tzDate.getMonth() + 1).padStart(2, '0')}`;
+    const currentHour = `${today}:${String(getHourInTimezone(now)).padStart(2, '0')}`; // 新增小时级别
+    
     const daily = `usage:daily:${keyId}:${today}`;
     const monthly = `usage:monthly:${keyId}:${currentMonth}`;
+    const hourly = `usage:hourly:${keyId}:${currentHour}`; // 新增小时级别key
 
     // 按模型统计的键
     const modelDaily = `usage:model:daily:${model}:${today}`;
     const modelMonthly = `usage:model:monthly:${model}:${currentMonth}`;
+    const modelHourly = `usage:model:hourly:${model}:${currentHour}`; // 新增模型小时级别
 
     // API Key级别的模型统计
     const keyModelDaily = `usage:${keyId}:model:daily:${model}:${today}`;
     const keyModelMonthly = `usage:${keyId}:model:monthly:${model}:${currentMonth}`;
+    const keyModelHourly = `usage:${keyId}:model:hourly:${model}:${currentHour}`; // 新增API Key模型小时级别
 
     // 智能处理输入输出token分配
     const finalInputTokens = inputTokens || 0;
@@ -218,21 +245,49 @@ class RedisClient {
       this.client.hincrby(keyModelMonthly, 'cacheReadTokens', finalCacheReadTokens),
       this.client.hincrby(keyModelMonthly, 'allTokens', totalTokens),
       this.client.hincrby(keyModelMonthly, 'requests', 1),
+      
+      // 小时级别统计
+      this.client.hincrby(hourly, 'tokens', coreTokens),
+      this.client.hincrby(hourly, 'inputTokens', finalInputTokens),
+      this.client.hincrby(hourly, 'outputTokens', finalOutputTokens),
+      this.client.hincrby(hourly, 'cacheCreateTokens', finalCacheCreateTokens),
+      this.client.hincrby(hourly, 'cacheReadTokens', finalCacheReadTokens),
+      this.client.hincrby(hourly, 'allTokens', totalTokens),
+      this.client.hincrby(hourly, 'requests', 1),
+      // 按模型统计 - 每小时
+      this.client.hincrby(modelHourly, 'inputTokens', finalInputTokens),
+      this.client.hincrby(modelHourly, 'outputTokens', finalOutputTokens),
+      this.client.hincrby(modelHourly, 'cacheCreateTokens', finalCacheCreateTokens),
+      this.client.hincrby(modelHourly, 'cacheReadTokens', finalCacheReadTokens),
+      this.client.hincrby(modelHourly, 'allTokens', totalTokens),
+      this.client.hincrby(modelHourly, 'requests', 1),
+      // API Key级别的模型统计 - 每小时
+      this.client.hincrby(keyModelHourly, 'inputTokens', finalInputTokens),
+      this.client.hincrby(keyModelHourly, 'outputTokens', finalOutputTokens),
+      this.client.hincrby(keyModelHourly, 'cacheCreateTokens', finalCacheCreateTokens),
+      this.client.hincrby(keyModelHourly, 'cacheReadTokens', finalCacheReadTokens),
+      this.client.hincrby(keyModelHourly, 'allTokens', totalTokens),
+      this.client.hincrby(keyModelHourly, 'requests', 1),
+      
       // 设置过期时间
       this.client.expire(daily, 86400 * 32), // 32天过期
       this.client.expire(monthly, 86400 * 365), // 1年过期
+      this.client.expire(hourly, 86400 * 7), // 小时统计7天过期
       this.client.expire(modelDaily, 86400 * 32), // 模型每日统计32天过期
       this.client.expire(modelMonthly, 86400 * 365), // 模型每月统计1年过期
+      this.client.expire(modelHourly, 86400 * 7), // 模型小时统计7天过期
       this.client.expire(keyModelDaily, 86400 * 32), // API Key模型每日统计32天过期
-      this.client.expire(keyModelMonthly, 86400 * 365) // API Key模型每月统计1年过期
+      this.client.expire(keyModelMonthly, 86400 * 365), // API Key模型每月统计1年过期
+      this.client.expire(keyModelHourly, 86400 * 7) // API Key模型小时统计7天过期
     ]);
   }
 
   async getUsageStats(keyId) {
     const totalKey = `usage:${keyId}`;
-    const today = new Date().toISOString().split('T')[0];
+    const today = getDateStringInTimezone();
     const dailyKey = `usage:daily:${keyId}:${today}`;
-    const currentMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+    const tzDate = getDateInTimezone();
+    const currentMonth = `${tzDate.getFullYear()}-${String(tzDate.getMonth() + 1).padStart(2, '0')}`;
     const monthlyKey = `usage:monthly:${keyId}:${currentMonth}`;
 
     const [total, daily, monthly] = await Promise.all([
@@ -501,7 +556,7 @@ class RedisClient {
   // 📊 获取今日系统统计
   async getTodayStats() {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getDateStringInTimezone();
       const dailyKeys = await this.client.keys(`usage:daily:*:${today}`);
 
       let totalRequestsToday = 0;

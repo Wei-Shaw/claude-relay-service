@@ -378,6 +378,43 @@ body::before {
 
 
 
+/* 自定义滚动条样式 */
+.custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(102, 126, 234, 0.3) rgba(102, 126, 234, 0.05);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(102, 126, 234, 0.05);
+    border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.4) 0%, rgba(118, 75, 162, 0.4) 100%);
+    border-radius: 10px;
+    transition: background 0.3s ease;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.6) 0%, rgba(118, 75, 162, 0.6) 100%);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.8) 0%, rgba(118, 75, 162, 0.8) 100%);
+}
+
+/* 弹窗滚动内容样式 */
+.modal-scroll-content {
+    max-height: calc(90vh - 160px);
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
 @media (max-width: 768px) {
     .glass, .glass-strong {
         margin: 16px;
@@ -391,5 +428,9 @@ body::before {
     .tab-btn {
         font-size: 14px;
         padding: 12px 8px;
+    }
+    
+    .modal-scroll-content {
+        max-height: calc(85vh - 120px);
     }
 }

@@ -77,6 +77,15 @@ const app = createApp({
             usageTrendChart: null,
             trendPeriod: 7,
             trendData: [],
+            trendGranularity: 'day', // 新增：趋势图粒度（day/hour）
+            
+            // API Keys 使用趋势
+            apiKeysUsageTrendChart: null,
+            apiKeysTrendData: {
+                data: [],
+                topApiKeys: [],
+                totalApiKeys: 0
+            },
             
             // 统一的日期筛选
             dateFilter: {
@@ -91,6 +100,10 @@ const app = createApp({
                     { value: '30days', label: '近30天', days: 30 }
                 ]
             },
+            defaultTime: [
+                new Date(2000, 1, 1, 0, 0, 0),
+                new Date(2000, 2, 1, 23, 59, 59),
+            ],
             showDateRangePicker: false, // 日期范围选择器显示状态
             dateRangeInputValue: '', // 日期范围显示文本
             
@@ -104,7 +117,10 @@ const app = createApp({
                 tokenLimit: '',
                 description: '',
                 concurrencyLimit: '',
-                claudeAccountId: ''
+                claudeAccountId: '',
+                enableModelRestriction: false,
+                restrictedModels: [],
+                modelInput: ''
             },
             apiKeyModelStats: {}, // 存储每个key的模型统计数据
             expandedApiKeys: {}, // 跟踪展开的API Keys
@@ -142,7 +158,10 @@ const app = createApp({
                 name: '',
                 tokenLimit: '',
                 concurrencyLimit: '',
-                claudeAccountId: ''
+                claudeAccountId: '',
+                enableModelRestriction: false,
+                restrictedModels: [],
+                modelInput: ''
             },
             
             // 账户
@@ -247,8 +266,11 @@ const app = createApp({
             // 初始化日期筛选器和图表数据
             this.initializeDateFilter();
             
-            // 预加载账号列表，以便在API Keys页面能正确显示绑定账号名称
-            this.loadAccounts().then(() => {
+            // 预加载账号列表和API Keys，以便正确显示绑定关系
+            Promise.all([
+                this.loadAccounts(),
+                this.loadApiKeys()
+            ]).then(() => {
                 // 根据当前活跃标签页加载数据
                 this.loadCurrentTabData();
             });
@@ -257,6 +279,7 @@ const app = createApp({
                 this.waitForChartJS().then(() => {
                     this.loadDashboardModelStats();
                     this.loadUsageTrend();
+                    this.loadApiKeysUsageTrend();
                 });
             }
         } else {
@@ -294,6 +317,20 @@ const app = createApp({
         // 获取绑定到特定账号的API Key数量
         getBoundApiKeysCount(accountId) {
             return this.apiKeys.filter(key => key.claudeAccountId === accountId).length;
+        },
+        
+        // 添加限制模型
+        addRestrictedModel(form) {
+            const model = form.modelInput.trim();
+            if (model && !form.restrictedModels.includes(model)) {
+                form.restrictedModels.push(model);
+                form.modelInput = '';
+            }
+        },
+        
+        // 移除限制模型
+        removeRestrictedModel(form, index) {
+            form.restrictedModels.splice(index, 1);
         },
         
         // Toast 通知方法
@@ -422,6 +459,10 @@ const app = createApp({
                 // 验证账户类型切换
                 if (this.editAccountForm.accountType === 'shared' && 
                     this.editAccountForm.originalAccountType === 'dedicated') {
+                    // 确保API Keys数据已加载，以便正确计算绑定数量
+                    if (this.apiKeys.length === 0) {
+                        await this.loadApiKeys();
+                    }
                     const boundKeysCount = this.getBoundApiKeysCount(this.editAccountForm.id);
                     if (boundKeysCount > 0) {
                         this.showToast(`无法切换到共享账户，该账户绑定了 ${boundKeysCount} 个API Key，请先解绑所有API Key`, 'error', '切换失败');
@@ -756,6 +797,7 @@ const app = createApp({
                     this.waitForChartJS().then(() => {
                         this.loadDashboardModelStats();
                         this.loadUsageTrend();
+                        this.loadApiKeysUsageTrend();
                     });
                     break;
                 case 'apiKeys':
@@ -766,7 +808,11 @@ const app = createApp({
                     ]);
                     break;
                 case 'accounts':
-                    this.loadAccounts();
+                    // 加载账户时同时加载API Keys，以便正确计算绑定数量
+                    Promise.all([
+                        this.loadAccounts(),
+                        this.loadApiKeys()
+                    ]);
                     break;
                 case 'models':
                     this.loadModelStats();
@@ -818,6 +864,19 @@ const app = createApp({
                     console.warn('Error destroying usage trend chart:', error);
                 }
                 this.usageTrendChart = null;
+            }
+            
+            // 清理API Keys使用趋势图表
+            if (this.apiKeysUsageTrendChart) {
+                try {
+                    // 先停止所有动画
+                    this.apiKeysUsageTrendChart.stop();
+                    // 再销毁图表
+                    this.apiKeysUsageTrendChart.destroy();
+                } catch (error) {
+                    console.warn('Error destroying API keys usage trend chart:', error);
+                }
+                this.apiKeysUsageTrendChart = null;
             }
         },
         
@@ -1017,6 +1076,7 @@ const app = createApp({
                         activeApiKeys: overview.activeApiKeys || 0,
                         totalAccounts: overview.totalClaudeAccounts || 0,
                         activeAccounts: overview.activeClaudeAccounts || 0,
+                        rateLimitedAccounts: overview.rateLimitedClaudeAccounts || 0,
                         todayRequests: recentActivity.requestsToday || 0,
                         totalRequests: overview.totalRequestsUsed || 0,
                         todayTokens: recentActivity.tokensToday || 0,
@@ -1151,7 +1211,9 @@ const app = createApp({
                         tokenLimit: this.apiKeyForm.tokenLimit && this.apiKeyForm.tokenLimit.trim() ? parseInt(this.apiKeyForm.tokenLimit) : null,
                         description: this.apiKeyForm.description || '',
                         concurrencyLimit: this.apiKeyForm.concurrencyLimit && this.apiKeyForm.concurrencyLimit.trim() ? parseInt(this.apiKeyForm.concurrencyLimit) : 0,
-                        claudeAccountId: this.apiKeyForm.claudeAccountId || null
+                        claudeAccountId: this.apiKeyForm.claudeAccountId || null,
+                        enableModelRestriction: this.apiKeyForm.enableModelRestriction,
+                        restrictedModels: this.apiKeyForm.restrictedModels
                     })
                 });
                 
@@ -1169,7 +1231,7 @@ const app = createApp({
                     
                     // 关闭创建弹窗并清理表单
                     this.showCreateApiKeyModal = false;
-                    this.apiKeyForm = { name: '', tokenLimit: '', description: '', concurrencyLimit: '', claudeAccountId: '' };
+                    this.apiKeyForm = { name: '', tokenLimit: '', description: '', concurrencyLimit: '', claudeAccountId: '', enableModelRestriction: false, restrictedModels: [], modelInput: '' };
                     
                     // 重新加载API Keys列表
                     await this.loadApiKeys();
@@ -1213,7 +1275,10 @@ const app = createApp({
                 name: key.name,
                 tokenLimit: key.tokenLimit || '',
                 concurrencyLimit: key.concurrencyLimit || '',
-                claudeAccountId: key.claudeAccountId || ''
+                claudeAccountId: key.claudeAccountId || '',
+                enableModelRestriction: key.enableModelRestriction || false,
+                restrictedModels: key.restrictedModels ? [...key.restrictedModels] : [],
+                modelInput: ''
             };
             this.showEditApiKeyModal = true;
         },
@@ -1225,7 +1290,10 @@ const app = createApp({
                 name: '',
                 tokenLimit: '',
                 concurrencyLimit: '',
-                claudeAccountId: ''
+                claudeAccountId: '',
+                enableModelRestriction: false,
+                restrictedModels: [],
+                modelInput: ''
             };
         },
 
@@ -1241,7 +1309,9 @@ const app = createApp({
                     body: JSON.stringify({
                         tokenLimit: this.editApiKeyForm.tokenLimit && this.editApiKeyForm.tokenLimit.toString().trim() !== '' ? parseInt(this.editApiKeyForm.tokenLimit) : 0,
                         concurrencyLimit: this.editApiKeyForm.concurrencyLimit && this.editApiKeyForm.concurrencyLimit.toString().trim() !== '' ? parseInt(this.editApiKeyForm.concurrencyLimit) : 0,
-                        claudeAccountId: this.editApiKeyForm.claudeAccountId || null
+                        claudeAccountId: this.editApiKeyForm.claudeAccountId || null,
+                        enableModelRestriction: this.editApiKeyForm.enableModelRestriction,
+                        restrictedModels: this.editApiKeyForm.restrictedModels
                     })
                 });
                 
@@ -1263,6 +1333,11 @@ const app = createApp({
         },
         
         async deleteAccount(accountId) {
+            // 确保API Keys数据已加载，以便正确计算绑定数量
+            if (this.apiKeys.length === 0) {
+                await this.loadApiKeys();
+            }
+            
             // 检查是否有API Key绑定到此账号
             const boundKeysCount = this.getBoundApiKeysCount(accountId);
             if (boundKeysCount > 0) {
@@ -1529,11 +1604,68 @@ const app = createApp({
             await this.loadUsageTrend();
         },
 
+        // 加载API Keys使用趋势数据
+        async loadApiKeysUsageTrend() {
+            console.log('Loading API keys usage trend data, granularity:', this.trendGranularity);
+            try {
+                let url = '/admin/api-keys-usage-trend?';
+                
+                if (this.trendGranularity === 'hour') {
+                    // 小时粒度，传递开始和结束时间
+                    url += `granularity=hour`;
+                    if (this.dateFilter.customRange && this.dateFilter.customRange.length === 2) {
+                        url += `&startDate=${encodeURIComponent(this.dateFilter.customRange[0])}`;
+                        url += `&endDate=${encodeURIComponent(this.dateFilter.customRange[1])}`;
+                    }
+                } else {
+                    // 天粒度，传递天数
+                    url += `granularity=day&days=${this.trendPeriod}`;
+                }
+                
+                const response = await fetch(url, {
+                    headers: { 'Authorization': 'Bearer ' + this.authToken }
+                });
+                
+                if (!response.ok) {
+                    console.error('API keys usage trend API error:', response.status, response.statusText);
+                    return;
+                }
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    this.apiKeysTrendData = {
+                        data: data.data || [],
+                        topApiKeys: data.topApiKeys || [],
+                        totalApiKeys: data.totalApiKeys || 0
+                    };
+                    console.log('Loaded API keys trend data:', this.apiKeysTrendData);
+                    this.updateApiKeysUsageTrendChart();
+                }
+            } catch (error) {
+                console.error('Failed to load API keys usage trend:', error);
+            }
+        },
+
         // 加载使用趋势数据
         async loadUsageTrend() {
-            console.log('Loading usage trend data, period:', this.trendPeriod, 'authToken:', !!this.authToken);
+            console.log('Loading usage trend data, period:', this.trendPeriod, 'granularity:', this.trendGranularity, 'authToken:', !!this.authToken);
             try {
-                const response = await fetch('/admin/usage-trend?days=' + this.trendPeriod, {
+                let url = '/admin/usage-trend?';
+                
+                if (this.trendGranularity === 'hour') {
+                    // 小时粒度，传递开始和结束时间
+                    url += `granularity=hour`;
+                    if (this.dateFilter.customRange && this.dateFilter.customRange.length === 2) {
+                        url += `&startDate=${encodeURIComponent(this.dateFilter.customRange[0])}`;
+                        url += `&endDate=${encodeURIComponent(this.dateFilter.customRange[1])}`;
+                    }
+                } else {
+                    // 天粒度，传递天数
+                    url += `granularity=day&days=${this.trendPeriod}`;
+                }
+                
+                const response = await fetch(url, {
                     headers: { 'Authorization': 'Bearer ' + this.authToken }
                 });
                 
@@ -1601,7 +1733,23 @@ const app = createApp({
                 return;
             }
             
-            const labels = this.trendData.map(item => item.date);
+            // 根据粒度格式化标签
+            const labels = this.trendData.map(item => {
+                if (this.trendGranularity === 'hour') {
+                    // 小时粒度：从hour字段提取时间
+                    if (item.hour) {
+                        const date = new Date(item.hour);
+                        return `${String(date.getHours()).padStart(2, '0')}:00`;
+                    }
+                    // 后备方案：从date字段解析
+                    const [, time] = item.date.split(':');
+                    return `${time}:00`;
+                } else {
+                    // 天粒度：显示日期
+                    return item.date;
+                }
+            });
+            
             const inputData = this.trendData.map(item => item.inputTokens || 0);
             const outputData = this.trendData.map(item => item.outputTokens || 0);
             const cacheCreateData = this.trendData.map(item => item.cacheCreateTokens || 0);
@@ -1676,6 +1824,19 @@ const app = createApp({
                         intersect: false,
                     },
                     scales: {
+                        x: {
+                            type: 'category',
+                            display: true,
+                            title: {
+                                display: true,
+                                text: this.trendGranularity === 'hour' ? '时间' : '日期'
+                            },
+                            ticks: {
+                                autoSkip: true,
+                                maxRotation: this.trendGranularity === 'hour' ? 45 : 0,
+                                minRotation: this.trendGranularity === 'hour' ? 45 : 0
+                            }
+                        },
                         y: {
                             type: 'linear',
                             display: true,
@@ -1711,6 +1872,25 @@ const app = createApp({
                             mode: 'index',
                             intersect: false,
                             callbacks: {
+                                title: (tooltipItems) => {
+                                    if (tooltipItems.length === 0) return '';
+                                    const index = tooltipItems[0].dataIndex;
+                                    const item = this.trendData[index];
+                                    
+                                    if (this.trendGranularity === 'hour' && item.hour) {
+                                        // 小时粒度：显示完整的日期时间
+                                        const date = new Date(item.hour);
+                                        return date.toLocaleString('zh-CN', {
+                                            year: 'numeric',
+                                            month: '2-digit',
+                                            day: '2-digit',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        });
+                                    }
+                                    // 天粒度：保持原有标签
+                                    return tooltipItems[0].label;
+                                },
                                 label: function(context) {
                                     const label = context.dataset.label || '';
                                     let value = context.parsed.y;
@@ -1736,6 +1916,178 @@ const app = createApp({
             } catch (error) {
                 console.error('Error creating usage trend chart:', error);
                 this.usageTrendChart = null;
+            }
+        },
+
+        // 更新API Keys使用趋势图
+        updateApiKeysUsageTrendChart() {
+            // 检查Chart.js是否已加载
+            if (typeof Chart === 'undefined') {
+                console.warn('Chart.js not loaded yet, retrying...');
+                setTimeout(() => this.updateApiKeysUsageTrendChart(), 500);
+                return;
+            }
+            
+            // 严格检查DOM元素是否有效
+            if (!this.isElementValid('apiKeysUsageTrendChart')) {
+                console.error('API keys usage trend chart canvas element not found or invalid');
+                return;
+            }
+            
+            const ctx = document.getElementById('apiKeysUsageTrendChart');
+            
+            // 安全销毁现有图表
+            if (this.apiKeysUsageTrendChart) {
+                try {
+                    this.apiKeysUsageTrendChart.destroy();
+                } catch (error) {
+                    console.warn('Error destroying API keys usage trend chart:', error);
+                }
+                this.apiKeysUsageTrendChart = null;
+            }
+            
+            // 如果没有数据，不创建图表
+            if (!this.apiKeysTrendData.data || this.apiKeysTrendData.data.length === 0) {
+                console.warn('No API keys trend data available, skipping chart creation');
+                return;
+            }
+            
+            // 准备数据
+            const labels = this.apiKeysTrendData.data.map(item => {
+                if (this.trendGranularity === 'hour') {
+                    const date = new Date(item.hour);
+                    return `${String(date.getHours()).padStart(2, '0')}:00`;
+                }
+                return item.date;
+            });
+            
+            // 获取所有API Key的数据集
+            const datasets = [];
+            const colors = [
+                'rgb(102, 126, 234)',
+                'rgb(240, 147, 251)',
+                'rgb(59, 130, 246)',
+                'rgb(147, 51, 234)',
+                'rgb(34, 197, 94)',
+                'rgb(251, 146, 60)',
+                'rgb(239, 68, 68)',
+                'rgb(16, 185, 129)',
+                'rgb(245, 158, 11)',
+                'rgb(236, 72, 153)'
+            ];
+            
+            // 只显示前10个使用量最多的API Key
+            this.apiKeysTrendData.topApiKeys.forEach((apiKeyId, index) => {
+                const data = this.apiKeysTrendData.data.map(item => {
+                    return item.apiKeys[apiKeyId] ? item.apiKeys[apiKeyId].tokens : 0;
+                });
+                
+                // 获取API Key名称
+                const apiKeyName = this.apiKeysTrendData.data.find(item => 
+                    item.apiKeys[apiKeyId]
+                )?.apiKeys[apiKeyId]?.name || `API Key ${apiKeyId}`;
+                
+                datasets.push({
+                    label: apiKeyName,
+                    data: data,
+                    borderColor: colors[index % colors.length],
+                    backgroundColor: colors[index % colors.length] + '20',
+                    tension: 0.3,
+                    fill: false
+                });
+            });
+            
+            try {
+                // 最后一次检查元素有效性
+                if (!this.isElementValid('apiKeysUsageTrendChart')) {
+                    throw new Error('Canvas element is not valid for chart creation');
+                }
+                
+                this.apiKeysUsageTrendChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: false, // 禁用动画防止异步渲染问题
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        scales: {
+                            x: {
+                                type: 'category',
+                                display: true,
+                                title: {
+                                    display: true,
+                                    text: this.trendGranularity === 'hour' ? '时间' : '日期'
+                                },
+                                ticks: {
+                                    autoSkip: true,
+                                    maxRotation: this.trendGranularity === 'hour' ? 45 : 0,
+                                    minRotation: this.trendGranularity === 'hour' ? 45 : 0
+                                }
+                            },
+                            y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                title: {
+                                    display: true,
+                                    text: 'Token 数量'
+                                },
+                                ticks: {
+                                    callback: function(value) {
+                                        return value.toLocaleString();
+                                    }
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                                labels: {
+                                    usePointStyle: true,
+                                    padding: 15
+                                }
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                                callbacks: {
+                                    title: (tooltipItems) => {
+                                        if (tooltipItems.length === 0) return '';
+                                        const index = tooltipItems[0].dataIndex;
+                                        const item = this.apiKeysTrendData.data[index];
+                                        
+                                        if (this.trendGranularity === 'hour' && item.hour) {
+                                            const date = new Date(item.hour);
+                                            return date.toLocaleString('zh-CN', {
+                                                year: 'numeric',
+                                                month: '2-digit',
+                                                day: '2-digit',
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                            });
+                                        }
+                                        return tooltipItems[0].label;
+                                    },
+                                    label: function(context) {
+                                        const label = context.dataset.label || '';
+                                        const value = context.parsed.y;
+                                        return label + ': ' + value.toLocaleString() + ' tokens';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error creating API keys usage trend chart:', error);
+                this.apiKeysUsageTrendChart = null;
             }
         },
 
@@ -1933,20 +2285,51 @@ const app = createApp({
             // 根据预设计算并设置自定义时间框的值
             const option = this.dateFilter.presetOptions.find(opt => opt.value === preset);
             if (option) {
-                const today = new Date();
-                const startDate = new Date(today);
-                startDate.setDate(today.getDate() - (option.days - 1));
+                const now = new Date();
+                let startDate, endDate;
+                
+                if (this.trendGranularity === 'hour') {
+                    // 小时粒度的预设处理
+                    if (preset === 'last24h') {
+                        endDate = new Date(now);
+                        startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                    } else if (preset === 'yesterday') {
+                        // 昨天的00:00到23:59
+                        startDate = new Date(now);
+                        startDate.setDate(startDate.getDate() - 1);
+                        startDate.setHours(0, 0, 0, 0);
+                        endDate = new Date(startDate);
+                        endDate.setHours(23, 59, 59, 999);
+                    } else if (preset === 'dayBefore') {
+                        // 前天的00:00到23:59
+                        startDate = new Date(now);
+                        startDate.setDate(startDate.getDate() - 2);
+                        startDate.setHours(0, 0, 0, 0);
+                        endDate = new Date(startDate);
+                        endDate.setHours(23, 59, 59, 999);
+                    }
+                } else {
+                    // 天粒度的预设处理（保持原有逻辑）
+                    endDate = new Date(now);
+                    startDate = new Date(now);
+                    startDate.setDate(now.getDate() - (option.days - 1));
+                    startDate.setHours(0, 0, 0, 0);
+                    endDate.setHours(23, 59, 59, 999);
+                }
                 
                 // 格式化为 Element Plus 需要的格式
                 const formatDate = (date) => {
                     return date.getFullYear() + '-' + 
                            String(date.getMonth() + 1).padStart(2, '0') + '-' + 
-                           String(date.getDate()).padStart(2, '0') + ' 00:00:00';
+                           String(date.getDate()).padStart(2, '0') + ' ' +
+                           String(date.getHours()).padStart(2, '0') + ':' +
+                           String(date.getMinutes()).padStart(2, '0') + ':' +
+                           String(date.getSeconds()).padStart(2, '0');
                 };
                 
                 this.dateFilter.customRange = [
                     formatDate(startDate),
-                    formatDate(today)
+                    formatDate(endDate)
                 ];
             }
             
@@ -2105,6 +2488,61 @@ const app = createApp({
             // 重新加载数据
             this.loadDashboardModelStats();
             this.loadUsageTrend();
+            this.loadApiKeysUsageTrend();
+        },
+        
+        // 设置趋势图粒度
+        setTrendGranularity(granularity) {
+            console.log('Setting trend granularity to:', granularity);
+            this.trendGranularity = granularity;
+            
+            // 根据粒度更新预设选项
+            if (granularity === 'hour') {
+                this.dateFilter.presetOptions = [
+                    { value: 'last24h', label: '近24小时', hours: 24 },
+                    { value: 'yesterday', label: '昨天', hours: 24 },
+                    { value: 'dayBefore', label: '前天', hours: 24 }
+                ];
+                
+                // 检查当前自定义日期范围是否超过24小时
+                if (this.dateFilter.type === 'custom' && this.dateFilter.customRange && this.dateFilter.customRange.length === 2) {
+                    const start = new Date(this.dateFilter.customRange[0]);
+                    const end = new Date(this.dateFilter.customRange[1]);
+                    const hoursDiff = (end - start) / (1000 * 60 * 60);
+                    
+                    if (hoursDiff > 24) {
+                        this.showToast('切换到小时粒度，日期范围已调整为近24小时', 'info');
+                        this.dateFilter.preset = 'last24h';
+                        this.setDateFilterPreset('last24h');
+                    }
+                } else if (['today', '7days', '30days'].includes(this.dateFilter.preset)) {
+                    // 预设不兼容，切换到近24小时
+                    this.dateFilter.preset = 'last24h';
+                    this.setDateFilterPreset('last24h');
+                }
+            } else {
+                // 恢复天粒度的选项
+                this.dateFilter.presetOptions = [
+                    { value: 'today', label: '今天', days: 1 },
+                    { value: '7days', label: '近7天', days: 7 },
+                    { value: '30days', label: '近30天', days: 30 }
+                ];
+                
+                // 如果当前是小时粒度的预设，切换到天粒度的默认预设
+                if (['last24h', 'yesterday', 'dayBefore'].includes(this.dateFilter.preset)) {
+                    this.dateFilter.preset = '7days';
+                    this.setDateFilterPreset('7days');
+                } else if (this.dateFilter.type === 'custom') {
+                    // 自定义日期范围在天粒度下通常不需要调整，因为24小时肯定在31天内
+                    // 只需要重新加载数据
+                    this.refreshChartsData();
+                    return;
+                }
+            }
+            
+            // 重新加载数据
+            this.loadUsageTrend();
+            this.loadApiKeysUsageTrend();
         },
 
         // API Keys 日期筛选方法
@@ -2293,22 +2731,47 @@ const app = createApp({
                 // 检查日期范围限制
                 const start = new Date(value[0]);
                 const end = new Date(value[1]);
-                const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
                 
-                if (daysDiff > 31) {
-                    this.showToast('日期范围不能超过31天', 'warning', '范围限制');
-                    // 重置为默认7天
-                    this.dateFilter.customRange = null;
-                    this.dateFilter.type = 'preset';
-                    this.dateFilter.preset = '7days';
-                    return;
+                if (this.trendGranularity === 'hour') {
+                    // 小时粒度：限制24小时
+                    const hoursDiff = (end - start) / (1000 * 60 * 60);
+                    if (hoursDiff > 24) {
+                        this.showToast('小时粒度下日期范围不能超过24小时', 'warning', '范围限制');
+                        // 调整结束时间为开始时间后24小时
+                        const newEnd = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+                        const formatDate = (date) => {
+                            return date.getFullYear() + '-' + 
+                                   String(date.getMonth() + 1).padStart(2, '0') + '-' + 
+                                   String(date.getDate()).padStart(2, '0') + ' ' +
+                                   String(date.getHours()).padStart(2, '0') + ':' +
+                                   String(date.getMinutes()).padStart(2, '0') + ':' +
+                                   String(date.getSeconds()).padStart(2, '0');
+                        };
+                        this.dateFilter.customRange = [
+                            formatDate(start),
+                            formatDate(newEnd)
+                        ];
+                        this.dateFilter.customEnd = newEnd.toISOString().split('T')[0];
+                        return;
+                    }
+                } else {
+                    // 天粒度：限制31天
+                    const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                    if (daysDiff > 31) {
+                        this.showToast('日期范围不能超过31天', 'warning', '范围限制');
+                        // 重置为默认7天
+                        this.dateFilter.customRange = null;
+                        this.dateFilter.type = 'preset';
+                        this.dateFilter.preset = '7days';
+                        return;
+                    }
                 }
                 
                 this.refreshChartsData();
             } else if (value === null) {
                 // 清空时恢复默认
                 this.dateFilter.type = 'preset';
-                this.dateFilter.preset = '7days';
+                this.dateFilter.preset = this.trendGranularity === 'hour' ? 'last24h' : '7days';
                 this.dateFilter.customStart = '';
                 this.dateFilter.customEnd = '';
                 this.refreshChartsData();

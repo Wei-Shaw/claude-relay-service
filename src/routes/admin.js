@@ -32,7 +32,9 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       tokenLimit,
       expiresAt,
       claudeAccountId,
-      concurrencyLimit
+      concurrencyLimit,
+      enableModelRestriction,
+      restrictedModels
     } = req.body;
 
     // 输入验证
@@ -57,13 +59,24 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Concurrency limit must be a non-negative integer' });
     }
 
+    // 验证模型限制字段
+    if (enableModelRestriction !== undefined && typeof enableModelRestriction !== 'boolean') {
+      return res.status(400).json({ error: 'Enable model restriction must be a boolean' });
+    }
+
+    if (restrictedModels !== undefined && !Array.isArray(restrictedModels)) {
+      return res.status(400).json({ error: 'Restricted models must be an array' });
+    }
+
     const newKey = await apiKeyService.generateApiKey({
       name,
       description,
       tokenLimit,
       expiresAt,
       claudeAccountId,
-      concurrencyLimit
+      concurrencyLimit,
+      enableModelRestriction,
+      restrictedModels
     });
 
     logger.success(`🔑 Admin created new API key: ${name}`);
@@ -78,9 +91,9 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
 router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
   try {
     const { keyId } = req.params;
-    const { tokenLimit, concurrencyLimit, claudeAccountId } = req.body;
+    const { tokenLimit, concurrencyLimit, claudeAccountId, enableModelRestriction, restrictedModels } = req.body;
 
-    // 只允许更新tokenLimit、concurrencyLimit和claudeAccountId
+    // 只允许更新指定字段
     const updates = {};
     
     if (tokenLimit !== undefined && tokenLimit !== null && tokenLimit !== '') {
@@ -100,6 +113,21 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
     if (claudeAccountId !== undefined) {
       // 空字符串表示解绑，null或空字符串都设置为空字符串
       updates.claudeAccountId = claudeAccountId || '';
+    }
+
+    // 处理模型限制字段
+    if (enableModelRestriction !== undefined) {
+      if (typeof enableModelRestriction !== 'boolean') {
+        return res.status(400).json({ error: 'Enable model restriction must be a boolean' });
+      }
+      updates.enableModelRestriction = enableModelRestriction;
+    }
+
+    if (restrictedModels !== undefined) {
+      if (!Array.isArray(restrictedModels)) {
+        return res.status(400).json({ error: 'Restricted models must be an array' });
+      }
+      updates.restrictedModels = restrictedModels;
     }
 
     await apiKeyService.updateApiKey(keyId, updates);
@@ -351,6 +379,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
     
     const activeApiKeys = apiKeys.filter(key => key.isActive).length;
     const activeAccounts = accounts.filter(acc => acc.isActive && acc.status === 'active').length;
+    const rateLimitedAccounts = accounts.filter(acc => acc.rateLimitStatus && acc.rateLimitStatus.isRateLimited).length;
 
     const dashboard = {
       overview: {
@@ -358,6 +387,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
         activeApiKeys,
         totalClaudeAccounts: accounts.length,
         activeClaudeAccounts: activeAccounts,
+        rateLimitedClaudeAccounts: rateLimitedAccounts,
         totalTokensUsed,
         totalRequestsUsed,
         totalInputTokensUsed,
@@ -528,22 +558,140 @@ router.post('/cleanup', authenticateAdmin, async (req, res) => {
 // 获取使用趋势数据
 router.get('/usage-trend', authenticateAdmin, async (req, res) => {
   try {
-    const { days = 7 } = req.query;
-    const daysCount = parseInt(days) || 7;
+    const { days = 7, granularity = 'day', startDate, endDate } = req.query;
     const client = redis.getClientSafe();
     
     const trendData = [];
-    const today = new Date();
     
-    // 获取过去N天的数据
-    for (let i = 0; i < daysCount; i++) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
+    if (granularity === 'hour') {
+      // 小时粒度统计
+      let startTime, endTime;
       
-      // 汇总当天所有API Key的使用数据
-      const pattern = `usage:daily:*:${dateStr}`;
-      const keys = await client.keys(pattern);
+      if (startDate && endDate) {
+        // 使用自定义时间范围
+        startTime = new Date(startDate);
+        endTime = new Date(endDate);
+      } else {
+        // 默认最近24小时
+        endTime = new Date();
+        startTime = new Date(endTime.getTime() - 24 * 60 * 60 * 1000);
+      }
+      
+      // 确保时间范围不超过24小时
+      const timeDiff = endTime - startTime;
+      if (timeDiff > 24 * 60 * 60 * 1000) {
+        return res.status(400).json({ 
+          error: '小时粒度查询时间范围不能超过24小时' 
+        });
+      }
+      
+      // 按小时遍历
+      const currentHour = new Date(startTime);
+      currentHour.setMinutes(0, 0, 0);
+      
+      while (currentHour <= endTime) {
+        const dateStr = currentHour.toISOString().split('T')[0];
+        const hour = String(currentHour.getHours()).padStart(2, '0');
+        const hourKey = `${dateStr}:${hour}`;
+        
+        // 获取当前小时的模型统计数据
+        const modelPattern = `usage:model:hourly:*:${hourKey}`;
+        const modelKeys = await client.keys(modelPattern);
+        
+        let hourInputTokens = 0;
+        let hourOutputTokens = 0;
+        let hourRequests = 0;
+        let hourCacheCreateTokens = 0;
+        let hourCacheReadTokens = 0;
+        let hourCost = 0;
+        
+        for (const modelKey of modelKeys) {
+          const modelMatch = modelKey.match(/usage:model:hourly:(.+):\d{4}-\d{2}-\d{2}:\d{2}$/);
+          if (!modelMatch) continue;
+          
+          const model = modelMatch[1];
+          const data = await client.hgetall(modelKey);
+          
+          if (data && Object.keys(data).length > 0) {
+            const modelInputTokens = parseInt(data.inputTokens) || 0;
+            const modelOutputTokens = parseInt(data.outputTokens) || 0;
+            const modelCacheCreateTokens = parseInt(data.cacheCreateTokens) || 0;
+            const modelCacheReadTokens = parseInt(data.cacheReadTokens) || 0;
+            const modelRequests = parseInt(data.requests) || 0;
+            
+            hourInputTokens += modelInputTokens;
+            hourOutputTokens += modelOutputTokens;
+            hourCacheCreateTokens += modelCacheCreateTokens;
+            hourCacheReadTokens += modelCacheReadTokens;
+            hourRequests += modelRequests;
+            
+            const modelUsage = {
+              input_tokens: modelInputTokens,
+              output_tokens: modelOutputTokens,
+              cache_creation_input_tokens: modelCacheCreateTokens,
+              cache_read_input_tokens: modelCacheReadTokens
+            };
+            const modelCostResult = CostCalculator.calculateCost(modelUsage, model);
+            hourCost += modelCostResult.costs.total;
+          }
+        }
+        
+        // 如果没有模型级别的数据，尝试API Key级别的数据
+        if (modelKeys.length === 0) {
+          const pattern = `usage:hourly:*:${hourKey}`;
+          const keys = await client.keys(pattern);
+          
+          for (const key of keys) {
+            const data = await client.hgetall(key);
+            if (data) {
+              hourInputTokens += parseInt(data.inputTokens) || 0;
+              hourOutputTokens += parseInt(data.outputTokens) || 0;
+              hourRequests += parseInt(data.requests) || 0;
+              hourCacheCreateTokens += parseInt(data.cacheCreateTokens) || 0;
+              hourCacheReadTokens += parseInt(data.cacheReadTokens) || 0;
+            }
+          }
+          
+          const usage = {
+            input_tokens: hourInputTokens,
+            output_tokens: hourOutputTokens,
+            cache_creation_input_tokens: hourCacheCreateTokens,
+            cache_read_input_tokens: hourCacheReadTokens
+          };
+          const costResult = CostCalculator.calculateCost(usage, 'unknown');
+          hourCost = costResult.costs.total;
+        }
+        
+        trendData.push({
+          date: hourKey,
+          hour: currentHour.toISOString(),
+          inputTokens: hourInputTokens,
+          outputTokens: hourOutputTokens,
+          requests: hourRequests,
+          cacheCreateTokens: hourCacheCreateTokens,
+          cacheReadTokens: hourCacheReadTokens,
+          totalTokens: hourInputTokens + hourOutputTokens + hourCacheCreateTokens + hourCacheReadTokens,
+          cost: hourCost
+        });
+        
+        // 移到下一个小时
+        currentHour.setHours(currentHour.getHours() + 1);
+      }
+      
+    } else {
+      // 天粒度统计（保持原有逻辑）
+      const daysCount = parseInt(days) || 7;
+      const today = new Date();
+      
+      // 获取过去N天的数据
+      for (let i = 0; i < daysCount; i++) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        
+        // 汇总当天所有API Key的使用数据
+        const pattern = `usage:daily:*:${dateStr}`;
+        const keys = await client.keys(pattern);
       
       let dayInputTokens = 0;
       let dayOutputTokens = 0;
@@ -553,7 +701,7 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
       let dayCost = 0;
       
       // 按模型统计使用量
-      const modelUsageMap = new Map();
+      // const modelUsageMap = new Map();
       
       // 获取当天所有模型的使用数据
       const modelPattern = `usage:model:daily:*:${dateStr}`;
@@ -630,10 +778,16 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
       });
     }
     
-    // 按日期正序排列
-    trendData.sort((a, b) => new Date(a.date) - new Date(b.date));
+    }
     
-    res.json({ success: true, data: trendData });
+    // 按日期正序排列
+    if (granularity === 'hour') {
+      trendData.sort((a, b) => new Date(a.hour) - new Date(b.hour));
+    } else {
+      trendData.sort((a, b) => new Date(a.date) - new Date(b.date));
+    }
+    
+    res.json({ success: true, data: trendData, granularity });
   } catch (error) {
     logger.error('❌ Failed to get usage trend:', error);
     res.status(500).json({ error: 'Failed to get usage trend', message: error.message });
@@ -832,6 +986,152 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
   }
 });
 
+
+// 获取按API Key分组的使用趋势
+router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
+  try {
+    const { granularity = 'day', days = 7, startDate, endDate } = req.query;
+    
+    logger.info(`📊 Getting API keys usage trend, granularity: ${granularity}, days: ${days}`);
+    
+    const client = redis.getClientSafe();
+    const trendData = [];
+    
+    // 获取所有API Keys
+    const apiKeys = await apiKeyService.getAllApiKeys();
+    const apiKeyMap = new Map(apiKeys.map(key => [key.id, key]));
+    
+    if (granularity === 'hour') {
+      // 小时粒度统计
+      let endTime, startTime;
+      
+      if (startDate && endDate) {
+        // 自定义时间范围
+        startTime = new Date(startDate);
+        endTime = new Date(endDate);
+      } else {
+        // 默认近24小时
+        endTime = new Date();
+        startTime = new Date(endTime.getTime() - 24 * 60 * 60 * 1000);
+      }
+      
+      // 按小时遍历
+      const currentHour = new Date(startTime);
+      currentHour.setMinutes(0, 0, 0);
+      
+      while (currentHour <= endTime) {
+        const hourKey = currentHour.toISOString().split(':')[0].replace('T', ':');
+        
+        // 获取这个小时所有API Key的数据
+        const pattern = `usage:hourly:*:${hourKey}`;
+        const keys = await client.keys(pattern);
+        
+        const hourData = {
+          hour: currentHour.toISOString(),
+          apiKeys: {}
+        };
+        
+        for (const key of keys) {
+          const match = key.match(/usage:hourly:(.+?):\d{4}-\d{2}-\d{2}:\d{2}/);
+          if (!match) continue;
+          
+          const apiKeyId = match[1];
+          const data = await client.hgetall(key);
+          
+          if (data && apiKeyMap.has(apiKeyId)) {
+            const totalTokens = (parseInt(data.inputTokens) || 0) + 
+                              (parseInt(data.outputTokens) || 0) + 
+                              (parseInt(data.cacheCreateTokens) || 0) + 
+                              (parseInt(data.cacheReadTokens) || 0);
+            
+            hourData.apiKeys[apiKeyId] = {
+              name: apiKeyMap.get(apiKeyId).name,
+              tokens: totalTokens
+            };
+          }
+        }
+        
+        trendData.push(hourData);
+        currentHour.setHours(currentHour.getHours() + 1);
+      }
+      
+    } else {
+      // 天粒度统计
+      const daysCount = parseInt(days) || 7;
+      const today = new Date();
+      
+      // 获取过去N天的数据
+      for (let i = 0; i < daysCount; i++) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        
+        // 获取这一天所有API Key的数据
+        const pattern = `usage:daily:*:${dateStr}`;
+        const keys = await client.keys(pattern);
+        
+        const dayData = {
+          date: dateStr,
+          apiKeys: {}
+        };
+        
+        for (const key of keys) {
+          const match = key.match(/usage:daily:(.+?):\d{4}-\d{2}-\d{2}/);
+          if (!match) continue;
+          
+          const apiKeyId = match[1];
+          const data = await client.hgetall(key);
+          
+          if (data && apiKeyMap.has(apiKeyId)) {
+            const totalTokens = (parseInt(data.inputTokens) || 0) + 
+                              (parseInt(data.outputTokens) || 0) + 
+                              (parseInt(data.cacheCreateTokens) || 0) + 
+                              (parseInt(data.cacheReadTokens) || 0);
+            
+            dayData.apiKeys[apiKeyId] = {
+              name: apiKeyMap.get(apiKeyId).name,
+              tokens: totalTokens
+            };
+          }
+        }
+        
+        trendData.push(dayData);
+      }
+    }
+    
+    // 按时间正序排列
+    if (granularity === 'hour') {
+      trendData.sort((a, b) => new Date(a.hour) - new Date(b.hour));
+    } else {
+      trendData.sort((a, b) => new Date(a.date) - new Date(b.date));
+    }
+    
+    // 计算每个API Key的总token数，用于排序
+    const apiKeyTotals = new Map();
+    for (const point of trendData) {
+      for (const [apiKeyId, data] of Object.entries(point.apiKeys)) {
+        apiKeyTotals.set(apiKeyId, (apiKeyTotals.get(apiKeyId) || 0) + data.tokens);
+      }
+    }
+    
+    // 获取前10个使用量最多的API Key
+    const topApiKeys = Array.from(apiKeyTotals.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([apiKeyId]) => apiKeyId);
+    
+    res.json({ 
+      success: true, 
+      data: trendData, 
+      granularity,
+      topApiKeys,
+      totalApiKeys: apiKeyTotals.size
+    });
+  } catch (error) {
+    logger.error('❌ Failed to get API keys usage trend:', error);
+    res.status(500).json({ error: 'Failed to get API keys usage trend', message: error.message });
+  }
+});
 
 // 计算总体使用费用
 router.get('/usage-costs', authenticateAdmin, async (req, res) => {

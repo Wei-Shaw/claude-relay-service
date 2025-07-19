@@ -13,6 +13,8 @@ services:
       - PORT=3000
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-}  # 可选：预设管理员用户名
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}  # 可选：预设管理员密码
     volumes:
       - ./logs:/app/logs
       - ./data:/app/data

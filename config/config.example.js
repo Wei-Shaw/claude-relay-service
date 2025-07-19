@@ -62,7 +62,9 @@ const config = {
   system: {
     cleanupInterval: parseInt(process.env.CLEANUP_INTERVAL) || 3600000, // 1小时
     tokenUsageRetention: parseInt(process.env.TOKEN_USAGE_RETENTION) || 2592000000, // 30天
-    healthCheckInterval: parseInt(process.env.HEALTH_CHECK_INTERVAL) || 60000 // 1分钟
+    healthCheckInterval: parseInt(process.env.HEALTH_CHECK_INTERVAL) || 60000, // 1分钟
+    timezone: process.env.SYSTEM_TIMEZONE || 'Asia/Shanghai', // 默认UTC+8（中国时区）
+    timezoneOffset: parseInt(process.env.TIMEZONE_OFFSET) || 8 // UTC偏移小时数，默认+8
   },
 
   // 🎨 Web界面配置

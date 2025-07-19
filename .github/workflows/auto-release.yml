@@ -1,0 +1,191 @@
+name: Auto Release on Push to Main
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-release:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Get latest tag
+      id: get_latest_tag
+      run: |
+        # 获取最新的版本标签
+        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+        echo "Latest tag: $LATEST_TAG"
+        echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+        
+        # 提取版本号部分（去掉 v 前缀）
+        VERSION=${LATEST_TAG#v}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Calculate next version
+      id: next_version
+      run: |
+        VERSION="${{ steps.get_latest_tag.outputs.version }}"
+        
+        # 分割版本号为 major.minor.patch
+        IFS='.' read -r -a version_parts <<< "$VERSION"
+        MAJOR="${version_parts[0]:-0}"
+        MINOR="${version_parts[1]:-0}"
+        PATCH="${version_parts[2]:-0}"
+        
+        # 递增 patch 版本号
+        NEW_PATCH=$((PATCH + 1))
+        NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+        NEW_TAG="v${NEW_VERSION}"
+        
+        echo "New version: $NEW_VERSION"
+        echo "New tag: $NEW_TAG"
+        echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+
+    - name: Install git-cliff
+      run: |
+        wget -q https://github.com/orhun/git-cliff/releases/download/v1.4.0/git-cliff-1.4.0-x86_64-unknown-linux-gnu.tar.gz
+        tar -xzf git-cliff-1.4.0-x86_64-unknown-linux-gnu.tar.gz
+        chmod +x git-cliff-1.4.0/git-cliff
+        sudo mv git-cliff-1.4.0/git-cliff /usr/local/bin/
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # 获取自上次标签以来的提交，如果 git-cliff 输出包含 [unreleased]，则移除它
+        CHANGELOG=$(git-cliff --config .github/cliff.toml --unreleased --strip header || echo "- 代码优化和改进")
+        # 移除 [unreleased] 标记
+        CHANGELOG=$(echo "$CHANGELOG" | sed 's/\[unreleased\]//g' | sed '/^$/d')
+        echo "content<<EOF" >> $GITHUB_OUTPUT
+        echo "$CHANGELOG" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Check if there are changes to release
+      id: check_changes
+      run: |
+        # 检查自上次标签以来是否有新的提交
+        LATEST_TAG="${{ steps.get_latest_tag.outputs.latest_tag }}"
+        if [ "$LATEST_TAG" = "v0.0.0" ]; then
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+        else
+          CHANGES=$(git rev-list $LATEST_TAG..HEAD --count)
+          if [ "$CHANGES" -gt 0 ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+        fi
+
+    - name: Create and push tag
+      if: steps.check_changes.outputs.has_changes == 'true'
+      run: |
+        NEW_TAG="${{ steps.next_version.outputs.new_tag }}"
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git tag -a "$NEW_TAG" -m "Release $NEW_TAG"
+        git push origin "$NEW_TAG"
+
+    - name: Create Release
+      if: steps.check_changes.outputs.has_changes == 'true'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.next_version.outputs.new_tag }}
+        name: Release ${{ steps.next_version.outputs.new_version }}
+        body: |
+          ## 🐳 Docker 镜像
+          
+          ```bash
+          docker pull ${{ secrets.DOCKERHUB_USERNAME || 'weishaw' }}/claude-relay-service:${{ steps.next_version.outputs.new_tag }}
+          docker pull ${{ secrets.DOCKERHUB_USERNAME || 'weishaw' }}/claude-relay-service:latest
+          ```
+          
+          ## 📦 主要更新
+          
+          ${{ steps.changelog.outputs.content }}
+          
+          ## 📋 完整更新日志
+          
+          查看 [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
+          
+          ---
+          *此版本由 GitHub Actions 自动发布*
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+
+    - name: Update CHANGELOG.md
+      if: steps.check_changes.outputs.has_changes == 'true'
+      run: |
+        # 生成完整的 CHANGELOG
+        git cliff --config .github/cliff.toml --output CHANGELOG.md
+        
+        # 提交 CHANGELOG 更新
+        if git diff --quiet CHANGELOG.md; then
+          echo "No changes to CHANGELOG.md"
+        else
+          git add CHANGELOG.md
+          git commit -m "chore: update CHANGELOG.md for ${{ steps.next_version.outputs.new_tag }} [skip ci]"
+          git push origin main
+        fi
+
+    - name: Send Telegram Notification
+      if: steps.check_changes.outputs.has_changes == 'true' && env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != ''
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      continue-on-error: true
+      run: |
+        VERSION="${{ steps.next_version.outputs.new_version }}"
+        TAG="${{ steps.next_version.outputs.new_tag }}"
+        REPO="${{ github.repository }}"
+        
+        # 获取更新内容并限制长度
+        CHANGELOG="${{ steps.changelog.outputs.content }}"
+        CHANGELOG_TRUNCATED=$(echo "$CHANGELOG" | head -c 1000)
+        if [ ${#CHANGELOG} -gt 1000 ]; then
+          CHANGELOG_TRUNCATED="${CHANGELOG_TRUNCATED}..."
+        fi
+        
+        # 构建消息内容
+        MESSAGE="🚀 *Claude Relay Service 新版本发布！*"$'\n'$'\n'
+        MESSAGE+="📦 版本号: \`${VERSION}\`"$'\n'$'\n'
+        MESSAGE+="📝 *更新内容:*"$'\n'
+        MESSAGE+="${CHANGELOG_TRUNCATED}"$'\n'$'\n'
+        MESSAGE+="🐳 *Docker 部署:*"$'\n'
+        MESSAGE+="\`\`\`bash"$'\n'
+        MESSAGE+="docker pull weishaw/claude-relay-service:${TAG}"$'\n'
+        MESSAGE+="docker pull weishaw/claude-relay-service:latest"$'\n'
+        MESSAGE+="\`\`\`"$'\n'$'\n'
+        MESSAGE+="🔗 *相关链接:*"$'\n'
+        MESSAGE+="• [GitHub Release](https://github.com/${REPO}/releases/tag/${TAG})"$'\n'
+        MESSAGE+="• [完整更新日志](https://github.com/${REPO}/blob/main/CHANGELOG.md)"$'\n'
+        MESSAGE+="• [Docker Hub](https://hub.docker.com/r/weishaw/claude-relay-service)"$'\n'$'\n'
+        MESSAGE+="#ClaudeRelay #Update #v${VERSION//./_}"
+        
+        # 使用 jq 构建 JSON 并发送
+        jq -n \
+          --arg chat_id "${TELEGRAM_CHAT_ID}" \
+          --arg text "${MESSAGE}" \
+          '{
+            chat_id: $chat_id,
+            text: $text,
+            parse_mode: "Markdown",
+            disable_web_page_preview: false
+          }' | \
+        curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+          -H "Content-Type: application/json" \
+          -d @-

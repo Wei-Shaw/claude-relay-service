@@ -10,11 +10,8 @@ LABEL version="1.0.0"
 RUN apk add --no-cache \
     curl \
     dumb-init \
+    sed \
     && rm -rf /var/cache/apk/*
-
-# 👤 创建应用用户
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S claude -u 1001 -G nodejs
 
 # 📁 设置工作目录
 WORKDIR /app
@@ -27,14 +24,22 @@ RUN npm ci --only=production && \
     npm cache clean --force
 
 # 📋 复制应用代码
-COPY --chown=claude:nodejs . .
+COPY . .
+
+# 🔧 复制并设置启动脚本权限
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # 📁 创建必要目录
-RUN mkdir -p logs data temp && \
-    chown -R claude:nodejs logs data temp
+RUN mkdir -p logs data temp
 
-# 🔐 切换到非 root 用户
-USER claude
+# 🔧 预先创建配置文件
+RUN if [ ! -f "/app/config/config.js" ] && [ -f "/app/config/config.example.js" ]; then \
+        cp /app/config/config.example.js /app/config/config.js; \
+    fi && \
+    if [ ! -f "/app/.env" ] && [ -f "/app/.env.example" ]; then \
+        cp /app/.env.example /app/.env; \
+    fi
 
 # 🌐 暴露端口
 EXPOSE 3000
@@ -44,5 +49,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:3000/health || exit 1
 
 # 🚀 启动应用
-ENTRYPOINT ["dumb-init", "--"]
+ENTRYPOINT ["dumb-init", "--", "/usr/local/bin/docker-entrypoint.sh"]
 CMD ["node", "src/app.js"]

@@ -217,7 +217,7 @@ router.post('/auth/change-password', async (req, res) => {
     
     try {
       const initData = JSON.parse(fs.readFileSync(initFilePath, 'utf8'));
-      const oldData = { ...initData }; // 备份旧数据
+      // const oldData = { ...initData }; // 备份旧数据
       
       // 更新 init.json
       initData.adminUsername = updatedUsername;
@@ -252,12 +252,12 @@ router.post('/auth/change-password', async (req, res) => {
     // 清除当前会话（强制用户重新登录）
     await redis.deleteSession(token);
 
-    logger.success(`🔐 Admin password changed successfully for user: ${updatedAdminData.username}`);
+    logger.success(`🔐 Admin password changed successfully for user: ${updatedUsername}`);
 
     res.json({
       success: true,
       message: 'Password changed successfully. Please login again.',
-      newUsername: updatedAdminData.username
+      newUsername: updatedUsername
     });
 
   } catch (error) {

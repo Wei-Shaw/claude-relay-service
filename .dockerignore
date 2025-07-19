@@ -1,0 +1,76 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+
+# Data files
+data/
+temp/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# GitHub
+.github/
+
+# Documentation
+README.md
+README_EN.md
+CHANGELOG.md
+docs/
+*.md
+
+# Development files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Docker files
+docker-compose.yml
+docker-compose.*.yml
+Dockerfile
+.dockerignore
+
+# Test files
+test/
+tests/
+__tests__/
+*.test.js
+*.spec.js
+coverage/
+.nyc_output/
+
+# Build files
+dist/
+build/
+*.pid
+*.seed
+*.pid.lock
+
+# CI/CD
+.travis.yml
+.gitlab-ci.yml
+azure-pipelines.yml
+
+# Package manager files
+# package-lock.json  # 需要保留此文件以支持 npm ci
+yarn.lock
+pnpm-lock.yaml
+
+# CLI
+cli/

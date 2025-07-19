@@ -18,7 +18,9 @@ class ApiKeyService {
       expiresAt = null,
       claudeAccountId = null,
       isActive = true,
-      concurrencyLimit = 0
+      concurrencyLimit = 0,
+      enableModelRestriction = false,
+      restrictedModels = []
     } = options;
 
     // 生成简单的API Key (64字符十六进制)
@@ -35,6 +37,8 @@ class ApiKeyService {
       concurrencyLimit: String(concurrencyLimit ?? 0),
       isActive: String(isActive),
       claudeAccountId: claudeAccountId || '',
+      enableModelRestriction: String(enableModelRestriction),
+      restrictedModels: JSON.stringify(restrictedModels || []),
       createdAt: new Date().toISOString(),
       lastUsedAt: '',
       expiresAt: expiresAt || '',
@@ -55,6 +59,8 @@ class ApiKeyService {
       concurrencyLimit: parseInt(keyData.concurrencyLimit),
       isActive: keyData.isActive === 'true',
       claudeAccountId: keyData.claudeAccountId,
+      enableModelRestriction: keyData.enableModelRestriction === 'true',
+      restrictedModels: JSON.parse(keyData.restrictedModels),
       createdAt: keyData.createdAt,
       expiresAt: keyData.expiresAt,
       createdBy: keyData.createdBy
@@ -102,6 +108,14 @@ class ApiKeyService {
 
       logger.api(`🔓 API key validated successfully: ${keyData.id}`);
 
+      // 解析限制模型数据
+      let restrictedModels = [];
+      try {
+        restrictedModels = keyData.restrictedModels ? JSON.parse(keyData.restrictedModels) : [];
+      } catch (e) {
+        restrictedModels = [];
+      }
+
       return {
         valid: true,
         keyData: {
@@ -109,7 +123,9 @@ class ApiKeyService {
           name: keyData.name,
           claudeAccountId: keyData.claudeAccountId,
           tokenLimit: parseInt(keyData.tokenLimit),
-              concurrencyLimit: parseInt(keyData.concurrencyLimit || 0),
+          concurrencyLimit: parseInt(keyData.concurrencyLimit || 0),
+          enableModelRestriction: keyData.enableModelRestriction === 'true',
+          restrictedModels: restrictedModels,
           usage
         }
       };
@@ -131,6 +147,12 @@ class ApiKeyService {
         key.concurrencyLimit = parseInt(key.concurrencyLimit || 0);
         key.currentConcurrency = await redis.getConcurrency(key.id);
         key.isActive = key.isActive === 'true';
+        key.enableModelRestriction = key.enableModelRestriction === 'true';
+        try {
+          key.restrictedModels = key.restrictedModels ? JSON.parse(key.restrictedModels) : [];
+        } catch (e) {
+          key.restrictedModels = [];
+        }
         delete key.apiKey; // 不返回哈希后的key
       }
 
@@ -150,12 +172,20 @@ class ApiKeyService {
       }
 
       // 允许更新的字段
-      const allowedUpdates = ['name', 'description', 'tokenLimit', 'concurrencyLimit', 'isActive', 'claudeAccountId', 'expiresAt'];
+      const allowedUpdates = ['name', 'description', 'tokenLimit', 'concurrencyLimit', 'isActive', 'claudeAccountId', 'expiresAt', 'enableModelRestriction', 'restrictedModels'];
       const updatedData = { ...keyData };
 
       for (const [field, value] of Object.entries(updates)) {
         if (allowedUpdates.includes(field)) {
-          updatedData[field] = (value != null ? value : '').toString();
+          if (field === 'restrictedModels') {
+            // 特殊处理 restrictedModels 数组
+            updatedData[field] = JSON.stringify(value || []);
+          } else if (field === 'enableModelRestriction') {
+            // 布尔值转字符串
+            updatedData[field] = String(value);
+          } else {
+            updatedData[field] = (value != null ? value : '').toString();
+          }
         }
       }
 

@@ -228,22 +228,35 @@ class ClaudeAccountService {
     try {
       const accounts = await redis.getAllClaudeAccounts();
       
-      // 处理返回数据，移除敏感信息
-      return accounts.map(account => ({
-        id: account.id,
-        name: account.name,
-        description: account.description,
-        email: account.email ? this._maskEmail(this._decryptSensitiveData(account.email)) : '',
-        isActive: account.isActive === 'true',
-        proxy: account.proxy ? JSON.parse(account.proxy) : null,
-        status: account.status,
-        errorMessage: account.errorMessage,
-        accountType: account.accountType || 'shared', // 兼容旧数据，默认为共享
-        createdAt: account.createdAt,
-        lastUsedAt: account.lastUsedAt,
-        lastRefreshAt: account.lastRefreshAt,
-        expiresAt: account.expiresAt
+      // 处理返回数据，移除敏感信息并添加限流状态
+      const processedAccounts = await Promise.all(accounts.map(async account => {
+        // 获取限流状态信息
+        const rateLimitInfo = await this.getAccountRateLimitInfo(account.id);
+        
+        return {
+          id: account.id,
+          name: account.name,
+          description: account.description,
+          email: account.email ? this._maskEmail(this._decryptSensitiveData(account.email)) : '',
+          isActive: account.isActive === 'true',
+          proxy: account.proxy ? JSON.parse(account.proxy) : null,
+          status: account.status,
+          errorMessage: account.errorMessage,
+          accountType: account.accountType || 'shared', // 兼容旧数据，默认为共享
+          createdAt: account.createdAt,
+          lastUsedAt: account.lastUsedAt,
+          lastRefreshAt: account.lastRefreshAt,
+          expiresAt: account.expiresAt,
+          // 添加限流状态信息
+          rateLimitStatus: rateLimitInfo ? {
+            isRateLimited: rateLimitInfo.isRateLimited,
+            rateLimitedAt: rateLimitInfo.rateLimitedAt,
+            minutesRemaining: rateLimitInfo.minutesRemaining
+          } : null
+        };
       }));
+      
+      return processedAccounts;
     } catch (error) {
       logger.error('❌ Failed to get Claude accounts:', error);
       throw error;
@@ -405,8 +418,15 @@ class ClaudeAccountService {
           // 验证映射的账户是否仍然在共享池中且可用
           const mappedAccount = sharedAccounts.find(acc => acc.id === mappedAccountId);
           if (mappedAccount) {
-            logger.info(`🎯 Using sticky session shared account: ${mappedAccount.name} (${mappedAccountId}) for session ${sessionHash}`);
-            return mappedAccountId;
+            // 如果映射的账户被限流了，删除映射并重新选择
+            const isRateLimited = await this.isAccountRateLimited(mappedAccountId);
+            if (isRateLimited) {
+              logger.warn(`⚠️ Mapped account ${mappedAccountId} is rate limited, selecting new account`);
+              await redis.deleteSessionAccountMapping(sessionHash);
+            } else {
+              logger.info(`🎯 Using sticky session shared account: ${mappedAccount.name} (${mappedAccountId}) for session ${sessionHash}`);
+              return mappedAccountId;
+            }
           } else {
             logger.warn(`⚠️ Mapped shared account ${mappedAccountId} is no longer available, selecting new account`);
             // 清理无效的映射
@@ -415,21 +435,54 @@ class ClaudeAccountService {
         }
       }
 
-      // 从共享池选择账户（负载均衡）
-      const sortedAccounts = sharedAccounts.sort((a, b) => {
-        const aLastRefresh = new Date(a.lastRefreshAt || 0).getTime();
-        const bLastRefresh = new Date(b.lastRefreshAt || 0).getTime();
-        return bLastRefresh - aLastRefresh;
-      });
-      const selectedAccountId = sortedAccounts[0].id;
+      // 将账户分为限流和非限流两组
+      const nonRateLimitedAccounts = [];
+      const rateLimitedAccounts = [];
+      
+      for (const account of sharedAccounts) {
+        const isRateLimited = await this.isAccountRateLimited(account.id);
+        if (isRateLimited) {
+          const rateLimitInfo = await this.getAccountRateLimitInfo(account.id);
+          account._rateLimitInfo = rateLimitInfo; // 临时存储限流信息
+          rateLimitedAccounts.push(account);
+        } else {
+          nonRateLimitedAccounts.push(account);
+        }
+      }
+
+      // 优先从非限流账户中选择
+      let candidateAccounts = nonRateLimitedAccounts;
+      
+      // 如果没有非限流账户，则从限流账户中选择（按限流时间排序，最早限流的优先）
+      if (candidateAccounts.length === 0) {
+        logger.warn('⚠️ All shared accounts are rate limited, selecting from rate limited pool');
+        candidateAccounts = rateLimitedAccounts.sort((a, b) => {
+          const aRateLimitedAt = new Date(a._rateLimitInfo.rateLimitedAt).getTime();
+          const bRateLimitedAt = new Date(b._rateLimitInfo.rateLimitedAt).getTime();
+          return aRateLimitedAt - bRateLimitedAt; // 最早限流的优先
+        });
+      } else {
+        // 非限流账户按最近刷新时间排序
+        candidateAccounts = candidateAccounts.sort((a, b) => {
+          const aLastRefresh = new Date(a.lastRefreshAt || 0).getTime();
+          const bLastRefresh = new Date(b.lastRefreshAt || 0).getTime();
+          return bLastRefresh - aLastRefresh;
+        });
+      }
+
+      if (candidateAccounts.length === 0) {
+        throw new Error('No available shared Claude accounts');
+      }
+
+      const selectedAccountId = candidateAccounts[0].id;
       
       // 如果有会话哈希，建立新的映射
       if (sessionHash) {
         await redis.setSessionAccountMapping(sessionHash, selectedAccountId, 3600); // 1小时过期
-        logger.info(`🎯 Created new sticky session mapping for shared account: ${sortedAccounts[0].name} (${selectedAccountId}) for session ${sessionHash}`);
+        logger.info(`🎯 Created new sticky session mapping for shared account: ${candidateAccounts[0].name} (${selectedAccountId}) for session ${sessionHash}`);
       }
 
-      logger.info(`🎯 Selected shared account: ${sortedAccounts[0].name} (${selectedAccountId}) for API key ${apiKeyData.name}`);
+      logger.info(`🎯 Selected shared account: ${candidateAccounts[0].name} (${selectedAccountId}) for API key ${apiKeyData.name}`);
       return selectedAccountId;
     } catch (error) {
       logger.error('❌ Failed to select account for API key:', error);
@@ -568,6 +621,118 @@ class ClaudeAccountService {
     } catch (error) {
       logger.error('❌ Failed to cleanup error accounts:', error);
       return 0;
+    }
+  }
+
+  // 🚫 标记账号为限流状态
+  async markAccountRateLimited(accountId, sessionHash = null) {
+    try {
+      const accountData = await redis.getClaudeAccount(accountId);
+      if (!accountData || Object.keys(accountData).length === 0) {
+        throw new Error('Account not found');
+      }
+
+      // 设置限流状态和时间
+      accountData.rateLimitedAt = new Date().toISOString();
+      accountData.rateLimitStatus = 'limited';
+      await redis.setClaudeAccount(accountId, accountData);
+
+      // 如果有会话哈希，删除粘性会话映射
+      if (sessionHash) {
+        await redis.deleteSessionAccountMapping(sessionHash);
+        logger.info(`🗑️ Deleted sticky session mapping for rate limited account: ${accountId}`);
+      }
+
+      logger.warn(`🚫 Account marked as rate limited: ${accountData.name} (${accountId})`);
+      return { success: true };
+    } catch (error) {
+      logger.error(`❌ Failed to mark account as rate limited: ${accountId}`, error);
+      throw error;
+    }
+  }
+
+  // ✅ 移除账号的限流状态
+  async removeAccountRateLimit(accountId) {
+    try {
+      const accountData = await redis.getClaudeAccount(accountId);
+      if (!accountData || Object.keys(accountData).length === 0) {
+        throw new Error('Account not found');
+      }
+
+      // 清除限流状态
+      delete accountData.rateLimitedAt;
+      delete accountData.rateLimitStatus;
+      await redis.setClaudeAccount(accountId, accountData);
+
+      logger.success(`✅ Rate limit removed for account: ${accountData.name} (${accountId})`);
+      return { success: true };
+    } catch (error) {
+      logger.error(`❌ Failed to remove rate limit for account: ${accountId}`, error);
+      throw error;
+    }
+  }
+
+  // 🔍 检查账号是否处于限流状态
+  async isAccountRateLimited(accountId) {
+    try {
+      const accountData = await redis.getClaudeAccount(accountId);
+      if (!accountData || Object.keys(accountData).length === 0) {
+        return false;
+      }
+
+      // 检查是否有限流状态
+      if (accountData.rateLimitStatus === 'limited' && accountData.rateLimitedAt) {
+        const rateLimitedAt = new Date(accountData.rateLimitedAt);
+        const now = new Date();
+        const hoursSinceRateLimit = (now - rateLimitedAt) / (1000 * 60 * 60);
+
+        // 如果限流超过1小时，自动解除
+        if (hoursSinceRateLimit >= 1) {
+          await this.removeAccountRateLimit(accountId);
+          return false;
+        }
+
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      logger.error(`❌ Failed to check rate limit status for account: ${accountId}`, error);
+      return false;
+    }
+  }
+
+  // 📊 获取账号的限流信息
+  async getAccountRateLimitInfo(accountId) {
+    try {
+      const accountData = await redis.getClaudeAccount(accountId);
+      if (!accountData || Object.keys(accountData).length === 0) {
+        return null;
+      }
+
+      if (accountData.rateLimitStatus === 'limited' && accountData.rateLimitedAt) {
+        const rateLimitedAt = new Date(accountData.rateLimitedAt);
+        const now = new Date();
+        const minutesSinceRateLimit = Math.floor((now - rateLimitedAt) / (1000 * 60));
+        const minutesRemaining = Math.max(0, 60 - minutesSinceRateLimit);
+
+        return {
+          isRateLimited: minutesRemaining > 0,
+          rateLimitedAt: accountData.rateLimitedAt,
+          minutesSinceRateLimit,
+          minutesRemaining
+        };
+      }
+
+      return {
+        isRateLimited: false,
+        rateLimitedAt: null,
+        minutesSinceRateLimit: 0,
+        minutesRemaining: 0
+      };
+    } catch (error) {
+      logger.error(`❌ Failed to get rate limit info for account: ${accountId}`, error);
+      return null;
     }
   }
 }
