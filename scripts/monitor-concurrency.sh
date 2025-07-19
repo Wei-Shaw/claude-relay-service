@@ -3,23 +3,40 @@
 # Claude Relay Service - 并发监控脚本
 # 实时监控所有API Key的并发使用情况
 
+# 加载环境变量
+if [ -f .env ]; then
+    export $(grep -v '^#' .env | xargs)
+fi
+
 echo "🔍 Claude Relay Service - 并发监控"
 echo "按 Ctrl+C 退出"
 echo "=================================="
 
-# 检查Redis连接
-if ! redis-cli ping > /dev/null 2>&1; then
-    echo "❌ Redis连接失败，请检查Redis服务是否运行"
-    exit 1
+# 获取服务配置
+SERVICE_HOST=${HOST:-127.0.0.1}
+SERVICE_PORT=${PORT:-3000}
+
+# 如果HOST是0.0.0.0，客户端应该连接localhost
+if [ "$SERVICE_HOST" = "0.0.0.0" ]; then
+    SERVICE_HOST="127.0.0.1"
 fi
+
+SERVICE_URL="http://${SERVICE_HOST}:${SERVICE_PORT}"
 
 # 获取Redis配置
 REDIS_HOST=${REDIS_HOST:-127.0.0.1}
 REDIS_PORT=${REDIS_PORT:-6379}
-REDIS_CMD="redis-cli"
+REDIS_CMD="redis-cli -h $REDIS_HOST -p $REDIS_PORT"
 
 if [ ! -z "$REDIS_PASSWORD" ]; then
-    REDIS_CMD="redis-cli -a $REDIS_PASSWORD"
+    REDIS_CMD="redis-cli -h $REDIS_HOST -p $REDIS_PORT -a $REDIS_PASSWORD"
+fi
+
+# 检查Redis连接
+if ! $REDIS_CMD ping > /dev/null 2>&1; then
+    echo "❌ Redis连接失败，请检查Redis服务是否运行"
+    echo "   配置: $REDIS_HOST:$REDIS_PORT"
+    exit 1
 fi
 
 # 监控函数
@@ -74,11 +91,11 @@ monitor_concurrency() {
         
         # 检查服务健康状态
         if command -v curl > /dev/null 2>&1; then
-            health_check=$(curl -s http://localhost:3000/health 2>/dev/null | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+            health_check=$(curl -s ${SERVICE_URL}/health 2>/dev/null | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
             if [ "$health_check" = "healthy" ]; then
-                echo "  ✅ 服务状态: 健康"
+                echo "  ✅ 服务状态: 健康 (${SERVICE_URL})"
             else
-                echo "  ⚠️  服务状态: 异常"
+                echo "  ⚠️  服务状态: 异常 (${SERVICE_URL})"
             fi
         fi
         
