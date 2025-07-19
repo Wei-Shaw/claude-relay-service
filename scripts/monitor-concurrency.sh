@@ -91,7 +91,7 @@ monitor_concurrency() {
         
         # 检查服务健康状态
         if command -v curl > /dev/null 2>&1; then
-            health_check=$(curl -s ${SERVICE_URL}/health 2>/dev/null | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+            health_check=$(curl -s ${SERVICE_URL}/health 2>/dev/null | grep -o '"status":"[^"]*"' | cut -d'"' -f4 | head -1)
             if [ "$health_check" = "healthy" ]; then
                 echo "  ✅ 服务状态: 健康 (${SERVICE_URL})"
             else

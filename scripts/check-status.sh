@@ -116,8 +116,8 @@ if command -v curl > /dev/null 2>&1; then
     
     health_response=$(curl -s ${SERVICE_URL}/health 2>/dev/null)
     if [ $? -eq 0 ]; then
-        health_status=$(echo "$health_response" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
-        uptime=$(echo "$health_response" | grep -o '"uptime":[^,}]*' | cut -d: -f2)
+        health_status=$(echo "$health_response" | grep -o '"status":"[^"]*"' | cut -d'"' -f4 | head -1)
+        uptime=$(echo "$health_response" | grep -o '"uptime":[^,}]*' | cut -d: -f2 | head -1)
         
         if [ "$health_status" = "healthy" ]; then
             echo "  ✅ 服务状态: 健康 (${SERVICE_URL})"
