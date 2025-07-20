@@ -46,10 +46,10 @@ jobs:
         tags: |
           type=ref,event=branch
           type=ref,event=pr
-          type=semver,pattern={{version}}
+          type=semver,pattern={{version}},priority=1000
           type=semver,pattern={{major}}.{{minor}}
           type=semver,pattern={{major}}
-          type=sha
+          type=sha,prefix=sha-,format=short
           type=raw,value=latest,enable={{is_default_branch}}
 
     - name: Build and push Docker image

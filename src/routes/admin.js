@@ -1190,17 +1190,17 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
     } else if (period === 'monthly') {
       pattern = `usage:model:monthly:*:${currentMonth}`;
     } else {
-      // 全部时间，先尝试从Redis获取所有历史模型统计数据
-      const allModelKeys = await client.keys('usage:model:*:*');
-      logger.info(`💰 Total period calculation: found ${allModelKeys.length} model keys`);
+      // 全部时间，先尝试从Redis获取所有历史模型统计数据（只使用monthly数据避免重复计算）
+      const allModelKeys = await client.keys('usage:model:monthly:*:*');
+      logger.info(`💰 Total period calculation: found ${allModelKeys.length} monthly model keys`);
       
       if (allModelKeys.length > 0) {
         // 如果有详细的模型统计数据，使用模型级别的计算
         const modelUsageMap = new Map();
         
         for (const key of allModelKeys) {
-          // 解析模型名称
-          let modelMatch = key.match(/usage:model:(?:daily|monthly):(.+):\d{4}-\d{2}(?:-\d{2})?$/);
+          // 解析模型名称（只处理monthly数据）
+          let modelMatch = key.match(/usage:model:monthly:(.+):(\d{4}-\d{2})$/);
           if (!modelMatch) continue;
           
           const model = modelMatch[1];

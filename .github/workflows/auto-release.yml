@@ -142,6 +142,41 @@ jobs:
           git push origin main
         fi
 
+    # Docker 构建和推送步骤
+    - name: Set up QEMU
+      if: steps.check_changes.outputs.has_changes == 'true'
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      if: steps.check_changes.outputs.has_changes == 'true'
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Docker Hub
+      if: steps.check_changes.outputs.has_changes == 'true'
+      uses: docker/login-action@v3
+      with:
+        registry: docker.io
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Build and push Docker image
+      if: steps.check_changes.outputs.has_changes == 'true'
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: |
+          ${{ secrets.DOCKERHUB_USERNAME }}/claude-relay-service:${{ steps.next_version.outputs.new_tag }}
+          ${{ secrets.DOCKERHUB_USERNAME }}/claude-relay-service:latest
+          ${{ secrets.DOCKERHUB_USERNAME }}/claude-relay-service:${{ steps.next_version.outputs.new_version }}
+        labels: |
+          org.opencontainers.image.version=${{ steps.next_version.outputs.new_version }}
+          org.opencontainers.image.created=${{ steps.next_version.outputs.created }}
+          org.opencontainers.image.revision=${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
     - name: Send Telegram Notification
       if: steps.check_changes.outputs.has_changes == 'true' && env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != ''
       env:
