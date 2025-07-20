@@ -33,6 +33,8 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       expiresAt,
       claudeAccountId,
       concurrencyLimit,
+      rateLimitWindow,
+      rateLimitRequests,
       enableModelRestriction,
       restrictedModels
     } = req.body;
@@ -58,6 +60,14 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
     if (concurrencyLimit !== undefined && concurrencyLimit !== null && concurrencyLimit !== '' && (!Number.isInteger(Number(concurrencyLimit)) || Number(concurrencyLimit) < 0)) {
       return res.status(400).json({ error: 'Concurrency limit must be a non-negative integer' });
     }
+    
+    if (rateLimitWindow !== undefined && rateLimitWindow !== null && rateLimitWindow !== '' && (!Number.isInteger(Number(rateLimitWindow)) || Number(rateLimitWindow) < 1)) {
+      return res.status(400).json({ error: 'Rate limit window must be a positive integer (minutes)' });
+    }
+    
+    if (rateLimitRequests !== undefined && rateLimitRequests !== null && rateLimitRequests !== '' && (!Number.isInteger(Number(rateLimitRequests)) || Number(rateLimitRequests) < 1)) {
+      return res.status(400).json({ error: 'Rate limit requests must be a positive integer' });
+    }
 
     // 验证模型限制字段
     if (enableModelRestriction !== undefined && typeof enableModelRestriction !== 'boolean') {
@@ -75,6 +85,8 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       expiresAt,
       claudeAccountId,
       concurrencyLimit,
+      rateLimitWindow,
+      rateLimitRequests,
       enableModelRestriction,
       restrictedModels
     });
@@ -91,7 +103,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
 router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
   try {
     const { keyId } = req.params;
-    const { tokenLimit, concurrencyLimit, claudeAccountId, enableModelRestriction, restrictedModels } = req.body;
+    const { tokenLimit, concurrencyLimit, rateLimitWindow, rateLimitRequests, claudeAccountId, enableModelRestriction, restrictedModels } = req.body;
 
     // 只允许更新指定字段
     const updates = {};
@@ -108,6 +120,20 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
         return res.status(400).json({ error: 'Concurrency limit must be a non-negative integer' });
       }
       updates.concurrencyLimit = Number(concurrencyLimit);
+    }
+    
+    if (rateLimitWindow !== undefined && rateLimitWindow !== null && rateLimitWindow !== '') {
+      if (!Number.isInteger(Number(rateLimitWindow)) || Number(rateLimitWindow) < 0) {
+        return res.status(400).json({ error: 'Rate limit window must be a non-negative integer (minutes)' });
+      }
+      updates.rateLimitWindow = Number(rateLimitWindow);
+    }
+    
+    if (rateLimitRequests !== undefined && rateLimitRequests !== null && rateLimitRequests !== '') {
+      if (!Number.isInteger(Number(rateLimitRequests)) || Number(rateLimitRequests) < 0) {
+        return res.status(400).json({ error: 'Rate limit requests must be a non-negative integer' });
+      }
+      updates.rateLimitRequests = Number(rateLimitRequests);
     }
 
     if (claudeAccountId !== undefined) {

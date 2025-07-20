@@ -103,6 +103,95 @@ const authenticateApiKey = async (req, res, next) => {
       };
     }
 
+    // 检查时间窗口限流
+    const rateLimitWindow = validation.keyData.rateLimitWindow || 0;
+    const rateLimitRequests = validation.keyData.rateLimitRequests || 0;
+    
+    if (rateLimitWindow > 0 && (rateLimitRequests > 0 || validation.keyData.tokenLimit > 0)) {
+      const windowStartKey = `rate_limit:window_start:${validation.keyData.id}`;
+      const requestCountKey = `rate_limit:requests:${validation.keyData.id}`;
+      const tokenCountKey = `rate_limit:tokens:${validation.keyData.id}`;
+      
+      const now = Date.now();
+      const windowDuration = rateLimitWindow * 60 * 1000; // 转换为毫秒
+      
+      // 获取窗口开始时间
+      let windowStart = await redis.getClient().get(windowStartKey);
+      
+      if (!windowStart) {
+        // 第一次请求，设置窗口开始时间
+        await redis.getClient().set(windowStartKey, now, 'PX', windowDuration);
+        await redis.getClient().set(requestCountKey, 0, 'PX', windowDuration);
+        await redis.getClient().set(tokenCountKey, 0, 'PX', windowDuration);
+        windowStart = now;
+      } else {
+        windowStart = parseInt(windowStart);
+        
+        // 检查窗口是否已过期
+        if (now - windowStart >= windowDuration) {
+          // 窗口已过期，重置
+          await redis.getClient().set(windowStartKey, now, 'PX', windowDuration);
+          await redis.getClient().set(requestCountKey, 0, 'PX', windowDuration);
+          await redis.getClient().set(tokenCountKey, 0, 'PX', windowDuration);
+          windowStart = now;
+        }
+      }
+      
+      // 获取当前计数
+      const currentRequests = parseInt(await redis.getClient().get(requestCountKey) || '0');
+      const currentTokens = parseInt(await redis.getClient().get(tokenCountKey) || '0');
+      
+      // 检查请求次数限制
+      if (rateLimitRequests > 0 && currentRequests >= rateLimitRequests) {
+        const resetTime = new Date(windowStart + windowDuration);
+        const remainingMinutes = Math.ceil((resetTime - now) / 60000);
+        
+        logger.security(`🚦 Rate limit exceeded (requests) for key: ${validation.keyData.id} (${validation.keyData.name}), requests: ${currentRequests}/${rateLimitRequests}`);
+        
+        return res.status(429).json({
+          error: 'Rate limit exceeded',
+          message: `已达到请求次数限制 (${rateLimitRequests} 次)，将在 ${remainingMinutes} 分钟后重置`,
+          currentRequests,
+          requestLimit: rateLimitRequests,
+          resetAt: resetTime.toISOString(),
+          remainingMinutes
+        });
+      }
+      
+      // 检查Token使用量限制
+      const tokenLimit = parseInt(validation.keyData.tokenLimit);
+      if (tokenLimit > 0 && currentTokens >= tokenLimit) {
+        const resetTime = new Date(windowStart + windowDuration);
+        const remainingMinutes = Math.ceil((resetTime - now) / 60000);
+        
+        logger.security(`🚦 Rate limit exceeded (tokens) for key: ${validation.keyData.id} (${validation.keyData.name}), tokens: ${currentTokens}/${tokenLimit}`);
+        
+        return res.status(429).json({
+          error: 'Rate limit exceeded',
+          message: `已达到 Token 使用限制 (${tokenLimit} tokens)，将在 ${remainingMinutes} 分钟后重置`,
+          currentTokens,
+          tokenLimit,
+          resetAt: resetTime.toISOString(),
+          remainingMinutes
+        });
+      }
+      
+      // 增加请求计数
+      await redis.getClient().incr(requestCountKey);
+      
+      // 存储限流信息到请求对象
+      req.rateLimitInfo = {
+        windowStart,
+        windowDuration,
+        requestCountKey,
+        tokenCountKey,
+        currentRequests: currentRequests + 1,
+        currentTokens,
+        rateLimitRequests,
+        tokenLimit
+      };
+    }
+    
     // 将验证信息添加到请求对象（只包含必要信息）
     req.apiKey = {
       id: validation.keyData.id,
@@ -110,6 +199,8 @@ const authenticateApiKey = async (req, res, next) => {
       tokenLimit: validation.keyData.tokenLimit,
       claudeAccountId: validation.keyData.claudeAccountId,
       concurrencyLimit: validation.keyData.concurrencyLimit,
+      rateLimitWindow: validation.keyData.rateLimitWindow,
+      rateLimitRequests: validation.keyData.rateLimitRequests,
       enableModelRestriction: validation.keyData.enableModelRestriction,
       restrictedModels: validation.keyData.restrictedModels
     };

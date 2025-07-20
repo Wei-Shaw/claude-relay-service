@@ -49,7 +49,7 @@ jobs:
           
           ## 📋 完整更新日志
           
-          查看 [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
+          查看 [所有版本](https://github.com/${{ github.repository }}/releases)
           
         draft: false
         prerelease: false

@@ -3,6 +3,7 @@ const claudeRelayService = require('../services/claudeRelayService');
 const apiKeyService = require('../services/apiKeyService');
 const { authenticateApiKey } = require('../middleware/auth');
 const logger = require('../utils/logger');
+const redis = require('../models/redis');
 
 const router = express.Router();
 
@@ -66,6 +67,15 @@ router.post('/v1/messages', authenticateApiKey, async (req, res) => {
             logger.error('❌ Failed to record stream usage:', error);
           });
           
+          // 更新时间窗口内的token计数
+          if (req.rateLimitInfo) {
+            const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens;
+            redis.getClient().incrby(req.rateLimitInfo.tokenCountKey, totalTokens).catch(error => {
+              logger.error('❌ Failed to update rate limit token count:', error);
+            });
+            logger.api(`📊 Updated rate limit token count: +${totalTokens} tokens`);
+          }
+          
           usageDataCaptured = true;
           logger.api(`📊 Stream usage recorded (real) - Model: ${model}, Input: ${inputTokens}, Output: ${outputTokens}, Cache Create: ${cacheCreateTokens}, Cache Read: ${cacheReadTokens}, Total: ${inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens} tokens`);
         } else {
@@ -121,6 +131,13 @@ router.post('/v1/messages', authenticateApiKey, async (req, res) => {
           
           // 记录真实的token使用量（包含模型信息和所有4种token）
           await apiKeyService.recordUsage(req.apiKey.id, inputTokens, outputTokens, cacheCreateTokens, cacheReadTokens, model);
+          
+          // 更新时间窗口内的token计数
+          if (req.rateLimitInfo) {
+            const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens;
+            await redis.getClient().incrby(req.rateLimitInfo.tokenCountKey, totalTokens);
+            logger.api(`📊 Updated rate limit token count: +${totalTokens} tokens`);
+          }
           
           usageRecorded = true;
           logger.api(`📊 Non-stream usage recorded (real) - Model: ${model}, Input: ${inputTokens}, Output: ${outputTokens}, Cache Create: ${cacheCreateTokens}, Cache Read: ${cacheReadTokens}, Total: ${inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens} tokens`);

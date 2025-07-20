@@ -117,6 +117,8 @@ const app = createApp({
                 tokenLimit: '',
                 description: '',
                 concurrencyLimit: '',
+                rateLimitWindow: '',
+                rateLimitRequests: '',
                 claudeAccountId: '',
                 enableModelRestriction: false,
                 restrictedModels: [],
@@ -158,6 +160,8 @@ const app = createApp({
                 name: '',
                 tokenLimit: '',
                 concurrencyLimit: '',
+                rateLimitWindow: '',
+                rateLimitRequests: '',
                 claudeAccountId: '',
                 enableModelRestriction: false,
                 restrictedModels: [],
@@ -1211,6 +1215,8 @@ const app = createApp({
                         tokenLimit: this.apiKeyForm.tokenLimit && this.apiKeyForm.tokenLimit.trim() ? parseInt(this.apiKeyForm.tokenLimit) : null,
                         description: this.apiKeyForm.description || '',
                         concurrencyLimit: this.apiKeyForm.concurrencyLimit && this.apiKeyForm.concurrencyLimit.trim() ? parseInt(this.apiKeyForm.concurrencyLimit) : 0,
+                        rateLimitWindow: this.apiKeyForm.rateLimitWindow && this.apiKeyForm.rateLimitWindow.trim() ? parseInt(this.apiKeyForm.rateLimitWindow) : null,
+                        rateLimitRequests: this.apiKeyForm.rateLimitRequests && this.apiKeyForm.rateLimitRequests.trim() ? parseInt(this.apiKeyForm.rateLimitRequests) : null,
                         claudeAccountId: this.apiKeyForm.claudeAccountId || null,
                         enableModelRestriction: this.apiKeyForm.enableModelRestriction,
                         restrictedModels: this.apiKeyForm.restrictedModels
@@ -1231,7 +1237,7 @@ const app = createApp({
                     
                     // 关闭创建弹窗并清理表单
                     this.showCreateApiKeyModal = false;
-                    this.apiKeyForm = { name: '', tokenLimit: '', description: '', concurrencyLimit: '', claudeAccountId: '', enableModelRestriction: false, restrictedModels: [], modelInput: '' };
+                    this.apiKeyForm = { name: '', tokenLimit: '', description: '', concurrencyLimit: '', rateLimitWindow: '', rateLimitRequests: '', claudeAccountId: '', enableModelRestriction: false, restrictedModels: [], modelInput: '' };
                     
                     // 重新加载API Keys列表
                     await this.loadApiKeys();
@@ -1275,6 +1281,8 @@ const app = createApp({
                 name: key.name,
                 tokenLimit: key.tokenLimit || '',
                 concurrencyLimit: key.concurrencyLimit || '',
+                rateLimitWindow: key.rateLimitWindow || '',
+                rateLimitRequests: key.rateLimitRequests || '',
                 claudeAccountId: key.claudeAccountId || '',
                 enableModelRestriction: key.enableModelRestriction || false,
                 restrictedModels: key.restrictedModels ? [...key.restrictedModels] : [],
@@ -1290,6 +1298,8 @@ const app = createApp({
                 name: '',
                 tokenLimit: '',
                 concurrencyLimit: '',
+                rateLimitWindow: '',
+                rateLimitRequests: '',
                 claudeAccountId: '',
                 enableModelRestriction: false,
                 restrictedModels: [],
@@ -1309,6 +1319,8 @@ const app = createApp({
                     body: JSON.stringify({
                         tokenLimit: this.editApiKeyForm.tokenLimit && this.editApiKeyForm.tokenLimit.toString().trim() !== '' ? parseInt(this.editApiKeyForm.tokenLimit) : 0,
                         concurrencyLimit: this.editApiKeyForm.concurrencyLimit && this.editApiKeyForm.concurrencyLimit.toString().trim() !== '' ? parseInt(this.editApiKeyForm.concurrencyLimit) : 0,
+                        rateLimitWindow: this.editApiKeyForm.rateLimitWindow && this.editApiKeyForm.rateLimitWindow.toString().trim() !== '' ? parseInt(this.editApiKeyForm.rateLimitWindow) : 0,
+                        rateLimitRequests: this.editApiKeyForm.rateLimitRequests && this.editApiKeyForm.rateLimitRequests.toString().trim() !== '' ? parseInt(this.editApiKeyForm.rateLimitRequests) : 0,
                         claudeAccountId: this.editApiKeyForm.claudeAccountId || null,
                         enableModelRestriction: this.editApiKeyForm.enableModelRestriction,
                         restrictedModels: this.editApiKeyForm.restrictedModels

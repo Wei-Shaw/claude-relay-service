@@ -534,6 +534,16 @@
                                                             <span v-if="key.concurrencyLimit > 0" class="text-xs text-gray-500">/ {{ key.concurrencyLimit }}</span>
                                                         </span>
                                                     </div>
+                                                    <!-- 时间窗口限流 -->
+                                                    <div v-if="key.rateLimitWindow > 0" class="flex justify-between text-sm">
+                                                        <span class="text-gray-600">时间窗口:</span>
+                                                        <span class="font-medium text-indigo-600">{{ key.rateLimitWindow }} 分钟</span>
+                                                    </div>
+                                                    <!-- 请求次数限制 -->
+                                                    <div v-if="key.rateLimitRequests > 0" class="flex justify-between text-sm">
+                                                        <span class="text-gray-600">请求限制:</span>
+                                                        <span class="font-medium text-indigo-600">{{ key.rateLimitRequests }} 次/窗口</span>
+                                                    </div>
                                                     <!-- 输入/输出Token -->
                                                     <div class="flex justify-between text-xs text-gray-500">
                                                         <span>输入: {{ formatNumber((key.usage && key.usage.total && key.usage.total.inputTokens) || 0) }}</span>
@@ -1792,14 +1802,38 @@
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-3">Token 限制 (可选)</label>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口 (可选)</label>
+                        <input 
+                            v-model="apiKeyForm.rateLimitWindow" 
+                            type="number" 
+                            min="1"
+                            placeholder="留空表示无限制" 
+                            class="form-input w-full"
+                        >
+                        <p class="text-xs text-gray-500 mt-2">设置时间窗口（分钟），在此时间内限制请求次数或Token使用量</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">请求次数限制 (可选)</label>
+                        <input 
+                            v-model="apiKeyForm.rateLimitRequests" 
+                            type="number" 
+                            min="1"
+                            placeholder="留空表示无限制" 
+                            class="form-input w-full"
+                        >
+                        <p class="text-xs text-gray-500 mt-2">在时间窗口内允许的最大请求次数</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口内 Token 限制 (可选)</label>
                         <input 
                             v-model="apiKeyForm.tokenLimit" 
                             type="number" 
                             placeholder="留空表示无限制" 
                             class="form-input w-full"
                         >
-                        <p class="text-xs text-gray-500 mt-2">设置此 API Key 的最大 token 使用量</p>
+                        <p class="text-xs text-gray-500 mt-2">设置在时间窗口内的最大 Token 使用量（需同时设置时间窗口）</p>
                     </div>
                     
                     <div>
@@ -1951,7 +1985,31 @@
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-3">Token 限制</label>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口</label>
+                        <input 
+                            v-model="editApiKeyForm.rateLimitWindow" 
+                            type="number" 
+                            min="1"
+                            placeholder="留空表示无限制" 
+                            class="form-input w-full"
+                        >
+                        <p class="text-xs text-gray-500 mt-2">设置时间窗口（分钟），在此时间内限制请求次数或Token使用量</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">请求次数限制</label>
+                        <input 
+                            v-model="editApiKeyForm.rateLimitRequests" 
+                            type="number" 
+                            min="1"
+                            placeholder="留空表示无限制" 
+                            class="form-input w-full"
+                        >
+                        <p class="text-xs text-gray-500 mt-2">在时间窗口内允许的最大请求次数</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口内 Token 限制</label>
                         <input 
                             v-model="editApiKeyForm.tokenLimit" 
                             type="number" 
@@ -1959,7 +2017,7 @@
                             placeholder="0 表示无限制" 
                             class="form-input w-full"
                         >
-                        <p class="text-xs text-gray-500 mt-2">设置此 API Key 的最大 token 使用量，0 或留空表示无限制</p>
+                        <p class="text-xs text-gray-500 mt-2">设置在时间窗口内的最大 Token 使用量（需同时设置时间窗口），0 或留空表示无限制</p>
                     </div>
                     
                     <div>

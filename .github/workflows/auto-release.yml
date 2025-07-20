@@ -119,7 +119,7 @@ jobs:
           
           ## 📋 完整更新日志
           
-          查看 [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
+          查看 [所有版本](https://github.com/${{ github.repository }}/releases)
           
           ---
           *此版本由 GitHub Actions 自动发布*
@@ -172,7 +172,7 @@ jobs:
         MESSAGE+="\`\`\`"$'\n'$'\n'
         MESSAGE+="🔗 *相关链接:*"$'\n'
         MESSAGE+="• [GitHub Release](https://github.com/${REPO}/releases/tag/${TAG})"$'\n'
-        MESSAGE+="• [完整更新日志](https://github.com/${REPO}/blob/main/CHANGELOG.md)"$'\n'
+        MESSAGE+="• [完整更新日志](https://github.com/${REPO}/releases)"$'\n'
         MESSAGE+="• [Docker Hub](https://hub.docker.com/r/weishaw/claude-relay-service)"$'\n'$'\n'
         MESSAGE+="#ClaudeRelay #Update #v${VERSION//./_}"
         

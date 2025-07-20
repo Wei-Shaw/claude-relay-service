@@ -23,7 +23,7 @@ class ClaudeRelayService {
     
     try {
       // 调试日志：查看API Key数据
-      logger.info(`🔍 API Key data received:`, {
+      logger.info('🔍 API Key data received:', {
         apiKeyName: apiKeyData.name,
         enableModelRestriction: apiKeyData.enableModelRestriction,
         restrictedModels: apiKeyData.restrictedModels,
@@ -448,7 +448,7 @@ class ClaudeRelayService {
   async relayStreamRequestWithUsageCapture(requestBody, apiKeyData, responseStream, clientHeaders, usageCallback) {
     try {
       // 调试日志：查看API Key数据（流式请求）
-      logger.info(`🔍 [Stream] API Key data received:`, {
+      logger.info('🔍 [Stream] API Key data received:', {
         apiKeyName: apiKeyData.name,
         enableModelRestriction: apiKeyData.enableModelRestriction,
         restrictedModels: apiKeyData.restrictedModels,
