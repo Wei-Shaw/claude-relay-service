@@ -76,10 +76,14 @@ class SessionHelper {
       if (typeof firstMessage.content === 'string') {
         firstMessageText = firstMessage.content;
       } else if (Array.isArray(firstMessage.content)) {
+        if (!firstMessage.content) {
+          logger.debug(`📋 Session hash generated from first message failed: `, firstMessage);
+        } else {
         firstMessageText = firstMessage.content
           .filter(part => part.type === 'text')
           .map(part => part.text || '')
           .join('');
+        }
       }
       
       if (firstMessageText) {
