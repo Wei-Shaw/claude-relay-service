@@ -78,12 +78,12 @@ class SessionHelper {
       } else if (Array.isArray(firstMessage.content)) {
         if (!firstMessage.content) {
           logger.error(`📋 Session hash generated from first message failed: `, firstMessage);
-        } else {
+        }
+
         firstMessageText = firstMessage.content
           .filter(part => part.type === 'text')
           .map(part => part.text || '')
           .join('');
-        }
       }
       
       if (firstMessageText) {
