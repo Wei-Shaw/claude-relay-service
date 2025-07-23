@@ -23,6 +23,7 @@ jobs:
         fetch-depth: 0
         token: ${{ secrets.GITHUB_TOKEN }}
 
+
     - name: Get latest tag
       id: get_latest_tag
       run: |
@@ -77,15 +78,20 @@ jobs:
     - name: Check if there are changes to release
       id: check_changes
       run: |
-        # 检查自上次标签以来是否有新的提交
+        # 检查自上次标签以来是否有新的提交（排除只修改VERSION文件的提交）
         LATEST_TAG="${{ steps.get_latest_tag.outputs.latest_tag }}"
         if [ "$LATEST_TAG" = "v0.0.0" ]; then
           echo "has_changes=true" >> $GITHUB_OUTPUT
         else
-          CHANGES=$(git rev-list $LATEST_TAG..HEAD --count)
-          if [ "$CHANGES" -gt 0 ]; then
+          # 获取除了VERSION文件外的其他文件变更
+          CHANGED_FILES=$(git diff --name-only $LATEST_TAG..HEAD | grep -v "^VERSION$" || true)
+          
+          if [ -n "$CHANGED_FILES" ]; then
+            echo "Found changes in files other than VERSION:"
+            echo "$CHANGED_FILES"
             echo "has_changes=true" >> $GITHUB_OUTPUT
           else
+            echo "No significant changes found (only VERSION file changed)"
             echo "has_changes=false" >> $GITHUB_OUTPUT
           fi
         fi
@@ -130,7 +136,7 @@ jobs:
     - name: Update VERSION file
       if: steps.check_changes.outputs.has_changes == 'true'
       run: |
-        # 更新 VERSION 文件
+        # 强制更新 VERSION 文件为最新版本
         echo "${{ steps.next_version.outputs.new_version }}" > VERSION
         
         # 检查是否有更改
@@ -141,18 +147,17 @@ jobs:
           echo "Updated VERSION file to ${{ steps.next_version.outputs.new_version }}"
         fi
 
-    - name: Update CHANGELOG.md
+    - name: Commit VERSION update
       if: steps.check_changes.outputs.has_changes == 'true'
       run: |
-        # 生成完整的 CHANGELOG
-        git cliff --config .github/cliff.toml --output CHANGELOG.md
-        
-        # 提交 CHANGELOG 和 VERSION 更新
-        if git diff --quiet CHANGELOG.md VERSION; then
-          echo "No changes to CHANGELOG.md or VERSION"
+        # 提交 VERSION 更新
+        if git diff --quiet VERSION; then
+          echo "No changes to VERSION"
         else
-          git add CHANGELOG.md VERSION
-          git commit -m "chore: update CHANGELOG.md and VERSION for ${{ steps.next_version.outputs.new_tag }} [skip ci]"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add VERSION
+          git commit -m "chore: update VERSION to ${{ steps.next_version.outputs.new_version }} for ${{ steps.next_version.outputs.new_tag }} [skip ci]"
           git push origin main
         fi
 
@@ -238,3 +243,25 @@ jobs:
         curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
           -H "Content-Type: application/json" \
           -d @-
+
+    - name: Ensure VERSION file is in sync
+      if: always()
+      run: |
+        # 在工作流结束时确保VERSION文件与最新tag同步
+        LATEST_TAG=$(git tag --sort=-version:refname | head -1 || echo "v0.0.0")
+        if [ "$LATEST_TAG" != "v0.0.0" ]; then
+          LATEST_VERSION=${LATEST_TAG#v}
+          CURRENT_VERSION=$(cat VERSION 2>/dev/null || echo "0.0.0")
+          
+          if [ "$CURRENT_VERSION" != "$LATEST_VERSION" ]; then
+            echo "Updating VERSION file to match latest release: $CURRENT_VERSION -> $LATEST_VERSION"
+            echo "$LATEST_VERSION" > VERSION
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add VERSION
+            git commit -m "chore: sync VERSION file with release $LATEST_TAG [skip ci]" || echo "No changes to commit"
+            git push origin main || echo "Nothing to push"
+          else
+            echo "VERSION file is already in sync: $CURRENT_VERSION"
+          fi
+        fi
