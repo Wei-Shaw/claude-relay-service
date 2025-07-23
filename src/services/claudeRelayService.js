@@ -8,6 +8,7 @@ const claudeAccountService = require('./claudeAccountService');
 const sessionHelper = require('../utils/sessionHelper');
 const logger = require('../utils/logger');
 const config = require('../../config/config');
+const claudeCodeHeadersService = require('./claudeCodeHeadersService');
 
 class ClaudeRelayService {
   constructor() {
@@ -15,10 +16,46 @@ class ClaudeRelayService {
     this.apiVersion = config.claude.apiVersion;
     this.betaHeader = config.claude.betaHeader;
     this.systemPrompt = config.claude.systemPrompt;
+    this.claudeCodeSystemPrompt = 'You are Claude Code, Anthropic\'s official CLI for Claude.';
+  }
+
+  // 🔍 判断是否是真实的 Claude Code 请求
+  isRealClaudeCodeRequest(requestBody, clientHeaders) {
+    // 检查 user-agent 是否匹配 Claude Code 格式
+    const userAgent = clientHeaders?.['user-agent'] || clientHeaders?.['User-Agent'] || '';
+    const isClaudeCodeUserAgent = /claude-cli\/\d+\.\d+\.\d+/.test(userAgent);
+    
+    // 检查系统提示词是否包含 Claude Code 标识
+    const hasClaudeCodeSystemPrompt = this._hasClaudeCodeSystemPrompt(requestBody);
+    
+    // 只有当 user-agent 匹配且系统提示词正确时，才认为是真实的 Claude Code 请求
+    return isClaudeCodeUserAgent && hasClaudeCodeSystemPrompt;
+  }
+
+  // 🔍 检查请求中是否包含 Claude Code 系统提示词
+  _hasClaudeCodeSystemPrompt(requestBody) {
+    if (!requestBody || !requestBody.system) return false;
+    
+    // 如果是字符串格式，一定不是真实的 Claude Code 请求
+    if (typeof requestBody.system === 'string') {
+      return false;
+    } 
+    
+    // 处理数组格式
+    if (Array.isArray(requestBody.system) && requestBody.system.length > 0) {
+      const firstItem = requestBody.system[0];
+      // 检查第一个元素是否包含 Claude Code 提示词
+      return firstItem && 
+             firstItem.type === 'text' && 
+             firstItem.text && 
+             firstItem.text === this.claudeCodeSystemPrompt;
+    }
+    
+    return false;
   }
 
   // 🚀 转发请求到Claude API
-  async relayRequest(requestBody, apiKeyData, clientRequest, clientResponse, clientHeaders) {
+  async relayRequest(requestBody, apiKeyData, clientRequest, clientResponse, clientHeaders, options = {}) {
     let upstreamRequest = null;
     
     try {
@@ -61,8 +98,8 @@ class ClaudeRelayService {
       // 获取有效的访问token
       const accessToken = await claudeAccountService.getValidAccessToken(accountId);
       
-      // 处理请求体
-      const processedBody = this._processRequestBody(requestBody);
+      // 处理请求体（传递 clientHeaders 以判断是否需要设置 Claude Code 系统提示词）
+      const processedBody = this._processRequestBody(requestBody, clientHeaders);
       
       // 获取代理配置
       const proxyAgent = await this._getProxyAgent(accountId);
@@ -89,7 +126,9 @@ class ClaudeRelayService {
         accessToken, 
         proxyAgent,
         clientHeaders,
-        (req) => { upstreamRequest = req; }
+        accountId,
+        (req) => { upstreamRequest = req; },
+        options
       );
       
       // 移除监听器（请求成功完成）
@@ -127,6 +166,11 @@ class ClaudeRelayService {
         if (isRateLimited) {
           await claudeAccountService.removeAccountRateLimit(accountId);
         }
+        
+        // 只有真实的 Claude Code 请求才更新 headers
+        if (clientHeaders && Object.keys(clientHeaders).length > 0 && this.isRealClaudeCodeRequest(requestBody, clientHeaders)) {
+          await claudeCodeHeadersService.storeAccountHeaders(accountId, clientHeaders);
+        }
       }
       
       // 记录成功的API调用
@@ -145,7 +189,7 @@ class ClaudeRelayService {
   }
 
   // 🔄 处理请求体
-  _processRequestBody(body) {
+  _processRequestBody(body, clientHeaders = {}) {
     if (!body) return body;
 
     // 深拷贝请求体
@@ -157,28 +201,76 @@ class ClaudeRelayService {
     // 移除cache_control中的ttl字段
     this._stripTtlFromCacheControl(processedBody);
 
-    // 只有在配置了系统提示时才添加
+    // 判断是否是真实的 Claude Code 请求
+    const isRealClaudeCode = this.isRealClaudeCodeRequest(processedBody, clientHeaders);
+    
+    // 如果不是真实的 Claude Code 请求，需要设置 Claude Code 系统提示词
+    if (!isRealClaudeCode) {
+      const claudeCodePrompt = {
+        type: 'text',
+        text: this.claudeCodeSystemPrompt,
+        cache_control: {
+          type: 'ephemeral'
+        }
+      };
+
+      if (processedBody.system) {
+        if (typeof processedBody.system === 'string') {
+          // 字符串格式：转换为数组，Claude Code 提示词在第一位
+          const userSystemPrompt = {
+            type: 'text',
+            text: processedBody.system
+          };
+          // 如果用户的提示词与 Claude Code 提示词相同，只保留一个
+          if (processedBody.system.trim() === this.claudeCodeSystemPrompt) {
+            processedBody.system = [claudeCodePrompt];
+          } else {
+            processedBody.system = [claudeCodePrompt, userSystemPrompt];
+          }
+        } else if (Array.isArray(processedBody.system)) {
+          // 检查第一个元素是否是 Claude Code 系统提示词
+          const firstItem = processedBody.system[0];
+          const isFirstItemClaudeCode = firstItem && 
+                                        firstItem.type === 'text' && 
+                                        firstItem.text === this.claudeCodeSystemPrompt;
+          
+          if (!isFirstItemClaudeCode) {
+            // 如果第一个不是 Claude Code 提示词，需要在开头插入
+            // 同时检查数组中是否有其他位置包含 Claude Code 提示词，如果有则移除
+            const filteredSystem = processedBody.system.filter(item => 
+              !(item && item.type === 'text' && item.text === this.claudeCodeSystemPrompt)
+            );
+            processedBody.system = [claudeCodePrompt, ...filteredSystem];
+          }
+        } else {
+          // 其他格式，记录警告但不抛出错误，尝试处理
+          logger.warn('⚠️ Unexpected system field type:', typeof processedBody.system);
+          processedBody.system = [claudeCodePrompt];
+        }
+      } else {
+        // 用户没有传递 system，需要添加 Claude Code 提示词
+        processedBody.system = [claudeCodePrompt];
+      }
+    }
+    
+    // 处理原有的系统提示（如果配置了）
     if (this.systemPrompt && this.systemPrompt.trim()) {
       const systemPrompt = {
         type: 'text',
         text: this.systemPrompt
       };
 
-      if (processedBody.system) {
-        if (Array.isArray(processedBody.system)) {
-          // 如果system数组存在但为空，或者没有有效内容，则添加系统提示
-          const hasValidContent = processedBody.system.some(item => 
-            item && item.text && item.text.trim()
-          );
-          if (!hasValidContent) {
-            processedBody.system = [systemPrompt];
-          } else {
-            processedBody.system.unshift(systemPrompt);
-          }
-        } else {
-          throw new Error('system field must be an array');
+      // 经过上面的处理，system 现在应该总是数组格式
+      if (processedBody.system && Array.isArray(processedBody.system)) {
+        // 不要重复添加相同的系统提示
+        const hasSystemPrompt = processedBody.system.some(item => 
+          item && item.text && item.text === this.systemPrompt
+        );
+        if (!hasSystemPrompt) {
+          processedBody.system.push(systemPrompt);
         }
       } else {
+        // 理论上不应该走到这里，但为了安全起见
         processedBody.system = [systemPrompt];
       }
     } else {
@@ -311,12 +403,22 @@ class ClaudeRelayService {
       'transfer-encoding'
     ];
     
+    // 应该保留的 headers（用于会话一致性和追踪）
+    const allowedHeaders = [
+      'x-request-id'
+    ];
+    
     const filteredHeaders = {};
     
     // 转发客户端的非敏感 headers
     Object.keys(clientHeaders || {}).forEach(key => {
       const lowerKey = key.toLowerCase();
-      if (!sensitiveHeaders.includes(lowerKey)) {
+      // 如果在允许列表中，直接保留
+      if (allowedHeaders.includes(lowerKey)) {
+        filteredHeaders[key] = clientHeaders[key];
+      } 
+      // 如果不在敏感列表中，也保留
+      else if (!sensitiveHeaders.includes(lowerKey)) {
         filteredHeaders[key] = clientHeaders[key];
       }
     });
@@ -325,12 +427,32 @@ class ClaudeRelayService {
   }
 
   // 🔗 发送请求到Claude API
-  async _makeClaudeRequest(body, accessToken, proxyAgent, clientHeaders, onRequest) {
-    return new Promise((resolve, reject) => {
-      const url = new URL(this.claudeApiUrl);
+  async _makeClaudeRequest(body, accessToken, proxyAgent, clientHeaders, accountId, onRequest, requestOptions = {}) {
+    const url = new URL(this.claudeApiUrl);
+    
+    // 获取过滤后的客户端 headers
+    const filteredHeaders = this._filterClientHeaders(clientHeaders);
+    
+    // 判断是否是真实的 Claude Code 请求
+    const isRealClaudeCode = this.isRealClaudeCodeRequest(body, clientHeaders);
+    
+    // 如果不是真实的 Claude Code 请求，需要使用从账户获取的 Claude Code headers
+    let finalHeaders = { ...filteredHeaders };
+    
+    if (!isRealClaudeCode) {
+      // 获取该账号存储的 Claude Code headers
+      const claudeCodeHeaders = await claudeCodeHeadersService.getAccountHeaders(accountId);
       
-      // 获取过滤后的客户端 headers
-      const filteredHeaders = this._filterClientHeaders(clientHeaders);
+      // 只添加客户端没有提供的 headers
+      Object.keys(claudeCodeHeaders).forEach(key => {
+        const lowerKey = key.toLowerCase();
+        if (!finalHeaders[key] && !finalHeaders[lowerKey]) {
+          finalHeaders[key] = claudeCodeHeaders[key];
+        }
+      });
+    }
+    
+    return new Promise((resolve, reject) => {
       
       const options = {
         hostname: url.hostname,
@@ -341,19 +463,21 @@ class ClaudeRelayService {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${accessToken}`,
           'anthropic-version': this.apiVersion,
-          ...filteredHeaders
+          ...finalHeaders
         },
         agent: proxyAgent,
         timeout: config.proxy.timeout
       };
       
       // 如果客户端没有提供 User-Agent，使用默认值
-      if (!filteredHeaders['User-Agent'] && !filteredHeaders['user-agent']) {
-        options.headers['User-Agent'] = 'claude-cli/1.0.53 (external, cli)';
+      if (!options.headers['User-Agent'] && !options.headers['user-agent']) {
+        options.headers['User-Agent'] = 'claude-cli/1.0.57 (external, cli)';
       }
 
-      if (this.betaHeader) {
-        options.headers['anthropic-beta'] = this.betaHeader;
+      // 使用自定义的 betaHeader 或默认值
+      const betaHeader = requestOptions?.betaHeader !== undefined ? requestOptions.betaHeader : this.betaHeader;
+      if (betaHeader) {
+        options.headers['anthropic-beta'] = betaHeader;
       }
 
       const req = https.request(options, (res) => {
@@ -445,7 +569,7 @@ class ClaudeRelayService {
   }
 
   // 🌊 处理流式响应（带usage数据捕获）
-  async relayStreamRequestWithUsageCapture(requestBody, apiKeyData, responseStream, clientHeaders, usageCallback) {
+  async relayStreamRequestWithUsageCapture(requestBody, apiKeyData, responseStream, clientHeaders, usageCallback, streamTransformer = null, options = {}) {
     try {
       // 调试日志：查看API Key数据（流式请求）
       logger.info('🔍 [Stream] API Key data received:', {
@@ -488,14 +612,14 @@ class ClaudeRelayService {
       // 获取有效的访问token
       const accessToken = await claudeAccountService.getValidAccessToken(accountId);
       
-      // 处理请求体
-      const processedBody = this._processRequestBody(requestBody);
+      // 处理请求体（传递 clientHeaders 以判断是否需要设置 Claude Code 系统提示词）
+      const processedBody = this._processRequestBody(requestBody, clientHeaders);
       
       // 获取代理配置
       const proxyAgent = await this._getProxyAgent(accountId);
       
       // 发送流式请求并捕获usage数据
-      return await this._makeClaudeStreamRequestWithUsageCapture(processedBody, accessToken, proxyAgent, clientHeaders, responseStream, usageCallback, accountId, sessionHash);
+      return await this._makeClaudeStreamRequestWithUsageCapture(processedBody, accessToken, proxyAgent, clientHeaders, responseStream, usageCallback, accountId, sessionHash, streamTransformer, options);
     } catch (error) {
       logger.error('❌ Claude stream relay with usage capture failed:', error);
       throw error;
@@ -503,12 +627,31 @@ class ClaudeRelayService {
   }
 
   // 🌊 发送流式请求到Claude API（带usage数据捕获）
-  async _makeClaudeStreamRequestWithUsageCapture(body, accessToken, proxyAgent, clientHeaders, responseStream, usageCallback, accountId, sessionHash) {
+  async _makeClaudeStreamRequestWithUsageCapture(body, accessToken, proxyAgent, clientHeaders, responseStream, usageCallback, accountId, sessionHash, streamTransformer = null, requestOptions = {}) {
+    // 获取过滤后的客户端 headers
+    const filteredHeaders = this._filterClientHeaders(clientHeaders);
+    
+    // 判断是否是真实的 Claude Code 请求
+    const isRealClaudeCode = this.isRealClaudeCodeRequest(body, clientHeaders);
+    
+    // 如果不是真实的 Claude Code 请求，需要使用从账户获取的 Claude Code headers
+    let finalHeaders = { ...filteredHeaders };
+    
+    if (!isRealClaudeCode) {
+      // 获取该账号存储的 Claude Code headers
+      const claudeCodeHeaders = await claudeCodeHeadersService.getAccountHeaders(accountId);
+      
+      // 只添加客户端没有提供的 headers
+      Object.keys(claudeCodeHeaders).forEach(key => {
+        const lowerKey = key.toLowerCase();
+        if (!finalHeaders[key] && !finalHeaders[lowerKey]) {
+          finalHeaders[key] = claudeCodeHeaders[key];
+        }
+      });
+    }
+    
     return new Promise((resolve, reject) => {
       const url = new URL(this.claudeApiUrl);
-      
-      // 获取过滤后的客户端 headers
-      const filteredHeaders = this._filterClientHeaders(clientHeaders);
       
       const options = {
         hostname: url.hostname,
@@ -519,27 +662,52 @@ class ClaudeRelayService {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${accessToken}`,
           'anthropic-version': this.apiVersion,
-          ...filteredHeaders
+          ...finalHeaders
         },
         agent: proxyAgent,
         timeout: config.proxy.timeout
       };
       
       // 如果客户端没有提供 User-Agent，使用默认值
-      if (!filteredHeaders['User-Agent'] && !filteredHeaders['user-agent']) {
-        options.headers['User-Agent'] = 'claude-cli/1.0.53 (external, cli)';
+      if (!options.headers['User-Agent'] && !options.headers['user-agent']) {
+        options.headers['User-Agent'] = 'claude-cli/1.0.57 (external, cli)';
       }
 
-      if (this.betaHeader) {
-        options.headers['anthropic-beta'] = this.betaHeader;
+      // 使用自定义的 betaHeader 或默认值
+      const betaHeader = requestOptions?.betaHeader !== undefined ? requestOptions.betaHeader : this.betaHeader;
+      if (betaHeader) {
+        options.headers['anthropic-beta'] = betaHeader;
       }
 
       const req = https.request(options, (res) => {
-        // 设置响应头
-        responseStream.statusCode = res.statusCode;
-        Object.keys(res.headers).forEach(key => {
-          responseStream.setHeader(key, res.headers[key]);
-        });
+        logger.debug(`🌊 Claude stream response status: ${res.statusCode}`);
+
+        // 错误响应处理
+        if (res.statusCode !== 200) {
+          logger.error(`❌ Claude API returned error status: ${res.statusCode}`);
+          let errorData = '';
+          
+          res.on('data', (chunk) => {
+            errorData += chunk.toString();
+          });
+          
+          res.on('end', () => {
+            logger.error('❌ Claude API error response:', errorData);
+            if (!responseStream.destroyed) {
+              // 发送错误事件
+              responseStream.write('event: error\n');
+              responseStream.write(`data: ${JSON.stringify({ 
+                error: 'Claude API error',
+                status: res.statusCode,
+                details: errorData,
+                timestamp: new Date().toISOString()
+              })}\n\n`);
+              responseStream.end();
+            }
+            reject(new Error(`Claude API error: ${res.statusCode}`));
+          });
+          return;
+        }
 
         let buffer = '';
         let finalUsageReported = false; // 防止重复统计的标志
@@ -548,19 +716,28 @@ class ClaudeRelayService {
         
         // 监听数据块，解析SSE并寻找usage信息
         res.on('data', (chunk) => {
-          const chunkStr = chunk.toString();
-          
-          buffer += chunkStr;
-          
-          // 处理完整的SSE行
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // 保留最后的不完整行
-          
-          // 转发已处理的完整行到客户端
-          if (lines.length > 0) {
-            const linesToForward = lines.join('\n') + (lines.length > 0 ? '\n' : '');
-            responseStream.write(linesToForward);
-          }
+          try {
+            const chunkStr = chunk.toString();
+            
+            buffer += chunkStr;
+            
+            // 处理完整的SSE行
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || ''; // 保留最后的不完整行
+            
+            // 转发已处理的完整行到客户端
+            if (lines.length > 0 && !responseStream.destroyed) {
+              const linesToForward = lines.join('\n') + (lines.length > 0 ? '\n' : '');
+              // 如果有流转换器，应用转换
+              if (streamTransformer) {
+                const transformed = streamTransformer(linesToForward);
+                if (transformed) {
+                  responseStream.write(transformed);
+                }
+              } else {
+                responseStream.write(linesToForward);
+              }
+            }
           
           for (const line of lines) {
             // 解析SSE数据寻找usage信息
@@ -607,14 +784,41 @@ class ClaudeRelayService {
               }
             }
           }
+          } catch (error) {
+            logger.error('❌ Error processing stream data:', error);
+            // 发送错误但不破坏流，让它自然结束
+            if (!responseStream.destroyed) {
+              responseStream.write('event: error\n');
+              responseStream.write(`data: ${JSON.stringify({ 
+                error: 'Stream processing error',
+                message: error.message,
+                timestamp: new Date().toISOString()
+              })}\n\n`);
+            }
+          }
         });
         
         res.on('end', async () => {
-          // 处理缓冲区中剩余的数据
-          if (buffer.trim()) {
-            responseStream.write(buffer);
+          try {
+            // 处理缓冲区中剩余的数据
+            if (buffer.trim() && !responseStream.destroyed) {
+              if (streamTransformer) {
+                const transformed = streamTransformer(buffer);
+                if (transformed) {
+                  responseStream.write(transformed);
+                }
+              } else {
+                responseStream.write(buffer);
+              }
+            }
+            
+            // 确保流正确结束
+            if (!responseStream.destroyed) {
+              responseStream.end();
+            }
+          } catch (error) {
+            logger.error('❌ Error processing stream end:', error);
           }
-          responseStream.end();
           
           // 检查是否捕获到usage数据
           if (!finalUsageReported) {
@@ -630,6 +834,11 @@ class ClaudeRelayService {
             const isRateLimited = await claudeAccountService.isAccountRateLimited(accountId);
             if (isRateLimited) {
               await claudeAccountService.removeAccountRateLimit(accountId);
+            }
+            
+            // 只有真实的 Claude Code 请求才更新 headers（流式请求）
+            if (clientHeaders && Object.keys(clientHeaders).length > 0 && this.isRealClaudeCodeRequest(body, clientHeaders)) {
+              await claudeCodeHeadersService.storeAccountHeaders(accountId, clientHeaders);
             }
           }
           
@@ -721,7 +930,7 @@ class ClaudeRelayService {
   }
 
   // 🌊 发送流式请求到Claude API
-  async _makeClaudeStreamRequest(body, accessToken, proxyAgent, clientHeaders, responseStream) {
+  async _makeClaudeStreamRequest(body, accessToken, proxyAgent, clientHeaders, responseStream, requestOptions = {}) {
     return new Promise((resolve, reject) => {
       const url = new URL(this.claudeApiUrl);
       
@@ -748,8 +957,10 @@ class ClaudeRelayService {
         options.headers['User-Agent'] = 'claude-cli/1.0.53 (external, cli)';
       }
 
-      if (this.betaHeader) {
-        options.headers['anthropic-beta'] = this.betaHeader;
+      // 使用自定义的 betaHeader 或默认值
+      const betaHeader = requestOptions?.betaHeader !== undefined ? requestOptions.betaHeader : this.betaHeader;
+      if (betaHeader) {
+        options.headers['anthropic-beta'] = betaHeader;
       }
 
       const req = https.request(options, (res) => {

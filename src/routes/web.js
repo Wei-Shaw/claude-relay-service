@@ -370,4 +370,6 @@ router.get('/style.css', (req, res) => {
   serveWhitelistedFile(req, res, 'style.css');
 });
 
+// 🔑 Gemini OAuth 回调页面
+
 module.exports = router;

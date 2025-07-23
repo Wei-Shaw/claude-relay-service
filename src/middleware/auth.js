@@ -198,11 +198,14 @@ const authenticateApiKey = async (req, res, next) => {
       name: validation.keyData.name,
       tokenLimit: validation.keyData.tokenLimit,
       claudeAccountId: validation.keyData.claudeAccountId,
+      geminiAccountId: validation.keyData.geminiAccountId,
+      permissions: validation.keyData.permissions,
       concurrencyLimit: validation.keyData.concurrencyLimit,
       rateLimitWindow: validation.keyData.rateLimitWindow,
       rateLimitRequests: validation.keyData.rateLimitRequests,
       enableModelRestriction: validation.keyData.enableModelRestriction,
-      restrictedModels: validation.keyData.restrictedModels
+      restrictedModels: validation.keyData.restrictedModels,
+      usage: validation.keyData.usage
     };
     req.usage = validation.keyData.usage;
     
@@ -460,9 +463,9 @@ const securityMiddleware = (req, res, next) => {
   if (req.path.startsWith('/web') || req.path === '/') {
     res.setHeader('Content-Security-Policy', [
       'default-src \'self\'',
-      'script-src \'self\' \'unsafe-inline\' \'unsafe-eval\' https://unpkg.com https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net',
-      'style-src \'self\' \'unsafe-inline\' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com',
-      'font-src \'self\' https://cdnjs.cloudflare.com',
+      'script-src \'self\' \'unsafe-inline\' \'unsafe-eval\' https://unpkg.com https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://cdn.bootcdn.net',
+      'style-src \'self\' \'unsafe-inline\' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://cdn.bootcdn.net',
+      'font-src \'self\' https://cdnjs.cloudflare.com https://cdn.bootcdn.net',
       'img-src \'self\' data:',
       'connect-src \'self\'',
       'frame-ancestors \'none\'',

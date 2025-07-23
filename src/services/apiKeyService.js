@@ -17,6 +17,8 @@ class ApiKeyService {
       tokenLimit = config.limits.defaultTokenLimit,
       expiresAt = null,
       claudeAccountId = null,
+      geminiAccountId = null,
+      permissions = 'all', // 'claude', 'gemini', 'all'
       isActive = true,
       concurrencyLimit = 0,
       rateLimitWindow = null,
@@ -41,6 +43,8 @@ class ApiKeyService {
       rateLimitRequests: String(rateLimitRequests ?? 0),
       isActive: String(isActive),
       claudeAccountId: claudeAccountId || '',
+      geminiAccountId: geminiAccountId || '',
+      permissions: permissions || 'all',
       enableModelRestriction: String(enableModelRestriction),
       restrictedModels: JSON.stringify(restrictedModels || []),
       createdAt: new Date().toISOString(),
@@ -65,6 +69,8 @@ class ApiKeyService {
       rateLimitRequests: parseInt(keyData.rateLimitRequests || 0),
       isActive: keyData.isActive === 'true',
       claudeAccountId: keyData.claudeAccountId,
+      geminiAccountId: keyData.geminiAccountId,
+      permissions: keyData.permissions,
       enableModelRestriction: keyData.enableModelRestriction === 'true',
       restrictedModels: JSON.parse(keyData.restrictedModels),
       createdAt: keyData.createdAt,
@@ -122,6 +128,8 @@ class ApiKeyService {
           id: keyData.id,
           name: keyData.name,
           claudeAccountId: keyData.claudeAccountId,
+          geminiAccountId: keyData.geminiAccountId,
+          permissions: keyData.permissions || 'all',
           tokenLimit: parseInt(keyData.tokenLimit),
           concurrencyLimit: parseInt(keyData.concurrencyLimit || 0),
           rateLimitWindow: parseInt(keyData.rateLimitWindow || 0),
@@ -152,6 +160,7 @@ class ApiKeyService {
         key.currentConcurrency = await redis.getConcurrency(key.id);
         key.isActive = key.isActive === 'true';
         key.enableModelRestriction = key.enableModelRestriction === 'true';
+        key.permissions = key.permissions || 'all'; // 兼容旧数据
         try {
           key.restrictedModels = key.restrictedModels ? JSON.parse(key.restrictedModels) : [];
         } catch (e) {
@@ -176,7 +185,7 @@ class ApiKeyService {
       }
 
       // 允许更新的字段
-      const allowedUpdates = ['name', 'description', 'tokenLimit', 'concurrencyLimit', 'rateLimitWindow', 'rateLimitRequests', 'isActive', 'claudeAccountId', 'expiresAt', 'enableModelRestriction', 'restrictedModels'];
+      const allowedUpdates = ['name', 'description', 'tokenLimit', 'concurrencyLimit', 'rateLimitWindow', 'rateLimitRequests', 'isActive', 'claudeAccountId', 'geminiAccountId', 'permissions', 'expiresAt', 'enableModelRestriction', 'restrictedModels'];
       const updatedData = { ...keyData };
 
       for (const [field, value] of Object.entries(updates)) {
@@ -292,4 +301,10 @@ class ApiKeyService {
   }
 }
 
-module.exports = new ApiKeyService();
+// 导出实例和单独的方法
+const apiKeyService = new ApiKeyService();
+
+// 为了方便其他服务调用，导出 recordUsage 方法
+apiKeyService.recordUsageMetrics = apiKeyService.recordUsage.bind(apiKeyService);
+
+module.exports = apiKeyService;

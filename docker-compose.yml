@@ -36,9 +36,8 @@ services:
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
-      - redis_data:/data
-      - ./config/redis.conf:/usr/local/etc/redis/redis.conf:ro
-    command: redis-server /usr/local/etc/redis/redis.conf
+      - ./redis_data:/data
+    command: redis-server --save 60 1 --appendonly yes --appendfsync everysec
     networks:
       - claude-relay-network
     healthcheck:
@@ -104,8 +103,6 @@ services:
       - monitoring
 
 volumes:
-  redis_data:
-    driver: local
   prometheus_data:
     driver: local
   grafana_data:

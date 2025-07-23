@@ -6,6 +6,15 @@ const axios = require('axios');
 const redis = require('../models/redis');
 const logger = require('../utils/logger');
 const config = require('../../config/config');
+const { maskToken } = require('../utils/tokenMask');
+const {
+  logRefreshStart,
+  logRefreshSuccess,
+  logRefreshError,
+  logTokenUsage,
+  logRefreshSkipped
+} = require('../utils/tokenRefreshLogger');
+const tokenRefreshService = require('./tokenRefreshService');
 
 class ClaudeAccountService {
   constructor() {
@@ -101,6 +110,8 @@ class ClaudeAccountService {
 
   // 🔄 刷新Claude账户token
   async refreshAccountToken(accountId) {
+    let lockAcquired = false;
+    
     try {
       const accountData = await redis.getClaudeAccount(accountId);
       
@@ -114,6 +125,35 @@ class ClaudeAccountService {
         throw new Error('No refresh token available - manual token update required');
       }
 
+      // 尝试获取分布式锁
+      lockAcquired = await tokenRefreshService.acquireRefreshLock(accountId, 'claude');
+      
+      if (!lockAcquired) {
+        // 如果无法获取锁，说明另一个进程正在刷新
+        logger.info(`🔒 Token refresh already in progress for account: ${accountData.name} (${accountId})`);
+        logRefreshSkipped(accountId, accountData.name, 'claude', 'already_locked');
+        
+        // 等待一段时间后返回，期望其他进程已完成刷新
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // 重新获取账户数据（可能已被其他进程刷新）
+        const updatedData = await redis.getClaudeAccount(accountId);
+        if (updatedData && updatedData.accessToken) {
+          const accessToken = this._decryptSensitiveData(updatedData.accessToken);
+          return {
+            success: true,
+            accessToken: accessToken,
+            expiresAt: updatedData.expiresAt
+          };
+        }
+        
+        throw new Error('Token refresh in progress by another process');
+      }
+
+      // 记录开始刷新
+      logRefreshStart(accountId, accountData.name, 'claude', 'manual_refresh');
+      logger.info(`🔄 Starting token refresh for account: ${accountData.name} (${accountId})`);
+
       // 创建代理agent
       const agent = this._createProxyAgent(accountData.proxy);
 
@@ -125,7 +165,7 @@ class ClaudeAccountService {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json, text/plain, */*',
-          'User-Agent': 'claude-cli/1.0.53 (external, cli)',
+          'User-Agent': 'claude-cli/1.0.56 (external, cli)',
           'Accept-Language': 'en-US,en;q=0.9',
           'Referer': 'https://claude.ai/',
           'Origin': 'https://claude.ai'
@@ -147,7 +187,15 @@ class ClaudeAccountService {
 
         await redis.setClaudeAccount(accountId, accountData);
         
-        logger.success(`🔄 Refreshed token for account: ${accountData.name} (${accountId})`);
+        // 记录刷新成功
+        logRefreshSuccess(accountId, accountData.name, 'claude', {
+          accessToken: access_token,
+          refreshToken: refresh_token,
+          expiresAt: accountData.expiresAt,
+          scopes: accountData.scopes
+        });
+        
+        logger.success(`🔄 Refreshed token for account: ${accountData.name} (${accountId}) - Access Token: ${maskToken(access_token)}`);
         
         return {
           success: true,
@@ -158,17 +206,23 @@ class ClaudeAccountService {
         throw new Error(`Token refresh failed with status: ${response.status}`);
       }
     } catch (error) {
-      logger.error(`❌ Failed to refresh token for account ${accountId}:`, error);
-      
-      // 更新错误状态
+      // 记录刷新失败
       const accountData = await redis.getClaudeAccount(accountId);
       if (accountData) {
+        logRefreshError(accountId, accountData.name, 'claude', error);
         accountData.status = 'error';
         accountData.errorMessage = error.message;
         await redis.setClaudeAccount(accountId, accountData);
       }
       
+      logger.error(`❌ Failed to refresh token for account ${accountId}:`, error);
+      
       throw error;
+    } finally {
+      // 释放锁
+      if (lockAcquired) {
+        await tokenRefreshService.releaseRefreshLock(accountId, 'claude');
+      }
     }
   }
 
@@ -188,8 +242,12 @@ class ClaudeAccountService {
       // 检查token是否过期
       const expiresAt = parseInt(accountData.expiresAt);
       const now = Date.now();
+      const isExpired = !expiresAt || now >= (expiresAt - 60000); // 60秒提前刷新
       
-      if (!expiresAt || now >= (expiresAt - 60000)) { // 60秒提前刷新
+      // 记录token使用情况
+      logTokenUsage(accountId, accountData.name, 'claude', accountData.expiresAt, isExpired);
+      
+      if (isExpired) {
         logger.info(`🔄 Token expired/expiring for account ${accountId}, attempting refresh...`);
         try {
           const refreshResult = await this.refreshAccountToken(accountId);
@@ -275,6 +333,9 @@ class ClaudeAccountService {
       const allowedUpdates = ['name', 'description', 'email', 'password', 'refreshToken', 'proxy', 'isActive', 'claudeAiOauth', 'accountType'];
       const updatedData = { ...accountData };
 
+      // 检查是否新增了 refresh token
+      const oldRefreshToken = this._decryptSensitiveData(accountData.refreshToken);
+      
       for (const [field, value] of Object.entries(updates)) {
         if (allowedUpdates.includes(field)) {
           if (['email', 'password', 'refreshToken'].includes(field)) {
@@ -296,6 +357,27 @@ class ClaudeAccountService {
           } else {
             updatedData[field] = value.toString();
           }
+        }
+      }
+      
+      // 如果新增了 refresh token（之前没有，现在有了），更新过期时间为10分钟
+      if (updates.refreshToken && !oldRefreshToken && updates.refreshToken.trim()) {
+        const newExpiresAt = Date.now() + (10 * 60 * 1000); // 10分钟
+        updatedData.expiresAt = newExpiresAt.toString();
+        logger.info(`🔄 New refresh token added for account ${accountId}, setting expiry to 10 minutes`);
+      }
+      
+      // 如果通过 claudeAiOauth 更新，也要检查是否新增了 refresh token
+      if (updates.claudeAiOauth && updates.claudeAiOauth.refreshToken && !oldRefreshToken) {
+        // 如果 expiresAt 设置的时间过长（超过1小时），调整为10分钟
+        const providedExpiry = parseInt(updates.claudeAiOauth.expiresAt);
+        const now = Date.now();
+        const oneHour = 60 * 60 * 1000;
+        
+        if (providedExpiry - now > oneHour) {
+          const newExpiresAt = now + (10 * 60 * 1000); // 10分钟
+          updatedData.expiresAt = newExpiresAt.toString();
+          logger.info(`🔄 Adjusted expiry time to 10 minutes for account ${accountId} with refresh token`);
         }
       }
 

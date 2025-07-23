@@ -127,18 +127,32 @@ jobs:
         prerelease: false
         generate_release_notes: true
 
+    - name: Update VERSION file
+      if: steps.check_changes.outputs.has_changes == 'true'
+      run: |
+        # 更新 VERSION 文件
+        echo "${{ steps.next_version.outputs.new_version }}" > VERSION
+        
+        # 检查是否有更改
+        if git diff --quiet VERSION; then
+          echo "VERSION file already up to date"
+        else
+          git add VERSION
+          echo "Updated VERSION file to ${{ steps.next_version.outputs.new_version }}"
+        fi
+
     - name: Update CHANGELOG.md
       if: steps.check_changes.outputs.has_changes == 'true'
       run: |
         # 生成完整的 CHANGELOG
         git cliff --config .github/cliff.toml --output CHANGELOG.md
         
-        # 提交 CHANGELOG 更新
-        if git diff --quiet CHANGELOG.md; then
-          echo "No changes to CHANGELOG.md"
+        # 提交 CHANGELOG 和 VERSION 更新
+        if git diff --quiet CHANGELOG.md VERSION; then
+          echo "No changes to CHANGELOG.md or VERSION"
         else
-          git add CHANGELOG.md
-          git commit -m "chore: update CHANGELOG.md for ${{ steps.next_version.outputs.new_tag }} [skip ci]"
+          git add CHANGELOG.md VERSION
+          git commit -m "chore: update CHANGELOG.md and VERSION for ${{ steps.next_version.outputs.new_tag }} [skip ci]"
           git push origin main
         fi
 

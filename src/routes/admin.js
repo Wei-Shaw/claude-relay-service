@@ -1,12 +1,17 @@
 const express = require('express');
 const apiKeyService = require('../services/apiKeyService');
 const claudeAccountService = require('../services/claudeAccountService');
+const geminiAccountService = require('../services/geminiAccountService');
 const redis = require('../models/redis');
 const { authenticateAdmin } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const oauthHelper = require('../utils/oauthHelper');
 const CostCalculator = require('../utils/costCalculator');
 const pricingService = require('../services/pricingService');
+const claudeCodeHeadersService = require('../services/claudeCodeHeadersService');
+const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 
 const router = express.Router();
 
@@ -32,6 +37,8 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       tokenLimit,
       expiresAt,
       claudeAccountId,
+      geminiAccountId,
+      permissions,
       concurrencyLimit,
       rateLimitWindow,
       rateLimitRequests,
@@ -84,6 +91,8 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       tokenLimit,
       expiresAt,
       claudeAccountId,
+      geminiAccountId,
+      permissions,
       concurrencyLimit,
       rateLimitWindow,
       rateLimitRequests,
@@ -103,7 +112,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
 router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
   try {
     const { keyId } = req.params;
-    const { tokenLimit, concurrencyLimit, rateLimitWindow, rateLimitRequests, claudeAccountId, enableModelRestriction, restrictedModels } = req.body;
+    const { tokenLimit, concurrencyLimit, rateLimitWindow, rateLimitRequests, claudeAccountId, geminiAccountId, permissions, enableModelRestriction, restrictedModels } = req.body;
 
     // 只允许更新指定字段
     const updates = {};
@@ -139,6 +148,19 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
     if (claudeAccountId !== undefined) {
       // 空字符串表示解绑，null或空字符串都设置为空字符串
       updates.claudeAccountId = claudeAccountId || '';
+    }
+
+    if (geminiAccountId !== undefined) {
+      // 空字符串表示解绑，null或空字符串都设置为空字符串
+      updates.geminiAccountId = geminiAccountId || '';
+    }
+
+    if (permissions !== undefined) {
+      // 验证权限值
+      if (!['claude', 'gemini', 'all'].includes(permissions)) {
+        return res.status(400).json({ error: 'Invalid permissions value. Must be claude, gemini, or all' });
+      }
+      updates.permissions = permissions;
     }
 
     // 处理模型限制字段
@@ -381,15 +403,181 @@ router.post('/claude-accounts/:accountId/refresh', authenticateAdmin, async (req
   }
 });
 
+// 🤖 Gemini 账户管理
+
+// 生成 Gemini OAuth 授权 URL
+router.post('/gemini-accounts/generate-auth-url', authenticateAdmin, async (req, res) => {
+  try {
+    const { state } = req.body;
+    
+    // 使用固定的 localhost:45462 作为回调地址
+    const redirectUri = 'http://localhost:45462';
+    
+    logger.info(`Generating Gemini OAuth URL with redirect_uri: ${redirectUri}`);
+    
+    const { authUrl, state: authState } = await geminiAccountService.generateAuthUrl(state, redirectUri);
+    
+    // 创建 OAuth 会话
+    const sessionId = authState;
+    await redis.setOAuthSession(sessionId, {
+      state: authState,
+      type: 'gemini',
+      redirectUri: redirectUri, // 保存固定的 redirect_uri 用于 token 交换
+      createdAt: new Date().toISOString()
+    });
+    
+    logger.info(`Generated Gemini OAuth URL with session: ${sessionId}`);
+    res.json({ 
+      success: true, 
+      data: { 
+        authUrl,
+        sessionId
+      } 
+    });
+  } catch (error) {
+    logger.error('❌ Failed to generate Gemini auth URL:', error);
+    res.status(500).json({ error: 'Failed to generate auth URL', message: error.message });
+  }
+});
+
+// 轮询 Gemini OAuth 授权状态
+router.post('/gemini-accounts/poll-auth-status', authenticateAdmin, async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+    
+    if (!sessionId) {
+      return res.status(400).json({ error: 'Session ID is required' });
+    }
+    
+    const result = await geminiAccountService.pollAuthorizationStatus(sessionId);
+    
+    if (result.success) {
+      logger.success(`✅ Gemini OAuth authorization successful for session: ${sessionId}`);
+      res.json({ success: true, data: { tokens: result.tokens } });
+    } else {
+      res.json({ success: false, error: result.error });
+    }
+  } catch (error) {
+    logger.error('❌ Failed to poll Gemini auth status:', error);
+    res.status(500).json({ error: 'Failed to poll auth status', message: error.message });
+  }
+});
+
+// 交换 Gemini 授权码
+router.post('/gemini-accounts/exchange-code', authenticateAdmin, async (req, res) => {
+  try {
+    const { code, sessionId } = req.body;
+    
+    if (!code) {
+      return res.status(400).json({ error: 'Authorization code is required' });
+    }
+    
+    // 使用固定的 localhost:45462 作为 redirect_uri
+    const redirectUri = 'http://localhost:45462';
+    logger.info(`Using fixed redirect_uri: ${redirectUri}`);
+    
+    const tokens = await geminiAccountService.exchangeCodeForTokens(code, redirectUri);
+    
+    // 清理 OAuth 会话
+    if (sessionId) {
+      await redis.deleteOAuthSession(sessionId);
+    }
+    
+    logger.success('✅ Successfully exchanged Gemini authorization code');
+    res.json({ success: true, data: { tokens } });
+  } catch (error) {
+    logger.error('❌ Failed to exchange Gemini authorization code:', error);
+    res.status(500).json({ error: 'Failed to exchange code', message: error.message });
+  }
+});
+
+// 获取所有 Gemini 账户
+router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
+  try {
+    const accounts = await geminiAccountService.getAllAccounts();
+    res.json({ success: true, data: accounts });
+  } catch (error) {
+    logger.error('❌ Failed to get Gemini accounts:', error);
+    res.status(500).json({ error: 'Failed to get accounts', message: error.message });
+  }
+});
+
+// 创建新的 Gemini 账户
+router.post('/gemini-accounts', authenticateAdmin, async (req, res) => {
+  try {
+    const accountData = req.body;
+    
+    // 输入验证
+    if (!accountData.name) {
+      return res.status(400).json({ error: 'Account name is required' });
+    }
+    
+    const newAccount = await geminiAccountService.createAccount(accountData);
+    
+    logger.success(`🏢 Admin created new Gemini account: ${accountData.name}`);
+    res.json({ success: true, data: newAccount });
+  } catch (error) {
+    logger.error('❌ Failed to create Gemini account:', error);
+    res.status(500).json({ error: 'Failed to create account', message: error.message });
+  }
+});
+
+// 更新 Gemini 账户
+router.put('/gemini-accounts/:accountId', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const updates = req.body;
+    
+    const updatedAccount = await geminiAccountService.updateAccount(accountId, updates);
+    
+    logger.success(`📝 Admin updated Gemini account: ${accountId}`);
+    res.json({ success: true, data: updatedAccount });
+  } catch (error) {
+    logger.error('❌ Failed to update Gemini account:', error);
+    res.status(500).json({ error: 'Failed to update account', message: error.message });
+  }
+});
+
+// 删除 Gemini 账户
+router.delete('/gemini-accounts/:accountId', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    
+    await geminiAccountService.deleteAccount(accountId);
+    
+    logger.success(`🗑️ Admin deleted Gemini account: ${accountId}`);
+    res.json({ success: true, message: 'Gemini account deleted successfully' });
+  } catch (error) {
+    logger.error('❌ Failed to delete Gemini account:', error);
+    res.status(500).json({ error: 'Failed to delete account', message: error.message });
+  }
+});
+
+// 刷新 Gemini 账户 token
+router.post('/gemini-accounts/:accountId/refresh', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    
+    const result = await geminiAccountService.refreshAccountToken(accountId);
+    
+    logger.success(`🔄 Admin refreshed token for Gemini account: ${accountId}`);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    logger.error('❌ Failed to refresh Gemini account token:', error);
+    res.status(500).json({ error: 'Failed to refresh token', message: error.message });
+  }
+});
+
 // 📊 系统统计
 
 // 获取系统概览
 router.get('/dashboard', authenticateAdmin, async (req, res) => {
   try {
-    const [, apiKeys, accounts, todayStats, systemAverages] = await Promise.all([
+    const [, apiKeys, claudeAccounts, geminiAccounts, todayStats, systemAverages] = await Promise.all([
       redis.getSystemStats(),
       apiKeyService.getAllApiKeys(),
       claudeAccountService.getAllAccounts(),
+      geminiAccountService.getAllAccounts(),
       redis.getTodayStats(),
       redis.getSystemAverages()
     ]);
@@ -404,16 +592,21 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
     const totalAllTokensUsed = apiKeys.reduce((sum, key) => sum + (key.usage?.total?.allTokens || 0), 0);
     
     const activeApiKeys = apiKeys.filter(key => key.isActive).length;
-    const activeAccounts = accounts.filter(acc => acc.isActive && acc.status === 'active').length;
-    const rateLimitedAccounts = accounts.filter(acc => acc.rateLimitStatus && acc.rateLimitStatus.isRateLimited).length;
+    const activeClaudeAccounts = claudeAccounts.filter(acc => acc.isActive && acc.status === 'active').length;
+    const rateLimitedClaudeAccounts = claudeAccounts.filter(acc => acc.rateLimitStatus && acc.rateLimitStatus.isRateLimited).length;
+    const activeGeminiAccounts = geminiAccounts.filter(acc => acc.isActive && acc.status === 'active').length;
+    const rateLimitedGeminiAccounts = geminiAccounts.filter(acc => acc.rateLimitStatus === 'limited').length;
 
     const dashboard = {
       overview: {
         totalApiKeys: apiKeys.length,
         activeApiKeys,
-        totalClaudeAccounts: accounts.length,
-        activeClaudeAccounts: activeAccounts,
-        rateLimitedClaudeAccounts: rateLimitedAccounts,
+        totalClaudeAccounts: claudeAccounts.length,
+        activeClaudeAccounts: activeClaudeAccounts,
+        rateLimitedClaudeAccounts: rateLimitedClaudeAccounts,
+        totalGeminiAccounts: geminiAccounts.length,
+        activeGeminiAccounts: activeGeminiAccounts,
+        rateLimitedGeminiAccounts: rateLimitedGeminiAccounts,
         totalTokensUsed,
         totalRequestsUsed,
         totalInputTokensUsed,
@@ -437,7 +630,8 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       },
       systemHealth: {
         redisConnected: redis.isConnected,
-        claudeAccountsHealthy: activeAccounts > 0,
+        claudeAccountsHealthy: activeClaudeAccounts > 0,
+        geminiAccountsHealthy: activeGeminiAccounts > 0,
         uptime: process.uptime()
       }
     };
@@ -1072,7 +1266,8 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
             
             hourData.apiKeys[apiKeyId] = {
               name: apiKeyMap.get(apiKeyId).name,
-              tokens: totalTokens
+              tokens: totalTokens,
+              requests: parseInt(data.requests) || 0
             };
           }
         }
@@ -1116,7 +1311,8 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
             
             dayData.apiKeys[apiKeyId] = {
               name: apiKeyMap.get(apiKeyId).name,
-              tokens: totalTokens
+              tokens: totalTokens,
+              requests: parseInt(data.requests) || 0
             };
           }
         }
@@ -1365,5 +1561,237 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
     res.status(500).json({ error: 'Failed to calculate usage costs', message: error.message });
   }
 });
+
+// 📋 获取所有账号的 Claude Code headers 信息
+router.get('/claude-code-headers', authenticateAdmin, async (req, res) => {
+  try {
+    const allHeaders = await claudeCodeHeadersService.getAllAccountHeaders();
+    
+    // 获取所有 Claude 账号信息
+    const accounts = await claudeAccountService.getAllAccounts();
+    const accountMap = {};
+    accounts.forEach(account => {
+      accountMap[account.id] = account.name;
+    });
+    
+    // 格式化输出
+    const formattedData = Object.entries(allHeaders).map(([accountId, data]) => ({
+      accountId,
+      accountName: accountMap[accountId] || 'Unknown',
+      version: data.version,
+      userAgent: data.headers['user-agent'],
+      updatedAt: data.updatedAt,
+      headers: data.headers
+    }));
+    
+    res.json({
+      success: true,
+      data: formattedData
+    });
+  } catch (error) {
+    logger.error('❌ Failed to get Claude Code headers:', error);
+    res.status(500).json({ error: 'Failed to get Claude Code headers', message: error.message });
+  }
+});
+
+// 🗑️ 清除指定账号的 Claude Code headers
+router.delete('/claude-code-headers/:accountId', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    await claudeCodeHeadersService.clearAccountHeaders(accountId);
+    
+    res.json({
+      success: true,
+      message: `Claude Code headers cleared for account ${accountId}`
+    });
+  } catch (error) {
+    logger.error('❌ Failed to clear Claude Code headers:', error);
+    res.status(500).json({ error: 'Failed to clear Claude Code headers', message: error.message });
+  }
+});
+
+// 🔄 版本检查
+router.get('/check-updates', authenticateAdmin, async (req, res) => {
+  // 读取当前版本
+  const versionPath = path.join(__dirname, '../../VERSION');
+  let currentVersion = '1.0.0';
+  try {
+    currentVersion = fs.readFileSync(versionPath, 'utf8').trim();
+  } catch (err) {
+    logger.warn('⚠️ Could not read VERSION file:', err.message);
+  }
+
+  try {
+
+    // 从缓存获取
+    const cacheKey = 'version_check_cache';
+    const cached = await redis.getClient().get(cacheKey);
+    
+    if (cached && !req.query.force) {
+      const cachedData = JSON.parse(cached);
+      const cacheAge = Date.now() - cachedData.timestamp;
+      
+      // 缓存有效期1小时
+      if (cacheAge < 3600000) {
+        // 实时计算 hasUpdate，不使用缓存的值
+        const hasUpdate = compareVersions(currentVersion, cachedData.latest) < 0;
+        
+        return res.json({
+          success: true,
+          data: {
+            current: currentVersion,
+            latest: cachedData.latest,
+            hasUpdate: hasUpdate, // 实时计算，不用缓存
+            releaseInfo: cachedData.releaseInfo,
+            cached: true
+          }
+        });
+      }
+    }
+
+    // 请求 GitHub API
+    const githubRepo = 'wei-shaw/claude-relay-service';
+    const response = await axios.get(
+      `https://api.github.com/repos/${githubRepo}/releases/latest`,
+      {
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'Claude-Relay-Service'
+        },
+        timeout: 10000
+      }
+    );
+
+    const release = response.data;
+    const latestVersion = release.tag_name.replace(/^v/, '');
+    
+    // 比较版本
+    const hasUpdate = compareVersions(currentVersion, latestVersion) < 0;
+    
+    const releaseInfo = {
+      name: release.name,
+      body: release.body,
+      publishedAt: release.published_at,
+      htmlUrl: release.html_url
+    };
+
+    // 缓存结果（不缓存 hasUpdate，因为它应该实时计算）
+    await redis.getClient().set(cacheKey, JSON.stringify({
+      latest: latestVersion,
+      releaseInfo,
+      timestamp: Date.now()
+    }), 'EX', 3600); // 1小时过期
+
+    res.json({
+      success: true,
+      data: {
+        current: currentVersion,
+        latest: latestVersion,
+        hasUpdate,
+        releaseInfo,
+        cached: false
+      }
+    });
+
+  } catch (error) {
+    // 改进错误日志记录
+    const errorDetails = {
+      message: error.message || 'Unknown error',
+      code: error.code,
+      response: error.response ? {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data
+      } : null,
+      request: error.request ? 'Request was made but no response received' : null
+    };
+    
+    logger.error('❌ Failed to check for updates:', errorDetails.message);
+    
+    // 处理 404 错误 - 仓库或版本不存在
+    if (error.response && error.response.status === 404) {
+      return res.json({
+        success: true,
+        data: {
+          current: currentVersion,
+          latest: currentVersion,
+          hasUpdate: false,
+          releaseInfo: {
+            name: 'No releases found',
+            body: 'The GitHub repository has no releases yet.',
+            publishedAt: new Date().toISOString(),
+            htmlUrl: '#'
+          },
+          warning: 'GitHub repository has no releases'
+        }
+      });
+    }
+    
+    // 如果是网络错误，尝试返回缓存的数据
+    if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND') {
+      const cacheKey = 'version_check_cache';
+      const cached = await redis.getClient().get(cacheKey);
+      
+      if (cached) {
+        const cachedData = JSON.parse(cached);
+        // 实时计算 hasUpdate
+        const hasUpdate = compareVersions(currentVersion, cachedData.latest) < 0;
+        
+        return res.json({
+          success: true,
+          data: {
+            current: currentVersion,
+            latest: cachedData.latest,
+            hasUpdate: hasUpdate, // 实时计算
+            releaseInfo: cachedData.releaseInfo,
+            cached: true,
+            warning: 'Using cached data due to network error'
+          }
+        });
+      }
+    }
+    
+    // 其他错误返回当前版本信息
+    res.json({
+      success: true,
+      data: {
+        current: currentVersion,
+        latest: currentVersion,
+        hasUpdate: false,
+        releaseInfo: {
+          name: 'Update check failed',
+          body: `Unable to check for updates: ${error.message || 'Unknown error'}`,
+          publishedAt: new Date().toISOString(),
+          htmlUrl: '#'
+        },
+        error: true,
+        warning: error.message || 'Failed to check for updates'
+      }
+    });
+  }
+});
+
+// 版本比较函数
+function compareVersions(current, latest) {
+  const parseVersion = (v) => {
+    const parts = v.split('.').map(Number);
+    return {
+      major: parts[0] || 0,
+      minor: parts[1] || 0,
+      patch: parts[2] || 0
+    };
+  };
+  
+  const currentV = parseVersion(current);
+  const latestV = parseVersion(latest);
+  
+  if (currentV.major !== latestV.major) {
+    return currentV.major - latestV.major;
+  }
+  if (currentV.minor !== latestV.minor) {
+    return currentV.minor - latestV.minor;
+  }
+  return currentV.patch - latestV.patch;
+}
 
 module.exports = router;

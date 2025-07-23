@@ -241,21 +241,22 @@ const originalError = logger.error;
 const originalWarn = logger.warn;
 const originalInfo = logger.info;
 
-logger.error = function(message, metadata = {}) {
+logger.error = function(message, ...args) {
   logger.stats.errors++;
-  return originalError.call(this, message, metadata);
+  return originalError.call(this, message, ...args);
 };
 
-logger.warn = function(message, metadata = {}) {
+logger.warn = function(message, ...args) {
   logger.stats.warnings++;
-  return originalWarn.call(this, message, metadata);
+  return originalWarn.call(this, message, ...args);
 };
 
-logger.info = function(message, metadata = {}) {
-  if (metadata.type === 'request') {
+logger.info = function(message, ...args) {
+  // 检查是否是请求类型的日志
+  if (args.length > 0 && typeof args[0] === 'object' && args[0].type === 'request') {
     logger.stats.requests++;
   }
-  return originalInfo.call(this, message, metadata);
+  return originalInfo.call(this, message, ...args);
 };
 
 // 📈 获取日志统计

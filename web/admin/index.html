@@ -4,16 +4,33 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Claude Relay Service - 管理后台</title>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    
+    <!-- 预连接到CDN域名，加速资源加载 -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+    
+    <!-- 使用更快的CDN资源，保持版本一致 -->
+    <!-- Vue 3.3.4 (必须先加载，不使用defer) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.3.4/vue.global.prod.min.js" crossorigin="anonymous"></script>
+    
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
-    <!-- Element Plus -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/element-plus/2.4.4/index.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/element-plus/2.4.4/index.full.min.js"></script>
+    
+    <!-- Chart.js 4.4.0 (独立库，可以延迟加载) -->
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.js" crossorigin="anonymous"></script>
+    
+    <!-- Element Plus 2.4.4 (依赖Vue，所以在Vue之后加载) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/element-plus/2.4.4/index.min.css" crossorigin="anonymous">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/element-plus/2.4.4/index.full.min.js" crossorigin="anonymous"></script>
+    
     <!-- Element Plus 中文语言包 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/element-plus/2.4.4/locale/zh-cn.min.js"></script>
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/element-plus/2.4.4/locale/zh-cn.min.js" crossorigin="anonymous"></script>
+    
+    <!-- Font Awesome 6.5.1 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    
     <link rel="stylesheet" href="/web/style.css">
 </head>
 <body>
@@ -79,7 +96,24 @@
                             <i class="fas fa-cloud text-xl text-gray-700"></i>
                         </div>
                         <div class="flex flex-col justify-center min-h-[48px]">
-                            <h1 class="text-2xl font-bold text-white header-title leading-tight">Claude Relay Service</h1>
+                            <div class="flex items-center gap-3">
+                                <h1 class="text-2xl font-bold text-white header-title leading-tight">Claude Relay Service</h1>
+                                <!-- 版本信息 -->
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm text-gray-400 font-mono">v{{ versionInfo.current || '...' }}</span>
+                                    <!-- 更新提示 -->
+                                    <a 
+                                        v-if="versionInfo.hasUpdate" 
+                                        :href="versionInfo.releaseInfo?.htmlUrl || '#'"
+                                        target="_blank"
+                                        class="inline-flex items-center gap-1 px-2 py-0.5 bg-green-500 border border-green-600 rounded-full text-xs text-white hover:bg-green-600 transition-colors animate-pulse"
+                                        title="有新版本可用"
+                                    >
+                                        <i class="fas fa-arrow-up text-[10px]"></i>
+                                        <span>新版本</span>
+                                    </a>
+                                </div>
+                            </div>
                             <p class="text-gray-600 text-sm leading-tight mt-0.5">管理后台</p>
                         </div>
                     </div>
@@ -97,10 +131,54 @@
                         <!-- 悬浮菜单 -->
                         <div 
                             v-if="userMenuOpen" 
-                            class="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 py-2 user-menu-dropdown"
+                            class="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-200 py-2 user-menu-dropdown"
                             style="z-index: 999999;"
                             @click.stop
                         >
+                            <!-- 版本信息 -->
+                            <div class="px-4 py-3 border-b border-gray-100">
+                                <div class="flex items-center justify-between text-sm">
+                                    <span class="text-gray-500">当前版本</span>
+                                    <span class="font-mono text-gray-700">v{{ versionInfo.current || '...' }}</span>
+                                </div>
+                                <div v-if="versionInfo.hasUpdate" class="mt-2">
+                                    <div class="flex items-center justify-between text-sm mb-2">
+                                        <span class="text-green-600 font-medium">
+                                            <i class="fas fa-arrow-up mr-1"></i>有新版本
+                                        </span>
+                                        <span class="font-mono text-green-600">v{{ versionInfo.latest }}</span>
+                                    </div>
+                                    <a 
+                                        :href="versionInfo.releaseInfo?.htmlUrl || '#'"
+                                        target="_blank"
+                                        class="block w-full text-center px-3 py-1.5 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 transition-colors"
+                                    >
+                                        <i class="fas fa-external-link-alt mr-1"></i>查看更新
+                                    </a>
+                                </div>
+                                <div v-else-if="versionInfo.checkingUpdate" class="mt-2 text-center text-xs text-gray-500">
+                                    <i class="fas fa-spinner fa-spin mr-1"></i>检查更新中...
+                                </div>
+                                <div v-else class="mt-2 text-center">
+                                    <!-- 已是最新版提醒 -->
+                                    <transition name="fade" mode="out-in">
+                                        <div v-if="versionInfo.noUpdateMessage" key="message" class="px-3 py-1.5 bg-green-100 border border-green-200 rounded-lg inline-block">
+                                            <p class="text-xs text-green-700 font-medium">
+                                                <i class="fas fa-check-circle mr-1"></i>当前已是最新版本
+                                            </p>
+                                        </div>
+                                        <button 
+                                            v-else
+                                            key="button"
+                                            @click="checkForUpdates()"
+                                            class="text-xs text-blue-500 hover:text-blue-700 transition-colors"
+                                        >
+                                            <i class="fas fa-sync-alt mr-1"></i>检查更新
+                                        </button>
+                                    </transition>
+                                </div>
+                            </div>
+                            
                             <button 
                                 @click="openChangePasswordModal"
                                 class="w-full px-4 py-3 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
@@ -158,7 +236,7 @@
                         <div class="stat-card">
                             <div class="flex items-center justify-between">
                                 <div>
-                                    <p class="text-sm font-semibold text-gray-600 mb-1">Claude账户</p>
+                                    <p class="text-sm font-semibold text-gray-600 mb-1">服务账户</p>
                                     <p class="text-3xl font-bold text-gray-900">{{ dashboardData.totalAccounts }}</p>
                                     <p class="text-xs text-gray-500 mt-1">
                                         活跃: {{ dashboardData.activeAccounts || 0 }}
@@ -406,10 +484,37 @@
                         </div>
                     </div>
                     
-                    <!-- API Keys Token消耗趋势图 -->
+                    <!-- API Keys 使用趋势图 -->
                     <div class="mb-8">
                         <div class="card p-6">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4">API Keys Token 消耗趋势</h3>
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-semibold text-gray-900">API Keys 使用趋势</h3>
+                                <!-- 维度切换按钮 -->
+                                <div class="flex gap-1 bg-gray-100 rounded-lg p-1">
+                                    <button 
+                                        @click="apiKeysTrendMetric = 'requests'; updateApiKeysUsageTrendChart()"
+                                        :class="[
+                                            'px-3 py-1 rounded-md text-sm font-medium transition-colors',
+                                            apiKeysTrendMetric === 'requests'
+                                                ? 'bg-white text-blue-600 shadow-sm' 
+                                                : 'text-gray-600 hover:text-gray-900'
+                                        ]"
+                                    >
+                                        <i class="fas fa-exchange-alt mr-1"></i>请求次数
+                                    </button>
+                                    <button 
+                                        @click="apiKeysTrendMetric = 'tokens'; updateApiKeysUsageTrendChart()"
+                                        :class="[
+                                            'px-3 py-1 rounded-md text-sm font-medium transition-colors',
+                                            apiKeysTrendMetric === 'tokens'
+                                                ? 'bg-white text-blue-600 shadow-sm' 
+                                                : 'text-gray-600 hover:text-gray-900'
+                                        ]"
+                                    >
+                                        <i class="fas fa-coins mr-1"></i>Token 数量
+                                    </button>
+                                </div>
+                            </div>
                             <div class="mb-4 text-sm text-gray-600">
                                 <span v-if="apiKeysTrendData.totalApiKeys > 10">
                                     共 {{ apiKeysTrendData.totalApiKeys }} 个 API Key，显示使用量前 10 个
@@ -770,8 +875,8 @@
                     <div class="card p-6">
                         <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
                             <div>
-                                <h3 class="text-xl font-bold text-gray-900 mb-2">Claude 账户管理</h3>
-                                <p class="text-gray-600">管理您的 Claude 账户和代理配置</p>
+                                <h3 class="text-xl font-bold text-gray-900 mb-2">账户管理</h3>
+                                <p class="text-gray-600">管理您的 Claude 和 Gemini 账户及代理配置</p>
                             </div>
                             <button 
                                 @click.stop="openCreateAccountModal"
@@ -799,6 +904,7 @@
                                 <thead class="bg-gray-50/80 backdrop-blur-sm">
                                     <tr>
                                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">名称</th>
+                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">平台</th>
                                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">类型</th>
                                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">状态</th>
                                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">代理</th>
@@ -828,6 +934,16 @@
                                                     <div class="text-xs text-gray-500">{{ account.id }}</div>
                                                 </div>
                                             </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span v-if="account.platform === 'gemini'" 
+                                                  class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
+                                                <i class="fas fa-robot mr-1"></i>Gemini
+                                            </span>
+                                            <span v-else 
+                                                  class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">
+                                                <i class="fas fa-brain mr-1"></i>Claude
+                                            </span>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <span v-if="account.scopes && account.scopes.length > 0" 
@@ -1801,39 +1917,65 @@
                         >
                     </div>
                     
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口 (可选)</label>
-                        <input 
-                            v-model="apiKeyForm.rateLimitWindow" 
-                            type="number" 
-                            min="1"
-                            placeholder="留空表示无限制" 
-                            class="form-input w-full"
-                        >
-                        <p class="text-xs text-gray-500 mt-2">设置时间窗口（分钟），在此时间内限制请求次数或Token使用量</p>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-3">请求次数限制 (可选)</label>
-                        <input 
-                            v-model="apiKeyForm.rateLimitRequests" 
-                            type="number" 
-                            min="1"
-                            placeholder="留空表示无限制" 
-                            class="form-input w-full"
-                        >
-                        <p class="text-xs text-gray-500 mt-2">在时间窗口内允许的最大请求次数</p>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口内 Token 限制 (可选)</label>
-                        <input 
-                            v-model="apiKeyForm.tokenLimit" 
-                            type="number" 
-                            placeholder="留空表示无限制" 
-                            class="form-input w-full"
-                        >
-                        <p class="text-xs text-gray-500 mt-2">设置在时间窗口内的最大 Token 使用量（需同时设置时间窗口）</p>
+                    <!-- 速率限制设置 -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-4">
+                        <div class="flex items-start gap-3 mb-3">
+                            <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <i class="fas fa-tachometer-alt text-white text-sm"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h4 class="font-semibold text-gray-800 mb-1">速率限制设置 (可选)</h4>
+                                <p class="text-sm text-gray-600">控制 API Key 的使用频率和资源消耗</p>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口 (分钟)</label>
+                            <input 
+                                v-model="apiKeyForm.rateLimitWindow" 
+                                type="number" 
+                                min="1"
+                                placeholder="留空表示无限制" 
+                                class="form-input w-full"
+                            >
+                            <p class="text-xs text-gray-500 mt-2">设置一个时间段（以分钟为单位），用于计算速率限制</p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口内的请求次数限制</label>
+                            <input 
+                                v-model="apiKeyForm.rateLimitRequests" 
+                                type="number" 
+                                min="1"
+                                placeholder="留空表示无限制" 
+                                class="form-input w-full"
+                            >
+                            <p class="text-xs text-gray-500 mt-2">在时间窗口内允许的最大请求次数（需要先设置时间窗口）</p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口内的 Token 使用量限制</label>
+                            <input 
+                                v-model="apiKeyForm.tokenLimit" 
+                                type="number" 
+                                placeholder="留空表示无限制" 
+                                class="form-input w-full"
+                            >
+                            <p class="text-xs text-gray-500 mt-2">在时间窗口内允许消耗的最大 Token 数量（需要先设置时间窗口）</p>
+                        </div>
+                        
+                        <!-- 示例说明 -->
+                        <div class="bg-blue-100 rounded-lg p-3 mt-3">
+                            <h5 class="text-sm font-semibold text-blue-800 mb-2">💡 使用示例</h5>
+                            <div class="text-xs text-blue-700 space-y-1">
+                                <p><strong>示例1:</strong> 时间窗口=60，请求次数限制=100</p>
+                                <p class="ml-4">→ 每60分钟内最多允许100次请求</p>
+                                <p class="mt-2"><strong>示例2:</strong> 时间窗口=10，Token限制=50000</p>
+                                <p class="ml-4">→ 每10分钟内最多消耗50,000个Token</p>
+                                <p class="mt-2"><strong>示例3:</strong> 时间窗口=30，请求次数限制=50，Token限制=100000</p>
+                                <p class="ml-4">→ 每30分钟内最多50次请求且总Token不超过100,000</p>
+                            </div>
+                        </div>
                     </div>
                     
                     <div>
@@ -1859,20 +2001,77 @@
                     </div>
                     
                     <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">服务权限</label>
+                        <div class="flex gap-4">
+                            <label class="flex items-center cursor-pointer">
+                                <input 
+                                    type="radio" 
+                                    v-model="apiKeyForm.permissions" 
+                                    value="all" 
+                                    class="mr-2"
+                                >
+                                <span class="text-sm text-gray-700">全部服务</span>
+                            </label>
+                            <label class="flex items-center cursor-pointer">
+                                <input 
+                                    type="radio" 
+                                    v-model="apiKeyForm.permissions" 
+                                    value="claude" 
+                                    class="mr-2"
+                                >
+                                <span class="text-sm text-gray-700">仅 Claude</span>
+                            </label>
+                            <label class="flex items-center cursor-pointer">
+                                <input 
+                                    type="radio" 
+                                    v-model="apiKeyForm.permissions" 
+                                    value="gemini" 
+                                    class="mr-2"
+                                >
+                                <span class="text-sm text-gray-700">仅 Gemini</span>
+                            </label>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">控制此 API Key 可以访问哪些服务</p>
+                    </div>
+                    
+                    <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-3">专属账号绑定 (可选)</label>
-                        <select 
-                            v-model="apiKeyForm.claudeAccountId" 
-                            class="form-input w-full"
-                        >
-                            <option value="">使用共享账号池</option>
-                            <option 
-                                v-for="account in dedicatedAccounts" 
-                                :key="account.id" 
-                                :value="account.id"
-                            >
-                                {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
-                            </option>
-                        </select>
+                        <div class="grid grid-cols-1 gap-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-1">Claude 专属账号</label>
+                                <select 
+                                    v-model="apiKeyForm.claudeAccountId" 
+                                    class="form-input w-full"
+                                    :disabled="apiKeyForm.permissions === 'gemini'"
+                                >
+                                    <option value="">使用共享账号池</option>
+                                    <option 
+                                        v-for="account in dedicatedAccounts.filter(a => a.platform === 'claude')" 
+                                        :key="account.id" 
+                                        :value="account.id"
+                                    >
+                                        {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
+                                    </option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-1">Gemini 专属账号</label>
+                                <select 
+                                    v-model="apiKeyForm.geminiAccountId" 
+                                    class="form-input w-full"
+                                    :disabled="apiKeyForm.permissions === 'claude'"
+                                >
+                                    <option value="">使用共享账号池</option>
+                                    <option 
+                                        v-for="account in dedicatedAccounts.filter(a => a.platform === 'gemini')" 
+                                        :key="account.id" 
+                                        :value="account.id"
+                                    >
+                                        {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
                         <p class="text-xs text-gray-500 mt-2">选择专属账号后，此API Key将只使用该账号，不选择则使用共享账号池</p>
                     </div>
                     
@@ -1984,40 +2183,66 @@
                         <p class="text-xs text-gray-500 mt-2">名称不可修改</p>
                     </div>
                     
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口</label>
-                        <input 
-                            v-model="editApiKeyForm.rateLimitWindow" 
-                            type="number" 
-                            min="1"
-                            placeholder="留空表示无限制" 
-                            class="form-input w-full"
-                        >
-                        <p class="text-xs text-gray-500 mt-2">设置时间窗口（分钟），在此时间内限制请求次数或Token使用量</p>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-3">请求次数限制</label>
-                        <input 
-                            v-model="editApiKeyForm.rateLimitRequests" 
-                            type="number" 
-                            min="1"
-                            placeholder="留空表示无限制" 
-                            class="form-input w-full"
-                        >
-                        <p class="text-xs text-gray-500 mt-2">在时间窗口内允许的最大请求次数</p>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口内 Token 限制</label>
-                        <input 
-                            v-model="editApiKeyForm.tokenLimit" 
-                            type="number" 
-                            min="0"
-                            placeholder="0 表示无限制" 
-                            class="form-input w-full"
-                        >
-                        <p class="text-xs text-gray-500 mt-2">设置在时间窗口内的最大 Token 使用量（需同时设置时间窗口），0 或留空表示无限制</p>
+                    <!-- 速率限制设置 -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-4">
+                        <div class="flex items-start gap-3 mb-3">
+                            <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <i class="fas fa-tachometer-alt text-white text-sm"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h4 class="font-semibold text-gray-800 mb-1">速率限制设置</h4>
+                                <p class="text-sm text-gray-600">控制 API Key 的使用频率和资源消耗</p>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口 (分钟)</label>
+                            <input 
+                                v-model="editApiKeyForm.rateLimitWindow" 
+                                type="number" 
+                                min="1"
+                                placeholder="留空表示无限制" 
+                                class="form-input w-full"
+                            >
+                            <p class="text-xs text-gray-500 mt-2">设置一个时间段（以分钟为单位），用于计算速率限制</p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口内的请求次数限制</label>
+                            <input 
+                                v-model="editApiKeyForm.rateLimitRequests" 
+                                type="number" 
+                                min="1"
+                                placeholder="留空表示无限制" 
+                                class="form-input w-full"
+                            >
+                            <p class="text-xs text-gray-500 mt-2">在时间窗口内允许的最大请求次数（需要先设置时间窗口）</p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口内的 Token 使用量限制</label>
+                            <input 
+                                v-model="editApiKeyForm.tokenLimit" 
+                                type="number" 
+                                min="0"
+                                placeholder="0 表示无限制" 
+                                class="form-input w-full"
+                            >
+                            <p class="text-xs text-gray-500 mt-2">在时间窗口内允许消耗的最大 Token 数量（需要先设置时间窗口），0 或留空表示无限制</p>
+                        </div>
+                        
+                        <!-- 示例说明 -->
+                        <div class="bg-blue-100 rounded-lg p-3 mt-3">
+                            <h5 class="text-sm font-semibold text-blue-800 mb-2">💡 使用示例</h5>
+                            <div class="text-xs text-blue-700 space-y-1">
+                                <p><strong>示例1:</strong> 时间窗口=60，请求次数限制=100</p>
+                                <p class="ml-4">→ 每60分钟内最多允许100次请求</p>
+                                <p class="mt-2"><strong>示例2:</strong> 时间窗口=10，Token限制=50000</p>
+                                <p class="ml-4">→ 每10分钟内最多消耗50,000个Token</p>
+                                <p class="mt-2"><strong>示例3:</strong> 时间窗口=30，请求次数限制=50，Token限制=100000</p>
+                                <p class="ml-4">→ 每30分钟内最多50次请求且总Token不超过100,000</p>
+                            </div>
+                        </div>
                     </div>
                     
                     <div>
@@ -2033,20 +2258,77 @@
                     </div>
                     
                     <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">服务权限</label>
+                        <div class="flex gap-4">
+                            <label class="flex items-center cursor-pointer">
+                                <input 
+                                    type="radio" 
+                                    v-model="editApiKeyForm.permissions" 
+                                    value="all" 
+                                    class="mr-2"
+                                >
+                                <span class="text-sm text-gray-700">全部服务</span>
+                            </label>
+                            <label class="flex items-center cursor-pointer">
+                                <input 
+                                    type="radio" 
+                                    v-model="editApiKeyForm.permissions" 
+                                    value="claude" 
+                                    class="mr-2"
+                                >
+                                <span class="text-sm text-gray-700">仅 Claude</span>
+                            </label>
+                            <label class="flex items-center cursor-pointer">
+                                <input 
+                                    type="radio" 
+                                    v-model="editApiKeyForm.permissions" 
+                                    value="gemini" 
+                                    class="mr-2"
+                                >
+                                <span class="text-sm text-gray-700">仅 Gemini</span>
+                            </label>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">控制此 API Key 可以访问哪些服务</p>
+                    </div>
+                    
+                    <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-3">专属账号绑定</label>
-                        <select 
-                            v-model="editApiKeyForm.claudeAccountId" 
-                            class="form-input w-full"
-                        >
-                            <option value="">使用共享账号池</option>
-                            <option 
-                                v-for="account in dedicatedAccounts" 
-                                :key="account.id" 
-                                :value="account.id"
-                            >
-                                {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
-                            </option>
-                        </select>
+                        <div class="grid grid-cols-1 gap-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-1">Claude 专属账号</label>
+                                <select 
+                                    v-model="editApiKeyForm.claudeAccountId" 
+                                    class="form-input w-full"
+                                    :disabled="editApiKeyForm.permissions === 'gemini'"
+                                >
+                                    <option value="">使用共享账号池</option>
+                                    <option 
+                                        v-for="account in dedicatedAccounts.filter(a => a.platform === 'claude')" 
+                                        :key="account.id" 
+                                        :value="account.id"
+                                    >
+                                        {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
+                                    </option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-1">Gemini 专属账号</label>
+                                <select 
+                                    v-model="editApiKeyForm.geminiAccountId" 
+                                    class="form-input w-full"
+                                    :disabled="editApiKeyForm.permissions === 'claude'"
+                                >
+                                    <option value="">使用共享账号池</option>
+                                    <option 
+                                        v-for="account in dedicatedAccounts.filter(a => a.platform === 'gemini')" 
+                                        :key="account.id" 
+                                        :value="account.id"
+                                    >
+                                        {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
                         <p class="text-xs text-gray-500 mt-2">修改绑定账号将影响此API Key的请求路由</p>
                     </div>
                     
@@ -2222,7 +2504,7 @@
             </div>
         </div>
 
-        <!-- 创建 Claude 账户模态框 -->
+        <!-- 创建账户模态框 -->
         <div v-if="showCreateAccountModal" class="fixed inset-0 modal z-50 flex items-center justify-center p-4">
             <div class="modal-content w-full max-w-2xl p-8 mx-auto max-h-[90vh] overflow-y-auto custom-scrollbar">
                 <div class="flex items-center justify-between mb-6">
@@ -2230,7 +2512,7 @@
                         <div class="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
                             <i class="fas fa-user-circle text-white"></i>
                         </div>
-                        <h3 class="text-xl font-bold text-gray-900">添加 Claude 账户</h3>
+                        <h3 class="text-xl font-bold text-gray-900">添加账户</h3>
                     </div>
                     <button 
                         @click="closeCreateAccountModal"
@@ -2264,6 +2546,30 @@
                 <!-- 步骤1: 基本信息和代理设置 -->
                 <div v-if="oauthStep === 1">
                     <div class="space-y-6">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-3">平台</label>
+                            <div class="flex gap-4">
+                                <label class="flex items-center cursor-pointer">
+                                    <input 
+                                        type="radio" 
+                                        v-model="accountForm.platform" 
+                                        value="claude" 
+                                        class="mr-2"
+                                    >
+                                    <span class="text-sm text-gray-700">Claude</span>
+                                </label>
+                                <label class="flex items-center cursor-pointer">
+                                    <input 
+                                        type="radio" 
+                                        v-model="accountForm.platform" 
+                                        value="gemini" 
+                                        class="mr-2"
+                                    >
+                                    <span class="text-sm text-gray-700">Gemini</span>
+                                </label>
+                            </div>
+                        </div>
+                        
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-3">添加方式</label>
                             <div class="flex gap-4">
@@ -2336,6 +2642,35 @@
                             </p>
                         </div>
                         
+                        <!-- Gemini 项目编号字段 -->
+                        <div v-if="accountForm.platform === 'gemini'">
+                            <label class="block text-sm font-semibold text-gray-700 mb-3">项目编号 (可选)</label>
+                            <input 
+                                v-model="accountForm.projectId" 
+                                type="text" 
+                                class="form-input w-full"
+                                placeholder="例如：123456789012（纯数字）"
+                            >
+                            <div class="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                <div class="flex items-start gap-2">
+                                    <i class="fas fa-info-circle text-yellow-600 mt-0.5"></i>
+                                    <div class="text-xs text-yellow-700">
+                                        <p class="font-medium mb-1">Google Cloud/Workspace 账号需要提供项目编号</p>
+                                        <p>某些 Google 账号（特别是绑定了 Google Cloud 的账号）会被识别为 Workspace 账号，需要提供额外的项目编号。</p>
+                                        <div class="mt-2 p-2 bg-white rounded border border-yellow-300">
+                                            <p class="font-medium mb-1">如何获取项目编号：</p>
+                                            <ol class="list-decimal list-inside space-y-1 ml-2">
+                                                <li>访问 <a href="https://console.cloud.google.com/welcome" target="_blank" class="text-blue-600 hover:underline font-medium">Google Cloud Console</a></li>
+                                                <li>复制<span class="font-semibold text-red-600">项目编号（Project Number）</span>，通常是12位纯数字</li>
+                                                <li class="text-red-600">⚠️ 注意：不要复制项目ID（Project ID），要复制项目编号！</li>
+                                            </ol>
+                                        </div>
+                                        <p class="mt-2"><strong>提示：</strong>如果您的账号是普通个人账号（未绑定 Google Cloud），请留空此字段。</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <!-- 手动输入 Token 字段 -->
                         <div v-if="accountForm.addType === 'manual'" class="space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
                             <div class="flex items-start gap-3 mb-4">
@@ -2344,15 +2679,23 @@
                                 </div>
                                 <div>
                                     <h5 class="font-semibold text-blue-900 mb-2">手动输入 Token</h5>
-                                    <p class="text-sm text-blue-800 mb-2">请输入有效的 Claude Access Token。如果您有 Refresh Token，建议也一并填写以支持自动刷新。</p>
+                                    <p v-if="accountForm.platform === 'claude'" class="text-sm text-blue-800 mb-2">
+                                        请输入有效的 Claude Access Token。如果您有 Refresh Token，建议也一并填写以支持自动刷新。
+                                    </p>
+                                    <p v-else-if="accountForm.platform === 'gemini'" class="text-sm text-blue-800 mb-2">
+                                        请输入有效的 Gemini Access Token。如果您有 Refresh Token，建议也一并填写以支持自动刷新。
+                                    </p>
                                     <div class="bg-white/80 rounded-lg p-3 mt-2 mb-2 border border-blue-300">
                                         <p class="text-sm text-blue-900 font-medium mb-1">
                                             <i class="fas fa-folder-open mr-1"></i>
                                             获取 Access Token 的方法：
                                         </p>
-                                        <p class="text-xs text-blue-800">
+                                        <p v-if="accountForm.platform === 'claude'" class="text-xs text-blue-800">
                                             请从已登录 Claude Code 的机器上获取 <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">~/.claude/.credentials.json</code> 文件中的凭证，
                                             请勿使用 Claude 官网 API Keys 页面的密钥。
+                                        </p>
+                                        <p v-else-if="accountForm.platform === 'gemini'" class="text-xs text-blue-800">
+                                            请从已登录 Gemini CLI 的机器上获取 <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">~/.config/gemini/credentials.json</code> 文件中的凭证。
                                         </p>
                                     </div>
                                     <p class="text-xs text-blue-600">💡 如果未填写 Refresh Token，Token 过期后需要手动更新。</p>
@@ -2365,7 +2708,7 @@
                                     v-model="accountForm.accessToken" 
                                     rows="4" 
                                     class="form-input w-full resize-none font-mono text-sm"
-                                    placeholder="sk-ant-oat01-..."
+                                    :placeholder="accountForm.platform === 'claude' ? 'sk-ant-oat01-...' : 'ya29.a0A...'"
                                     required
                                 ></textarea>
                             </div>
@@ -2376,7 +2719,7 @@
                                     v-model="accountForm.refreshToken" 
                                     rows="4" 
                                     class="form-input w-full resize-none font-mono text-sm"
-                                    placeholder="sk-ant-ort01-..."
+                                    :placeholder="accountForm.platform === 'claude' ? 'sk-ant-ort01-...' : '1//0g...'"
                                 ></textarea>
                                 <p class="text-xs text-gray-500 mt-2">如果有 Refresh Token，填写后系统可以自动刷新过期的 Access Token</p>
                             </div>
@@ -2384,7 +2727,10 @@
 
                         <div class="border-t pt-6">
                             <label class="block text-sm font-semibold text-gray-700 mb-3">代理设置 (可选)</label>
-                            <p class="text-sm text-gray-500 mb-4">如果需要使用代理访问Claude服务，请配置代理信息。OAuth授权也将通过此代理进行。</p>
+                            <p class="text-sm text-gray-500 mb-4">
+                                <span v-if="accountForm.platform === 'claude'">如果需要使用代理访问Claude服务，请配置代理信息。OAuth授权也将通过此代理进行。</span>
+                                <span v-else-if="accountForm.platform === 'gemini'">如果需要使用代理访问Gemini服务，请配置代理信息。OAuth授权也将通过此代理进行。</span>
+                            </p>
                             <select 
                                 v-model="accountForm.proxyType" 
                                 class="form-input w-full"
@@ -2472,7 +2818,8 @@
 
                 <!-- 步骤2: OAuth 授权 -->
                 <div v-if="oauthStep === 2">
-                    <div class="space-y-6">
+                    <!-- Claude OAuth 流程 -->
+                    <div v-if="accountForm.platform === 'claude'" class="space-y-6">
                         <!-- 获取授权URL -->
                         <div v-if="!oauthData.authUrl" class="text-center py-8">
                             <div class="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
@@ -2555,6 +2902,101 @@
                         </div>
                     </div>
                     
+                    <!-- Gemini OAuth 流程 -->
+                    <div v-else-if="accountForm.platform === 'gemini'" class="space-y-6">
+                        <!-- 获取授权URL -->
+                        <div v-if="!geminiOauthData.authUrl" class="text-center py-8">
+                            <div class="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-link text-green-600 text-2xl"></i>
+                            </div>
+                            <h5 class="text-lg font-semibold text-gray-900 mb-2">获取授权链接</h5>
+                            <p class="text-gray-600 mb-6">点击下方按钮生成Gemini OAuth授权链接</p>
+                            <button 
+                                @click="generateAuthUrl()" 
+                                :disabled="authUrlLoading"
+                                class="btn btn-primary px-8 py-3 font-semibold"
+                            >
+                                <div v-if="authUrlLoading" class="loading-spinner mr-2"></div>
+                                <i v-else class="fas fa-magic mr-2"></i>
+                                {{ authUrlLoading ? '生成中...' : '生成授权链接' }}
+                            </button>
+                        </div>
+
+                        <!-- 显示授权URL和轮询状态 -->
+                        <div v-if="geminiOauthData.authUrl">
+                            <div class="bg-green-50 border border-green-200 rounded-xl p-6 mb-6">
+                                <div class="flex items-start gap-3 mb-4">
+                                    <div class="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
+                                        <i class="fas fa-info text-white text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <h5 class="font-semibold text-green-900 mb-2">操作说明</h5>
+                                        <ol class="text-sm text-green-800 space-y-1 list-decimal list-inside">
+                                            <li>点击下方的授权链接，在新页面中完成Google账号登录</li>
+                                            <li>点击"登录"按钮后可能会加载很慢（这是正常的）</li>
+                                            <li>如果超过1分钟还在加载，请按 F5 刷新页面</li>
+                                            <li>授权完成后会跳转到 http://localhost:45462 (可能显示无法访问)</li>
+                                            <li>复制浏览器地址栏的完整链接并粘贴到下方输入框</li>
+                                        </ol>
+                                        <div class="mt-3 text-xs text-green-700 bg-green-100 rounded-lg p-3">
+                                            <i class="fas fa-lightbulb mr-1"></i>
+                                            <strong>提示：</strong>如果页面一直无法跳转，可以打开浏览器开发者工具（F12），F5刷新一下授权页再点击页面的登录按钮，在"网络"标签中找到以 localhost:45462 开头的请求，复制其完整URL。
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-3">授权链接</label>
+                                    <div class="flex gap-2">
+                                        <input 
+                                            :value="geminiOauthData.authUrl"
+                                            readonly
+                                            class="form-input flex-1 font-mono text-sm bg-gray-50"
+                                        >
+                                        <button 
+                                            @click="copyToClipboard(geminiOauthData.authUrl)"
+                                            class="btn btn-primary px-4 py-2 flex items-center gap-2"
+                                        >
+                                            <i class="fas fa-copy"></i>复制
+                                        </button>
+                                        <a 
+                                            :href="geminiOauthData.authUrl" 
+                                            target="_blank"
+                                            class="btn btn-success px-4 py-2 flex items-center gap-2"
+                                        >
+                                            <i class="fas fa-external-link-alt"></i>打开
+                                        </a>
+                                    </div>
+                                </div>
+
+                                <!-- 授权码输入框 -->
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-3">
+                                        <i class="fas fa-key text-green-500 mr-2"></i>复制oauth后的链接
+                                    </label>
+                                    <textarea 
+                                        v-model="geminiOauthData.code" 
+                                        rows="3" 
+                                        class="form-input w-full resize-none font-mono text-sm"
+                                        placeholder="粘贴以 http://localhost:45462 开头的完整链接..."
+                                    ></textarea>
+                                    <div class="mt-2 space-y-1">
+                                        <p class="text-xs text-gray-600">
+                                            <i class="fas fa-check-circle text-green-500 mr-1"></i>
+                                            支持粘贴完整链接，系统会自动提取授权码
+                                        </p>
+                                        <p class="text-xs text-gray-600">
+                                            <i class="fas fa-check-circle text-green-500 mr-1"></i>
+                                            也可以直接粘贴授权码（code参数的值）
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="flex gap-3 pt-6">
                         <button 
                             type="button" 
@@ -2563,7 +3005,9 @@
                         >
                             <i class="fas fa-arrow-left mr-2"></i>上一步
                         </button>
+                        <!-- Claude 完成按钮 -->
                         <button 
+                            v-if="accountForm.platform === 'claude'"
                             type="button" 
                             @click="createOAuthAccount()"
                             :disabled="!oauthData.callbackUrl || !oauthData.authUrl || createAccountLoading"
@@ -2573,12 +3017,24 @@
                             <i v-else class="fas fa-check mr-2"></i>
                             {{ createAccountLoading ? '创建中...' : '完成创建' }}
                         </button>
+                        <!-- Gemini 完成按钮 -->
+                        <button 
+                            v-else-if="accountForm.platform === 'gemini'"
+                            type="button" 
+                            @click="createGeminiOAuthAccount()"
+                            :disabled="!geminiOauthData.code || !geminiOauthData.authUrl || createAccountLoading"
+                            class="btn btn-success flex-1 py-3 px-6 font-semibold"
+                        >
+                            <div v-if="createAccountLoading" class="loading-spinner mr-2"></div>
+                            <i v-else class="fas fa-check mr-2"></i>
+                            {{ createAccountLoading ? '创建中...' : '使用授权码创建账户' }}
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- 编辑 Claude 账户模态框 -->
+        <!-- 编辑账户模态框 -->
         <div v-if="showEditAccountModal" class="fixed inset-0 modal z-50 flex items-center justify-center p-4">
             <div class="modal-content w-full max-w-2xl p-8 mx-auto max-h-[90vh] overflow-y-auto custom-scrollbar">
                 <div class="flex items-center justify-between mb-6">
@@ -2586,7 +3042,7 @@
                         <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
                             <i class="fas fa-edit text-white"></i>
                         </div>
-                        <h3 class="text-xl font-bold text-gray-900">编辑 Claude 账户</h3>
+                        <h3 class="text-xl font-bold text-gray-900">编辑账户</h3>
                     </div>
                     <button 
                         @click="closeEditAccountModal"
@@ -2656,6 +3112,35 @@
                     </div>
                     
                     <!-- Token 更新区域 -->
+                    <!-- Gemini 项目编号字段（编辑模式） -->
+                    <div v-if="editAccountForm.platform === 'gemini'">
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">项目编号 (可选)</label>
+                        <input 
+                            v-model="editAccountForm.projectId" 
+                            type="text" 
+                            class="form-input w-full"
+                            placeholder="例如：123456789012（纯数字）"
+                        >
+                        <div class="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <div class="flex items-start gap-2">
+                                <i class="fas fa-info-circle text-yellow-600 mt-0.5"></i>
+                                <div class="text-xs text-yellow-700">
+                                    <p class="font-medium mb-1">Google Cloud/Workspace 账号需要提供项目编号</p>
+                                    <p>如果您的账号被识别为 Workspace 账号，请提供项目编号。留空将尝试自动检测。</p>
+                                    <div class="mt-2 p-2 bg-white rounded border border-yellow-300">
+                                        <p class="font-medium mb-1">如何获取项目编号：</p>
+                                        <ol class="list-decimal list-inside space-y-1 ml-2">
+                                            <li>访问 <a href="https://console.cloud.google.com/welcome" target="_blank" class="text-blue-600 hover:underline font-medium">Google Cloud Console</a></li>
+                                            <li>复制<span class="font-semibold text-red-600">项目编号（Project Number）</span>，通常是12位纯数字</li>
+                                            <li class="text-red-600">⚠️ 注意：不要复制项目ID（Project ID），要复制项目编号！</li>
+                                        </ol>
+                                    </div>
+                                    <p class="mt-2"><strong>提示：</strong>如果您的账号是普通个人账号（未绑定 Google Cloud），请留空此字段。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="bg-amber-50 p-4 rounded-lg border border-amber-200">
                         <div class="flex items-start gap-3 mb-4">
                             <div class="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
@@ -2866,6 +3351,36 @@
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+        
+        <!-- 确认弹窗 -->
+        <div v-if="showConfirmModal" class="fixed inset-0 modal z-50 flex items-center justify-center p-4">
+            <div class="modal-content w-full max-w-md p-6 mx-auto">
+                <div class="flex items-start gap-4 mb-6">
+                    <div class="w-12 h-12 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-exclamation text-white text-xl"></i>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">{{ confirmModal.title }}</h3>
+                        <p class="text-gray-600 text-sm leading-relaxed whitespace-pre-line">{{ confirmModal.message }}</p>
+                    </div>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button 
+                        @click="handleConfirmCancel"
+                        class="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                    >
+                        {{ confirmModal.cancelText || '取消' }}
+                    </button>
+                    <button 
+                        @click="handleConfirmOk"
+                        class="flex-1 px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-xl font-medium hover:from-yellow-600 hover:to-orange-600 transition-colors shadow-sm"
+                    >
+                        {{ confirmModal.confirmText || '继续' }}
+                    </button>
+                </div>
             </div>
         </div>
 

@@ -19,6 +19,9 @@ data/
 !data/.gitkeep
 !data/init.json
 
+# Redis data directory
+redis_data/
+
 # Logs directory
 logs/
 *.log
