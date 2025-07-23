@@ -77,7 +77,7 @@ class SessionHelper {
         firstMessageText = firstMessage.content;
       } else if (Array.isArray(firstMessage.content)) {
         if (!firstMessage.content) {
-          logger.error(`📋 Session hash generated from first message failed: `, firstMessage);
+          logger.error('📋 Session hash generated from first message failed: ', firstMessage);
         }
 
         firstMessageText = firstMessage.content

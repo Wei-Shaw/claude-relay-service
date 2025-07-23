@@ -21,8 +21,13 @@ const OAUTH_SCOPES = ['https://www.googleapis.com/auth/cloud-platform'];
 
 // 加密相关常量
 const ALGORITHM = 'aes-256-cbc';
-const ENCRYPTION_KEY = Buffer.from(config.security.encryptionKey, 'hex');
+const ENCRYPTION_SALT = 'gemini-account-salt';
 const IV_LENGTH = 16;
+
+// 生成加密密钥（使用与 claudeAccountService 相同的方法）
+function generateEncryptionKey() {
+  return crypto.scryptSync(config.security.encryptionKey, ENCRYPTION_SALT, 32);
+}
 
 // Gemini 账户键前缀
 const GEMINI_ACCOUNT_KEY_PREFIX = 'gemini_account:';
@@ -32,8 +37,9 @@ const ACCOUNT_SESSION_MAPPING_PREFIX = 'gemini_session_account_mapping:';
 // 加密函数
 function encrypt(text) {
   if (!text) return '';
+  const key = generateEncryptionKey();
   const iv = crypto.randomBytes(IV_LENGTH);
-  const cipher = crypto.createCipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
+  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
   let encrypted = cipher.update(text);
   encrypted = Buffer.concat([encrypted, cipher.final()]);
   return iv.toString('hex') + ':' + encrypted.toString('hex');
@@ -43,10 +49,11 @@ function encrypt(text) {
 function decrypt(text) {
   if (!text) return '';
   try {
+    const key = generateEncryptionKey();
     const textParts = text.split(':');
     const iv = Buffer.from(textParts.shift(), 'hex');
     const encryptedText = Buffer.from(textParts.join(':'), 'hex');
-    const decipher = crypto.createDecipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
     let decrypted = decipher.update(encryptedText);
     decrypted = Buffer.concat([decrypted, decipher.final()]);
     return decrypted.toString();
