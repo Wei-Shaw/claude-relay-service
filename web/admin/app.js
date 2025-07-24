@@ -368,6 +368,40 @@ const app = createApp({
     },
     
     methods: {
+        // 统一的API请求方法，处理token过期等错误
+        async apiRequest(url, options = {}) {
+            try {
+                const defaultOptions = {
+                    headers: {
+                        'Authorization': 'Bearer ' + this.authToken,
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    ...options
+                };
+                
+                const response = await fetch(url, defaultOptions);
+                const data = await response.json();
+                
+                // 检查是否是token过期错误
+                if (!response.ok && (response.status === 401 || 
+                    (data.error === 'Invalid admin token' || 
+                     data.message === 'Invalid or expired admin session'))) {
+                    // 清理本地存储并刷新页面
+                    localStorage.removeItem('authToken');
+                    this.authToken = null;
+                    this.isLoggedIn = false;
+                    location.reload();
+                    return null;
+                }
+                
+                return data;
+            } catch (error) {
+                console.error('API request error:', error);
+                throw error;
+            }
+        },
+        
         // 显示确认弹窗
         showConfirm(title, message, confirmText = '继续', cancelText = '取消') {
             return new Promise((resolve) => {
@@ -766,18 +800,17 @@ const app = createApp({
                     ? '/admin/gemini-accounts/generate-auth-url'
                     : '/admin/claude-accounts/generate-auth-url';
 
-                const response = await fetch(endpoint, {
+                const data = await this.apiRequest(endpoint, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + this.authToken
-                    },
                     body: JSON.stringify({
                         proxy: proxy
                     })
                 });
                 
-                const data = await response.json();
+                if (!data) {
+                    // 如果token过期，apiRequest会返回null并刷新页面
+                    return;
+                }
                 
                 if (data.success) {
                     if (this.accountForm.platform === 'gemini') {
@@ -822,19 +855,18 @@ const app = createApp({
             this.createAccountLoading = true;
             try {
                 // 首先交换authorization code获取token
-                const exchangeResponse = await fetch('/admin/claude-accounts/exchange-code', {
+                const exchangeData = await this.apiRequest('/admin/claude-accounts/exchange-code', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + this.authToken
-                    },
                     body: JSON.stringify({
                         sessionId: this.oauthData.sessionId,
                         callbackUrl: this.oauthData.callbackUrl
                     })
                 });
                 
-                const exchangeData = await exchangeResponse.json();
+                if (!exchangeData) {
+                    // 如果token过期，apiRequest会返回null并刷新页面
+                    return;
+                }
                 
                 if (!exchangeData.success) {
                     // Display detailed error information
@@ -857,12 +889,8 @@ const app = createApp({
                 }
                 
                 // 创建账户
-                const createResponse = await fetch('/admin/claude-accounts', {
+                const createData = await this.apiRequest('/admin/claude-accounts', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + this.authToken
-                    },
                     body: JSON.stringify({
                         name: this.accountForm.name,
                         description: this.accountForm.description,
@@ -872,7 +900,10 @@ const app = createApp({
                     })
                 });
                 
-                const createData = await createResponse.json();
+                if (!createData) {
+                    // 如果token过期，apiRequest会返回null并刷新页面
+                    return;
+                }
                 
                 if (createData.success) {
                     this.showToast('OAuth账户创建成功！', 'success', '账户创建成功');
@@ -1025,18 +1056,18 @@ const app = createApp({
                 attempts++;
                 
                 try {
-                    const response = await fetch('/admin/gemini-accounts/poll-auth-status', {
+                    const data = await this.apiRequest('/admin/gemini-accounts/poll-auth-status', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': 'Bearer ' + this.authToken
-                        },
                         body: JSON.stringify({
                             sessionId: this.geminiOauthData.sessionId
                         })
                     });
                     
-                    const data = await response.json();
+                    if (!data) {
+                        // 如果token过期，apiRequest会返回null并刷新页面
+                        this.stopGeminiOAuthPolling();
+                        return;
+                    }
                     
                     if (data.success) {
                         // 授权成功
@@ -1073,19 +1104,18 @@ const app = createApp({
             this.createAccountLoading = true;
             try {
                 // 首先交换授权码获取 tokens
-                const tokenResponse = await fetch('/admin/gemini-accounts/exchange-code', {
+                const tokenData = await this.apiRequest('/admin/gemini-accounts/exchange-code', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + this.authToken
-                    },
                     body: JSON.stringify({
                         code: this.geminiOauthData.code,
                         sessionId: this.geminiOauthData.sessionId
                     })
                 });
                 
-                const tokenData = await tokenResponse.json();
+                if (!tokenData) {
+                    // 如果token过期，apiRequest会返回null并刷新页面
+                    return;
+                }
                 
                 if (!tokenData.success) {
                     this.showToast(tokenData.message || '授权码交换失败', 'error', '交换失败');
@@ -1105,12 +1135,8 @@ const app = createApp({
                 }
                 
                 // 创建账户
-                const response = await fetch('/admin/gemini-accounts', {
+                const data = await this.apiRequest('/admin/gemini-accounts', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + this.authToken
-                    },
                     body: JSON.stringify({
                         name: this.accountForm.name,
                         description: this.accountForm.description,
@@ -1121,7 +1147,10 @@ const app = createApp({
                     })
                 });
                 
-                const data = await response.json();
+                if (!data) {
+                    // 如果token过期，apiRequest会返回null并刷新页面
+                    return;
+                }
                 
                 if (data.success) {
                     this.showToast('Gemini OAuth账户创建成功！', 'success', '账户创建成功');
@@ -1315,7 +1344,8 @@ const app = createApp({
                     // 记录当前用户名（使用服务器返回的真实用户名）
                     this.currentUser.username = data.username;
                     
-                    this.loadDashboard();
+                    // 登录成功后刷新页面以重新加载所有数据
+                    location.reload();
                 } else {
                     this.loginError = data.message;
                 }
@@ -1330,11 +1360,12 @@ const app = createApp({
         // 加载当前用户信息
         async loadCurrentUser() {
             try {
-                const response = await fetch('/web/auth/user', {
-                    headers: { 'Authorization': 'Bearer ' + this.authToken }
-                });
+                const data = await this.apiRequest('/web/auth/user');
                 
-                const data = await response.json();
+                if (!data) {
+                    // 如果token过期，apiRequest会返回null并刷新页面
+                    return;
+                }
                 
                 if (data.success) {
                     this.currentUser.username = data.user.username;
@@ -1380,14 +1411,14 @@ const app = createApp({
             
             try {
                 // 使用后端接口检查更新
-                const response = await fetch('/admin/check-updates', {
-                    headers: {
-                        'Authorization': `Bearer ${this.authToken}`
-                    }
-                });
+                const result = await this.apiRequest('/admin/check-updates');
                 
-                if (response.ok) {
-                    const result = await response.json();
+                if (!result) {
+                    // 如果token过期，apiRequest会返回null并刷新页面
+                    return;
+                }
+                
+                if (result.success) {
                     const data = result.data;
                     
                     this.versionInfo.current = data.current;
@@ -1501,12 +1532,8 @@ const app = createApp({
             
             this.changePasswordLoading = true;
             try {
-                const response = await fetch('/web/auth/change-password', {
+                const result = await this.apiRequest('/web/auth/change-password', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + this.authToken
-                    },
                     body: JSON.stringify({
                         newUsername: this.changePasswordForm.newUsername || undefined,
                         currentPassword: this.changePasswordForm.currentPassword,
@@ -1514,7 +1541,10 @@ const app = createApp({
                     })
                 });
                 
-                const result = await response.json();
+                if (!result) {
+                    // 如果token过期，apiRequest会返回null并刷新页面
+                    return;
+                }
                 
                 if (result.success) {
                     this.showToast('账户信息修改成功，即将退出登录', 'success');
@@ -1563,24 +1593,16 @@ const app = createApp({
         
         async loadDashboard() {
             try {
-                const [dashboardResponse, costsResponse] = await Promise.all([
-                    fetch('/admin/dashboard', {
-                        headers: { 'Authorization': 'Bearer ' + this.authToken }
-                    }),
-                    Promise.all([
-                        fetch('/admin/usage-costs?period=today', {
-                            headers: { 'Authorization': 'Bearer ' + this.authToken }
-                        }),
-                        fetch('/admin/usage-costs?period=all', {
-                            headers: { 'Authorization': 'Bearer ' + this.authToken }
-                        })
-                    ])
+                const [dashboardData, todayCostsData, totalCostsData] = await Promise.all([
+                    this.apiRequest('/admin/dashboard'),
+                    this.apiRequest('/admin/usage-costs?period=today'),
+                    this.apiRequest('/admin/usage-costs?period=all')
                 ]);
                 
-                const dashboardData = await dashboardResponse.json();
-                const [todayCostsResponse, totalCostsResponse] = costsResponse;
-                const todayCostsData = await todayCostsResponse.json();
-                const totalCostsData = await totalCostsResponse.json();
+                if (!dashboardData || !todayCostsData || !totalCostsData) {
+                    // 如果token过期，apiRequest会返回null并刷新页面
+                    return;
+                }
                 
                 if (dashboardData.success) {
                     const overview = dashboardData.data.overview || {};
@@ -1629,10 +1651,12 @@ const app = createApp({
             this.apiKeysLoading = true;
             console.log('Loading API Keys...');
             try {
-                const response = await fetch('/admin/api-keys', {
-                    headers: { 'Authorization': 'Bearer ' + this.authToken }
-                });
-                const data = await response.json();
+                const data = await this.apiRequest('/admin/api-keys');
+                
+                if (!data) {
+                    // 如果token过期，apiRequest会返回null并刷新页面
+                    return;
+                }
                 
                 console.log('API Keys response:', data);
                 
@@ -1674,19 +1698,15 @@ const app = createApp({
             this.accountsLoading = true;
             try {
                 // 并行加载 Claude 和 Gemini 账户
-                const [claudeResponse, geminiResponse] = await Promise.all([
-                    fetch('/admin/claude-accounts', {
-                        headers: { 'Authorization': 'Bearer ' + this.authToken }
-                    }),
-                    fetch('/admin/gemini-accounts', {
-                        headers: { 'Authorization': 'Bearer ' + this.authToken }
-                    })
+                const [claudeData, geminiData] = await Promise.all([
+                    this.apiRequest('/admin/claude-accounts'),
+                    this.apiRequest('/admin/gemini-accounts')
                 ]);
                 
-                const [claudeData, geminiData] = await Promise.all([
-                    claudeResponse.json(),
-                    geminiResponse.json()
-                ]);
+                if (!claudeData || !geminiData) {
+                    // 如果token过期，apiRequest会返回null并刷新页面
+                    return;
+                }
                 
                 // 合并账户数据
                 const allAccounts = [];
@@ -1728,10 +1748,12 @@ const app = createApp({
         async loadModelStats() {
             this.modelStatsLoading = true;
             try {
-                const response = await fetch('/admin/model-stats?period=' + this.modelStatsPeriod, {
-                    headers: { 'Authorization': 'Bearer ' + this.authToken }
-                });
-                const data = await response.json();
+                const data = await this.apiRequest('/admin/model-stats?period=' + this.modelStatsPeriod);
+                
+                if (!data) {
+                    // 如果token过期，apiRequest会返回null并刷新页面
+                    return;
+                }
                 
                 if (data.success) {
                     this.modelStats = data.data || [];
@@ -1749,12 +1771,8 @@ const app = createApp({
         async createApiKey() {
             this.createApiKeyLoading = true;
             try {
-                const response = await fetch('/admin/api-keys', {
+                const data = await this.apiRequest('/admin/api-keys', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + this.authToken
-                    },
                     body: JSON.stringify({
                         name: this.apiKeyForm.name,
                         tokenLimit: this.apiKeyForm.tokenLimit && this.apiKeyForm.tokenLimit.trim() ? parseInt(this.apiKeyForm.tokenLimit) : null,
@@ -1770,7 +1788,10 @@ const app = createApp({
                     })
                 });
                 
-                const data = await response.json();
+                if (!data) {
+                    // 如果token过期，apiRequest会返回null并刷新页面
+                    return;
+                }
                 
                 if (data.success) {
                     // 设置新API Key数据并显示弹窗
@@ -1809,12 +1830,14 @@ const app = createApp({
             if (!confirmed) return;
             
             try {
-                const response = await fetch('/admin/api-keys/' + keyId, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': 'Bearer ' + this.authToken }
+                const data = await this.apiRequest('/admin/api-keys/' + keyId, {
+                    method: 'DELETE'
                 });
                 
-                const data = await response.json();
+                if (!data) {
+                    // 如果token过期，apiRequest会返回null并刷新页面
+                    return;
+                }
                 
                 if (data.success) {
                     this.showToast('API Key 删除成功', 'success', '删除成功');
@@ -1867,12 +1890,8 @@ const app = createApp({
         async updateApiKey() {
             this.editApiKeyLoading = true;
             try {
-                const response = await fetch('/admin/api-keys/' + this.editApiKeyForm.id, {
+                const data = await this.apiRequest('/admin/api-keys/' + this.editApiKeyForm.id, {
                     method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + this.authToken
-                    },
                     body: JSON.stringify({
                         tokenLimit: this.editApiKeyForm.tokenLimit && this.editApiKeyForm.tokenLimit.toString().trim() !== '' ? parseInt(this.editApiKeyForm.tokenLimit) : 0,
                         concurrencyLimit: this.editApiKeyForm.concurrencyLimit && this.editApiKeyForm.concurrencyLimit.toString().trim() !== '' ? parseInt(this.editApiKeyForm.concurrencyLimit) : 0,
@@ -1886,7 +1905,10 @@ const app = createApp({
                     })
                 });
                 
-                const data = await response.json();
+                if (!data) {
+                    // 如果token过期，apiRequest会返回null并刷新页面
+                    return;
+                }
                 
                 if (data.success) {
                     this.showToast('API Key 更新成功', 'success', '更新成功');
@@ -2077,21 +2099,13 @@ const app = createApp({
         async loadDashboardModelStats() {
             console.log('Loading dashboard model stats, period:', this.dashboardModelPeriod, 'authToken:', !!this.authToken);
             try {
-                const response = await fetch('/admin/model-stats?period=' + this.dashboardModelPeriod, {
-                    headers: { 'Authorization': 'Bearer ' + this.authToken }
-                });
+                const data = await this.apiRequest('/admin/model-stats?period=' + this.dashboardModelPeriod);
                 
-                console.log('Model stats response status:', response.status);
-                
-                if (!response.ok) {
-                    console.error('Model stats API error:', response.status, response.statusText);
-                    const errorText = await response.text();
-                    console.error('Error response:', errorText);
-                    this.dashboardModelStats = [];
+                if (!data) {
+                    // 如果token过期，apiRequest会返回null并刷新页面
                     return;
                 }
                 
-                const data = await response.json();
                 console.log('Model stats response data:', data);
                 
                 if (data.success) {
