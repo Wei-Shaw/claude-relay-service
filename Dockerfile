@@ -36,9 +36,6 @@ RUN mkdir -p logs data temp
 # 🔧 预先创建配置文件
 RUN if [ ! -f "/app/config/config.js" ] && [ -f "/app/config/config.example.js" ]; then \
         cp /app/config/config.example.js /app/config/config.js; \
-    fi && \
-    if [ ! -f "/app/.env" ] && [ -f "/app/.env.example" ]; then \
-        cp /app/.env.example /app/.env; \
     fi
 
 # 🌐 暴露端口

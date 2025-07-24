@@ -107,7 +107,7 @@ const securityLogger = winston.createLogger({
 
 // 🌟 增强的 Winston logger
 const logger = winston.createLogger({
-  level: config.logging.level,
+  level: process.env.LOG_LEVEL || config.logging.level,
   format: logFormat,
   transports: [
     // 📄 文件输出
@@ -282,10 +282,11 @@ logger.healthCheck = () => {
 
 // 🎬 启动日志记录系统
 logger.start('Logger initialized', {
-  level: config.logging.level,
+  level: process.env.LOG_LEVEL || config.logging.level,
   directory: config.logging.dirname,
   maxSize: config.logging.maxSize,
-  maxFiles: config.logging.maxFiles
+  maxFiles: config.logging.maxFiles,
+  envOverride: process.env.LOG_LEVEL ? true : false
 });
 
 module.exports = logger;

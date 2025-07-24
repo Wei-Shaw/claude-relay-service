@@ -3,12 +3,20 @@ set -e
 
 echo "🚀 Claude Relay Service 启动中..."
 
-# 生成随机字符串的函数
-generate_random_string() {
-  length=$1
-  # 使用 /dev/urandom 生成随机字符串
-  tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c $length
-}
+# 检查关键环境变量
+if [ -z "$JWT_SECRET" ]; then
+  echo "❌ 错误: JWT_SECRET 环境变量未设置"
+  echo "   请在 docker-compose.yml 中设置 JWT_SECRET"
+  echo "   例如: JWT_SECRET=your-random-secret-key-at-least-32-chars"
+  exit 1
+fi
+
+if [ -z "$ENCRYPTION_KEY" ]; then
+  echo "❌ 错误: ENCRYPTION_KEY 环境变量未设置"
+  echo "   请在 docker-compose.yml 中设置 ENCRYPTION_KEY"
+  echo "   例如: ENCRYPTION_KEY=your-32-character-encryption-key"
+  exit 1
+fi
 
 # 检查并复制配置文件
 if [ ! -f "/app/config/config.js" ]; then
@@ -22,47 +30,16 @@ if [ ! -f "/app/config/config.js" ]; then
   fi
 fi
 
-# 检查并配置 .env 文件（文件已在构建时创建）
-if [ -f "/app/.env" ]; then
-  echo "📋 配置 .env 文件..."
-  
-  # 生成随机的 JWT_SECRET (64字符)
-  if [ -z "$JWT_SECRET" ]; then
-    JWT_SECRET=$(grep "^JWT_SECRET=" /app/.env | cut -d'=' -f2)
-    if [ -z "$JWT_SECRET" ] || [ "$JWT_SECRET" = "your-jwt-secret-here" ]; then
-      JWT_SECRET=$(generate_random_string 64)
-      echo "🔑 生成 JWT_SECRET"
-    fi
-  fi
-  
-  # 生成随机的 ENCRYPTION_KEY (32字符)
-  if [ -z "$ENCRYPTION_KEY" ]; then
-    ENCRYPTION_KEY=$(grep "^ENCRYPTION_KEY=" /app/.env | cut -d'=' -f2)
-    if [ -z "$ENCRYPTION_KEY" ] || [ "$ENCRYPTION_KEY" = "your-encryption-key-here" ]; then
-      ENCRYPTION_KEY=$(generate_random_string 32)
-      echo "🔑 生成 ENCRYPTION_KEY"
-    fi
-  fi
-  
-  # 直接使用sed修改.env文件 - root用户无权限问题
-  sed -i "s/JWT_SECRET=.*/JWT_SECRET=${JWT_SECRET}/" /app/.env
-  sed -i "s/ENCRYPTION_KEY=.*/ENCRYPTION_KEY=${ENCRYPTION_KEY}/" /app/.env
-  sed -i "s/REDIS_HOST=.*/REDIS_HOST=redis/" /app/.env
-  
-  echo "✅ .env 已配置"
-else
-  echo "❌ 错误: .env 文件不存在"
-  exit 1
-fi
-
-# 导出环境变量
-export JWT_SECRET
-export ENCRYPTION_KEY
+# 显示配置信息
+echo "✅ 环境配置已就绪"
+echo "   JWT_SECRET: [已设置]"
+echo "   ENCRYPTION_KEY: [已设置]"
+echo "   REDIS_HOST: ${REDIS_HOST:-localhost}"
+echo "   PORT: ${PORT:-3000}"
 
 # 检查是否需要初始化
 if [ ! -f "/app/data/init.json" ]; then
   echo "📋 首次启动，执行初始化设置..."
-  
   
   # 如果设置了环境变量，显示提示
   if [ -n "$ADMIN_USERNAME" ] || [ -n "$ADMIN_PASSWORD" ]; then

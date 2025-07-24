@@ -1,5 +1,8 @@
 version: '3.8'
 
+# Claude Relay Service Docker Compose 配置
+# 所有配置通过环境变量设置，无需映射 .env 文件
+
 services:
   # 🚀 Claude Relay Service
   claude-relay:
@@ -9,12 +12,61 @@ services:
     ports:
       - "${PORT:-3000}:3000"
     environment:
+      # 🌐 服务器配置
       - NODE_ENV=production
       - PORT=3000
+      - HOST=0.0.0.0
+      
+      # 🔐 安全配置（必填）
+      - JWT_SECRET=${JWT_SECRET}  # 必填：至少32字符的随机字符串
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}  # 必填：32字符的加密密钥
+      - ADMIN_SESSION_TIMEOUT=${ADMIN_SESSION_TIMEOUT:-86400000}
+      - API_KEY_PREFIX=${API_KEY_PREFIX:-cr_}
+      
+      # 👤 管理员凭据（可选）
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      
+      # 📊 Redis 配置
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - ADMIN_USERNAME=${ADMIN_USERNAME:-}  # 可选：预设管理员用户名
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}  # 可选：预设管理员密码
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_DB=${REDIS_DB:-0}
+      - REDIS_ENABLE_TLS=${REDIS_ENABLE_TLS:-}
+      
+      # 🎯 Claude API 配置
+      - CLAUDE_API_URL=${CLAUDE_API_URL:-https://api.anthropic.com/v1/messages}
+      - CLAUDE_API_VERSION=${CLAUDE_API_VERSION:-2023-06-01}
+      - CLAUDE_BETA_HEADER=${CLAUDE_BETA_HEADER:-claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14}
+      
+      # 🌐 代理配置
+      - DEFAULT_PROXY_TIMEOUT=${DEFAULT_PROXY_TIMEOUT:-60000}
+      - MAX_PROXY_RETRIES=${MAX_PROXY_RETRIES:-3}
+      
+      # 📈 使用限制
+      - DEFAULT_TOKEN_LIMIT=${DEFAULT_TOKEN_LIMIT:-1000000}
+      
+      # 📝 日志配置
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_MAX_SIZE=${LOG_MAX_SIZE:-10m}
+      - LOG_MAX_FILES=${LOG_MAX_FILES:-5}
+      
+      # 🔧 系统配置
+      - CLEANUP_INTERVAL=${CLEANUP_INTERVAL:-3600000}
+      - TOKEN_USAGE_RETENTION=${TOKEN_USAGE_RETENTION:-2592000000}
+      - HEALTH_CHECK_INTERVAL=${HEALTH_CHECK_INTERVAL:-60000}
+      - SYSTEM_TIMEZONE=${SYSTEM_TIMEZONE:-Asia/Shanghai}
+      - TIMEZONE_OFFSET=${TIMEZONE_OFFSET:-8}
+      
+      # 🎨 Web 界面配置
+      - WEB_TITLE=${WEB_TITLE:-Claude Relay Service}
+      - WEB_DESCRIPTION=${WEB_DESCRIPTION:-Multi-account Claude API relay service}
+      - WEB_LOGO_URL=${WEB_LOGO_URL:-/assets/logo.png}
+      
+      # 🛠️ 开发配置
+      - DEBUG=${DEBUG:-false}
+      - ENABLE_CORS=${ENABLE_CORS:-true}
+      - TRUST_PROXY=${TRUST_PROXY:-true}
     volumes:
       - ./logs:/app/logs
       - ./data:/app/data

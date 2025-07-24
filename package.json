@@ -18,6 +18,7 @@
     "service:stop": "node scripts/manage.js stop",
     "service:restart": "node scripts/manage.js restart",
     "service:restart:daemon": "node scripts/manage.js restart -d",
+    "service:logs:follow": "node scripts/manage.js logs -f",
     "service:restart:d": "node scripts/manage.js restart -d",
     "service:status": "node scripts/manage.js status",
     "service:logs": "node scripts/manage.js logs",
