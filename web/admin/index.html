@@ -208,7 +208,7 @@
                     <button 
                         v-for="tab in tabs" 
                         :key="tab.key"
-                        @click="activeTab = tab.key"
+                        @click="switchTab(tab.key)"
                         :class="['tab-btn flex-1 py-3 px-6 text-sm font-semibold transition-all duration-300', 
                                 activeTab === tab.key ? 'active' : 'text-gray-700 hover:bg-white/10 hover:text-gray-900']"
                     >
@@ -538,12 +538,24 @@
                                 <h3 class="text-xl font-bold text-gray-900 mb-2">API Keys 管理</h3>
                                 <p class="text-gray-600">管理和监控您的 API 密钥</p>
                             </div>
-                            <button 
-                                @click.stop="openCreateApiKeyModal"
-                                class="btn btn-primary px-6 py-3 flex items-center gap-2"
-                            >
-                                <i class="fas fa-plus"></i>创建新 Key
-                            </button>
+                            <div class="flex items-center gap-3">
+                                <!-- Token统计时间范围选择 -->
+                                <select 
+                                    v-model="apiKeyStatsTimeRange" 
+                                    @change="loadApiKeys()"
+                                    class="form-select px-4 py-2 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                >
+                                    <option value="all">全部时间</option>
+                                    <option value="7days">最近7天</option>
+                                    <option value="monthly">本月</option>
+                                </select>
+                                <button 
+                                    @click.stop="openCreateApiKeyModal"
+                                    class="btn btn-primary px-6 py-3 flex items-center gap-2"
+                                >
+                                    <i class="fas fa-plus"></i>创建新 Key
+                                </button>
+                            </div>
                         </div>
                         
                         <div v-if="apiKeysLoading" class="text-center py-12">
@@ -568,6 +580,7 @@
                                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">状态</th>
                                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">使用统计</th>
                                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">创建时间</th>
+                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">过期时间</th>
                                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">操作</th>
                                     </tr>
                                 </thead>
@@ -654,6 +667,11 @@
                                                         <span>输入: {{ formatNumber((key.usage && key.usage.total && key.usage.total.inputTokens) || 0) }}</span>
                                                         <span>输出: {{ formatNumber((key.usage && key.usage.total && key.usage.total.outputTokens) || 0) }}</span>
                                                     </div>
+                                                    <!-- 缓存Token细节 -->
+                                                    <div v-if="((key.usage && key.usage.total && key.usage.total.cacheCreateTokens) || 0) > 0 || ((key.usage && key.usage.total && key.usage.total.cacheReadTokens) || 0) > 0" class="flex justify-between text-xs text-orange-500">
+                                                        <span>缓存创建: {{ formatNumber((key.usage && key.usage.total && key.usage.total.cacheCreateTokens) || 0) }}</span>
+                                                        <span>缓存读取: {{ formatNumber((key.usage && key.usage.total && key.usage.total.cacheReadTokens) || 0) }}</span>
+                                                    </div>
                                                     <!-- RPM/TPM -->
                                                     <div class="flex justify-between text-xs text-blue-600">
                                                         <span>RPM: {{ (key.usage && key.usage.averages && key.usage.averages.rpm) || 0 }}</span>
@@ -679,12 +697,38 @@
                                                 {{ new Date(key.createdAt).toLocaleDateString() }}
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                                <div v-if="key.expiresAt">
+                                                    <div v-if="isApiKeyExpired(key.expiresAt)" class="text-red-600">
+                                                        <i class="fas fa-exclamation-circle mr-1"></i>
+                                                        已过期
+                                                    </div>
+                                                    <div v-else-if="isApiKeyExpiringSoon(key.expiresAt)" class="text-orange-600">
+                                                        <i class="fas fa-clock mr-1"></i>
+                                                        {{ formatExpireDate(key.expiresAt) }}
+                                                    </div>
+                                                    <div v-else class="text-gray-600">
+                                                        {{ formatExpireDate(key.expiresAt) }}
+                                                    </div>
+                                                </div>
+                                                <div v-else class="text-gray-400">
+                                                    <i class="fas fa-infinity mr-1"></i>
+                                                    永不过期
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm">
                                                 <div class="flex gap-2">
                                                     <button 
                                                         @click="openEditApiKeyModal(key)" 
                                                         class="text-blue-600 hover:text-blue-900 font-medium hover:bg-blue-50 px-3 py-1 rounded-lg transition-colors"
                                                     >
                                                         <i class="fas fa-edit mr-1"></i>编辑
+                                                    </button>
+                                                    <button 
+                                                        v-if="key.expiresAt && (isApiKeyExpired(key.expiresAt) || isApiKeyExpiringSoon(key.expiresAt))"
+                                                        @click="openRenewApiKeyModal(key)" 
+                                                        class="text-green-600 hover:text-green-900 font-medium hover:bg-green-50 px-3 py-1 rounded-lg transition-colors"
+                                                    >
+                                                        <i class="fas fa-clock mr-1"></i>续期
                                                     </button>
                                                     <button 
                                                         @click="deleteApiKey(key.id)" 
@@ -2001,6 +2045,36 @@
                     </div>
                     
                     <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">有效期限</label>
+                        <select 
+                            v-model="apiKeyForm.expireDuration" 
+                            @change="updateExpireAt"
+                            class="form-input w-full"
+                        >
+                            <option value="">永不过期</option>
+                            <option value="1d">1 天</option>
+                            <option value="7d">7 天</option>
+                            <option value="30d">30 天</option>
+                            <option value="90d">90 天</option>
+                            <option value="180d">180 天</option>
+                            <option value="365d">365 天</option>
+                            <option value="custom">自定义日期</option>
+                        </select>
+                        <div v-if="apiKeyForm.expireDuration === 'custom'" class="mt-3">
+                            <input 
+                                v-model="apiKeyForm.customExpireDate" 
+                                type="datetime-local" 
+                                class="form-input w-full"
+                                :min="minDateTime"
+                                @change="updateCustomExpireAt"
+                            >
+                        </div>
+                        <p v-if="apiKeyForm.expiresAt" class="text-xs text-gray-500 mt-2">
+                            将于 {{ formatExpireDate(apiKeyForm.expiresAt) }} 过期
+                        </p>
+                    </div>
+                    
+                    <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-3">服务权限</label>
                         <div class="flex gap-4">
                             <label class="flex items-center cursor-pointer">
@@ -2410,6 +2484,92 @@
             </div>
         </div>
 
+        <!-- API Key 续期弹窗 -->
+        <div v-if="showRenewApiKeyModal" class="fixed inset-0 modal z-50 flex items-center justify-center p-4">
+            <div class="modal-content w-full max-w-md p-8 mx-auto max-h-[90vh] flex flex-col">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+                            <i class="fas fa-clock text-white"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-900">续期 API Key</h3>
+                    </div>
+                    <button 
+                        @click="closeRenewApiKeyModal"
+                        class="text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-6 modal-scroll-content custom-scrollbar flex-1">
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div class="flex items-start gap-3">
+                            <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <i class="fas fa-info text-white text-sm"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800 mb-1">API Key 信息</h4>
+                                <p class="text-sm text-gray-700">{{ renewApiKeyForm.name }}</p>
+                                <p class="text-xs text-gray-600 mt-1">
+                                    当前过期时间：{{ renewApiKeyForm.currentExpiresAt ? formatExpireDate(renewApiKeyForm.currentExpiresAt) : '永不过期' }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">续期时长</label>
+                        <select 
+                            v-model="renewApiKeyForm.renewDuration" 
+                            @change="updateRenewExpireAt"
+                            class="form-input w-full"
+                        >
+                            <option value="7d">延长 7 天</option>
+                            <option value="30d">延长 30 天</option>
+                            <option value="90d">延长 90 天</option>
+                            <option value="180d">延长 180 天</option>
+                            <option value="365d">延长 365 天</option>
+                            <option value="custom">自定义日期</option>
+                            <option value="permanent">设为永不过期</option>
+                        </select>
+                        <div v-if="renewApiKeyForm.renewDuration === 'custom'" class="mt-3">
+                            <input 
+                                v-model="renewApiKeyForm.customExpireDate" 
+                                type="datetime-local" 
+                                class="form-input w-full"
+                                :min="minDateTime"
+                                @change="updateCustomRenewExpireAt"
+                            >
+                        </div>
+                        <p v-if="renewApiKeyForm.newExpiresAt" class="text-xs text-gray-500 mt-2">
+                            新的过期时间：{{ formatExpireDate(renewApiKeyForm.newExpiresAt) }}
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="flex gap-3 pt-4">
+                    <button 
+                        type="button" 
+                        @click="closeRenewApiKeyModal" 
+                        class="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+                    >
+                        取消
+                    </button>
+                    <button 
+                        type="button" 
+                        @click="renewApiKey"
+                        :disabled="renewApiKeyLoading || !renewApiKeyForm.renewDuration"
+                        class="btn btn-primary flex-1 py-3 px-6 font-semibold"
+                    >
+                        <div v-if="renewApiKeyLoading" class="loading-spinner mr-2"></div>
+                        <i v-else class="fas fa-clock mr-2"></i>
+                        {{ renewApiKeyLoading ? '续期中...' : '确认续期' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+        
         <!-- 新创建的 API Key 展示弹窗 -->
         <div v-if="showNewApiKeyModal" class="fixed inset-0 modal z-50 flex items-center justify-center p-4">
             <div class="modal-content w-full max-w-lg p-8 mx-auto max-h-[90vh] overflow-y-auto custom-scrollbar">

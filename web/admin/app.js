@@ -111,6 +111,7 @@ const app = createApp({
             // API Keys
             apiKeys: [],
             apiKeysLoading: false,
+            apiKeyStatsTimeRange: 'all', // API Key统计时间范围：all, 7days, monthly
             showCreateApiKeyModal: false,
             createApiKeyLoading: false,
             apiKeyForm: {
@@ -125,7 +126,10 @@ const app = createApp({
                 permissions: 'all', // 'claude', 'gemini', 'all'
                 enableModelRestriction: false,
                 restrictedModels: [],
-                modelInput: ''
+                modelInput: '',
+                expireDuration: '', // 过期时长选择
+                customExpireDate: '', // 自定义过期日期
+                expiresAt: null // 实际的过期时间戳
             },
             apiKeyModelStats: {}, // 存储每个key的模型统计数据
             expandedApiKeys: {}, // 跟踪展开的API Keys
@@ -153,6 +157,18 @@ const app = createApp({
                 name: '',
                 description: '',
                 showFullKey: false
+            },
+            
+            // API Key续期
+            showRenewApiKeyModal: false,
+            renewApiKeyLoading: false,
+            renewApiKeyForm: {
+                id: '',
+                name: '',
+                currentExpiresAt: null,
+                renewDuration: '30d',
+                customExpireDate: '',
+                newExpiresAt: null
             },
 
             // 编辑API Key
@@ -284,11 +300,21 @@ const app = createApp({
             return this.accounts.filter(account => 
                 account.accountType === 'dedicated' && account.isActive === true
             );
+        },
+        
+        // 计算最小日期时间（当前时间）
+        minDateTime() {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            return now.toISOString().slice(0, 16);
         }
     },
     
     mounted() {
         console.log('Vue app mounted, authToken:', !!this.authToken, 'activeTab:', this.activeTab);
+        
+        // 从URL参数中读取tab信息
+        this.initializeTabFromUrl();
         
         // 初始化防抖函数
         this.setTrendPeriod = this.debounce(this._setTrendPeriod, 300);
@@ -301,6 +327,11 @@ const app = createApp({
             if (!isClickInsideUserMenu) {
                 this.userMenuOpen = false;
             }
+        });
+        
+        // 监听浏览器前进后退按钮事件
+        window.addEventListener('popstate', () => {
+            this.initializeTabFromUrl();
         });
         
         if (this.authToken) {
@@ -368,6 +399,40 @@ const app = createApp({
     },
     
     methods: {
+        // 从URL读取tab参数并设置activeTab
+        initializeTabFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const tabParam = urlParams.get('tab');
+            
+            // 检查tab参数是否有效
+            const validTabs = this.tabs.map(tab => tab.key);
+            if (tabParam && validTabs.includes(tabParam)) {
+                this.activeTab = tabParam;
+            }
+        },
+        
+        // 切换tab并更新URL
+        switchTab(tabKey) {
+            if (this.activeTab !== tabKey) {
+                this.activeTab = tabKey;
+                this.updateUrlTab(tabKey);
+            }
+        },
+        
+        // 更新URL中的tab参数
+        updateUrlTab(tabKey) {
+            const url = new URL(window.location.href);
+            if (tabKey === 'dashboard') {
+                // 如果是默认的dashboard标签，移除tab参数
+                url.searchParams.delete('tab');
+            } else {
+                url.searchParams.set('tab', tabKey);
+            }
+            
+            // 使用pushState更新URL但不刷新页面
+            window.history.pushState({}, '', url.toString());
+        },
+        
         // 统一的API请求方法，处理token过期等错误
         async apiRequest(url, options = {}) {
             try {
@@ -525,6 +590,72 @@ const app = createApp({
             this.$nextTick(() => {
                 this.showCreateApiKeyModal = true;
             });
+        },
+        
+        // 更新过期时间
+        updateExpireAt() {
+            const duration = this.apiKeyForm.expireDuration;
+            if (!duration) {
+                this.apiKeyForm.expiresAt = null;
+                return;
+            }
+            
+            if (duration === 'custom') {
+                // 自定义日期需要用户选择
+                return;
+            }
+            
+            const now = new Date();
+            const durationMap = {
+                '1d': 1,
+                '7d': 7,
+                '30d': 30,
+                '90d': 90,
+                '180d': 180,
+                '365d': 365
+            };
+            
+            const days = durationMap[duration];
+            if (days) {
+                const expireDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+                this.apiKeyForm.expiresAt = expireDate.toISOString();
+            }
+        },
+        
+        // 更新自定义过期时间
+        updateCustomExpireAt() {
+            if (this.apiKeyForm.customExpireDate) {
+                const expireDate = new Date(this.apiKeyForm.customExpireDate);
+                this.apiKeyForm.expiresAt = expireDate.toISOString();
+            }
+        },
+        
+        // 格式化过期日期
+        formatExpireDate(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            return date.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        },
+        
+        // 检查 API Key 是否已过期
+        isApiKeyExpired(expiresAt) {
+            if (!expiresAt) return false;
+            return new Date(expiresAt) < new Date();
+        },
+        
+        // 检查 API Key 是否即将过期（7天内）
+        isApiKeyExpiringSoon(expiresAt) {
+            if (!expiresAt) return false;
+            const expireDate = new Date(expiresAt);
+            const now = new Date();
+            const daysUntilExpire = (expireDate - now) / (1000 * 60 * 60 * 24);
+            return daysUntilExpire > 0 && daysUntilExpire <= 7;
         },
         
         // 打开创建账户模态框  
@@ -1649,9 +1780,9 @@ const app = createApp({
         
         async loadApiKeys() {
             this.apiKeysLoading = true;
-            console.log('Loading API Keys...');
+            console.log('Loading API Keys with time range:', this.apiKeyStatsTimeRange);
             try {
-                const data = await this.apiRequest('/admin/api-keys');
+                const data = await this.apiRequest(`/admin/api-keys?timeRange=${this.apiKeyStatsTimeRange}`);
                 
                 if (!data) {
                     // 如果token过期，apiRequest会返回null并刷新页面
@@ -1784,7 +1915,8 @@ const app = createApp({
                         geminiAccountId: this.apiKeyForm.geminiAccountId || null,
                         permissions: this.apiKeyForm.permissions || 'all',
                         enableModelRestriction: this.apiKeyForm.enableModelRestriction,
-                        restrictedModels: this.apiKeyForm.restrictedModels
+                        restrictedModels: this.apiKeyForm.restrictedModels,
+                        expiresAt: this.apiKeyForm.expiresAt
                     })
                 });
                 
@@ -1805,7 +1937,23 @@ const app = createApp({
                     
                     // 关闭创建弹窗并清理表单
                     this.showCreateApiKeyModal = false;
-                    this.apiKeyForm = { name: '', tokenLimit: '', description: '', concurrencyLimit: '', rateLimitWindow: '', rateLimitRequests: '', claudeAccountId: '', enableModelRestriction: false, restrictedModels: [], modelInput: '' };
+                    this.apiKeyForm = { 
+                        name: '', 
+                        tokenLimit: '', 
+                        description: '', 
+                        concurrencyLimit: '', 
+                        rateLimitWindow: '', 
+                        rateLimitRequests: '', 
+                        claudeAccountId: '', 
+                        geminiAccountId: '',
+                        permissions: 'all',
+                        enableModelRestriction: false, 
+                        restrictedModels: [], 
+                        modelInput: '',
+                        expireDuration: '',
+                        customExpireDate: '',
+                        expiresAt: null
+                    };
                     
                     // 重新加载API Keys列表
                     await this.loadApiKeys();
@@ -1851,6 +1999,111 @@ const app = createApp({
             }
         },
 
+        // 打开续期弹窗
+        openRenewApiKeyModal(key) {
+            this.renewApiKeyForm = {
+                id: key.id,
+                name: key.name,
+                currentExpiresAt: key.expiresAt,
+                renewDuration: '30d',
+                customExpireDate: '',
+                newExpiresAt: null
+            };
+            this.showRenewApiKeyModal = true;
+            // 立即计算新的过期时间
+            this.updateRenewExpireAt();
+        },
+        
+        // 关闭续期弹窗
+        closeRenewApiKeyModal() {
+            this.showRenewApiKeyModal = false;
+            this.renewApiKeyForm = {
+                id: '',
+                name: '',
+                currentExpiresAt: null,
+                renewDuration: '30d',
+                customExpireDate: '',
+                newExpiresAt: null
+            };
+        },
+        
+        // 更新续期过期时间
+        updateRenewExpireAt() {
+            const duration = this.renewApiKeyForm.renewDuration;
+            
+            if (duration === 'permanent') {
+                this.renewApiKeyForm.newExpiresAt = null;
+                return;
+            }
+            
+            if (duration === 'custom') {
+                // 自定义日期需要用户选择
+                return;
+            }
+            
+            // 计算新的过期时间
+            const baseTime = this.renewApiKeyForm.currentExpiresAt 
+                ? new Date(this.renewApiKeyForm.currentExpiresAt) 
+                : new Date();
+                
+            // 如果当前已过期，从现在开始计算
+            if (baseTime < new Date()) {
+                baseTime.setTime(new Date().getTime());
+            }
+            
+            const durationMap = {
+                '7d': 7,
+                '30d': 30,
+                '90d': 90,
+                '180d': 180,
+                '365d': 365
+            };
+            
+            const days = durationMap[duration];
+            if (days) {
+                const expireDate = new Date(baseTime.getTime() + days * 24 * 60 * 60 * 1000);
+                this.renewApiKeyForm.newExpiresAt = expireDate.toISOString();
+            }
+        },
+        
+        // 更新自定义续期时间
+        updateCustomRenewExpireAt() {
+            if (this.renewApiKeyForm.customExpireDate) {
+                const expireDate = new Date(this.renewApiKeyForm.customExpireDate);
+                this.renewApiKeyForm.newExpiresAt = expireDate.toISOString();
+            }
+        },
+        
+        // 执行续期操作
+        async renewApiKey() {
+            this.renewApiKeyLoading = true;
+            try {
+                const data = await this.apiRequest('/admin/api-keys/' + this.renewApiKeyForm.id, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        expiresAt: this.renewApiKeyForm.newExpiresAt
+                    })
+                });
+                
+                if (!data) {
+                    return;
+                }
+                
+                if (data.success) {
+                    this.showToast('API Key 续期成功', 'success');
+                    this.closeRenewApiKeyModal();
+                    await this.loadApiKeys();
+                } else {
+                    this.showToast(data.message || '续期失败', 'error');
+                }
+            } catch (error) {
+                console.error('Error renewing API key:', error);
+                this.showToast('续期失败，请检查网络连接', 'error');
+            } finally {
+                this.renewApiKeyLoading = false;
+            }
+        },
+        
         openEditApiKeyModal(key) {
             this.editApiKeyForm = {
                 id: key.id,
@@ -2889,23 +3142,13 @@ const app = createApp({
         calculateApiKeyCost(usage) {
             if (!usage || !usage.total) return '$0.000000';
             
-            // 使用通用模型价格估算
-            const totalInputTokens = usage.total.inputTokens || 0;
-            const totalOutputTokens = usage.total.outputTokens || 0;
-            const totalCacheCreateTokens = usage.total.cacheCreateTokens || 0;
-            const totalCacheReadTokens = usage.total.cacheReadTokens || 0;
+            // 使用后端返回的准确费用数据
+            if (usage.total.formattedCost) {
+                return usage.total.formattedCost;
+            }
             
-            // 简单估算（使用Claude 3.5 Sonnet价格）
-            const inputCost = (totalInputTokens / 1000000) * 3.00;
-            const outputCost = (totalOutputTokens / 1000000) * 15.00;
-            const cacheCreateCost = (totalCacheCreateTokens / 1000000) * 3.75;
-            const cacheReadCost = (totalCacheReadTokens / 1000000) * 0.30;
-            
-            const totalCost = inputCost + outputCost + cacheCreateCost + cacheReadCost;
-            
-            if (totalCost < 0.000001) return '$0.000000';
-            if (totalCost < 0.01) return '$' + totalCost.toFixed(6);
-            return '$' + totalCost.toFixed(4);
+            // 如果没有后端费用数据，返回默认值
+            return '$0.000000';
         },
 
         // 初始化日期筛选器

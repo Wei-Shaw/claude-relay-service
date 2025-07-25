@@ -444,11 +444,11 @@ class ClaudeAccountService {
       }
 
       // 如果没有映射或映射无效，选择新账户
-      // 优先选择最近刷新过token的账户
+      // 优先选择最久未使用的账户（负载均衡）
       const sortedAccounts = activeAccounts.sort((a, b) => {
-        const aLastRefresh = new Date(a.lastRefreshAt || 0).getTime();
-        const bLastRefresh = new Date(b.lastRefreshAt || 0).getTime();
-        return bLastRefresh - aLastRefresh;
+        const aLastUsed = new Date(a.lastUsedAt || 0).getTime();
+        const bLastUsed = new Date(b.lastUsedAt || 0).getTime();
+        return aLastUsed - bLastUsed; // 最久未使用的优先
       });
 
       const selectedAccountId = sortedAccounts[0].id;
@@ -544,11 +544,11 @@ class ClaudeAccountService {
           return aRateLimitedAt - bRateLimitedAt; // 最早限流的优先
         });
       } else {
-        // 非限流账户按最近刷新时间排序
+        // 非限流账户按最后使用时间排序（最久未使用的优先）
         candidateAccounts = candidateAccounts.sort((a, b) => {
-          const aLastRefresh = new Date(a.lastRefreshAt || 0).getTime();
-          const bLastRefresh = new Date(b.lastRefreshAt || 0).getTime();
-          return bLastRefresh - aLastRefresh;
+          const aLastUsed = new Date(a.lastUsedAt || 0).getTime();
+          const bLastUsed = new Date(b.lastUsedAt || 0).getTime();
+          return aLastUsed - bLastUsed; // 最久未使用的优先
         });
       }
 

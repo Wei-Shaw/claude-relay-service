@@ -29,7 +29,17 @@
     "lint": "eslint src/**/*.js",
     "docker:build": "docker build -t claude-relay-service .",
     "docker:up": "docker-compose up -d",
-    "docker:down": "docker-compose down"
+    "docker:down": "docker-compose down",
+    "migrate:apikey-expiry": "node scripts/migrate-apikey-expiry.js",
+    "migrate:apikey-expiry:dry": "node scripts/migrate-apikey-expiry.js --dry-run",
+    "migrate:fix-usage-stats": "node scripts/fix-usage-stats.js",
+    "data:export": "node scripts/data-transfer.js export",
+    "data:import": "node scripts/data-transfer.js import",
+    "data:export:sanitized": "node scripts/data-transfer.js export --sanitize",
+    "data:export:enhanced": "node scripts/data-transfer-enhanced.js export",
+    "data:export:encrypted": "node scripts/data-transfer-enhanced.js export --decrypt=false",
+    "data:import:enhanced": "node scripts/data-transfer-enhanced.js import",
+    "data:debug": "node scripts/debug-redis-keys.js"
   },
   "dependencies": {
     "axios": "^1.6.0",
@@ -43,7 +53,7 @@
     "google-auth-library": "^10.1.0",
     "helmet": "^7.1.0",
     "https-proxy-agent": "^7.0.2",
-    "inquirer": "^9.2.15",
+    "inquirer": "^8.2.6",
     "ioredis": "^5.3.2",
     "morgan": "^1.10.0",
     "ora": "^5.4.1",

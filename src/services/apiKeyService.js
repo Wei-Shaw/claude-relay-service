@@ -283,14 +283,17 @@ class ApiKeyService {
       let cleanedCount = 0;
 
       for (const key of apiKeys) {
-        if (key.expiresAt && new Date(key.expiresAt) < now) {
-          await redis.deleteApiKey(key.id);
+        // 检查是否已过期且仍处于激活状态
+        if (key.expiresAt && new Date(key.expiresAt) < now && key.isActive === 'true') {
+          // 将过期的 API Key 标记为禁用状态，而不是直接删除
+          await this.updateApiKey(key.id, { isActive: false });
+          logger.info(`🔒 API Key ${key.id} (${key.name}) has expired and been disabled`);
           cleanedCount++;
         }
       }
 
       if (cleanedCount > 0) {
-        logger.success(`🧹 Cleaned up ${cleanedCount} expired API keys`);
+        logger.success(`🧹 Disabled ${cleanedCount} expired API keys`);
       }
 
       return cleanedCount;

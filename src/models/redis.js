@@ -324,11 +324,13 @@ class RedisClient {
       const allTokens = parseInt(data.totalAllTokens) || parseInt(data.allTokens) || 0;
 
       const totalFromSeparate = inputTokens + outputTokens;
+      // 计算实际的总tokens（包含所有类型）
+      const actualAllTokens = allTokens || (inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens);
 
       if (totalFromSeparate === 0 && tokens > 0) {
         // 旧数据：没有输入输出分离
         return {
-          tokens,
+          tokens: tokens, // 保持兼容性，但统一使用allTokens
           inputTokens: Math.round(tokens * 0.3), // 假设30%为输入
           outputTokens: Math.round(tokens * 0.7), // 假设70%为输出
           cacheCreateTokens: 0, // 旧数据没有缓存token
@@ -337,14 +339,14 @@ class RedisClient {
           requests
         };
       } else {
-        // 新数据或无数据
+        // 新数据或无数据 - 统一使用allTokens作为tokens的值
         return {
-          tokens,
+          tokens: actualAllTokens, // 统一使用allTokens作为总数
           inputTokens,
           outputTokens,
           cacheCreateTokens,
           cacheReadTokens,
-          allTokens: allTokens || (inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens), // 计算或使用存储的值
+          allTokens: actualAllTokens,
           requests
         };
       }

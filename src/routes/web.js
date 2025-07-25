@@ -72,13 +72,43 @@ router.post('/auth/login', async (req, res) => {
     }
 
     // 从Redis获取管理员信息
-    const adminData = await redis.getSession('admin_credentials');
+    let adminData = await redis.getSession('admin_credentials');
     
+    // 如果Redis中没有管理员凭据，尝试从init.json重新加载
     if (!adminData || Object.keys(adminData).length === 0) {
-      return res.status(401).json({
-        error: 'Invalid credentials',
-        message: 'Invalid username or password'
-      });
+      const initFilePath = path.join(__dirname, '../../data/init.json');
+      
+      if (fs.existsSync(initFilePath)) {
+        try {
+          const initData = JSON.parse(fs.readFileSync(initFilePath, 'utf8'));
+          const saltRounds = 10;
+          const passwordHash = await bcrypt.hash(initData.adminPassword, saltRounds);
+          
+          adminData = {
+            username: initData.adminUsername,
+            passwordHash: passwordHash,
+            createdAt: initData.initializedAt || new Date().toISOString(),
+            lastLogin: null,
+            updatedAt: initData.updatedAt || null
+          };
+          
+          // 重新存储到Redis，不设置过期时间
+          await redis.getClient().hset('session:admin_credentials', adminData);
+          
+          logger.info('✅ Admin credentials reloaded from init.json');
+        } catch (error) {
+          logger.error('❌ Failed to reload admin credentials:', error);
+          return res.status(401).json({
+            error: 'Invalid credentials',
+            message: 'Invalid username or password'
+          });
+        }
+      } else {
+        return res.status(401).json({
+          error: 'Invalid credentials',
+          message: 'Invalid username or password'
+        });
+      }
     }
 
     // 验证用户名和密码
