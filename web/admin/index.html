@@ -282,7 +282,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
                         <div class="stat-card">
                             <div class="flex items-center justify-between">
-                                <div class="flex-1">
+                                <div class="flex-1 mr-8">
                                     <p class="text-sm font-semibold text-gray-600 mb-1">今日Token</p>
                                     <div class="flex items-baseline gap-2 mb-2">
                                         <p class="text-3xl font-bold text-blue-600">{{ formatNumber((dashboardData.todayInputTokens || 0) + (dashboardData.todayOutputTokens || 0) + (dashboardData.todayCacheCreateTokens || 0) + (dashboardData.todayCacheReadTokens || 0)) }}</p>
@@ -305,7 +305,7 @@
 
                         <div class="stat-card">
                             <div class="flex items-center justify-between">
-                                <div class="flex-1">
+                                <div class="flex-1 mr-8">
                                     <p class="text-sm font-semibold text-gray-600 mb-1">总Token消耗</p>
                                     <div class="flex items-baseline gap-2 mb-2">
                                         <p class="text-3xl font-bold text-emerald-600">{{ formatNumber((dashboardData.totalInputTokens || 0) + (dashboardData.totalOutputTokens || 0) + (dashboardData.totalCacheCreateTokens || 0) + (dashboardData.totalCacheReadTokens || 0)) }}</p>
