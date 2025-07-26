@@ -2270,6 +2270,43 @@
                         </div>
                     </div>
                     
+                    <!-- 客户端限制 -->
+                    <div>
+                        <div class="flex items-center mb-3">
+                            <input 
+                                type="checkbox" 
+                                v-model="apiKeyForm.enableClientRestriction" 
+                                id="enableClientRestriction"
+                                class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                            >
+                            <label for="enableClientRestriction" class="ml-2 text-sm font-semibold text-gray-700 cursor-pointer">
+                                启用客户端限制
+                            </label>
+                        </div>
+                        
+                        <div v-if="apiKeyForm.enableClientRestriction" class="space-y-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-2">允许的客户端</label>
+                                <p class="text-xs text-gray-500 mb-3">勾选允许使用此API Key的客户端</p>
+                                <div class="space-y-2">
+                                    <div v-for="client in supportedClients" :key="client.id" class="flex items-start">
+                                        <input 
+                                            type="checkbox" 
+                                            :id="`client_${client.id}`"
+                                            :value="client.id"
+                                            v-model="apiKeyForm.allowedClients"
+                                            class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 mt-0.5"
+                                        >
+                                        <label :for="`client_${client.id}`" class="ml-2 flex-1 cursor-pointer">
+                                            <span class="text-sm font-medium text-gray-700">{{ client.name }}</span>
+                                            <span class="text-xs text-gray-500 block">{{ client.description }}</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="flex gap-3 pt-4">
                         <button 
                             type="button" 
@@ -2523,6 +2560,43 @@
                                     </button>
                                 </div>
                                 <p class="text-xs text-gray-500 mt-2">设置此API Key无法访问的模型，例如：claude-opus-4-20250514</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 客户端限制 -->
+                    <div>
+                        <div class="flex items-center mb-3">
+                            <input 
+                                type="checkbox" 
+                                v-model="editApiKeyForm.enableClientRestriction" 
+                                id="editEnableClientRestriction"
+                                class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                            >
+                            <label for="editEnableClientRestriction" class="ml-2 text-sm font-semibold text-gray-700 cursor-pointer">
+                                启用客户端限制
+                            </label>
+                        </div>
+                        
+                        <div v-if="editApiKeyForm.enableClientRestriction" class="space-y-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-2">允许的客户端</label>
+                                <p class="text-xs text-gray-500 mb-3">勾选允许使用此API Key的客户端</p>
+                                <div class="space-y-2">
+                                    <div v-for="client in supportedClients" :key="client.id" class="flex items-start">
+                                        <input 
+                                            type="checkbox" 
+                                            :id="`edit_client_${client.id}`"
+                                            :value="client.id"
+                                            v-model="editApiKeyForm.allowedClients"
+                                            class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 mt-0.5"
+                                        >
+                                        <label :for="`edit_client_${client.id}`" class="ml-2 flex-1 cursor-pointer">
+                                            <span class="text-sm font-medium text-gray-700">{{ client.name }}</span>
+                                            <span class="text-xs text-gray-500 block">{{ client.description }}</span>
+                                        </label>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

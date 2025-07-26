@@ -129,6 +129,8 @@ const app = createApp({
                 enableModelRestriction: false,
                 restrictedModels: [],
                 modelInput: '',
+                enableClientRestriction: false,
+                allowedClients: [],
                 expireDuration: '', // 过期时长选择
                 customExpireDate: '', // 自定义过期日期
                 expiresAt: null // 实际的过期时间戳
@@ -188,8 +190,13 @@ const app = createApp({
                 permissions: 'all',
                 enableModelRestriction: false,
                 restrictedModels: [],
-                modelInput: ''
+                modelInput: '',
+                enableClientRestriction: false,
+                allowedClients: []
             },
+            
+            // 支持的客户端列表
+            supportedClients: [],
             
             // 账户
             accounts: [],
@@ -427,10 +434,11 @@ const app = createApp({
             // 初始化日期筛选器和图表数据
             this.initializeDateFilter();
             
-            // 预加载账号列表和API Keys，以便正确显示绑定关系
+            // 预加载账号列表、API Keys和支持的客户端，以便正确显示绑定关系
             Promise.all([
                 this.loadAccounts(),
-                this.loadApiKeys()
+                this.loadApiKeys(),
+                this.loadSupportedClients()
             ]).then(() => {
                 // 根据当前活跃标签页加载数据
                 this.loadCurrentTabData();
@@ -1883,6 +1891,18 @@ const app = createApp({
             }
         },
         
+        async loadSupportedClients() {
+            try {
+                const data = await this.apiRequest('/admin/supported-clients');
+                if (data && data.success) {
+                    this.supportedClients = data.data || [];
+                    console.log('Loaded supported clients:', this.supportedClients);
+                }
+            } catch (error) {
+                console.error('Failed to load supported clients:', error);
+            }
+        },
+        
         async loadApiKeys() {
             this.apiKeysLoading = true;
             console.log('Loading API Keys with time range:', this.apiKeyStatsTimeRange);
@@ -2053,6 +2073,8 @@ const app = createApp({
                         permissions: this.apiKeyForm.permissions || 'all',
                         enableModelRestriction: this.apiKeyForm.enableModelRestriction,
                         restrictedModels: this.apiKeyForm.restrictedModels,
+                        enableClientRestriction: this.apiKeyForm.enableClientRestriction,
+                        allowedClients: this.apiKeyForm.allowedClients,
                         expiresAt: this.apiKeyForm.expiresAt
                     })
                 });
@@ -2087,6 +2109,8 @@ const app = createApp({
                         enableModelRestriction: false, 
                         restrictedModels: [], 
                         modelInput: '',
+                        enableClientRestriction: false,
+                        allowedClients: [],
                         expireDuration: '',
                         customExpireDate: '',
                         expiresAt: null
@@ -2254,7 +2278,9 @@ const app = createApp({
                 permissions: key.permissions || 'all',
                 enableModelRestriction: key.enableModelRestriction || false,
                 restrictedModels: key.restrictedModels ? [...key.restrictedModels] : [],
-                modelInput: ''
+                modelInput: '',
+                enableClientRestriction: key.enableClientRestriction || false,
+                allowedClients: key.allowedClients ? [...key.allowedClients] : []
             };
             this.showEditApiKeyModal = true;
         },
@@ -2273,7 +2299,9 @@ const app = createApp({
                 permissions: 'all',
                 enableModelRestriction: false,
                 restrictedModels: [],
-                modelInput: ''
+                modelInput: '',
+                enableClientRestriction: false,
+                allowedClients: []
             };
         },
 
@@ -2291,7 +2319,9 @@ const app = createApp({
                         geminiAccountId: this.editApiKeyForm.geminiAccountId || null,
                         permissions: this.editApiKeyForm.permissions || 'all',
                         enableModelRestriction: this.editApiKeyForm.enableModelRestriction,
-                        restrictedModels: this.editApiKeyForm.restrictedModels
+                        restrictedModels: this.editApiKeyForm.restrictedModels,
+                        enableClientRestriction: this.editApiKeyForm.enableClientRestriction,
+                        allowedClients: this.editApiKeyForm.allowedClients
                     })
                 });
                 

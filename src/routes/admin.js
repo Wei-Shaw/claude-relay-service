@@ -12,6 +12,7 @@ const claudeCodeHeadersService = require('../services/claudeCodeHeadersService')
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const config = require('../../config/config');
 
 const router = express.Router();
 
@@ -236,6 +237,21 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
   }
 });
 
+// 获取支持的客户端列表
+router.get('/supported-clients', authenticateAdmin, async (req, res) => {
+  try {
+    const clients = config.clientRestrictions.predefinedClients.map(client => ({
+      id: client.id,
+      name: client.name,
+      description: client.description
+    }));
+    res.json({ success: true, data: clients });
+  } catch (error) {
+    logger.error('❌ Failed to get supported clients:', error);
+    res.status(500).json({ error: 'Failed to get supported clients', message: error.message });
+  }
+});
+
 // 创建新的API Key
 router.post('/api-keys', authenticateAdmin, async (req, res) => {
   try {
@@ -251,7 +267,9 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       rateLimitWindow,
       rateLimitRequests,
       enableModelRestriction,
-      restrictedModels
+      restrictedModels,
+      enableClientRestriction,
+      allowedClients
     } = req.body;
 
     // 输入验证
@@ -293,6 +311,15 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Restricted models must be an array' });
     }
 
+    // 验证客户端限制字段
+    if (enableClientRestriction !== undefined && typeof enableClientRestriction !== 'boolean') {
+      return res.status(400).json({ error: 'Enable client restriction must be a boolean' });
+    }
+
+    if (allowedClients !== undefined && !Array.isArray(allowedClients)) {
+      return res.status(400).json({ error: 'Allowed clients must be an array' });
+    }
+
     const newKey = await apiKeyService.generateApiKey({
       name,
       description,
@@ -305,7 +332,9 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       rateLimitWindow,
       rateLimitRequests,
       enableModelRestriction,
-      restrictedModels
+      restrictedModels,
+      enableClientRestriction,
+      allowedClients
     });
 
     logger.success(`🔑 Admin created new API key: ${name}`);
@@ -320,7 +349,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
 router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
   try {
     const { keyId } = req.params;
-    const { tokenLimit, concurrencyLimit, rateLimitWindow, rateLimitRequests, claudeAccountId, geminiAccountId, permissions, enableModelRestriction, restrictedModels, expiresAt } = req.body;
+    const { tokenLimit, concurrencyLimit, rateLimitWindow, rateLimitRequests, claudeAccountId, geminiAccountId, permissions, enableModelRestriction, restrictedModels, enableClientRestriction, allowedClients, expiresAt } = req.body;
 
     // 只允许更新指定字段
     const updates = {};
@@ -384,6 +413,21 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
         return res.status(400).json({ error: 'Restricted models must be an array' });
       }
       updates.restrictedModels = restrictedModels;
+    }
+
+    // 处理客户端限制字段
+    if (enableClientRestriction !== undefined) {
+      if (typeof enableClientRestriction !== 'boolean') {
+        return res.status(400).json({ error: 'Enable client restriction must be a boolean' });
+      }
+      updates.enableClientRestriction = enableClientRestriction;
+    }
+
+    if (allowedClients !== undefined) {
+      if (!Array.isArray(allowedClients)) {
+        return res.status(400).json({ error: 'Allowed clients must be an array' });
+      }
+      updates.allowedClients = allowedClients;
     }
 
     // 处理过期时间字段

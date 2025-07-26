@@ -106,7 +106,7 @@
 - 🔄 **智能切换**: 账户出问题自动换下一个
 - 🚀 **性能优化**: 连接池、缓存，减少延迟
 - 📊 **监控面板**: Web界面查看所有数据
-- 🛡️ **安全控制**: 访问限制、速率控制
+- 🛡️ **安全控制**: 访问限制、速率控制、客户端限制
 - 🌐 **代理支持**: 支持HTTP/SOCKS5代理
 
 ---
@@ -398,7 +398,11 @@ docker-compose.yml 已包含：
 1. 点击「API Keys」标签
 2. 点击「创建新Key」
 3. 给Key起个名字，比如「张三的Key」
-4. 设置使用限制（可选）
+4. 设置使用限制（可选）：
+   - **速率限制**: 限制每个时间窗口的请求次数和Token使用量
+   - **并发限制**: 限制同时处理的请求数
+   - **模型限制**: 限制可访问的模型列表
+   - **客户端限制**: 限制只允许特定客户端使用（如ClaudeCode、Gemini-CLI等）
 5. 保存，记下生成的Key
 
 ### 4. 开始使用Claude code
@@ -497,6 +501,63 @@ npm run service:status
 - 升级前建议备份重要配置文件（.env, config/config.js）
 - 查看更新日志了解是否有破坏性变更
 - 如果有数据库结构变更，会自动迁移
+
+---
+
+## 🔒 客户端限制功能
+
+### 功能说明
+
+客户端限制功能允许你控制每个API Key可以被哪些客户端使用，通过User-Agent识别客户端，提高API的安全性。
+
+### 使用方法
+
+1. **在创建或编辑API Key时启用客户端限制**：
+   - 勾选"启用客户端限制"
+   - 选择允许的客户端（支持多选）
+
+2. **预定义客户端**：
+   - **ClaudeCode**: 官方Claude CLI（匹配 `claude-cli/x.x.x (external, cli)` 格式）
+   - **Gemini-CLI**: Gemini命令行工具（匹配 `GeminiCLI/vx.x.x (platform; arch)` 格式）
+
+3. **调试和诊断**：
+   - 系统会在日志中记录所有请求的User-Agent
+   - 客户端验证失败时会返回403错误并记录详细信息
+   - 通过日志可以查看实际的User-Agent格式，方便配置自定义客户端
+
+### 自定义客户端配置
+
+如需添加自定义客户端，可以修改 `config/config.js` 文件：
+
+```javascript
+clientRestrictions: {
+  predefinedClients: [
+    // ... 现有客户端配置
+    {
+      id: 'my_custom_client',
+      name: 'My Custom Client',
+      description: '我的自定义客户端',
+      userAgentPattern: /^MyClient\/[\d\.]+/i
+    }
+  ]
+}
+```
+
+### 日志示例
+
+认证成功时的日志：
+```
+🔓 Authenticated request from key: 测试Key (key-id) in 5ms
+   User-Agent: "claude-cli/1.0.58 (external, cli)"
+```
+
+客户端限制检查日志：
+```
+🔍 Checking client restriction for key: key-id (测试Key)
+   User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+   Allowed clients: claude_code, gemini_cli
+🚫 Client restriction failed for key: key-id (测试Key) from 127.0.0.1, User-Agent: Mozilla/5.0...
+```
 
 ### 常见问题处理
 
