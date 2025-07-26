@@ -254,7 +254,7 @@ class ApiKeyService {
           await redis.incrementAccountUsage(accountId, totalTokens, inputTokens, outputTokens, cacheCreateTokens, cacheReadTokens, model);
           logger.database(`📊 Recorded account usage: ${accountId} - ${totalTokens} tokens (API Key: ${keyId})`);
         } else {
-          logger.debug(`⚠️ No accountId provided for usage recording, skipping account-level statistics`);
+          logger.debug('⚠️ No accountId provided for usage recording, skipping account-level statistics');
         }
       }
       

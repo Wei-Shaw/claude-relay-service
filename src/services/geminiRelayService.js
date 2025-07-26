@@ -371,9 +371,110 @@ async function getAvailableModels(accessToken, proxy, projectId, location = 'us-
   }
 }
 
+// Count Tokens API - 用于Gemini CLI兼容性
+async function countTokens({
+  model,
+  content,
+  accessToken,
+  proxy,
+  projectId,
+  location = 'us-central1'
+}) {
+  // 确保模型名称格式正确
+  if (!model.startsWith('models/')) {
+    model = `models/${model}`;
+  }
+  
+  // 转换内容格式 - 支持多种输入格式
+  let requestBody;
+  if (Array.isArray(content)) {
+    // 如果content是数组，直接使用
+    requestBody = { contents: content };
+  } else if (typeof content === 'string') {
+    // 如果是字符串，转换为Gemini格式
+    requestBody = {
+      contents: [{
+        parts: [{ text: content }]
+      }]
+    };
+  } else if (content.parts || content.role) {
+    // 如果已经是Gemini格式的单个content
+    requestBody = { contents: [content] };
+  } else {
+    // 其他情况，尝试直接使用
+    requestBody = { contents: content };
+  }
+  
+  // 构建API URL
+  let apiUrl;
+  if (projectId) {
+    // 使用项目特定的 URL 格式（Google Cloud/Workspace 账号）
+    apiUrl = `${GEMINI_API_BASE}/projects/${projectId}/locations/${location}/${model}:countTokens`;
+    logger.debug(`Using project-specific countTokens URL with projectId: ${projectId}, location: ${location}`);
+  } else {
+    // 使用标准 URL 格式（个人 Google 账号）
+    apiUrl = `${GEMINI_API_BASE}/${model}:countTokens`;
+    logger.debug('Using standard countTokens URL without projectId');
+  }
+  
+  const axiosConfig = {
+    method: 'POST',
+    url: apiUrl,
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    },
+    data: requestBody,
+    timeout: 30000
+  };
+  
+  // 添加代理配置
+  const proxyAgent = createProxyAgent(proxy);
+  if (proxyAgent) {
+    axiosConfig.httpsAgent = proxyAgent;
+    logger.debug('Using proxy for Gemini countTokens request');
+  }
+  
+  try {
+    logger.debug('Sending countTokens request to Gemini API');
+    const response = await axios(axiosConfig);
+    
+    // 返回符合Gemini API格式的响应
+    return {
+      totalTokens: response.data.totalTokens || 0,
+      totalBillableCharacters: response.data.totalBillableCharacters || 0,
+      ...response.data
+    };
+  } catch (error) {
+    logger.error('Gemini countTokens API request failed:', error.response?.data || error.message);
+    
+    // 转换错误格式
+    if (error.response) {
+      const geminiError = error.response.data?.error;
+      throw {
+        status: error.response.status,
+        error: {
+          message: geminiError?.message || 'Gemini countTokens API request failed',
+          type: geminiError?.code || 'api_error',
+          code: geminiError?.code
+        }
+      };
+    }
+    
+    throw {
+      status: 500,
+      error: {
+        message: error.message,
+        type: 'network_error'
+      }
+    };
+  }
+}
+
 module.exports = {
   sendGeminiRequest,
   getAvailableModels,
   convertMessagesToGemini,
-  convertGeminiResponse
+  convertGeminiResponse,
+  countTokens
 };
