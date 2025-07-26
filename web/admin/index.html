@@ -575,17 +575,40 @@
                             <table class="min-w-full">
                                 <thead class="bg-gray-50/80 backdrop-blur-sm">
                                     <tr>
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">名称</th>
+                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortApiKeys('name')">
+                                            名称
+                                            <i v-if="apiKeysSortBy === 'name'" :class="['fas', apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
+                                            <i v-else class="fas fa-sort ml-1 text-gray-400"></i>
+                                        </th>
                                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">API Key</th>
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">状态</th>
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">使用统计</th>
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">创建时间</th>
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">过期时间</th>
+                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortApiKeys('status')">
+                                            状态
+                                            <i v-if="apiKeysSortBy === 'status'" :class="['fas', apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
+                                            <i v-else class="fas fa-sort ml-1 text-gray-400"></i>
+                                        </th>
+                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                            使用统计
+                                            <span class="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded" @click="sortApiKeys('cost')">
+                                                (费用
+                                                <i v-if="apiKeysSortBy === 'cost'" :class="['fas', apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
+                                                <i v-else class="fas fa-sort ml-1 text-gray-400"></i>)
+                                            </span>
+                                        </th>
+                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortApiKeys('createdAt')">
+                                            创建时间
+                                            <i v-if="apiKeysSortBy === 'createdAt'" :class="['fas', apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
+                                            <i v-else class="fas fa-sort ml-1 text-gray-400"></i>
+                                        </th>
+                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortApiKeys('expiresAt')">
+                                            过期时间
+                                            <i v-if="apiKeysSortBy === 'expiresAt'" :class="['fas', apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
+                                            <i v-else class="fas fa-sort ml-1 text-gray-400"></i>
+                                        </th>
                                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-200/50">
-                                    <template v-for="key in apiKeys" :key="key.id">
+                                    <template v-for="key in sortedApiKeys" :key="key.id">
                                         <!-- API Key 主行 -->
                                         <tr class="table-row">
                                             <td class="px-6 py-4 whitespace-nowrap">
@@ -922,12 +945,21 @@
                                 <h3 class="text-xl font-bold text-gray-900 mb-2">账户管理</h3>
                                 <p class="text-gray-600">管理您的 Claude 和 Gemini 账户及代理配置</p>
                             </div>
-                            <button 
-                                @click.stop="openCreateAccountModal"
-                                class="btn btn-success px-6 py-3 flex items-center gap-2"
-                            >
-                                <i class="fas fa-plus"></i>添加账户
-                            </button>
+                            <div class="flex gap-2">
+                                <select v-model="accountSortBy" @change="sortAccounts()" class="form-input px-3 py-2 text-sm">
+                                    <option value="name">按名称排序</option>
+                                    <option value="dailyTokens">按今日Token排序</option>
+                                    <option value="dailyRequests">按今日请求数排序</option>
+                                    <option value="totalTokens">按总Token排序</option>
+                                    <option value="lastUsed">按最后使用排序</option>
+                                </select>
+                                <button 
+                                    @click.stop="openCreateAccountModal"
+                                    class="btn btn-success px-6 py-3 flex items-center gap-2"
+                                >
+                                    <i class="fas fa-plus"></i>添加账户
+                                </button>
+                            </div>
                         </div>
                         
                         <div v-if="accountsLoading" class="text-center py-12">
@@ -947,17 +979,34 @@
                             <table class="min-w-full">
                                 <thead class="bg-gray-50/80 backdrop-blur-sm">
                                     <tr>
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">名称</th>
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">平台</th>
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">类型</th>
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">状态</th>
+                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortAccounts('name')">
+                                            名称
+                                            <i v-if="accountsSortBy === 'name'" :class="['fas', accountsSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
+                                            <i v-else class="fas fa-sort ml-1 text-gray-400"></i>
+                                        </th>
+                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortAccounts('platform')">
+                                            平台
+                                            <i v-if="accountsSortBy === 'platform'" :class="['fas', accountsSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
+                                            <i v-else class="fas fa-sort ml-1 text-gray-400"></i>
+                                        </th>
+                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortAccounts('accountType')">
+                                            类型
+                                            <i v-if="accountsSortBy === 'accountType'" :class="['fas', accountsSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
+                                            <i v-else class="fas fa-sort ml-1 text-gray-400"></i>
+                                        </th>
+                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortAccounts('status')">
+                                            状态
+                                            <i v-if="accountsSortBy === 'status'" :class="['fas', accountsSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
+                                            <i v-else class="fas fa-sort ml-1 text-gray-400"></i>
+                                        </th>
                                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">代理</th>
+                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">今日使用</th>
                                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">最后使用</th>
                                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-200/50">
-                                    <tr v-for="account in accounts" :key="account.id" class="table-row">
+                                    <tr v-for="account in sortedAccounts" :key="account.id" class="table-row">
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <div class="flex items-center">
                                                 <div class="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center mr-3">
@@ -1023,6 +1072,22 @@
                                                 {{ account.proxy.type }}://{{ account.proxy.host }}:{{ account.proxy.port }}
                                             </div>
                                             <div v-else class="text-gray-400">无代理</div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                            <div v-if="account.usage && account.usage.daily" class="space-y-1">
+                                                <div class="flex items-center gap-2">
+                                                    <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                                                    <span class="text-sm font-medium text-gray-900">{{ account.usage.daily.requests || 0 }} 次</span>
+                                                </div>
+                                                <div class="flex items-center gap-2">
+                                                    <div class="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                                    <span class="text-xs text-gray-600">{{ formatNumber(account.usage.daily.allTokens || 0) }} tokens</span>
+                                                </div>
+                                                <div v-if="account.usage.averages && account.usage.averages.rpm > 0" class="text-xs text-gray-500">
+                                                    平均 {{ account.usage.averages.rpm.toFixed(2) }} RPM
+                                                </div>
+                                            </div>
+                                            <div v-else class="text-gray-400 text-xs">暂无数据</div>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             {{ account.lastUsedAt ? new Date(account.lastUsedAt).toLocaleDateString() : '从未使用' }}

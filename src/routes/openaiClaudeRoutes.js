@@ -258,7 +258,8 @@ async function handleChatCompletion(req, res, apiKeyData) {
               outputTokens, 
               cacheCreateTokens, 
               cacheReadTokens, 
-              model
+              model,
+              accountId
             ).catch(error => {
               logger.error('❌ Failed to record usage:', error);
             });
@@ -327,7 +328,8 @@ async function handleChatCompletion(req, res, apiKeyData) {
           usage.output_tokens || 0,
           usage.cache_creation_input_tokens || 0,
           usage.cache_read_input_tokens || 0,
-          claudeRequest.model
+          claudeRequest.model,
+          accountId
         ).catch(error => {
           logger.error('❌ Failed to record usage:', error);
         });

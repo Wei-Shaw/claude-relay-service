@@ -531,7 +531,34 @@ router.post('/claude-accounts/exchange-code', authenticateAdmin, async (req, res
 router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
   try {
     const accounts = await claudeAccountService.getAllAccounts();
-    res.json({ success: true, data: accounts });
+    
+    // 为每个账户添加使用统计信息
+    const accountsWithStats = await Promise.all(accounts.map(async (account) => {
+      try {
+        const usageStats = await redis.getAccountUsageStats(account.id);
+        return {
+          ...account,
+          usage: {
+            daily: usageStats.daily,
+            total: usageStats.total,
+            averages: usageStats.averages
+          }
+        };
+      } catch (statsError) {
+        logger.warn(`⚠️ Failed to get usage stats for account ${account.id}:`, statsError.message);
+        // 如果获取统计失败，返回空统计
+        return {
+          ...account,
+          usage: {
+            daily: { tokens: 0, requests: 0, allTokens: 0 },
+            total: { tokens: 0, requests: 0, allTokens: 0 },
+            averages: { rpm: 0, tpm: 0 }
+          }
+        };
+      }
+    }));
+    
+    res.json({ success: true, data: accountsWithStats });
   } catch (error) {
     logger.error('❌ Failed to get Claude accounts:', error);
     res.status(500).json({ error: 'Failed to get Claude accounts', message: error.message });
@@ -718,7 +745,18 @@ router.post('/gemini-accounts/exchange-code', authenticateAdmin, async (req, res
 router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
   try {
     const accounts = await geminiAccountService.getAllAccounts();
-    res.json({ success: true, data: accounts });
+    
+    // 为Gemini账户添加空的使用统计（暂时）
+    const accountsWithStats = accounts.map(account => ({
+      ...account,
+      usage: {
+        daily: { tokens: 0, requests: 0, allTokens: 0 },
+        total: { tokens: 0, requests: 0, allTokens: 0 },
+        averages: { rpm: 0, tpm: 0 }
+      }
+    }));
+    
+    res.json({ success: true, data: accountsWithStats });
   } catch (error) {
     logger.error('❌ Failed to get Gemini accounts:', error);
     res.status(500).json({ error: 'Failed to get accounts', message: error.message });
@@ -788,6 +826,73 @@ router.post('/gemini-accounts/:accountId/refresh', authenticateAdmin, async (req
   } catch (error) {
     logger.error('❌ Failed to refresh Gemini account token:', error);
     res.status(500).json({ error: 'Failed to refresh token', message: error.message });
+  }
+});
+
+// 📊 账户使用统计
+
+// 获取所有账户的使用统计
+router.get('/accounts/usage-stats', authenticateAdmin, async (req, res) => {
+  try {
+    const accountsStats = await redis.getAllAccountsUsageStats();
+    
+    res.json({
+      success: true,
+      data: accountsStats,
+      summary: {
+        totalAccounts: accountsStats.length,
+        activeToday: accountsStats.filter(account => account.daily.requests > 0).length,
+        totalDailyTokens: accountsStats.reduce((sum, account) => sum + (account.daily.allTokens || 0), 0),
+        totalDailyRequests: accountsStats.reduce((sum, account) => sum + (account.daily.requests || 0), 0)
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('❌ Failed to get accounts usage stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get accounts usage stats',
+      message: error.message
+    });
+  }
+});
+
+// 获取单个账户的使用统计
+router.get('/accounts/:accountId/usage-stats', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const accountStats = await redis.getAccountUsageStats(accountId);
+    
+    // 获取账户基本信息
+    const accountData = await claudeAccountService.getAccount(accountId);
+    if (!accountData) {
+      return res.status(404).json({
+        success: false,
+        error: 'Account not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        ...accountStats,
+        accountInfo: {
+          name: accountData.name,
+          email: accountData.email,
+          status: accountData.status,
+          isActive: accountData.isActive,
+          createdAt: accountData.createdAt
+        }
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('❌ Failed to get account usage stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get account usage stats',
+      message: error.message
+    });
   }
 });
 

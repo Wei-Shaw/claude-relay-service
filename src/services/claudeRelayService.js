@@ -181,6 +181,8 @@ class ClaudeRelayService {
       
       logger.info(`✅ API request completed - Key: ${apiKeyData.name}, Account: ${accountId}, Model: ${requestBody.model}, Input: ~${Math.round(inputTokens)} tokens, Output: ~${Math.round(outputTokens)} tokens`);
       
+      // 在响应中添加accountId，以便调用方记录账户级别统计
+      response.accountId = accountId;
       return response;
     } catch (error) {
       logger.error(`❌ Claude relay request failed for key: ${apiKeyData.name || apiKeyData.id}:`, error.message);
@@ -619,7 +621,10 @@ class ClaudeRelayService {
       const proxyAgent = await this._getProxyAgent(accountId);
       
       // 发送流式请求并捕获usage数据
-      return await this._makeClaudeStreamRequestWithUsageCapture(processedBody, accessToken, proxyAgent, clientHeaders, responseStream, usageCallback, accountId, sessionHash, streamTransformer, options);
+      return await this._makeClaudeStreamRequestWithUsageCapture(processedBody, accessToken, proxyAgent, clientHeaders, responseStream, (usageData) => {
+        // 在usageCallback中添加accountId
+        usageCallback({ ...usageData, accountId });
+      }, accountId, sessionHash, streamTransformer, options);
     } catch (error) {
       logger.error('❌ Claude stream relay with usage capture failed:', error);
       throw error;
