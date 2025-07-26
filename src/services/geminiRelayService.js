@@ -405,15 +405,16 @@ async function countTokens({
     requestBody = { contents: content };
   }
   
-  // 构建API URL
+  // 构建API URL - countTokens需要使用generativelanguage API
+  const GENERATIVE_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
   let apiUrl;
   if (projectId) {
     // 使用项目特定的 URL 格式（Google Cloud/Workspace 账号）
-    apiUrl = `${GEMINI_API_BASE}/projects/${projectId}/locations/${location}/${model}:countTokens`;
+    apiUrl = `${GENERATIVE_API_BASE}/projects/${projectId}/locations/${location}/${model}:countTokens`;
     logger.debug(`Using project-specific countTokens URL with projectId: ${projectId}, location: ${location}`);
   } else {
     // 使用标准 URL 格式（个人 Google 账号）
-    apiUrl = `${GEMINI_API_BASE}/${model}:countTokens`;
+    apiUrl = `${GENERATIVE_API_BASE}/${model}:countTokens`;
     logger.debug('Using standard countTokens URL without projectId');
   }
   
@@ -422,7 +423,8 @@ async function countTokens({
     url: apiUrl,
     headers: {
       'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'X-Goog-User-Project': projectId || undefined
     },
     data: requestBody,
     timeout: 30000
@@ -436,7 +438,8 @@ async function countTokens({
   }
   
   try {
-    logger.debug('Sending countTokens request to Gemini API');
+    logger.debug(`Sending countTokens request to: ${apiUrl}`);
+    logger.debug(`Request body: ${JSON.stringify(requestBody, null, 2)}`);
     const response = await axios(axiosConfig);
     
     // 返回符合Gemini API格式的响应
@@ -446,7 +449,13 @@ async function countTokens({
       ...response.data
     };
   } catch (error) {
-    logger.error('Gemini countTokens API request failed:', error.response?.data || error.message);
+    logger.error(`Gemini countTokens API request failed for URL: ${apiUrl}`);
+    logger.error('Request config:', JSON.stringify({
+      url: apiUrl,
+      headers: axiosConfig.headers,
+      data: requestBody
+    }, null, 2));
+    logger.error('Error details:', error.response?.data || error.message);
     
     // 转换错误格式
     if (error.response) {
@@ -454,7 +463,7 @@ async function countTokens({
       throw {
         status: error.response.status,
         error: {
-          message: geminiError?.message || 'Gemini countTokens API request failed',
+          message: geminiError?.message || `Gemini countTokens API request failed (Status: ${error.response.status})`,
           type: geminiError?.code || 'api_error',
           code: geminiError?.code
         }
