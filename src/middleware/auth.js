@@ -241,6 +241,27 @@ const authenticateApiKey = async (req, res, next) => {
       };
     }
     
+    // 检查每日费用限制
+    const dailyCostLimit = validation.keyData.dailyCostLimit || 0;
+    if (dailyCostLimit > 0) {
+      const dailyCost = validation.keyData.dailyCost || 0;
+      
+      if (dailyCost >= dailyCostLimit) {
+        logger.security(`💰 Daily cost limit exceeded for key: ${validation.keyData.id} (${validation.keyData.name}), cost: $${dailyCost.toFixed(2)}/$${dailyCostLimit}`);
+        
+        return res.status(429).json({
+          error: 'Daily cost limit exceeded',
+          message: `已达到每日费用限制 ($${dailyCostLimit})`,
+          currentCost: dailyCost,
+          costLimit: dailyCostLimit,
+          resetAt: new Date(new Date().setHours(24, 0, 0, 0)).toISOString() // 明天0点重置
+        });
+      }
+      
+      // 记录当前费用使用情况
+      logger.api(`💰 Cost usage for key: ${validation.keyData.id} (${validation.keyData.name}), current: $${dailyCost.toFixed(2)}/$${dailyCostLimit}`);
+    }
+    
     // 将验证信息添加到请求对象（只包含必要信息）
     req.apiKey = {
       id: validation.keyData.id,
@@ -256,6 +277,8 @@ const authenticateApiKey = async (req, res, next) => {
       restrictedModels: validation.keyData.restrictedModels,
       enableClientRestriction: validation.keyData.enableClientRestriction,
       allowedClients: validation.keyData.allowedClients,
+      dailyCostLimit: validation.keyData.dailyCostLimit,
+      dailyCost: validation.keyData.dailyCost,
       usage: validation.keyData.usage
     };
     req.usage = validation.keyData.usage;

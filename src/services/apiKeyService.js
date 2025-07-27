@@ -26,7 +26,8 @@ class ApiKeyService {
       enableModelRestriction = false,
       restrictedModels = [],
       enableClientRestriction = false,
-      allowedClients = []
+      allowedClients = [],
+      dailyCostLimit = 0
     } = options;
 
     // 生成简单的API Key (64字符十六进制)
@@ -51,6 +52,7 @@ class ApiKeyService {
       restrictedModels: JSON.stringify(restrictedModels || []),
       enableClientRestriction: String(enableClientRestriction || false),
       allowedClients: JSON.stringify(allowedClients || []),
+      dailyCostLimit: String(dailyCostLimit || 0),
       createdAt: new Date().toISOString(),
       lastUsedAt: '',
       expiresAt: expiresAt || '',
@@ -79,6 +81,7 @@ class ApiKeyService {
       restrictedModels: JSON.parse(keyData.restrictedModels),
       enableClientRestriction: keyData.enableClientRestriction === 'true',
       allowedClients: JSON.parse(keyData.allowedClients || '[]'),
+      dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
       createdAt: keyData.createdAt,
       expiresAt: keyData.expiresAt,
       createdBy: keyData.createdBy
@@ -114,6 +117,9 @@ class ApiKeyService {
 
       // 获取使用统计（供返回数据使用）
       const usage = await redis.getUsageStats(keyData.id);
+      
+      // 获取当日费用统计
+      const dailyCost = await redis.getDailyCost(keyData.id);
 
       // 更新最后使用时间（优化：只在实际API调用时更新，而不是验证时）
       // 注意：lastUsedAt的更新已移至recordUsage方法中
@@ -141,6 +147,9 @@ class ApiKeyService {
         keyData: {
           id: keyData.id,
           name: keyData.name,
+          description: keyData.description,
+          createdAt: keyData.createdAt,
+          expiresAt: keyData.expiresAt,
           claudeAccountId: keyData.claudeAccountId,
           geminiAccountId: keyData.geminiAccountId,
           permissions: keyData.permissions || 'all',
@@ -152,6 +161,8 @@ class ApiKeyService {
           restrictedModels: restrictedModels,
           enableClientRestriction: keyData.enableClientRestriction === 'true',
           allowedClients: allowedClients,
+          dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
+          dailyCost: dailyCost || 0,
           usage
         }
       };
@@ -178,6 +189,8 @@ class ApiKeyService {
         key.enableModelRestriction = key.enableModelRestriction === 'true';
         key.enableClientRestriction = key.enableClientRestriction === 'true';
         key.permissions = key.permissions || 'all'; // 兼容旧数据
+        key.dailyCostLimit = parseFloat(key.dailyCostLimit || 0);
+        key.dailyCost = await redis.getDailyCost(key.id) || 0;
         try {
           key.restrictedModels = key.restrictedModels ? JSON.parse(key.restrictedModels) : [];
         } catch (e) {
@@ -207,7 +220,7 @@ class ApiKeyService {
       }
 
       // 允许更新的字段
-      const allowedUpdates = ['name', 'description', 'tokenLimit', 'concurrencyLimit', 'rateLimitWindow', 'rateLimitRequests', 'isActive', 'claudeAccountId', 'geminiAccountId', 'permissions', 'expiresAt', 'enableModelRestriction', 'restrictedModels', 'enableClientRestriction', 'allowedClients'];
+      const allowedUpdates = ['name', 'description', 'tokenLimit', 'concurrencyLimit', 'rateLimitWindow', 'rateLimitRequests', 'isActive', 'claudeAccountId', 'geminiAccountId', 'permissions', 'expiresAt', 'enableModelRestriction', 'restrictedModels', 'enableClientRestriction', 'allowedClients', 'dailyCostLimit'];
       const updatedData = { ...keyData };
 
       for (const [field, value] of Object.entries(updates)) {
@@ -261,8 +274,25 @@ class ApiKeyService {
     try {
       const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens;
       
+      // 计算费用
+      const CostCalculator = require('../utils/costCalculator');
+      const costInfo = CostCalculator.calculateCost({
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
+        cache_creation_input_tokens: cacheCreateTokens,
+        cache_read_input_tokens: cacheReadTokens
+      }, model);
+      
       // 记录API Key级别的使用统计
       await redis.incrementTokenUsage(keyId, totalTokens, inputTokens, outputTokens, cacheCreateTokens, cacheReadTokens, model);
+      
+      // 记录费用统计
+      if (costInfo.costs.total > 0) {
+        await redis.incrementDailyCost(keyId, costInfo.costs.total);
+        logger.database(`💰 Recorded cost for ${keyId}: $${costInfo.costs.total.toFixed(6)}, model: ${model}`);
+      } else {
+        logger.debug(`💰 No cost recorded for ${keyId} - zero cost for model: ${model}`);
+      }
       
       // 获取API Key数据以确定关联的账户
       const keyData = await redis.getApiKey(keyId);

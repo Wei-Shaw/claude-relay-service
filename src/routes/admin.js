@@ -18,6 +18,37 @@ const router = express.Router();
 
 // 🔑 API Keys 管理
 
+// 调试：获取API Key费用详情
+router.get('/api-keys/:keyId/cost-debug', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyId } = req.params;
+    const costStats = await redis.getCostStats(keyId);
+    const dailyCost = await redis.getDailyCost(keyId);
+    const today = redis.getDateStringInTimezone();
+    const client = redis.getClientSafe();
+    
+    // 获取所有相关的Redis键
+    const costKeys = await client.keys(`usage:cost:*:${keyId}:*`);
+    const keyValues = {};
+    
+    for (const key of costKeys) {
+      keyValues[key] = await client.get(key);
+    }
+    
+    res.json({
+      keyId,
+      today,
+      dailyCost,
+      costStats,
+      redisKeys: keyValues,
+      timezone: config.system.timezoneOffset || 8
+    });
+  } catch (error) {
+    logger.error('❌ Failed to get cost debug info:', error);
+    res.status(500).json({ error: 'Failed to get cost debug info', message: error.message });
+  }
+});
+
 // 获取所有API Keys
 router.get('/api-keys', authenticateAdmin, async (req, res) => {
   try {
@@ -28,17 +59,27 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
     const now = new Date();
     let searchPatterns = [];
     
-    if (timeRange === '7days') {
+    if (timeRange === 'today') {
+      // 今日 - 使用时区日期
+      const redis = require('../models/redis');
+      const tzDate = redis.getDateInTimezone(now);
+      const dateStr = `${tzDate.getFullYear()}-${String(tzDate.getMonth() + 1).padStart(2, '0')}-${String(tzDate.getDate()).padStart(2, '0')}`;
+      searchPatterns.push(`usage:daily:*:${dateStr}`);
+    } else if (timeRange === '7days') {
       // 最近7天
+      const redis = require('../models/redis');
       for (let i = 0; i < 7; i++) {
         const date = new Date(now);
         date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().split('T')[0];
+        const tzDate = redis.getDateInTimezone(date);
+        const dateStr = `${tzDate.getFullYear()}-${String(tzDate.getMonth() + 1).padStart(2, '0')}-${String(tzDate.getDate()).padStart(2, '0')}`;
         searchPatterns.push(`usage:daily:*:${dateStr}`);
       }
     } else if (timeRange === 'monthly') {
       // 本月
-      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const redis = require('../models/redis');
+      const tzDate = redis.getDateInTimezone(now);
+      const currentMonth = `${tzDate.getFullYear()}-${String(tzDate.getMonth() + 1).padStart(2, '0')}`;
       searchPatterns.push(`usage:monthly:*:${currentMonth}`);
     }
     
@@ -145,9 +186,16 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
         
         // 计算指定时间范围的费用
         let totalCost = 0;
-        const modelKeys = timeRange === '7days' 
+        const redis = require('../models/redis');
+        const tzToday = redis.getDateStringInTimezone(now);
+        const tzDate = redis.getDateInTimezone(now);
+        const tzMonth = `${tzDate.getFullYear()}-${String(tzDate.getMonth() + 1).padStart(2, '0')}`;
+        
+        const modelKeys = timeRange === 'today' 
+          ? await client.keys(`usage:${apiKey.id}:model:daily:*:${tzToday}`)
+          : timeRange === '7days' 
           ? await client.keys(`usage:${apiKey.id}:model:daily:*:*`)
-          : await client.keys(`usage:${apiKey.id}:model:monthly:*:${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+          : await client.keys(`usage:${apiKey.id}:model:monthly:*:${tzMonth}`);
         
         const modelStatsMap = new Map();
         
@@ -161,6 +209,8 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
               const daysDiff = Math.floor((now - keyDate) / (1000 * 60 * 60 * 24));
               if (daysDiff > 6) continue;
             }
+          } else if (timeRange === 'today') {
+            // today选项已经在查询时过滤了，不需要额外处理
           }
           
           const modelMatch = key.match(/usage:.+:model:(?:daily|monthly):(.+):\d{4}-\d{2}(?:-\d{2})?$/);
@@ -269,7 +319,8 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       enableModelRestriction,
       restrictedModels,
       enableClientRestriction,
-      allowedClients
+      allowedClients,
+      dailyCostLimit
     } = req.body;
 
     // 输入验证
@@ -334,7 +385,8 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       enableModelRestriction,
       restrictedModels,
       enableClientRestriction,
-      allowedClients
+      allowedClients,
+      dailyCostLimit
     });
 
     logger.success(`🔑 Admin created new API key: ${name}`);
@@ -349,7 +401,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
 router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
   try {
     const { keyId } = req.params;
-    const { tokenLimit, concurrencyLimit, rateLimitWindow, rateLimitRequests, claudeAccountId, geminiAccountId, permissions, enableModelRestriction, restrictedModels, enableClientRestriction, allowedClients, expiresAt } = req.body;
+    const { tokenLimit, concurrencyLimit, rateLimitWindow, rateLimitRequests, claudeAccountId, geminiAccountId, permissions, enableModelRestriction, restrictedModels, enableClientRestriction, allowedClients, expiresAt, dailyCostLimit } = req.body;
 
     // 只允许更新指定字段
     const updates = {};
@@ -443,6 +495,15 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
         }
         updates.expiresAt = expiresAt;
       }
+    }
+
+    // 处理每日费用限制
+    if (dailyCostLimit !== undefined && dailyCostLimit !== null && dailyCostLimit !== '') {
+      const costLimit = Number(dailyCostLimit);
+      if (isNaN(costLimit) || costLimit < 0) {
+        return res.status(400).json({ error: 'Daily cost limit must be a non-negative number' });
+      }
+      updates.dailyCostLimit = costLimit;
     }
 
     await apiKeyService.updateApiKey(keyId, updates);

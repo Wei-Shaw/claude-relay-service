@@ -25,7 +25,7 @@ const ALLOWED_FILES = {
   'style.css': {
     path: path.join(__dirname, '../../web/admin/style.css'),
     contentType: 'text/css; charset=utf-8'
-  }
+  },
 };
 
 // 🛡️ 安全文件服务函数
@@ -399,6 +399,9 @@ router.get('/app.js', (req, res) => {
 router.get('/style.css', (req, res) => {
   serveWhitelistedFile(req, res, 'style.css');
 });
+
+
+
 
 // 🔑 Gemini OAuth 回调页面
 

@@ -467,6 +467,66 @@ class RedisClient {
     };
   }
 
+  // 💰 获取当日费用
+  async getDailyCost(keyId) {
+    const today = getDateStringInTimezone();
+    const costKey = `usage:cost:daily:${keyId}:${today}`;
+    const cost = await this.client.get(costKey);
+    const result = parseFloat(cost || 0);
+    logger.debug(`💰 Getting daily cost for ${keyId}, date: ${today}, key: ${costKey}, value: ${cost}, result: ${result}`);
+    return result;
+  }
+
+  // 💰 增加当日费用
+  async incrementDailyCost(keyId, amount) {
+    const today = getDateStringInTimezone();
+    const tzDate = getDateInTimezone();
+    const currentMonth = `${tzDate.getFullYear()}-${String(tzDate.getMonth() + 1).padStart(2, '0')}`;
+    const currentHour = `${today}:${String(getHourInTimezone()).padStart(2, '0')}`;
+    
+    const dailyKey = `usage:cost:daily:${keyId}:${today}`;
+    const monthlyKey = `usage:cost:monthly:${keyId}:${currentMonth}`;
+    const hourlyKey = `usage:cost:hourly:${keyId}:${currentHour}`;
+    const totalKey = `usage:cost:total:${keyId}`;
+    
+    logger.debug(`💰 Incrementing cost for ${keyId}, amount: $${amount}, date: ${today}, dailyKey: ${dailyKey}`);
+    
+    const results = await Promise.all([
+      this.client.incrbyfloat(dailyKey, amount),
+      this.client.incrbyfloat(monthlyKey, amount),
+      this.client.incrbyfloat(hourlyKey, amount),
+      this.client.incrbyfloat(totalKey, amount),
+      // 设置过期时间
+      this.client.expire(dailyKey, 86400 * 30), // 30天
+      this.client.expire(monthlyKey, 86400 * 90), // 90天
+      this.client.expire(hourlyKey, 86400 * 7) // 7天
+    ]);
+    
+    logger.debug(`💰 Cost incremented successfully, new daily total: $${results[0]}`);
+  }
+
+  // 💰 获取费用统计
+  async getCostStats(keyId) {
+    const today = getDateStringInTimezone();
+    const tzDate = getDateInTimezone();
+    const currentMonth = `${tzDate.getFullYear()}-${String(tzDate.getMonth() + 1).padStart(2, '0')}`;
+    const currentHour = `${today}:${String(getHourInTimezone()).padStart(2, '0')}`;
+    
+    const [daily, monthly, hourly, total] = await Promise.all([
+      this.client.get(`usage:cost:daily:${keyId}:${today}`),
+      this.client.get(`usage:cost:monthly:${keyId}:${currentMonth}`),
+      this.client.get(`usage:cost:hourly:${keyId}:${currentHour}`),
+      this.client.get(`usage:cost:total:${keyId}`)
+    ]);
+    
+    return {
+      daily: parseFloat(daily || 0),
+      monthly: parseFloat(monthly || 0),
+      hourly: parseFloat(hourly || 0),
+      total: parseFloat(total || 0)
+    };
+  }
+
   // 📊 获取账户使用统计
   async getAccountUsageStats(accountId) {
     const accountKey = `account_usage:${accountId}`;
@@ -1023,4 +1083,11 @@ class RedisClient {
   }
 }
 
-module.exports = new RedisClient();
+const redisClient = new RedisClient();
+
+// 导出时区辅助函数
+redisClient.getDateInTimezone = getDateInTimezone;
+redisClient.getDateStringInTimezone = getDateStringInTimezone;
+redisClient.getHourInTimezone = getHourInTimezone;
+
+module.exports = redisClient;

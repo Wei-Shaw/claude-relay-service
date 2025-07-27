@@ -10,6 +10,7 @@
     "install:web": "cd web && npm install",
     "setup": "node scripts/setup.js",
     "cli": "node cli/index.js",
+    "init:costs": "node src/cli/initCosts.js",
     "service": "node scripts/manage.js",
     "service:start": "node scripts/manage.js start",
     "service:start:daemon": "node scripts/manage.js start -d",

@@ -227,7 +227,7 @@
                                     <p class="text-3xl font-bold text-gray-900">{{ dashboardData.totalApiKeys }}</p>
                                     <p class="text-xs text-gray-500 mt-1">活跃: {{ dashboardData.activeApiKeys || 0 }}</p>
                                 </div>
-                                <div class="stat-icon bg-gradient-to-br from-blue-500 to-blue-600">
+                                <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-blue-500 to-blue-600">
                                     <i class="fas fa-key"></i>
                                 </div>
                             </div>
@@ -245,7 +245,7 @@
                                         </span>
                                     </p>
                                 </div>
-                                <div class="stat-icon bg-gradient-to-br from-green-500 to-green-600">
+                                <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-green-500 to-green-600">
                                     <i class="fas fa-user-circle"></i>
                                 </div>
                             </div>
@@ -258,7 +258,7 @@
                                     <p class="text-3xl font-bold text-gray-900">{{ dashboardData.todayRequests }}</p>
                                     <p class="text-xs text-gray-500 mt-1">总请求: {{ formatNumber(dashboardData.totalRequests || 0) }}</p>
                                 </div>
-                                <div class="stat-icon bg-gradient-to-br from-purple-500 to-purple-600">
+                                <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-purple-500 to-purple-600">
                                     <i class="fas fa-chart-line"></i>
                                 </div>
                             </div>
@@ -271,7 +271,7 @@
                                     <p class="text-3xl font-bold text-green-600">{{ dashboardData.systemStatus }}</p>
                                     <p class="text-xs text-gray-500 mt-1">运行时间: {{ formatUptime(dashboardData.uptime) }}</p>
                                 </div>
-                                <div class="stat-icon bg-gradient-to-br from-yellow-500 to-orange-500">
+                                <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-yellow-500 to-orange-500">
                                     <i class="fas fa-heartbeat"></i>
                                 </div>
                             </div>
@@ -284,7 +284,7 @@
                             <div class="flex items-center justify-between">
                                 <div class="flex-1 mr-8">
                                     <p class="text-sm font-semibold text-gray-600 mb-1">今日Token</p>
-                                    <div class="flex items-baseline gap-2 mb-2">
+                                    <div class="flex items-baseline gap-2 mb-2 flex-wrap">
                                         <p class="text-3xl font-bold text-blue-600">{{ formatNumber((dashboardData.todayInputTokens || 0) + (dashboardData.todayOutputTokens || 0) + (dashboardData.todayCacheCreateTokens || 0) + (dashboardData.todayCacheReadTokens || 0)) }}</p>
                                         <span class="text-sm text-green-600 font-medium">/ {{ costsData.todayCosts.formatted.totalCost }}</span>
                                     </div>
@@ -297,7 +297,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="stat-icon bg-gradient-to-br from-indigo-500 to-indigo-600">
+                                <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-indigo-500 to-indigo-600">
                                     <i class="fas fa-coins"></i>
                                 </div>
                             </div>
@@ -307,7 +307,7 @@
                             <div class="flex items-center justify-between">
                                 <div class="flex-1 mr-8">
                                     <p class="text-sm font-semibold text-gray-600 mb-1">总Token消耗</p>
-                                    <div class="flex items-baseline gap-2 mb-2">
+                                    <div class="flex items-baseline gap-2 mb-2 flex-wrap">
                                         <p class="text-3xl font-bold text-emerald-600">{{ formatNumber((dashboardData.totalInputTokens || 0) + (dashboardData.totalOutputTokens || 0) + (dashboardData.totalCacheCreateTokens || 0) + (dashboardData.totalCacheReadTokens || 0)) }}</p>
                                         <span class="text-sm text-green-600 font-medium">/ {{ costsData.totalCosts.formatted.totalCost }}</span>
                                     </div>
@@ -320,7 +320,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="stat-icon bg-gradient-to-br from-emerald-500 to-emerald-600">
+                                <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-emerald-500 to-emerald-600">
                                     <i class="fas fa-database"></i>
                                 </div>
                             </div>
@@ -333,7 +333,7 @@
                                     <p class="text-3xl font-bold text-orange-600">{{ dashboardData.systemRPM || 0 }}</p>
                                     <p class="text-xs text-gray-500 mt-1">每分钟请求数</p>
                                 </div>
-                                <div class="stat-icon bg-gradient-to-br from-orange-500 to-orange-600">
+                                <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-orange-500 to-orange-600">
                                     <i class="fas fa-tachometer-alt"></i>
                                 </div>
                             </div>
@@ -346,7 +346,7 @@
                                     <p class="text-3xl font-bold text-rose-600">{{ dashboardData.systemTPM || 0 }}</p>
                                     <p class="text-xs text-gray-500 mt-1">每分钟Token数</p>
                                 </div>
-                                <div class="stat-icon bg-gradient-to-br from-rose-500 to-rose-600">
+                                <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-rose-500 to-rose-600">
                                     <i class="fas fa-rocket"></i>
                                 </div>
                             </div>
@@ -543,11 +543,12 @@
                                 <select 
                                     v-model="apiKeyStatsTimeRange" 
                                     @change="loadApiKeys()"
-                                    class="form-select px-4 py-2 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    class="form-input px-3 py-2 text-sm"
                                 >
-                                    <option value="all">全部时间</option>
+                                    <option value="today">今日</option>
                                     <option value="7days">最近7天</option>
                                     <option value="monthly">本月</option>
+                                    <option value="all">全部时间</option>
                                 </select>
                                 <button 
                                     @click.stop="openCreateApiKeyModal"
@@ -661,6 +662,13 @@
                                                     <div class="flex justify-between text-sm">
                                                         <span class="text-gray-600">费用:</span>
                                                         <span class="font-medium text-green-600">{{ calculateApiKeyCost(key.usage) }}</span>
+                                                    </div>
+                                                    <!-- 每日费用限制 -->
+                                                    <div v-if="key.dailyCostLimit > 0" class="flex justify-between text-sm">
+                                                        <span class="text-gray-600">今日费用:</span>
+                                                        <span :class="['font-medium', (key.dailyCost || 0) >= key.dailyCostLimit ? 'text-red-600' : 'text-blue-600']">
+                                                            ${{ (key.dailyCost || 0).toFixed(2) }} / ${{ key.dailyCostLimit.toFixed(2) }}
+                                                        </span>
                                                     </div>
                                                     <!-- 并发限制 -->
                                                     <div class="flex justify-between text-sm">
@@ -2088,6 +2096,27 @@
                     </div>
                     
                     <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">每日费用限制 (美元)</label>
+                        <div class="space-y-3">
+                            <div class="flex gap-2">
+                                <button type="button" @click="apiKeyForm.dailyCostLimit = '50'" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium">$50</button>
+                                <button type="button" @click="apiKeyForm.dailyCostLimit = '100'" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium">$100</button>
+                                <button type="button" @click="apiKeyForm.dailyCostLimit = '200'" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium">$200</button>
+                                <button type="button" @click="apiKeyForm.dailyCostLimit = ''" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium">自定义</button>
+                            </div>
+                            <input 
+                                v-model="apiKeyForm.dailyCostLimit" 
+                                type="number" 
+                                min="0"
+                                step="0.01"
+                                placeholder="0 表示无限制" 
+                                class="form-input w-full"
+                            >
+                            <p class="text-xs text-gray-500">设置此 API Key 每日的费用限制，超过限制将拒绝请求，0 或留空表示无限制</p>
+                        </div>
+                    </div>
+                    
+                    <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-3">并发限制 (可选)</label>
                         <input 
                             v-model="apiKeyForm.concurrencyLimit" 
@@ -2418,6 +2447,27 @@
                                 <p class="mt-2"><strong>示例3:</strong> 时间窗口=30，请求次数限制=50，Token限制=100000</p>
                                 <p class="ml-4">→ 每30分钟内最多50次请求且总Token不超过100,000</p>
                             </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">每日费用限制 (美元)</label>
+                        <div class="space-y-3">
+                            <div class="flex gap-2">
+                                <button type="button" @click="editApiKeyForm.dailyCostLimit = '50'" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium">$50</button>
+                                <button type="button" @click="editApiKeyForm.dailyCostLimit = '100'" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium">$100</button>
+                                <button type="button" @click="editApiKeyForm.dailyCostLimit = '200'" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium">$200</button>
+                                <button type="button" @click="editApiKeyForm.dailyCostLimit = ''" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium">自定义</button>
+                            </div>
+                            <input 
+                                v-model="editApiKeyForm.dailyCostLimit" 
+                                type="number" 
+                                min="0"
+                                step="0.01"
+                                placeholder="0 表示无限制" 
+                                class="form-input w-full"
+                            >
+                            <p class="text-xs text-gray-500">设置此 API Key 每日的费用限制，超过限制将拒绝请求，0 或留空表示无限制</p>
                         </div>
                     </div>
                     
