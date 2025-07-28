@@ -39,10 +39,15 @@
         <div v-if="!isLoggedIn" class="flex items-center justify-center min-h-screen p-6">
             <div class="glass-strong rounded-3xl p-10 w-full max-w-md shadow-2xl">
                 <div class="text-center mb-8">
-                    <div class="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-gray-300/30 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-                        <i class="fas fa-cloud text-3xl text-gray-700"></i>
+                    <div class="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-gray-300/30 rounded-2xl flex items-center justify-center backdrop-blur-sm overflow-hidden">
+                        <img v-if="oemSettings.siteIconData || oemSettings.siteIcon" 
+                             :src="oemSettings.siteIconData || oemSettings.siteIcon" 
+                             alt="Logo"
+                             class="w-12 h-12 object-contain"
+                             @error="(e) => e.target.style.display = 'none'">
+                        <i v-else class="fas fa-cloud text-3xl text-gray-700"></i>
                     </div>
-                    <h1 class="text-3xl font-bold text-white mb-2 header-title">Claude Relay Service</h1>
+                    <h1 class="text-3xl font-bold text-white mb-2 header-title">{{ oemSettings.siteName || 'Claude Relay Service' }}</h1>
                     <p class="text-white/80 text-lg">管理后台</p>
                 </div>
                 
@@ -92,12 +97,17 @@
             <div class="glass-strong rounded-3xl p-6 mb-8 shadow-xl" style="z-index: 10; position: relative;">
                 <div class="flex flex-col md:flex-row justify-between items-center gap-4">
                     <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-gray-300/30 rounded-xl flex items-center justify-center backdrop-blur-sm flex-shrink-0">
-                            <i class="fas fa-cloud text-xl text-gray-700"></i>
+                        <div class="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-gray-300/30 rounded-xl flex items-center justify-center backdrop-blur-sm flex-shrink-0 overflow-hidden">
+                            <img v-if="oemSettings.siteIconData || oemSettings.siteIcon" 
+                                 :src="oemSettings.siteIconData || oemSettings.siteIcon" 
+                                 alt="Logo"
+                                 class="w-8 h-8 object-contain"
+                                 @error="(e) => e.target.style.display = 'none'">
+                            <i v-else class="fas fa-cloud text-xl text-gray-700"></i>
                         </div>
                         <div class="flex flex-col justify-center min-h-[48px]">
                             <div class="flex items-center gap-3">
-                                <h1 class="text-2xl font-bold text-white header-title leading-tight">Claude Relay Service</h1>
+                                <h1 class="text-2xl font-bold text-white header-title leading-tight">{{ oemSettings.siteName || 'Claude Relay Service' }}</h1>
                                 <!-- 版本信息 -->
                                 <div class="flex items-center gap-2">
                                     <span class="text-sm text-gray-400 font-mono">v{{ versionInfo.current || '...' }}</span>
@@ -202,7 +212,7 @@
             </div>
 
             <!-- 主内容区域 -->
-            <div class="glass-strong rounded-3xl p-6 shadow-xl" style="z-index: 1;">
+            <div class="glass-strong rounded-3xl p-6 shadow-xl" style="z-index: 1; min-height: calc(100vh - 240px);">
                 <!-- 标签栏 -->
                 <div class="flex flex-wrap gap-2 mb-8 bg-white/10 rounded-2xl p-2 backdrop-blur-sm">
                     <button 
@@ -1999,6 +2009,138 @@
                             <p class="text-blue-100 mb-4">你已经成功安装并配置了 Claude Code，现在可以开始享受 AI 编程助手带来的便利了。</p>
                             <p class="text-sm text-blue-200">如果在使用过程中遇到任何问题，可以查看官方文档或社区讨论获取帮助。</p>
                         </div>
+                    </div>
+                </div>
+
+                <!-- 其他设置页面 -->
+                <div v-if="activeTab === 'settings'" class="tab-content">
+                    <div class="card p-6">
+                        <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-900 mb-2">其他设置</h3>
+                                <p class="text-gray-600">自定义网站名称和图标</p>
+                            </div>
+                        </div>
+
+                        <div v-if="oemSettingsLoading" class="text-center py-12">
+                            <div class="loading-spinner mx-auto mb-4"></div>
+                            <p class="text-gray-500">正在加载设置...</p>
+                        </div>
+
+                        <div v-else class="table-container">
+                        <table class="min-w-full">
+                            <tbody class="divide-y divide-gray-200/50">
+                                <!-- 网站名称 -->
+                                <tr class="table-row">
+                                    <td class="px-6 py-4 whitespace-nowrap w-48">
+                                        <div class="flex items-center">
+                                            <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center mr-3">
+                                                <i class="fas fa-font text-white text-xs"></i>
+                                            </div>
+                                            <div>
+                                                <div class="text-sm font-semibold text-gray-900">网站名称</div>
+                                                <div class="text-xs text-gray-500">品牌标识</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <input 
+                                            v-model="oemSettings.siteName"
+                                            type="text" 
+                                            class="form-input w-full max-w-md"
+                                            placeholder="TokenDance"
+                                            maxlength="100"
+                                        >
+                                        <p class="text-xs text-gray-500 mt-1">将显示在浏览器标题和页面头部</p>
+                                    </td>
+                                </tr>
+
+                                <!-- 网站图标 -->
+                                <tr class="table-row">
+                                    <td class="px-6 py-4 whitespace-nowrap w-48">
+                                        <div class="flex items-center">
+                                            <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center mr-3">
+                                                <i class="fas fa-image text-white text-xs"></i>
+                                            </div>
+                                            <div>
+                                                <div class="text-sm font-semibold text-gray-900">网站图标</div>
+                                                <div class="text-xs text-gray-500">Favicon</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="space-y-3">
+                                            <!-- 图标预览 -->
+                                            <div v-if="oemSettings.siteIconData || oemSettings.siteIcon" class="inline-flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                                                <img 
+                                                    :src="oemSettings.siteIconData || oemSettings.siteIcon" 
+                                                    alt="图标预览" 
+                                                    class="w-8 h-8"
+                                                    @error="handleIconError"
+                                                >
+                                                <span class="text-sm text-gray-600">当前图标</span>
+                                                <button 
+                                                    @click="removeIcon"
+                                                    class="text-red-600 hover:text-red-900 font-medium hover:bg-red-50 px-3 py-1 rounded-lg transition-colors"
+                                                >
+                                                    <i class="fas fa-trash mr-1"></i>删除
+                                                </button>
+                                            </div>
+                                            <!-- 文件上传 -->
+                                            <div>
+                                                <input 
+                                                    type="file" 
+                                                    ref="iconFileInput"
+                                                    @change="handleIconUpload"
+                                                    accept=".ico,.png,.jpg,.jpeg,.svg"
+                                                    class="hidden"
+                                                >
+                                                <button 
+                                                    @click="$refs.iconFileInput.click()"
+                                                    class="btn btn-success px-4 py-2"
+                                                >
+                                                    <i class="fas fa-upload mr-2"></i>
+                                                    上传图标
+                                                </button>
+                                                <span class="text-xs text-gray-500 ml-3">支持 .ico, .png, .jpg, .svg 格式，最大 350KB</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <!-- 操作按钮 -->
+                                <tr>
+                                    <td class="px-6 py-6" colspan="2">
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex gap-3">
+                                                <button 
+                                                    @click="saveOemSettings"
+                                                    :disabled="oemSettingsSaving"
+                                                    class="btn btn-primary px-6 py-3"
+                                                >
+                                                    <div v-if="oemSettingsSaving" class="loading-spinner mr-2"></div>
+                                                    <i v-else class="fas fa-save mr-2"></i>
+                                                    {{ oemSettingsSaving ? '保存中...' : '保存设置' }}
+                                                </button>
+                                                
+                                                <button 
+                                                    @click="resetOemSettings"
+                                                    class="btn bg-gray-100 text-gray-700 hover:bg-gray-200 px-6 py-3"
+                                                >
+                                                    <i class="fas fa-undo mr-2"></i>
+                                                    重置为默认
+                                                </button>
+                                            </div>
+                                            
+                                            <div v-if="oemSettings.updatedAt" class="text-sm text-gray-500">
+                                                <i class="fas fa-clock mr-1"></i>
+                                                最后更新：{{ formatDateTime(oemSettings.updatedAt) }}
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>

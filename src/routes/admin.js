@@ -2227,4 +2227,91 @@ function compareVersions(current, latest) {
   return currentV.patch - latestV.patch;
 }
 
+// 🎨 OEM设置管理
+
+// 获取OEM设置（公开接口，用于显示）
+router.get('/oem-settings', async (req, res) => {
+  try {
+    const client = redis.getClient();
+    const oemSettings = await client.get('oem:settings');
+    
+    // 默认设置
+    const defaultSettings = {
+      siteName: 'Claude Relay Service',
+      siteIcon: '',
+      siteIconData: '', // Base64编码的图标数据
+      updatedAt: new Date().toISOString()
+    };
+    
+    let settings = defaultSettings;
+    if (oemSettings) {
+      try {
+        settings = { ...defaultSettings, ...JSON.parse(oemSettings) };
+      } catch (err) {
+        logger.warn('⚠️ Failed to parse OEM settings, using defaults:', err.message);
+      }
+    }
+    
+    res.json({
+      success: true,
+      data: settings
+    });
+  } catch (error) {
+    logger.error('❌ Failed to get OEM settings:', error);
+    res.status(500).json({ error: 'Failed to get OEM settings', message: error.message });
+  }
+});
+
+// 更新OEM设置
+router.put('/oem-settings', authenticateAdmin, async (req, res) => {
+  try {
+    const { siteName, siteIcon, siteIconData } = req.body;
+    
+    // 验证输入
+    if (!siteName || typeof siteName !== 'string' || siteName.trim().length === 0) {
+      return res.status(400).json({ error: 'Site name is required' });
+    }
+    
+    if (siteName.length > 100) {
+      return res.status(400).json({ error: 'Site name must be less than 100 characters' });
+    }
+    
+    // 验证图标数据大小（如果是base64）
+    if (siteIconData && siteIconData.length > 500000) { // 约375KB
+      return res.status(400).json({ error: 'Icon file must be less than 350KB' });
+    }
+    
+    // 验证图标URL（如果提供）
+    if (siteIcon && !siteIconData) {
+      // 简单验证URL格式
+      try {
+        new URL(siteIcon);
+      } catch (err) {
+        return res.status(400).json({ error: 'Invalid icon URL format' });
+      }
+    }
+    
+    const settings = {
+      siteName: siteName.trim(),
+      siteIcon: (siteIcon || '').trim(),
+      siteIconData: (siteIconData || '').trim(), // Base64数据
+      updatedAt: new Date().toISOString()
+    };
+    
+    const client = redis.getClient();
+    await client.set('oem:settings', JSON.stringify(settings));
+    
+    logger.info(`✅ OEM settings updated: ${siteName}`);
+    
+    res.json({
+      success: true,
+      message: 'OEM settings updated successfully',
+      data: settings
+    });
+  } catch (error) {
+    logger.error('❌ Failed to update OEM settings:', error);
+    res.status(500).json({ error: 'Failed to update OEM settings', message: error.message });
+  }
+});
+
 module.exports = router;

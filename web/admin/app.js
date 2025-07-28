@@ -1,3 +1,4 @@
+/* global Vue, Chart, ElementPlus, ElementPlusLocaleZhCn, FileReader, document, localStorage, location, navigator, window */
 const { createApp } = Vue;
 
 const app = createApp({
@@ -24,7 +25,8 @@ const app = createApp({
                 { key: 'dashboard', name: '仪表板', icon: 'fas fa-tachometer-alt' },
                 { key: 'apiKeys', name: 'API Keys', icon: 'fas fa-key' },
                 { key: 'accounts', name: '账户管理', icon: 'fas fa-user-circle' },
-                { key: 'tutorial', name: '使用教程', icon: 'fas fa-graduation-cap' }
+                { key: 'tutorial', name: '使用教程', icon: 'fas fa-graduation-cap' },
+                { key: 'settings', name: '其他设置', icon: 'fas fa-cogs' }
             ],
             
             // 教程系统选择
@@ -298,7 +300,17 @@ const app = createApp({
                 showReleaseNotes: false,  // 是否显示发布说明
                 autoCheckInterval: null,  // 自动检查定时器
                 noUpdateMessage: false  // 显示"已是最新版"提醒
-            }
+            },
+
+            // OEM设置相关
+            oemSettings: {
+                siteName: 'Claude Relay Service',
+                siteIcon: '',
+                siteIconData: '', // Base64图标数据
+                updatedAt: null
+            },
+            oemSettingsLoading: false,
+            oemSettingsSaving: false
         }
     },
     
@@ -445,6 +457,7 @@ const app = createApp({
                 // 根据当前活跃标签页加载数据
                 this.loadCurrentTabData();
             });
+            
             // 如果在仪表盘，等待Chart.js加载后初始化图表
             if (this.activeTab === 'dashboard') {
                 this.waitForChartJS().then(() => {
@@ -456,6 +469,9 @@ const app = createApp({
         } else {
             console.log('No auth token found, user needs to login');
         }
+        
+        // 始终加载OEM设置，无论登录状态
+        this.loadOemSettings();
     },
     
     beforeUnmount() {
@@ -755,6 +771,20 @@ const app = createApp({
                 day: '2-digit',
                 hour: '2-digit',
                 minute: '2-digit'
+            });
+        },
+
+        // 格式化日期时间
+        formatDateTime(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            return date.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
             });
         },
         
@@ -1487,6 +1517,12 @@ const app = createApp({
                     break;
                 case 'tutorial':
                     // 教程页面不需要加载数据
+                    break;
+                case 'settings':
+                    // OEM 设置已在 mounted 时加载，避免重复加载
+                    if (!this.oemSettings.siteName && !this.oemSettings.siteIcon && !this.oemSettings.siteIconData) {
+                        this.loadOemSettings();
+                    }
                     break;
             }
         },
@@ -3965,6 +4001,180 @@ const app = createApp({
             });
             
             this.showToast('已重置筛选条件并刷新数据', 'info', '重置成功');
+        },
+
+        // OEM设置相关方法
+        async loadOemSettings() {
+            this.oemSettingsLoading = true;
+            try {
+                const result = await this.apiRequest('/admin/oem-settings');
+                if (result && result.success) {
+                    this.oemSettings = { ...this.oemSettings, ...result.data };
+                    
+                    // 应用设置到页面
+                    this.applyOemSettings();
+                } else {
+                    // 如果请求失败但不是因为认证问题，使用默认值
+                    console.warn('Failed to load OEM settings, using defaults');
+                    this.applyOemSettings();
+                }
+            } catch (error) {
+                console.error('Error loading OEM settings:', error);
+                // 加载失败时也应用默认值，确保页面正常显示
+                this.applyOemSettings();
+            } finally {
+                this.oemSettingsLoading = false;
+            }
+        },
+
+        async saveOemSettings() {
+            // 验证输入
+            if (!this.oemSettings.siteName || this.oemSettings.siteName.trim() === '') {
+                this.showToast('网站名称不能为空', 'error', '验证失败');
+                return;
+            }
+
+            if (this.oemSettings.siteName.length > 100) {
+                this.showToast('网站名称不能超过100个字符', 'error', '验证失败');
+                return;
+            }
+
+            this.oemSettingsSaving = true;
+            try {
+                const result = await this.apiRequest('/admin/oem-settings', {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        siteName: this.oemSettings.siteName.trim(),
+                        siteIcon: this.oemSettings.siteIcon.trim(),
+                        siteIconData: this.oemSettings.siteIconData.trim()
+                    })
+                });
+
+                if (result && result.success) {
+                    this.oemSettings = { ...this.oemSettings, ...result.data };
+                    this.showToast('OEM设置保存成功', 'success', '保存成功');
+                    
+                    // 应用设置到页面
+                    this.applyOemSettings();
+                } else {
+                    this.showToast(result?.message || '保存失败', 'error', '保存失败');
+                }
+            } catch (error) {
+                console.error('Error saving OEM settings:', error);
+                this.showToast('保存OEM设置失败', 'error', '保存失败');
+            } finally {
+                this.oemSettingsSaving = false;
+            }
+        },
+
+        applyOemSettings() {
+            // 更新网站标题
+            document.title = `${this.oemSettings.siteName} - 管理后台`;
+            
+            // 更新页面中的所有网站名称
+            const titleElements = document.querySelectorAll('.header-title');
+            titleElements.forEach(el => {
+                el.textContent = this.oemSettings.siteName;
+            });
+
+            // 应用自定义CSS
+            this.applyCustomCss();
+            
+            // 应用网站图标
+            this.applyFavicon();
+        },
+
+        applyCustomCss() {
+            // 移除之前的自定义CSS
+            const existingStyle = document.getElementById('custom-oem-css');
+            if (existingStyle) {
+                existingStyle.remove();
+            }
+        },
+
+        applyFavicon() {
+            const iconData = this.oemSettings.siteIconData || this.oemSettings.siteIcon;
+            if (iconData && iconData.trim()) {
+                // 移除现有的favicon
+                const existingFavicons = document.querySelectorAll('link[rel*="icon"]');
+                existingFavicons.forEach(link => link.remove());
+
+                // 添加新的favicon
+                const link = document.createElement('link');
+                link.rel = 'icon';
+                
+                // 根据数据类型设置适当的type
+                if (iconData.startsWith('data:')) {
+                    // Base64数据
+                    link.href = iconData;
+                } else {
+                    // URL
+                    link.type = 'image/x-icon';
+                    link.href = iconData;
+                }
+                
+                document.head.appendChild(link);
+            }
+        },
+
+        resetOemSettings() {
+            this.oemSettings = {
+                siteName: 'Claude Relay Service',
+                siteIcon: '',
+                siteIconData: '',
+                updatedAt: null
+            };
+        },
+
+        // 处理图标文件上传
+        async handleIconUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // 验证文件大小
+            if (file.size > 350 * 1024) { // 350KB
+                this.showToast('图标文件大小不能超过350KB', 'error', '文件太大');
+                return;
+            }
+
+            // 验证文件类型
+            const allowedTypes = ['image/x-icon', 'image/png', 'image/jpeg', 'image/svg+xml'];
+            if (!allowedTypes.includes(file.type) && !file.name.endsWith('.ico')) {
+                this.showToast('请选择有效的图标文件格式 (.ico, .png, .jpg, .svg)', 'error', '格式错误');
+                return;
+            }
+
+            try {
+                // 读取文件为Base64
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    this.oemSettings.siteIconData = e.target.result;
+                    this.oemSettings.siteIcon = ''; // 清空URL
+                    this.showToast('图标上传成功', 'success', '上传成功');
+                };
+                reader.onerror = () => {
+                    this.showToast('图标文件读取失败', 'error', '读取失败');
+                };
+                reader.readAsDataURL(file);
+            } catch (error) {
+                console.error('Icon upload error:', error);
+                this.showToast('图标上传过程中出现错误', 'error', '上传失败');
+            }
+        },
+
+        // 移除图标
+        removeIcon() {
+            this.oemSettings.siteIcon = '';
+            this.oemSettings.siteIconData = '';
+            if (this.$refs.iconFileInput) {
+                this.$refs.iconFileInput.value = '';
+            }
+        },
+
+        // 处理图标加载错误
+        handleIconError(event) {
+            console.error('Icon load error');
+            event.target.style.display = 'none';
         }
     }
 });

@@ -3,12 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Claude Relay Service - API Key 统计</title>
+    <title>API Key 统计</title>
     
     <!-- 🎨 样式 -->
     <link rel="stylesheet" href="/apiStats/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        [v-cloak] {
+            display: none;
+        }
+        
+        /* 调整间距使其与管理页面一致 */
+        .stat-card {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.8) 100%);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 24px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 
+                0 20px 25px -5px rgba(0, 0, 0, 0.1),
+                0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        /* 与管理页面一致的按钮样式 */
+        .glass-button {
+            background: var(--glass-color, rgba(255, 255, 255, 0.1));
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color, rgba(255, 255, 255, 0.2));
+        }
+        
+        /* 调整卡片样式 */
+        .card {
+            background: var(--surface-color, rgba(255, 255, 255, 0.95));
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 
+                0 10px 15px -3px rgba(0, 0, 0, 0.1),
+                0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+            position: relative;
+        }
+    </style>
     
     <!-- 🔧 Vue 3 -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
@@ -22,41 +65,45 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/timezone.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/utc.min.js"></script>
 </head>
-<body class="min-h-screen text-white">
-    <div id="app">
+<body class="min-h-screen">
+    <div id="app" v-cloak class="min-h-screen p-6">
         <!-- 🎯 顶部导航 -->
-        <div class="container mx-auto px-4 py-8">
             <div class="glass-strong rounded-3xl p-6 mb-8 shadow-xl">
                 <div class="flex flex-col md:flex-row justify-between items-center gap-4">
                     <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-gray-300/30 rounded-xl flex items-center justify-center backdrop-blur-sm flex-shrink-0">
-                            <i class="fas fa-cloud text-xl text-gray-700"></i>
+                        <div class="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-gray-300/30 rounded-xl flex items-center justify-center backdrop-blur-sm flex-shrink-0 overflow-hidden">
+                            <img v-if="oemSettings.siteIconData || oemSettings.siteIcon" 
+                                 :src="oemSettings.siteIconData || oemSettings.siteIcon" 
+                                 alt="Logo"
+                                 class="w-8 h-8 object-contain"
+                                 @error="(e) => e.target.style.display = 'none'">
+                            <i v-else class="fas fa-cloud text-xl text-gray-700"></i>
                         </div>
                         <div class="flex flex-col justify-center min-h-[48px]">
                             <div class="flex items-center gap-3">
-                                <h1 class="text-2xl font-bold text-white header-title leading-tight">Claude Relay Service</h1>
+                                <h1 class="text-2xl font-bold text-white header-title leading-tight">{{ oemSettings.siteName || 'Claude Relay Service' }}</h1>
                             </div>
-                            <p class="text-white/80 text-sm leading-tight">API Key 使用统计</p>
+                            <p class="text-gray-600 text-sm leading-tight mt-0.5">API Key 使用统计</p>
                         </div>
                     </div>
                     <div class="flex items-center gap-3">
-                        <a href="/web" class="glass-button rounded-xl px-4 py-2 text-white hover:bg-white/20 transition-colors flex items-center gap-2">
+                        <a href="/web" class="glass-button rounded-xl px-4 py-2 text-gray-700 hover:bg-white/20 transition-colors flex items-center gap-2">
                             <i class="fas fa-cog text-sm"></i>
                             <span class="text-sm font-medium">管理后台</span>
                         </a>
                     </div>
                 </div>
             </div>
-            
-            <!-- 🔑 API Key 输入区域 -->
-            <div class="api-input-wide-card glass-strong rounded-3xl p-6 mb-8 shadow-xl">
+        
+        <!-- 🔑 API Key 输入区域 -->
+        <div class="api-input-wide-card glass-strong rounded-3xl p-6 mb-8 shadow-xl">
                 <!-- 📊 标题区域 -->
                 <div class="wide-card-title text-center mb-6">
                     <h2 class="text-2xl font-bold mb-2">
                         <i class="fas fa-chart-line mr-3"></i>
                         使用统计查询
                     </h2>
-                    <p class="text-base">查询您的 API Key 使用情况和统计数据</p>
+                    <p class="text-base text-gray-600">查询您的 API Key 使用情况和统计数据</p>
                 </div>
                 
                 <!-- 🔍 输入区域 -->
@@ -100,18 +147,18 @@
                 </div>
             </div>
 
-            <!-- ❌ 错误提示 -->
-            <div v-if="error" class="max-w-2xl mx-auto mb-8">
-                <div class="bg-red-500/20 border border-red-500/30 rounded-lg p-4 text-red-200">
-                    <i class="fas fa-exclamation-triangle mr-2"></i>
-                    {{ error }}
-                </div>
+        <!-- ❌ 错误提示 -->
+        <div v-if="error" class="mb-8">
+            <div class="bg-red-500/20 border border-red-500/30 rounded-xl p-4 text-red-800 backdrop-blur-sm">
+                <i class="fas fa-exclamation-triangle mr-2"></i>
+                {{ error }}
             </div>
+        </div>
 
-            <!-- 📊 统计数据展示区域 -->
-            <div v-if="statsData" class="fade-in">
-                <!-- 主要内容卡片 -->
-                <div class="glass-strong rounded-3xl p-6">
+        <!-- 📊 统计数据展示区域 -->
+        <div v-if="statsData" class="fade-in">
+            <!-- 主要内容卡片 -->
+            <div class="glass-strong rounded-3xl p-6 shadow-xl">
                     <!-- 📅 时间范围选择器 -->
                     <div class="mb-6 pb-6 border-b border-gray-200">
                         <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -200,19 +247,19 @@
                             </h3>
                             <div class="grid grid-cols-2 gap-4">
                                 <div class="stat-card text-center">
-                                    <div class="text-2xl font-bold text-green-600">{{ formatNumber(currentPeriodData.requests) }}</div>
+                                    <div class="text-3xl font-bold text-green-600">{{ formatNumber(currentPeriodData.requests) }}</div>
                                     <div class="text-sm text-gray-600">{{ statsPeriod === 'daily' ? '今日' : '本月' }}请求数</div>
                                 </div>
                                 <div class="stat-card text-center">
-                                    <div class="text-2xl font-bold text-blue-600">{{ formatNumber(currentPeriodData.allTokens) }}</div>
+                                    <div class="text-3xl font-bold text-blue-600">{{ formatNumber(currentPeriodData.allTokens) }}</div>
                                     <div class="text-sm text-gray-600">{{ statsPeriod === 'daily' ? '今日' : '本月' }}Token数</div>
                                 </div>
                                 <div class="stat-card text-center">
-                                    <div class="text-2xl font-bold text-purple-600">{{ currentPeriodData.formattedCost || '$0.000000' }}</div>
+                                    <div class="text-3xl font-bold text-purple-600">{{ currentPeriodData.formattedCost || '$0.000000' }}</div>
                                     <div class="text-sm text-gray-600">{{ statsPeriod === 'daily' ? '今日' : '本月' }}费用</div>
                                 </div>
                                 <div class="stat-card text-center">
-                                    <div class="text-2xl font-bold text-yellow-600">{{ formatNumber(currentPeriodData.inputTokens) }}</div>
+                                    <div class="text-3xl font-bold text-yellow-600">{{ formatNumber(currentPeriodData.inputTokens) }}</div>
                                     <div class="text-sm text-gray-600">{{ statsPeriod === 'daily' ? '今日' : '本月' }}输入Token</div>
                                 </div>
                             </div>
