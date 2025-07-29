@@ -8,6 +8,7 @@ class PricingService {
     this.dataDir = path.join(process.cwd(), 'data');
     this.pricingFile = path.join(this.dataDir, 'model_pricing.json');
     this.pricingUrl = 'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json';
+    this.fallbackFile = path.join(process.cwd(), 'resources', 'model-pricing', 'model_prices_and_context_window.json');
     this.pricingData = null;
     this.lastUpdated = null;
     this.updateInterval = 24 * 60 * 60 * 1000; // 24小时
@@ -50,8 +51,8 @@ class PricingService {
       }
     } catch (error) {
       logger.error('❌ Failed to check/update pricing:', error);
-      // 如果更新失败，尝试加载现有数据
-      await this.loadPricingData();
+      // 如果更新失败，尝试使用fallback
+      await this.useFallbackPricing();
     }
   }
 
@@ -74,7 +75,18 @@ class PricingService {
   }
 
   // 下载价格数据
-  downloadPricingData() {
+  async downloadPricingData() {
+    try {
+      await this._downloadFromRemote();
+    } catch (downloadError) {
+      logger.warn(`⚠️  Failed to download pricing data: ${downloadError.message}`);
+      logger.info('📋 Using local fallback pricing data...');
+      await this.useFallbackPricing();
+    }
+  }
+
+  // 实际的下载逻辑
+  _downloadFromRemote() {
     return new Promise((resolve, reject) => {
       const request = https.get(this.pricingUrl, (response) => {
         if (response.statusCode !== 200) {
@@ -107,12 +119,12 @@ class PricingService {
       });
 
       request.on('error', (error) => {
-        reject(new Error(`Failed to download pricing data: ${error.message}`));
+        reject(new Error(`Network error: ${error.message}`));
       });
 
       request.setTimeout(30000, () => {
         request.destroy();
-        reject(new Error('Download timeout'));
+        reject(new Error('Download timeout after 30 seconds'));
       });
     });
   }
@@ -129,11 +141,41 @@ class PricingService {
         
         logger.info(`💰 Loaded pricing data for ${Object.keys(this.pricingData).length} models from cache`);
       } else {
-        logger.warn('💰 No pricing data file found');
-        this.pricingData = {};
+        logger.warn('💰 No pricing data file found, will use fallback');
+        await this.useFallbackPricing();
       }
     } catch (error) {
       logger.error('❌ Failed to load pricing data:', error);
+      await this.useFallbackPricing();
+    }
+  }
+
+  // 使用fallback价格数据
+  async useFallbackPricing() {
+    try {
+      if (fs.existsSync(this.fallbackFile)) {
+        logger.info('📋 Copying fallback pricing data to data directory...');
+        
+        // 读取fallback文件
+        const fallbackData = fs.readFileSync(this.fallbackFile, 'utf8');
+        const jsonData = JSON.parse(fallbackData);
+        
+        // 保存到data目录
+        fs.writeFileSync(this.pricingFile, JSON.stringify(jsonData, null, 2));
+        
+        // 更新内存中的数据
+        this.pricingData = jsonData;
+        this.lastUpdated = new Date();
+        
+        logger.warn(`⚠️  Using fallback pricing data for ${Object.keys(jsonData).length} models`);
+        logger.info('💡 Note: This fallback data may be outdated. The system will try to update from the remote source on next check.');
+      } else {
+        logger.error('❌ Fallback pricing file not found at:', this.fallbackFile);
+        logger.error('❌ Please ensure the resources/model-pricing directory exists with the pricing file');
+        this.pricingData = {};
+      }
+    } catch (error) {
+      logger.error('❌ Failed to use fallback pricing data:', error);
       this.pricingData = {};
     }
   }
@@ -222,11 +264,16 @@ class PricingService {
   // 强制更新价格数据
   async forceUpdate() {
     try {
-      await this.downloadPricingData();
+      await this._downloadFromRemote();
       return { success: true, message: 'Pricing data updated successfully' };
     } catch (error) {
       logger.error('❌ Force update failed:', error);
-      return { success: false, message: error.message };
+      logger.info('📋 Force update failed, using fallback pricing data...');
+      await this.useFallbackPricing();
+      return { 
+        success: false, 
+        message: `Download failed: ${error.message}. Using fallback pricing data instead.` 
+      };
     }
   }
 }

@@ -1,8 +1,8 @@
 <template>
   <Teleport to="body">
     <div class="fixed inset-0 modal z-50 flex items-center justify-center p-4">
-      <div class="modal-content w-full max-w-md p-8 mx-auto max-h-[90vh] flex flex-col">
-      <div class="flex items-center justify-between mb-6">
+      <div class="modal-content w-full max-w-lg p-6 mx-auto max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
             <i class="fas fa-key text-white"></i>
@@ -17,22 +17,25 @@
         </button>
       </div>
       
-      <form @submit.prevent="createApiKey" class="space-y-6 modal-scroll-content custom-scrollbar flex-1">
+      <form @submit.prevent="createApiKey" class="space-y-4 modal-scroll-content custom-scrollbar flex-1">
         <div>
-          <label class="block text-sm font-semibold text-gray-700 mb-3">名称</label>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">名称 <span class="text-red-500">*</span></label>
           <input 
             v-model="form.name" 
             type="text" 
             required 
             class="form-input w-full"
+            :class="{ 'border-red-500': errors.name }"
             placeholder="为您的 API Key 取一个名称"
+            @input="errors.name = ''"
           >
+          <p v-if="errors.name" class="text-red-500 text-xs mt-1">{{ errors.name }}</p>
         </div>
         
         <!-- 标签 -->
         <div>
-          <label class="block text-sm font-semibold text-gray-700 mb-3">标签</label>
-          <div class="space-y-3">
+          <label class="block text-sm font-semibold text-gray-700 mb-2">标签</label>
+          <div class="space-y-2">
             <!-- 已添加的标签 -->
             <div v-if="form.tags.length > 0" class="flex flex-wrap gap-2">
               <span v-for="(tag, index) in form.tags" :key="index" 
@@ -64,74 +67,72 @@
         </div>
         
         <!-- 速率限制设置 -->
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-4">
-          <div class="flex items-start gap-3 mb-3">
-            <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
-              <i class="fas fa-tachometer-alt text-white text-sm"></i>
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div class="flex items-center gap-2 mb-2">
+            <div class="w-6 h-6 bg-blue-500 rounded flex items-center justify-center flex-shrink-0">
+              <i class="fas fa-tachometer-alt text-white text-xs"></i>
             </div>
-            <div class="flex-1">
-              <h4 class="font-semibold text-gray-800 mb-1">速率限制设置 (可选)</h4>
-              <p class="text-sm text-gray-600">控制 API Key 的使用频率和资源消耗</p>
+            <h4 class="font-semibold text-gray-800 text-sm">速率限制设置 (可选)</h4>
+          </div>
+          
+          <div class="space-y-2">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-2">
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">时间窗口 (分钟)</label>
+                <input 
+                  v-model="form.rateLimitWindow" 
+                  type="number" 
+                  min="1"
+                  placeholder="无限制" 
+                  class="form-input w-full text-sm"
+                >
+                <p class="text-xs text-gray-500 mt-0.5">时间段单位</p>
+              </div>
+              
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">请求次数限制</label>
+                <input 
+                  v-model="form.rateLimitRequests" 
+                  type="number" 
+                  min="1"
+                  placeholder="无限制" 
+                  class="form-input w-full text-sm"
+                >
+                <p class="text-xs text-gray-500 mt-0.5">窗口内最大请求</p>
+              </div>
+              
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Token 限制</label>
+                <input 
+                  v-model="form.tokenLimit" 
+                  type="number" 
+                  placeholder="无限制" 
+                  class="form-input w-full text-sm"
+                >
+                <p class="text-xs text-gray-500 mt-0.5">窗口内最大Token</p>
+              </div>
             </div>
-          </div>
-          
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口 (分钟)</label>
-            <input 
-              v-model="form.rateLimitWindow" 
-              type="number" 
-              min="1"
-              placeholder="留空表示无限制" 
-              class="form-input w-full"
-            >
-            <p class="text-xs text-gray-500 mt-2">设置一个时间段（以分钟为单位），用于计算速率限制</p>
-          </div>
-          
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口内的请求次数限制</label>
-            <input 
-              v-model="form.rateLimitRequests" 
-              type="number" 
-              min="1"
-              placeholder="留空表示无限制" 
-              class="form-input w-full"
-            >
-            <p class="text-xs text-gray-500 mt-2">在时间窗口内允许的最大请求次数（需要先设置时间窗口）</p>
-          </div>
-          
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口内的 Token 使用量限制</label>
-            <input 
-              v-model="form.tokenLimit" 
-              type="number" 
-              placeholder="留空表示无限制" 
-              class="form-input w-full"
-            >
-            <p class="text-xs text-gray-500 mt-2">在时间窗口内允许消耗的最大 Token 数量（需要先设置时间窗口）</p>
-          </div>
-          
-          <!-- 示例说明 -->
-          <div class="bg-blue-100 rounded-lg p-3 mt-3">
-            <h5 class="text-sm font-semibold text-blue-800 mb-2">💡 使用示例</h5>
-            <div class="text-xs text-blue-700 space-y-1">
-              <p><strong>示例1:</strong> 时间窗口=60，请求次数限制=1000</p>
-              <p class="ml-4">→ 每60分钟内最多1000次请求</p>
-              <p class="mt-2"><strong>示例2:</strong> 时间窗口=1，Token限制=10000</p>
-              <p class="ml-4">→ 每分钟最多消耗10,000个Token</p>
-              <p class="mt-2"><strong>示例3:</strong> 时间窗口=30，请求次数限制=50，Token限制=100000</p>
-              <p class="ml-4">→ 每30分钟内最多50次请求且总Token不超过100,000</p>
+            
+            <!-- 示例说明 -->
+            <div class="bg-blue-100 rounded-lg p-2">
+              <h5 class="text-xs font-semibold text-blue-800 mb-1">💡 使用示例</h5>
+              <div class="text-xs text-blue-700 space-y-0.5">
+                <div><strong>示例1:</strong> 时间窗口=60，请求次数=1000 → 每60分钟最多1000次请求</div>
+                <div><strong>示例2:</strong> 时间窗口=1，Token=10000 → 每分钟最多10,000个Token</div>
+                <div><strong>示例3:</strong> 窗口=30，请求=50，Token=100000 → 每30分钟50次请求且不超10万Token</div>
+              </div>
             </div>
           </div>
         </div>
         
         <div>
-          <label class="block text-sm font-semibold text-gray-700 mb-3">每日费用限制 (美元)</label>
-          <div class="space-y-3">
+          <label class="block text-sm font-semibold text-gray-700 mb-2">每日费用限制 (美元)</label>
+          <div class="space-y-2">
             <div class="flex gap-2">
-              <button type="button" @click="form.dailyCostLimit = '50'" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium">$50</button>
-              <button type="button" @click="form.dailyCostLimit = '100'" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium">$100</button>
-              <button type="button" @click="form.dailyCostLimit = '200'" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium">$200</button>
-              <button type="button" @click="form.dailyCostLimit = ''" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium">自定义</button>
+              <button type="button" @click="form.dailyCostLimit = '50'" class="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium">$50</button>
+              <button type="button" @click="form.dailyCostLimit = '100'" class="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium">$100</button>
+              <button type="button" @click="form.dailyCostLimit = '200'" class="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium">$200</button>
+              <button type="button" @click="form.dailyCostLimit = ''" class="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium">自定义</button>
             </div>
             <input 
               v-model="form.dailyCostLimit" 
@@ -146,7 +147,7 @@
         </div>
         
         <div>
-          <label class="block text-sm font-semibold text-gray-700 mb-3">并发限制 (可选)</label>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">并发限制 (可选)</label>
           <input 
             v-model="form.concurrencyLimit" 
             type="number" 
@@ -158,17 +159,17 @@
         </div>
         
         <div>
-          <label class="block text-sm font-semibold text-gray-700 mb-3">备注 (可选)</label>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">备注 (可选)</label>
           <textarea 
             v-model="form.description" 
-            rows="3" 
-            class="form-input w-full resize-none"
+            rows="2" 
+            class="form-input w-full resize-none text-sm"
             placeholder="描述此 API Key 的用途..."
           ></textarea>
         </div>
         
         <div>
-          <label class="block text-sm font-semibold text-gray-700 mb-3">有效期限</label>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">有效期限</label>
           <select 
             v-model="form.expireDuration" 
             @change="updateExpireAt"
@@ -198,7 +199,7 @@
         </div>
         
         <div>
-          <label class="block text-sm font-semibold text-gray-700 mb-3">服务权限</label>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">服务权限</label>
           <div class="flex gap-4">
             <label class="flex items-center cursor-pointer">
               <input 
@@ -232,7 +233,7 @@
         </div>
         
         <div>
-          <label class="block text-sm font-semibold text-gray-700 mb-3">专属账号绑定 (可选)</label>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">专属账号绑定 (可选)</label>
           <div class="grid grid-cols-1 gap-3">
             <div>
               <label class="block text-sm font-medium text-gray-600 mb-1">Claude 专属账号</label>
@@ -273,7 +274,7 @@
         </div>
         
         <div>
-          <div class="flex items-center mb-3">
+          <div class="flex items-center mb-2">
             <input 
               type="checkbox" 
               v-model="form.enableModelRestriction" 
@@ -285,25 +286,25 @@
             </label>
           </div>
           
-          <div v-if="form.enableModelRestriction" class="space-y-3">
+          <div v-if="form.enableModelRestriction" class="space-y-2 bg-red-50 border border-red-200 rounded-lg p-3">
             <div>
-              <label class="block text-sm font-medium text-gray-600 mb-2">限制的模型列表</label>
-              <div class="flex flex-wrap gap-2 mb-3 min-h-[32px] p-2 bg-gray-50 rounded-lg border border-gray-200">
+              <label class="block text-xs font-medium text-gray-700 mb-1">限制的模型列表</label>
+              <div class="flex flex-wrap gap-1 mb-2 min-h-[24px]">
                 <span 
                   v-for="(model, index) in form.restrictedModels" 
                   :key="index"
-                  class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-red-100 text-red-800"
+                  class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-red-100 text-red-800"
                 >
                   {{ model }}
                   <button 
                     type="button"
                     @click="removeRestrictedModel(index)"
-                    class="ml-2 text-red-600 hover:text-red-800"
+                    class="ml-1 text-red-600 hover:text-red-800"
                   >
                     <i class="fas fa-times text-xs"></i>
                   </button>
                 </span>
-                <span v-if="form.restrictedModels.length === 0" class="text-gray-400 text-sm">
+                <span v-if="form.restrictedModels.length === 0" class="text-gray-400 text-xs">
                   暂无限制的模型
                 </span>
               </div>
@@ -313,24 +314,24 @@
                   @keydown.enter.prevent="addRestrictedModel"
                   type="text"
                   placeholder="输入模型名称，按回车添加"
-                  class="form-input flex-1"
+                  class="form-input flex-1 text-sm"
                 >
                 <button 
                   type="button"
                   @click="addRestrictedModel"
-                  class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                  class="px-3 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
                 >
                   <i class="fas fa-plus"></i>
                 </button>
               </div>
-              <p class="text-xs text-gray-500 mt-2">设置此API Key无法访问的模型，例如：claude-opus-4-20250514</p>
+              <p class="text-xs text-gray-500 mt-1">例如：claude-opus-4-20250514</p>
             </div>
           </div>
         </div>
         
         <!-- 客户端限制 -->
         <div>
-          <div class="flex items-center mb-3">
+          <div class="flex items-center mb-2">
             <input 
               type="checkbox" 
               v-model="form.enableClientRestriction" 
@@ -342,11 +343,10 @@
             </label>
           </div>
           
-          <div v-if="form.enableClientRestriction" class="space-y-3">
+          <div v-if="form.enableClientRestriction" class="bg-green-50 border border-green-200 rounded-lg p-3">
             <div>
-              <label class="block text-sm font-medium text-gray-600 mb-2">允许的客户端</label>
-              <p class="text-xs text-gray-500 mb-3">勾选允许使用此API Key的客户端</p>
-              <div class="space-y-2">
+              <label class="block text-xs font-medium text-gray-700 mb-2">允许的客户端</label>
+              <div class="space-y-1">
                 <div v-for="client in supportedClients" :key="client.id" class="flex items-start">
                   <input 
                     type="checkbox" 
@@ -365,18 +365,18 @@
           </div>
         </div>
         
-        <div class="flex gap-3 pt-4">
+        <div class="flex gap-3 pt-2">
           <button 
             type="button" 
             @click="$emit('close')" 
-            class="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+            class="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition-colors text-sm"
           >
             取消
           </button>
           <button 
             type="submit" 
-            :disabled="loading || !form.name"
-            class="btn btn-primary flex-1 py-3 px-6 font-semibold"
+            :disabled="loading"
+            class="btn btn-primary flex-1 py-2.5 px-4 font-semibold text-sm"
           >
             <div v-if="loading" class="loading-spinner mr-2"></div>
             <i v-else class="fas fa-plus mr-2"></i>
@@ -408,6 +408,11 @@ const emit = defineEmits(['close', 'success'])
 const authStore = useAuthStore()
 const clientsStore = useClientsStore()
 const loading = ref(false)
+
+// 表单验证状态
+const errors = ref({
+  name: ''
+})
 
 // 标签相关
 const newTag = ref('')
@@ -537,6 +542,14 @@ const removeTag = (index) => {
 
 // 创建 API Key
 const createApiKey = async () => {
+  // 验证表单
+  errors.value.name = ''
+  
+  if (!form.name || !form.name.trim()) {
+    errors.value.name = '请输入API Key名称'
+    return
+  }
+  
   loading.value = true
   
   try {

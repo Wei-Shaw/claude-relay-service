@@ -863,7 +863,21 @@ const handleRenewSuccess = () => {
 
 // 删除API Key
 const deleteApiKey = async (keyId) => {
-  if (!confirm('确定要删除这个 API Key 吗？此操作不可恢复。')) return
+  let confirmed = false
+  
+  if (window.showConfirm) {
+    confirmed = await window.showConfirm(
+      '删除 API Key',
+      '确定要删除这个 API Key 吗？此操作不可恢复。',
+      '确定删除',
+      '取消'
+    )
+  } else {
+    // 降级方案
+    confirmed = confirm('确定要删除这个 API Key 吗？此操作不可恢复。')
+  }
+  
+  if (!confirmed) return
   
   try {
     const data = await apiClient.delete(`/admin/api-keys/${keyId}`)

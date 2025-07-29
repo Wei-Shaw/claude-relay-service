@@ -3,12 +3,12 @@
     <Transition name="modal" appear>
       <div 
         v-if="isVisible"
-        class="fixed inset-0 modal z-50 flex items-center justify-center p-4"
+        class="fixed inset-0 modal z-[100] flex items-center justify-center p-4"
         @click.self="handleCancel"
       >
         <div class="modal-content w-full max-w-md p-6 mx-auto">
           <div class="flex items-start gap-4 mb-6">
-            <div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center">
+            <div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl flex items-center justify-center">
               <i class="fas fa-exclamation-triangle text-white text-lg"></i>
             </div>
             <div class="flex-1">
@@ -27,7 +27,7 @@
             </button>
             <button 
               @click="handleConfirm"
-              class="btn btn-danger px-6 py-3"
+              class="btn btn-warning px-6 py-3"
               :class="{ 'opacity-50 cursor-not-allowed': isProcessing }"
               :disabled="isProcessing"
             >
@@ -145,6 +145,10 @@ defineExpose({
 
 .btn-danger {
   @apply bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+}
+
+.btn-warning {
+  @apply bg-amber-600 text-white hover:bg-amber-700 focus:ring-amber-500;
 }
 
 .loading-spinner {
