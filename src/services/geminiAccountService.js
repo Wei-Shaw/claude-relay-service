@@ -13,11 +13,27 @@ const {
   logRefreshSkipped
 } = require('../utils/tokenRefreshLogger');
 const tokenRefreshService = require('./tokenRefreshService');
+const http = require('http');
+const url = require('url');
+
+// 使用 Node.js 内置 fetch（Node 18+）或 fallback
+const fetch = globalThis.fetch || require('node-fetch');
 
 // Gemini CLI OAuth 配置 - 这些是公开的 Gemini CLI 凭据
 const OAUTH_CLIENT_ID = '681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com';
 const OAUTH_CLIENT_SECRET = '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';
 const OAUTH_SCOPES = ['https://www.googleapis.com/auth/cloud-platform'];
+
+// OAuth Personal 扩展作用域（个人Google账户需要）
+const OAUTH_PERSONAL_SCOPES = [
+  'https://www.googleapis.com/auth/cloud-platform',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/userinfo.profile'
+];
+
+// 成功/失败页面 URL
+const SIGN_IN_SUCCESS_URL = 'https://developers.google.com/gemini-code-assist/auth_success_gemini';
+const SIGN_IN_FAILURE_URL = 'https://developers.google.com/gemini-code-assist/auth_failure_gemini';
 
 // 加密相关常量
 const ALGORITHM = 'aes-256-cbc';
@@ -66,20 +82,42 @@ function decrypt(text) {
   }
 }
 
-// 创建 OAuth2 客户端
-function createOAuth2Client(redirectUri = null) {
+// 创建 OAuth2 客户端（支持代理配置）
+function createOAuth2Client(redirectUri = null, proxyConfig = null) {
   // 如果没有提供 redirectUri，使用默认值
   const uri = redirectUri || 'http://localhost:45462';
-  return new OAuth2Client(
-    OAUTH_CLIENT_ID,
-    OAUTH_CLIENT_SECRET,
-    uri
-  );
+  
+  const clientOptions = {
+    clientId: OAUTH_CLIENT_ID,
+    clientSecret: OAUTH_CLIENT_SECRET,
+    redirectUri: uri
+  };
+  
+  // 添加代理配置支持
+  if (proxyConfig) {
+    try {
+      const proxy = typeof proxyConfig === 'string' ? JSON.parse(proxyConfig) : proxyConfig;
+      if (proxy.type && proxy.host && proxy.port) {
+        const proxyUrl = proxy.username && proxy.password
+          ? `${proxy.type}://${proxy.username}:${proxy.password}@${proxy.host}:${proxy.port}`
+          : `${proxy.type}://${proxy.host}:${proxy.port}`;
+        
+        clientOptions.transporterOptions = {
+          proxy: proxyUrl
+        };
+        logger.debug('OAuth2Client configured with proxy:', proxyUrl.replace(/\/\/[^:]+:[^@]+@/, '//***:***@'));
+      }
+    } catch (error) {
+      logger.error('Error configuring OAuth2Client proxy:', error);
+    }
+  }
+  
+  return new OAuth2Client(clientOptions);
 }
 
 // 生成授权 URL
-async function generateAuthUrl(state = null, redirectUri = null) {
-  const oAuth2Client = createOAuth2Client(redirectUri);
+async function generateAuthUrl(state = null, redirectUri = null, proxyConfig = null) {
+  const oAuth2Client = createOAuth2Client(redirectUri, proxyConfig);
   const authUrl = oAuth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: OAUTH_SCOPES,
@@ -146,8 +184,8 @@ async function pollAuthorizationStatus(sessionId, maxAttempts = 60, interval = 2
 }
 
 // 交换授权码获取 tokens
-async function exchangeCodeForTokens(code, redirectUri = null) {
-  const oAuth2Client = createOAuth2Client(redirectUri);
+async function exchangeCodeForTokens(code, redirectUri = null, proxyConfig = null) {
+  const oAuth2Client = createOAuth2Client(redirectUri, proxyConfig);
   
   try {
     const { tokens } = await oAuth2Client.getToken(code);
@@ -167,8 +205,8 @@ async function exchangeCodeForTokens(code, redirectUri = null) {
 }
 
 // 刷新访问令牌
-async function refreshAccessToken(refreshToken) {
-  const oAuth2Client = createOAuth2Client();
+async function refreshAccessToken(refreshToken, proxyConfig = null) {
+  const oAuth2Client = createOAuth2Client(null, proxyConfig);
   
   try {
     // 设置 refresh_token
@@ -204,10 +242,13 @@ async function refreshAccessToken(refreshToken) {
   }
 }
 
-// 创建 Gemini 账户
+// 创建 Gemini 账户（支持多种认证类型）
 async function createAccount(accountData) {
   const id = uuidv4();
   const now = new Date().toISOString();
+  
+  // 确定认证类型
+  const authType = accountData.authType || 'code-assist'; // 默认为 code-assist (原有方式)
   
   // 处理凭证数据
   let geminiOauth = null;
@@ -252,6 +293,7 @@ async function createAccount(accountData) {
   const account = {
     id,
     platform: 'gemini', // 标识为 Gemini 账户
+    authType, // 认证类型: 'code-assist' | 'oauth-personal'
     name: accountData.name || 'Gemini Account',
     description: accountData.description || '',
     accountType: accountData.accountType || 'shared',
@@ -270,6 +312,9 @@ async function createAccount(accountData) {
     
     // 项目编号（Google Cloud/Workspace 账号需要）
     projectId: accountData.projectId || '',
+    
+    // oauth-personal 特有字段
+    userInfo: accountData.userInfo ? JSON.stringify(accountData.userInfo) : '',
     
     // 时间戳
     createdAt: now,
@@ -290,7 +335,7 @@ async function createAccount(accountData) {
     await client.sadd(SHARED_GEMINI_ACCOUNTS_KEY, id);
   }
   
-  logger.info(`Created Gemini account: ${id}`);
+  logger.info(`Created Gemini account (${authType}): ${id}`);
   return account;
 }
 
@@ -459,7 +504,7 @@ async function selectAvailableAccount(apiKeyId, sessionHash = null) {
     
     if (mappedAccountId) {
       const account = await getAccount(mappedAccountId);
-      if (account && account.isActive === 'true' && !isTokenExpired(account)) {
+      if (account && account.isActive === 'true' && !(await isTokenExpired(account))) {
         logger.debug(`Using sticky session account: ${mappedAccountId}`);
         return account;
       }
@@ -473,8 +518,35 @@ async function selectAvailableAccount(apiKeyId, sessionHash = null) {
   if (apiKeyData.geminiAccountId) {
     const account = await getAccount(apiKeyData.geminiAccountId);
     if (account && account.isActive === 'true') {
+      
+      // 对于 oauth-personal 账户，检查是否需要设置
+      if (account.authType === 'oauth-personal' && !account.userTier) {
+        logger.info(`OAuth Personal account ${account.id} needs setup - initializing...`);
+        try {
+          await setupOAuthPersonalAccount(account.id);
+          // 重新获取更新后的账户信息
+          const updatedAccount = await getAccount(account.id);
+          if (updatedAccount) {
+            logger.info(`OAuth Personal account ${account.id} setup completed successfully`);
+            return updatedAccount;
+          } else {
+            logger.error(`Failed to retrieve updated account ${account.id} after setup`);
+          }
+        } catch (error) {
+          logger.error(`Failed to setup OAuth Personal account ${account.id}:`, error);
+          // 标记账户为错误状态
+          await updateAccount(account.id, {
+            status: 'error',
+            errorMessage: `Setup failed: ${error.message}`
+          });
+          // 继续尝试其他账户
+        }
+      } else if (account.authType === 'oauth-personal' && account.userTier) {
+        logger.debug(`OAuth Personal account ${account.id} already set up with tier: ${account.userTier}`);
+      }
+      
       // 检查 token 是否过期
-      const isExpired = isTokenExpired(account);
+      const isExpired = await isTokenExpired(account);
       
       // 记录token使用情况
       logTokenUsage(account.id, account.name, 'gemini', account.expiresAt, isExpired);
@@ -522,7 +594,7 @@ async function selectAvailableAccount(apiKeyId, sessionHash = null) {
   const selectedAccount = availableAccounts[0];
   
   // 检查并刷新 token
-  const isExpired = isTokenExpired(selectedAccount);
+  const isExpired = await isTokenExpired(selectedAccount);
   
   // 记录token使用情况
   logTokenUsage(selectedAccount.id, selectedAccount.name, 'gemini', selectedAccount.expiresAt, isExpired);
@@ -544,15 +616,64 @@ async function selectAvailableAccount(apiKeyId, sessionHash = null) {
   return selectedAccount;
 }
 
-// 检查 token 是否过期
-function isTokenExpired(account) {
+// 检查 token 是否过期并验证有效性
+async function isTokenExpired(account) {
   if (!account.expiresAt) return true;
   
   const expiryTime = new Date(account.expiresAt).getTime();
   const now = Date.now();
   const buffer = 10 * 1000; // 10秒缓冲
   
-  return now >= (expiryTime - buffer);
+  // 首先检查时间过期
+  if (now >= (expiryTime - buffer)) {
+    return true;
+  }
+  
+  // 对于 OAuth Personal 类型，进行额外的 token 验证
+  if (account.authType === 'oauth-personal' && account.accessToken) {
+    try {
+      const oAuth2Client = createOAuth2Client(null, account.proxy);
+      
+      // accessToken 已经在 getAccount 中解密过了，直接使用
+      const accessToken = account.accessToken;
+      const refreshToken = account.refreshToken;
+      
+      // 设置凭证
+      oAuth2Client.setCredentials({
+        access_token: accessToken,
+        refresh_token: refreshToken
+      });
+      
+      // 获取有效的 access token (这会验证并刷新如需要)
+      const { token } = await oAuth2Client.getAccessToken();
+      if (!token) {
+        logger.debug(`OAuth Personal token validation failed for account ${account.id}: no token returned`);
+        return true;
+      }
+      
+      // 如果 token 被刷新了，更新账户信息
+      const credentials = oAuth2Client.credentials;
+      if (credentials.access_token !== accessToken) {
+        logger.info(`OAuth Personal token refreshed for account ${account.id}`);
+        
+        // 更新账户的 token 信息
+        await updateAccount(account.id, {
+          accessToken: credentials.access_token,
+          refreshToken: credentials.refresh_token || refreshToken,
+          expiresAt: credentials.expiry_date ? new Date(credentials.expiry_date).toISOString() : account.expiresAt
+        });
+      }
+      
+      logger.debug(`OAuth Personal token validation successful for account ${account.id}`);
+      return false;
+    } catch (error) {
+      logger.debug(`OAuth Personal token validation failed for account ${account.id}:`, error.message);
+      return true;
+    }
+  }
+  
+  // 对于 code-assist 类型，只检查时间过期
+  return false;
 }
 
 // 检查账户是否被限流
@@ -567,7 +688,7 @@ function isRateLimited(account) {
   return false;
 }
 
-// 刷新账户 token
+// 刷新账户 token（支持不同认证类型）
 async function refreshAccountToken(accountId) {
   let lockAcquired = false;
   let account = null;
@@ -614,7 +735,20 @@ async function refreshAccountToken(accountId) {
     logger.info(`🔄 Starting token refresh for Gemini account: ${account.name} (${accountId})`);
     
     // account.refreshToken 已经是解密后的值（从 getAccount 返回）
-    const newTokens = await refreshAccessToken(account.refreshToken);
+    let newTokens = await refreshAccessToken(account.refreshToken);
+    
+    // 根据认证类型选择刷新方式
+    if (account.authType === 'oauth-personal') {
+      // 使用 oauth-personal 刷新方式
+      newTokens = await refreshOAuthPersonalToken(
+        accountId,
+        account.refreshToken, // 已经在 getAccount 中解密过了，不需要再次解密
+        account.proxy ? JSON.parse(account.proxy) : null
+      );
+    } else {
+      // 使用默认的 code-assist 方式刷新
+      newTokens = await refreshAccessToken(account.refreshToken, account.proxy); // 已经在 getAccount 中解密过了
+    }
     
     // 更新账户信息
     const updates = {
@@ -637,7 +771,7 @@ async function refreshAccountToken(accountId) {
       scopes: newTokens.scope
     });
     
-    logger.info(`Refreshed token for Gemini account: ${accountId} - Access Token: ${maskToken(newTokens.access_token)}`);
+    logger.info(`Refreshed token for Gemini account (${account.authType || 'code-assist'}): ${accountId} - Access Token: ${maskToken(newTokens.access_token)}`);
     
     return newTokens;
   } catch (error) {
@@ -687,6 +821,613 @@ async function setAccountRateLimited(accountId, isLimited = true) {
   await updateAccount(accountId, updates);
 }
 
+// ===== OAuth Personal 功能 =====
+
+// OAuth 会话存储
+const oauthSessions = new Map();
+
+// 获取可用端口
+async function getAvailablePort() {
+  return new Promise((resolve, reject) => {
+    const net = require('net');
+    const server = net.createServer();
+    
+    server.listen(0, () => {
+      const port = server.address().port;
+      server.close(() => resolve(port));
+    });
+    
+    server.on('error', reject);
+  });
+}
+
+// 生成 OAuth Personal User Code 授权 URL
+async function generateOAuthPersonalUserCodeAuth(accountId, proxyConfig = null) {
+  const oAuth2Client = createOAuth2Client(null, proxyConfig);
+  
+  // 生成 PKCE 参数
+  const codeVerifier = await oAuth2Client.generateCodeVerifierAsync();
+  const state = crypto.randomBytes(32).toString('hex');
+  
+  const authUrl = oAuth2Client.generateAuthUrl({
+    redirect_uri: 'https://codeassist.google.com/authcode',
+    access_type: 'offline',
+    scope: OAUTH_PERSONAL_SCOPES,
+    code_challenge_method: 'S256',
+    code_challenge: codeVerifier.codeChallenge,
+    state,
+    prompt: 'select_account'
+  });
+
+  // 存储会话信息
+  const sessionData = {
+    accountId,
+    codeVerifier: codeVerifier.codeVerifier,
+    state,
+    proxyConfig,
+    type: 'oauth_personal_user_code',
+    createdAt: Date.now()
+  };
+  
+  oauthSessions.set(state, sessionData);
+  
+  // 30分钟后清理
+  setTimeout(() => {
+    oauthSessions.delete(state);
+  }, 30 * 60 * 1000);
+
+  logger.info(`Generated oauth-personal user code auth URL for account: ${accountId}`);
+  
+  return {
+    authUrl,
+    state,
+    instructions: {
+      step1: 'Copy the URL and open it in your browser',
+      step2: 'Sign in with your personal Google account',  
+      step3: 'Copy the authorization code from the result page',
+      step4: 'Return the code to complete authentication'
+    }
+  };
+}
+
+// 交换 OAuth Personal User Code
+async function exchangeOAuthPersonalUserCode(code, state) {
+  const sessionData = oauthSessions.get(state);
+  if (!sessionData || sessionData.type !== 'oauth_personal_user_code') {
+    throw new Error('Invalid or expired OAuth session');
+  }
+
+  const oAuth2Client = createOAuth2Client(null, sessionData.proxyConfig);
+  
+  try {
+    const { tokens } = await oAuth2Client.getToken({
+      code,
+      codeVerifier: sessionData.codeVerifier,
+      redirect_uri: 'https://codeassist.google.com/authcode'
+    });
+
+    // 获取用户信息
+    oAuth2Client.setCredentials(tokens);
+    const userInfo = await fetchUserInfo(oAuth2Client);
+    
+    // 清理会话
+    oauthSessions.delete(state);
+    
+    logger.success(`OAuth-personal user code authentication successful for account: ${sessionData.accountId}`);
+    
+    return {
+      tokens,
+      userInfo,
+      accountId: sessionData.accountId
+    };
+    
+  } catch (error) {
+    oauthSessions.delete(state);
+    logger.error(`Failed to exchange oauth-personal user code for account ${sessionData.accountId}:`, error);
+    throw new Error('Failed to exchange authorization code');
+  }
+}
+
+// 交换 OAuth Personal User Code (通过 accountId)
+async function exchangeOAuthPersonalUserCodeByAccountId(code, accountId) {
+  // 查找所有未过期的会话，找到匹配的 accountId
+  let targetSessionData = null;
+  let targetState = null;
+  
+  for (const [state, sessionData] of oauthSessions) {
+    if (sessionData.type === 'oauth_personal_user_code' && 
+        sessionData.accountId === accountId &&
+        (Date.now() - sessionData.createdAt) < 30 * 60 * 1000) { // 30分钟内
+      targetSessionData = sessionData;
+      targetState = state;
+      break;
+    }
+  }
+  
+  if (!targetSessionData) {
+    throw new Error('No valid OAuth session found for this account. Please generate a new authorization URL.');
+  }
+
+  const oAuth2Client = createOAuth2Client(null, targetSessionData.proxyConfig);
+  
+  try {
+    const { tokens } = await oAuth2Client.getToken({
+      code,
+      codeVerifier: targetSessionData.codeVerifier,
+      redirect_uri: 'https://codeassist.google.com/authcode'
+    });
+
+    // 获取用户信息
+    oAuth2Client.setCredentials(tokens);
+    const userInfo = await fetchUserInfo(oAuth2Client);
+    
+    // 清理会话
+    oauthSessions.delete(targetState);
+    
+    logger.success(`OAuth-personal user code authentication successful for account: ${accountId} (via accountId)`);
+    
+    return {
+      tokens,
+      userInfo,
+      accountId: accountId
+    };
+    
+  } catch (error) {
+    oauthSessions.delete(targetState);
+    logger.error(`Failed to exchange oauth-personal user code for account ${accountId}:`, error);
+    throw new Error('Failed to exchange authorization code');
+  }
+}
+
+// 交换 OAuth Personal User Code (自动查找会话)
+async function exchangeOAuthPersonalUserCodeAuto(code) {
+  // 查找所有未过期的 oauth-personal 会话
+  let targetSessionData = null;
+  let targetState = null;
+  
+  // 遍历所有会话，找到最新的未过期会话
+  for (const [state, sessionData] of oauthSessions) {
+    if (sessionData.type === 'oauth_personal_user_code' && 
+        (Date.now() - sessionData.createdAt) < 30 * 60 * 1000) { // 30分钟内
+      // 如果找到多个，使用最新的一个
+      if (!targetSessionData || sessionData.createdAt > targetSessionData.createdAt) {
+        targetSessionData = sessionData;
+        targetState = state;
+      }
+    }
+  }
+  
+  if (!targetSessionData) {
+    throw new Error('No valid OAuth session found. Please generate a new authorization URL.');
+  }
+
+  const oAuth2Client = createOAuth2Client(null, targetSessionData.proxyConfig);
+  
+  try {
+    const { tokens } = await oAuth2Client.getToken({
+      code,
+      codeVerifier: targetSessionData.codeVerifier,
+      redirect_uri: 'https://codeassist.google.com/authcode'
+    });
+
+    // 获取用户信息
+    oAuth2Client.setCredentials(tokens);
+    const userInfo = await fetchUserInfo(oAuth2Client);
+    
+    // 清理会话
+    oauthSessions.delete(targetState);
+    
+    logger.success(`OAuth-personal user code authentication successful for account: ${targetSessionData.accountId} (auto-found)`);
+    
+    return {
+      tokens,
+      userInfo,
+      accountId: targetSessionData.accountId
+    };
+    
+  } catch (error) {
+    oauthSessions.delete(targetState);
+    logger.error(`Failed to exchange oauth-personal user code for account ${targetSessionData.accountId}:`, error);
+    throw new Error('Failed to exchange authorization code');
+  }
+}
+
+// 生成 OAuth Personal Web 授权流程
+async function generateOAuthPersonalWebAuth(accountId, proxyConfig = null) {
+  const port = await getAvailablePort();
+  const redirectUri = `http://localhost:${port}/oauth2callback`;
+  const state = crypto.randomBytes(32).toString('hex');
+  
+  const oAuth2Client = createOAuth2Client(null, proxyConfig);
+  
+  const authUrl = oAuth2Client.generateAuthUrl({
+    redirect_uri: redirectUri,
+    access_type: 'offline',
+    scope: OAUTH_PERSONAL_SCOPES,
+    state,
+    prompt: 'select_account'
+  });
+
+  const loginCompletePromise = new Promise((resolve, reject) => {
+    const server = http.createServer(async (req, res) => {
+      try {
+        if (req.url.indexOf('/oauth2callback') === -1) {
+          res.writeHead(302, { Location: SIGN_IN_FAILURE_URL });
+          res.end();
+          reject(new Error('Unexpected request: ' + req.url));
+          return;
+        }
+
+        const qs = new url.URL(req.url, 'http://localhost:3000').searchParams;
+        
+        if (qs.get('error')) {
+          res.writeHead(302, { Location: SIGN_IN_FAILURE_URL });
+          res.end();
+          reject(new Error(`OAuth error: ${qs.get('error')}`));
+          return;
+        }
+
+        if (qs.get('state') !== state) {
+          res.end('State mismatch. Possible CSRF attack');
+          reject(new Error('State mismatch. Possible CSRF attack'));
+          return;
+        }
+
+        if (qs.get('code')) {
+          const { tokens } = await oAuth2Client.getToken({
+            code: qs.get('code'),
+            redirect_uri: redirectUri
+          });
+
+          // 获取用户信息
+          oAuth2Client.setCredentials(tokens);
+          const userInfo = await fetchUserInfo(oAuth2Client);
+
+          res.writeHead(302, { Location: SIGN_IN_SUCCESS_URL });
+          res.end();
+          
+          server.close();
+          resolve({
+            tokens,
+            userInfo,
+            accountId
+          });
+        } else {
+          res.end('Missing code parameter');
+          reject(new Error('Missing code parameter'));
+        }
+      } catch (error) {
+        res.writeHead(500);
+        res.end('Server error: ' + error.message);
+        server.close();
+        reject(error);
+      }
+    });
+
+    server.listen(port, () => {
+      logger.info(`OAuth Personal web server listening on http://localhost:${port}`);
+    });
+
+    // 10分钟超时
+    setTimeout(() => {
+      server.close();
+      reject(new Error('OAuth flow timeout'));
+    }, 10 * 60 * 1000);
+  });
+
+  return {
+    authUrl,
+    port,
+    loginCompletePromise,
+    instructions: [
+      '1. Click the authorization URL to open it in your browser',
+      '2. Sign in with your personal Google account',
+      '3. Grant the requested permissions',
+      '4. The browser will automatically return to complete the process',
+      '5. Close the browser tab when you see the success message'
+    ]
+  };
+}
+
+// 获取用户信息
+async function fetchUserInfo(oAuth2Client) {
+  try {
+    const { token } = await oAuth2Client.getAccessToken();
+    if (!token) return null;
+
+    const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      logger.error('Failed to fetch user info:', response.status, response.statusText);
+      return null;
+    }
+
+    return await response.json();
+  } catch (error) {
+    logger.error('Error retrieving user info:', error);
+    return null;
+  }
+}
+
+// 刷新 OAuth Personal 访问令牌
+async function refreshOAuthPersonalToken(accountId, refreshToken, proxyConfig = null) {
+  const oAuth2Client = createOAuth2Client(null, proxyConfig);
+  
+  try {
+    oAuth2Client.setCredentials({
+      refresh_token: refreshToken
+    });
+
+    const { credentials } = await oAuth2Client.refreshAccessToken();
+    
+    logger.info(`OAuth-personal access token refreshed for account: ${accountId}`);
+    
+    return {
+      access_token: credentials.access_token,
+      refresh_token: credentials.refresh_token || refreshToken,
+      scope: credentials.scope || OAUTH_PERSONAL_SCOPES.join(' '),
+      token_type: credentials.token_type || 'Bearer',
+      expiry_date: credentials.expiry_date
+    };
+  } catch (error) {
+    logger.error(`Failed to refresh oauth-personal access token for account ${accountId}:`, error);
+    throw new Error('Failed to refresh access token');
+  }
+}
+
+// 获取有效的 OAuth Personal 访问令牌
+async function getOAuthPersonalValidToken(accountId, proxyConfig = null) {
+  try {
+    const account = await getAccount(accountId);
+    if (!account || account.authType !== 'oauth-personal') {
+      logger.debug(`Account ${accountId} not found or not oauth-personal type`);
+      return null;
+    }
+
+    // 检查是否过期 (给10秒缓冲)
+    const now = Date.now();
+    const expiryTime = account.expiresAt ? new Date(account.expiresAt).getTime() : 0;
+    const buffer = 10 * 1000;
+
+    if (now < (expiryTime - buffer)) {
+      logger.debug(`Valid oauth-personal access token found for account: ${accountId}`);
+      return decrypt(account.accessToken);
+    }
+
+    // 如果过期，尝试刷新
+    if (account.refreshToken) {
+      try {
+        const newCredentials = await refreshOAuthPersonalToken(
+          accountId, 
+          decrypt(account.refreshToken), 
+          account.proxy ? JSON.parse(account.proxy) : proxyConfig
+        );
+        
+        // 更新账户
+        await updateAccount(accountId, {
+          accessToken: newCredentials.access_token,
+          refreshToken: newCredentials.refresh_token,
+          expiresAt: new Date(newCredentials.expiry_date).toISOString(),
+          lastRefreshAt: new Date().toISOString(),
+          geminiOauth: JSON.stringify(newCredentials)
+        });
+        
+        return newCredentials.access_token;
+      } catch (error) {
+        logger.error(`Failed to refresh oauth-personal token for account ${accountId}:`, error);
+        return null;
+      }
+    }
+
+    logger.debug(`No refresh token available for oauth-personal account: ${accountId}`);
+    return null;
+  } catch (error) {
+    logger.error(`Error getting oauth-personal valid token for account ${accountId}:`, error);
+    return null;
+  }
+}
+
+// 清除 OAuth Personal 凭证缓存
+async function clearOAuthPersonalCredentials(accountId) {
+  try {
+    const account = await getAccount(accountId);
+    if (account && account.authType === 'oauth-personal') {
+      await updateAccount(accountId, {
+        accessToken: '',
+        refreshToken: '',
+        geminiOauth: '',
+        expiresAt: '',
+        status: 'inactive'
+      });
+      
+      logger.info(`Cleared oauth-personal credentials for account: ${accountId}`);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    logger.error(`Failed to clear oauth-personal credentials for account ${accountId}:`, error);
+    throw error;
+  }
+}
+
+// 设置 OAuth Personal 账户 - 实现 Code Assist 初始化流程
+async function setupOAuthPersonalAccount(accountId) {
+  try {
+    const account = await getAccount(accountId);
+    if (!account || account.authType !== 'oauth-personal') {
+      throw new Error(`Account ${accountId} is not an oauth-personal account`);
+    }
+
+    // 获取有效的访问令牌
+    const accessToken = await getOAuthPersonalValidToken(accountId);
+    
+    // 创建 OAuth2 客户端进行 Code Assist API 调用
+    const oAuth2Client = createOAuth2Client(null, account.proxy);
+    oAuth2Client.setCredentials({
+      access_token: accessToken,
+      refresh_token: account.refreshToken
+    });
+
+    logger.info(`Setting up OAuth Personal account: ${accountId}`);
+
+    // 步骤1: 调用 loadCodeAssist 获取用户信息
+    const loadCodeAssistUrl = 'https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist';
+    const loadCodeAssistData = {
+      cloudaicompanionProject: account.projectId || undefined,
+      metadata: {
+        ideType: 'IDE_UNSPECIFIED',
+        platform: 'PLATFORM_UNSPECIFIED', 
+        pluginType: 'GEMINI',
+        duetProject: account.projectId || undefined
+      }
+    };
+
+    const loadResponse = await fetch(loadCodeAssistUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(loadCodeAssistData)
+    });
+
+    if (!loadResponse.ok) {
+      const errorData = await loadResponse.text();
+      logger.error(`loadCodeAssist failed for account ${accountId}:`, errorData);
+      throw new Error(`loadCodeAssist failed: ${loadResponse.status} ${errorData}`);
+    }
+
+    const loadResult = await loadResponse.json();
+    logger.debug(`loadCodeAssist result for account ${accountId}:`, JSON.stringify(loadResult, null, 2));
+
+    // 如果服务器返回了项目ID，更新账户信息
+    let projectId = account.projectId;
+    if (!projectId && loadResult.cloudaicompanionProject) {
+      projectId = loadResult.cloudaicompanionProject;
+      logger.info(`Auto-discovered project ID for account ${accountId}: ${projectId}`);
+    }
+
+    // 获取用户层级信息
+    const tier = getOnboardTier(loadResult);
+    logger.debug(`User tier for account ${accountId}:`, tier);
+
+    // 步骤2: 调用 onboardUser 完成用户入驻
+    const onboardUserUrl = 'https://cloudcode-pa.googleapis.com/v1internal:onboardUser';
+    const onboardUserData = {
+      tierId: tier.id,
+      cloudaicompanionProject: projectId,
+      metadata: {
+        ideType: 'IDE_UNSPECIFIED',
+        platform: 'PLATFORM_UNSPECIFIED',
+        pluginType: 'GEMINI',
+        duetProject: projectId
+      }
+    };
+
+    const onboardResponse = await fetch(onboardUserUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(onboardUserData)
+    });
+
+    if (!onboardResponse.ok) {
+      const errorData = await onboardResponse.text();
+      logger.error(`onboardUser failed for account ${accountId}:`, errorData);
+      throw new Error(`onboardUser failed: ${onboardResponse.status} ${errorData}`);
+    }
+
+    let onboardResult = await onboardResponse.json();
+    logger.debug(`onboardUser initial result for account ${accountId}:`, JSON.stringify(onboardResult, null, 2));
+
+    // 轮询直到 onboardUser 操作完成
+    while (!onboardResult.done) {
+      logger.debug(`Waiting for onboardUser completion for account ${accountId}...`);
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      const pollResponse = await fetch(onboardUserUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(onboardUserData)
+      });
+
+      if (!pollResponse.ok) {
+        const errorData = await pollResponse.text();
+        logger.error(`onboardUser polling failed for account ${accountId}:`, errorData);
+        break;
+      }
+
+      onboardResult = await pollResponse.json();
+      logger.debug(`onboardUser polling result for account ${accountId}:`, JSON.stringify(onboardResult, null, 2));
+    }
+
+    // 更新账户信息，使用最终的项目ID
+    const finalProjectId = onboardResult.response?.cloudaicompanionProject?.id || projectId || '';
+    const updateData = {
+      status: 'active',
+      errorMessage: '',
+      userTier: tier.id
+    };
+
+    if (finalProjectId && finalProjectId !== account.projectId) {
+      updateData.projectId = finalProjectId;
+      logger.info(`Updated project ID for account ${accountId}: ${finalProjectId}`);
+    }
+
+    await updateAccount(accountId, updateData);
+
+    logger.info(`OAuth Personal account setup completed for ${accountId}, project: ${finalProjectId}, tier: ${tier.id}`);
+    
+    return {
+      projectId: finalProjectId,
+      userTier: tier.id,
+      setupComplete: true
+    };
+
+  } catch (error) {
+    logger.error(`Failed to setup OAuth Personal account ${accountId}:`, error);
+    
+    // 标记账户为错误状态
+    await updateAccount(accountId, {
+      status: 'error',
+      errorMessage: error.message
+    });
+    
+    throw error;
+  }
+}
+
+// 辅助函数：获取入驻层级
+function getOnboardTier(loadResponse) {
+  if (loadResponse.currentTier) {
+    return loadResponse.currentTier;
+  }
+  
+  // 查找默认层级
+  for (const tier of loadResponse.allowedTiers || []) {
+    if (tier.isDefault) {
+      return tier;
+    }
+  }
+  
+  // 如果没有找到，使用 LEGACY 层级
+  return {
+    name: '',
+    description: '',
+    id: 'LEGACY',
+    userDefinedCloudaicompanionProject: true
+  };
+}
+
 module.exports = {
   generateAuthUrl,
   pollAuthorizationStatus,
@@ -703,5 +1444,17 @@ module.exports = {
   setAccountRateLimited,
   isTokenExpired,
   OAUTH_CLIENT_ID,
-  OAUTH_SCOPES
+  OAUTH_SCOPES,
+  
+  // OAuth Personal 功能
+  generateOAuthPersonalUserCodeAuth,
+  exchangeOAuthPersonalUserCode,
+  exchangeOAuthPersonalUserCodeByAccountId, // 通过 accountId 交换
+  exchangeOAuthPersonalUserCodeAuto, // 自动查找会话并交换
+  generateOAuthPersonalWebAuth,
+  refreshOAuthPersonalToken,
+  getOAuthPersonalValidToken,
+  clearOAuthPersonalCredentials,
+  fetchUserInfo,
+  setupOAuthPersonalAccount
 };
