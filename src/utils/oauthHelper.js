@@ -145,9 +145,12 @@ async function exchangeCodeForTokens(authorizationCode, codeVerifier, state, pro
             proxyType: proxyConfig?.type || 'none'
         });
 
-        const response = await axios.post(OAUTH_CONFIG.TOKEN_URL, params, {
+        // 将参数转换为URL编码格式
+        const urlEncodedParams = new URLSearchParams(params).toString();
+        
+        const response = await axios.post(OAUTH_CONFIG.TOKEN_URL, urlEncodedParams, {
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded',
                 'User-Agent': 'claude-cli/1.0.56 (external, cli)',
                 'Accept': 'application/json, text/plain, */*',
                 'Accept-Language': 'en-US,en;q=0.9',

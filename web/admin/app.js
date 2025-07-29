@@ -136,7 +136,8 @@ const app = createApp({
                 expireDuration: '', // 过期时长选择
                 customExpireDate: '', // 自定义过期日期
                 expiresAt: null, // 实际的过期时间戳
-                dailyCostLimit: '' // 每日费用限制
+                dailyCostLimit: '', // 每日费用限制
+                tags: [] // 标签数组
             },
             apiKeyModelStats: {}, // 存储每个key的模型统计数据
             expandedApiKeys: {}, // 跟踪展开的API Keys
@@ -165,6 +166,12 @@ const app = createApp({
                 description: '',
                 showFullKey: false
             },
+            
+            // 标签相关
+            newTag: '', // 新标签输入
+            newEditTag: '', // 编辑时的新标签输入
+            selectedTagFilter: '', // 选中的标签筛选器
+            availableTags: [], // 所有可用的标签
             
             // API Key续期
             showRenewApiKeyModal: false,
@@ -196,7 +203,8 @@ const app = createApp({
                 modelInput: '',
                 enableClientRestriction: false,
                 allowedClients: [],
-                dailyCostLimit: ''
+                dailyCostLimit: '',
+                tags: []
             },
             
             // 支持的客户端列表
@@ -353,11 +361,21 @@ const app = createApp({
         
         // 排序后的API Keys列表
         sortedApiKeys() {
-            if (!this.apiKeysSortBy) {
-                return this.apiKeys;
+            // 先进行标签筛选
+            let filteredKeys = this.apiKeys;
+            if (this.selectedTagFilter) {
+                filteredKeys = this.apiKeys.filter(key => 
+                    key.tags && key.tags.includes(this.selectedTagFilter)
+                );
             }
             
-            return [...this.apiKeys].sort((a, b) => {
+            // 如果没有排序字段，返回筛选后的结果
+            if (!this.apiKeysSortBy) {
+                return filteredKeys;
+            }
+            
+            // 排序
+            return [...filteredKeys].sort((a, b) => {
                 let aValue, bValue;
                 
                 // 特殊处理不同字段
@@ -395,6 +413,17 @@ const app = createApp({
                     return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
                 }
             });
+        },
+        
+        // 计算所有可用的标签
+        computedAvailableTags() {
+            const tagsSet = new Set();
+            this.apiKeys.forEach(key => {
+                if (key.tags && Array.isArray(key.tags)) {
+                    key.tags.forEach(tag => tagsSet.add(tag));
+                }
+            });
+            return Array.from(tagsSet).sort();
         },
         
         // 获取专属账号列表
@@ -502,6 +531,13 @@ const app = createApp({
                     this.handleGeminiAuthCodeInput(newValue);
                 }
             }
+        },
+        apiKeys: {
+            handler() {
+                // 更新可用标签列表
+                this.availableTags = this.computedAvailableTags;
+            },
+            deep: true
         }
     },
     
@@ -721,6 +757,53 @@ const app = createApp({
             this.$nextTick(() => {
                 this.showCreateApiKeyModal = true;
             });
+        },
+        
+        // 标签管理方法
+        addTag() {
+            if (this.newTag && this.newTag.trim()) {
+                const tag = this.newTag.trim();
+                if (!this.apiKeyForm.tags.includes(tag)) {
+                    this.apiKeyForm.tags.push(tag);
+                }
+                this.newTag = '';
+            }
+        },
+        
+        addExistingTag(tag) {
+            if (tag && !this.apiKeyForm.tags.includes(tag)) {
+                this.apiKeyForm.tags.push(tag);
+            }
+        },
+        
+        removeTag(index) {
+            this.apiKeyForm.tags.splice(index, 1);
+        },
+        
+        addEditTag() {
+            if (this.newEditTag && this.newEditTag.trim()) {
+                const tag = this.newEditTag.trim();
+                if (!this.editApiKeyForm.tags.includes(tag)) {
+                    this.editApiKeyForm.tags.push(tag);
+                }
+                this.newEditTag = '';
+            }
+        },
+        
+        addExistingEditTag(tag) {
+            if (tag && !this.editApiKeyForm.tags.includes(tag)) {
+                this.editApiKeyForm.tags.push(tag);
+            }
+        },
+        
+        addExistingEditTag(tag) {
+            if (tag && !this.editApiKeyForm.tags.includes(tag)) {
+                this.editApiKeyForm.tags.push(tag);
+            }
+        },
+        
+        removeEditTag(index) {
+            this.editApiKeyForm.tags.splice(index, 1);
         },
         
         // 更新过期时间
@@ -2114,7 +2197,8 @@ const app = createApp({
                         enableClientRestriction: this.apiKeyForm.enableClientRestriction,
                         allowedClients: this.apiKeyForm.allowedClients,
                         expiresAt: this.apiKeyForm.expiresAt,
-                        dailyCostLimit: this.apiKeyForm.dailyCostLimit && this.apiKeyForm.dailyCostLimit.toString().trim() ? parseFloat(this.apiKeyForm.dailyCostLimit) : 0
+                        dailyCostLimit: this.apiKeyForm.dailyCostLimit && this.apiKeyForm.dailyCostLimit.toString().trim() ? parseFloat(this.apiKeyForm.dailyCostLimit) : 0,
+                        tags: this.apiKeyForm.tags
                     })
                 });
                 
@@ -2153,7 +2237,8 @@ const app = createApp({
                         expireDuration: '',
                         customExpireDate: '',
                         expiresAt: null,
-                        dailyCostLimit: ''
+                        dailyCostLimit: '',
+                        tags: []
                     };
                     
                     // 重新加载API Keys列表
@@ -2321,7 +2406,8 @@ const app = createApp({
                 modelInput: '',
                 enableClientRestriction: key.enableClientRestriction || false,
                 allowedClients: key.allowedClients ? [...key.allowedClients] : [],
-                dailyCostLimit: key.dailyCostLimit || ''
+                dailyCostLimit: key.dailyCostLimit || '',
+                tags: key.tags ? [...key.tags] : []
             };
             this.showEditApiKeyModal = true;
         },
@@ -2364,7 +2450,8 @@ const app = createApp({
                         restrictedModels: this.editApiKeyForm.restrictedModels,
                         enableClientRestriction: this.editApiKeyForm.enableClientRestriction,
                         allowedClients: this.editApiKeyForm.allowedClients,
-                        dailyCostLimit: this.editApiKeyForm.dailyCostLimit && this.editApiKeyForm.dailyCostLimit.toString().trim() !== '' ? parseFloat(this.editApiKeyForm.dailyCostLimit) : 0
+                        dailyCostLimit: this.editApiKeyForm.dailyCostLimit && this.editApiKeyForm.dailyCostLimit.toString().trim() !== '' ? parseFloat(this.editApiKeyForm.dailyCostLimit) : 0,
+                        tags: this.editApiKeyForm.tags
                     })
                 });
                 

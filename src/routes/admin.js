@@ -320,7 +320,8 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       restrictedModels,
       enableClientRestriction,
       allowedClients,
-      dailyCostLimit
+      dailyCostLimit,
+      tags
     } = req.body;
 
     // 输入验证
@@ -371,6 +372,15 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Allowed clients must be an array' });
     }
 
+    // 验证标签字段
+    if (tags !== undefined && !Array.isArray(tags)) {
+      return res.status(400).json({ error: 'Tags must be an array' });
+    }
+    
+    if (tags && tags.some(tag => typeof tag !== 'string' || tag.trim().length === 0)) {
+      return res.status(400).json({ error: 'All tags must be non-empty strings' });
+    }
+
     const newKey = await apiKeyService.generateApiKey({
       name,
       description,
@@ -386,7 +396,8 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       restrictedModels,
       enableClientRestriction,
       allowedClients,
-      dailyCostLimit
+      dailyCostLimit,
+      tags
     });
 
     logger.success(`🔑 Admin created new API key: ${name}`);
@@ -401,7 +412,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
 router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
   try {
     const { keyId } = req.params;
-    const { tokenLimit, concurrencyLimit, rateLimitWindow, rateLimitRequests, claudeAccountId, geminiAccountId, permissions, enableModelRestriction, restrictedModels, enableClientRestriction, allowedClients, expiresAt, dailyCostLimit } = req.body;
+    const { tokenLimit, concurrencyLimit, rateLimitWindow, rateLimitRequests, claudeAccountId, geminiAccountId, permissions, enableModelRestriction, restrictedModels, enableClientRestriction, allowedClients, expiresAt, dailyCostLimit, tags } = req.body;
 
     // 只允许更新指定字段
     const updates = {};
@@ -504,6 +515,17 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
         return res.status(400).json({ error: 'Daily cost limit must be a non-negative number' });
       }
       updates.dailyCostLimit = costLimit;
+    }
+
+    // 处理标签
+    if (tags !== undefined) {
+      if (!Array.isArray(tags)) {
+        return res.status(400).json({ error: 'Tags must be an array' });
+      }
+      if (tags.some(tag => typeof tag !== 'string' || tag.trim().length === 0)) {
+        return res.status(400).json({ error: 'All tags must be non-empty strings' });
+      }
+      updates.tags = tags;
     }
 
     await apiKeyService.updateApiKey(keyId, updates);

@@ -257,10 +257,47 @@ body::before {
 .table-container {
     background: rgba(255, 255, 255, 0.95);
     border-radius: 16px;
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: visible;
     box-shadow: 
         0 10px 15px -3px rgba(0, 0, 0, 0.1),
         0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* API Keys 表格优化 */
+.table-container table {
+    width: 100%;
+    min-width: 1470px;
+}
+
+/* 固定表格布局优化 */
+.table-fixed {
+    table-layout: fixed;
+}
+
+/* 表格单元格文本处理 */
+.table-container td {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+/* 名称列文本换行优化 */
+.table-container td .break-words {
+    word-break: break-word;
+    line-height: 1.3;
+}
+
+/* 表格响应式调整 */
+@media (min-width: 1700px) {
+    .table-container {
+        overflow-x: visible;
+    }
+}
+
+@media (max-width: 1700px) {
+    .table-container table {
+        min-width: 1320px;
+    }
 }
 
 .table-row {
@@ -459,4 +496,41 @@ body::before {
 .user-menu-dropdown {
     min-width: 240px;
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* 模型使用分布布局优化 */
+.model-distribution-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: flex-start;
+}
+
+.model-distribution-container.single-item {
+    justify-content: center;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.model-distribution-container.two-items {
+    justify-content: center;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+/* 饼图容器居中优化 */
+#modelUsageChart {
+    max-width: 100%;
+    height: auto;
+}
+
+@media (max-width: 768px) {
+    .model-distribution-container {
+        justify-content: center;
+    }
+    
+    .model-distribution-container.single-item,
+    .model-distribution-container.two-items {
+        max-width: 100%;
+    }
 }

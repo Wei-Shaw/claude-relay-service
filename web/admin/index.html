@@ -444,8 +444,10 @@
                             <!-- 饼图 -->
                             <div class="card p-6">
                                 <h4 class="text-lg font-semibold text-gray-800 mb-4">Token使用分布</h4>
-                                <div class="relative" style="height: 300px;">
-                                    <canvas id="modelUsageChart"></canvas>
+                                <div class="flex justify-center">
+                                    <div class="relative w-full max-w-sm" style="height: 300px;">
+                                        <canvas id="modelUsageChart"></canvas>
+                                    </div>
                                 </div>
                             </div>
                             
@@ -560,6 +562,14 @@
                                     <option value="monthly">本月</option>
                                     <option value="all">全部时间</option>
                                 </select>
+                                <!-- 标签筛选器 -->
+                                <select 
+                                    v-model="selectedTagFilter" 
+                                    class="form-input px-3 py-2 text-sm"
+                                >
+                                    <option value="">所有标签</option>
+                                    <option v-for="tag in availableTags" :key="tag" :value="tag">{{ tag }}</option>
+                                </select>
                                 <button 
                                     @click.stop="openCreateApiKeyModal"
                                     class="btn btn-primary px-6 py-3 flex items-center gap-2"
@@ -583,21 +593,32 @@
                         </div>
                         
                         <div v-else class="table-container">
-                            <table class="min-w-full">
+                            <table class="min-w-full table-fixed">
+                                <colgroup>
+                                    <col style="width: 320px"><!-- 名称 -->
+                                    <col style="width: 180px"><!-- 标签 -->
+                                    <col style="width: 200px"><!-- API Key -->
+                                    <col style="width: 100px"><!-- 状态 -->
+                                    <col style="width: 280px"><!-- 使用统计 -->
+                                    <col style="width: 130px"><!-- 创建时间 -->
+                                    <col style="width: 130px"><!-- 过期时间 -->
+                                    <col style="width: 130px"><!-- 操作 -->
+                                </colgroup>
                                 <thead class="bg-gray-50/80 backdrop-blur-sm">
                                     <tr>
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortApiKeys('name')">
+                                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortApiKeys('name')">
                                             名称
                                             <i v-if="apiKeysSortBy === 'name'" :class="['fas', apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
                                             <i v-else class="fas fa-sort ml-1 text-gray-400"></i>
                                         </th>
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">API Key</th>
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortApiKeys('status')">
+                                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">标签</th>
+                                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">API Key</th>
+                                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortApiKeys('status')">
                                             状态
                                             <i v-if="apiKeysSortBy === 'status'" :class="['fas', apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
                                             <i v-else class="fas fa-sort ml-1 text-gray-400"></i>
                                         </th>
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                                             使用统计
                                             <span class="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded" @click="sortApiKeys('cost')">
                                                 (费用
@@ -605,50 +626,62 @@
                                                 <i v-else class="fas fa-sort ml-1 text-gray-400"></i>)
                                             </span>
                                         </th>
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortApiKeys('createdAt')">
+                                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortApiKeys('createdAt')">
                                             创建时间
                                             <i v-if="apiKeysSortBy === 'createdAt'" :class="['fas', apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
                                             <i v-else class="fas fa-sort ml-1 text-gray-400"></i>
                                         </th>
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortApiKeys('expiresAt')">
+                                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortApiKeys('expiresAt')">
                                             过期时间
                                             <i v-if="apiKeysSortBy === 'expiresAt'" :class="['fas', apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
                                             <i v-else class="fas fa-sort ml-1 text-gray-400"></i>
                                         </th>
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">操作</th>
+                                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-200/50">
                                     <template v-for="key in sortedApiKeys" :key="key.id">
                                         <!-- API Key 主行 -->
                                         <tr class="table-row">
-                                            <td class="px-6 py-4 whitespace-nowrap">
+                                            <td class="px-4 py-3">
                                                 <div class="flex items-center">
-                                                    <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center mr-3">
+                                                    <div class="w-7 h-7 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
                                                         <i class="fas fa-key text-white text-xs"></i>
                                                     </div>
-                                                    <div>
-                                                        <div class="text-sm font-semibold text-gray-900">{{ key.name }}</div>
-                                                        <div class="text-xs text-gray-500">{{ key.id }}</div>
+                                                    <div class="min-w-0 flex-1">
+                                                        <div class="text-sm font-semibold text-gray-900 break-words" :title="key.name">{{ key.name }}</div>
+                                                        <div class="text-xs text-gray-500 truncate" :title="key.id">{{ key.id }}</div>
                                                         <div class="text-xs text-gray-500 mt-1">
-                                                            <span v-if="key.claudeAccountId">
+                                                            <span v-if="key.claudeAccountId || key.geminiAccountId">
                                                                 <i class="fas fa-link mr-1"></i>
-                                                                绑定: {{ getBoundAccountName(key.claudeAccountId) }}
+                                                                <span class="break-words" :title="getBoundAccountName(key.claudeAccountId || key.geminiAccountId)">
+                                                                    {{ getBoundAccountName(key.claudeAccountId || key.geminiAccountId) }}
+                                                                </span>
                                                             </span>
                                                             <span v-else>
                                                                 <i class="fas fa-share-alt mr-1"></i>
-                                                                使用共享池
+                                                                共享池
                                                             </span>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                <div class="text-sm font-mono text-gray-600 bg-gray-50 px-3 py-1 rounded-lg">
-                                                    {{ (key.apiKey || '').substring(0, 20) }}...
+                                            <td class="px-4 py-3">
+                                                <div class="flex flex-wrap gap-1">
+                                                    <span v-for="tag in (key.tags || [])" :key="tag" 
+                                                          class="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
+                                                        {{ tag }}
+                                                    </span>
+                                                    <span v-if="!key.tags || key.tags.length === 0" 
+                                                          class="text-xs text-gray-400">无标签</span>
                                                 </div>
                                             </td>
-                                            <td class="px-6 py-4 whitespace-nowrap">
+                                            <td class="px-4 py-3 whitespace-nowrap">
+                                                <div class="text-xs font-mono text-gray-600 bg-gray-50 px-2 py-1 rounded">
+                                                    {{ (key.apiKey || '').substring(0, 16) }}...
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-3 whitespace-nowrap">
                                                 <span :class="['inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold', 
                                                              key.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800']">
                                                     <div :class="['w-2 h-2 rounded-full mr-2', 
@@ -656,71 +689,43 @@
                                                     {{ key.isActive ? '活跃' : '禁用' }}
                                                 </span>
                                             </td>
-                                            <td class="px-6 py-4">
-                                                <div class="space-y-1">
+                                            <td class="px-3 py-3">
+                                                <div class="space-y-0.5 text-xs">
                                                     <!-- 请求统计 -->
-                                                    <div class="flex justify-between text-sm">
+                                                    <div class="flex justify-between">
                                                         <span class="text-gray-600">请求数:</span>
                                                         <span class="font-medium text-gray-900">{{ formatNumber((key.usage && key.usage.total && key.usage.total.requests) || 0) }}</span>
                                                     </div>
                                                     <!-- Token统计 -->
-                                                    <div class="flex justify-between text-sm">
+                                                    <div class="flex justify-between">
                                                         <span class="text-gray-600">Token:</span>
                                                         <span class="font-medium text-gray-900">{{ formatNumber((key.usage && key.usage.total && key.usage.total.tokens) || 0) }}</span>
                                                     </div>
                                                     <!-- 费用统计 -->
-                                                    <div class="flex justify-between text-sm">
+                                                    <div class="flex justify-between">
                                                         <span class="text-gray-600">费用:</span>
                                                         <span class="font-medium text-green-600">{{ calculateApiKeyCost(key.usage) }}</span>
                                                     </div>
                                                     <!-- 每日费用限制 -->
-                                                    <div v-if="key.dailyCostLimit > 0" class="flex justify-between text-sm">
+                                                    <div v-if="key.dailyCostLimit > 0" class="flex justify-between">
                                                         <span class="text-gray-600">今日费用:</span>
                                                         <span :class="['font-medium', (key.dailyCost || 0) >= key.dailyCostLimit ? 'text-red-600' : 'text-blue-600']">
                                                             ${{ (key.dailyCost || 0).toFixed(2) }} / ${{ key.dailyCostLimit.toFixed(2) }}
                                                         </span>
                                                     </div>
-                                                    <!-- 并发限制 -->
-                                                    <div class="flex justify-between text-sm">
-                                                        <span class="text-gray-600">并发限制:</span>
-                                                        <span class="font-medium text-purple-600">{{ key.concurrencyLimit > 0 ? key.concurrencyLimit : '无限制' }}</span>
-                                                    </div>
-                                                    <!-- 当前并发数 -->
-                                                    <div class="flex justify-between text-sm">
-                                                        <span class="text-gray-600">当前并发:</span>
-                                                        <span :class="['font-medium', key.currentConcurrency > 0 ? 'text-orange-600' : 'text-gray-600']">
-                                                            {{ key.currentConcurrency || 0 }}
-                                                            <span v-if="key.concurrencyLimit > 0" class="text-xs text-gray-500">/ {{ key.concurrencyLimit }}</span>
-                                                        </span>
-                                                    </div>
-                                                    <!-- 时间窗口限流 -->
-                                                    <div v-if="key.rateLimitWindow > 0" class="flex justify-between text-sm">
-                                                        <span class="text-gray-600">时间窗口:</span>
-                                                        <span class="font-medium text-indigo-600">{{ key.rateLimitWindow }} 分钟</span>
-                                                    </div>
-                                                    <!-- 请求次数限制 -->
-                                                    <div v-if="key.rateLimitRequests > 0" class="flex justify-between text-sm">
-                                                        <span class="text-gray-600">请求限制:</span>
-                                                        <span class="font-medium text-indigo-600">{{ key.rateLimitRequests }} 次/窗口</span>
-                                                    </div>
                                                     <!-- 输入/输出Token -->
-                                                    <div class="flex justify-between text-xs text-gray-500">
+                                                    <div class="flex justify-between text-gray-500">
                                                         <span>输入: {{ formatNumber((key.usage && key.usage.total && key.usage.total.inputTokens) || 0) }}</span>
                                                         <span>输出: {{ formatNumber((key.usage && key.usage.total && key.usage.total.outputTokens) || 0) }}</span>
                                                     </div>
-                                                    <!-- 缓存Token细节 -->
-                                                    <div v-if="((key.usage && key.usage.total && key.usage.total.cacheCreateTokens) || 0) > 0 || ((key.usage && key.usage.total && key.usage.total.cacheReadTokens) || 0) > 0" class="flex justify-between text-xs text-orange-500">
-                                                        <span>缓存创建: {{ formatNumber((key.usage && key.usage.total && key.usage.total.cacheCreateTokens) || 0) }}</span>
-                                                        <span>缓存读取: {{ formatNumber((key.usage && key.usage.total && key.usage.total.cacheReadTokens) || 0) }}</span>
-                                                    </div>
                                                     <!-- RPM/TPM -->
-                                                    <div class="flex justify-between text-xs text-blue-600">
+                                                    <div class="flex justify-between text-blue-600">
                                                         <span>RPM: {{ (key.usage && key.usage.averages && key.usage.averages.rpm) || 0 }}</span>
                                                         <span>TPM: {{ (key.usage && key.usage.averages && key.usage.averages.tpm) || 0 }}</span>
                                                     </div>
                                                     <!-- 今日统计 -->
                                                     <div class="pt-1 border-t border-gray-100">
-                                                        <div class="flex justify-between text-xs text-green-600">
+                                                        <div class="flex justify-between text-green-600">
                                                             <span>今日: {{ formatNumber((key.usage && key.usage.daily && key.usage.daily.requests) || 0) }}次</span>
                                                             <span>{{ formatNumber((key.usage && key.usage.daily && key.usage.daily.tokens) || 0) }}T</span>
                                                         </div>
@@ -734,10 +739,10 @@
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            <td class="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
                                                 {{ new Date(key.createdAt).toLocaleDateString() }}
                                             </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                            <td class="px-4 py-3 whitespace-nowrap text-xs">
                                                 <div v-if="key.expiresAt">
                                                     <div v-if="isApiKeyExpired(key.expiresAt)" class="text-red-600">
                                                         <i class="fas fa-exclamation-circle mr-1"></i>
@@ -756,26 +761,29 @@
                                                     永不过期
                                                 </div>
                                             </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                                <div class="flex gap-2">
+                                            <td class="px-4 py-3 whitespace-nowrap text-xs">
+                                                <div class="flex gap-1">
                                                     <button 
                                                         @click="openEditApiKeyModal(key)" 
-                                                        class="text-blue-600 hover:text-blue-900 font-medium hover:bg-blue-50 px-3 py-1 rounded-lg transition-colors"
+                                                        class="text-blue-600 hover:text-blue-900 font-medium hover:bg-blue-50 px-2 py-1 rounded transition-colors"
+                                                        title="编辑"
                                                     >
-                                                        <i class="fas fa-edit mr-1"></i>编辑
+                                                        <i class="fas fa-edit"></i>
                                                     </button>
                                                     <button 
                                                         v-if="key.expiresAt && (isApiKeyExpired(key.expiresAt) || isApiKeyExpiringSoon(key.expiresAt))"
                                                         @click="openRenewApiKeyModal(key)" 
-                                                        class="text-green-600 hover:text-green-900 font-medium hover:bg-green-50 px-3 py-1 rounded-lg transition-colors"
+                                                        class="text-green-600 hover:text-green-900 font-medium hover:bg-green-50 px-2 py-1 rounded transition-colors"
+                                                        title="续期"
                                                     >
-                                                        <i class="fas fa-clock mr-1"></i>续期
+                                                        <i class="fas fa-clock"></i>
                                                     </button>
                                                     <button 
                                                         @click="deleteApiKey(key.id)" 
-                                                        class="text-red-600 hover:text-red-900 font-medium hover:bg-red-50 px-3 py-1 rounded-lg transition-colors"
+                                                        class="text-red-600 hover:text-red-900 font-medium hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                                                        title="删除"
                                                     >
-                                                        <i class="fas fa-trash mr-1"></i>删除
+                                                        <i class="fas fa-trash"></i>
                                                     </button>
                                                 </div>
                                             </td>
@@ -857,7 +865,13 @@
                                                         </div>
                                                         <p class="text-xs text-gray-400">尝试调整时间范围或点击刷新重新加载数据</p>
                                                     </div>
-                                                    <div v-else-if="apiKeyModelStats[key.id] && apiKeyModelStats[key.id].length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                    <div v-else-if="apiKeyModelStats[key.id] && apiKeyModelStats[key.id].length > 0" 
+                                                         :class="[
+                                                           'grid gap-4',
+                                                           apiKeyModelStats[key.id].length === 1 ? 'grid-cols-1 max-w-md' :
+                                                           apiKeyModelStats[key.id].length === 2 ? 'grid-cols-1 md:grid-cols-2 max-w-4xl' :
+                                                           'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                                                         ]">
                                                         <div v-for="stat in apiKeyModelStats[key.id]" :key="stat.model" 
                                                              class="bg-gradient-to-br from-white to-gray-50 rounded-xl p-4 border border-gray-200 hover:border-indigo-300 hover:shadow-lg transition-all duration-200">
                                                             <div class="flex justify-between items-start mb-3">
@@ -2148,7 +2162,7 @@
 
         <!-- 创建 API Key 模态框 -->
         <div v-if="showCreateApiKeyModal" class="fixed inset-0 modal z-50 flex items-center justify-center p-4">
-            <div class="modal-content w-full max-w-md p-8 mx-auto max-h-[90vh] flex flex-col">
+            <div class="modal-content w-full max-w-2xl p-8 mx-auto max-h-[90vh] flex flex-col">
                 <div class="flex items-center justify-between mb-6">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
@@ -2175,6 +2189,59 @@
                             placeholder="为您的 API Key 取一个名称"
                         >
                     </div>
+
+                    <!-- 标签设置 -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">标签 (可选)</label>
+                        
+                        <!-- 已选标签显示 -->
+                        <div class="flex flex-wrap gap-2 mb-3" v-if="apiKeyForm.tags && apiKeyForm.tags.length > 0">
+                            <span v-for="(tag, index) in apiKeyForm.tags" :key="index" 
+                                  class="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
+                                {{ tag }}
+                                <button type="button" @click="removeTag(index)" 
+                                        class="text-blue-600 hover:text-blue-800 ml-1">
+                                    <i class="fas fa-times text-xs"></i>
+                                </button>
+                            </span>
+                        </div>
+
+                        <!-- 现有标签快速选择 -->
+                        <div v-if="computedAvailableTags.length > 0" class="mb-3">
+                            <div class="text-xs text-gray-600 mb-2">快速选择已有标签：</div>
+                            <div class="flex flex-wrap gap-1">
+                                <button 
+                                    type="button"
+                                    v-for="tag in computedAvailableTags" 
+                                    :key="tag"
+                                    @click="addExistingTag(tag)"
+                                    :disabled="apiKeyForm.tags.includes(tag)"
+                                    class="px-2 py-1 text-xs rounded-md border transition-colors"
+                                    :class="apiKeyForm.tags.includes(tag) 
+                                        ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' 
+                                        : 'bg-white text-gray-700 border-gray-300 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 cursor-pointer'"
+                                >
+                                    {{ tag }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 新建标签输入 -->
+                        <div class="flex gap-2">
+                            <input 
+                                v-model="newTag" 
+                                type="text" 
+                                class="form-input flex-1"
+                                placeholder="输入新标签名称"
+                                @keypress.enter.prevent="addTag"
+                            >
+                            <button type="button" @click="addTag" 
+                                    class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">用于标记不同团队或用途，方便筛选管理</p>
+                    </div>
                     
                     <!-- 速率限制设置 -->
                     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-4">
@@ -2188,39 +2255,41 @@
                             </div>
                         </div>
                         
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口 (分钟)</label>
-                            <input 
-                                v-model="apiKeyForm.rateLimitWindow" 
-                                type="number" 
-                                min="1"
-                                placeholder="留空表示无限制" 
-                                class="form-input w-full"
-                            >
-                            <p class="text-xs text-gray-500 mt-2">设置一个时间段（以分钟为单位），用于计算速率限制</p>
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口内的请求次数限制</label>
-                            <input 
-                                v-model="apiKeyForm.rateLimitRequests" 
-                                type="number" 
-                                min="1"
-                                placeholder="留空表示无限制" 
-                                class="form-input w-full"
-                            >
-                            <p class="text-xs text-gray-500 mt-2">在时间窗口内允许的最大请求次数（需要先设置时间窗口）</p>
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口内的 Token 使用量限制</label>
-                            <input 
-                                v-model="apiKeyForm.tokenLimit" 
-                                type="number" 
-                                placeholder="留空表示无限制" 
-                                class="form-input w-full"
-                            >
-                            <p class="text-xs text-gray-500 mt-2">在时间窗口内允许消耗的最大 Token 数量（需要先设置时间窗口）</p>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口 (分钟)</label>
+                                <input 
+                                    v-model="apiKeyForm.rateLimitWindow" 
+                                    type="number" 
+                                    min="1"
+                                    placeholder="留空表示无限制" 
+                                    class="form-input w-full"
+                                >
+                                <p class="text-xs text-gray-500 mt-2">设置一个时间段（以分钟为单位），用于计算速率限制</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-3">请求次数限制</label>
+                                <input 
+                                    v-model="apiKeyForm.rateLimitRequests" 
+                                    type="number" 
+                                    min="1"
+                                    placeholder="留空表示无限制" 
+                                    class="form-input w-full"
+                                >
+                                <p class="text-xs text-gray-500 mt-2">在时间窗口内允许的最大请求次数</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-3">Token 使用量限制</label>
+                                <input 
+                                    v-model="apiKeyForm.tokenLimit" 
+                                    type="number" 
+                                    placeholder="留空表示无限制" 
+                                    class="form-input w-full"
+                                >
+                                <p class="text-xs text-gray-500 mt-2">在时间窗口内允许消耗的最大 Token 数量</p>
+                            </div>
                         </div>
                         
                         <!-- 示例说明 -->
@@ -2237,10 +2306,11 @@
                         </div>
                     </div>
                     
+                    <!-- 费用限制 -->
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-3">每日费用限制 (美元)</label>
                         <div class="space-y-3">
-                            <div class="flex gap-2">
+                            <div class="flex gap-2 flex-wrap">
                                 <button type="button" @click="apiKeyForm.dailyCostLimit = '50'" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium">$50</button>
                                 <button type="button" @click="apiKeyForm.dailyCostLimit = '100'" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium">$100</button>
                                 <button type="button" @click="apiKeyForm.dailyCostLimit = '200'" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium">$200</button>
@@ -2258,6 +2328,7 @@
                         </div>
                     </div>
                     
+                    <!-- 并发限制 -->
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-3">并发限制 (可选)</label>
                         <input 
@@ -2502,7 +2573,7 @@
 
         <!-- 编辑 API Key 模态框 -->
         <div v-if="showEditApiKeyModal" class="fixed inset-0 modal z-50 flex items-center justify-center p-4">
-            <div class="modal-content w-full max-w-md p-8 mx-auto max-h-[90vh] flex flex-col">
+            <div class="modal-content w-full max-w-2xl p-8 mx-auto max-h-[90vh] flex flex-col">
                 <div class="flex items-center justify-between mb-6">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
@@ -2529,6 +2600,59 @@
                         >
                         <p class="text-xs text-gray-500 mt-2">名称不可修改</p>
                     </div>
+
+                    <!-- 标签设置 -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">标签 (可选)</label>
+                        
+                        <!-- 已选标签显示 -->
+                        <div class="flex flex-wrap gap-2 mb-3" v-if="editApiKeyForm.tags && editApiKeyForm.tags.length > 0">
+                            <span v-for="(tag, index) in editApiKeyForm.tags" :key="index" 
+                                  class="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
+                                {{ tag }}
+                                <button type="button" @click="removeEditTag(index)" 
+                                        class="text-blue-600 hover:text-blue-800 ml-1">
+                                    <i class="fas fa-times text-xs"></i>
+                                </button>
+                            </span>
+                        </div>
+
+                        <!-- 现有标签快速选择 -->
+                        <div v-if="computedAvailableTags.length > 0" class="mb-3">
+                            <div class="text-xs text-gray-600 mb-2">快速选择已有标签：</div>
+                            <div class="flex flex-wrap gap-1">
+                                <button 
+                                    type="button"
+                                    v-for="tag in computedAvailableTags" 
+                                    :key="tag"
+                                    @click="addExistingEditTag(tag)"
+                                    :disabled="editApiKeyForm.tags.includes(tag)"
+                                    class="px-2 py-1 text-xs rounded-md border transition-colors"
+                                    :class="editApiKeyForm.tags.includes(tag) 
+                                        ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' 
+                                        : 'bg-white text-gray-700 border-gray-300 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 cursor-pointer'"
+                                >
+                                    {{ tag }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 新建标签输入 -->
+                        <div class="flex gap-2">
+                            <input 
+                                v-model="newEditTag" 
+                                type="text" 
+                                class="form-input flex-1"
+                                placeholder="输入新标签名称"
+                                @keypress.enter.prevent="addEditTag"
+                            >
+                            <button type="button" @click="addEditTag" 
+                                    class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">用于标记不同团队或用途，方便筛选管理</p>
+                    </div>
                     
                     <!-- 速率限制设置 -->
                     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-4">
@@ -2542,40 +2666,42 @@
                             </div>
                         </div>
                         
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口 (分钟)</label>
-                            <input 
-                                v-model="editApiKeyForm.rateLimitWindow" 
-                                type="number" 
-                                min="1"
-                                placeholder="留空表示无限制" 
-                                class="form-input w-full"
-                            >
-                            <p class="text-xs text-gray-500 mt-2">设置一个时间段（以分钟为单位），用于计算速率限制</p>
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口内的请求次数限制</label>
-                            <input 
-                                v-model="editApiKeyForm.rateLimitRequests" 
-                                type="number" 
-                                min="1"
-                                placeholder="留空表示无限制" 
-                                class="form-input w-full"
-                            >
-                            <p class="text-xs text-gray-500 mt-2">在时间窗口内允许的最大请求次数（需要先设置时间窗口）</p>
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口内的 Token 使用量限制</label>
-                            <input 
-                                v-model="editApiKeyForm.tokenLimit" 
-                                type="number" 
-                                min="0"
-                                placeholder="0 表示无限制" 
-                                class="form-input w-full"
-                            >
-                            <p class="text-xs text-gray-500 mt-2">在时间窗口内允许消耗的最大 Token 数量（需要先设置时间窗口），0 或留空表示无限制</p>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口 (分钟)</label>
+                                <input 
+                                    v-model="editApiKeyForm.rateLimitWindow" 
+                                    type="number" 
+                                    min="1"
+                                    placeholder="留空表示无限制" 
+                                    class="form-input w-full"
+                                >
+                                <p class="text-xs text-gray-500 mt-2">设置一个时间段（以分钟为单位），用于计算速率限制</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-3">请求次数限制</label>
+                                <input 
+                                    v-model="editApiKeyForm.rateLimitRequests" 
+                                    type="number" 
+                                    min="1"
+                                    placeholder="留空表示无限制" 
+                                    class="form-input w-full"
+                                >
+                                <p class="text-xs text-gray-500 mt-2">在时间窗口内允许的最大请求次数</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-3">Token 使用量限制</label>
+                                <input 
+                                    v-model="editApiKeyForm.tokenLimit" 
+                                    type="number" 
+                                    min="0"
+                                    placeholder="0 表示无限制" 
+                                    class="form-input w-full"
+                                >
+                                <p class="text-xs text-gray-500 mt-2">在时间窗口内允许消耗的最大 Token 数量，0 或留空表示无限制</p>
+                            </div>
                         </div>
                         
                         <!-- 示例说明 -->
