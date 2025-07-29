@@ -50,9 +50,12 @@ function decrypt(text) {
   if (!text) return '';
   try {
     const key = generateEncryptionKey();
-    const textParts = text.split(':');
-    const iv = Buffer.from(textParts.shift(), 'hex');
-    const encryptedText = Buffer.from(textParts.join(':'), 'hex');
+    // IV 是固定长度的 32 个十六进制字符（16 字节）
+    const ivHex = text.substring(0, 32);
+    const encryptedHex = text.substring(33); // 跳过冒号
+    
+    const iv = Buffer.from(ivHex, 'hex');
+    const encryptedText = Buffer.from(encryptedHex, 'hex');
     const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
     let decrypted = decipher.update(encryptedText);
     decrypted = Buffer.concat([decrypted, decipher.final()]);
@@ -168,22 +171,36 @@ async function refreshAccessToken(refreshToken) {
   const oAuth2Client = createOAuth2Client();
   
   try {
+    // 设置 refresh_token
     oAuth2Client.setCredentials({
       refresh_token: refreshToken
     });
     
-    const { credentials } = await oAuth2Client.refreshAccessToken();
+    // 调用 refreshAccessToken 获取新的 tokens
+    const response = await oAuth2Client.refreshAccessToken();
+    const credentials = response.credentials;
+    
+    // 检查是否成功获取了新的 access_token
+    if (!credentials || !credentials.access_token) {
+      throw new Error('No access token returned from refresh');
+    }
+    
+    logger.info(`🔄 Successfully refreshed Gemini token. New expiry: ${new Date(credentials.expiry_date).toISOString()}`);
     
     return {
       access_token: credentials.access_token,
-      refresh_token: credentials.refresh_token || refreshToken,
+      refresh_token: credentials.refresh_token || refreshToken, // 保留原 refresh_token 如果没有返回新的
       scope: credentials.scope || OAUTH_SCOPES.join(' '),
       token_type: credentials.token_type || 'Bearer',
-      expiry_date: credentials.expiry_date
+      expiry_date: credentials.expiry_date || Date.now() + 3600000 // 默认1小时过期
     };
   } catch (error) {
-    logger.error('Error refreshing access token:', error);
-    throw new Error('Failed to refresh access token');
+    logger.error('Error refreshing access token:', {
+      message: error.message,
+      code: error.code,
+      response: error.response?.data
+    });
+    throw new Error(`Failed to refresh access token: ${error.message}`);
   }
 }
 
@@ -311,7 +328,8 @@ async function updateAccount(accountId, updates) {
   updates.updatedAt = now;
   
   // 检查是否新增了 refresh token
-  const oldRefreshToken = existingAccount.refreshToken ? decrypt(existingAccount.refreshToken) : '';
+  // existingAccount.refreshToken 已经是解密后的值了（从 getAccount 返回）
+  const oldRefreshToken = existingAccount.refreshToken || '';
   let needUpdateExpiry = false;
   
   // 加密敏感字段
@@ -595,7 +613,8 @@ async function refreshAccountToken(accountId) {
     logRefreshStart(accountId, account.name, 'gemini', 'manual_refresh');
     logger.info(`🔄 Starting token refresh for Gemini account: ${account.name} (${accountId})`);
     
-    const newTokens = await refreshAccessToken(decrypt(account.refreshToken));
+    // account.refreshToken 已经是解密后的值（从 getAccount 返回）
+    const newTokens = await refreshAccessToken(account.refreshToken);
     
     // 更新账户信息
     const updates = {
@@ -603,7 +622,9 @@ async function refreshAccountToken(accountId) {
       refreshToken: newTokens.refresh_token || account.refreshToken,
       expiresAt: new Date(newTokens.expiry_date).toISOString(),
       lastRefreshAt: new Date().toISOString(),
-      geminiOauth: JSON.stringify(newTokens)
+      geminiOauth: JSON.stringify(newTokens),
+      status: 'active',  // 刷新成功后，将状态更新为 active
+      errorMessage: ''   // 清空错误信息
     };
     
     await updateAccount(accountId, updates);
@@ -625,11 +646,17 @@ async function refreshAccountToken(accountId) {
     
     logger.error(`Failed to refresh token for account ${accountId}:`, error);
     
-    // 标记账户为错误状态
-    await updateAccount(accountId, {
-      status: 'error',
-      errorMessage: error.message
-    });
+    // 标记账户为错误状态（只有在账户存在时）
+    if (account) {
+      try {
+        await updateAccount(accountId, {
+          status: 'error',
+          errorMessage: error.message
+        });
+      } catch (updateError) {
+        logger.error('Failed to update account status after refresh error:', updateError);
+      }
+    }
     
     throw error;
   } finally {

@@ -103,6 +103,53 @@ jobs:
         echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
         echo "new_tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
 
+    - name: Check if frontend build is needed
+      id: check_frontend
+      if: steps.check.outputs.needs_bump == 'true'
+      run: |
+        # 检查 web/admin-spa 目录是否有变更
+        FRONTEND_CHANGES=false
+        CHANGED_FILES=$(git diff --name-only HEAD~1..HEAD 2>/dev/null || git diff --name-only $(git rev-list --max-parents=0 HEAD)..HEAD)
+        
+        while IFS= read -r file; do
+          if [[ "$file" =~ ^web/admin-spa/ ]] && 
+             [[ ! "$file" =~ ^web/admin-spa/dist/ ]] &&
+             [[ ! "$file" =~ \.(md|txt)$ ]] &&
+             [[ "$file" != "web/admin-spa/.gitignore" ]]; then
+            echo "Found frontend change in: $file"
+            FRONTEND_CHANGES=true
+            break
+          fi
+        done <<< "$CHANGED_FILES"
+        
+        echo "needs_build=$FRONTEND_CHANGES" >> $GITHUB_OUTPUT
+
+    - name: Setup Node.js
+      if: steps.check.outputs.needs_bump == 'true' && steps.check_frontend.outputs.needs_build == 'true'
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: web/admin-spa/package-lock.json
+
+    - name: Build admin-spa
+      if: steps.check.outputs.needs_bump == 'true' && steps.check_frontend.outputs.needs_build == 'true'
+      run: |
+        echo "Building admin-spa frontend..."
+        cd web/admin-spa
+        npm ci
+        npm run build
+        cd ../..
+        
+        # 确认 dist 目录已创建
+        if [ -d "web/admin-spa/dist" ]; then
+          echo "✅ Frontend build successful"
+          ls -la web/admin-spa/dist/
+        else
+          echo "❌ Frontend build failed - dist directory not found"
+          exit 1
+        fi
+
     - name: Update VERSION file
       if: steps.check.outputs.needs_bump == 'true'
       run: |
@@ -112,9 +159,19 @@ jobs:
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
         
-        # 提交VERSION文件 - 添加 [skip ci] 以避免再次触发
+        # 检查是否需要添加 dist 目录
+        if [ "${{ steps.check_frontend.outputs.needs_build }}" = "true" ] && [ -d "web/admin-spa/dist" ]; then
+          git add -f web/admin-spa/dist/
+          echo "Added frontend dist directory to commit"
+        fi
+        
+        # 提交VERSION文件和可能的dist目录 - 添加 [skip ci] 以避免再次触发
         git add VERSION
-        git commit -m "chore: sync VERSION file with release ${{ steps.next_version.outputs.new_tag }} [skip ci]"
+        if [ "${{ steps.check_frontend.outputs.needs_build }}" = "true" ]; then
+          git commit -m "chore: sync VERSION file with release ${{ steps.next_version.outputs.new_tag }} and rebuild frontend [skip ci]"
+        else
+          git commit -m "chore: sync VERSION file with release ${{ steps.next_version.outputs.new_tag }} [skip ci]"
+        fi
 
     - name: Install git-cliff
       if: steps.check.outputs.needs_bump == 'true'

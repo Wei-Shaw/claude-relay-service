@@ -12,52 +12,10 @@ const router = express.Router();
 // 🏠 服务静态文件
 router.use('/assets', express.static(path.join(__dirname, '../../web/assets')));
 
-// 🔒 Web管理界面文件白名单 - 仅允许这些特定文件
-const ALLOWED_FILES = {
-  'index.html': {
-    path: path.join(__dirname, '../../web/admin/index.html'),
-    contentType: 'text/html; charset=utf-8'
-  },
-  'app.js': {
-    path: path.join(__dirname, '../../web/admin/app.js'),
-    contentType: 'application/javascript; charset=utf-8'
-  },
-  'style.css': {
-    path: path.join(__dirname, '../../web/admin/style.css'),
-    contentType: 'text/css; charset=utf-8'
-  },
-};
-
-// 🛡️ 安全文件服务函数
-function serveWhitelistedFile(req, res, filename) {
-  const fileConfig = ALLOWED_FILES[filename];
-  
-  if (!fileConfig) {
-    logger.security(`🚨 Attempted access to non-whitelisted file: ${filename}`);
-    return res.status(404).json({ error: 'File not found' });
-  }
-
-  try {
-    // 检查文件是否存在
-    if (!fs.existsSync(fileConfig.path)) {
-      logger.error(`❌ Whitelisted file not found: ${fileConfig.path}`);
-      return res.status(404).json({ error: 'File not found' });
-    }
-
-    // 读取并返回文件内容
-    const content = fs.readFileSync(fileConfig.path, 'utf8');
-    res.setHeader('Content-Type', fileConfig.contentType);
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.send(content);
-    
-    logger.info(`📄 Served whitelisted file: ${filename}`);
-  } catch (error) {
-    logger.error(`❌ Error serving file ${filename}:`, error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+// 🌐 页面路由重定向到新版 admin-spa
+router.get('/', (req, res) => {
+  res.redirect(301, '/admin-next/api-stats');
+});
 
 // 🔐 管理员登录
 router.post('/auth/login', async (req, res) => {
@@ -386,23 +344,5 @@ router.post('/auth/refresh', async (req, res) => {
     });
   }
 });
-
-// 🌐 Web管理界面路由 - 使用固定白名单
-router.get('/', (req, res) => {
-  serveWhitelistedFile(req, res, 'index.html');
-});
-
-router.get('/app.js', (req, res) => {
-  serveWhitelistedFile(req, res, 'app.js');
-});
-
-router.get('/style.css', (req, res) => {
-  serveWhitelistedFile(req, res, 'style.css');
-});
-
-
-
-
-// 🔑 Gemini OAuth 回调页面
 
 module.exports = router;

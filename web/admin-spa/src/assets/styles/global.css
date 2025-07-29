@@ -1,3 +1,4 @@
+/* 从原始 style.css 复制的全局样式 */
 :root {
     --primary-color: #667eea;
     --secondary-color: #764ba2;
@@ -91,6 +92,101 @@ body::before {
         0 10px 15px -3px rgba(102, 126, 234, 0.3),
         0 4px 6px -2px rgba(102, 126, 234, 0.05);
     transform: translateY(-1px);
+}
+
+/* 按钮样式 */
+.btn {
+    font-weight: 500;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    letter-spacing: 0.025em;
+}
+
+.btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.3s ease, height 0.3s ease;
+}
+
+.btn:active::before {
+    width: 300px;
+    height: 300px;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    color: white;
+    box-shadow: 
+        0 10px 15px -3px rgba(102, 126, 234, 0.3),
+        0 4px 6px -2px rgba(102, 126, 234, 0.05);
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 
+        0 20px 25px -5px rgba(102, 126, 234, 0.3),
+        0 10px 10px -5px rgba(102, 126, 234, 0.1);
+}
+
+.btn-success {
+    background: linear-gradient(135deg, var(--success-color) 0%, #059669 100%);
+    color: white;
+    box-shadow: 
+        0 10px 15px -3px rgba(16, 185, 129, 0.3),
+        0 4px 6px -2px rgba(16, 185, 129, 0.05);
+}
+
+.btn-success:hover {
+    transform: translateY(-1px);
+    box-shadow: 
+        0 20px 25px -5px rgba(16, 185, 129, 0.3),
+        0 10px 10px -5px rgba(16, 185, 129, 0.1);
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, var(--error-color) 0%, #dc2626 100%);
+    color: white;
+    box-shadow: 
+        0 10px 15px -3px rgba(239, 68, 68, 0.3),
+        0 4px 6px -2px rgba(239, 68, 68, 0.05);
+}
+
+.btn-danger:hover {
+    transform: translateY(-1px);
+    box-shadow: 
+        0 20px 25px -5px rgba(239, 68, 68, 0.3),
+        0 10px 10px -5px rgba(239, 68, 68, 0.1);
+}
+
+/* 表单输入框样式 */
+.form-input {
+    background: rgba(255, 255, 255, 0.9);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    font-size: 16px;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 
+        0 0 0 3px rgba(102, 126, 234, 0.1),
+        0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.95);
 }
 
 .card {
@@ -376,8 +472,6 @@ body::before {
     display: none; 
 }
 
-
-
 /* 自定义滚动条样式 */
 .custom-scrollbar {
     scrollbar-width: thin;
@@ -459,4 +553,20 @@ body::before {
 .user-menu-dropdown {
     min-width: 240px;
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Tab 内容区域样式 */
+.tab-content {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }

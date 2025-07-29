@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-Claude Relay Service 是一个功能完整的 Claude API 中转服务，支持多账户管理、API Key 认证、代理配置和现代化 Web 管理界面。该服务作为客户端（如 SillyTavern）与 Anthropic API 之间的中间件，提供认证、限流、监控等功能。
+Claude Relay Service 是一个功能完整的 AI API 中转服务，支持 Claude 和 Gemini 双平台。提供多账户管理、API Key 认证、代理配置和现代化 Web 管理界面。该服务作为客户端（如 SillyTavern、Claude Code、Gemini CLI）与 AI API 之间的中间件，提供认证、限流、监控等功能。
 
 ## 核心架构
 
@@ -19,6 +19,7 @@ Claude Relay Service 是一个功能完整的 Claude API 中转服务，支持�
 ### 主要服务组件
 - **claudeRelayService.js**: 核心代理服务，处理请求转发和流式响应
 - **claudeAccountService.js**: Claude账户管理，OAuth token刷新和账户选择
+- **geminiAccountService.js**: Gemini账户管理，Google OAuth token刷新和账户选择
 - **apiKeyService.js**: API Key管理，验证、限流和使用统计
 - **oauthHelper.js**: OAuth工具，PKCE流程实现和代理支持
 
@@ -124,6 +125,11 @@ npm run setup  # 自动生成密钥并创建管理员账户
 2. **授权码无效**: 确保复制了完整的Authorization Code，没有遗漏字符
 3. **Token刷新失败**: 检查refreshToken有效性和代理配置
 
+### Gemini Token刷新问题
+1. **刷新失败**: 确保 refresh_token 有效且未过期
+2. **错误日志**: 查看 `logs/token-refresh-error.log` 获取详细错误信息
+3. **测试脚本**: 运行 `node scripts/test-gemini-refresh.js` 测试 token 刷新
+
 ### 常见开发问题
 1. **Redis连接失败**: 确认Redis服务运行，检查连接配置
 2. **管理员登录失败**: 检查init.json同步到Redis，运行npm run setup
@@ -218,3 +224,8 @@ npm run cli accounts refresh <accountId>
 npm run cli admin create -- --username admin2
 npm run cli admin reset-password -- --username admin
 ```
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.

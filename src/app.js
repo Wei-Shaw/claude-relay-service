@@ -63,6 +63,11 @@ class Application {
         logger.info(`💰 Cost initialization completed: ${result.processed} processed, ${result.errors} errors`);
       }
       
+      // 🕐 初始化Claude账户会话窗口
+      logger.info('🕐 Initializing Claude account session windows...');
+      const claudeAccountService = require('./services/claudeAccountService');
+      await claudeAccountService.initializeSessionWindows();
+      
       // 🛡️ 安全中间件
       this.app.use(helmet({
         contentSecurityPolicy: false, // 允许内联样式和脚本
@@ -117,20 +122,71 @@ class Application {
         this.app.set('trust proxy', 1);
       }
 
+      // 🎨 新版管理界面静态文件服务（必须在其他路由之前）
+      const adminSpaPath = path.join(__dirname, '..', 'web', 'admin-spa', 'dist');
+      if (fs.existsSync(adminSpaPath)) {
+        // 处理不带斜杠的路径，重定向到带斜杠的路径
+        this.app.get('/admin-next', (req, res) => {
+          res.redirect(301, '/admin-next/');
+        });
+        
+        // 安全的静态文件服务配置
+        this.app.use('/admin-next/', express.static(adminSpaPath, {
+          maxAge: '1d', // 缓存静态资源1天
+          etag: true,
+          lastModified: true,
+          index: 'index.html',
+          // 安全选项：禁止目录遍历
+          dotfiles: 'deny', // 拒绝访问点文件
+          redirect: false, // 禁止目录重定向
+          // 自定义错误处理
+          setHeaders: (res, path) => {
+            // 为不同类型的文件设置适当的缓存策略
+            if (path.endsWith('.js') || path.endsWith('.css')) {
+              res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); // 1年缓存
+            } else if (path.endsWith('.html')) {
+              res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            }
+          }
+        }));
+        
+        // 处理SPA路由：所有未匹配的admin-next路径都返回index.html
+        this.app.get('/admin-next/*', (req, res, next) => {
+          // 安全检查：防止路径遍历攻击
+          const requestPath = req.path.replace('/admin-next/', '');
+          if (requestPath.includes('..') || requestPath.includes('//') || requestPath.includes('\\')) {
+            return res.status(400).json({ error: 'Invalid path' });
+          }
+          
+          // 如果是静态资源请求但文件不存在，返回404
+          if (requestPath.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf)$/i)) {
+            return res.status(404).send('Not found');
+          }
+          
+          // 其他路径返回index.html（SPA路由处理）
+          res.sendFile(path.join(adminSpaPath, 'index.html'));
+        });
+        
+        logger.info('✅ Admin SPA (next) static files mounted at /admin-next/');
+      } else {
+        logger.warn('⚠️ Admin SPA dist directory not found, skipping /admin-next route');
+      }
+
       // 🛣️ 路由
       this.app.use('/api', apiRoutes);
       this.app.use('/api', geminiV1betaRoutes); // Gemini CLI v1beta API 支持
       this.app.use('/claude', apiRoutes); // /claude 路由别名，与 /api 功能相同
       this.app.use('/admin', adminRoutes);
+      // 使用 web 路由（包含 auth 和页面重定向）
       this.app.use('/web', webRoutes);
       this.app.use('/apiStats', apiStatsRoutes);
       this.app.use('/gemini', geminiRoutes);
       this.app.use('/openai/gemini', openaiGeminiRoutes);
       this.app.use('/openai/claude', openaiClaudeRoutes);
       
-      // 🏠 根路径重定向到API统计页面
+      // 🏠 根路径重定向到新版管理界面
       this.app.get('/', (req, res) => {
-        res.redirect('/apiStats');
+        res.redirect('/admin-next/api-stats');
       });
       
       // 🏥 增强的健康检查端点
@@ -318,7 +374,7 @@ class Application {
       
       this.server = this.app.listen(config.server.port, config.server.host, () => {
         logger.start(`🚀 Claude Relay Service started on ${config.server.host}:${config.server.port}`);
-        logger.info(`🌐 Web interface: http://${config.server.host}:${config.server.port}/web`);
+        logger.info(`🌐 Web interface: http://${config.server.host}:${config.server.port}/admin-next/api-stats`);
         logger.info(`🔗 API endpoint: http://${config.server.host}:${config.server.port}/api/v1/messages`);
         logger.info(`⚙️  Admin API: http://${config.server.host}:${config.server.port}/admin`);
         logger.info(`🏥 Health check: http://${config.server.host}:${config.server.port}/health`);

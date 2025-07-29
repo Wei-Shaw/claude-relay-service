@@ -1,6 +1,4 @@
 const express = require('express');
-const path = require('path');
-const fs = require('fs');
 const redis = require('../models/redis');
 const logger = require('../utils/logger');
 const apiKeyService = require('../services/apiKeyService');
@@ -8,45 +6,9 @@ const CostCalculator = require('../utils/costCalculator');
 
 const router = express.Router();
 
-// 🛡️ 安全文件服务函数
-function serveStaticFile(req, res, filename, contentType) {
-  const filePath = path.join(__dirname, '../../web/apiStats', filename);
-  
-  try {
-    // 检查文件是否存在
-    if (!fs.existsSync(filePath)) {
-      logger.error(`❌ API Stats file not found: ${filePath}`);
-      return res.status(404).json({ error: 'File not found' });
-    }
-
-    // 读取并返回文件内容
-    const content = fs.readFileSync(filePath, 'utf8');
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.send(content);
-    
-    logger.info(`📄 Served API Stats file: ${filename}`);
-  } catch (error) {
-    logger.error(`❌ Error serving API Stats file ${filename}:`, error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
-
-// 🏠 API Stats 主页面
+// 🏠 重定向页面请求到新版 admin-spa
 router.get('/', (req, res) => {
-  serveStaticFile(req, res, 'index.html', 'text/html; charset=utf-8');
-});
-
-// 📱 JavaScript 文件
-router.get('/app.js', (req, res) => {
-  serveStaticFile(req, res, 'app.js', 'application/javascript; charset=utf-8');
-});
-
-// 🎨 CSS 文件
-router.get('/style.css', (req, res) => {
-  serveStaticFile(req, res, 'style.css', 'text/css; charset=utf-8');
+  res.redirect(301, '/admin-next/api-stats');
 });
 
 // 🔑 获取 API Key 对应的 ID
