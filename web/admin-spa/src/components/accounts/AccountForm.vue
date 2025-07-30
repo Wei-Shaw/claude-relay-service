@@ -1,36 +1,48 @@
 <template>
   <Teleport to="body">
-    <div v-if="show" class="fixed inset-0 modal z-50 flex items-center justify-center p-4">
+    <div
+      v-if="show"
+      class="fixed inset-0 modal z-50 flex items-center justify-center p-4"
+    >
       <div class="modal-content w-full max-w-2xl p-8 mx-auto max-h-[90vh] overflow-y-auto custom-scrollbar">
         <div class="flex items-center justify-between mb-6">
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
-              <i class="fas fa-user-circle text-white"></i>
+              <i class="fas fa-user-circle text-white" />
             </div>
-            <h3 class="text-xl font-bold text-gray-900">{{ isEdit ? '编辑账户' : '添加账户' }}</h3>
+            <h3 class="text-xl font-bold text-gray-900">
+              {{ isEdit ? '编辑账户' : '添加账户' }}
+            </h3>
           </div>
           <button 
-            @click="$emit('close')"
             class="text-gray-400 hover:text-gray-600 transition-colors"
+            @click="$emit('close')"
           >
-            <i class="fas fa-times text-xl"></i>
+            <i class="fas fa-times text-xl" />
           </button>
         </div>
         
         <!-- 步骤指示器 -->
-        <div v-if="!isEdit && form.addType === 'oauth'" class="flex items-center justify-center mb-8">
+        <div
+          v-if="!isEdit && form.addType === 'oauth'"
+          class="flex items-center justify-center mb-8"
+        >
           <div class="flex items-center space-x-4">
             <div class="flex items-center">
-              <div :class="['w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold', 
-                           oauthStep >= 1 ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-500']">
+              <div
+                :class="['w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold', 
+                         oauthStep >= 1 ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-500']"
+              >
                 1
               </div>
               <span class="ml-2 text-sm font-medium text-gray-700">基本信息</span>
             </div>
-            <div class="w-8 h-0.5 bg-gray-300"></div>
+            <div class="w-8 h-0.5 bg-gray-300" />
             <div class="flex items-center">
-              <div :class="['w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold', 
-                           oauthStep >= 2 ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-500']">
+              <div
+                :class="['w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold', 
+                         oauthStep >= 2 ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-500']"
+              >
                 2
               </div>
               <span class="ml-2 text-sm font-medium text-gray-700">授权认证</span>
@@ -46,8 +58,8 @@
               <div class="flex gap-4">
                 <label class="flex items-center cursor-pointer">
                   <input 
-                    type="radio" 
                     v-model="form.platform" 
+                    type="radio" 
                     value="claude" 
                     class="mr-2"
                   >
@@ -55,8 +67,8 @@
                 </label>
                 <label class="flex items-center cursor-pointer">
                   <input 
-                    type="radio" 
                     v-model="form.platform" 
+                    type="radio" 
                     value="claude-console" 
                     class="mr-2"
                   >
@@ -64,8 +76,8 @@
                 </label>
                 <label class="flex items-center cursor-pointer">
                   <input 
-                    type="radio" 
                     v-model="form.platform" 
+                    type="radio" 
                     value="gemini" 
                     class="mr-2"
                   >
@@ -79,8 +91,8 @@
               <div class="flex gap-4">
                 <label class="flex items-center cursor-pointer">
                   <input 
-                    type="radio" 
                     v-model="form.addType" 
+                    type="radio" 
                     value="oauth" 
                     class="mr-2"
                   >
@@ -88,8 +100,8 @@
                 </label>
                 <label class="flex items-center cursor-pointer">
                   <input 
-                    type="radio" 
                     v-model="form.addType" 
+                    type="radio" 
                     value="manual" 
                     class="mr-2"
                   >
@@ -108,7 +120,12 @@
                 :class="{ 'border-red-500': errors.name }"
                 placeholder="为账户设置一个易识别的名称"
               >
-              <p v-if="errors.name" class="text-red-500 text-xs mt-1">{{ errors.name }}</p>
+              <p
+                v-if="errors.name"
+                class="text-red-500 text-xs mt-1"
+              >
+                {{ errors.name }}
+              </p>
             </div>
             
             <div>
@@ -118,7 +135,7 @@
                 rows="3" 
                 class="form-input w-full resize-none"
                 placeholder="账户用途说明..."
-              ></textarea>
+              />
             </div>
             
             <div>
@@ -126,8 +143,8 @@
               <div class="flex gap-4">
                 <label class="flex items-center cursor-pointer">
                   <input 
-                    type="radio" 
                     v-model="form.accountType" 
+                    type="radio" 
                     value="shared" 
                     class="mr-2"
                   >
@@ -135,8 +152,8 @@
                 </label>
                 <label class="flex items-center cursor-pointer">
                   <input 
-                    type="radio" 
                     v-model="form.accountType" 
+                    type="radio" 
                     value="dedicated" 
                     class="mr-2"
                   >
@@ -159,26 +176,43 @@
               >
               <div class="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                 <div class="flex items-start gap-2">
-                  <i class="fas fa-info-circle text-yellow-600 mt-0.5"></i>
+                  <i class="fas fa-info-circle text-yellow-600 mt-0.5" />
                   <div class="text-xs text-yellow-700">
-                    <p class="font-medium mb-1">Google Cloud/Workspace 账号需要提供项目编号</p>
+                    <p class="font-medium mb-1">
+                      Google Cloud/Workspace 账号需要提供项目编号
+                    </p>
                     <p>某些 Google 账号（特别是绑定了 Google Cloud 的账号）会被识别为 Workspace 账号，需要提供额外的项目编号。</p>
                     <div class="mt-2 p-2 bg-white rounded border border-yellow-300">
-                      <p class="font-medium mb-1">如何获取项目编号：</p>
+                      <p class="font-medium mb-1">
+                        如何获取项目编号：
+                      </p>
                       <ol class="list-decimal list-inside space-y-1 ml-2">
-                        <li>访问 <a href="https://console.cloud.google.com/welcome" target="_blank" class="text-blue-600 hover:underline font-medium">Google Cloud Console</a></li>
+                        <li>
+                          访问 <a
+                            href="https://console.cloud.google.com/welcome"
+                            target="_blank"
+                            class="text-blue-600 hover:underline font-medium"
+                          >Google Cloud Console</a>
+                        </li>
                         <li>复制<span class="font-semibold text-red-600">项目编号（Project Number）</span>，通常是12位纯数字</li>
-                        <li class="text-red-600">⚠️ 注意：不要复制项目ID（Project ID），要复制项目编号！</li>
+                        <li class="text-red-600">
+                          ⚠️ 注意：不要复制项目ID（Project ID），要复制项目编号！
+                        </li>
                       </ol>
                     </div>
-                    <p class="mt-2"><strong>提示：</strong>如果您的账号是普通个人账号（未绑定 Google Cloud），请留空此字段。</p>
+                    <p class="mt-2">
+                      <strong>提示：</strong>如果您的账号是普通个人账号（未绑定 Google Cloud），请留空此字段。
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
             
             <!-- Claude Console 特定字段 -->
-            <div v-if="form.platform === 'claude-console' && !isEdit" class="space-y-4">
+            <div
+              v-if="form.platform === 'claude-console' && !isEdit"
+              class="space-y-4"
+            >
               <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-3">API URL *</label>
                 <input 
@@ -189,7 +223,12 @@
                   :class="{ 'border-red-500': errors.apiUrl }"
                   placeholder="例如：https://api.example.com"
                 >
-                <p v-if="errors.apiUrl" class="text-red-500 text-xs mt-1">{{ errors.apiUrl }}</p>
+                <p
+                  v-if="errors.apiUrl"
+                  class="text-red-500 text-xs mt-1"
+                >
+                  {{ errors.apiUrl }}
+                </p>
               </div>
               
               <div>
@@ -202,7 +241,12 @@
                   :class="{ 'border-red-500': errors.apiKey }"
                   placeholder="请输入API Key"
                 >
-                <p v-if="errors.apiKey" class="text-red-500 text-xs mt-1">{{ errors.apiKey }}</p>
+                <p
+                  v-if="errors.apiKey"
+                  class="text-red-500 text-xs mt-1"
+                >
+                  {{ errors.apiKey }}
+                </p>
               </div>
               
               <div>
@@ -210,22 +254,22 @@
                 <div class="mb-2 flex gap-2">
                   <button
                     type="button"
-                    @click="addPresetModel('claude-sonnet-4-20250514')"
                     class="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                    @click="addPresetModel('claude-sonnet-4-20250514')"
                   >
                     + claude-sonnet-4-20250514
                   </button>
                   <button
                     type="button"
-                    @click="addPresetModel('claude-opus-4-20250514')"
                     class="px-3 py-1 text-xs bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
+                    @click="addPresetModel('claude-opus-4-20250514')"
                   >
                     + claude-opus-4-20250514
                   </button>
                   <button
                     type="button"
-                    @click="addPresetModel('claude-3-5-haiku-20241022')"
                     class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-purple-200 transition-colors"
+                    @click="addPresetModel('claude-3-5-haiku-20241022')"
                   >
                     + claude-3-5-haiku-20241022
                   </button>
@@ -235,8 +279,10 @@
                   rows="3" 
                   class="form-input w-full resize-none"
                   placeholder="每行一个模型，留空表示支持所有模型。特别注意,ClaudeCode必须加上hiku模型！"
-                ></textarea>
-                <p class="text-xs text-gray-500 mt-1">留空表示支持所有模型。如果指定模型，请求中的模型不在列表内将不会调度到此账号</p>
+                />
+                <p class="text-xs text-gray-500 mt-1">
+                  留空表示支持所有模型。如果指定模型，请求中的模型不在列表内将不会调度到此账号
+                </p>
               </div>
               
               <div>
@@ -258,7 +304,9 @@
                   class="form-input w-full"
                   placeholder="默认60分钟"
                 >
-                <p class="text-xs text-gray-500 mt-1">当账号返回429错误时，暂停调度的时间（分钟）</p>
+                <p class="text-xs text-gray-500 mt-1">
+                  当账号返回429错误时，暂停调度的时间（分钟）
+                </p>
               </div>
             </div>
             
@@ -273,37 +321,58 @@
                 class="form-input w-full"
                 placeholder="数字越小优先级越高，默认50"
               >
-              <p class="text-xs text-gray-500 mt-1">数字越小优先级越高，建议范围：1-100</p>
+              <p class="text-xs text-gray-500 mt-1">
+                数字越小优先级越高，建议范围：1-100
+              </p>
             </div>
             
             <!-- 手动输入 Token 字段 -->
-            <div v-if="form.addType === 'manual' && form.platform !== 'claude-console'" class="space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
+            <div
+              v-if="form.addType === 'manual' && form.platform !== 'claude-console'"
+              class="space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-200"
+            >
               <div class="flex items-start gap-3 mb-4">
                 <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
-                  <i class="fas fa-info text-white text-sm"></i>
+                  <i class="fas fa-info text-white text-sm" />
                 </div>
                 <div>
-                  <h5 class="font-semibold text-blue-900 mb-2">手动输入 Token</h5>
-                  <p v-if="form.platform === 'claude'" class="text-sm text-blue-800 mb-2">
+                  <h5 class="font-semibold text-blue-900 mb-2">
+                    手动输入 Token
+                  </h5>
+                  <p
+                    v-if="form.platform === 'claude'"
+                    class="text-sm text-blue-800 mb-2"
+                  >
                     请输入有效的 Claude Access Token。如果您有 Refresh Token，建议也一并填写以支持自动刷新。
                   </p>
-                  <p v-else-if="form.platform === 'gemini'" class="text-sm text-blue-800 mb-2">
+                  <p
+                    v-else-if="form.platform === 'gemini'"
+                    class="text-sm text-blue-800 mb-2"
+                  >
                     请输入有效的 Gemini Access Token。如果您有 Refresh Token，建议也一并填写以支持自动刷新。
                   </p>
                   <div class="bg-white/80 rounded-lg p-3 mt-2 mb-2 border border-blue-300">
                     <p class="text-sm text-blue-900 font-medium mb-1">
-                      <i class="fas fa-folder-open mr-1"></i>
+                      <i class="fas fa-folder-open mr-1" />
                       获取 Access Token 的方法：
                     </p>
-                    <p v-if="form.platform === 'claude'" class="text-xs text-blue-800">
+                    <p
+                      v-if="form.platform === 'claude'"
+                      class="text-xs text-blue-800"
+                    >
                       请从已登录 Claude Code 的机器上获取 <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">~/.claude/.credentials.json</code> 文件中的凭证，
                       请勿使用 Claude 官网 API Keys 页面的密钥。
                     </p>
-                    <p v-else-if="form.platform === 'gemini'" class="text-xs text-blue-800">
+                    <p
+                      v-else-if="form.platform === 'gemini'"
+                      class="text-xs text-blue-800"
+                    >
                       请从已登录 Gemini CLI 的机器上获取 <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">~/.config/gemini/credentials.json</code> 文件中的凭证。
                     </p>
                   </div>
-                  <p class="text-xs text-blue-600">💡 如果未填写 Refresh Token，Token 过期后需要手动更新。</p>
+                  <p class="text-xs text-blue-600">
+                    💡 如果未填写 Refresh Token，Token 过期后需要手动更新。
+                  </p>
                 </div>
               </div>
               
@@ -316,8 +385,13 @@
                   class="form-input w-full resize-none font-mono text-xs"
                   :class="{ 'border-red-500': errors.accessToken }"
                   placeholder="请输入 Access Token..."
-                ></textarea>
-                <p v-if="errors.accessToken" class="text-red-500 text-xs mt-1">{{ errors.accessToken }}</p>
+                />
+                <p
+                  v-if="errors.accessToken"
+                  class="text-red-500 text-xs mt-1"
+                >
+                  {{ errors.accessToken }}
+                </p>
               </div>
               
               <div>
@@ -327,7 +401,7 @@
                   rows="4" 
                   class="form-input w-full resize-none font-mono text-xs"
                   placeholder="请输入 Refresh Token..."
-                ></textarea>
+                />
               </div>
             </div>
             
@@ -337,28 +411,31 @@
             <div class="flex gap-3 pt-4">
               <button 
                 type="button" 
-                @click="$emit('close')" 
-                class="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+                class="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors" 
+                @click="$emit('close')"
               >
                 取消
               </button>
               <button 
                 v-if="form.addType === 'oauth' && form.platform !== 'claude-console'"
                 type="button" 
-                @click="nextStep"
                 :disabled="loading"
                 class="btn btn-primary flex-1 py-3 px-6 font-semibold"
+                @click="nextStep"
               >
                 下一步
               </button>
               <button 
                 v-else
                 type="button" 
-                @click="createAccount"
                 :disabled="loading"
                 class="btn btn-primary flex-1 py-3 px-6 font-semibold"
+                @click="createAccount"
               >
-                <div v-if="loading" class="loading-spinner mr-2"></div>
+                <div
+                  v-if="loading"
+                  class="loading-spinner mr-2"
+                />
                 {{ loading ? '创建中...' : '创建' }}
               </button>
             </div>
@@ -375,7 +452,10 @@
         />
         
         <!-- 编辑模式 -->
-        <div v-if="isEdit" class="space-y-6">
+        <div
+          v-if="isEdit"
+          class="space-y-6"
+        >
           <!-- 基本信息 -->
           <div>
             <label class="block text-sm font-semibold text-gray-700 mb-3">账户名称</label>
@@ -395,7 +475,7 @@
               rows="3" 
               class="form-input w-full resize-none"
               placeholder="账户用途说明..."
-            ></textarea>
+            />
           </div>
           
           <div>
@@ -403,8 +483,8 @@
             <div class="flex gap-4">
               <label class="flex items-center cursor-pointer">
                 <input 
-                  type="radio" 
                   v-model="form.accountType" 
+                  type="radio" 
                   value="shared" 
                   class="mr-2"
                 >
@@ -412,8 +492,8 @@
               </label>
               <label class="flex items-center cursor-pointer">
                 <input 
-                  type="radio" 
                   v-model="form.accountType" 
+                  type="radio" 
                   value="dedicated" 
                   class="mr-2"
                 >
@@ -450,11 +530,16 @@
               class="form-input w-full"
               placeholder="数字越小优先级越高"
             >
-            <p class="text-xs text-gray-500 mt-1">数字越小优先级越高，建议范围：1-100</p>
+            <p class="text-xs text-gray-500 mt-1">
+              数字越小优先级越高，建议范围：1-100
+            </p>
           </div>
           
           <!-- Claude Console 特定字段（编辑模式）-->
-          <div v-if="form.platform === 'claude-console'" class="space-y-4">
+          <div
+            v-if="form.platform === 'claude-console'"
+            class="space-y-4"
+          >
             <div>
               <label class="block text-sm font-semibold text-gray-700 mb-3">API URL</label>
               <input 
@@ -474,7 +559,9 @@
                 class="form-input w-full"
                 placeholder="留空表示不更新"
               >
-              <p class="text-xs text-gray-500 mt-1">留空表示不更新 API Key</p>
+              <p class="text-xs text-gray-500 mt-1">
+                留空表示不更新 API Key
+              </p>
             </div>
             
             <div>
@@ -482,32 +569,32 @@
               <div class="mb-2 flex gap-2">
                 <button
                   type="button"
-                  @click="addPresetModel('claude-sonnet-4-20250514')"
                   class="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                  @click="addPresetModel('claude-sonnet-4-20250514')"
                 >
                   + claude-sonnet-4-20250514
                 </button>
                 <button
                   type="button"
-                  @click="addPresetModel('claude-opus-4-20250514')"
                   class="px-3 py-1 text-xs bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
+                  @click="addPresetModel('claude-opus-4-20250514')"
                 >
                   + claude-opus-4-20250514
                 </button>
                 <button
-                    type="button"
-                    @click="addPresetModel('claude-3-5-haiku-20241022')"
-                    class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-purple-200 transition-colors"
-                  >
-                    + claude-3-5-haiku-20241022
-                  </button>
+                  type="button"
+                  class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-purple-200 transition-colors"
+                  @click="addPresetModel('claude-3-5-haiku-20241022')"
+                >
+                  + claude-3-5-haiku-20241022
+                </button>
               </div>
               <textarea 
                 v-model="form.supportedModels" 
                 rows="3" 
                 class="form-input w-full resize-none"
                 placeholder="每行一个模型，留空表示支持所有模型。特别注意,ClaudeCode必须加上hiku模型！"
-              ></textarea>
+              />
             </div>
             
             <div>
@@ -532,15 +619,24 @@
           </div>
           
           <!-- Token 更新 -->
-          <div v-if="form.platform !== 'claude-console'" class="bg-amber-50 p-4 rounded-lg border border-amber-200">
+          <div
+            v-if="form.platform !== 'claude-console'"
+            class="bg-amber-50 p-4 rounded-lg border border-amber-200"
+          >
             <div class="flex items-start gap-3 mb-4">
               <div class="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
-                <i class="fas fa-key text-white text-sm"></i>
+                <i class="fas fa-key text-white text-sm" />
               </div>
               <div>
-                <h5 class="font-semibold text-amber-900 mb-2">更新 Token</h5>
-                <p class="text-sm text-amber-800 mb-2">可以更新 Access Token 和 Refresh Token。为了安全起见，不会显示当前的 Token 值。</p>
-                <p class="text-xs text-amber-600">💡 留空表示不更新该字段。</p>
+                <h5 class="font-semibold text-amber-900 mb-2">
+                  更新 Token
+                </h5>
+                <p class="text-sm text-amber-800 mb-2">
+                  可以更新 Access Token 和 Refresh Token。为了安全起见，不会显示当前的 Token 值。
+                </p>
+                <p class="text-xs text-amber-600">
+                  💡 留空表示不更新该字段。
+                </p>
               </div>
             </div>
             
@@ -552,7 +648,7 @@
                   rows="4" 
                   class="form-input w-full resize-none font-mono text-xs"
                   placeholder="留空表示不更新..."
-                ></textarea>
+                />
               </div>
               
               <div>
@@ -562,7 +658,7 @@
                   rows="4" 
                   class="form-input w-full resize-none font-mono text-xs"
                   placeholder="留空表示不更新..."
-                ></textarea>
+                />
               </div>
             </div>
           </div>
@@ -573,18 +669,21 @@
           <div class="flex gap-3 pt-4">
             <button 
               type="button" 
-              @click="$emit('close')" 
-              class="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+              class="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors" 
+              @click="$emit('close')"
             >
               取消
             </button>
             <button 
               type="button" 
-              @click="updateAccount"
               :disabled="loading"
               class="btn btn-primary flex-1 py-3 px-6 font-semibold"
+              @click="updateAccount"
             >
-              <div v-if="loading" class="loading-spinner mr-2"></div>
+              <div
+                v-if="loading"
+                class="loading-spinner mr-2"
+              />
               {{ loading ? '更新中...' : '更新' }}
             </button>
           </div>

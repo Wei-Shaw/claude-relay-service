@@ -1,6 +1,9 @@
 <template>
   <!-- 顶部导航 -->
-  <div class="glass-strong rounded-3xl p-6 mb-8 shadow-xl" style="z-index: 10; position: relative;">
+  <div
+    class="glass-strong rounded-3xl p-6 mb-8 shadow-xl"
+    style="z-index: 10; position: relative;"
+  >
     <div class="flex flex-col md:flex-row justify-between items-center gap-4">
       <div class="flex items-center gap-4">
         <LogoTitle 
@@ -22,7 +25,7 @@
                 class="inline-flex items-center gap-1 px-2 py-0.5 bg-green-500 border border-green-600 rounded-full text-xs text-white hover:bg-green-600 transition-colors animate-pulse"
                 title="有新版本可用"
               >
-                <i class="fas fa-arrow-up text-[10px]"></i>
+                <i class="fas fa-arrow-up text-[10px]" />
                 <span>新版本</span>
               </a>
             </div>
@@ -32,12 +35,15 @@
       <!-- 用户菜单 -->
       <div class="relative user-menu-container">
         <button 
-          @click="userMenuOpen = !userMenuOpen"
           class="btn btn-primary px-4 py-3 flex items-center gap-2 relative"
+          @click="userMenuOpen = !userMenuOpen"
         >
-          <i class="fas fa-user-circle"></i>
+          <i class="fas fa-user-circle" />
           <span>{{ currentUser.username || 'Admin' }}</span>
-          <i class="fas fa-chevron-down text-xs transition-transform duration-200" :class="{ 'rotate-180': userMenuOpen }"></i>
+          <i
+            class="fas fa-chevron-down text-xs transition-transform duration-200"
+            :class="{ 'rotate-180': userMenuOpen }"
+          />
         </button>
         
         <!-- 悬浮菜单 -->
@@ -53,10 +59,13 @@
               <span class="text-gray-500">当前版本</span>
               <span class="font-mono text-gray-700">v{{ versionInfo.current || '...' }}</span>
             </div>
-            <div v-if="versionInfo.hasUpdate" class="mt-2">
+            <div
+              v-if="versionInfo.hasUpdate"
+              class="mt-2"
+            >
               <div class="flex items-center justify-between text-sm mb-2">
                 <span class="text-green-600 font-medium">
-                  <i class="fas fa-arrow-up mr-1"></i>有新版本
+                  <i class="fas fa-arrow-up mr-1" />有新版本
                 </span>
                 <span class="font-mono text-green-600">v{{ versionInfo.latest }}</span>
               </div>
@@ -65,47 +74,60 @@
                 target="_blank"
                 class="block w-full text-center px-3 py-1.5 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 transition-colors"
               >
-                <i class="fas fa-external-link-alt mr-1"></i>查看更新
+                <i class="fas fa-external-link-alt mr-1" />查看更新
               </a>
             </div>
-            <div v-else-if="versionInfo.checkingUpdate" class="mt-2 text-center text-xs text-gray-500">
-              <i class="fas fa-spinner fa-spin mr-1"></i>检查更新中...
+            <div
+              v-else-if="versionInfo.checkingUpdate"
+              class="mt-2 text-center text-xs text-gray-500"
+            >
+              <i class="fas fa-spinner fa-spin mr-1" />检查更新中...
             </div>
-            <div v-else class="mt-2 text-center">
+            <div
+              v-else
+              class="mt-2 text-center"
+            >
               <!-- 已是最新版提醒 -->
-              <transition name="fade" mode="out-in">
-                <div v-if="versionInfo.noUpdateMessage" key="message" class="px-3 py-1.5 bg-green-100 border border-green-200 rounded-lg inline-block">
+              <transition
+                name="fade"
+                mode="out-in"
+              >
+                <div
+                  v-if="versionInfo.noUpdateMessage"
+                  key="message"
+                  class="px-3 py-1.5 bg-green-100 border border-green-200 rounded-lg inline-block"
+                >
                   <p class="text-xs text-green-700 font-medium">
-                    <i class="fas fa-check-circle mr-1"></i>当前已是最新版本
+                    <i class="fas fa-check-circle mr-1" />当前已是最新版本
                   </p>
                 </div>
                 <button 
                   v-else
                   key="button"
-                  @click="checkForUpdates()"
                   class="text-xs text-blue-500 hover:text-blue-700 transition-colors"
+                  @click="checkForUpdates()"
                 >
-                  <i class="fas fa-sync-alt mr-1"></i>检查更新
+                  <i class="fas fa-sync-alt mr-1" />检查更新
                 </button>
               </transition>
             </div>
           </div>
           
           <button 
-            @click="openChangePasswordModal"
             class="w-full px-4 py-3 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+            @click="openChangePasswordModal"
           >
-            <i class="fas fa-key text-blue-500"></i>
+            <i class="fas fa-key text-blue-500" />
             <span>修改账户信息</span>
           </button>
           
           <hr class="my-2 border-gray-200">
           
           <button 
-            @click="logout"
             class="w-full px-4 py-3 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+            @click="logout"
           >
-            <i class="fas fa-sign-out-alt text-red-500"></i>
+            <i class="fas fa-sign-out-alt text-red-500" />
             <span>退出登录</span>
           </button>
         </div>
@@ -114,24 +136,32 @@
   </div>
   
   <!-- 修改账户信息模态框 -->
-  <div v-if="showChangePasswordModal" class="fixed inset-0 modal z-50 flex items-center justify-center p-4">
+  <div
+    v-if="showChangePasswordModal"
+    class="fixed inset-0 modal z-50 flex items-center justify-center p-4"
+  >
     <div class="modal-content w-full max-w-md p-8 mx-auto max-h-[90vh] flex flex-col">
       <div class="flex items-center justify-between mb-6">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-            <i class="fas fa-key text-white"></i>
+            <i class="fas fa-key text-white" />
           </div>
-          <h3 class="text-xl font-bold text-gray-900">修改账户信息</h3>
+          <h3 class="text-xl font-bold text-gray-900">
+            修改账户信息
+          </h3>
         </div>
         <button 
-          @click="closeChangePasswordModal"
           class="text-gray-400 hover:text-gray-600 transition-colors"
+          @click="closeChangePasswordModal"
         >
-          <i class="fas fa-times text-xl"></i>
+          <i class="fas fa-times text-xl" />
         </button>
       </div>
       
-      <form @submit.prevent="changePassword" class="space-y-6 modal-scroll-content custom-scrollbar flex-1">
+      <form
+        class="space-y-6 modal-scroll-content custom-scrollbar flex-1"
+        @submit.prevent="changePassword"
+      >
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-3">当前用户名</label>
           <input 
@@ -140,7 +170,9 @@
             disabled
             class="form-input w-full bg-gray-100 cursor-not-allowed"
           >
-          <p class="text-xs text-gray-500 mt-2">当前用户名，输入新用户名以修改</p>
+          <p class="text-xs text-gray-500 mt-2">
+            当前用户名，输入新用户名以修改
+          </p>
         </div>
         
         <div>
@@ -151,7 +183,9 @@
             class="form-input w-full"
             placeholder="输入新用户名（留空保持不变）"
           >
-          <p class="text-xs text-gray-500 mt-2">留空表示不修改用户名</p>
+          <p class="text-xs text-gray-500 mt-2">
+            留空表示不修改用户名
+          </p>
         </div>
         
         <div>
@@ -174,7 +208,9 @@
             class="form-input w-full"
             placeholder="请输入新密码"
           >
-          <p class="text-xs text-gray-500 mt-2">密码长度至少8位</p>
+          <p class="text-xs text-gray-500 mt-2">
+            密码长度至少8位
+          </p>
         </div>
         
         <div>
@@ -191,8 +227,8 @@
         <div class="flex gap-3 pt-4">
           <button 
             type="button" 
-            @click="closeChangePasswordModal" 
-            class="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+            class="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors" 
+            @click="closeChangePasswordModal"
           >
             取消
           </button>
@@ -201,8 +237,14 @@
             :disabled="changePasswordLoading"
             class="btn btn-primary flex-1 py-3 px-6 font-semibold"
           >
-            <div v-if="changePasswordLoading" class="loading-spinner mr-2"></div>
-            <i v-else class="fas fa-save mr-2"></i>
+            <div
+              v-if="changePasswordLoading"
+              class="loading-spinner mr-2"
+            />
+            <i
+              v-else
+              class="fas fa-save mr-2"
+            />
             {{ changePasswordLoading ? '保存中...' : '保存修改' }}
           </button>
         </div>

@@ -6,8 +6,8 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
-    "build:web": "cd web && npm run build",
-    "install:web": "cd web && npm install",
+    "build:web": "cd web/admin-spa && npm run build",
+    "install:web": "cd web/admin-spa && npm install",
     "setup": "node scripts/setup.js",
     "cli": "node cli/index.js",
     "init:costs": "node src/cli/initCosts.js",

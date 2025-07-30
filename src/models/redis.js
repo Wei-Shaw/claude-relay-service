@@ -3,23 +3,30 @@ const config = require('../../config/config');
 const logger = require('../utils/logger');
 
 // 时区辅助函数
+// 注意：这个函数的目的是获取某个时间点在目标时区的"本地"表示
+// 例如：UTC时间 2025-07-30 01:00:00 在 UTC+8 时区表示为 2025-07-30 09:00:00
 function getDateInTimezone(date = new Date()) {
   const offset = config.system.timezoneOffset || 8; // 默认UTC+8
-  const utcTime = date.getTime() + (date.getTimezoneOffset() * 60000);
-  const targetTime = new Date(utcTime + (offset * 3600000));
-  return targetTime;
+  
+  // 方法：创建一个偏移后的Date对象，使其getUTCXXX方法返回目标时区的值
+  // 这样我们可以用getUTCFullYear()等方法获取目标时区的年月日时分秒
+  const offsetMs = offset * 3600000; // 时区偏移的毫秒数
+  const adjustedTime = new Date(date.getTime() + offsetMs);
+  
+  return adjustedTime;
 }
 
 // 获取配置时区的日期字符串 (YYYY-MM-DD)
 function getDateStringInTimezone(date = new Date()) {
   const tzDate = getDateInTimezone(date);
-  return `${tzDate.getFullYear()}-${String(tzDate.getMonth() + 1).padStart(2, '0')}-${String(tzDate.getDate()).padStart(2, '0')}`;
+  // 使用UTC方法获取偏移后的日期部分
+  return `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}-${String(tzDate.getUTCDate()).padStart(2, '0')}`;
 }
 
 // 获取配置时区的小时 (0-23)
 function getHourInTimezone(date = new Date()) {
   const tzDate = getDateInTimezone(date);
-  return tzDate.getHours();
+  return tzDate.getUTCHours();
 }
 
 class RedisClient {
@@ -162,7 +169,7 @@ class RedisClient {
     const now = new Date();
     const today = getDateStringInTimezone(now);
     const tzDate = getDateInTimezone(now);
-    const currentMonth = `${tzDate.getFullYear()}-${String(tzDate.getMonth() + 1).padStart(2, '0')}`;
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`;
     const currentHour = `${today}:${String(getHourInTimezone(now)).padStart(2, '0')}`; // 新增小时级别
     
     const daily = `usage:daily:${keyId}:${today}`;
@@ -179,6 +186,10 @@ class RedisClient {
     const keyModelMonthly = `usage:${keyId}:model:monthly:${model}:${currentMonth}`;
     const keyModelHourly = `usage:${keyId}:model:hourly:${model}:${currentHour}`; // 新增API Key模型小时级别
 
+    // 新增：系统级分钟统计
+    const minuteTimestamp = Math.floor(now.getTime() / 60000);
+    const systemMinuteKey = `system:metrics:minute:${minuteTimestamp}`;
+
     // 智能处理输入输出token分配
     const finalInputTokens = inputTokens || 0;
     const finalOutputTokens = outputTokens || (finalInputTokens > 0 ? 0 : tokens);
@@ -190,96 +201,122 @@ class RedisClient {
     // 核心token（不包括缓存）- 用于与历史数据兼容
     const coreTokens = finalInputTokens + finalOutputTokens;
 
-    await Promise.all([
-      // 核心token统计（保持向后兼容）
-      this.client.hincrby(key, 'totalTokens', coreTokens),
-      this.client.hincrby(key, 'totalInputTokens', finalInputTokens),
-      this.client.hincrby(key, 'totalOutputTokens', finalOutputTokens),
-      // 缓存token统计（新增）
-      this.client.hincrby(key, 'totalCacheCreateTokens', finalCacheCreateTokens),
-      this.client.hincrby(key, 'totalCacheReadTokens', finalCacheReadTokens),
-      this.client.hincrby(key, 'totalAllTokens', totalTokens), // 包含所有类型的总token
-      // 请求计数
-      this.client.hincrby(key, 'totalRequests', 1),
-      // 每日统计
-      this.client.hincrby(daily, 'tokens', coreTokens),
-      this.client.hincrby(daily, 'inputTokens', finalInputTokens),
-      this.client.hincrby(daily, 'outputTokens', finalOutputTokens),
-      this.client.hincrby(daily, 'cacheCreateTokens', finalCacheCreateTokens),
-      this.client.hincrby(daily, 'cacheReadTokens', finalCacheReadTokens),
-      this.client.hincrby(daily, 'allTokens', totalTokens),
-      this.client.hincrby(daily, 'requests', 1),
-      // 每月统计
-      this.client.hincrby(monthly, 'tokens', coreTokens),
-      this.client.hincrby(monthly, 'inputTokens', finalInputTokens),
-      this.client.hincrby(monthly, 'outputTokens', finalOutputTokens),
-      this.client.hincrby(monthly, 'cacheCreateTokens', finalCacheCreateTokens),
-      this.client.hincrby(monthly, 'cacheReadTokens', finalCacheReadTokens),
-      this.client.hincrby(monthly, 'allTokens', totalTokens),
-      this.client.hincrby(monthly, 'requests', 1),
-      // 按模型统计 - 每日
-      this.client.hincrby(modelDaily, 'inputTokens', finalInputTokens),
-      this.client.hincrby(modelDaily, 'outputTokens', finalOutputTokens),
-      this.client.hincrby(modelDaily, 'cacheCreateTokens', finalCacheCreateTokens),
-      this.client.hincrby(modelDaily, 'cacheReadTokens', finalCacheReadTokens),
-      this.client.hincrby(modelDaily, 'allTokens', totalTokens),
-      this.client.hincrby(modelDaily, 'requests', 1),
-      // 按模型统计 - 每月
-      this.client.hincrby(modelMonthly, 'inputTokens', finalInputTokens),
-      this.client.hincrby(modelMonthly, 'outputTokens', finalOutputTokens),
-      this.client.hincrby(modelMonthly, 'cacheCreateTokens', finalCacheCreateTokens),
-      this.client.hincrby(modelMonthly, 'cacheReadTokens', finalCacheReadTokens),
-      this.client.hincrby(modelMonthly, 'allTokens', totalTokens),
-      this.client.hincrby(modelMonthly, 'requests', 1),
-      // API Key级别的模型统计 - 每日
-      this.client.hincrby(keyModelDaily, 'inputTokens', finalInputTokens),
-      this.client.hincrby(keyModelDaily, 'outputTokens', finalOutputTokens),
-      this.client.hincrby(keyModelDaily, 'cacheCreateTokens', finalCacheCreateTokens),
-      this.client.hincrby(keyModelDaily, 'cacheReadTokens', finalCacheReadTokens),
-      this.client.hincrby(keyModelDaily, 'allTokens', totalTokens),
-      this.client.hincrby(keyModelDaily, 'requests', 1),
-      // API Key级别的模型统计 - 每月
-      this.client.hincrby(keyModelMonthly, 'inputTokens', finalInputTokens),
-      this.client.hincrby(keyModelMonthly, 'outputTokens', finalOutputTokens),
-      this.client.hincrby(keyModelMonthly, 'cacheCreateTokens', finalCacheCreateTokens),
-      this.client.hincrby(keyModelMonthly, 'cacheReadTokens', finalCacheReadTokens),
-      this.client.hincrby(keyModelMonthly, 'allTokens', totalTokens),
-      this.client.hincrby(keyModelMonthly, 'requests', 1),
-      
-      // 小时级别统计
-      this.client.hincrby(hourly, 'tokens', coreTokens),
-      this.client.hincrby(hourly, 'inputTokens', finalInputTokens),
-      this.client.hincrby(hourly, 'outputTokens', finalOutputTokens),
-      this.client.hincrby(hourly, 'cacheCreateTokens', finalCacheCreateTokens),
-      this.client.hincrby(hourly, 'cacheReadTokens', finalCacheReadTokens),
-      this.client.hincrby(hourly, 'allTokens', totalTokens),
-      this.client.hincrby(hourly, 'requests', 1),
-      // 按模型统计 - 每小时
-      this.client.hincrby(modelHourly, 'inputTokens', finalInputTokens),
-      this.client.hincrby(modelHourly, 'outputTokens', finalOutputTokens),
-      this.client.hincrby(modelHourly, 'cacheCreateTokens', finalCacheCreateTokens),
-      this.client.hincrby(modelHourly, 'cacheReadTokens', finalCacheReadTokens),
-      this.client.hincrby(modelHourly, 'allTokens', totalTokens),
-      this.client.hincrby(modelHourly, 'requests', 1),
-      // API Key级别的模型统计 - 每小时
-      this.client.hincrby(keyModelHourly, 'inputTokens', finalInputTokens),
-      this.client.hincrby(keyModelHourly, 'outputTokens', finalOutputTokens),
-      this.client.hincrby(keyModelHourly, 'cacheCreateTokens', finalCacheCreateTokens),
-      this.client.hincrby(keyModelHourly, 'cacheReadTokens', finalCacheReadTokens),
-      this.client.hincrby(keyModelHourly, 'allTokens', totalTokens),
-      this.client.hincrby(keyModelHourly, 'requests', 1),
-      
-      // 设置过期时间
-      this.client.expire(daily, 86400 * 32), // 32天过期
-      this.client.expire(monthly, 86400 * 365), // 1年过期
-      this.client.expire(hourly, 86400 * 7), // 小时统计7天过期
-      this.client.expire(modelDaily, 86400 * 32), // 模型每日统计32天过期
-      this.client.expire(modelMonthly, 86400 * 365), // 模型每月统计1年过期
-      this.client.expire(modelHourly, 86400 * 7), // 模型小时统计7天过期
-      this.client.expire(keyModelDaily, 86400 * 32), // API Key模型每日统计32天过期
-      this.client.expire(keyModelMonthly, 86400 * 365), // API Key模型每月统计1年过期
-      this.client.expire(keyModelHourly, 86400 * 7) // API Key模型小时统计7天过期
-    ]);
+    // 使用Pipeline优化性能
+    const pipeline = this.client.pipeline();
+    
+    // 现有的统计保持不变
+    // 核心token统计（保持向后兼容）
+    pipeline.hincrby(key, 'totalTokens', coreTokens);
+    pipeline.hincrby(key, 'totalInputTokens', finalInputTokens);
+    pipeline.hincrby(key, 'totalOutputTokens', finalOutputTokens);
+    // 缓存token统计（新增）
+    pipeline.hincrby(key, 'totalCacheCreateTokens', finalCacheCreateTokens);
+    pipeline.hincrby(key, 'totalCacheReadTokens', finalCacheReadTokens);
+    pipeline.hincrby(key, 'totalAllTokens', totalTokens); // 包含所有类型的总token
+    // 请求计数
+    pipeline.hincrby(key, 'totalRequests', 1);
+    
+    // 每日统计
+    pipeline.hincrby(daily, 'tokens', coreTokens);
+    pipeline.hincrby(daily, 'inputTokens', finalInputTokens);
+    pipeline.hincrby(daily, 'outputTokens', finalOutputTokens);
+    pipeline.hincrby(daily, 'cacheCreateTokens', finalCacheCreateTokens);
+    pipeline.hincrby(daily, 'cacheReadTokens', finalCacheReadTokens);
+    pipeline.hincrby(daily, 'allTokens', totalTokens);
+    pipeline.hincrby(daily, 'requests', 1);
+    
+    // 每月统计
+    pipeline.hincrby(monthly, 'tokens', coreTokens);
+    pipeline.hincrby(monthly, 'inputTokens', finalInputTokens);
+    pipeline.hincrby(monthly, 'outputTokens', finalOutputTokens);
+    pipeline.hincrby(monthly, 'cacheCreateTokens', finalCacheCreateTokens);
+    pipeline.hincrby(monthly, 'cacheReadTokens', finalCacheReadTokens);
+    pipeline.hincrby(monthly, 'allTokens', totalTokens);
+    pipeline.hincrby(monthly, 'requests', 1);
+    
+    // 按模型统计 - 每日
+    pipeline.hincrby(modelDaily, 'inputTokens', finalInputTokens);
+    pipeline.hincrby(modelDaily, 'outputTokens', finalOutputTokens);
+    pipeline.hincrby(modelDaily, 'cacheCreateTokens', finalCacheCreateTokens);
+    pipeline.hincrby(modelDaily, 'cacheReadTokens', finalCacheReadTokens);
+    pipeline.hincrby(modelDaily, 'allTokens', totalTokens);
+    pipeline.hincrby(modelDaily, 'requests', 1);
+    
+    // 按模型统计 - 每月
+    pipeline.hincrby(modelMonthly, 'inputTokens', finalInputTokens);
+    pipeline.hincrby(modelMonthly, 'outputTokens', finalOutputTokens);
+    pipeline.hincrby(modelMonthly, 'cacheCreateTokens', finalCacheCreateTokens);
+    pipeline.hincrby(modelMonthly, 'cacheReadTokens', finalCacheReadTokens);
+    pipeline.hincrby(modelMonthly, 'allTokens', totalTokens);
+    pipeline.hincrby(modelMonthly, 'requests', 1);
+    
+    // API Key级别的模型统计 - 每日
+    pipeline.hincrby(keyModelDaily, 'inputTokens', finalInputTokens);
+    pipeline.hincrby(keyModelDaily, 'outputTokens', finalOutputTokens);
+    pipeline.hincrby(keyModelDaily, 'cacheCreateTokens', finalCacheCreateTokens);
+    pipeline.hincrby(keyModelDaily, 'cacheReadTokens', finalCacheReadTokens);
+    pipeline.hincrby(keyModelDaily, 'allTokens', totalTokens);
+    pipeline.hincrby(keyModelDaily, 'requests', 1);
+    
+    // API Key级别的模型统计 - 每月
+    pipeline.hincrby(keyModelMonthly, 'inputTokens', finalInputTokens);
+    pipeline.hincrby(keyModelMonthly, 'outputTokens', finalOutputTokens);
+    pipeline.hincrby(keyModelMonthly, 'cacheCreateTokens', finalCacheCreateTokens);
+    pipeline.hincrby(keyModelMonthly, 'cacheReadTokens', finalCacheReadTokens);
+    pipeline.hincrby(keyModelMonthly, 'allTokens', totalTokens);
+    pipeline.hincrby(keyModelMonthly, 'requests', 1);
+    
+    // 小时级别统计
+    pipeline.hincrby(hourly, 'tokens', coreTokens);
+    pipeline.hincrby(hourly, 'inputTokens', finalInputTokens);
+    pipeline.hincrby(hourly, 'outputTokens', finalOutputTokens);
+    pipeline.hincrby(hourly, 'cacheCreateTokens', finalCacheCreateTokens);
+    pipeline.hincrby(hourly, 'cacheReadTokens', finalCacheReadTokens);
+    pipeline.hincrby(hourly, 'allTokens', totalTokens);
+    pipeline.hincrby(hourly, 'requests', 1);
+    
+    // 按模型统计 - 每小时
+    pipeline.hincrby(modelHourly, 'inputTokens', finalInputTokens);
+    pipeline.hincrby(modelHourly, 'outputTokens', finalOutputTokens);
+    pipeline.hincrby(modelHourly, 'cacheCreateTokens', finalCacheCreateTokens);
+    pipeline.hincrby(modelHourly, 'cacheReadTokens', finalCacheReadTokens);
+    pipeline.hincrby(modelHourly, 'allTokens', totalTokens);
+    pipeline.hincrby(modelHourly, 'requests', 1);
+    
+    // API Key级别的模型统计 - 每小时
+    pipeline.hincrby(keyModelHourly, 'inputTokens', finalInputTokens);
+    pipeline.hincrby(keyModelHourly, 'outputTokens', finalOutputTokens);
+    pipeline.hincrby(keyModelHourly, 'cacheCreateTokens', finalCacheCreateTokens);
+    pipeline.hincrby(keyModelHourly, 'cacheReadTokens', finalCacheReadTokens);
+    pipeline.hincrby(keyModelHourly, 'allTokens', totalTokens);
+    pipeline.hincrby(keyModelHourly, 'requests', 1);
+    
+    // 新增：系统级分钟统计
+    pipeline.hincrby(systemMinuteKey, 'requests', 1);
+    pipeline.hincrby(systemMinuteKey, 'totalTokens', totalTokens);
+    pipeline.hincrby(systemMinuteKey, 'inputTokens', finalInputTokens);
+    pipeline.hincrby(systemMinuteKey, 'outputTokens', finalOutputTokens);
+    pipeline.hincrby(systemMinuteKey, 'cacheCreateTokens', finalCacheCreateTokens);
+    pipeline.hincrby(systemMinuteKey, 'cacheReadTokens', finalCacheReadTokens);
+    
+    // 设置过期时间
+    pipeline.expire(daily, 86400 * 32); // 32天过期
+    pipeline.expire(monthly, 86400 * 365); // 1年过期
+    pipeline.expire(hourly, 86400 * 7); // 小时统计7天过期
+    pipeline.expire(modelDaily, 86400 * 32); // 模型每日统计32天过期
+    pipeline.expire(modelMonthly, 86400 * 365); // 模型每月统计1年过期
+    pipeline.expire(modelHourly, 86400 * 7); // 模型小时统计7天过期
+    pipeline.expire(keyModelDaily, 86400 * 32); // API Key模型每日统计32天过期
+    pipeline.expire(keyModelMonthly, 86400 * 365); // API Key模型每月统计1年过期
+    pipeline.expire(keyModelHourly, 86400 * 7); // API Key模型小时统计7天过期
+    
+    // 系统级分钟统计的过期时间（窗口时间的2倍）
+    const config = require('../../config/config');
+    const metricsWindow = config.system.metricsWindow;
+    pipeline.expire(systemMinuteKey, metricsWindow * 60 * 2);
+    
+    // 执行Pipeline
+    await pipeline.exec();
   }
 
   // 📊 记录账户级别的使用统计
@@ -287,7 +324,7 @@ class RedisClient {
     const now = new Date();
     const today = getDateStringInTimezone(now);
     const tzDate = getDateInTimezone(now);
-    const currentMonth = `${tzDate.getFullYear()}-${String(tzDate.getMonth() + 1).padStart(2, '0')}`;
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`;
     const currentHour = `${today}:${String(getHourInTimezone(now)).padStart(2, '0')}`;
     
     // 账户级别统计的键
@@ -385,7 +422,7 @@ class RedisClient {
     const today = getDateStringInTimezone();
     const dailyKey = `usage:daily:${keyId}:${today}`;
     const tzDate = getDateInTimezone();
-    const currentMonth = `${tzDate.getFullYear()}-${String(tzDate.getMonth() + 1).padStart(2, '0')}`;
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`;
     const monthlyKey = `usage:monthly:${keyId}:${currentMonth}`;
 
     const [total, daily, monthly] = await Promise.all([
@@ -481,8 +518,8 @@ class RedisClient {
   async incrementDailyCost(keyId, amount) {
     const today = getDateStringInTimezone();
     const tzDate = getDateInTimezone();
-    const currentMonth = `${tzDate.getFullYear()}-${String(tzDate.getMonth() + 1).padStart(2, '0')}`;
-    const currentHour = `${today}:${String(getHourInTimezone()).padStart(2, '0')}`;
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`;
+    const currentHour = `${today}:${String(getHourInTimezone(new Date())).padStart(2, '0')}`;
     
     const dailyKey = `usage:cost:daily:${keyId}:${today}`;
     const monthlyKey = `usage:cost:monthly:${keyId}:${currentMonth}`;
@@ -509,8 +546,8 @@ class RedisClient {
   async getCostStats(keyId) {
     const today = getDateStringInTimezone();
     const tzDate = getDateInTimezone();
-    const currentMonth = `${tzDate.getFullYear()}-${String(tzDate.getMonth() + 1).padStart(2, '0')}`;
-    const currentHour = `${today}:${String(getHourInTimezone()).padStart(2, '0')}`;
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`;
+    const currentHour = `${today}:${String(getHourInTimezone(new Date())).padStart(2, '0')}`;
     
     const [daily, monthly, hourly, total] = await Promise.all([
       this.client.get(`usage:cost:daily:${keyId}:${today}`),
@@ -533,7 +570,7 @@ class RedisClient {
     const today = getDateStringInTimezone();
     const accountDailyKey = `account_usage:daily:${accountId}:${today}`;
     const tzDate = getDateInTimezone();
-    const currentMonth = `${tzDate.getFullYear()}-${String(tzDate.getMonth() + 1).padStart(2, '0')}`;
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`;
     const accountMonthlyKey = `account_usage:monthly:${accountId}:${currentMonth}`;
 
     const [total, daily, monthly] = await Promise.all([
@@ -963,6 +1000,96 @@ class RedisClient {
         totalInputTokens: 0,
         totalOutputTokens: 0,
         totalTokens: 0
+      };
+    }
+  }
+
+  // 📊 获取实时系统指标（基于滑动窗口）
+  async getRealtimeSystemMetrics() {
+    try {
+      const config = require('../../config/config');
+      const windowMinutes = config.system.metricsWindow || 5;
+      
+      const now = new Date();
+      const currentMinute = Math.floor(now.getTime() / 60000);
+      
+      // 调试：打印当前时间和分钟时间戳
+      logger.debug(`🔍 Realtime metrics - Current time: ${now.toISOString()}, Minute timestamp: ${currentMinute}`);
+      
+      // 使用Pipeline批量获取窗口内的所有分钟数据
+      const pipeline = this.client.pipeline();
+      const minuteKeys = [];
+      for (let i = 0; i < windowMinutes; i++) {
+        const minuteKey = `system:metrics:minute:${currentMinute - i}`;
+        minuteKeys.push(minuteKey);
+        pipeline.hgetall(minuteKey);
+      }
+      
+      logger.debug(`🔍 Realtime metrics - Checking keys: ${minuteKeys.join(', ')}`);
+      
+      const results = await pipeline.exec();
+      
+      // 聚合计算
+      let totalRequests = 0;
+      let totalTokens = 0;
+      let totalInputTokens = 0;
+      let totalOutputTokens = 0;
+      let totalCacheCreateTokens = 0;
+      let totalCacheReadTokens = 0;
+      let validDataCount = 0;
+      
+      results.forEach(([err, data], index) => {
+        if (!err && data && Object.keys(data).length > 0) {
+          validDataCount++;
+          totalRequests += parseInt(data.requests || 0);
+          totalTokens += parseInt(data.totalTokens || 0);
+          totalInputTokens += parseInt(data.inputTokens || 0);
+          totalOutputTokens += parseInt(data.outputTokens || 0);
+          totalCacheCreateTokens += parseInt(data.cacheCreateTokens || 0);
+          totalCacheReadTokens += parseInt(data.cacheReadTokens || 0);
+          
+          logger.debug(`🔍 Realtime metrics - Key ${minuteKeys[index]} data:`, {
+            requests: data.requests,
+            totalTokens: data.totalTokens
+          });
+        }
+      });
+      
+      logger.debug(`🔍 Realtime metrics - Valid data count: ${validDataCount}/${windowMinutes}, Total requests: ${totalRequests}, Total tokens: ${totalTokens}`);
+      
+      // 计算平均值（每分钟）
+      const realtimeRPM = windowMinutes > 0 ? Math.round((totalRequests / windowMinutes) * 100) / 100 : 0;
+      const realtimeTPM = windowMinutes > 0 ? Math.round((totalTokens / windowMinutes) * 100) / 100 : 0;
+      
+      const result = {
+        realtimeRPM,
+        realtimeTPM,
+        windowMinutes,
+        totalRequests,
+        totalTokens,
+        totalInputTokens,
+        totalOutputTokens,
+        totalCacheCreateTokens,
+        totalCacheReadTokens
+      };
+      
+      logger.debug('🔍 Realtime metrics - Final result:', result);
+      
+      return result;
+    } catch (error) {
+      console.error('Error getting realtime system metrics:', error);
+      // 如果出错，返回历史平均值作为降级方案
+      const historicalMetrics = await this.getSystemAverages();
+      return {
+        realtimeRPM: historicalMetrics.systemRPM,
+        realtimeTPM: historicalMetrics.systemTPM,
+        windowMinutes: 0, // 标识使用了历史数据
+        totalRequests: 0,
+        totalTokens: historicalMetrics.totalTokens,
+        totalInputTokens: historicalMetrics.totalInputTokens,
+        totalOutputTokens: historicalMetrics.totalOutputTokens,
+        totalCacheCreateTokens: 0,
+        totalCacheReadTokens: 0
       };
     }
   }

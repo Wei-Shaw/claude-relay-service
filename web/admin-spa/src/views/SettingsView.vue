@@ -3,17 +3,29 @@
     <div class="card p-6">
       <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
         <div>
-          <h3 class="text-xl font-bold text-gray-900 mb-2">其他设置</h3>
-          <p class="text-gray-600">自定义网站名称和图标</p>
+          <h3 class="text-xl font-bold text-gray-900 mb-2">
+            其他设置
+          </h3>
+          <p class="text-gray-600">
+            自定义网站名称和图标
+          </p>
         </div>
       </div>
       
-      <div v-if="loading" class="text-center py-12">
-        <div class="loading-spinner mx-auto mb-4"></div>
-        <p class="text-gray-500">正在加载设置...</p>
+      <div
+        v-if="loading"
+        class="text-center py-12"
+      >
+        <div class="loading-spinner mx-auto mb-4" />
+        <p class="text-gray-500">
+          正在加载设置...
+        </p>
       </div>
       
-      <div v-else class="table-container">
+      <div
+        v-else
+        class="table-container"
+      >
         <table class="min-w-full">
           <tbody class="divide-y divide-gray-200/50">
             <!-- 网站名称 -->
@@ -21,11 +33,15 @@
               <td class="px-6 py-4 whitespace-nowrap w-48">
                 <div class="flex items-center">
                   <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center mr-3">
-                    <i class="fas fa-font text-white text-xs"></i>
+                    <i class="fas fa-font text-white text-xs" />
                   </div>
                   <div>
-                    <div class="text-sm font-semibold text-gray-900">网站名称</div>
-                    <div class="text-xs text-gray-500">品牌标识</div>
+                    <div class="text-sm font-semibold text-gray-900">
+                      网站名称
+                    </div>
+                    <div class="text-xs text-gray-500">
+                      品牌标识
+                    </div>
                   </div>
                 </div>
               </td>
@@ -37,7 +53,9 @@
                   placeholder="Claude Relay Service"
                   maxlength="100"
                 >
-                <p class="text-xs text-gray-500 mt-1">将显示在浏览器标题和页面头部</p>
+                <p class="text-xs text-gray-500 mt-1">
+                  将显示在浏览器标题和页面头部
+                </p>
               </td>
             </tr>
             
@@ -46,18 +64,25 @@
               <td class="px-6 py-4 whitespace-nowrap w-48">
                 <div class="flex items-center">
                   <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center mr-3">
-                    <i class="fas fa-image text-white text-xs"></i>
+                    <i class="fas fa-image text-white text-xs" />
                   </div>
                   <div>
-                    <div class="text-sm font-semibold text-gray-900">网站图标</div>
-                    <div class="text-xs text-gray-500">Favicon</div>
+                    <div class="text-sm font-semibold text-gray-900">
+                      网站图标
+                    </div>
+                    <div class="text-xs text-gray-500">
+                      Favicon
+                    </div>
                   </div>
                 </div>
               </td>
               <td class="px-6 py-4">
                 <div class="space-y-3">
                   <!-- 图标预览 -->
-                  <div v-if="oemSettings.siteIconData || oemSettings.siteIcon" class="inline-flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                  <div
+                    v-if="oemSettings.siteIconData || oemSettings.siteIcon"
+                    class="inline-flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
+                  >
                     <img 
                       :src="oemSettings.siteIconData || oemSettings.siteIcon" 
                       alt="图标预览" 
@@ -66,27 +91,27 @@
                     >
                     <span class="text-sm text-gray-600">当前图标</span>
                     <button 
-                      @click="removeIcon"
                       class="text-red-600 hover:text-red-900 font-medium hover:bg-red-50 px-3 py-1 rounded-lg transition-colors"
+                      @click="removeIcon"
                     >
-                      <i class="fas fa-trash mr-1"></i>删除
+                      <i class="fas fa-trash mr-1" />删除
                     </button>
                   </div>
                   
                   <!-- 文件上传 -->
                   <div>
                     <input 
-                      type="file" 
-                      ref="iconFileInput"
-                      @change="handleIconUpload"
+                      ref="iconFileInput" 
+                      type="file"
                       accept=".ico,.png,.jpg,.jpeg,.svg"
                       class="hidden"
+                      @change="handleIconUpload"
                     >
                     <button 
-                      @click="$refs.iconFileInput.click()"
                       class="btn btn-success px-4 py-2"
+                      @click="$refs.iconFileInput.click()"
                     >
-                      <i class="fas fa-upload mr-2"></i>
+                      <i class="fas fa-upload mr-2" />
                       上传图标
                     </button>
                     <span class="text-xs text-gray-500 ml-3">支持 .ico, .png, .jpg, .svg 格式，最大 350KB</span>
@@ -97,32 +122,44 @@
             
             <!-- 操作按钮 -->
             <tr>
-              <td class="px-6 py-6" colspan="2">
+              <td
+                class="px-6 py-6"
+                colspan="2"
+              >
                 <div class="flex items-center justify-between">
                   <div class="flex gap-3">
                     <button 
-                      @click="saveOemSettings"
                       :disabled="saving"
                       class="btn btn-primary px-6 py-3"
                       :class="{ 'opacity-50 cursor-not-allowed': saving }"
+                      @click="saveOemSettings"
                     >
-                      <div v-if="saving" class="loading-spinner mr-2"></div>
-                      <i v-else class="fas fa-save mr-2"></i>
+                      <div
+                        v-if="saving"
+                        class="loading-spinner mr-2"
+                      />
+                      <i
+                        v-else
+                        class="fas fa-save mr-2"
+                      />
                       {{ saving ? '保存中...' : '保存设置' }}
                     </button>
                     
                     <button 
-                      @click="resetOemSettings"
                       class="btn bg-gray-100 text-gray-700 hover:bg-gray-200 px-6 py-3"
                       :disabled="saving"
+                      @click="resetOemSettings"
                     >
-                      <i class="fas fa-undo mr-2"></i>
+                      <i class="fas fa-undo mr-2" />
                       重置为默认
                     </button>
                   </div>
                   
-                  <div v-if="oemSettings.updatedAt" class="text-sm text-gray-500">
-                    <i class="fas fa-clock mr-1"></i>
+                  <div
+                    v-if="oemSettings.updatedAt"
+                    class="text-sm text-gray-500"
+                  >
+                    <i class="fas fa-clock mr-1" />
                     最后更新：{{ formatDateTime(oemSettings.updatedAt) }}
                   </div>
                 </div>

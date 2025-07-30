@@ -3,199 +3,355 @@
     <div class="card p-6">
       <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
         <div>
-          <h3 class="text-xl font-bold text-gray-900 mb-2">账户管理</h3>
-          <p class="text-gray-600">管理您的 Claude 和 Gemini 账户及代理配置</p>
+          <h3 class="text-xl font-bold text-gray-900 mb-2">
+            账户管理
+          </h3>
+          <p class="text-gray-600">
+            管理您的 Claude 和 Gemini 账户及代理配置
+          </p>
         </div>
         <div class="flex gap-2">
-          <select v-model="accountSortBy" @change="sortAccounts()" class="form-input px-3 py-2 text-sm">
-            <option value="name">按名称排序</option>
-            <option value="dailyTokens">按今日Token排序</option>
-            <option value="dailyRequests">按今日请求数排序</option>
-            <option value="totalTokens">按总Token排序</option>
-            <option value="lastUsed">按最后使用排序</option>
+          <select
+            v-model="accountSortBy"
+            class="form-input px-3 py-2 text-sm"
+            @change="sortAccounts()"
+          >
+            <option value="name">
+              按名称排序
+            </option>
+            <option value="dailyTokens">
+              按今日Token排序
+            </option>
+            <option value="dailyRequests">
+              按今日请求数排序
+            </option>
+            <option value="totalTokens">
+              按总Token排序
+            </option>
+            <option value="lastUsed">
+              按最后使用排序
+            </option>
           </select>
           <button 
-            @click.stop="openCreateAccountModal"
             class="btn btn-success px-6 py-3 flex items-center gap-2"
+            @click.stop="openCreateAccountModal"
           >
-            <i class="fas fa-plus"></i>添加账户
+            <i class="fas fa-plus" />添加账户
           </button>
         </div>
       </div>
       
-      <div v-if="accountsLoading" class="text-center py-12">
-        <div class="loading-spinner mx-auto mb-4"></div>
-        <p class="text-gray-500">正在加载账户...</p>
+      <div
+        v-if="accountsLoading"
+        class="text-center py-12"
+      >
+        <div class="loading-spinner mx-auto mb-4" />
+        <p class="text-gray-500">
+          正在加载账户...
+        </p>
       </div>
       
-      <div v-else-if="sortedAccounts.length === 0" class="text-center py-12">
+      <div
+        v-else-if="sortedAccounts.length === 0"
+        class="text-center py-12"
+      >
         <div class="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-          <i class="fas fa-user-circle text-gray-400 text-xl"></i>
+          <i class="fas fa-user-circle text-gray-400 text-xl" />
         </div>
-        <p class="text-gray-500 text-lg">暂无账户</p>
-        <p class="text-gray-400 text-sm mt-2">点击上方按钮添加您的第一个账户</p>
+        <p class="text-gray-500 text-lg">
+          暂无账户
+        </p>
+        <p class="text-gray-400 text-sm mt-2">
+          点击上方按钮添加您的第一个账户
+        </p>
       </div>
       
-      <div v-else class="table-container">
+      <div
+        v-else
+        class="table-container"
+      >
         <table class="min-w-full">
           <thead class="bg-gray-50/80 backdrop-blur-sm">
             <tr>
-              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortAccounts('name')">
+              <th
+                class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                @click="sortAccounts('name')"
+              >
                 名称
-                <i v-if="accountsSortBy === 'name'" :class="['fas', accountsSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
-                <i v-else class="fas fa-sort ml-1 text-gray-400"></i>
+                <i
+                  v-if="accountsSortBy === 'name'"
+                  :class="['fas', accountsSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"
+                />
+                <i
+                  v-else
+                  class="fas fa-sort ml-1 text-gray-400"
+                />
               </th>
-              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortAccounts('platform')">
+              <th
+                class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                @click="sortAccounts('platform')"
+              >
                 平台
-                <i v-if="accountsSortBy === 'platform'" :class="['fas', accountsSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
-                <i v-else class="fas fa-sort ml-1 text-gray-400"></i>
+                <i
+                  v-if="accountsSortBy === 'platform'"
+                  :class="['fas', accountsSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"
+                />
+                <i
+                  v-else
+                  class="fas fa-sort ml-1 text-gray-400"
+                />
               </th>
-              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortAccounts('accountType')">
+              <th
+                class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                @click="sortAccounts('accountType')"
+              >
                 类型
-                <i v-if="accountsSortBy === 'accountType'" :class="['fas', accountsSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
-                <i v-else class="fas fa-sort ml-1 text-gray-400"></i>
+                <i
+                  v-if="accountsSortBy === 'accountType'"
+                  :class="['fas', accountsSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"
+                />
+                <i
+                  v-else
+                  class="fas fa-sort ml-1 text-gray-400"
+                />
               </th>
-              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortAccounts('status')">
+              <th
+                class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                @click="sortAccounts('status')"
+              >
                 状态
-                <i v-if="accountsSortBy === 'status'" :class="['fas', accountsSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
-                <i v-else class="fas fa-sort ml-1 text-gray-400"></i>
+                <i
+                  v-if="accountsSortBy === 'status'"
+                  :class="['fas', accountsSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"
+                />
+                <i
+                  v-else
+                  class="fas fa-sort ml-1 text-gray-400"
+                />
               </th>
-              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortAccounts('priority')">
+              <th
+                class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                @click="sortAccounts('priority')"
+              >
                 优先级
-                <i v-if="accountsSortBy === 'priority'" :class="['fas', accountsSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
-                <i v-else class="fas fa-sort ml-1 text-gray-400"></i>
+                <i
+                  v-if="accountsSortBy === 'priority'"
+                  :class="['fas', accountsSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"
+                />
+                <i
+                  v-else
+                  class="fas fa-sort ml-1 text-gray-400"
+                />
               </th>
-              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">代理</th>
-              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">今日使用</th>
-              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">会话窗口</th>
-              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">最后使用</th>
-              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">操作</th>
+              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                代理
+              </th>
+              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                今日使用
+              </th>
+              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                会话窗口
+              </th>
+              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                最后使用
+              </th>
+              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                操作
+              </th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200/50">
-            <tr v-for="account in sortedAccounts" :key="account.id" class="table-row">
+            <tr
+              v-for="account in sortedAccounts"
+              :key="account.id"
+              class="table-row"
+            >
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex items-center">
                   <div class="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center mr-3">
-                    <i class="fas fa-user-circle text-white text-xs"></i>
+                    <i class="fas fa-user-circle text-white text-xs" />
                   </div>
                   <div>
                     <div class="flex items-center gap-2">
-                      <div class="text-sm font-semibold text-gray-900">{{ account.name }}</div>
-                      <span v-if="account.accountType === 'dedicated'" 
-                            class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                        <i class="fas fa-lock mr-1"></i>专属
+                      <div class="text-sm font-semibold text-gray-900">
+                        {{ account.name }}
+                      </div>
+                      <span
+                        v-if="account.accountType === 'dedicated'" 
+                        class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800"
+                      >
+                        <i class="fas fa-lock mr-1" />专属
                       </span>
-                      <span v-else 
-                            class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        <i class="fas fa-share-alt mr-1"></i>共享
+                      <span
+                        v-else 
+                        class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
+                      >
+                        <i class="fas fa-share-alt mr-1" />共享
                       </span>
                     </div>
-                    <div class="text-xs text-gray-500">{{ account.id }}</div>
+                    <div class="text-xs text-gray-500">
+                      {{ account.id }}
+                    </div>
                   </div>
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span v-if="account.platform === 'gemini'" 
-                      class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
-                  <i class="fas fa-robot mr-1"></i>Gemini
+                <span
+                  v-if="account.platform === 'gemini'" 
+                  class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800"
+                >
+                  <i class="fas fa-robot mr-1" />Gemini
                 </span>
-                <span v-else-if="account.platform === 'claude-console'" 
-                      class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">
-                  <i class="fas fa-terminal mr-1"></i>Claude Console
+                <span
+                  v-else-if="account.platform === 'claude-console'" 
+                  class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800"
+                >
+                  <i class="fas fa-terminal mr-1" />Claude Console
                 </span>
-                <span v-else 
-                      class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">
-                  <i class="fas fa-brain mr-1"></i>Claude
+                <span
+                  v-else 
+                  class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800"
+                >
+                  <i class="fas fa-brain mr-1" />Claude
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span v-if="account.platform === 'claude-console'" 
-                      class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-                  <i class="fas fa-key mr-1"></i>API Key
+                <span
+                  v-if="account.platform === 'claude-console'" 
+                  class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800"
+                >
+                  <i class="fas fa-key mr-1" />API Key
                 </span>
-                <span v-else-if="account.scopes && account.scopes.length > 0" 
-                      class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
-                  <i class="fas fa-lock mr-1"></i>OAuth
+                <span
+                  v-else-if="account.scopes && account.scopes.length > 0" 
+                  class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800"
+                >
+                  <i class="fas fa-lock mr-1" />OAuth
                 </span>
-                <span v-else 
-                      class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800">
-                  <i class="fas fa-key mr-1"></i>传统
+                <span
+                  v-else 
+                  class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800"
+                >
+                  <i class="fas fa-key mr-1" />传统
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex flex-col gap-1">
-                  <span :class="['inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold', 
-                               account.status === 'blocked' ? 'bg-orange-100 text-orange-800' :
-                               account.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800']">
-                    <div :class="['w-2 h-2 rounded-full mr-2', 
+                  <span
+                    :class="['inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold', 
+                             account.status === 'blocked' ? 'bg-orange-100 text-orange-800' :
+                             account.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800']"
+                  >
+                    <div
+                      :class="['w-2 h-2 rounded-full mr-2', 
                                account.status === 'blocked' ? 'bg-orange-500' :
-                               account.isActive ? 'bg-green-500' : 'bg-red-500']"></div>
+                               account.isActive ? 'bg-green-500' : 'bg-red-500']"
+                    />
                     {{ account.status === 'blocked' ? '已封锁' : account.isActive ? '正常' : '异常' }}
                   </span>
-                  <span v-if="account.rateLimitStatus && account.rateLimitStatus.isRateLimited" 
-                        class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
-                    <i class="fas fa-exclamation-triangle mr-1"></i>
+                  <span
+                    v-if="account.rateLimitStatus && account.rateLimitStatus.isRateLimited" 
+                    class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800"
+                  >
+                    <i class="fas fa-exclamation-triangle mr-1" />
                     限流中 ({{ account.rateLimitStatus.minutesRemaining }}分钟)
                   </span>
-                  <span v-if="account.schedulable === false" 
-                        class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
-                    <i class="fas fa-pause-circle mr-1"></i>
+                  <span
+                    v-if="account.schedulable === false" 
+                    class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700"
+                  >
+                    <i class="fas fa-pause-circle mr-1" />
                     不可调度
                   </span>
-                  <span v-if="account.status === 'blocked' && account.errorMessage" 
-                        class="text-xs text-gray-500 mt-1 max-w-xs truncate" 
-                        :title="account.errorMessage">
+                  <span
+                    v-if="account.status === 'blocked' && account.errorMessage" 
+                    class="text-xs text-gray-500 mt-1 max-w-xs truncate" 
+                    :title="account.errorMessage"
+                  >
                     {{ account.errorMessage }}
                   </span>
-                  <span v-if="account.accountType === 'dedicated'" 
-                        class="text-xs text-gray-500">
+                  <span
+                    v-if="account.accountType === 'dedicated'" 
+                    class="text-xs text-gray-500"
+                  >
                     绑定: {{ account.boundApiKeysCount || 0 }} 个API Key
                   </span>
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <div v-if="account.platform === 'claude' || account.platform === 'claude-console'" class="flex items-center gap-2">
+                <div
+                  v-if="account.platform === 'claude' || account.platform === 'claude-console'"
+                  class="flex items-center gap-2"
+                >
                   <div class="w-16 bg-gray-200 rounded-full h-2">
-                    <div class="bg-gradient-to-r from-green-500 to-blue-600 h-2 rounded-full transition-all duration-300" 
-                         :style="{ width: ((101 - (account.priority || 50)) + '%') }"></div>
+                    <div
+                      class="bg-gradient-to-r from-green-500 to-blue-600 h-2 rounded-full transition-all duration-300" 
+                      :style="{ width: ((101 - (account.priority || 50)) + '%') }"
+                    />
                   </div>
                   <span class="text-xs text-gray-700 font-medium min-w-[20px]">
                     {{ account.priority || 50 }}
                   </span>
                 </div>
-                <div v-else class="text-gray-400 text-sm">
+                <div
+                  v-else
+                  class="text-gray-400 text-sm"
+                >
                   <span class="text-xs">N/A</span>
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                <div v-if="formatProxyDisplay(account.proxy)" class="text-xs bg-blue-50 px-2 py-1 rounded font-mono">
+                <div
+                  v-if="formatProxyDisplay(account.proxy)"
+                  class="text-xs bg-blue-50 px-2 py-1 rounded font-mono"
+                >
                   {{ formatProxyDisplay(account.proxy) }}
                 </div>
-                <div v-else class="text-gray-400">无代理</div>
+                <div
+                  v-else
+                  class="text-gray-400"
+                >
+                  无代理
+                </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm">
-                <div v-if="account.usage && account.usage.daily" class="space-y-1">
+                <div
+                  v-if="account.usage && account.usage.daily"
+                  class="space-y-1"
+                >
                   <div class="flex items-center gap-2">
-                    <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <div class="w-2 h-2 bg-green-500 rounded-full" />
                     <span class="text-sm font-medium text-gray-900">{{ account.usage.daily.requests || 0 }} 次</span>
                   </div>
                   <div class="flex items-center gap-2">
-                    <div class="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <div class="w-2 h-2 bg-blue-500 rounded-full" />
                     <span class="text-xs text-gray-600">{{ formatNumber(account.usage.daily.allTokens || 0) }} tokens</span>
                   </div>
-                  <div v-if="account.usage.averages && account.usage.averages.rpm > 0" class="text-xs text-gray-500">
+                  <div
+                    v-if="account.usage.averages && account.usage.averages.rpm > 0"
+                    class="text-xs text-gray-500"
+                  >
                     平均 {{ account.usage.averages.rpm.toFixed(2) }} RPM
                   </div>
                 </div>
-                <div v-else class="text-gray-400 text-xs">暂无数据</div>
+                <div
+                  v-else
+                  class="text-gray-400 text-xs"
+                >
+                  暂无数据
+                </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <div v-if="account.platform === 'claude' && account.sessionWindow && account.sessionWindow.hasActiveWindow" class="space-y-2">
+                <div
+                  v-if="account.platform === 'claude' && account.sessionWindow && account.sessionWindow.hasActiveWindow"
+                  class="space-y-2"
+                >
                   <div class="flex items-center gap-2">
                     <div class="w-24 bg-gray-200 rounded-full h-2">
-                      <div class="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-full transition-all duration-300" 
-                           :style="{ width: account.sessionWindow.progress + '%' }"></div>
+                      <div
+                        class="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-full transition-all duration-300" 
+                        :style="{ width: account.sessionWindow.progress + '%' }"
+                      />
                     </div>
                     <span class="text-xs text-gray-700 font-medium min-w-[32px]">
                       {{ account.sessionWindow.progress }}%
@@ -203,15 +359,24 @@
                   </div>
                   <div class="text-xs text-gray-600">
                     <div>{{ formatSessionWindow(account.sessionWindow.windowStart, account.sessionWindow.windowEnd) }}</div>
-                    <div v-if="account.sessionWindow.remainingTime > 0" class="text-indigo-600 font-medium">
+                    <div
+                      v-if="account.sessionWindow.remainingTime > 0"
+                      class="text-indigo-600 font-medium"
+                    >
                       剩余 {{ formatRemainingTime(account.sessionWindow.remainingTime) }}
                     </div>
                   </div>
                 </div>
-                <div v-else-if="account.platform === 'claude'" class="text-gray-400 text-sm">
-                  <i class="fas fa-minus"></i>
+                <div
+                  v-else-if="account.platform === 'claude'"
+                  class="text-gray-400 text-sm"
+                >
+                  <i class="fas fa-minus" />
                 </div>
-                <div v-else class="text-gray-400 text-sm">
+                <div
+                  v-else
+                  class="text-gray-400 text-sm"
+                >
                   <span class="text-xs">N/A</span>
                 </div>
               </td>
@@ -222,7 +387,6 @@
                 <div class="flex items-center gap-2">
                   <button 
                     v-if="account.platform === 'claude' && account.scopes"
-                    @click="refreshToken(account)"
                     :disabled="account.isRefreshing"
                     :class="[
                       'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
@@ -231,41 +395,46 @@
                         : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                     ]"
                     :title="account.isRefreshing ? '刷新中...' : '刷新Token'"
+                    @click="refreshToken(account)"
                   >
-                    <i :class="[
-                      'fas fa-sync-alt',
-                      account.isRefreshing ? 'animate-spin' : ''
-                    ]"></i>
+                    <i
+                      :class="[
+                        'fas fa-sync-alt',
+                        account.isRefreshing ? 'animate-spin' : ''
+                      ]"
+                    />
                   </button>
                   <button 
-                    @click="toggleSchedulable(account)"
                     :disabled="account.isTogglingSchedulable"
                     :class="[
                       'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
                       account.isTogglingSchedulable
                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                         : account.schedulable
-                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     ]"
                     :title="account.schedulable ? '点击禁用调度' : '点击启用调度'"
+                    @click="toggleSchedulable(account)"
                   >
-                    <i :class="[
-                      'fas',
-                      account.schedulable ? 'fa-toggle-on' : 'fa-toggle-off'
-                    ]"></i>
+                    <i
+                      :class="[
+                        'fas',
+                        account.schedulable ? 'fa-toggle-on' : 'fa-toggle-off'
+                      ]"
+                    />
                   </button>
                   <button 
-                    @click="editAccount(account)"
                     class="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-200 transition-colors"
+                    @click="editAccount(account)"
                   >
-                    <i class="fas fa-edit"></i>
+                    <i class="fas fa-edit" />
                   </button>
                   <button 
-                    @click="deleteAccount(account)"
                     class="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-medium hover:bg-red-200 transition-colors"
+                    @click="deleteAccount(account)"
                   >
-                    <i class="fas fa-trash"></i>
+                    <i class="fas fa-trash" />
                   </button>
                 </div>
               </td>

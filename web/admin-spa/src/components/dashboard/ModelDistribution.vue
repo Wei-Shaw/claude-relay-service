@@ -2,38 +2,65 @@
   <div class="glass-strong rounded-3xl p-6">
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
       <h2 class="text-xl font-bold text-gray-800 flex items-center">
-        <i class="fas fa-robot mr-2 text-purple-500"></i>
+        <i class="fas fa-robot mr-2 text-purple-500" />
         模型使用分布
       </h2>
       
-      <el-radio-group v-model="modelPeriod" size="small" @change="handlePeriodChange">
-        <el-radio-button label="daily">今日</el-radio-button>
-        <el-radio-button label="total">累计</el-radio-button>
+      <el-radio-group
+        v-model="modelPeriod"
+        size="small"
+        @change="handlePeriodChange"
+      >
+        <el-radio-button label="daily">
+          今日
+        </el-radio-button>
+        <el-radio-button label="total">
+          累计
+        </el-radio-button>
       </el-radio-group>
     </div>
     
-    <div v-if="dashboardStore.dashboardModelStats.length === 0" class="text-center py-12 text-gray-500">
-      <i class="fas fa-chart-pie text-4xl mb-3 opacity-30"></i>
+    <div
+      v-if="dashboardStore.dashboardModelStats.length === 0"
+      class="text-center py-12 text-gray-500"
+    >
+      <i class="fas fa-chart-pie text-4xl mb-3 opacity-30" />
       <p>暂无模型使用数据</p>
     </div>
     
-    <div v-else class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div
+      v-else
+      class="grid grid-cols-1 lg:grid-cols-2 gap-6"
+    >
       <!-- 饼图 -->
-      <div class="relative" style="height: 300px;">
-        <canvas ref="chartCanvas"></canvas>
+      <div
+        class="relative"
+        style="height: 300px;"
+      >
+        <canvas ref="chartCanvas" />
       </div>
       
       <!-- 数据列表 -->
       <div class="space-y-3">
-        <div v-for="(stat, index) in sortedStats" :key="stat.model" 
-             class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+        <div
+          v-for="(stat, index) in sortedStats"
+          :key="stat.model" 
+          class="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+        >
           <div class="flex items-center gap-3">
-            <div class="w-4 h-4 rounded" :style="`background-color: ${getColor(index)}`"></div>
+            <div
+              class="w-4 h-4 rounded"
+              :style="`background-color: ${getColor(index)}`"
+            />
             <span class="font-medium text-gray-700">{{ stat.model }}</span>
           </div>
           <div class="text-right">
-            <p class="font-semibold text-gray-800">{{ formatNumber(stat.requests) }} 请求</p>
-            <p class="text-sm text-gray-500">{{ formatNumber(stat.totalTokens) }} tokens</p>
+            <p class="font-semibold text-gray-800">
+              {{ formatNumber(stat.requests) }} 请求
+            </p>
+            <p class="text-sm text-gray-500">
+              {{ formatNumber(stat.totalTokens) }} tokens
+            </p>
           </div>
         </div>
       </div>

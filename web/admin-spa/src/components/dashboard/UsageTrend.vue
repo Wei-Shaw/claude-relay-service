@@ -2,24 +2,45 @@
   <div class="glass-strong rounded-3xl p-6 mb-8">
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
       <h2 class="text-xl font-bold text-gray-800 flex items-center">
-        <i class="fas fa-chart-area mr-2 text-blue-500"></i>
+        <i class="fas fa-chart-area mr-2 text-blue-500" />
         使用趋势
       </h2>
       
       <div class="flex items-center gap-3">
-        <el-radio-group v-model="granularity" size="small" @change="handleGranularityChange">
-          <el-radio-button label="day">按天</el-radio-button>
-          <el-radio-button label="hour">按小时</el-radio-button>
+        <el-radio-group
+          v-model="granularity"
+          size="small"
+          @change="handleGranularityChange"
+        >
+          <el-radio-button label="day">
+            按天
+          </el-radio-button>
+          <el-radio-button label="hour">
+            按小时
+          </el-radio-button>
         </el-radio-group>
         
-        <el-select v-model="trendPeriod" size="small" style="width: 120px" @change="handlePeriodChange">
-          <el-option :label="`最近${period.days}天`" :value="period.days" v-for="period in periodOptions" :key="period.days" />
+        <el-select
+          v-model="trendPeriod"
+          size="small"
+          style="width: 120px"
+          @change="handlePeriodChange"
+        >
+          <el-option
+            v-for="period in periodOptions"
+            :key="period.days"
+            :label="`最近${period.days}天`"
+            :value="period.days"
+          />
         </el-select>
       </div>
     </div>
     
-    <div class="relative" style="height: 300px;">
-      <canvas ref="chartCanvas"></canvas>
+    <div
+      class="relative"
+      style="height: 300px;"
+    >
+      <canvas ref="chartCanvas" />
     </div>
   </div>
 </template>
@@ -55,8 +76,12 @@ const createChart = () => {
   
   const labels = dashboardStore.trendData.map(item => {
     if (granularity.value === 'hour') {
-      const date = new Date(item.date)
-      return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:00`
+      // 小时粒度使用hour字段
+      const date = new Date(item.hour)
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const hour = String(date.getHours()).padStart(2, '0')
+      return `${month}/${day} ${hour}:00`
     }
     return item.date
   })

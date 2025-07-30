@@ -5,12 +5,18 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-semibold text-gray-600 mb-1">总API Keys</p>
-            <p class="text-3xl font-bold text-gray-900">{{ dashboardData.totalApiKeys }}</p>
-            <p class="text-xs text-gray-500 mt-1">活跃: {{ dashboardData.activeApiKeys || 0 }}</p>
+            <p class="text-sm font-semibold text-gray-600 mb-1">
+              总API Keys
+            </p>
+            <p class="text-3xl font-bold text-gray-900">
+              {{ dashboardData.totalApiKeys }}
+            </p>
+            <p class="text-xs text-gray-500 mt-1">
+              活跃: {{ dashboardData.activeApiKeys || 0 }}
+            </p>
           </div>
           <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-blue-500 to-blue-600">
-            <i class="fas fa-key"></i>
+            <i class="fas fa-key" />
           </div>
         </div>
       </div>
@@ -18,17 +24,24 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-semibold text-gray-600 mb-1">服务账户</p>
-            <p class="text-3xl font-bold text-gray-900">{{ dashboardData.totalAccounts }}</p>
+            <p class="text-sm font-semibold text-gray-600 mb-1">
+              服务账户
+            </p>
+            <p class="text-3xl font-bold text-gray-900">
+              {{ dashboardData.totalAccounts }}
+            </p>
             <p class="text-xs text-gray-500 mt-1">
               活跃: {{ dashboardData.activeAccounts || 0 }}
-              <span v-if="dashboardData.rateLimitedAccounts > 0" class="text-yellow-600">
+              <span
+                v-if="dashboardData.rateLimitedAccounts > 0"
+                class="text-yellow-600"
+              >
                 | 限流: {{ dashboardData.rateLimitedAccounts }}
               </span>
             </p>
           </div>
           <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-green-500 to-green-600">
-            <i class="fas fa-user-circle"></i>
+            <i class="fas fa-user-circle" />
           </div>
         </div>
       </div>
@@ -36,12 +49,18 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-semibold text-gray-600 mb-1">今日请求</p>
-            <p class="text-3xl font-bold text-gray-900">{{ dashboardData.todayRequests }}</p>
-            <p class="text-xs text-gray-500 mt-1">总请求: {{ formatNumber(dashboardData.totalRequests || 0) }}</p>
+            <p class="text-sm font-semibold text-gray-600 mb-1">
+              今日请求
+            </p>
+            <p class="text-3xl font-bold text-gray-900">
+              {{ dashboardData.todayRequests }}
+            </p>
+            <p class="text-xs text-gray-500 mt-1">
+              总请求: {{ formatNumber(dashboardData.totalRequests || 0) }}
+            </p>
           </div>
           <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-purple-500 to-purple-600">
-            <i class="fas fa-chart-line"></i>
+            <i class="fas fa-chart-line" />
           </div>
         </div>
       </div>
@@ -49,12 +68,18 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-semibold text-gray-600 mb-1">系统状态</p>
-            <p class="text-3xl font-bold text-green-600">{{ dashboardData.systemStatus }}</p>
-            <p class="text-xs text-gray-500 mt-1">运行时间: {{ formattedUptime }}</p>
+            <p class="text-sm font-semibold text-gray-600 mb-1">
+              系统状态
+            </p>
+            <p class="text-3xl font-bold text-green-600">
+              {{ dashboardData.systemStatus }}
+            </p>
+            <p class="text-xs text-gray-500 mt-1">
+              运行时间: {{ formattedUptime }}
+            </p>
           </div>
           <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-yellow-500 to-orange-500">
-            <i class="fas fa-heartbeat"></i>
+            <i class="fas fa-heartbeat" />
           </div>
         </div>
       </div>
@@ -65,22 +90,32 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div class="flex-1 mr-8">
-            <p class="text-sm font-semibold text-gray-600 mb-1">今日Token</p>
+            <p class="text-sm font-semibold text-gray-600 mb-1">
+              今日Token
+            </p>
             <div class="flex items-baseline gap-2 mb-2 flex-wrap">
-              <p class="text-3xl font-bold text-blue-600">{{ formatNumber((dashboardData.todayInputTokens || 0) + (dashboardData.todayOutputTokens || 0) + (dashboardData.todayCacheCreateTokens || 0) + (dashboardData.todayCacheReadTokens || 0)) }}</p>
+              <p class="text-3xl font-bold text-blue-600">
+                {{ formatNumber((dashboardData.todayInputTokens || 0) + (dashboardData.todayOutputTokens || 0) + (dashboardData.todayCacheCreateTokens || 0) + (dashboardData.todayCacheReadTokens || 0)) }}
+              </p>
               <span class="text-sm text-green-600 font-medium">/ {{ costsData.todayCosts.formatted.totalCost }}</span>
             </div>
             <div class="text-xs text-gray-500">
               <div class="flex justify-between items-center flex-wrap gap-x-4">
                 <span>输入: <span class="font-medium">{{ formatNumber(dashboardData.todayInputTokens || 0) }}</span></span>
                 <span>输出: <span class="font-medium">{{ formatNumber(dashboardData.todayOutputTokens || 0) }}</span></span>
-                <span v-if="(dashboardData.todayCacheCreateTokens || 0) > 0" class="text-purple-600">缓存创建: <span class="font-medium">{{ formatNumber(dashboardData.todayCacheCreateTokens || 0) }}</span></span>
-                <span v-if="(dashboardData.todayCacheReadTokens || 0) > 0" class="text-purple-600">缓存读取: <span class="font-medium">{{ formatNumber(dashboardData.todayCacheReadTokens || 0) }}</span></span>
+                <span
+                  v-if="(dashboardData.todayCacheCreateTokens || 0) > 0"
+                  class="text-purple-600"
+                >缓存创建: <span class="font-medium">{{ formatNumber(dashboardData.todayCacheCreateTokens || 0) }}</span></span>
+                <span
+                  v-if="(dashboardData.todayCacheReadTokens || 0) > 0"
+                  class="text-purple-600"
+                >缓存读取: <span class="font-medium">{{ formatNumber(dashboardData.todayCacheReadTokens || 0) }}</span></span>
               </div>
             </div>
           </div>
           <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-indigo-500 to-indigo-600">
-            <i class="fas fa-coins"></i>
+            <i class="fas fa-coins" />
           </div>
         </div>
       </div>
@@ -88,22 +123,32 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div class="flex-1 mr-8">
-            <p class="text-sm font-semibold text-gray-600 mb-1">总Token消耗</p>
+            <p class="text-sm font-semibold text-gray-600 mb-1">
+              总Token消耗
+            </p>
             <div class="flex items-baseline gap-2 mb-2 flex-wrap">
-              <p class="text-3xl font-bold text-emerald-600">{{ formatNumber((dashboardData.totalInputTokens || 0) + (dashboardData.totalOutputTokens || 0) + (dashboardData.totalCacheCreateTokens || 0) + (dashboardData.totalCacheReadTokens || 0)) }}</p>
+              <p class="text-3xl font-bold text-emerald-600">
+                {{ formatNumber((dashboardData.totalInputTokens || 0) + (dashboardData.totalOutputTokens || 0) + (dashboardData.totalCacheCreateTokens || 0) + (dashboardData.totalCacheReadTokens || 0)) }}
+              </p>
               <span class="text-sm text-green-600 font-medium">/ {{ costsData.totalCosts.formatted.totalCost }}</span>
             </div>
             <div class="text-xs text-gray-500">
               <div class="flex justify-between items-center flex-wrap gap-x-4">
                 <span>输入: <span class="font-medium">{{ formatNumber(dashboardData.totalInputTokens || 0) }}</span></span>
                 <span>输出: <span class="font-medium">{{ formatNumber(dashboardData.totalOutputTokens || 0) }}</span></span>
-                <span v-if="(dashboardData.totalCacheCreateTokens || 0) > 0" class="text-purple-600">缓存创建: <span class="font-medium">{{ formatNumber(dashboardData.totalCacheCreateTokens || 0) }}</span></span>
-                <span v-if="(dashboardData.totalCacheReadTokens || 0) > 0" class="text-purple-600">缓存读取: <span class="font-medium">{{ formatNumber(dashboardData.totalCacheReadTokens || 0) }}</span></span>
+                <span
+                  v-if="(dashboardData.totalCacheCreateTokens || 0) > 0"
+                  class="text-purple-600"
+                >缓存创建: <span class="font-medium">{{ formatNumber(dashboardData.totalCacheCreateTokens || 0) }}</span></span>
+                <span
+                  v-if="(dashboardData.totalCacheReadTokens || 0) > 0"
+                  class="text-purple-600"
+                >缓存读取: <span class="font-medium">{{ formatNumber(dashboardData.totalCacheReadTokens || 0) }}</span></span>
               </div>
             </div>
           </div>
           <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-emerald-500 to-emerald-600">
-            <i class="fas fa-database"></i>
+            <i class="fas fa-database" />
           </div>
         </div>
       </div>
@@ -111,12 +156,25 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-semibold text-gray-600 mb-1">平均RPM</p>
-            <p class="text-3xl font-bold text-orange-600">{{ dashboardData.systemRPM || 0 }}</p>
-            <p class="text-xs text-gray-500 mt-1">每分钟请求数</p>
+            <p class="text-sm font-semibold text-gray-600 mb-1">
+              实时RPM 
+              <span class="text-xs text-gray-400">({{ dashboardData.metricsWindow }}分钟)</span>
+            </p>
+            <p class="text-3xl font-bold text-orange-600">
+              {{ dashboardData.realtimeRPM || 0 }}
+            </p>
+            <p class="text-xs text-gray-500 mt-1">
+              每分钟请求数
+              <span
+                v-if="dashboardData.isHistoricalMetrics"
+                class="text-yellow-600"
+              >
+                <i class="fas fa-exclamation-circle" /> 历史数据
+              </span>
+            </p>
           </div>
           <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-orange-500 to-orange-600">
-            <i class="fas fa-tachometer-alt"></i>
+            <i class="fas fa-tachometer-alt" />
           </div>
         </div>
       </div>
@@ -124,12 +182,25 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-semibold text-gray-600 mb-1">平均TPM</p>
-            <p class="text-3xl font-bold text-rose-600">{{ dashboardData.systemTPM || 0 }}</p>
-            <p class="text-xs text-gray-500 mt-1">每分钟Token数</p>
+            <p class="text-sm font-semibold text-gray-600 mb-1">
+              实时TPM 
+              <span class="text-xs text-gray-400">({{ dashboardData.metricsWindow }}分钟)</span>
+            </p>
+            <p class="text-3xl font-bold text-rose-600">
+              {{ formatNumber(dashboardData.realtimeTPM || 0) }}
+            </p>
+            <p class="text-xs text-gray-500 mt-1">
+              每分钟Token数
+              <span
+                v-if="dashboardData.isHistoricalMetrics"
+                class="text-yellow-600"
+              >
+                <i class="fas fa-exclamation-circle" /> 历史数据
+              </span>
+            </p>
           </div>
           <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-rose-500 to-rose-600">
-            <i class="fas fa-rocket"></i>
+            <i class="fas fa-rocket" />
           </div>
         </div>
       </div>
@@ -137,21 +208,23 @@
 
     <!-- 模型消费统计 -->
     <div class="mb-8">
-      <div class="flex items-center justify-between mb-6">
-        <h3 class="text-xl font-bold text-gray-900">模型使用分布与Token使用趋势</h3>
-        <div class="flex gap-2 items-center">
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+        <h3 class="text-xl font-bold text-gray-900">
+          模型使用分布与Token使用趋势
+        </h3>
+        <div class="flex flex-wrap gap-2 items-center">
           <!-- 快捷日期选择 -->
           <div class="flex gap-1 bg-gray-100 rounded-lg p-1">
             <button 
               v-for="option in dateFilter.presetOptions" 
               :key="option.value"
-              @click="setDateFilterPreset(option.value)"
               :class="[
                 'px-3 py-1 rounded-md text-sm font-medium transition-colors',
                 dateFilter.preset === option.value && dateFilter.type === 'preset'
                   ? 'bg-white text-blue-600 shadow-sm' 
                   : 'text-gray-600 hover:text-gray-900'
               ]"
+              @click="setDateFilterPreset(option.value)"
             >
               {{ option.label }}
             </button>
@@ -160,89 +233,163 @@
           <!-- 粒度切换按钮 -->
           <div class="flex gap-1 bg-gray-100 rounded-lg p-1">
             <button 
-              @click="setTrendGranularity('day')"
               :class="[
                 'px-3 py-1 rounded-md text-sm font-medium transition-colors',
                 trendGranularity === 'day'
                   ? 'bg-white text-blue-600 shadow-sm' 
                   : 'text-gray-600 hover:text-gray-900'
               ]"
+              @click="setTrendGranularity('day')"
             >
-              <i class="fas fa-calendar-day mr-1"></i>按天
+              <i class="fas fa-calendar-day mr-1" />按天
             </button>
             <button 
-              @click="setTrendGranularity('hour')"
               :class="[
                 'px-3 py-1 rounded-md text-sm font-medium transition-colors',
                 trendGranularity === 'hour'
                   ? 'bg-white text-blue-600 shadow-sm' 
                   : 'text-gray-600 hover:text-gray-900'
               ]"
+              @click="setTrendGranularity('hour')"
             >
-              <i class="fas fa-clock mr-1"></i>按小时
+              <i class="fas fa-clock mr-1" />按小时
             </button>
           </div>
           
           <!-- Element Plus 日期范围选择器 -->
           <div class="flex items-center gap-2">
             <el-date-picker
-              :default-time="defaultTime"
               v-model="dateFilter.customRange"
+              :default-time="defaultTime"
               type="datetimerange"
               range-separator="至"
               start-placeholder="开始日期"
               end-placeholder="结束日期"
               format="YYYY-MM-DD HH:mm:ss"
               value-format="YYYY-MM-DD HH:mm:ss"
-              @change="onCustomDateRangeChange"
               :disabled-date="disabledDate"
               size="default"
               style="width: 400px;"
               class="custom-date-picker"
-            ></el-date-picker>
-            <span v-if="trendGranularity === 'hour'" class="text-xs text-orange-600">
-              <i class="fas fa-info-circle"></i> 最多24小时
+              @change="onCustomDateRangeChange"
+            />
+            <span
+              v-if="trendGranularity === 'hour'"
+              class="text-xs text-orange-600"
+            >
+              <i class="fas fa-info-circle" /> 最多24小时
             </span>
           </div>
           
-          <button @click="refreshChartsData()" class="btn btn-primary px-4 py-2 flex items-center gap-2">
-            <i class="fas fa-sync-alt"></i>刷新
-          </button>
+          <!-- 刷新控制 -->
+          <div class="flex items-center gap-2">
+            <!-- 自动刷新控制 -->
+            <div class="flex items-center bg-gray-100 rounded-lg px-3 py-1">
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input 
+                  v-model="autoRefreshEnabled" 
+                  type="checkbox"
+                  class="sr-only peer"
+                >
+                <!-- 更小的开关 -->
+                <div class="relative w-9 h-5 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-blue-500 transition-all duration-200 after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:w-4 after:h-4 after:rounded-full after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-4" />
+                <span class="ml-2.5 text-sm font-medium text-gray-600 select-none flex items-center gap-1">
+                  <i class="fas fa-redo-alt text-xs text-gray-500" />
+                  <span>自动刷新</span>
+                  <span
+                    v-if="autoRefreshEnabled"
+                    class="ml-1 text-xs text-blue-600 font-mono transition-opacity"
+                    :class="refreshCountdown > 0 ? 'opacity-100' : 'opacity-0'"
+                  >
+                    {{ refreshCountdown }}s
+                  </span>
+                </span>
+              </label>
+            </div>
+            
+            <!-- 刷新按钮 -->
+            <button 
+              :disabled="isRefreshing" 
+              class="px-3 py-1 rounded-md text-sm font-medium transition-colors bg-white text-blue-600 shadow-sm hover:bg-gray-50 border border-gray-300 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="立即刷新数据"
+              @click="refreshAllData()"
+            >
+              <i :class="['fas fa-sync-alt text-xs', { 'animate-spin': isRefreshing }]" />
+              <span>{{ isRefreshing ? '刷新中' : '刷新' }}</span>
+            </button>
+          </div>
         </div>
       </div>
       
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- 饼图 -->
         <div class="card p-6">
-          <h4 class="text-lg font-semibold text-gray-800 mb-4">Token使用分布</h4>
-          <div class="relative" style="height: 300px;">
-            <canvas ref="modelUsageChart"></canvas>
+          <h4 class="text-lg font-semibold text-gray-800 mb-4">
+            Token使用分布
+          </h4>
+          <div
+            class="relative"
+            style="height: 300px;"
+          >
+            <canvas ref="modelUsageChart" />
           </div>
         </div>
         
         <!-- 详细数据表格 -->
         <div class="card p-6">
-          <h4 class="text-lg font-semibold text-gray-800 mb-4">详细统计数据</h4>
-          <div v-if="dashboardModelStats.length === 0" class="text-center py-8">
-            <p class="text-gray-500">暂无模型使用数据</p>
+          <h4 class="text-lg font-semibold text-gray-800 mb-4">
+            详细统计数据
+          </h4>
+          <div
+            v-if="dashboardModelStats.length === 0"
+            class="text-center py-8"
+          >
+            <p class="text-gray-500">
+              暂无模型使用数据
+            </p>
           </div>
-          <div v-else class="overflow-auto max-h-[300px]">
+          <div
+            v-else
+            class="overflow-auto max-h-[300px]"
+          >
             <table class="min-w-full">
               <thead class="bg-gray-50 sticky top-0">
                 <tr>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">模型</th>
-                  <th class="px-4 py-2 text-right text-xs font-medium text-gray-700">请求数</th>
-                  <th class="px-4 py-2 text-right text-xs font-medium text-gray-700">总Token</th>
-                  <th class="px-4 py-2 text-right text-xs font-medium text-gray-700">费用</th>
-                  <th class="px-4 py-2 text-right text-xs font-medium text-gray-700">占比</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">
+                    模型
+                  </th>
+                  <th class="px-4 py-2 text-right text-xs font-medium text-gray-700">
+                    请求数
+                  </th>
+                  <th class="px-4 py-2 text-right text-xs font-medium text-gray-700">
+                    总Token
+                  </th>
+                  <th class="px-4 py-2 text-right text-xs font-medium text-gray-700">
+                    费用
+                  </th>
+                  <th class="px-4 py-2 text-right text-xs font-medium text-gray-700">
+                    占比
+                  </th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-200">
-                <tr v-for="stat in dashboardModelStats" :key="stat.model" class="hover:bg-gray-50">
-                  <td class="px-4 py-2 text-sm text-gray-900">{{ stat.model }}</td>
-                  <td class="px-4 py-2 text-sm text-gray-600 text-right">{{ formatNumber(stat.requests) }}</td>
-                  <td class="px-4 py-2 text-sm text-gray-600 text-right">{{ formatNumber(stat.allTokens) }}</td>
-                  <td class="px-4 py-2 text-sm text-green-600 text-right font-medium">{{ stat.formatted ? stat.formatted.total : '$0.000000' }}</td>
+                <tr
+                  v-for="stat in dashboardModelStats"
+                  :key="stat.model"
+                  class="hover:bg-gray-50"
+                >
+                  <td class="px-4 py-2 text-sm text-gray-900">
+                    {{ stat.model }}
+                  </td>
+                  <td class="px-4 py-2 text-sm text-gray-600 text-right">
+                    {{ formatNumber(stat.requests) }}
+                  </td>
+                  <td class="px-4 py-2 text-sm text-gray-600 text-right">
+                    {{ formatNumber(stat.allTokens) }}
+                  </td>
+                  <td class="px-4 py-2 text-sm text-green-600 text-right font-medium">
+                    {{ stat.formatted ? stat.formatted.total : '$0.000000' }}
+                  </td>
                   <td class="px-4 py-2 text-sm font-medium text-right">
                     <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                       {{ calculatePercentage(stat.allTokens, dashboardModelStats) }}%
@@ -260,7 +407,7 @@
     <div class="mb-8">
       <div class="card p-6">
         <div style="height: 300px;">
-          <canvas ref="usageTrendChart"></canvas>
+          <canvas ref="usageTrendChart" />
         </div>
       </div>
     </div>
@@ -269,30 +416,32 @@
     <div class="mb-8">
       <div class="card p-6">
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold text-gray-900">API Keys 使用趋势</h3>
+          <h3 class="text-lg font-semibold text-gray-900">
+            API Keys 使用趋势
+          </h3>
           <!-- 维度切换按钮 -->
           <div class="flex gap-1 bg-gray-100 rounded-lg p-1">
             <button 
-              @click="apiKeysTrendMetric = 'requests'; updateApiKeysUsageTrendChart()"
               :class="[
                 'px-3 py-1 rounded-md text-sm font-medium transition-colors',
                 apiKeysTrendMetric === 'requests'
                   ? 'bg-white text-blue-600 shadow-sm' 
                   : 'text-gray-600 hover:text-gray-900'
               ]"
+              @click="apiKeysTrendMetric = 'requests'; updateApiKeysUsageTrendChart()"
             >
-              <i class="fas fa-exchange-alt mr-1"></i>请求次数
+              <i class="fas fa-exchange-alt mr-1" />请求次数
             </button>
             <button 
-              @click="apiKeysTrendMetric = 'tokens'; updateApiKeysUsageTrendChart()"
               :class="[
                 'px-3 py-1 rounded-md text-sm font-medium transition-colors',
                 apiKeysTrendMetric === 'tokens'
                   ? 'bg-white text-blue-600 shadow-sm' 
                   : 'text-gray-600 hover:text-gray-900'
               ]"
+              @click="apiKeysTrendMetric = 'tokens'; updateApiKeysUsageTrendChart()"
             >
-              <i class="fas fa-coins mr-1"></i>Token 数量
+              <i class="fas fa-coins mr-1" />Token 数量
             </button>
           </div>
         </div>
@@ -305,7 +454,7 @@
           </span>
         </div>
         <div style="height: 350px;">
-          <canvas ref="apiKeysUsageTrendChart"></canvas>
+          <canvas ref="apiKeysUsageTrendChart" />
         </div>
       </div>
     </div>
@@ -313,7 +462,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useDashboardStore } from '@/stores/dashboard'
 import Chart from 'chart.js/auto'
@@ -334,8 +483,6 @@ const {
 
 const {
   loadDashboardData,
-  loadUsageTrend,
-  loadModelStats,
   loadApiKeysTrend,
   setDateFilterPreset,
   onCustomDateRangeChange,
@@ -351,6 +498,20 @@ const apiKeysUsageTrendChart = ref(null)
 let modelUsageChartInstance = null
 let usageTrendChartInstance = null
 let apiKeysUsageTrendChartInstance = null
+
+// 自动刷新相关
+const autoRefreshEnabled = ref(false)
+const autoRefreshInterval = ref(30) // 秒
+const autoRefreshTimer = ref(null)
+const refreshCountdown = ref(0)
+const countdownTimer = ref(null)
+const isRefreshing = ref(false)
+
+// 计算倒计时显示
+const refreshCountdownDisplay = computed(() => {
+  if (!autoRefreshEnabled.value || refreshCountdown.value <= 0) return ''
+  return `${refreshCountdown.value}秒后刷新`
+})
 
 // 格式化数字
 function formatNumber(num) {
@@ -441,8 +602,35 @@ function createUsageTrendChart() {
   const requestsData = data.map(d => d.requests || 0)
   const costData = data.map(d => d.cost || 0)
   
+  // 根据数据类型确定标签字段和格式
+  const labelField = data[0]?.date ? 'date' : 'hour'
+  const labels = data.map(d => {
+    // 优先使用后端提供的label字段
+    if (d.label) {
+      return d.label
+    }
+    
+    if (labelField === 'hour') {
+      // 格式化小时显示
+      const date = new Date(d.hour)
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const hour = String(date.getHours()).padStart(2, '0')
+      return `${month}/${day} ${hour}:00`
+    }
+    // 按天显示时，只显示月/日，不显示年份
+    const dateStr = d.date
+    if (dateStr && dateStr.includes('-')) {
+      const parts = dateStr.split('-')
+      if (parts.length >= 3) {
+        return `${parts[1]}/${parts[2]}`
+      }
+    }
+    return d.date
+  })
+  
   const chartData = {
-    labels: data.map(d => d.date),
+    labels: labels,
     datasets: [
       {
         label: '输入Token',
@@ -516,6 +704,22 @@ function createUsageTrendChart() {
         tooltip: {
           mode: 'index',
           intersect: false,
+          itemSort: function(a, b) {
+            // 按值倒序排列，费用和请求数特殊处理
+            const aLabel = a.dataset.label || ''
+            const bLabel = b.dataset.label || ''
+            
+            // 费用和请求数使用不同的轴，单独处理
+            if (aLabel === '费用 (USD)' || bLabel === '费用 (USD)') {
+              return aLabel === '费用 (USD)' ? -1 : 1
+            }
+            if (aLabel === '请求数' || bLabel === '请求数') {
+              return aLabel === '请求数' ? 1 : -1
+            }
+            
+            // 其他按token值倒序
+            return b.parsed.y - a.parsed.y
+          },
           callbacks: {
             label: function(context) {
               const label = context.dataset.label || ''
@@ -531,7 +735,14 @@ function createUsageTrendChart() {
               } else if (label === '请求数') {
                 return label + ': ' + value.toLocaleString() + ' 次'
               } else {
-                return label + ': ' + value.toLocaleString() + ' tokens'
+                // 格式化token数显示
+                if (value >= 1000000) {
+                  return label + ': ' + (value / 1000000).toFixed(2) + 'M tokens'
+                } else if (value >= 1000) {
+                  return label + ': ' + (value / 1000).toFixed(2) + 'K tokens'
+                } else {
+                  return label + ': ' + value.toLocaleString() + ' tokens'
+                }
               }
             }
           }
@@ -628,8 +839,34 @@ function createApiKeysUsageTrendChart() {
     }
   }) || []
   
+  // 根据数据类型确定标签字段
+  const labelField = data[0]?.date ? 'date' : 'hour'
+  
   const chartData = {
-    labels: data.map(d => d.date),
+    labels: data.map(d => {
+      // 优先使用后端提供的label字段
+      if (d.label) {
+        return d.label
+      }
+      
+      if (labelField === 'hour') {
+        // 格式化小时显示
+        const date = new Date(d.hour)
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        const hour = String(date.getHours()).padStart(2, '0')
+        return `${month}/${day} ${hour}:00`
+      }
+      // 按天显示时，只显示月/日，不显示年份
+      const dateStr = d.date
+      if (dateStr && dateStr.includes('-')) {
+        const parts = dateStr.split('-')
+        if (parts.length >= 3) {
+          return `${parts[1]}/${parts[2]}`
+        }
+      }
+      return d.date
+    }),
     datasets: datasets
   }
   
@@ -653,12 +890,52 @@ function createApiKeysUsageTrendChart() {
         tooltip: {
           mode: 'index',
           intersect: false,
+          itemSort: function(a, b) {
+            // 按值倒序排列
+            return b.parsed.y - a.parsed.y
+          },
           callbacks: {
             label: function(context) {
               const label = context.dataset.label || ''
               const value = context.parsed.y
-              const unit = apiKeysTrendMetric.value === 'tokens' ? ' tokens' : ' 次'
-              return label + ': ' + value.toLocaleString() + unit
+              const dataIndex = context.dataIndex
+              const dataPoint = apiKeysTrendData.value.data[dataIndex]
+              
+              // 获取所有数据集在这个时间点的值，用于排名
+              const allValues = context.chart.data.datasets.map((dataset, idx) => ({
+                value: dataset.data[dataIndex] || 0,
+                index: idx
+              })).sort((a, b) => b.value - a.value)
+              
+              // 找出当前数据集的排名
+              const rank = allValues.findIndex(item => item.index === context.datasetIndex) + 1
+              
+              // 准备排名标识
+              let rankIcon = ''
+              if (rank === 1) rankIcon = '🥇 '
+              else if (rank === 2) rankIcon = '🥈 '
+              else if (rank === 3) rankIcon = '🥉 '
+              
+              if (apiKeysTrendMetric.value === 'tokens') {
+                // 格式化token显示
+                let formattedValue = ''
+                if (value >= 1000000) {
+                  formattedValue = (value / 1000000).toFixed(2) + 'M'
+                } else if (value >= 1000) {
+                  formattedValue = (value / 1000).toFixed(2) + 'K'
+                } else {
+                  formattedValue = value.toLocaleString()
+                }
+                
+                // 获取对应API Key的费用信息
+                const apiKeyId = apiKeysTrendData.value.topApiKeys[context.datasetIndex]
+                const apiKeyData = dataPoint?.apiKeys?.[apiKeyId]
+                const cost = apiKeyData?.formattedCost || '$0.00'
+                
+                return `${rankIcon}${label}: ${formattedValue} tokens (${cost})`
+              } else {
+                return `${rankIcon}${label}: ${value.toLocaleString()} 次`
+              }
             }
           }
         }
@@ -709,19 +986,111 @@ watch(apiKeysTrendData, () => {
   nextTick(() => createApiKeysUsageTrendChart())
 })
 
+// 刷新所有数据
+async function refreshAllData() {
+  if (isRefreshing.value) return
+  
+  isRefreshing.value = true
+  try {
+    await Promise.all([
+      loadDashboardData(),
+      refreshChartsData()
+    ])
+  } finally {
+    isRefreshing.value = false
+  }
+}
+
+// 启动自动刷新
+function startAutoRefresh() {
+  if (!autoRefreshEnabled.value) return
+  
+  // 重置倒计时
+  refreshCountdown.value = autoRefreshInterval.value
+  
+  // 清除现有定时器
+  if (countdownTimer.value) {
+    clearInterval(countdownTimer.value)
+  }
+  if (autoRefreshTimer.value) {
+    clearTimeout(autoRefreshTimer.value)
+  }
+  
+  // 启动倒计时
+  countdownTimer.value = setInterval(() => {
+    refreshCountdown.value--
+    if (refreshCountdown.value <= 0) {
+      clearInterval(countdownTimer.value)
+    }
+  }, 1000)
+  
+  // 设置刷新定时器
+  autoRefreshTimer.value = setTimeout(async () => {
+    await refreshAllData()
+    // 递归调用以继续自动刷新
+    if (autoRefreshEnabled.value) {
+      startAutoRefresh()
+    }
+  }, autoRefreshInterval.value * 1000)
+}
+
+// 停止自动刷新
+function stopAutoRefresh() {
+  if (countdownTimer.value) {
+    clearInterval(countdownTimer.value)
+    countdownTimer.value = null
+  }
+  if (autoRefreshTimer.value) {
+    clearTimeout(autoRefreshTimer.value)
+    autoRefreshTimer.value = null
+  }
+  refreshCountdown.value = 0
+}
+
+// 切换自动刷新
+function toggleAutoRefresh() {
+  autoRefreshEnabled.value = !autoRefreshEnabled.value
+  if (autoRefreshEnabled.value) {
+    startAutoRefresh()
+  } else {
+    stopAutoRefresh()
+  }
+}
+
+// 监听自动刷新状态变化
+watch(autoRefreshEnabled, (newVal) => {
+  if (newVal) {
+    startAutoRefresh()
+  } else {
+    stopAutoRefresh()
+  }
+})
+
 // 初始化
 onMounted(async () => {
   // 加载所有数据
-  await Promise.all([
-    loadDashboardData(),
-    refreshChartsData()  // 使用refreshChartsData来确保根据当前筛选条件加载数据
-  ])
+  await refreshAllData()
   
   // 创建图表
   await nextTick()
   createModelUsageChart()
   createUsageTrendChart()
   createApiKeysUsageTrendChart()
+})
+
+// 清理
+onUnmounted(() => {
+  stopAutoRefresh()
+  // 销毁图表实例
+  if (modelUsageChartInstance) {
+    modelUsageChartInstance.destroy()
+  }
+  if (usageTrendChartInstance) {
+    usageTrendChartInstance.destroy()
+  }
+  if (apiKeysUsageTrendChartInstance) {
+    apiKeysUsageTrendChartInstance.destroy()
+  }
 })
 </script>
 
@@ -740,5 +1109,19 @@ onMounted(async () => {
 
 .custom-date-picker :deep(.el-range-input) {
   font-size: 13px;
+}
+
+/* 旋转动画 */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
 }
 </style>

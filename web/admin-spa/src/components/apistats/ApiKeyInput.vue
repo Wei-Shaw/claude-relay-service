@@ -3,10 +3,12 @@
     <!-- 标题区域 -->
     <div class="wide-card-title text-center mb-6">
       <h2 class="text-2xl font-bold mb-2">
-        <i class="fas fa-chart-line mr-3"></i>
+        <i class="fas fa-chart-line mr-3" />
         使用统计查询
       </h2>
-      <p class="text-base text-gray-600">查询您的 API Key 使用情况和统计数据</p>
+      <p class="text-base text-gray-600">
+        查询您的 API Key 使用情况和统计数据
+      </p>
     </div>
     
     <!-- 输入区域 -->
@@ -15,7 +17,7 @@
         <!-- API Key 输入 -->
         <div class="lg:col-span-3">
           <label class="block text-sm font-medium mb-2 text-gray-700">
-            <i class="fas fa-key mr-2"></i>
+            <i class="fas fa-key mr-2" />
             输入您的 API Key
           </label>
           <input 
@@ -23,8 +25,8 @@
             type="password" 
             placeholder="请输入您的 API Key (cr_...)"
             class="wide-card-input w-full"
-            @keyup.enter="queryStats"
             :disabled="loading"
+            @keyup.enter="queryStats"
           >
         </div>
         
@@ -34,12 +36,18 @@
             &nbsp;
           </label>
           <button 
-            @click="queryStats"
             :disabled="loading || !apiKey.trim()"
             class="btn btn-primary btn-query w-full h-full flex items-center justify-center gap-2"
+            @click="queryStats"
           >
-            <i v-if="loading" class="fas fa-spinner loading-spinner"></i>
-            <i v-else class="fas fa-search"></i>
+            <i
+              v-if="loading"
+              class="fas fa-spinner loading-spinner"
+            />
+            <i
+              v-else
+              class="fas fa-search"
+            />
             {{ loading ? '查询中...' : '查询统计' }}
           </button>
         </div>
@@ -47,7 +55,7 @@
       
       <!-- 安全提示 -->
       <div class="security-notice mt-4">
-        <i class="fas fa-shield-alt mr-2"></i>
+        <i class="fas fa-shield-alt mr-2" />
         您的 API Key 仅用于查询自己的统计数据，不会被存储或用于其他用途
       </div>
     </div>

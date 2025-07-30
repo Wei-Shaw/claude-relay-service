@@ -13,24 +13,31 @@
       >
         <div class="toast-content">
           <div class="toast-icon">
-            <i :class="getIconClass(toast.type)"></i>
+            <i :class="getIconClass(toast.type)" />
           </div>
           <div class="toast-body">
-            <div v-if="toast.title" class="toast-title">{{ toast.title }}</div>
-            <div class="toast-message">{{ toast.message }}</div>
+            <div
+              v-if="toast.title"
+              class="toast-title"
+            >
+              {{ toast.title }}
+            </div>
+            <div class="toast-message">
+              {{ toast.message }}
+            </div>
           </div>
           <button 
             class="toast-close"
             @click.stop="removeToast(toast.id)"
           >
-            <i class="fas fa-times"></i>
+            <i class="fas fa-times" />
           </button>
         </div>
         <div 
           v-if="toast.duration > 0"
           class="toast-progress"
           :style="{ animationDuration: `${toast.duration}ms` }"
-        ></div>
+        />
       </div>
     </div>
   </Teleport>
