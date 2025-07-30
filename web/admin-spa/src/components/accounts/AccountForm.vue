@@ -250,36 +250,92 @@
               </div>
               
               <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-3">支持的模型 (可选)--注意,ClaudeCode必须加上hiku模型！</label>
-                <div class="mb-2 flex gap-2">
+                <label class="block text-sm font-semibold text-gray-700 mb-3">模型映射表 (可选)</label>
+                <div class="bg-blue-50 p-3 rounded-lg mb-3">
+                  <p class="text-xs text-blue-700">
+                    <i class="fas fa-info-circle mr-1" />
+                    留空表示支持所有模型且不修改请求。配置映射后，左侧模型会被识别为支持的模型，右侧是实际发送的模型。
+                  </p>
+                </div>
+                
+                <!-- 模型映射表 -->
+                <div class="space-y-2 mb-3">
+                  <div
+                    v-for="(mapping, index) in modelMappings"
+                    :key="index"
+                    class="flex items-center gap-2"
+                  >
+                    <input
+                      v-model="mapping.from"
+                      type="text"
+                      class="form-input flex-1"
+                      placeholder="原始模型名称"
+                    >
+                    <i class="fas fa-arrow-right text-gray-400" />
+                    <input
+                      v-model="mapping.to"
+                      type="text"
+                      class="form-input flex-1"
+                      placeholder="映射后的模型名称"
+                    >
+                    <button
+                      type="button"
+                      class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      @click="removeModelMapping(index)"
+                    >
+                      <i class="fas fa-trash" />
+                    </button>
+                  </div>
+                </div>
+                
+                <!-- 添加映射按钮 -->
+                <button
+                  type="button"
+                  class="w-full px-4 py-2 border-2 border-dashed border-gray-300 text-gray-600 rounded-lg hover:border-gray-400 hover:text-gray-700 transition-colors"
+                  @click="addModelMapping"
+                >
+                  <i class="fas fa-plus mr-2" />
+                  添加模型映射
+                </button>
+                
+                <!-- 快捷添加按钮 -->
+                <div class="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
                     class="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
-                    @click="addPresetModel('claude-sonnet-4-20250514')"
+                    @click="addPresetMapping('claude-3-5-sonnet-20241022', 'claude-3-5-sonnet-20241022')"
                   >
-                    + claude-sonnet-4-20250514
+                    + Sonnet 3.5
                   </button>
                   <button
                     type="button"
                     class="px-3 py-1 text-xs bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
-                    @click="addPresetModel('claude-opus-4-20250514')"
+                    @click="addPresetMapping('claude-3-opus-20240229', 'claude-3-opus-20240229')"
                   >
-                    + claude-opus-4-20250514
+                    + Opus 3
                   </button>
                   <button
                     type="button"
-                    class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-purple-200 transition-colors"
-                    @click="addPresetModel('claude-3-5-haiku-20241022')"
+                    class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
+                    @click="addPresetMapping('claude-3-5-haiku-20241022', 'claude-3-5-haiku-20241022')"
                   >
-                    + claude-3-5-haiku-20241022
+                    + Haiku 3.5
+                  </button>
+                  <button
+                    type="button"
+                    class="px-3 py-1 text-xs bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors"
+                    @click="addPresetMapping('claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022')"
+                  >
+                    + Sonnet 4 → 3.5
+                  </button>
+                  <button
+                    type="button"
+                    class="px-3 py-1 text-xs bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                    @click="addPresetMapping('claude-opus-4-20250514', 'claude-3-opus-20240229')"
+                  >
+                    + Opus 4 → 3
                   </button>
                 </div>
-                <textarea 
-                  v-model="form.supportedModels" 
-                  rows="3" 
-                  class="form-input w-full resize-none"
-                  placeholder="每行一个模型，留空表示支持所有模型。特别注意,ClaudeCode必须加上hiku模型！"
-                />
                 <p class="text-xs text-gray-500 mt-1">
                   留空表示支持所有模型。如果指定模型，请求中的模型不在列表内将不会调度到此账号
                 </p>
@@ -565,36 +621,92 @@
             </div>
             
             <div>
-              <label class="block text-sm font-semibold text-gray-700 mb-3">支持的模型 (可选)</label>
-              <div class="mb-2 flex gap-2">
+              <label class="block text-sm font-semibold text-gray-700 mb-3">模型映射表 (可选)</label>
+              <div class="bg-blue-50 p-3 rounded-lg mb-3">
+                <p class="text-xs text-blue-700">
+                  <i class="fas fa-info-circle mr-1" />
+                  留空表示支持所有模型且不修改请求。配置映射后，左侧模型会被识别为支持的模型，右侧是实际发送的模型。
+                </p>
+              </div>
+              
+              <!-- 模型映射表 -->
+              <div class="space-y-2 mb-3">
+                <div
+                  v-for="(mapping, index) in modelMappings"
+                  :key="index"
+                  class="flex items-center gap-2"
+                >
+                  <input
+                    v-model="mapping.from"
+                    type="text"
+                    class="form-input flex-1"
+                    placeholder="原始模型名称"
+                  >
+                  <i class="fas fa-arrow-right text-gray-400" />
+                  <input
+                    v-model="mapping.to"
+                    type="text"
+                    class="form-input flex-1"
+                    placeholder="映射后的模型名称"
+                  >
+                  <button
+                    type="button"
+                    class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    @click="removeModelMapping(index)"
+                  >
+                    <i class="fas fa-trash" />
+                  </button>
+                </div>
+              </div>
+              
+              <!-- 添加映射按钮 -->
+              <button
+                type="button"
+                class="w-full px-4 py-2 border-2 border-dashed border-gray-300 text-gray-600 rounded-lg hover:border-gray-400 hover:text-gray-700 transition-colors"
+                @click="addModelMapping"
+              >
+                <i class="fas fa-plus mr-2" />
+                添加模型映射
+              </button>
+              
+              <!-- 快捷添加按钮 -->
+              <div class="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
                   class="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
-                  @click="addPresetModel('claude-sonnet-4-20250514')"
+                  @click="addPresetMapping('claude-3-5-sonnet-20241022', 'claude-3-5-sonnet-20241022')"
                 >
-                  + claude-sonnet-4-20250514
+                  + Sonnet 3.5
                 </button>
                 <button
                   type="button"
                   class="px-3 py-1 text-xs bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
-                  @click="addPresetModel('claude-opus-4-20250514')"
+                  @click="addPresetMapping('claude-3-opus-20240229', 'claude-3-opus-20240229')"
                 >
-                  + claude-opus-4-20250514
+                  + Opus 3
                 </button>
                 <button
                   type="button"
-                  class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-purple-200 transition-colors"
-                  @click="addPresetModel('claude-3-5-haiku-20241022')"
+                  class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
+                  @click="addPresetMapping('claude-3-5-haiku-20241022', 'claude-3-5-haiku-20241022')"
                 >
-                  + claude-3-5-haiku-20241022
+                  + Haiku 3.5
+                </button>
+                <button
+                  type="button"
+                  class="px-3 py-1 text-xs bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors"
+                  @click="addPresetMapping('claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022')"
+                >
+                  + Sonnet 4 → 3.5
+                </button>
+                <button
+                  type="button"
+                  class="px-3 py-1 text-xs bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                  @click="addPresetMapping('claude-opus-4-20250514', 'claude-3-opus-20240229')"
+                >
+                  + Opus 4 → 3
                 </button>
               </div>
-              <textarea 
-                v-model="form.supportedModels" 
-                rows="3" 
-                class="form-input w-full resize-none"
-                placeholder="每行一个模型，留空表示支持所有模型。特别注意,ClaudeCode必须加上hiku模型！"
-              />
             </div>
             
             <div>
@@ -770,10 +882,31 @@ const form = ref({
   apiUrl: props.account?.apiUrl || '',
   apiKey: props.account?.apiKey || '',
   priority: props.account?.priority || 50,
-  supportedModels: props.account?.supportedModels?.join('\n') || '',
   userAgent: props.account?.userAgent || '',
   rateLimitDuration: props.account?.rateLimitDuration || 60
 })
+
+// 模型映射表数据
+const modelMappings = ref([])
+
+// 初始化模型映射表
+const initModelMappings = () => {
+  if (props.account?.supportedModels) {
+    // 如果是对象格式（新的映射表）
+    if (typeof props.account.supportedModels === 'object' && !Array.isArray(props.account.supportedModels)) {
+      modelMappings.value = Object.entries(props.account.supportedModels).map(([from, to]) => ({
+        from,
+        to
+      }))
+    } else if (Array.isArray(props.account.supportedModels)) {
+      // 如果是数组格式（旧格式），转换为映射表
+      modelMappings.value = props.account.supportedModels.map(model => ({
+        from: model,
+        to: model
+      }))
+    }
+  }
+}
 
 // 表单验证错误
 const errors = ref({
@@ -955,9 +1088,7 @@ const createAccount = async () => {
       data.apiUrl = form.value.apiUrl
       data.apiKey = form.value.apiKey
       data.priority = form.value.priority || 50
-      data.supportedModels = form.value.supportedModels
-        ? form.value.supportedModels.split('\n').filter(m => m.trim())
-        : []
+      data.supportedModels = convertMappingsToObject() || {}
       data.userAgent = form.value.userAgent || null
       data.rateLimitDuration = form.value.rateLimitDuration || 60
     }
@@ -1067,9 +1198,7 @@ const updateAccount = async () => {
         data.apiKey = form.value.apiKey
       }
       data.priority = form.value.priority || 50
-      data.supportedModels = form.value.supportedModels
-        ? form.value.supportedModels.split('\n').filter(m => m.trim())
-        : []
+      data.supportedModels = convertMappingsToObject() || {}
       data.userAgent = form.value.userAgent || null
       data.rateLimitDuration = form.value.rateLimitDuration || 60
     }
@@ -1125,28 +1254,44 @@ watch(() => form.value.platform, (newPlatform) => {
   }
 })
 
-// 添加预设模型
-const addPresetModel = (modelName) => {
-  // 获取当前模型列表
-  const currentModels = form.value.supportedModels
-    ? form.value.supportedModels.split('\n').filter(m => m.trim())
-    : []
-  
-  // 检查是否已存在
-  if (currentModels.includes(modelName)) {
-    showToast(`模型 ${modelName} 已存在`, 'info')
+// 添加模型映射
+const addModelMapping = () => {
+  modelMappings.value.push({ from: '', to: '' })
+}
+
+// 移除模型映射
+const removeModelMapping = (index) => {
+  modelMappings.value.splice(index, 1)
+}
+
+// 添加预设映射
+const addPresetMapping = (from, to) => {
+  // 检查是否已存在相同的映射
+  const exists = modelMappings.value.some(mapping => mapping.from === from)
+  if (exists) {
+    showToast(`模型 ${from} 的映射已存在`, 'info')
     return
   }
   
-  // 添加到列表
-  currentModels.push(modelName)
-  form.value.supportedModels = currentModels.join('\n')
-  showToast(`已添加模型 ${modelName}`, 'success')
+  modelMappings.value.push({ from, to })
+  showToast(`已添加映射: ${from} → ${to}`, 'success')
+}
+
+// 将模型映射表转换为对象格式
+const convertMappingsToObject = () => {
+  const mapping = {}
+  modelMappings.value.forEach(item => {
+    if (item.from && item.to) {
+      mapping[item.from] = item.to
+    }
+  })
+  return Object.keys(mapping).length > 0 ? mapping : null
 }
 
 // 监听账户变化，更新表单
 watch(() => props.account, (newAccount) => {
   if (newAccount) {
+    initModelMappings()
     // 重新初始化代理配置
     const proxyConfig = newAccount.proxy && newAccount.proxy.host && newAccount.proxy.port
       ? {
@@ -1180,10 +1325,12 @@ watch(() => props.account, (newAccount) => {
       apiUrl: newAccount.apiUrl || '',
       apiKey: '',  // 编辑模式不显示现有的 API Key
       priority: newAccount.priority || 50,
-      supportedModels: newAccount.supportedModels?.join('\n') || '',
       userAgent: newAccount.userAgent || '',
       rateLimitDuration: newAccount.rateLimitDuration || 60
     }
   }
 }, { immediate: true })
+
+// 初始化时调用
+initModelMappings()
 </script>

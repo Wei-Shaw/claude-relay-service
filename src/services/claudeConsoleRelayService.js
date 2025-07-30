@@ -25,6 +25,22 @@ class ClaudeConsoleRelayService {
       logger.debug(`🔑 Account has apiKey: ${!!account.apiKey}`);
       logger.debug(`📝 Request model: ${requestBody.model}`);
 
+      // 处理模型映射
+      let mappedModel = requestBody.model;
+      if (account.supportedModels && typeof account.supportedModels === 'object' && !Array.isArray(account.supportedModels)) {
+        const newModel = claudeConsoleAccountService.getMappedModel(account.supportedModels, requestBody.model);
+        if (newModel !== requestBody.model) {
+          logger.info(`🔄 Mapping model from ${requestBody.model} to ${newModel}`);
+          mappedModel = newModel;
+        }
+      }
+
+      // 创建修改后的请求体
+      const modifiedRequestBody = {
+        ...requestBody,
+        model: mappedModel
+      };
+
       // 模型兼容性检查已经在调度器中完成，这里不需要再检查
 
       // 创建代理agent
@@ -67,7 +83,7 @@ class ClaudeConsoleRelayService {
       const requestConfig = {
         method: 'POST',
         url: apiEndpoint,
-        data: requestBody,
+        data: modifiedRequestBody,
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': account.apiKey,

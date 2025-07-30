@@ -25,7 +25,7 @@ class ClaudeConsoleAccountService {
       apiUrl = '',
       apiKey = '',
       priority = 50, // 默认优先级50（1-100）
-      supportedModels = [], // 支持的模型列表，空数组表示支持所有
+      supportedModels = [], // 支持的模型列表或映射表，空数组/对象表示支持所有
       userAgent = 'claude-cli/1.0.61 (console, cli)',
       rateLimitDuration = 60, // 限流时间（分钟）
       proxy = null,
@@ -41,6 +41,9 @@ class ClaudeConsoleAccountService {
 
     const accountId = uuidv4();
     
+    // 处理 supportedModels，确保向后兼容
+    const processedModels = this._processModelMapping(supportedModels);
+    
     const accountData = {
       id: accountId,
       platform: 'claude-console',
@@ -49,7 +52,7 @@ class ClaudeConsoleAccountService {
       apiUrl: apiUrl,
       apiKey: this._encryptSensitiveData(apiKey),
       priority: priority.toString(),
-      supportedModels: JSON.stringify(supportedModels),
+      supportedModels: JSON.stringify(processedModels),
       userAgent,
       rateLimitDuration: rateLimitDuration.toString(),
       proxy: proxy ? JSON.stringify(proxy) : '',
@@ -209,7 +212,9 @@ class ClaudeConsoleAccountService {
       if (updates.priority !== undefined) updatedData.priority = updates.priority.toString();
       if (updates.supportedModels !== undefined) {
         logger.debug(`[DEBUG] Updating supportedModels: ${JSON.stringify(updates.supportedModels)}`);
-        updatedData.supportedModels = JSON.stringify(updates.supportedModels);
+        // 处理 supportedModels，确保向后兼容
+        const processedModels = this._processModelMapping(updates.supportedModels);
+        updatedData.supportedModels = JSON.stringify(processedModels);
       }
       if (updates.userAgent !== undefined) updatedData.userAgent = updates.userAgent;
       if (updates.rateLimitDuration !== undefined) updatedData.rateLimitDuration = updates.rateLimitDuration.toString();
@@ -487,6 +492,55 @@ class ClaudeConsoleAccountService {
       minutesSinceRateLimit: 0,
       minutesRemaining: 0
     };
+  }
+
+  // 🔄 处理模型映射，确保向后兼容
+  _processModelMapping(supportedModels) {
+    // 如果是空值，返回空对象（支持所有模型）
+    if (!supportedModels || (Array.isArray(supportedModels) && supportedModels.length === 0)) {
+      return {};
+    }
+
+    // 如果已经是对象格式（新的映射表格式），直接返回
+    if (typeof supportedModels === 'object' && !Array.isArray(supportedModels)) {
+      return supportedModels;
+    }
+
+    // 如果是数组格式（旧格式），转换为映射表
+    if (Array.isArray(supportedModels)) {
+      const mapping = {};
+      supportedModels.forEach(model => {
+        if (model && typeof model === 'string') {
+          mapping[model] = model; // 映射到自身
+        }
+      });
+      return mapping;
+    }
+
+    // 其他情况返回空对象
+    return {};
+  }
+
+  // 🔍 检查模型是否支持（用于调度）
+  isModelSupported(modelMapping, requestedModel) {
+    // 如果映射表为空，支持所有模型
+    if (!modelMapping || Object.keys(modelMapping).length === 0) {
+      return true;
+    }
+
+    // 检查请求的模型是否在映射表的键中
+    return Object.prototype.hasOwnProperty.call(modelMapping, requestedModel);
+  }
+
+  // 🔄 获取映射后的模型名称
+  getMappedModel(modelMapping, requestedModel) {
+    // 如果映射表为空，返回原模型
+    if (!modelMapping || Object.keys(modelMapping).length === 0) {
+      return requestedModel;
+    }
+
+    // 返回映射后的模型，如果不存在则返回原模型
+    return modelMapping[requestedModel] || requestedModel;
   }
 }
 

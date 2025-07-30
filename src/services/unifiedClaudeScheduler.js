@@ -174,10 +174,20 @@ class UnifiedClaudeScheduler {
           account.schedulable !== false) { // 检查是否可调度
         
         // 检查模型支持（如果有请求的模型）
-        if (requestedModel && account.supportedModels && account.supportedModels.length > 0) {
-          if (!account.supportedModels.includes(requestedModel)) {
-            logger.info(`🚫 Claude Console account ${account.name} does not support model ${requestedModel}`);
-            continue;
+        if (requestedModel && account.supportedModels) {
+          // 兼容旧格式（数组）和新格式（对象）
+          if (Array.isArray(account.supportedModels)) {
+            // 旧格式：数组
+            if (account.supportedModels.length > 0 && !account.supportedModels.includes(requestedModel)) {
+              logger.info(`🚫 Claude Console account ${account.name} does not support model ${requestedModel}`);
+              continue;
+            }
+          } else if (typeof account.supportedModels === 'object') {
+            // 新格式：映射表
+            if (Object.keys(account.supportedModels).length > 0 && !claudeConsoleAccountService.isModelSupported(account.supportedModels, requestedModel)) {
+              logger.info(`🚫 Claude Console account ${account.name} does not support model ${requestedModel}`);
+              continue;
+            }
           }
         }
         
