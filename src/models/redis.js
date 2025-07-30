@@ -1008,17 +1008,24 @@ class RedisClient {
   async getRealtimeSystemMetrics() {
     try {
       const config = require('../../config/config');
-      const windowMinutes = config.system.metricsWindow;
+      const windowMinutes = config.system.metricsWindow || 5;
       
       const now = new Date();
       const currentMinute = Math.floor(now.getTime() / 60000);
       
+      // 调试：打印当前时间和分钟时间戳
+      logger.debug(`🔍 Realtime metrics - Current time: ${now.toISOString()}, Minute timestamp: ${currentMinute}`);
+      
       // 使用Pipeline批量获取窗口内的所有分钟数据
       const pipeline = this.client.pipeline();
+      const minuteKeys = [];
       for (let i = 0; i < windowMinutes; i++) {
         const minuteKey = `system:metrics:minute:${currentMinute - i}`;
+        minuteKeys.push(minuteKey);
         pipeline.hgetall(minuteKey);
       }
+      
+      logger.debug(`🔍 Realtime metrics - Checking keys: ${minuteKeys.join(', ')}`);
       
       const results = await pipeline.exec();
       
@@ -1029,23 +1036,32 @@ class RedisClient {
       let totalOutputTokens = 0;
       let totalCacheCreateTokens = 0;
       let totalCacheReadTokens = 0;
+      let validDataCount = 0;
       
-      results.forEach(([err, data]) => {
-        if (!err && data) {
+      results.forEach(([err, data], index) => {
+        if (!err && data && Object.keys(data).length > 0) {
+          validDataCount++;
           totalRequests += parseInt(data.requests || 0);
           totalTokens += parseInt(data.totalTokens || 0);
           totalInputTokens += parseInt(data.inputTokens || 0);
           totalOutputTokens += parseInt(data.outputTokens || 0);
           totalCacheCreateTokens += parseInt(data.cacheCreateTokens || 0);
           totalCacheReadTokens += parseInt(data.cacheReadTokens || 0);
+          
+          logger.debug(`🔍 Realtime metrics - Key ${minuteKeys[index]} data:`, {
+            requests: data.requests,
+            totalTokens: data.totalTokens
+          });
         }
       });
+      
+      logger.debug(`🔍 Realtime metrics - Valid data count: ${validDataCount}/${windowMinutes}, Total requests: ${totalRequests}, Total tokens: ${totalTokens}`);
       
       // 计算平均值（每分钟）
       const realtimeRPM = windowMinutes > 0 ? Math.round((totalRequests / windowMinutes) * 100) / 100 : 0;
       const realtimeTPM = windowMinutes > 0 ? Math.round((totalTokens / windowMinutes) * 100) / 100 : 0;
       
-      return {
+      const result = {
         realtimeRPM,
         realtimeTPM,
         windowMinutes,
@@ -1056,6 +1072,10 @@ class RedisClient {
         totalCacheCreateTokens,
         totalCacheReadTokens
       };
+      
+      logger.debug(`🔍 Realtime metrics - Final result:`, result);
+      
+      return result;
     } catch (error) {
       console.error('Error getting realtime system metrics:', error);
       // 如果出错，返回历史平均值作为降级方案

@@ -1,5 +1,45 @@
 <template>
   <div>
+    <!-- 自动刷新控制栏 -->
+    <div class="mb-6 bg-white rounded-lg shadow-sm p-4">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div class="flex items-center gap-2 sm:gap-4">
+          <h2 class="text-lg font-semibold text-gray-800">系统仪表盘</h2>
+          <div v-if="refreshCountdownDisplay" class="text-sm text-gray-500 whitespace-nowrap">
+            <i class="fas fa-clock"></i>
+            {{ refreshCountdownDisplay }}
+          </div>
+        </div>
+        <div class="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
+          <!-- 手动刷新按钮 -->
+          <button 
+            @click="refreshAllData" 
+            :disabled="isRefreshing"
+            class="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <i :class="['fas fa-sync-alt', { 'animate-spin': isRefreshing }]"></i>
+            {{ isRefreshing ? '刷新中...' : '刷新数据' }}
+          </button>
+          
+          <!-- 自动刷新开关 -->
+          <div class="flex items-center gap-2">
+            <label class="flex items-center cursor-pointer">
+              <input 
+                type="checkbox" 
+                v-model="autoRefreshEnabled"
+                class="sr-only peer"
+              >
+              <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              <span class="ml-3 text-sm font-medium text-gray-700">
+                自动刷新
+                <span class="text-xs text-gray-500">(30秒)</span>
+              </span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+    
     <!-- 主要统计 -->
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
       <div class="stat-card">
@@ -221,8 +261,13 @@
             </span>
           </div>
           
-          <button @click="refreshChartsData()" class="btn btn-primary px-4 py-2 flex items-center gap-2">
-            <i class="fas fa-sync-alt"></i>刷新
+          <button 
+            @click="refreshAllData()" 
+            :disabled="isRefreshing"
+            class="btn btn-primary px-4 py-2 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <i :class="['fas fa-sync-alt', { 'animate-spin': isRefreshing }]"></i>
+            {{ isRefreshing ? '刷新中' : '刷新' }}
           </button>
         </div>
       </div>
@@ -329,7 +374,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useDashboardStore } from '@/stores/dashboard'
 import Chart from 'chart.js/auto'
@@ -367,6 +412,20 @@ const apiKeysUsageTrendChart = ref(null)
 let modelUsageChartInstance = null
 let usageTrendChartInstance = null
 let apiKeysUsageTrendChartInstance = null
+
+// 自动刷新相关
+const autoRefreshEnabled = ref(false)
+const autoRefreshInterval = ref(30) // 秒
+const autoRefreshTimer = ref(null)
+const refreshCountdown = ref(0)
+const countdownTimer = ref(null)
+const isRefreshing = ref(false)
+
+// 计算倒计时显示
+const refreshCountdownDisplay = computed(() => {
+  if (!autoRefreshEnabled.value || refreshCountdown.value <= 0) return ''
+  return `${refreshCountdown.value}秒后刷新`
+})
 
 // 格式化数字
 function formatNumber(num) {
@@ -778,19 +837,111 @@ watch(apiKeysTrendData, () => {
   nextTick(() => createApiKeysUsageTrendChart())
 })
 
+// 刷新所有数据
+async function refreshAllData() {
+  if (isRefreshing.value) return
+  
+  isRefreshing.value = true
+  try {
+    await Promise.all([
+      loadDashboardData(),
+      refreshChartsData()
+    ])
+  } finally {
+    isRefreshing.value = false
+  }
+}
+
+// 启动自动刷新
+function startAutoRefresh() {
+  if (!autoRefreshEnabled.value) return
+  
+  // 重置倒计时
+  refreshCountdown.value = autoRefreshInterval.value
+  
+  // 清除现有定时器
+  if (countdownTimer.value) {
+    clearInterval(countdownTimer.value)
+  }
+  if (autoRefreshTimer.value) {
+    clearTimeout(autoRefreshTimer.value)
+  }
+  
+  // 启动倒计时
+  countdownTimer.value = setInterval(() => {
+    refreshCountdown.value--
+    if (refreshCountdown.value <= 0) {
+      clearInterval(countdownTimer.value)
+    }
+  }, 1000)
+  
+  // 设置刷新定时器
+  autoRefreshTimer.value = setTimeout(async () => {
+    await refreshAllData()
+    // 递归调用以继续自动刷新
+    if (autoRefreshEnabled.value) {
+      startAutoRefresh()
+    }
+  }, autoRefreshInterval.value * 1000)
+}
+
+// 停止自动刷新
+function stopAutoRefresh() {
+  if (countdownTimer.value) {
+    clearInterval(countdownTimer.value)
+    countdownTimer.value = null
+  }
+  if (autoRefreshTimer.value) {
+    clearTimeout(autoRefreshTimer.value)
+    autoRefreshTimer.value = null
+  }
+  refreshCountdown.value = 0
+}
+
+// 切换自动刷新
+function toggleAutoRefresh() {
+  autoRefreshEnabled.value = !autoRefreshEnabled.value
+  if (autoRefreshEnabled.value) {
+    startAutoRefresh()
+  } else {
+    stopAutoRefresh()
+  }
+}
+
+// 监听自动刷新状态变化
+watch(autoRefreshEnabled, (newVal) => {
+  if (newVal) {
+    startAutoRefresh()
+  } else {
+    stopAutoRefresh()
+  }
+})
+
 // 初始化
 onMounted(async () => {
   // 加载所有数据
-  await Promise.all([
-    loadDashboardData(),
-    refreshChartsData()  // 使用refreshChartsData来确保根据当前筛选条件加载数据
-  ])
+  await refreshAllData()
   
   // 创建图表
   await nextTick()
   createModelUsageChart()
   createUsageTrendChart()
   createApiKeysUsageTrendChart()
+})
+
+// 清理
+onUnmounted(() => {
+  stopAutoRefresh()
+  // 销毁图表实例
+  if (modelUsageChartInstance) {
+    modelUsageChartInstance.destroy()
+  }
+  if (usageTrendChartInstance) {
+    usageTrendChartInstance.destroy()
+  }
+  if (apiKeysUsageTrendChartInstance) {
+    apiKeysUsageTrendChartInstance.destroy()
+  }
 })
 </script>
 
@@ -809,5 +960,19 @@ onMounted(async () => {
 
 .custom-date-picker :deep(.el-range-input) {
   font-size: 13px;
+}
+
+/* 旋转动画 */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
 }
 </style>
