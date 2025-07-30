@@ -2,12 +2,21 @@
   <div class="stat-card">
     <div class="flex items-start justify-between">
       <div class="flex-1">
-        <p class="text-sm font-medium text-gray-600 mb-1">{{ title }}</p>
-        <p class="text-3xl font-bold text-gray-800">{{ value }}</p>
-        <p v-if="subtitle" class="text-sm text-gray-500 mt-2">{{ subtitle }}</p>
+        <p class="text-sm font-medium text-gray-600 mb-1">
+          {{ title }}
+        </p>
+        <p class="text-3xl font-bold text-gray-800">
+          {{ value }}
+        </p>
+        <p
+          v-if="subtitle"
+          class="text-sm text-gray-500 mt-2"
+        >
+          {{ subtitle }}
+        </p>
       </div>
       <div :class="['stat-icon', iconBgClass]">
-        <i :class="icon"></i>
+        <i :class="icon" />
       </div>
     </div>
   </div>

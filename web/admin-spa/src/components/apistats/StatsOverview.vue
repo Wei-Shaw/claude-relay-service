@@ -3,7 +3,7 @@
     <!-- API Key 基本信息 -->
     <div class="card p-6">
       <h3 class="text-xl font-bold mb-4 flex items-center text-gray-900">
-        <i class="fas fa-info-circle mr-3 text-blue-500"></i>
+        <i class="fas fa-info-circle mr-3 text-blue-500" />
         API Key 信息
       </h3>
       <div class="space-y-3">
@@ -13,8 +13,14 @@
         </div>
         <div class="flex justify-between items-center">
           <span class="text-gray-600">状态</span>
-          <span :class="statsData.isActive ? 'text-green-600' : 'text-red-600'" class="font-medium">
-            <i :class="statsData.isActive ? 'fas fa-check-circle' : 'fas fa-times-circle'" class="mr-1"></i>
+          <span
+            :class="statsData.isActive ? 'text-green-600' : 'text-red-600'"
+            class="font-medium"
+          >
+            <i
+              :class="statsData.isActive ? 'fas fa-check-circle' : 'fas fa-times-circle'"
+              class="mr-1"
+            />
             {{ statsData.isActive ? '活跃' : '已停用' }}
           </span>
         </div>
@@ -29,20 +35,32 @@
         <div class="flex justify-between items-center">
           <span class="text-gray-600">过期时间</span>
           <div v-if="statsData.expiresAt">
-            <div v-if="isApiKeyExpired(statsData.expiresAt)" class="text-red-600 font-medium">
-              <i class="fas fa-exclamation-circle mr-1"></i>
+            <div
+              v-if="isApiKeyExpired(statsData.expiresAt)"
+              class="text-red-600 font-medium"
+            >
+              <i class="fas fa-exclamation-circle mr-1" />
               已过期
             </div>
-            <div v-else-if="isApiKeyExpiringSoon(statsData.expiresAt)" class="text-orange-600 font-medium">
-              <i class="fas fa-clock mr-1"></i>
+            <div
+              v-else-if="isApiKeyExpiringSoon(statsData.expiresAt)"
+              class="text-orange-600 font-medium"
+            >
+              <i class="fas fa-clock mr-1" />
               {{ formatExpireDate(statsData.expiresAt) }}
             </div>
-            <div v-else class="text-gray-900 font-medium">
+            <div
+              v-else
+              class="text-gray-900 font-medium"
+            >
               {{ formatExpireDate(statsData.expiresAt) }}
             </div>
           </div>
-          <div v-else class="text-gray-400 font-medium">
-            <i class="fas fa-infinity mr-1"></i>
+          <div
+            v-else
+            class="text-gray-400 font-medium"
+          >
+            <i class="fas fa-infinity mr-1" />
             永不过期
           </div>
         </div>
@@ -52,25 +70,41 @@
     <!-- 使用统计概览 -->
     <div class="card p-6">
       <h3 class="text-xl font-bold mb-4 flex items-center text-gray-900">
-        <i class="fas fa-chart-bar mr-3 text-green-500"></i>
+        <i class="fas fa-chart-bar mr-3 text-green-500" />
         使用统计概览 <span class="text-sm font-normal text-gray-600 ml-2">({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span>
       </h3>
       <div class="grid grid-cols-2 gap-4">
         <div class="stat-card text-center">
-          <div class="text-3xl font-bold text-green-600">{{ formatNumber(currentPeriodData.requests) }}</div>
-          <div class="text-sm text-gray-600">{{ statsPeriod === 'daily' ? '今日' : '本月' }}请求数</div>
+          <div class="text-3xl font-bold text-green-600">
+            {{ formatNumber(currentPeriodData.requests) }}
+          </div>
+          <div class="text-sm text-gray-600">
+            {{ statsPeriod === 'daily' ? '今日' : '本月' }}请求数
+          </div>
         </div>
         <div class="stat-card text-center">
-          <div class="text-3xl font-bold text-blue-600">{{ formatNumber(currentPeriodData.allTokens) }}</div>
-          <div class="text-sm text-gray-600">{{ statsPeriod === 'daily' ? '今日' : '本月' }}Token数</div>
+          <div class="text-3xl font-bold text-blue-600">
+            {{ formatNumber(currentPeriodData.allTokens) }}
+          </div>
+          <div class="text-sm text-gray-600">
+            {{ statsPeriod === 'daily' ? '今日' : '本月' }}Token数
+          </div>
         </div>
         <div class="stat-card text-center">
-          <div class="text-3xl font-bold text-purple-600">{{ currentPeriodData.formattedCost || '$0.000000' }}</div>
-          <div class="text-sm text-gray-600">{{ statsPeriod === 'daily' ? '今日' : '本月' }}费用</div>
+          <div class="text-3xl font-bold text-purple-600">
+            {{ currentPeriodData.formattedCost || '$0.000000' }}
+          </div>
+          <div class="text-sm text-gray-600">
+            {{ statsPeriod === 'daily' ? '今日' : '本月' }}费用
+          </div>
         </div>
         <div class="stat-card text-center">
-          <div class="text-3xl font-bold text-yellow-600">{{ formatNumber(currentPeriodData.inputTokens) }}</div>
-          <div class="text-sm text-gray-600">{{ statsPeriod === 'daily' ? '今日' : '本月' }}输入Token</div>
+          <div class="text-3xl font-bold text-yellow-600">
+            {{ formatNumber(currentPeriodData.inputTokens) }}
+          </div>
+          <div class="text-sm text-gray-600">
+            {{ statsPeriod === 'daily' ? '今日' : '本月' }}输入Token
+          </div>
         </div>
       </div>
     </div>

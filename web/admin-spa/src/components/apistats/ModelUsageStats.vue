@@ -2,19 +2,27 @@
   <div class="card p-6">
     <div class="mb-6">
       <h3 class="text-xl font-bold flex items-center text-gray-900">
-        <i class="fas fa-robot mr-3 text-indigo-500"></i>
+        <i class="fas fa-robot mr-3 text-indigo-500" />
         模型使用统计 <span class="text-sm font-normal text-gray-600 ml-2">({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span>
       </h3>
     </div>
 
     <!-- 模型统计加载状态 -->
-    <div v-if="modelStatsLoading" class="text-center py-8">
-      <i class="fas fa-spinner loading-spinner text-2xl mb-2 text-gray-600"></i>
-      <p class="text-gray-600">加载模型统计数据中...</p>
+    <div
+      v-if="modelStatsLoading"
+      class="text-center py-8"
+    >
+      <i class="fas fa-spinner loading-spinner text-2xl mb-2 text-gray-600" />
+      <p class="text-gray-600">
+        加载模型统计数据中...
+      </p>
     </div>
 
     <!-- 模型统计数据 -->
-    <div v-else-if="modelStats.length > 0" class="space-y-4">
+    <div
+      v-else-if="modelStats.length > 0"
+      class="space-y-4"
+    >
       <div 
         v-for="(model, index) in modelStats" 
         :key="index"
@@ -22,39 +30,66 @@
       >
         <div class="flex justify-between items-start mb-3">
           <div>
-            <h4 class="font-bold text-lg text-gray-900">{{ model.model }}</h4>
-            <p class="text-gray-600 text-sm">{{ model.requests }} 次请求</p>
+            <h4 class="font-bold text-lg text-gray-900">
+              {{ model.model }}
+            </h4>
+            <p class="text-gray-600 text-sm">
+              {{ model.requests }} 次请求
+            </p>
           </div>
           <div class="text-right">
-            <div class="text-lg font-bold text-green-600">{{ model.formatted?.total || '$0.000000' }}</div>
-            <div class="text-sm text-gray-600">总费用</div>
+            <div class="text-lg font-bold text-green-600">
+              {{ model.formatted?.total || '$0.000000' }}
+            </div>
+            <div class="text-sm text-gray-600">
+              总费用
+            </div>
           </div>
         </div>
         
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
           <div class="bg-gray-50 rounded p-2">
-            <div class="text-gray-600">输入 Token</div>
-            <div class="font-medium text-gray-900">{{ formatNumber(model.inputTokens) }}</div>
+            <div class="text-gray-600">
+              输入 Token
+            </div>
+            <div class="font-medium text-gray-900">
+              {{ formatNumber(model.inputTokens) }}
+            </div>
           </div>
           <div class="bg-gray-50 rounded p-2">
-            <div class="text-gray-600">输出 Token</div>
-            <div class="font-medium text-gray-900">{{ formatNumber(model.outputTokens) }}</div>
+            <div class="text-gray-600">
+              输出 Token
+            </div>
+            <div class="font-medium text-gray-900">
+              {{ formatNumber(model.outputTokens) }}
+            </div>
           </div>
           <div class="bg-gray-50 rounded p-2">
-            <div class="text-gray-600">缓存创建</div>
-            <div class="font-medium text-gray-900">{{ formatNumber(model.cacheCreateTokens) }}</div>
+            <div class="text-gray-600">
+              缓存创建
+            </div>
+            <div class="font-medium text-gray-900">
+              {{ formatNumber(model.cacheCreateTokens) }}
+            </div>
           </div>
           <div class="bg-gray-50 rounded p-2">
-            <div class="text-gray-600">缓存读取</div>
-            <div class="font-medium text-gray-900">{{ formatNumber(model.cacheReadTokens) }}</div>
+            <div class="text-gray-600">
+              缓存读取
+            </div>
+            <div class="font-medium text-gray-900">
+              {{ formatNumber(model.cacheReadTokens) }}
+            </div>
           </div>
         </div>
       </div>
     </div>
 
     <!-- 无模型数据 -->
-    <div v-else class="text-center py-8 text-gray-500">
-      <i class="fas fa-chart-pie text-3xl mb-3"></i>
+    <div
+      v-else
+      class="text-center py-8 text-gray-500"
+    >
+      <i class="fas fa-chart-pie text-3xl mb-3" />
       <p>暂无{{ statsPeriod === 'daily' ? '今日' : '本月' }}模型使用数据</p>
     </div>
   </div>

@@ -3,13 +3,13 @@
     <button 
       v-for="tab in tabs" 
       :key="tab.key"
-      @click="$emit('tab-change', tab.key)"
       :class="[
         'tab-btn flex-1 py-3 px-6 text-sm font-semibold transition-all duration-300',
         activeTab === tab.key ? 'active' : 'text-gray-700 hover:bg-white/10 hover:text-gray-900'
       ]"
+      @click="$emit('tab-change', tab.key)"
     >
-      <i :class="tab.icon + ' mr-2'"></i>{{ tab.name }}
+      <i :class="tab.icon + ' mr-2'" />{{ tab.name }}
     </button>
   </div>
 </template>

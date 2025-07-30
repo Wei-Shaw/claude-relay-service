@@ -1,6 +1,9 @@
 <template>
   <Teleport to="body">
-    <Transition name="modal" appear>
+    <Transition
+      name="modal"
+      appear
+    >
       <div 
         v-if="isVisible"
         class="fixed inset-0 modal z-[100] flex items-center justify-center p-4"
@@ -9,29 +12,36 @@
         <div class="modal-content w-full max-w-md p-6 mx-auto">
           <div class="flex items-start gap-4 mb-6">
             <div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl flex items-center justify-center">
-              <i class="fas fa-exclamation-triangle text-white text-lg"></i>
+              <i class="fas fa-exclamation-triangle text-white text-lg" />
             </div>
             <div class="flex-1">
-              <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ title }}</h3>
-              <div class="text-gray-600 leading-relaxed whitespace-pre-line">{{ message }}</div>
+              <h3 class="text-lg font-semibold text-gray-900 mb-2">
+                {{ title }}
+              </h3>
+              <div class="text-gray-600 leading-relaxed whitespace-pre-line">
+                {{ message }}
+              </div>
             </div>
           </div>
           
           <div class="flex items-center justify-end gap-3">
             <button 
-              @click="handleCancel"
               class="btn bg-gray-100 text-gray-700 hover:bg-gray-200 px-6 py-3"
               :disabled="isProcessing"
+              @click="handleCancel"
             >
               {{ cancelText }}
             </button>
             <button 
-              @click="handleConfirm"
               class="btn btn-warning px-6 py-3"
               :class="{ 'opacity-50 cursor-not-allowed': isProcessing }"
               :disabled="isProcessing"
+              @click="handleConfirm"
             >
-              <div v-if="isProcessing" class="loading-spinner mr-2"></div>
+              <div
+                v-if="isProcessing"
+                class="loading-spinner mr-2"
+              />
               {{ confirmText }}
             </button>
           </div>

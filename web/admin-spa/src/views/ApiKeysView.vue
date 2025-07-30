@@ -3,107 +3,200 @@
     <div class="card p-6">
       <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
         <div>
-          <h3 class="text-xl font-bold text-gray-900 mb-2">API Keys 管理</h3>
-          <p class="text-gray-600">管理和监控您的 API 密钥</p>
+          <h3 class="text-xl font-bold text-gray-900 mb-2">
+            API Keys 管理
+          </h3>
+          <p class="text-gray-600">
+            管理和监控您的 API 密钥
+          </p>
         </div>
         <div class="flex items-center gap-3">
           <!-- Token统计时间范围选择 -->
           <select 
             v-model="apiKeyStatsTimeRange" 
-            @change="loadApiKeys()"
             class="form-input px-3 py-2 text-sm"
+            @change="loadApiKeys()"
           >
-            <option value="today">今日</option>
-            <option value="7days">最近7天</option>
-            <option value="monthly">本月</option>
-            <option value="all">全部时间</option>
+            <option value="today">
+              今日
+            </option>
+            <option value="7days">
+              最近7天
+            </option>
+            <option value="monthly">
+              本月
+            </option>
+            <option value="all">
+              全部时间
+            </option>
           </select>
           <!-- 标签筛选器 -->
           <select 
             v-model="selectedTagFilter" 
             class="form-input px-3 py-2 text-sm"
           >
-            <option value="">所有标签</option>
-            <option v-for="tag in availableTags" :key="tag" :value="tag">{{ tag }}</option>
+            <option value="">
+              所有标签
+            </option>
+            <option
+              v-for="tag in availableTags"
+              :key="tag"
+              :value="tag"
+            >
+              {{ tag }}
+            </option>
           </select>
           <button 
-            @click.stop="openCreateApiKeyModal"
             class="btn btn-primary px-6 py-3 flex items-center gap-2"
+            @click.stop="openCreateApiKeyModal"
           >
-            <i class="fas fa-plus"></i>创建新 Key
+            <i class="fas fa-plus" />创建新 Key
           </button>
         </div>
       </div>
       
-      <div v-if="apiKeysLoading" class="text-center py-12">
-        <div class="loading-spinner mx-auto mb-4"></div>
-        <p class="text-gray-500">正在加载 API Keys...</p>
+      <div
+        v-if="apiKeysLoading"
+        class="text-center py-12"
+      >
+        <div class="loading-spinner mx-auto mb-4" />
+        <p class="text-gray-500">
+          正在加载 API Keys...
+        </p>
       </div>
       
-      <div v-else-if="apiKeys.length === 0" class="text-center py-12">
+      <div
+        v-else-if="apiKeys.length === 0"
+        class="text-center py-12"
+      >
         <div class="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-          <i class="fas fa-key text-gray-400 text-xl"></i>
+          <i class="fas fa-key text-gray-400 text-xl" />
         </div>
-        <p class="text-gray-500 text-lg">暂无 API Keys</p>
-        <p class="text-gray-400 text-sm mt-2">点击上方按钮创建您的第一个 API Key</p>
+        <p class="text-gray-500 text-lg">
+          暂无 API Keys
+        </p>
+        <p class="text-gray-400 text-sm mt-2">
+          点击上方按钮创建您的第一个 API Key
+        </p>
       </div>
       
-      <div v-else class="table-container">
+      <div
+        v-else
+        class="table-container"
+      >
         <table class="min-w-full">
           <thead class="bg-gray-50/80 backdrop-blur-sm">
             <tr>
-              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortApiKeys('name')">
+              <th
+                class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                @click="sortApiKeys('name')"
+              >
                 名称
-                <i v-if="apiKeysSortBy === 'name'" :class="['fas', apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
-                <i v-else class="fas fa-sort ml-1 text-gray-400"></i>
+                <i
+                  v-if="apiKeysSortBy === 'name'"
+                  :class="['fas', apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"
+                />
+                <i
+                  v-else
+                  class="fas fa-sort ml-1 text-gray-400"
+                />
               </th>
-              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">标签</th>
-              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">API Key</th>
-              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortApiKeys('status')">
+              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                标签
+              </th>
+              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                API Key
+              </th>
+              <th
+                class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                @click="sortApiKeys('status')"
+              >
                 状态
-                <i v-if="apiKeysSortBy === 'status'" :class="['fas', apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
-                <i v-else class="fas fa-sort ml-1 text-gray-400"></i>
+                <i
+                  v-if="apiKeysSortBy === 'status'"
+                  :class="['fas', apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"
+                />
+                <i
+                  v-else
+                  class="fas fa-sort ml-1 text-gray-400"
+                />
               </th>
               <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                 使用统计
-                <span class="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded" @click="sortApiKeys('cost')">
+                <span
+                  class="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
+                  @click="sortApiKeys('cost')"
+                >
                   (费用
-                  <i v-if="apiKeysSortBy === 'cost'" :class="['fas', apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
-                  <i v-else class="fas fa-sort ml-1 text-gray-400"></i>)
+                  <i
+                    v-if="apiKeysSortBy === 'cost'"
+                    :class="['fas', apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"
+                  />
+                  <i
+                    v-else
+                    class="fas fa-sort ml-1 text-gray-400"
+                  />)
                 </span>
               </th>
-              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortApiKeys('createdAt')">
+              <th
+                class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                @click="sortApiKeys('createdAt')"
+              >
                 创建时间
-                <i v-if="apiKeysSortBy === 'createdAt'" :class="['fas', apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
-                <i v-else class="fas fa-sort ml-1 text-gray-400"></i>
+                <i
+                  v-if="apiKeysSortBy === 'createdAt'"
+                  :class="['fas', apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"
+                />
+                <i
+                  v-else
+                  class="fas fa-sort ml-1 text-gray-400"
+                />
               </th>
-              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortApiKeys('expiresAt')">
+              <th
+                class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                @click="sortApiKeys('expiresAt')"
+              >
                 过期时间
-                <i v-if="apiKeysSortBy === 'expiresAt'" :class="['fas', apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
-                <i v-else class="fas fa-sort ml-1 text-gray-400"></i>
+                <i
+                  v-if="apiKeysSortBy === 'expiresAt'"
+                  :class="['fas', apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"
+                />
+                <i
+                  v-else
+                  class="fas fa-sort ml-1 text-gray-400"
+                />
               </th>
-              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">操作</th>
+              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                操作
+              </th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200/50">
-            <template v-for="key in sortedApiKeys" :key="key.id">
+            <template
+              v-for="key in sortedApiKeys"
+              :key="key.id"
+            >
               <!-- API Key 主行 -->
               <tr class="table-row">
                 <td class="px-6 py-4 whitespace-nowrap">
                   <div class="flex items-center">
                     <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center mr-3">
-                      <i class="fas fa-key text-white text-xs"></i>
+                      <i class="fas fa-key text-white text-xs" />
                     </div>
                     <div>
-                      <div class="text-sm font-semibold text-gray-900">{{ key.name }}</div>
-                      <div class="text-xs text-gray-500">{{ key.id }}</div>
+                      <div class="text-sm font-semibold text-gray-900">
+                        {{ key.name }}
+                      </div>
+                      <div class="text-xs text-gray-500">
+                        {{ key.id }}
+                      </div>
                       <div class="text-xs text-gray-500 mt-1">
                         <span v-if="key.claudeAccountId">
-                          <i class="fas fa-link mr-1"></i>
+                          <i class="fas fa-link mr-1" />
                           绑定: {{ getBoundAccountName(key.claudeAccountId) }}
                         </span>
                         <span v-else>
-                          <i class="fas fa-share-alt mr-1"></i>
+                          <i class="fas fa-share-alt mr-1" />
                           使用共享池
                         </span>
                       </div>
@@ -112,12 +205,17 @@
                 </td>
                 <td class="px-6 py-4">
                   <div class="flex flex-wrap gap-1">
-                    <span v-for="tag in (key.tags || [])" :key="tag" 
-                          class="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
+                    <span
+                      v-for="tag in (key.tags || [])"
+                      :key="tag" 
+                      class="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full"
+                    >
                       {{ tag }}
                     </span>
-                    <span v-if="!key.tags || key.tags.length === 0" 
-                          class="text-xs text-gray-400">无标签</span>
+                    <span
+                      v-if="!key.tags || key.tags.length === 0" 
+                      class="text-xs text-gray-400"
+                    >无标签</span>
                   </div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
@@ -126,10 +224,14 @@
                   </div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
-                  <span :class="['inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold', 
-                               key.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800']">
-                    <div :class="['w-2 h-2 rounded-full mr-2', 
-                               key.isActive ? 'bg-green-500' : 'bg-red-500']"></div>
+                  <span
+                    :class="['inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold', 
+                             key.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800']"
+                  >
+                    <div
+                      :class="['w-2 h-2 rounded-full mr-2', 
+                               key.isActive ? 'bg-green-500' : 'bg-red-500']"
+                    />
                     {{ key.isActive ? '活跃' : '禁用' }}
                   </span>
                 </td>
@@ -151,7 +253,10 @@
                       <span class="font-medium text-green-600">{{ calculateApiKeyCost(key.usage) }}</span>
                     </div>
                     <!-- 每日费用限制 -->
-                    <div v-if="key.dailyCostLimit > 0" class="flex justify-between text-sm">
+                    <div
+                      v-if="key.dailyCostLimit > 0"
+                      class="flex justify-between text-sm"
+                    >
                       <span class="text-gray-600">今日费用:</span>
                       <span :class="['font-medium', (key.dailyCost || 0) >= key.dailyCostLimit ? 'text-red-600' : 'text-blue-600']">
                         ${{ (key.dailyCost || 0).toFixed(2) }} / ${{ key.dailyCostLimit.toFixed(2) }}
@@ -167,16 +272,25 @@
                       <span class="text-gray-600">当前并发:</span>
                       <span :class="['font-medium', key.currentConcurrency > 0 ? 'text-orange-600' : 'text-gray-600']">
                         {{ key.currentConcurrency || 0 }}
-                        <span v-if="key.concurrencyLimit > 0" class="text-xs text-gray-500">/ {{ key.concurrencyLimit }}</span>
+                        <span
+                          v-if="key.concurrencyLimit > 0"
+                          class="text-xs text-gray-500"
+                        >/ {{ key.concurrencyLimit }}</span>
                       </span>
                     </div>
                     <!-- 时间窗口限流 -->
-                    <div v-if="key.rateLimitWindow > 0" class="flex justify-between text-sm">
+                    <div
+                      v-if="key.rateLimitWindow > 0"
+                      class="flex justify-between text-sm"
+                    >
                       <span class="text-gray-600">时间窗口:</span>
                       <span class="font-medium text-indigo-600">{{ key.rateLimitWindow }} 分钟</span>
                     </div>
                     <!-- 请求次数限制 -->
-                    <div v-if="key.rateLimitRequests > 0" class="flex justify-between text-sm">
+                    <div
+                      v-if="key.rateLimitRequests > 0"
+                      class="flex justify-between text-sm"
+                    >
                       <span class="text-gray-600">请求限制:</span>
                       <span class="font-medium text-indigo-600">{{ key.rateLimitRequests }} 次/窗口</span>
                     </div>
@@ -186,7 +300,10 @@
                       <span>输出: {{ formatNumber((key.usage && key.usage.total && key.usage.total.outputTokens) || 0) }}</span>
                     </div>
                     <!-- 缓存Token细节 -->
-                    <div v-if="((key.usage && key.usage.total && key.usage.total.cacheCreateTokens) || 0) > 0 || ((key.usage && key.usage.total && key.usage.total.cacheReadTokens) || 0) > 0" class="flex justify-between text-xs text-orange-500">
+                    <div
+                      v-if="((key.usage && key.usage.total && key.usage.total.cacheCreateTokens) || 0) > 0 || ((key.usage && key.usage.total && key.usage.total.cacheReadTokens) || 0) > 0"
+                      class="flex justify-between text-xs text-orange-500"
+                    >
                       <span>缓存创建: {{ formatNumber((key.usage && key.usage.total && key.usage.total.cacheCreateTokens) || 0) }}</span>
                       <span>缓存读取: {{ formatNumber((key.usage && key.usage.total && key.usage.total.cacheReadTokens) || 0) }}</span>
                     </div>
@@ -204,8 +321,12 @@
                     </div>
                     <!-- 模型分布按钮 -->
                     <div class="pt-2">
-                      <button @click="toggleApiKeyModelStats(key.id)" v-if="key && key.id" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
-                        <i :class="['fas', expandedApiKeys[key.id] ? 'fa-chevron-up' : 'fa-chevron-down', 'mr-1']"></i>
+                      <button
+                        v-if="key && key.id"
+                        class="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                        @click="toggleApiKeyModelStats(key.id)"
+                      >
+                        <i :class="['fas', expandedApiKeys[key.id] ? 'fa-chevron-up' : 'fa-chevron-down', 'mr-1']" />
                         模型使用分布
                       </button>
                     </div>
@@ -216,50 +337,62 @@
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm">
                   <div v-if="key.expiresAt">
-                    <div v-if="isApiKeyExpired(key.expiresAt)" class="text-red-600">
-                      <i class="fas fa-exclamation-circle mr-1"></i>
+                    <div
+                      v-if="isApiKeyExpired(key.expiresAt)"
+                      class="text-red-600"
+                    >
+                      <i class="fas fa-exclamation-circle mr-1" />
                       已过期
                     </div>
-                    <div v-else-if="isApiKeyExpiringSoon(key.expiresAt)" class="text-orange-600">
-                      <i class="fas fa-clock mr-1"></i>
+                    <div
+                      v-else-if="isApiKeyExpiringSoon(key.expiresAt)"
+                      class="text-orange-600"
+                    >
+                      <i class="fas fa-clock mr-1" />
                       {{ formatExpireDate(key.expiresAt) }}
                     </div>
-                    <div v-else class="text-gray-600">
+                    <div
+                      v-else
+                      class="text-gray-600"
+                    >
                       {{ formatExpireDate(key.expiresAt) }}
                     </div>
                   </div>
-                  <div v-else class="text-gray-400">
-                    <i class="fas fa-infinity mr-1"></i>
+                  <div
+                    v-else
+                    class="text-gray-400"
+                  >
+                    <i class="fas fa-infinity mr-1" />
                     永不过期
                   </div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm">
                   <div class="flex gap-2">
                     <button 
-                      @click="copyApiStatsLink(key)" 
-                      class="text-purple-600 hover:text-purple-900 font-medium hover:bg-purple-50 px-3 py-1 rounded-lg transition-colors"
+                      class="text-purple-600 hover:text-purple-900 font-medium hover:bg-purple-50 px-3 py-1 rounded-lg transition-colors" 
                       title="复制统计页面链接"
+                      @click="copyApiStatsLink(key)"
                     >
-                      <i class="fas fa-chart-bar mr-1"></i>统计
+                      <i class="fas fa-chart-bar mr-1" />统计
                     </button>
                     <button 
-                      @click="openEditApiKeyModal(key)" 
-                      class="text-blue-600 hover:text-blue-900 font-medium hover:bg-blue-50 px-3 py-1 rounded-lg transition-colors"
+                      class="text-blue-600 hover:text-blue-900 font-medium hover:bg-blue-50 px-3 py-1 rounded-lg transition-colors" 
+                      @click="openEditApiKeyModal(key)"
                     >
-                      <i class="fas fa-edit mr-1"></i>编辑
+                      <i class="fas fa-edit mr-1" />编辑
                     </button>
                     <button 
                       v-if="key.expiresAt && (isApiKeyExpired(key.expiresAt) || isApiKeyExpiringSoon(key.expiresAt))"
-                      @click="openRenewApiKeyModal(key)" 
-                      class="text-green-600 hover:text-green-900 font-medium hover:bg-green-50 px-3 py-1 rounded-lg transition-colors"
+                      class="text-green-600 hover:text-green-900 font-medium hover:bg-green-50 px-3 py-1 rounded-lg transition-colors" 
+                      @click="openRenewApiKeyModal(key)"
                     >
-                      <i class="fas fa-clock mr-1"></i>续期
+                      <i class="fas fa-clock mr-1" />续期
                     </button>
                     <button 
-                      @click="deleteApiKey(key.id)" 
-                      class="text-red-600 hover:text-red-900 font-medium hover:bg-red-50 px-3 py-1 rounded-lg transition-colors"
+                      class="text-red-600 hover:text-red-900 font-medium hover:bg-red-50 px-3 py-1 rounded-lg transition-colors" 
+                      @click="deleteApiKey(key.id)"
                     >
-                      <i class="fas fa-trash mr-1"></i>删除
+                      <i class="fas fa-trash mr-1" />删除
                     </button>
                   </div>
                 </td>
@@ -267,20 +400,31 @@
               
               <!-- 模型统计展开区域 -->
               <tr v-if="key && key.id && expandedApiKeys[key.id]">
-                <td colspan="7" class="px-6 py-4 bg-gray-50">
-                  <div v-if="!apiKeyModelStats[key.id]" class="text-center py-4">
-                    <div class="loading-spinner mx-auto"></div>
-                    <p class="text-sm text-gray-500 mt-2">加载模型统计...</p>
+                <td
+                  colspan="7"
+                  class="px-6 py-4 bg-gray-50"
+                >
+                  <div
+                    v-if="!apiKeyModelStats[key.id]"
+                    class="text-center py-4"
+                  >
+                    <div class="loading-spinner mx-auto" />
+                    <p class="text-sm text-gray-500 mt-2">
+                      加载模型统计...
+                    </p>
                   </div>
                   <div class="space-y-4">
                     <!-- 通用的标题和时间筛选器，无论是否有数据都显示 -->
                     <div class="flex items-center justify-between mb-4">
                       <h5 class="text-sm font-semibold text-gray-700 flex items-center">
-                        <i class="fas fa-chart-pie text-indigo-500 mr-2"></i>
+                        <i class="fas fa-chart-pie text-indigo-500 mr-2" />
                         模型使用分布
                       </h5>
                       <div class="flex items-center gap-2">
-                        <span v-if="apiKeyModelStats[key.id] && apiKeyModelStats[key.id].length > 0" class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                        <span
+                          v-if="apiKeyModelStats[key.id] && apiKeyModelStats[key.id].length > 0"
+                          class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full"
+                        >
                           {{ apiKeyModelStats[key.id].length }} 个模型
                         </span>
                         
@@ -291,13 +435,13 @@
                             <button 
                               v-for="option in getApiKeyDateFilter(key.id).presetOptions" 
                               :key="option.value"
-                              @click="setApiKeyDateFilterPreset(option.value, key.id)"
                               :class="[
                                 'px-2 py-1 rounded text-xs font-medium transition-colors',
                                 getApiKeyDateFilter(key.id).preset === option.value && getApiKeyDateFilter(key.id).type === 'preset'
                                   ? 'bg-white text-blue-600 shadow-sm' 
                                   : 'text-gray-600 hover:text-gray-900'
                               ]"
+                              @click="setApiKeyDateFilterPreset(option.value, key.id)"
                             >
                               {{ option.label }}
                             </button>
@@ -306,7 +450,6 @@
                           <!-- Element Plus 日期范围选择器 -->
                           <el-date-picker
                             :model-value="getApiKeyDateFilter(key.id).customRange"
-                            @update:model-value="(value) => onApiKeyCustomDateRangeChange(key.id, value)"
                             type="datetimerange"
                             range-separator="至"
                             start-placeholder="开始日期"
@@ -317,33 +460,47 @@
                             :default-time="defaultTime"
                             size="small"
                             style="width: 280px;"
+                            @update:model-value="(value) => onApiKeyCustomDateRangeChange(key.id, value)"
                             class="api-key-date-picker"
                             :clearable="true"
                             :unlink-panels="false"
-                          ></el-date-picker>
+                          />
                         </div>
                       </div>
                     </div>
                     
                     <!-- 数据展示区域 -->
-                    <div v-if="apiKeyModelStats[key.id] && apiKeyModelStats[key.id].length === 0" class="text-center py-8">
+                    <div
+                      v-if="apiKeyModelStats[key.id] && apiKeyModelStats[key.id].length === 0"
+                      class="text-center py-8"
+                    >
                       <div class="flex items-center justify-center gap-2 mb-3">
-                        <i class="fas fa-chart-line text-gray-400 text-lg"></i>
-                        <p class="text-sm text-gray-500">暂无模型使用数据</p>
+                        <i class="fas fa-chart-line text-gray-400 text-lg" />
+                        <p class="text-sm text-gray-500">
+                          暂无模型使用数据
+                        </p>
                         <button 
-                          @click="resetApiKeyDateFilter(key.id)"
                           class="text-blue-500 hover:text-blue-700 text-sm ml-2 flex items-center gap-1 transition-colors"
                           title="重置筛选条件并刷新"
+                          @click="resetApiKeyDateFilter(key.id)"
                         >
-                          <i class="fas fa-sync-alt text-xs"></i>
+                          <i class="fas fa-sync-alt text-xs" />
                           <span class="text-xs">刷新</span>
                         </button>
                       </div>
-                      <p class="text-xs text-gray-400">尝试调整时间范围或点击刷新重新加载数据</p>
+                      <p class="text-xs text-gray-400">
+                        尝试调整时间范围或点击刷新重新加载数据
+                      </p>
                     </div>
-                    <div v-else-if="apiKeyModelStats[key.id] && apiKeyModelStats[key.id].length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      <div v-for="stat in apiKeyModelStats[key.id]" :key="stat.model" 
-                           class="bg-gradient-to-br from-white to-gray-50 rounded-xl p-4 border border-gray-200 hover:border-indigo-300 hover:shadow-lg transition-all duration-200">
+                    <div
+                      v-else-if="apiKeyModelStats[key.id] && apiKeyModelStats[key.id].length > 0"
+                      class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                    >
+                      <div
+                        v-for="stat in apiKeyModelStats[key.id]"
+                        :key="stat.model" 
+                        class="bg-gradient-to-br from-white to-gray-50 rounded-xl p-4 border border-gray-200 hover:border-indigo-300 hover:shadow-lg transition-all duration-200"
+                      >
                         <div class="flex justify-between items-start mb-3">
                           <div class="flex-1">
                             <span class="text-sm font-semibold text-gray-800 block mb-1">{{ stat.model }}</span>
@@ -354,14 +511,14 @@
                         <div class="space-y-2 mb-3">
                           <div class="flex justify-between items-center text-sm">
                             <span class="text-gray-600 flex items-center">
-                              <i class="fas fa-coins text-yellow-500 mr-1 text-xs"></i>
+                              <i class="fas fa-coins text-yellow-500 mr-1 text-xs" />
                               总Token:
                             </span>
                             <span class="font-semibold text-gray-900">{{ formatNumber(stat.allTokens) }}</span>
                           </div>
                           <div class="flex justify-between items-center text-sm">
                             <span class="text-gray-600 flex items-center">
-                              <i class="fas fa-dollar-sign text-green-500 mr-1 text-xs"></i>
+                              <i class="fas fa-dollar-sign text-green-500 mr-1 text-xs" />
                               费用:
                             </span>
                             <span class="font-semibold text-green-600">{{ calculateModelCost(stat) }}</span>
@@ -369,28 +526,34 @@
                           <div class="pt-2 mt-2 border-t border-gray-100">
                             <div class="flex justify-between items-center text-xs text-gray-500">
                               <span class="flex items-center">
-                                <i class="fas fa-arrow-down text-green-500 mr-1"></i>
+                                <i class="fas fa-arrow-down text-green-500 mr-1" />
                                 输入:
                               </span>
                               <span class="font-medium">{{ formatNumber(stat.inputTokens) }}</span>
                             </div>
                             <div class="flex justify-between items-center text-xs text-gray-500">
                               <span class="flex items-center">
-                                <i class="fas fa-arrow-up text-blue-500 mr-1"></i>
+                                <i class="fas fa-arrow-up text-blue-500 mr-1" />
                                 输出:
                               </span>
                               <span class="font-medium">{{ formatNumber(stat.outputTokens) }}</span>
                             </div>
-                            <div v-if="stat.cacheCreateTokens > 0" class="flex justify-between items-center text-xs text-purple-600">
+                            <div
+                              v-if="stat.cacheCreateTokens > 0"
+                              class="flex justify-between items-center text-xs text-purple-600"
+                            >
                               <span class="flex items-center">
-                                <i class="fas fa-save mr-1"></i>
+                                <i class="fas fa-save mr-1" />
                                 缓存创建:
                               </span>
                               <span class="font-medium">{{ formatNumber(stat.cacheCreateTokens) }}</span>
                             </div>
-                            <div v-if="stat.cacheReadTokens > 0" class="flex justify-between items-center text-xs text-purple-600">
+                            <div
+                              v-if="stat.cacheReadTokens > 0"
+                              class="flex justify-between items-center text-xs text-purple-600"
+                            >
                               <span class="flex items-center">
-                                <i class="fas fa-download mr-1"></i>
+                                <i class="fas fa-download mr-1" />
                                 缓存读取:
                               </span>
                               <span class="font-medium">{{ formatNumber(stat.cacheReadTokens) }}</span>
@@ -400,9 +563,10 @@
                         
                         <!-- 进度条 -->
                         <div class="w-full bg-gray-200 rounded-full h-2 mt-3">
-                          <div class="bg-gradient-to-r from-indigo-500 to-purple-600 h-2 rounded-full transition-all duration-500" 
-                               :style="{ width: calculateApiKeyModelPercentage(stat.allTokens, apiKeyModelStats[key.id]) + '%' }">
-                          </div>
+                          <div
+                            class="bg-gradient-to-r from-indigo-500 to-purple-600 h-2 rounded-full transition-all duration-500" 
+                            :style="{ width: calculateApiKeyModelPercentage(stat.allTokens, apiKeyModelStats[key.id]) + '%' }"
+                          />
                         </div>
                         <div class="text-right mt-1">
                           <span class="text-xs font-medium text-indigo-600">
@@ -413,10 +577,13 @@
                     </div>
                     
                     <!-- 总计统计，仅在有数据时显示 -->
-                    <div v-if="apiKeyModelStats[key.id] && apiKeyModelStats[key.id].length > 0" class="mt-4 p-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-100">
+                    <div
+                      v-if="apiKeyModelStats[key.id] && apiKeyModelStats[key.id].length > 0"
+                      class="mt-4 p-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-100"
+                    >
                       <div class="flex items-center justify-between text-sm">
                         <span class="font-semibold text-gray-700 flex items-center">
-                          <i class="fas fa-calculator text-indigo-500 mr-2"></i>
+                          <i class="fas fa-calculator text-indigo-500 mr-2" />
                           总计统计
                         </span>
                         <div class="flex gap-4 text-xs">
@@ -448,7 +615,7 @@
     
     <EditApiKeyModal 
       v-if="showEditApiKeyModal"
-      :apiKey="editingApiKey"
+      :api-key="editingApiKey"
       :accounts="accounts"
       @close="showEditApiKeyModal = false"
       @success="handleEditSuccess"
@@ -456,14 +623,14 @@
     
     <RenewApiKeyModal 
       v-if="showRenewApiKeyModal"
-      :apiKey="renewingApiKey"
+      :api-key="renewingApiKey"
       @close="showRenewApiKeyModal = false"
       @success="handleRenewSuccess"
     />
     
     <NewApiKeyModal 
       v-if="showNewApiKeyModal"
-      :apiKey="newApiKeyData"
+      :api-key="newApiKeyData"
       @close="showNewApiKeyModal = false"
     />
   </div>

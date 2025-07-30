@@ -10,8 +10,11 @@
           :logo-src="oemSettings.siteIconData || oemSettings.siteIcon"
         />
         <div class="flex items-center gap-3">
-          <router-link to="/dashboard" class="admin-button rounded-xl px-4 py-2 text-white transition-all duration-300 flex items-center gap-2">
-            <i class="fas fa-cog text-sm"></i>
+          <router-link
+            to="/dashboard"
+            class="admin-button rounded-xl px-4 py-2 text-white transition-all duration-300 flex items-center gap-2"
+          >
+            <i class="fas fa-cog text-sm" />
             <span class="text-sm font-medium">管理后台</span>
           </router-link>
         </div>
@@ -23,23 +26,23 @@
       <div class="flex justify-center">
         <div class="inline-flex bg-white/10 backdrop-blur-xl rounded-full p-1 shadow-lg border border-white/20">
           <button
-            @click="currentTab = 'stats'"
             :class="[
               'tab-pill-button',
               currentTab === 'stats' ? 'active' : ''
             ]"
+            @click="currentTab = 'stats'"
           >
-            <i class="fas fa-chart-line mr-2"></i>
+            <i class="fas fa-chart-line mr-2" />
             <span>统计查询</span>
           </button>
           <button
-            @click="currentTab = 'tutorial'"
             :class="[
               'tab-pill-button',
               currentTab === 'tutorial' ? 'active' : ''
             ]"
+            @click="currentTab = 'tutorial'"
           >
-            <i class="fas fa-graduation-cap mr-2"></i>
+            <i class="fas fa-graduation-cap mr-2" />
             <span>使用教程</span>
           </button>
         </div>
@@ -47,45 +50,54 @@
     </div>
 
     <!-- 统计内容 -->
-    <div v-if="currentTab === 'stats'" class="tab-content">
+    <div
+      v-if="currentTab === 'stats'"
+      class="tab-content"
+    >
       <!-- API Key 输入区域 -->
       <ApiKeyInput />
 
       <!-- 错误提示 -->
-      <div v-if="error" class="mb-8">
+      <div
+        v-if="error"
+        class="mb-8"
+      >
         <div class="bg-red-500/20 border border-red-500/30 rounded-xl p-4 text-red-800 backdrop-blur-sm">
-          <i class="fas fa-exclamation-triangle mr-2"></i>
+          <i class="fas fa-exclamation-triangle mr-2" />
           {{ error }}
         </div>
       </div>
 
       <!-- 统计数据展示区域 -->
-      <div v-if="statsData" class="fade-in">
+      <div
+        v-if="statsData"
+        class="fade-in"
+      >
         <div class="glass-strong rounded-3xl p-6 shadow-xl">
           <!-- 时间范围选择器 -->
           <div class="mb-6 pb-6 border-b border-gray-200">
             <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div class="flex items-center gap-3">
-                <i class="fas fa-clock text-blue-500 text-lg"></i>
+                <i class="fas fa-clock text-blue-500 text-lg" />
                 <span class="text-lg font-medium text-gray-700">统计时间范围</span>
               </div>
               <div class="flex gap-2">
                 <button 
-                  @click="switchPeriod('daily')"
                   :class="['period-btn', { 'active': statsPeriod === 'daily' }]"
                   class="px-6 py-2 text-sm font-medium flex items-center gap-2"
                   :disabled="loading || modelStatsLoading"
+                  @click="switchPeriod('daily')"
                 >
-                  <i class="fas fa-calendar-day"></i>
+                  <i class="fas fa-calendar-day" />
                   今日
                 </button>
                 <button 
-                  @click="switchPeriod('monthly')"
                   :class="['period-btn', { 'active': statsPeriod === 'monthly' }]"
                   class="px-6 py-2 text-sm font-medium flex items-center gap-2"
                   :disabled="loading || modelStatsLoading"
+                  @click="switchPeriod('monthly')"
                 >
-                  <i class="fas fa-calendar-alt"></i>
+                  <i class="fas fa-calendar-alt" />
                   本月
                 </button>
               </div>
@@ -108,7 +120,10 @@
     </div>
 
     <!-- 教程内容 -->
-    <div v-if="currentTab === 'tutorial'" class="tab-content">
+    <div
+      v-if="currentTab === 'tutorial'"
+      class="tab-content"
+    >
       <div class="glass-strong rounded-3xl shadow-xl">
         <TutorialView />
       </div>

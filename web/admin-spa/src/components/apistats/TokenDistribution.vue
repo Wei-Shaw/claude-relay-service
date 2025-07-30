@@ -1,34 +1,34 @@
 <template>
   <div class="card p-6">
     <h3 class="text-xl font-bold mb-4 flex items-center text-gray-900">
-      <i class="fas fa-coins mr-3 text-yellow-500"></i>
+      <i class="fas fa-coins mr-3 text-yellow-500" />
       Token 使用分布 <span class="text-sm font-normal text-gray-600 ml-2">({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span>
     </h3>
     <div class="space-y-3">
       <div class="flex justify-between items-center">
         <span class="text-gray-600 flex items-center">
-          <i class="fas fa-arrow-right mr-2 text-green-500"></i>
+          <i class="fas fa-arrow-right mr-2 text-green-500" />
           输入 Token
         </span>
         <span class="font-medium text-gray-900">{{ formatNumber(currentPeriodData.inputTokens) }}</span>
       </div>
       <div class="flex justify-between items-center">
         <span class="text-gray-600 flex items-center">
-          <i class="fas fa-arrow-left mr-2 text-blue-500"></i>
+          <i class="fas fa-arrow-left mr-2 text-blue-500" />
           输出 Token
         </span>
         <span class="font-medium text-gray-900">{{ formatNumber(currentPeriodData.outputTokens) }}</span>
       </div>
       <div class="flex justify-between items-center">
         <span class="text-gray-600 flex items-center">
-          <i class="fas fa-save mr-2 text-purple-500"></i>
+          <i class="fas fa-save mr-2 text-purple-500" />
           缓存创建 Token
         </span>
         <span class="font-medium text-gray-900">{{ formatNumber(currentPeriodData.cacheCreateTokens) }}</span>
       </div>
       <div class="flex justify-between items-center">
         <span class="text-gray-600 flex items-center">
-          <i class="fas fa-download mr-2 text-orange-500"></i>
+          <i class="fas fa-download mr-2 text-orange-500" />
           缓存读取 Token
         </span>
         <span class="font-medium text-gray-900">{{ formatNumber(currentPeriodData.cacheReadTokens) }}</span>

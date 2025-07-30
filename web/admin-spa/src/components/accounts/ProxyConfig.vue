@@ -1,21 +1,26 @@
 <template>
   <div class="space-y-4">
     <div class="flex items-center justify-between">
-      <h4 class="text-sm font-semibold text-gray-700">代理设置 (可选)</h4>
+      <h4 class="text-sm font-semibold text-gray-700">
+        代理设置 (可选)
+      </h4>
       <label class="flex items-center cursor-pointer">
         <input 
-          type="checkbox" 
-          v-model="proxy.enabled"
+          v-model="proxy.enabled" 
+          type="checkbox"
           class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
         >
         <span class="ml-2 text-sm text-gray-700">启用代理</span>
       </label>
     </div>
     
-    <div v-if="proxy.enabled" class="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4">
+    <div
+      v-if="proxy.enabled"
+      class="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4"
+    >
       <div class="flex items-start gap-3 mb-3">
         <div class="w-8 h-8 bg-gray-500 rounded-lg flex items-center justify-center flex-shrink-0">
-          <i class="fas fa-server text-white text-sm"></i>
+          <i class="fas fa-server text-white text-sm" />
         </div>
         <div class="flex-1">
           <p class="text-sm text-gray-700">
@@ -33,9 +38,15 @@
           v-model="proxy.type" 
           class="form-input w-full"
         >
-          <option value="socks5">SOCKS5</option>
-          <option value="http">HTTP</option>
-          <option value="https">HTTPS</option>
+          <option value="socks5">
+            SOCKS5
+          </option>
+          <option value="http">
+            HTTP
+          </option>
+          <option value="https">
+            HTTPS
+          </option>
         </select>
       </div>
       
@@ -63,17 +74,23 @@
       <div class="space-y-4">
         <div class="flex items-center">
           <input 
-            type="checkbox" 
+            id="proxyAuth" 
             v-model="showAuth"
-            id="proxyAuth"
+            type="checkbox"
             class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
           >
-          <label for="proxyAuth" class="ml-2 text-sm text-gray-700 cursor-pointer">
+          <label
+            for="proxyAuth"
+            class="ml-2 text-sm text-gray-700 cursor-pointer"
+          >
             需要身份验证
           </label>
         </div>
         
-        <div v-if="showAuth" class="grid grid-cols-2 gap-4">
+        <div
+          v-if="showAuth"
+          class="grid grid-cols-2 gap-4"
+        >
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">用户名</label>
             <input 
@@ -94,10 +111,10 @@
               >
               <button 
                 type="button"
-                @click="showPassword = !showPassword"
                 class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                @click="showPassword = !showPassword"
               >
-                <i :class="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                <i :class="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'" />
               </button>
             </div>
           </div>
@@ -106,7 +123,7 @@
       
       <div class="bg-blue-50 p-3 rounded-lg border border-blue-200">
         <p class="text-xs text-blue-700">
-          <i class="fas fa-info-circle mr-1"></i>
+          <i class="fas fa-info-circle mr-1" />
           <strong>提示：</strong>代理设置将用于所有与此账户相关的API请求。请确保代理服务器支持HTTPS流量转发。
         </p>
       </div>
