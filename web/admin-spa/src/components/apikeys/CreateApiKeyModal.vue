@@ -358,13 +358,24 @@
                   <option value="">
                     使用共享账号池
                   </option>
-                  <option 
-                    v-for="account in accounts.claude.filter(a => a.accountType === 'dedicated')" 
-                    :key="account.id" 
-                    :value="account.id"
-                  >
-                    {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
-                  </option>
+                  <optgroup v-if="accounts.claude.filter(a => a.isDedicated && a.platform === 'claude-oauth').length > 0" label="Claude OAuth 账号">
+                    <option 
+                      v-for="account in accounts.claude.filter(a => a.isDedicated && a.platform === 'claude-oauth')" 
+                      :key="account.id" 
+                      :value="account.id"
+                    >
+                      {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
+                    </option>
+                  </optgroup>
+                  <optgroup v-if="accounts.claude.filter(a => a.isDedicated && a.platform === 'claude-console').length > 0" label="Claude Console 账号">
+                    <option 
+                      v-for="account in accounts.claude.filter(a => a.isDedicated && a.platform === 'claude-console')" 
+                      :key="account.id" 
+                      :value="`console:${account.id}`"
+                    >
+                      {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
+                    </option>
+                  </optgroup>
                 </select>
               </div>
               <div>
@@ -378,7 +389,7 @@
                     使用共享账号池
                   </option>
                   <option 
-                    v-for="account in accounts.gemini.filter(a => a.accountType === 'dedicated')" 
+                    v-for="account in accounts.gemini.filter(a => a.isDedicated)" 
                     :key="account.id" 
                     :value="account.id"
                   >
@@ -728,9 +739,23 @@ const createApiKey = async () => {
       dailyCostLimit: form.dailyCostLimit !== '' && form.dailyCostLimit !== null ? parseFloat(form.dailyCostLimit) : 0,
       expiresAt: form.expiresAt || undefined,
       permissions: form.permissions,
-      claudeAccountId: form.claudeAccountId || undefined,
-      geminiAccountId: form.geminiAccountId || undefined,
       tags: form.tags.length > 0 ? form.tags : undefined
+    }
+    
+    // 处理Claude账户绑定（区分OAuth和Console）
+    if (form.claudeAccountId) {
+      if (form.claudeAccountId.startsWith('console:')) {
+        // Claude Console账户
+        data.claudeConsoleAccountId = form.claudeAccountId.substring(8);
+      } else {
+        // Claude OAuth账户
+        data.claudeAccountId = form.claudeAccountId;
+      }
+    }
+    
+    // Gemini账户绑定
+    if (form.geminiAccountId) {
+      data.geminiAccountId = form.geminiAccountId;
     }
     
     // 模型限制 - 始终提交这些字段

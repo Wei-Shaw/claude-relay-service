@@ -191,9 +191,9 @@
                         {{ key.id }}
                       </div>
                       <div class="text-xs text-gray-500 mt-1">
-                        <span v-if="key.claudeAccountId">
+                        <span v-if="key.claudeAccountId || key.claudeConsoleAccountId">
                           <i class="fas fa-link mr-1" />
-                          绑定: {{ getBoundAccountName(key.claudeAccountId) }}
+                          绑定: {{ getBoundAccountName(key.claudeAccountId, key.claudeConsoleAccountId) }}
                         </span>
                         <span v-else>
                           <i class="fas fa-share-alt mr-1" />
@@ -713,17 +713,42 @@ const sortedApiKeys = computed(() => {
 // 加载账户列表
 const loadAccounts = async () => {
   try {
-    const [claudeData, geminiData] = await Promise.all([
+    const [claudeData, claudeConsoleData, geminiData] = await Promise.all([
       apiClient.get('/admin/claude-accounts'),
+      apiClient.get('/admin/claude-console-accounts'),
       apiClient.get('/admin/gemini-accounts')
     ])
     
+    // 合并Claude OAuth账户和Claude Console账户
+    const claudeAccounts = []
+    
     if (claudeData.success) {
-      accounts.value.claude = claudeData.data || []
+      claudeData.data?.forEach(account => {
+        claudeAccounts.push({
+          ...account,
+          platform: 'claude-oauth',
+          isDedicated: account.accountType === 'dedicated'
+        })
+      })
     }
     
+    if (claudeConsoleData.success) {
+      claudeConsoleData.data?.forEach(account => {
+        claudeAccounts.push({
+          ...account,
+          platform: 'claude-console',
+          isDedicated: account.accountType === 'dedicated'
+        })
+      })
+    }
+    
+    accounts.value.claude = claudeAccounts
+    
     if (geminiData.success) {
-      accounts.value.gemini = geminiData.data || []
+      accounts.value.gemini = (geminiData.data || []).map(account => ({
+        ...account,
+        isDedicated: account.accountType === 'dedicated'
+      }))
     }
   } catch (error) {
     console.error('加载账户列表失败:', error)
@@ -778,23 +803,28 @@ const calculateApiKeyCost = (usage) => {
 }
 
 // 获取绑定账户名称
-const getBoundAccountName = (accountId) => {
-  if (!accountId) return '未知账户'
-  
-  // 从Claude账户列表中查找
-  const claudeAccount = accounts.value.claude.find(acc => acc.id === accountId)
-  if (claudeAccount) {
-    return claudeAccount.name
+const getBoundAccountName = (claudeAccountId, claudeConsoleAccountId) => {
+  // 优先显示Claude OAuth账户
+  if (claudeAccountId) {
+    const claudeAccount = accounts.value.claude.find(acc => acc.id === claudeAccountId)
+    if (claudeAccount) {
+      return claudeAccount.name
+    }
+    // 如果找不到，返回账户ID的前8位
+    return `账户-${claudeAccountId.substring(0, 8)}`
   }
   
-  // 从Gemini账户列表中查找
-  const geminiAccount = accounts.value.gemini.find(acc => acc.id === accountId)
-  if (geminiAccount) {
-    return geminiAccount.name
+  // 其次显示Claude Console账户
+  if (claudeConsoleAccountId) {
+    const consoleAccount = accounts.value.claude.find(acc => acc.id === claudeConsoleAccountId)
+    if (consoleAccount) {
+      return `${consoleAccount.name} (Console)`
+    }
+    // 如果找不到，返回账户ID的前8位
+    return `Console-${claudeConsoleAccountId.substring(0, 8)}`
   }
   
-  // 如果找不到，返回账户ID的前8位
-  return `账户-${accountId.substring(0, 8)}`
+  return '未知账户'
 }
 
 // 检查API Key是否过期

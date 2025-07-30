@@ -566,8 +566,9 @@ const loadAccounts = async () => {
     
     if (claudeConsoleData.success) {
       const claudeConsoleAccounts = (claudeConsoleData.data || []).map(acc => {
-        // Claude Console账户暂时不支持直接绑定
-        return { ...acc, platform: 'claude-console', boundApiKeysCount: 0 }
+        // 计算每个Claude Console账户绑定的API Key数量
+        const boundApiKeysCount = apiKeys.value.filter(key => key.claudeConsoleAccountId === acc.id).length
+        return { ...acc, platform: 'claude-console', boundApiKeysCount }
       })
       allAccounts.push(...claudeConsoleAccounts)
     }

@@ -17,6 +17,7 @@ class ApiKeyService {
       tokenLimit = config.limits.defaultTokenLimit,
       expiresAt = null,
       claudeAccountId = null,
+      claudeConsoleAccountId = null,
       geminiAccountId = null,
       permissions = 'all', // 'claude', 'gemini', 'all'
       isActive = true,
@@ -47,6 +48,7 @@ class ApiKeyService {
       rateLimitRequests: String(rateLimitRequests ?? 0),
       isActive: String(isActive),
       claudeAccountId: claudeAccountId || '',
+      claudeConsoleAccountId: claudeConsoleAccountId || '',
       geminiAccountId: geminiAccountId || '',
       permissions: permissions || 'all',
       enableModelRestriction: String(enableModelRestriction),
@@ -77,6 +79,7 @@ class ApiKeyService {
       rateLimitRequests: parseInt(keyData.rateLimitRequests || 0),
       isActive: keyData.isActive === 'true',
       claudeAccountId: keyData.claudeAccountId,
+      claudeConsoleAccountId: keyData.claudeConsoleAccountId,
       geminiAccountId: keyData.geminiAccountId,
       permissions: keyData.permissions,
       enableModelRestriction: keyData.enableModelRestriction === 'true',
@@ -162,6 +165,7 @@ class ApiKeyService {
           createdAt: keyData.createdAt,
           expiresAt: keyData.expiresAt,
           claudeAccountId: keyData.claudeAccountId,
+          claudeConsoleAccountId: keyData.claudeConsoleAccountId,
           geminiAccountId: keyData.geminiAccountId,
           permissions: keyData.permissions || 'all',
           tokenLimit: parseInt(keyData.tokenLimit),
@@ -237,7 +241,7 @@ class ApiKeyService {
       }
 
       // 允许更新的字段
-      const allowedUpdates = ['name', 'description', 'tokenLimit', 'concurrencyLimit', 'rateLimitWindow', 'rateLimitRequests', 'isActive', 'claudeAccountId', 'geminiAccountId', 'permissions', 'expiresAt', 'enableModelRestriction', 'restrictedModels', 'enableClientRestriction', 'allowedClients', 'dailyCostLimit', 'tags'];
+      const allowedUpdates = ['name', 'description', 'tokenLimit', 'concurrencyLimit', 'rateLimitWindow', 'rateLimitRequests', 'isActive', 'claudeAccountId', 'claudeConsoleAccountId', 'geminiAccountId', 'permissions', 'expiresAt', 'enableModelRestriction', 'restrictedModels', 'enableClientRestriction', 'allowedClients', 'dailyCostLimit', 'tags'];
       const updatedData = { ...keyData };
 
       for (const [field, value] of Object.entries(updates)) {

@@ -892,7 +892,10 @@ class ClaudeAccountService {
     const windowStartHour = Math.floor(hour / 5) * 5; // 向下取整到最近的5小时边界
     
     const windowStart = new Date(requestTime);
-    windowStart.setHours(windowStartHour, 0, 0, 0);
+    windowStart.setHours(windowStartHour);
+    windowStart.setMinutes(0);
+    windowStart.setSeconds(0);
+    windowStart.setMilliseconds(0);
     
     return windowStart;
   }
@@ -969,79 +972,67 @@ class ClaudeAccountService {
       logger.info('🔄 Initializing session windows for all Claude accounts...');
       
       const accounts = await redis.getAllClaudeAccounts();
-      let initializedCount = 0;
-      let skippedCount = 0;
-      let expiredCount = 0;
+      let validWindowCount = 0;
+      let expiredWindowCount = 0;
+      let noWindowCount = 0;
+      const now = new Date();
       
       for (const account of accounts) {
-        // 如果已经有会话窗口信息且不强制重算，跳过
-        if (account.sessionWindowStart && account.sessionWindowEnd && !forceRecalculate) {
-          skippedCount++;
-          logger.debug(`⏭️ Skipped account ${account.name} (${account.id}) - already has session window`);
-          continue;
+        // 如果强制重算，清除现有窗口信息
+        if (forceRecalculate && (account.sessionWindowStart || account.sessionWindowEnd)) {
+          logger.info(`🔄 Force recalculating window for account ${account.name} (${account.id})`);
+          delete account.sessionWindowStart;
+          delete account.sessionWindowEnd;
+          delete account.lastRequestTime;
+          await redis.setClaudeAccount(account.id, account);
         }
         
-        // 如果有lastUsedAt，基于它恢复会话窗口
-        if (account.lastUsedAt) {
-          const lastUsedTime = new Date(account.lastUsedAt);
-          const now = new Date();
+        // 检查现有会话窗口
+        if (account.sessionWindowStart && account.sessionWindowEnd) {
+          const windowEnd = new Date(account.sessionWindowEnd);
+          const windowStart = new Date(account.sessionWindowStart);
+          const timeUntilExpires = Math.round((windowEnd.getTime() - now.getTime()) / (1000 * 60));
           
-          // 计算时间差（分钟）
-          const timeSinceLastUsed = Math.round((now.getTime() - lastUsedTime.getTime()) / (1000 * 60));
-          
-          // 计算lastUsedAt对应的会话窗口
-          const windowStart = this._calculateSessionWindowStart(lastUsedTime);
-          const windowEnd = this._calculateSessionWindowEnd(windowStart);
-          
-          // 计算窗口剩余时间（分钟）
-          const timeUntilWindowExpires = Math.round((windowEnd.getTime() - now.getTime()) / (1000 * 60));
-          
-          logger.info(`🔍 Analyzing account ${account.name} (${account.id}):`);
-          logger.info(`   Last used: ${lastUsedTime.toISOString()} (${timeSinceLastUsed} minutes ago)`);
-          logger.info(`   Calculated window: ${windowStart.toISOString()} - ${windowEnd.toISOString()}`);
-          logger.info(`   Window expires in: ${timeUntilWindowExpires > 0 ? timeUntilWindowExpires + ' minutes' : 'EXPIRED'}`);
-          
-          // 只有窗口未过期才恢复
           if (now.getTime() < windowEnd.getTime()) {
-            account.sessionWindowStart = windowStart.toISOString();
-            account.sessionWindowEnd = windowEnd.toISOString();
-            account.lastRequestTime = account.lastUsedAt;
-            
-            await redis.setClaudeAccount(account.id, account);
-            initializedCount++;
-            
-            logger.success(`✅ Initialized session window for account ${account.name} (${account.id})`);
+            // 窗口仍然有效，保留它
+            validWindowCount++;
+            logger.info(`✅ Account ${account.name} (${account.id}) has valid window: ${windowStart.toISOString()} - ${windowEnd.toISOString()} (${timeUntilExpires} minutes remaining)`);
           } else {
-            expiredCount++;
-            logger.warn(`⏰ Window expired for account ${account.name} (${account.id}) - will create new window on next request`);
+            // 窗口已过期，清除它
+            expiredWindowCount++;
+            logger.warn(`⏰ Account ${account.name} (${account.id}) window expired: ${windowStart.toISOString()} - ${windowEnd.toISOString()}`);
+            
+            // 清除过期的窗口信息
+            delete account.sessionWindowStart;
+            delete account.sessionWindowEnd;
+            delete account.lastRequestTime;
+            await redis.setClaudeAccount(account.id, account);
           }
         } else {
-          logger.info(`📭 No lastUsedAt data for account ${account.name} (${account.id}) - will create window on first request`);
+          noWindowCount++;
+          logger.info(`📭 Account ${account.name} (${account.id}) has no session window - will create on next request`);
         }
       }
       
       logger.success('✅ Session window initialization completed:');
       logger.success(`   📊 Total accounts: ${accounts.length}`);
-      logger.success(`   ✅ Initialized: ${initializedCount}`);
-      logger.success(`   ⏭️ Skipped (existing): ${skippedCount}`);  
-      logger.success(`   ⏰ Expired: ${expiredCount}`);
-      logger.success(`   📭 No usage data: ${accounts.length - initializedCount - skippedCount - expiredCount}`);
+      logger.success(`   ✅ Valid windows: ${validWindowCount}`);
+      logger.success(`   ⏰ Expired windows: ${expiredWindowCount}`);
+      logger.success(`   📭 No windows: ${noWindowCount}`);
       
       return {
         total: accounts.length,
-        initialized: initializedCount,
-        skipped: skippedCount,
-        expired: expiredCount,
-        noData: accounts.length - initializedCount - skippedCount - expiredCount
+        validWindows: validWindowCount,
+        expiredWindows: expiredWindowCount,
+        noWindows: noWindowCount
       };
     } catch (error) {
       logger.error('❌ Failed to initialize session windows:', error);
       return {
         total: 0,
-        initialized: 0,
-        skipped: 0,
-        expired: 0,
-        noData: 0,
+        validWindows: 0,
+        expiredWindows: 0,
+        noWindows: 0,
         error: error.message
       };
     }

@@ -12,16 +12,31 @@ class UnifiedClaudeScheduler {
   async selectAccountForApiKey(apiKeyData, sessionHash = null, requestedModel = null) {
     try {
       // 如果API Key绑定了专属账户，优先使用
+      // 1. 检查Claude OAuth账户绑定
       if (apiKeyData.claudeAccountId) {
         const boundAccount = await redis.getClaudeAccount(apiKeyData.claudeAccountId);
         if (boundAccount && boundAccount.isActive === 'true' && boundAccount.status !== 'error') {
-          logger.info(`🎯 Using bound dedicated Claude account: ${boundAccount.name} (${apiKeyData.claudeAccountId}) for API key ${apiKeyData.name}`);
+          logger.info(`🎯 Using bound dedicated Claude OAuth account: ${boundAccount.name} (${apiKeyData.claudeAccountId}) for API key ${apiKeyData.name}`);
           return {
             accountId: apiKeyData.claudeAccountId,
             accountType: 'claude-official'
           };
         } else {
-          logger.warn(`⚠️ Bound Claude account ${apiKeyData.claudeAccountId} is not available, falling back to pool`);
+          logger.warn(`⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not available, falling back to pool`);
+        }
+      }
+      
+      // 2. 检查Claude Console账户绑定
+      if (apiKeyData.claudeConsoleAccountId) {
+        const boundConsoleAccount = await claudeConsoleAccountService.getAccount(apiKeyData.claudeConsoleAccountId);
+        if (boundConsoleAccount && boundConsoleAccount.isActive === true && boundConsoleAccount.status === 'active') {
+          logger.info(`🎯 Using bound dedicated Claude Console account: ${boundConsoleAccount.name} (${apiKeyData.claudeConsoleAccountId}) for API key ${apiKeyData.name}`);
+          return {
+            accountId: apiKeyData.claudeConsoleAccountId,
+            accountType: 'claude-console'
+          };
+        } else {
+          logger.warn(`⚠️ Bound Claude Console account ${apiKeyData.claudeConsoleAccountId} is not available, falling back to pool`);
         }
       }
 
@@ -81,13 +96,14 @@ class UnifiedClaudeScheduler {
   async _getAllAvailableAccounts(apiKeyData, requestedModel = null) {
     const availableAccounts = [];
 
-    // 如果API Key绑定了专属Claude账户，优先返回
+    // 如果API Key绑定了专属账户，优先返回
+    // 1. 检查Claude OAuth账户绑定
     if (apiKeyData.claudeAccountId) {
       const boundAccount = await redis.getClaudeAccount(apiKeyData.claudeAccountId);
       if (boundAccount && boundAccount.isActive === 'true' && boundAccount.status !== 'error' && boundAccount.status !== 'blocked') {
         const isRateLimited = await claudeAccountService.isAccountRateLimited(boundAccount.id);
         if (!isRateLimited) {
-          logger.info(`🎯 Using bound dedicated Claude account: ${boundAccount.name} (${apiKeyData.claudeAccountId})`);
+          logger.info(`🎯 Using bound dedicated Claude OAuth account: ${boundAccount.name} (${apiKeyData.claudeAccountId})`);
           return [{
             ...boundAccount,
             accountId: boundAccount.id,
@@ -97,7 +113,27 @@ class UnifiedClaudeScheduler {
           }];
         }
       } else {
-        logger.warn(`⚠️ Bound Claude account ${apiKeyData.claudeAccountId} is not available`);
+        logger.warn(`⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not available`);
+      }
+    }
+    
+    // 2. 检查Claude Console账户绑定
+    if (apiKeyData.claudeConsoleAccountId) {
+      const boundConsoleAccount = await claudeConsoleAccountService.getAccount(apiKeyData.claudeConsoleAccountId);
+      if (boundConsoleAccount && boundConsoleAccount.isActive === true && boundConsoleAccount.status === 'active') {
+        const isRateLimited = await claudeConsoleAccountService.isAccountRateLimited(boundConsoleAccount.id);
+        if (!isRateLimited) {
+          logger.info(`🎯 Using bound dedicated Claude Console account: ${boundConsoleAccount.name} (${apiKeyData.claudeConsoleAccountId})`);
+          return [{
+            ...boundConsoleAccount,
+            accountId: boundConsoleAccount.id,
+            accountType: 'claude-console',
+            priority: parseInt(boundConsoleAccount.priority) || 50,
+            lastUsedAt: boundConsoleAccount.lastUsedAt || '0'
+          }];
+        }
+      } else {
+        logger.warn(`⚠️ Bound Claude Console account ${apiKeyData.claudeConsoleAccountId} is not available`);
       }
     }
 
