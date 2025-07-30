@@ -1978,6 +1978,8 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
           apiKeys: {}
         };
         
+        // 先收集基础数据
+        const apiKeyDataMap = new Map();
         for (const key of keys) {
           const match = key.match(/usage:hourly:(.+?):\d{4}-\d{2}-\d{2}:\d{2}/);
           if (!match) continue;
@@ -1992,23 +1994,72 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
             const cacheReadTokens = parseInt(data.cacheReadTokens) || 0;
             const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens;
             
-            // 计算费用 - 使用默认模型价格，因为小时级别的数据没有模型信息
-            const usage = {
-              input_tokens: inputTokens,
-              output_tokens: outputTokens,
-              cache_creation_input_tokens: cacheCreateTokens,
-              cache_read_input_tokens: cacheReadTokens
-            };
-            const costResult = CostCalculator.calculateCost(usage, 'claude-3-5-haiku-20241022');
-            
-            hourData.apiKeys[apiKeyId] = {
+            apiKeyDataMap.set(apiKeyId, {
               name: apiKeyMap.get(apiKeyId).name,
               tokens: totalTokens,
               requests: parseInt(data.requests) || 0,
-              cost: costResult.costs.total,
-              formattedCost: costResult.formatted.total
-            };
+              inputTokens,
+              outputTokens,
+              cacheCreateTokens,
+              cacheReadTokens
+            });
           }
+        }
+        
+        // 获取该小时的模型级别数据来计算准确费用
+        const modelPattern = `usage:*:model:hourly:*:${hourKey}`;
+        const modelKeys = await client.keys(modelPattern);
+        const apiKeyCostMap = new Map();
+        
+        for (const modelKey of modelKeys) {
+          const match = modelKey.match(/usage:(.+?):model:hourly:(.+?):\d{4}-\d{2}-\d{2}:\d{2}/);
+          if (!match) continue;
+          
+          const apiKeyId = match[1];
+          const model = match[2];
+          const modelData = await client.hgetall(modelKey);
+          
+          if (modelData && apiKeyDataMap.has(apiKeyId)) {
+            const usage = {
+              input_tokens: parseInt(modelData.inputTokens) || 0,
+              output_tokens: parseInt(modelData.outputTokens) || 0,
+              cache_creation_input_tokens: parseInt(modelData.cacheCreateTokens) || 0,
+              cache_read_input_tokens: parseInt(modelData.cacheReadTokens) || 0
+            };
+            
+            const costResult = CostCalculator.calculateCost(usage, model);
+            const currentCost = apiKeyCostMap.get(apiKeyId) || 0;
+            apiKeyCostMap.set(apiKeyId, currentCost + costResult.costs.total);
+          }
+        }
+        
+        // 组合数据
+        for (const [apiKeyId, data] of apiKeyDataMap) {
+          const cost = apiKeyCostMap.get(apiKeyId) || 0;
+          
+          // 如果没有模型级别数据，使用默认模型计算（降级方案）
+          let finalCost = cost;
+          let formattedCost = CostCalculator.formatCost(cost);
+          
+          if (cost === 0 && data.tokens > 0) {
+            const usage = {
+              input_tokens: data.inputTokens,
+              output_tokens: data.outputTokens,
+              cache_creation_input_tokens: data.cacheCreateTokens,
+              cache_read_input_tokens: data.cacheReadTokens
+            };
+            const fallbackResult = CostCalculator.calculateCost(usage, 'claude-3-5-sonnet-20241022');
+            finalCost = fallbackResult.costs.total;
+            formattedCost = fallbackResult.formatted.total;
+          }
+          
+          hourData.apiKeys[apiKeyId] = {
+            name: data.name,
+            tokens: data.tokens,
+            requests: data.requests,
+            cost: finalCost,
+            formattedCost: formattedCost
+          };
         }
         
         trendData.push(hourData);
@@ -2035,6 +2086,8 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
           apiKeys: {}
         };
         
+        // 先收集基础数据
+        const apiKeyDataMap = new Map();
         for (const key of keys) {
           const match = key.match(/usage:daily:(.+?):\d{4}-\d{2}-\d{2}/);
           if (!match) continue;
@@ -2049,23 +2102,72 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
             const cacheReadTokens = parseInt(data.cacheReadTokens) || 0;
             const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens;
             
-            // 计算费用 - 使用默认模型价格，因为日级别的汇总数据没有模型信息
-            const usage = {
-              input_tokens: inputTokens,
-              output_tokens: outputTokens,
-              cache_creation_input_tokens: cacheCreateTokens,
-              cache_read_input_tokens: cacheReadTokens
-            };
-            const costResult = CostCalculator.calculateCost(usage, 'claude-3-5-haiku-20241022');
-            
-            dayData.apiKeys[apiKeyId] = {
+            apiKeyDataMap.set(apiKeyId, {
               name: apiKeyMap.get(apiKeyId).name,
               tokens: totalTokens,
               requests: parseInt(data.requests) || 0,
-              cost: costResult.costs.total,
-              formattedCost: costResult.formatted.total
-            };
+              inputTokens,
+              outputTokens,
+              cacheCreateTokens,
+              cacheReadTokens
+            });
           }
+        }
+        
+        // 获取该天的模型级别数据来计算准确费用
+        const modelPattern = `usage:*:model:daily:*:${dateStr}`;
+        const modelKeys = await client.keys(modelPattern);
+        const apiKeyCostMap = new Map();
+        
+        for (const modelKey of modelKeys) {
+          const match = modelKey.match(/usage:(.+?):model:daily:(.+?):\d{4}-\d{2}-\d{2}/);
+          if (!match) continue;
+          
+          const apiKeyId = match[1];
+          const model = match[2];
+          const modelData = await client.hgetall(modelKey);
+          
+          if (modelData && apiKeyDataMap.has(apiKeyId)) {
+            const usage = {
+              input_tokens: parseInt(modelData.inputTokens) || 0,
+              output_tokens: parseInt(modelData.outputTokens) || 0,
+              cache_creation_input_tokens: parseInt(modelData.cacheCreateTokens) || 0,
+              cache_read_input_tokens: parseInt(modelData.cacheReadTokens) || 0
+            };
+            
+            const costResult = CostCalculator.calculateCost(usage, model);
+            const currentCost = apiKeyCostMap.get(apiKeyId) || 0;
+            apiKeyCostMap.set(apiKeyId, currentCost + costResult.costs.total);
+          }
+        }
+        
+        // 组合数据
+        for (const [apiKeyId, data] of apiKeyDataMap) {
+          const cost = apiKeyCostMap.get(apiKeyId) || 0;
+          
+          // 如果没有模型级别数据，使用默认模型计算（降级方案）
+          let finalCost = cost;
+          let formattedCost = CostCalculator.formatCost(cost);
+          
+          if (cost === 0 && data.tokens > 0) {
+            const usage = {
+              input_tokens: data.inputTokens,
+              output_tokens: data.outputTokens,
+              cache_creation_input_tokens: data.cacheCreateTokens,
+              cache_read_input_tokens: data.cacheReadTokens
+            };
+            const fallbackResult = CostCalculator.calculateCost(usage, 'claude-3-5-sonnet-20241022');
+            finalCost = fallbackResult.costs.total;
+            formattedCost = fallbackResult.formatted.total;
+          }
+          
+          dayData.apiKeys[apiKeyId] = {
+            name: data.name,
+            tokens: data.tokens,
+            requests: data.requests,
+            cost: finalCost,
+            formattedCost: formattedCost
+          };
         }
         
         trendData.push(dayData);
