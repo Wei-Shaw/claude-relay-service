@@ -1,6 +1,7 @@
 const express = require('express');
 const apiKeyService = require('../services/apiKeyService');
 const claudeAccountService = require('../services/claudeAccountService');
+const claudeConsoleAccountService = require('../services/claudeConsoleAccountService');
 const geminiAccountService = require('../services/geminiAccountService');
 const redis = require('../models/redis');
 const { authenticateAdmin } = require('../middleware/auth');
@@ -703,7 +704,8 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       refreshToken,
       claudeAiOauth,
       proxy,
-      accountType
+      accountType,
+      priority
     } = req.body;
 
     if (!name) {
@@ -715,6 +717,11 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Invalid account type. Must be "shared" or "dedicated"' });
     }
 
+    // 验证priority的有效性
+    if (priority !== undefined && (typeof priority !== 'number' || priority < 1 || priority > 100)) {
+      return res.status(400).json({ error: 'Priority must be a number between 1 and 100' });
+    }
+
     const newAccount = await claudeAccountService.createAccount({
       name,
       description,
@@ -723,7 +730,8 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       refreshToken,
       claudeAiOauth,
       proxy,
-      accountType: accountType || 'shared' // 默认为共享类型
+      accountType: accountType || 'shared', // 默认为共享类型
+      priority: priority || 50 // 默认优先级为50
     });
 
     logger.success(`🏢 Admin created new Claude account: ${name} (${accountType || 'shared'})`);
@@ -739,6 +747,11 @@ router.put('/claude-accounts/:accountId', authenticateAdmin, async (req, res) =>
   try {
     const { accountId } = req.params;
     const updates = req.body;
+
+    // 验证priority的有效性
+    if (updates.priority !== undefined && (typeof updates.priority !== 'number' || updates.priority < 1 || updates.priority > 100)) {
+      return res.status(400).json({ error: 'Priority must be a number between 1 and 100' });
+    }
 
     await claudeAccountService.updateAccount(accountId, updates);
     
@@ -777,6 +790,198 @@ router.post('/claude-accounts/:accountId/refresh', authenticateAdmin, async (req
   } catch (error) {
     logger.error('❌ Failed to refresh Claude account token:', error);
     res.status(500).json({ error: 'Failed to refresh token', message: error.message });
+  }
+});
+
+// 切换Claude账户调度状态
+router.put('/claude-accounts/:accountId/toggle-schedulable', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    
+    const accounts = await claudeAccountService.getAllAccounts();
+    const account = accounts.find(acc => acc.id === accountId);
+    
+    if (!account) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+    
+    const newSchedulable = !account.schedulable;
+    await claudeAccountService.updateAccount(accountId, { schedulable: newSchedulable });
+    
+    logger.success(`🔄 Admin toggled Claude account schedulable status: ${accountId} -> ${newSchedulable ? 'schedulable' : 'not schedulable'}`);
+    res.json({ success: true, schedulable: newSchedulable });
+  } catch (error) {
+    logger.error('❌ Failed to toggle Claude account schedulable status:', error);
+    res.status(500).json({ error: 'Failed to toggle schedulable status', message: error.message });
+  }
+});
+
+// 🎮 Claude Console 账户管理
+
+// 获取所有Claude Console账户
+router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
+  try {
+    const accounts = await claudeConsoleAccountService.getAllAccounts();
+    
+    // 为每个账户添加使用统计信息
+    const accountsWithStats = await Promise.all(accounts.map(async (account) => {
+      try {
+        const usageStats = await redis.getAccountUsageStats(account.id);
+        return {
+          ...account,
+          usage: {
+            daily: usageStats.daily,
+            total: usageStats.total,
+            averages: usageStats.averages
+          }
+        };
+      } catch (statsError) {
+        logger.warn(`⚠️ Failed to get usage stats for Claude Console account ${account.id}:`, statsError.message);
+        return {
+          ...account,
+          usage: {
+            daily: { tokens: 0, requests: 0, allTokens: 0 },
+            total: { tokens: 0, requests: 0, allTokens: 0 },
+            averages: { rpm: 0, tpm: 0 }
+          }
+        };
+      }
+    }));
+    
+    res.json({ success: true, data: accountsWithStats });
+  } catch (error) {
+    logger.error('❌ Failed to get Claude Console accounts:', error);
+    res.status(500).json({ error: 'Failed to get Claude Console accounts', message: error.message });
+  }
+});
+
+// 创建新的Claude Console账户
+router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
+  try {
+    const {
+      name,
+      description,
+      apiUrl,
+      apiKey,
+      priority,
+      supportedModels,
+      userAgent,
+      rateLimitDuration,
+      proxy,
+      accountType
+    } = req.body;
+
+    if (!name || !apiUrl || !apiKey) {
+      return res.status(400).json({ error: 'Name, API URL and API Key are required' });
+    }
+
+    // 验证priority的有效性（1-100）
+    if (priority !== undefined && (priority < 1 || priority > 100)) {
+      return res.status(400).json({ error: 'Priority must be between 1 and 100' });
+    }
+
+    // 验证accountType的有效性
+    if (accountType && !['shared', 'dedicated'].includes(accountType)) {
+      return res.status(400).json({ error: 'Invalid account type. Must be "shared" or "dedicated"' });
+    }
+
+    const newAccount = await claudeConsoleAccountService.createAccount({
+      name,
+      description,
+      apiUrl,
+      apiKey,
+      priority: priority || 50,
+      supportedModels: supportedModels || [],
+      userAgent,
+      rateLimitDuration: rateLimitDuration || 60,
+      proxy,
+      accountType: accountType || 'shared'
+    });
+
+    logger.success(`🎮 Admin created Claude Console account: ${name}`);
+    res.json({ success: true, data: newAccount });
+  } catch (error) {
+    logger.error('❌ Failed to create Claude Console account:', error);
+    res.status(500).json({ error: 'Failed to create Claude Console account', message: error.message });
+  }
+});
+
+// 更新Claude Console账户
+router.put('/claude-console-accounts/:accountId', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const updates = req.body;
+
+    // 验证priority的有效性（1-100）
+    if (updates.priority !== undefined && (updates.priority < 1 || updates.priority > 100)) {
+      return res.status(400).json({ error: 'Priority must be between 1 and 100' });
+    }
+
+    await claudeConsoleAccountService.updateAccount(accountId, updates);
+    
+    logger.success(`📝 Admin updated Claude Console account: ${accountId}`);
+    res.json({ success: true, message: 'Claude Console account updated successfully' });
+  } catch (error) {
+    logger.error('❌ Failed to update Claude Console account:', error);
+    res.status(500).json({ error: 'Failed to update Claude Console account', message: error.message });
+  }
+});
+
+// 删除Claude Console账户
+router.delete('/claude-console-accounts/:accountId', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    
+    await claudeConsoleAccountService.deleteAccount(accountId);
+    
+    logger.success(`🗑️ Admin deleted Claude Console account: ${accountId}`);
+    res.json({ success: true, message: 'Claude Console account deleted successfully' });
+  } catch (error) {
+    logger.error('❌ Failed to delete Claude Console account:', error);
+    res.status(500).json({ error: 'Failed to delete Claude Console account', message: error.message });
+  }
+});
+
+
+// 切换Claude Console账户状态
+router.put('/claude-console-accounts/:accountId/toggle', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    
+    const account = await claudeConsoleAccountService.getAccount(accountId);
+    if (!account) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+    
+    const newStatus = !account.isActive;
+    await claudeConsoleAccountService.updateAccount(accountId, { isActive: newStatus });
+    
+    logger.success(`🔄 Admin toggled Claude Console account status: ${accountId} -> ${newStatus ? 'active' : 'inactive'}`);
+    res.json({ success: true, isActive: newStatus });
+  } catch (error) {
+    logger.error('❌ Failed to toggle Claude Console account status:', error);
+    res.status(500).json({ error: 'Failed to toggle account status', message: error.message });
+  }
+});
+
+// 切换Claude Console账户调度状态
+router.put('/claude-console-accounts/:accountId/toggle-schedulable', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    
+    const account = await claudeConsoleAccountService.getAccount(accountId);
+    if (!account) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+    
+    const newSchedulable = !account.schedulable;
+    await claudeConsoleAccountService.updateAccount(accountId, { schedulable: newSchedulable });
+    
+    logger.success(`🔄 Admin toggled Claude Console account schedulable status: ${accountId} -> ${newSchedulable ? 'schedulable' : 'not schedulable'}`);
+    res.json({ success: true, schedulable: newSchedulable });
+  } catch (error) {
+    logger.error('❌ Failed to toggle Claude Console account schedulable status:', error);
+    res.status(500).json({ error: 'Failed to toggle schedulable status', message: error.message });
   }
 });
 

@@ -1,9 +1,12 @@
 const express = require('express');
 const claudeRelayService = require('../services/claudeRelayService');
+const claudeConsoleRelayService = require('../services/claudeConsoleRelayService');
+const unifiedClaudeScheduler = require('../services/unifiedClaudeScheduler');
 const apiKeyService = require('../services/apiKeyService');
 const { authenticateApiKey } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const redis = require('../models/redis');
+const sessionHelper = require('../utils/sessionHelper');
 
 const router = express.Router();
 
@@ -56,8 +59,17 @@ async function handleMessagesRequest(req, res) {
       
       let usageDataCaptured = false;
       
-      // 使用自定义流处理器来捕获usage数据
-      await claudeRelayService.relayStreamRequestWithUsageCapture(req.body, req.apiKey, res, req.headers, (usageData) => {
+      // 生成会话哈希用于sticky会话
+      const sessionHash = sessionHelper.generateSessionHash(req.body);
+      
+      // 使用统一调度选择账号（传递请求的模型）
+      const requestedModel = req.body.model;
+      const { accountId, accountType } = await unifiedClaudeScheduler.selectAccountForApiKey(req.apiKey, sessionHash, requestedModel);
+      
+      // 根据账号类型选择对应的转发服务并调用
+      if (accountType === 'claude-official') {
+        // 官方Claude账号使用原有的转发服务（会自己选择账号）
+        await claudeRelayService.relayStreamRequestWithUsageCapture(req.body, req.apiKey, res, req.headers, (usageData) => {
         // 回调函数：当检测到完整usage数据时记录真实token使用量
         logger.info('🎯 Usage callback triggered with complete data:', JSON.stringify(usageData, null, 2));
         
@@ -88,7 +100,42 @@ async function handleMessagesRequest(req, res) {
         } else {
           logger.warn('⚠️ Usage callback triggered but data is incomplete:', JSON.stringify(usageData));
         }
-      });
+        });
+      } else {
+        // Claude Console账号使用Console转发服务（需要传递accountId）
+        await claudeConsoleRelayService.relayStreamRequestWithUsageCapture(req.body, req.apiKey, res, req.headers, (usageData) => {
+          // 回调函数：当检测到完整usage数据时记录真实token使用量
+          logger.info('🎯 Usage callback triggered with complete data:', JSON.stringify(usageData, null, 2));
+          
+          if (usageData && usageData.input_tokens !== undefined && usageData.output_tokens !== undefined) {
+            const inputTokens = usageData.input_tokens || 0;
+            const outputTokens = usageData.output_tokens || 0;
+            const cacheCreateTokens = usageData.cache_creation_input_tokens || 0;
+            const cacheReadTokens = usageData.cache_read_input_tokens || 0;
+            const model = usageData.model || 'unknown';
+            
+            // 记录真实的token使用量（包含模型信息和所有4种token以及账户ID）
+            const usageAccountId = usageData.accountId;
+            apiKeyService.recordUsage(req.apiKey.id, inputTokens, outputTokens, cacheCreateTokens, cacheReadTokens, model, usageAccountId).catch(error => {
+              logger.error('❌ Failed to record stream usage:', error);
+            });
+            
+            // 更新时间窗口内的token计数
+            if (req.rateLimitInfo) {
+              const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens;
+              redis.getClient().incrby(req.rateLimitInfo.tokenCountKey, totalTokens).catch(error => {
+                logger.error('❌ Failed to update rate limit token count:', error);
+              });
+              logger.api(`📊 Updated rate limit token count: +${totalTokens} tokens`);
+            }
+            
+            usageDataCaptured = true;
+            logger.api(`📊 Stream usage recorded (real) - Model: ${model}, Input: ${inputTokens}, Output: ${outputTokens}, Cache Create: ${cacheCreateTokens}, Cache Read: ${cacheReadTokens}, Total: ${inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens} tokens`);
+          } else {
+            logger.warn('⚠️ Usage callback triggered but data is incomplete:', JSON.stringify(usageData));
+          }
+        }, accountId);
+      }
       
       // 流式请求完成后 - 如果没有捕获到usage数据，记录警告但不进行估算
       setTimeout(() => {
@@ -103,7 +150,27 @@ async function handleMessagesRequest(req, res) {
         apiKeyName: req.apiKey.name
       });
       
-      const response = await claudeRelayService.relayRequest(req.body, req.apiKey, req, res, req.headers);
+      // 生成会话哈希用于sticky会话
+      const sessionHash = sessionHelper.generateSessionHash(req.body);
+      
+      // 使用统一调度选择账号（传递请求的模型）
+      const requestedModel = req.body.model;
+      const { accountId, accountType } = await unifiedClaudeScheduler.selectAccountForApiKey(req.apiKey, sessionHash, requestedModel);
+      
+      // 根据账号类型选择对应的转发服务
+      let response;
+      logger.debug(`[DEBUG] Request query params: ${JSON.stringify(req.query)}`);
+      logger.debug(`[DEBUG] Request URL: ${req.url}`);
+      logger.debug(`[DEBUG] Request path: ${req.path}`);
+      
+      if (accountType === 'claude-official') {
+        // 官方Claude账号使用原有的转发服务
+        response = await claudeRelayService.relayRequest(req.body, req.apiKey, req, res, req.headers);
+      } else {
+        // Claude Console账号使用Console转发服务
+        logger.debug(`[DEBUG] Calling claudeConsoleRelayService.relayRequest with accountId: ${accountId}`);
+        response = await claudeConsoleRelayService.relayRequest(req.body, req.apiKey, req, res, req.headers, accountId);
+      }
       
       logger.info('📡 Claude API response received', {
         statusCode: response.statusCode,

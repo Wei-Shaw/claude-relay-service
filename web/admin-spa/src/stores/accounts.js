@@ -5,6 +5,7 @@ import { apiClient } from '@/config/api'
 export const useAccountsStore = defineStore('accounts', () => {
   // 状态
   const claudeAccounts = ref([])
+  const claudeConsoleAccounts = ref([])
   const geminiAccounts = ref([])
   const loading = ref(false)
   const error = ref(null)
@@ -23,6 +24,25 @@ export const useAccountsStore = defineStore('accounts', () => {
         claudeAccounts.value = response.data || []
       } else {
         throw new Error(response.message || '获取Claude账户失败')
+      }
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+  
+  // 获取Claude Console账户列表
+  const fetchClaudeConsoleAccounts = async () => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await apiClient.get('/admin/claude-console-accounts')
+      if (response.success) {
+        claudeConsoleAccounts.value = response.data || []
+      } else {
+        throw new Error(response.message || '获取Claude Console账户失败')
       }
     } catch (err) {
       error.value = err.message
@@ -58,6 +78,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     try {
       await Promise.all([
         fetchClaudeAccounts(),
+        fetchClaudeConsoleAccounts(),
         fetchGeminiAccounts()
       ])
     } catch (err) {
@@ -79,6 +100,26 @@ export const useAccountsStore = defineStore('accounts', () => {
         return response.data
       } else {
         throw new Error(response.message || '创建Claude账户失败')
+      }
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+  
+  // 创建Claude Console账户
+  const createClaudeConsoleAccount = async (data) => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await apiClient.post('/admin/claude-console-accounts', data)
+      if (response.success) {
+        await fetchClaudeConsoleAccounts()
+        return response.data
+      } else {
+        throw new Error(response.message || '创建Claude Console账户失败')
       }
     } catch (err) {
       error.value = err.message
@@ -128,6 +169,26 @@ export const useAccountsStore = defineStore('accounts', () => {
     }
   }
   
+  // 更新Claude Console账户
+  const updateClaudeConsoleAccount = async (id, data) => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await apiClient.put(`/admin/claude-console-accounts/${id}`, data)
+      if (response.success) {
+        await fetchClaudeConsoleAccounts()
+        return response
+      } else {
+        throw new Error(response.message || '更新Claude Console账户失败')
+      }
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+  
   // 更新Gemini账户
   const updateGeminiAccount = async (id, data) => {
     loading.value = true
@@ -153,14 +214,21 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const endpoint = platform === 'claude' 
-        ? `/admin/claude-accounts/${id}/toggle`
-        : `/admin/gemini-accounts/${id}/toggle`
+      let endpoint
+      if (platform === 'claude') {
+        endpoint = `/admin/claude-accounts/${id}/toggle`
+      } else if (platform === 'claude-console') {
+        endpoint = `/admin/claude-console-accounts/${id}/toggle`
+      } else {
+        endpoint = `/admin/gemini-accounts/${id}/toggle`
+      }
       
       const response = await apiClient.put(endpoint)
       if (response.success) {
         if (platform === 'claude') {
           await fetchClaudeAccounts()
+        } else if (platform === 'claude-console') {
+          await fetchClaudeConsoleAccounts()
         } else {
           await fetchGeminiAccounts()
         }
@@ -181,14 +249,21 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const endpoint = platform === 'claude' 
-        ? `/admin/claude-accounts/${id}`
-        : `/admin/gemini-accounts/${id}`
+      let endpoint
+      if (platform === 'claude') {
+        endpoint = `/admin/claude-accounts/${id}`
+      } else if (platform === 'claude-console') {
+        endpoint = `/admin/claude-console-accounts/${id}`
+      } else {
+        endpoint = `/admin/gemini-accounts/${id}`
+      }
       
       const response = await apiClient.delete(endpoint)
       if (response.success) {
         if (platform === 'claude') {
           await fetchClaudeAccounts()
+        } else if (platform === 'claude-console') {
+          await fetchClaudeConsoleAccounts()
         } else {
           await fetchGeminiAccounts()
         }
@@ -284,6 +359,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     }
   }
   
+  
   // 排序账户
   const sortAccounts = (field) => {
     if (sortBy.value === field) {
@@ -297,6 +373,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   // 重置store
   const reset = () => {
     claudeAccounts.value = []
+    claudeConsoleAccounts.value = []
     geminiAccounts.value = []
     loading.value = false
     error.value = null
@@ -307,6 +384,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   return {
     // State
     claudeAccounts,
+    claudeConsoleAccounts,
     geminiAccounts,
     loading,
     error,
@@ -315,11 +393,14 @@ export const useAccountsStore = defineStore('accounts', () => {
     
     // Actions
     fetchClaudeAccounts,
+    fetchClaudeConsoleAccounts,
     fetchGeminiAccounts,
     fetchAllAccounts,
     createClaudeAccount,
+    createClaudeConsoleAccount,
     createGeminiAccount,
     updateClaudeAccount,
+    updateClaudeConsoleAccount,
     updateGeminiAccount,
     toggleAccount,
     deleteAccount,

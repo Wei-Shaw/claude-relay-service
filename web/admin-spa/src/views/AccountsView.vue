@@ -60,6 +60,11 @@
                 <i v-if="accountsSortBy === 'status'" :class="['fas', accountsSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
                 <i v-else class="fas fa-sort ml-1 text-gray-400"></i>
               </th>
+              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100" @click="sortAccounts('priority')">
+                优先级
+                <i v-if="accountsSortBy === 'priority'" :class="['fas', accountsSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down', 'ml-1']"></i>
+                <i v-else class="fas fa-sort ml-1 text-gray-400"></i>
+              </th>
               <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">代理</th>
               <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">今日使用</th>
               <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">会话窗口</th>
@@ -95,13 +100,21 @@
                       class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
                   <i class="fas fa-robot mr-1"></i>Gemini
                 </span>
+                <span v-else-if="account.platform === 'claude-console'" 
+                      class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">
+                  <i class="fas fa-terminal mr-1"></i>Claude Console
+                </span>
                 <span v-else 
                       class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">
                   <i class="fas fa-brain mr-1"></i>Claude
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span v-if="account.scopes && account.scopes.length > 0" 
+                <span v-if="account.platform === 'claude-console'" 
+                      class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                  <i class="fas fa-key mr-1"></i>API Key
+                </span>
+                <span v-else-if="account.scopes && account.scopes.length > 0" 
                       class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
                   <i class="fas fa-lock mr-1"></i>OAuth
                 </span>
@@ -113,20 +126,46 @@
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex flex-col gap-1">
                   <span :class="['inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold', 
+                               account.status === 'blocked' ? 'bg-orange-100 text-orange-800' :
                                account.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800']">
                     <div :class="['w-2 h-2 rounded-full mr-2', 
+                               account.status === 'blocked' ? 'bg-orange-500' :
                                account.isActive ? 'bg-green-500' : 'bg-red-500']"></div>
-                    {{ account.isActive ? '正常' : '异常' }}
+                    {{ account.status === 'blocked' ? '已封锁' : account.isActive ? '正常' : '异常' }}
                   </span>
                   <span v-if="account.rateLimitStatus && account.rateLimitStatus.isRateLimited" 
                         class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
                     <i class="fas fa-exclamation-triangle mr-1"></i>
                     限流中 ({{ account.rateLimitStatus.minutesRemaining }}分钟)
                   </span>
+                  <span v-if="account.schedulable === false" 
+                        class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
+                    <i class="fas fa-pause-circle mr-1"></i>
+                    不可调度
+                  </span>
+                  <span v-if="account.status === 'blocked' && account.errorMessage" 
+                        class="text-xs text-gray-500 mt-1 max-w-xs truncate" 
+                        :title="account.errorMessage">
+                    {{ account.errorMessage }}
+                  </span>
                   <span v-if="account.accountType === 'dedicated'" 
                         class="text-xs text-gray-500">
                     绑定: {{ account.boundApiKeysCount || 0 }} 个API Key
                   </span>
+                </div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div v-if="account.platform === 'claude' || account.platform === 'claude-console'" class="flex items-center gap-2">
+                  <div class="w-16 bg-gray-200 rounded-full h-2">
+                    <div class="bg-gradient-to-r from-green-500 to-blue-600 h-2 rounded-full transition-all duration-300" 
+                         :style="{ width: ((101 - (account.priority || 50)) + '%') }"></div>
+                  </div>
+                  <span class="text-xs text-gray-700 font-medium min-w-[20px]">
+                    {{ account.priority || 50 }}
+                  </span>
+                </div>
+                <div v-else class="text-gray-400 text-sm">
+                  <span class="text-xs">N/A</span>
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
@@ -199,6 +238,24 @@
                     ]"></i>
                   </button>
                   <button 
+                    @click="toggleSchedulable(account)"
+                    :disabled="account.isTogglingSchedulable"
+                    :class="[
+                      'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                      account.isTogglingSchedulable
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : account.schedulable
+                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ]"
+                    :title="account.schedulable ? '点击禁用调度' : '点击启用调度'"
+                  >
+                    <i :class="[
+                      'fas',
+                      account.schedulable ? 'fa-toggle-on' : 'fa-toggle-off'
+                    ]"></i>
+                  </button>
+                  <button 
                     @click="editAccount(account)"
                     class="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-200 transition-colors"
                   >
@@ -251,6 +308,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
 import { useConfirm } from '@/composables/useConfirm'
+import { useAccountsStore } from '@/stores/accounts'
 import AccountForm from '@/components/accounts/AccountForm.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
@@ -314,8 +372,9 @@ const sortedAccounts = computed(() => {
 const loadAccounts = async () => {
   accountsLoading.value = true
   try {
-    const [claudeData, geminiData, apiKeysData] = await Promise.all([
+    const [claudeData, claudeConsoleData, geminiData, apiKeysData] = await Promise.all([
       apiClient.get('/admin/claude-accounts'),
+      apiClient.get('/admin/claude-console-accounts'),
       apiClient.get('/admin/gemini-accounts'),
       apiClient.get('/admin/api-keys')
     ])
@@ -334,6 +393,14 @@ const loadAccounts = async () => {
         return { ...acc, platform: 'claude', boundApiKeysCount }
       })
       allAccounts.push(...claudeAccounts)
+    }
+    
+    if (claudeConsoleData.success) {
+      const claudeConsoleAccounts = (claudeConsoleData.data || []).map(acc => {
+        // Claude Console账户暂时不支持直接绑定
+        return { ...acc, platform: 'claude-console', boundApiKeysCount: 0 }
+      })
+      allAccounts.push(...claudeConsoleAccounts)
     }
     
     if (geminiData.success) {
@@ -449,6 +516,7 @@ const formatRemainingTime = (minutes) => {
   return `${mins}分钟`
 }
 
+
 // 打开创建账户模态框
 const openCreateAccountModal = () => {
   showCreateAccountModal.value = true
@@ -483,9 +551,14 @@ const deleteAccount = async (account) => {
   if (!confirmed) return
   
   try {
-    const endpoint = account.platform === 'claude' 
-      ? `/admin/claude-accounts/${account.id}`
-      : `/admin/gemini-accounts/${account.id}`
+    let endpoint
+    if (account.platform === 'claude') {
+      endpoint = `/admin/claude-accounts/${account.id}`
+    } else if (account.platform === 'claude-console') {
+      endpoint = `/admin/claude-console-accounts/${account.id}`
+    } else {
+      endpoint = `/admin/gemini-accounts/${account.id}`
+    }
       
     const data = await apiClient.delete(endpoint)
     
@@ -518,6 +591,41 @@ const refreshToken = async (account) => {
     showToast('Token刷新失败', 'error')
   } finally {
     account.isRefreshing = false
+  }
+}
+
+// 切换调度状态
+const toggleSchedulable = async (account) => {
+  if (account.isTogglingSchedulable) return
+  
+  try {
+    account.isTogglingSchedulable = true
+    
+    let endpoint
+    if (account.platform === 'claude') {
+      endpoint = `/admin/claude-accounts/${account.id}/toggle-schedulable`
+    } else if (account.platform === 'claude-console') {
+      endpoint = `/admin/claude-console-accounts/${account.id}/toggle-schedulable`
+    } else {
+      showToast('Gemini账户暂不支持调度控制', 'warning')
+      return
+    }
+    
+    const data = await apiClient.put(endpoint)
+    
+    if (data.success) {
+      account.schedulable = data.schedulable
+      showToast(
+        data.schedulable ? '已启用调度' : '已禁用调度', 
+        'success'
+      )
+    } else {
+      showToast(data.message || '操作失败', 'error')
+    }
+  } catch (error) {
+    showToast('切换调度状态失败', 'error')
+  } finally {
+    account.isTogglingSchedulable = false
   }
 }
 

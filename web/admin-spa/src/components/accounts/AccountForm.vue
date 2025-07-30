@@ -57,6 +57,15 @@
                   <input 
                     type="radio" 
                     v-model="form.platform" 
+                    value="claude-console" 
+                    class="mr-2"
+                  >
+                  <span class="text-sm text-gray-700">Claude Console</span>
+                </label>
+                <label class="flex items-center cursor-pointer">
+                  <input 
+                    type="radio" 
+                    v-model="form.platform" 
                     value="gemini" 
                     class="mr-2"
                   >
@@ -65,7 +74,7 @@
               </div>
             </div>
             
-            <div v-if="!isEdit">
+            <div v-if="!isEdit && form.platform !== 'claude-console'">
               <label class="block text-sm font-semibold text-gray-700 mb-3">添加方式</label>
               <div class="flex gap-4">
                 <label class="flex items-center cursor-pointer">
@@ -168,8 +177,107 @@
               </div>
             </div>
             
+            <!-- Claude Console 特定字段 -->
+            <div v-if="form.platform === 'claude-console' && !isEdit" class="space-y-4">
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-3">API URL *</label>
+                <input 
+                  v-model="form.apiUrl" 
+                  type="text" 
+                  required
+                  class="form-input w-full"
+                  :class="{ 'border-red-500': errors.apiUrl }"
+                  placeholder="例如：https://api.example.com"
+                >
+                <p v-if="errors.apiUrl" class="text-red-500 text-xs mt-1">{{ errors.apiUrl }}</p>
+              </div>
+              
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-3">API Key *</label>
+                <input 
+                  v-model="form.apiKey" 
+                  type="password" 
+                  required
+                  class="form-input w-full"
+                  :class="{ 'border-red-500': errors.apiKey }"
+                  placeholder="请输入API Key"
+                >
+                <p v-if="errors.apiKey" class="text-red-500 text-xs mt-1">{{ errors.apiKey }}</p>
+              </div>
+              
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-3">支持的模型 (可选)--注意,ClaudeCode必须加上hiku模型！</label>
+                <div class="mb-2 flex gap-2">
+                  <button
+                    type="button"
+                    @click="addPresetModel('claude-sonnet-4-20250514')"
+                    class="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                  >
+                    + claude-sonnet-4-20250514
+                  </button>
+                  <button
+                    type="button"
+                    @click="addPresetModel('claude-opus-4-20250514')"
+                    class="px-3 py-1 text-xs bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
+                  >
+                    + claude-opus-4-20250514
+                  </button>
+                  <button
+                    type="button"
+                    @click="addPresetModel('claude-3-5-haiku-20241022')"
+                    class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-purple-200 transition-colors"
+                  >
+                    + claude-3-5-haiku-20241022
+                  </button>
+                </div>
+                <textarea 
+                  v-model="form.supportedModels" 
+                  rows="3" 
+                  class="form-input w-full resize-none"
+                  placeholder="每行一个模型，留空表示支持所有模型。特别注意,ClaudeCode必须加上hiku模型！"
+                ></textarea>
+                <p class="text-xs text-gray-500 mt-1">留空表示支持所有模型。如果指定模型，请求中的模型不在列表内将不会调度到此账号</p>
+              </div>
+              
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-3">自定义 User-Agent (可选)</label>
+                <input 
+                  v-model="form.userAgent" 
+                  type="text" 
+                  class="form-input w-full"
+                  placeholder="默认：claude-cli/1.0.61 (console, cli)"
+                >
+              </div>
+              
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-3">限流时间 (分钟)</label>
+                <input 
+                  v-model.number="form.rateLimitDuration" 
+                  type="number" 
+                  min="1"
+                  class="form-input w-full"
+                  placeholder="默认60分钟"
+                >
+                <p class="text-xs text-gray-500 mt-1">当账号返回429错误时，暂停调度的时间（分钟）</p>
+              </div>
+            </div>
+            
+            <!-- Claude和Claude Console的优先级设置 -->
+            <div v-if="(form.platform === 'claude' || form.platform === 'claude-console')">
+              <label class="block text-sm font-semibold text-gray-700 mb-3">调度优先级 (1-100)</label>
+              <input 
+                v-model.number="form.priority" 
+                type="number" 
+                min="1"
+                max="100"
+                class="form-input w-full"
+                placeholder="数字越小优先级越高，默认50"
+              >
+              <p class="text-xs text-gray-500 mt-1">数字越小优先级越高，建议范围：1-100</p>
+            </div>
+            
             <!-- 手动输入 Token 字段 -->
-            <div v-if="form.addType === 'manual'" class="space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
+            <div v-if="form.addType === 'manual' && form.platform !== 'claude-console'" class="space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
               <div class="flex items-start gap-3 mb-4">
                 <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
                   <i class="fas fa-info text-white text-sm"></i>
@@ -235,7 +343,7 @@
                 取消
               </button>
               <button 
-                v-if="form.addType === 'oauth'"
+                v-if="form.addType === 'oauth' && form.platform !== 'claude-console'"
                 type="button" 
                 @click="nextStep"
                 :disabled="loading"
@@ -331,8 +439,100 @@
             </p>
           </div>
           
+          <!-- Claude和Claude Console的优先级设置（编辑模式） -->
+          <div v-if="(form.platform === 'claude' || form.platform === 'claude-console')">
+            <label class="block text-sm font-semibold text-gray-700 mb-3">调度优先级 (1-100)</label>
+            <input 
+              v-model.number="form.priority" 
+              type="number" 
+              min="1"
+              max="100"
+              class="form-input w-full"
+              placeholder="数字越小优先级越高"
+            >
+            <p class="text-xs text-gray-500 mt-1">数字越小优先级越高，建议范围：1-100</p>
+          </div>
+          
+          <!-- Claude Console 特定字段（编辑模式）-->
+          <div v-if="form.platform === 'claude-console'" class="space-y-4">
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-3">API URL</label>
+              <input 
+                v-model="form.apiUrl" 
+                type="text" 
+                required
+                class="form-input w-full"
+                placeholder="例如：https://api.example.com"
+              >
+            </div>
+            
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-3">API Key</label>
+              <input 
+                v-model="form.apiKey" 
+                type="password" 
+                class="form-input w-full"
+                placeholder="留空表示不更新"
+              >
+              <p class="text-xs text-gray-500 mt-1">留空表示不更新 API Key</p>
+            </div>
+            
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-3">支持的模型 (可选)</label>
+              <div class="mb-2 flex gap-2">
+                <button
+                  type="button"
+                  @click="addPresetModel('claude-sonnet-4-20250514')"
+                  class="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                >
+                  + claude-sonnet-4-20250514
+                </button>
+                <button
+                  type="button"
+                  @click="addPresetModel('claude-opus-4-20250514')"
+                  class="px-3 py-1 text-xs bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
+                >
+                  + claude-opus-4-20250514
+                </button>
+                <button
+                    type="button"
+                    @click="addPresetModel('claude-3-5-haiku-20241022')"
+                    class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-purple-200 transition-colors"
+                  >
+                    + claude-3-5-haiku-20241022
+                  </button>
+              </div>
+              <textarea 
+                v-model="form.supportedModels" 
+                rows="3" 
+                class="form-input w-full resize-none"
+                placeholder="每行一个模型，留空表示支持所有模型。特别注意,ClaudeCode必须加上hiku模型！"
+              ></textarea>
+            </div>
+            
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-3">自定义 User-Agent (可选)</label>
+              <input 
+                v-model="form.userAgent" 
+                type="text" 
+                class="form-input w-full"
+                placeholder="默认：claude-cli/1.0.61 (console, cli)"
+              >
+            </div>
+            
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-3">限流时间 (分钟)</label>
+              <input 
+                v-model.number="form.rateLimitDuration" 
+                type="number" 
+                min="1"
+                class="form-input w-full"
+              >
+            </div>
+          </div>
+          
           <!-- Token 更新 -->
-          <div class="bg-amber-50 p-4 rounded-lg border border-amber-200">
+          <div v-if="form.platform !== 'claude-console'" class="bg-amber-50 p-4 rounded-lg border border-amber-200">
             <div class="flex items-start gap-3 mb-4">
               <div class="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
                 <i class="fas fa-key text-white text-sm"></i>
@@ -466,13 +666,22 @@ const form = ref({
   projectId: props.account?.projectId || '',
   accessToken: '',
   refreshToken: '',
-  proxy: initProxyConfig()
+  proxy: initProxyConfig(),
+  // Claude Console 特定字段
+  apiUrl: props.account?.apiUrl || '',
+  apiKey: props.account?.apiKey || '',
+  priority: props.account?.priority || 50,
+  supportedModels: props.account?.supportedModels?.join('\n') || '',
+  userAgent: props.account?.userAgent || '',
+  rateLimitDuration: props.account?.rateLimitDuration || 60
 })
 
 // 表单验证错误
 const errors = ref({
   name: '',
-  accessToken: ''
+  accessToken: '',
+  apiUrl: '',
+  apiKey: ''
 })
 
 // 计算是否可以进入下一步
@@ -539,6 +748,7 @@ const handleOAuthSuccess = async (tokenInfo) => {
     if (form.value.platform === 'claude') {
       // Claude使用claudeAiOauth字段
       data.claudeAiOauth = tokenInfo.claudeAiOauth || tokenInfo
+      data.priority = form.value.priority || 50
     } else if (form.value.platform === 'gemini') {
       // Gemini使用geminiOauth字段
       data.geminiOauth = tokenInfo.tokens || tokenInfo
@@ -567,6 +777,8 @@ const createAccount = async () => {
   // 清除之前的错误
   errors.value.name = ''
   errors.value.accessToken = ''
+  errors.value.apiUrl = ''
+  errors.value.apiKey = ''
   
   let hasError = false
   
@@ -575,7 +787,17 @@ const createAccount = async () => {
     hasError = true
   }
   
-  if (form.value.addType === 'manual' && (!form.value.accessToken || form.value.accessToken.trim() === '')) {
+  // Claude Console 验证
+  if (form.value.platform === 'claude-console') {
+    if (!form.value.apiUrl || form.value.apiUrl.trim() === '') {
+      errors.value.apiUrl = '请填写 API URL'
+      hasError = true
+    }
+    if (!form.value.apiKey || form.value.apiKey.trim() === '') {
+      errors.value.apiKey = '请填写 API Key'
+      hasError = true
+    }
+  } else if (form.value.addType === 'manual' && (!form.value.accessToken || form.value.accessToken.trim() === '')) {
     errors.value.accessToken = '请填写 Access Token'
     hasError = true
   }
@@ -611,6 +833,7 @@ const createAccount = async () => {
         expiresAt: Date.now() + expiresInMs,
         scopes: ['user:inference']
       }
+      data.priority = form.value.priority || 50
     } else if (form.value.platform === 'gemini') {
       // Gemini手动模式需要构建geminiOauth对象
       const expiresInMs = form.value.refreshToken 
@@ -628,11 +851,23 @@ const createAccount = async () => {
       if (form.value.projectId) {
         data.projectId = form.value.projectId
       }
+    } else if (form.value.platform === 'claude-console') {
+      // Claude Console 账户特定数据
+      data.apiUrl = form.value.apiUrl
+      data.apiKey = form.value.apiKey
+      data.priority = form.value.priority || 50
+      data.supportedModels = form.value.supportedModels
+        ? form.value.supportedModels.split('\n').filter(m => m.trim())
+        : []
+      data.userAgent = form.value.userAgent || null
+      data.rateLimitDuration = form.value.rateLimitDuration || 60
     }
     
     let result
     if (form.value.platform === 'claude') {
       result = await accountsStore.createClaudeAccount(data)
+    } else if (form.value.platform === 'claude-console') {
+      result = await accountsStore.createClaudeConsoleAccount(data)
     } else {
       result = await accountsStore.createGeminiAccount(data)
     }
@@ -721,8 +956,29 @@ const updateAccount = async () => {
       data.projectId = form.value.projectId
     }
     
+    // Claude 官方账号优先级更新
+    if (props.account.platform === 'claude') {
+      data.priority = form.value.priority || 50
+    }
+    
+    // Claude Console 特定更新
+    if (props.account.platform === 'claude-console') {
+      data.apiUrl = form.value.apiUrl
+      if (form.value.apiKey) {
+        data.apiKey = form.value.apiKey
+      }
+      data.priority = form.value.priority || 50
+      data.supportedModels = form.value.supportedModels
+        ? form.value.supportedModels.split('\n').filter(m => m.trim())
+        : []
+      data.userAgent = form.value.userAgent || null
+      data.rateLimitDuration = form.value.rateLimitDuration || 60
+    }
+    
     if (props.account.platform === 'claude') {
       await accountsStore.updateClaudeAccount(props.account.id, data)
+    } else if (props.account.platform === 'claude-console') {
+      await accountsStore.updateClaudeConsoleAccount(props.account.id, data)
     } else {
       await accountsStore.updateGeminiAccount(props.account.id, data)
     }
@@ -748,6 +1004,46 @@ watch(() => form.value.accessToken, () => {
     errors.value.accessToken = ''
   }
 })
+
+// 监听API URL变化，清除错误
+watch(() => form.value.apiUrl, () => {
+  if (errors.value.apiUrl && form.value.apiUrl?.trim()) {
+    errors.value.apiUrl = ''
+  }
+})
+
+// 监听API Key变化，清除错误
+watch(() => form.value.apiKey, () => {
+  if (errors.value.apiKey && form.value.apiKey?.trim()) {
+    errors.value.apiKey = ''
+  }
+})
+
+// 监听平台变化，重置表单
+watch(() => form.value.platform, (newPlatform) => {
+  if (newPlatform === 'claude-console') {
+    form.value.addType = 'manual' // Claude Console 只支持手动模式
+  }
+})
+
+// 添加预设模型
+const addPresetModel = (modelName) => {
+  // 获取当前模型列表
+  const currentModels = form.value.supportedModels
+    ? form.value.supportedModels.split('\n').filter(m => m.trim())
+    : []
+  
+  // 检查是否已存在
+  if (currentModels.includes(modelName)) {
+    showToast(`模型 ${modelName} 已存在`, 'info')
+    return
+  }
+  
+  // 添加到列表
+  currentModels.push(modelName)
+  form.value.supportedModels = currentModels.join('\n')
+  showToast(`已添加模型 ${modelName}`, 'success')
+}
 
 // 监听账户变化，更新表单
 watch(() => props.account, (newAccount) => {
@@ -780,7 +1076,14 @@ watch(() => props.account, (newAccount) => {
       projectId: newAccount.projectId || '',
       accessToken: '',
       refreshToken: '',
-      proxy: proxyConfig
+      proxy: proxyConfig,
+      // Claude Console 特定字段
+      apiUrl: newAccount.apiUrl || '',
+      apiKey: '',  // 编辑模式不显示现有的 API Key
+      priority: newAccount.priority || 50,
+      supportedModels: newAccount.supportedModels?.join('\n') || '',
+      userAgent: newAccount.userAgent || '',
+      rateLimitDuration: newAccount.rateLimitDuration || 60
     }
   }
 }, { immediate: true })

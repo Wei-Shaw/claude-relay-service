@@ -37,7 +37,9 @@ class ClaudeAccountService {
       claudeAiOauth = null, // Claude标准格式的OAuth数据
       proxy = null, // { type: 'socks5', host: 'localhost', port: 1080, username: '', password: '' }
       isActive = true,
-      accountType = 'shared' // 'dedicated' or 'shared'
+      accountType = 'shared', // 'dedicated' or 'shared'
+      priority = 50, // 调度优先级 (1-100，数字越小优先级越高)
+      schedulable = true // 是否可被调度
     } = options;
 
     const accountId = uuidv4();
@@ -60,11 +62,13 @@ class ClaudeAccountService {
         proxy: proxy ? JSON.stringify(proxy) : '',
         isActive: isActive.toString(),
         accountType: accountType, // 账号类型：'dedicated' 或 'shared'
+        priority: priority.toString(), // 调度优先级
         createdAt: new Date().toISOString(),
         lastUsedAt: '',
         lastRefreshAt: '',
         status: 'active', // 有OAuth数据的账户直接设为active
-        errorMessage: ''
+        errorMessage: '',
+        schedulable: schedulable.toString() // 是否可被调度
       };
     } else {
       // 兼容旧格式
@@ -81,11 +85,13 @@ class ClaudeAccountService {
         proxy: proxy ? JSON.stringify(proxy) : '',
         isActive: isActive.toString(),
         accountType: accountType, // 账号类型：'dedicated' 或 'shared'
+        priority: priority.toString(), // 调度优先级
         createdAt: new Date().toISOString(),
         lastUsedAt: '',
         lastRefreshAt: '',
         status: 'created', // created, active, expired, error
-        errorMessage: ''
+        errorMessage: '',
+        schedulable: schedulable.toString() // 是否可被调度
       };
     }
 
@@ -101,6 +107,7 @@ class ClaudeAccountService {
       isActive,
       proxy,
       accountType,
+      priority,
       status: accountData.status,
       createdAt: accountData.createdAt,
       expiresAt: accountData.expiresAt,
@@ -305,6 +312,7 @@ class ClaudeAccountService {
           status: account.status,
           errorMessage: account.errorMessage,
           accountType: account.accountType || 'shared', // 兼容旧数据，默认为共享
+          priority: parseInt(account.priority) || 50, // 兼容旧数据，默认优先级50
           createdAt: account.createdAt,
           lastUsedAt: account.lastUsedAt,
           lastRefreshAt: account.lastRefreshAt,
@@ -323,7 +331,9 @@ class ClaudeAccountService {
             progress: 0,
             remainingTime: null,
             lastRequestTime: null
-          }
+          },
+          // 添加调度状态
+          schedulable: account.schedulable !== 'false' // 默认为true，兼容历史数据
         };
       }));
       
@@ -343,7 +353,7 @@ class ClaudeAccountService {
         throw new Error('Account not found');
       }
 
-      const allowedUpdates = ['name', 'description', 'email', 'password', 'refreshToken', 'proxy', 'isActive', 'claudeAiOauth', 'accountType'];
+      const allowedUpdates = ['name', 'description', 'email', 'password', 'refreshToken', 'proxy', 'isActive', 'claudeAiOauth', 'accountType', 'priority', 'schedulable'];
       const updatedData = { ...accountData };
 
       // 检查是否新增了 refresh token
@@ -355,6 +365,8 @@ class ClaudeAccountService {
             updatedData[field] = this._encryptSensitiveData(value);
           } else if (field === 'proxy') {
             updatedData[field] = value ? JSON.stringify(value) : '';
+          } else if (field === 'priority') {
+            updatedData[field] = value.toString();
           } else if (field === 'claudeAiOauth') {
             // 更新 Claude AI OAuth 数据
             if (value) {
@@ -1008,7 +1020,7 @@ class ClaudeAccountService {
         }
       }
       
-      logger.success(`✅ Session window initialization completed:`);
+      logger.success('✅ Session window initialization completed:');
       logger.success(`   📊 Total accounts: ${accounts.length}`);
       logger.success(`   ✅ Initialized: ${initializedCount}`);
       logger.success(`   ⏭️ Skipped (existing): ${skippedCount}`);  
