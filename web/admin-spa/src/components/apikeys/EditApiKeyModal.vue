@@ -522,8 +522,9 @@ onMounted(async () => {
   form.restrictedModels = props.apiKey.restrictedModels || []
   form.allowedClients = props.apiKey.allowedClients || []
   form.tags = props.apiKey.tags || []
-  form.enableModelRestriction = form.restrictedModels.length > 0
-  form.enableClientRestriction = form.allowedClients.length > 0
+  // 从后端数据中获取实际的启用状态，而不是根据数组长度推断
+  form.enableModelRestriction = props.apiKey.enableModelRestriction || false
+  form.enableClientRestriction = props.apiKey.enableClientRestriction || false
 })
 </script>
 

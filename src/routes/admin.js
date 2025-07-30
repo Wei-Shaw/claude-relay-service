@@ -1261,13 +1261,14 @@ router.get('/accounts/:accountId/usage-stats', authenticateAdmin, async (req, re
 // 获取系统概览
 router.get('/dashboard', authenticateAdmin, async (req, res) => {
   try {
-    const [, apiKeys, claudeAccounts, geminiAccounts, todayStats, systemAverages] = await Promise.all([
+    const [, apiKeys, claudeAccounts, geminiAccounts, todayStats, systemAverages, realtimeMetrics] = await Promise.all([
       redis.getSystemStats(),
       apiKeyService.getAllApiKeys(),
       claudeAccountService.getAllAccounts(),
       geminiAccountService.getAllAccounts(),
       redis.getTodayStats(),
-      redis.getSystemAverages()
+      redis.getSystemAverages(),
+      redis.getRealtimeSystemMetrics()
     ]);
 
     // 计算使用统计（统一使用allTokens）
@@ -1315,6 +1316,12 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       systemAverages: {
         rpm: systemAverages.systemRPM,
         tpm: systemAverages.systemTPM
+      },
+      realtimeMetrics: {
+        rpm: realtimeMetrics.realtimeRPM,
+        tpm: realtimeMetrics.realtimeTPM,
+        windowMinutes: realtimeMetrics.windowMinutes,
+        isHistorical: realtimeMetrics.windowMinutes === 0 // 标识是否使用了历史数据
       },
       systemHealth: {
         redisConnected: redis.isConnected,
@@ -1483,7 +1490,7 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
         endTime = new Date(endDate);
         
         // 调试日志
-        logger.info(`📊 Usage trend hour granularity - received times:`);
+        logger.info('📊 Usage trend hour granularity - received times:');
         logger.info(`  startDate (raw): ${startDate}`);
         logger.info(`  endDate (raw): ${endDate}`);
         logger.info(`  startTime (parsed): ${startTime.toISOString()}`);

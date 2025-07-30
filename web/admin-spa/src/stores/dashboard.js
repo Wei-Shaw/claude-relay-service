@@ -26,6 +26,10 @@ export const useDashboardStore = defineStore('dashboard', () => {
     todayCacheReadTokens: 0,
     systemRPM: 0,
     systemTPM: 0,
+    realtimeRPM: 0,
+    realtimeTPM: 0,
+    metricsWindow: 5,
+    isHistoricalMetrics: false,
     systemStatus: '正常',
     uptime: 0,
     systemTimezone: 8 // 默认 UTC+8
@@ -129,6 +133,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
         const overview = dashboardResponse.data.overview || {}
         const recentActivity = dashboardResponse.data.recentActivity || {}
         const systemAverages = dashboardResponse.data.systemAverages || {}
+        const realtimeMetrics = dashboardResponse.data.realtimeMetrics || {}
         const systemHealth = dashboardResponse.data.systemHealth || {}
         
         dashboardData.value = {
@@ -151,6 +156,10 @@ export const useDashboardStore = defineStore('dashboard', () => {
           todayCacheReadTokens: recentActivity.cacheReadTokensToday || 0,
           systemRPM: systemAverages.rpm || 0,
           systemTPM: systemAverages.tpm || 0,
+          realtimeRPM: realtimeMetrics.rpm || 0,
+          realtimeTPM: realtimeMetrics.tpm || 0,
+          metricsWindow: realtimeMetrics.windowMinutes || 5,
+          isHistoricalMetrics: realtimeMetrics.isHistorical || false,
           systemStatus: systemHealth.redisConnected ? '正常' : '异常',
           uptime: systemHealth.uptime || 0,
           systemTimezone: dashboardResponse.data.systemTimezone || 8

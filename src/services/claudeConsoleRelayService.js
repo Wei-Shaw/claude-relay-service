@@ -88,11 +88,11 @@ class ClaudeConsoleRelayService {
         logger.debug(`[DEBUG] Adding beta header: ${options.betaHeader}`);
         requestConfig.headers['anthropic-beta'] = options.betaHeader;
       } else {
-        logger.debug(`[DEBUG] No beta header to add`);
+        logger.debug('[DEBUG] No beta header to add');
       }
 
       // 发送请求
-      logger.debug(`📤 Sending request to Claude Console API with headers:`, JSON.stringify(requestConfig.headers, null, 2));
+      logger.debug('📤 Sending request to Claude Console API with headers:', JSON.stringify(requestConfig.headers, null, 2));
       const response = await axios(requestConfig);
 
       // 移除监听器（请求成功完成）

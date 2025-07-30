@@ -111,9 +111,17 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-semibold text-gray-600 mb-1">平均RPM</p>
-            <p class="text-3xl font-bold text-orange-600">{{ dashboardData.systemRPM || 0 }}</p>
-            <p class="text-xs text-gray-500 mt-1">每分钟请求数</p>
+            <p class="text-sm font-semibold text-gray-600 mb-1">
+              实时RPM 
+              <span class="text-xs text-gray-400">({{ dashboardData.metricsWindow }}分钟)</span>
+            </p>
+            <p class="text-3xl font-bold text-orange-600">{{ dashboardData.realtimeRPM || 0 }}</p>
+            <p class="text-xs text-gray-500 mt-1">
+              每分钟请求数
+              <span v-if="dashboardData.isHistoricalMetrics" class="text-yellow-600">
+                <i class="fas fa-exclamation-circle"></i> 历史数据
+              </span>
+            </p>
           </div>
           <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-orange-500 to-orange-600">
             <i class="fas fa-tachometer-alt"></i>
@@ -124,9 +132,17 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-semibold text-gray-600 mb-1">平均TPM</p>
-            <p class="text-3xl font-bold text-rose-600">{{ dashboardData.systemTPM || 0 }}</p>
-            <p class="text-xs text-gray-500 mt-1">每分钟Token数</p>
+            <p class="text-sm font-semibold text-gray-600 mb-1">
+              实时TPM 
+              <span class="text-xs text-gray-400">({{ dashboardData.metricsWindow }}分钟)</span>
+            </p>
+            <p class="text-3xl font-bold text-rose-600">{{ dashboardData.realtimeTPM || 0 }}</p>
+            <p class="text-xs text-gray-500 mt-1">
+              每分钟Token数
+              <span v-if="dashboardData.isHistoricalMetrics" class="text-yellow-600">
+                <i class="fas fa-exclamation-circle"></i> 历史数据
+              </span>
+            </p>
           </div>
           <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-rose-500 to-rose-600">
             <i class="fas fa-rocket"></i>
