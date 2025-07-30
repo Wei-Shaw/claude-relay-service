@@ -159,6 +159,21 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
     }
   }
   
+  // 获取已存在的标签
+  const fetchTags = async () => {
+    try {
+      const response = await apiClient.get('/admin/api-keys/tags')
+      if (response.success) {
+        return response.data || []
+      } else {
+        throw new Error(response.message || '获取标签失败')
+      }
+    } catch (err) {
+      console.error('获取标签失败:', err)
+      return []
+    }
+  }
+  
   // 重置store
   const reset = () => {
     apiKeys.value = []
@@ -186,6 +201,7 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
     renewApiKey,
     deleteApiKey,
     fetchApiKeyStats,
+    fetchTags,
     sortApiKeys,
     reset
   }

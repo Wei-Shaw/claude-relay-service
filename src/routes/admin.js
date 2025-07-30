@@ -303,6 +303,34 @@ router.get('/supported-clients', authenticateAdmin, async (req, res) => {
   }
 });
 
+// 获取已存在的标签列表
+router.get('/api-keys/tags', authenticateAdmin, async (req, res) => {
+  try {
+    const apiKeys = await apiKeyService.getAllApiKeys();
+    const tagSet = new Set();
+    
+    // 收集所有API Keys的标签
+    for (const apiKey of apiKeys) {
+      if (apiKey.tags && Array.isArray(apiKey.tags)) {
+        apiKey.tags.forEach(tag => {
+          if (tag && tag.trim()) {
+            tagSet.add(tag.trim());
+          }
+        });
+      }
+    }
+    
+    // 转换为数组并排序
+    const tags = Array.from(tagSet).sort();
+    
+    logger.info(`📋 Retrieved ${tags.length} unique tags from API keys`);
+    res.json({ success: true, data: tags });
+  } catch (error) {
+    logger.error('❌ Failed to get API key tags:', error);
+    res.status(500).json({ error: 'Failed to get API key tags', message: error.message });
+  }
+});
+
 // 创建新的API Key
 router.post('/api-keys', authenticateAdmin, async (req, res) => {
   try {

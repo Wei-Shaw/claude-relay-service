@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <div class="fixed inset-0 modal z-50 flex items-center justify-center p-4">
-      <div class="modal-content w-full max-w-lg p-6 mx-auto max-h-[90vh] flex flex-col">
+      <div class="modal-content w-full max-w-4xl p-6 mx-auto max-h-[90vh] flex flex-col">
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
@@ -35,33 +35,57 @@
         <!-- 标签 -->
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">标签</label>
-          <div class="space-y-2">
-            <!-- 已添加的标签 -->
-            <div v-if="form.tags.length > 0" class="flex flex-wrap gap-2">
-              <span v-for="(tag, index) in form.tags" :key="index" 
-                    class="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
-                {{ tag }}
-                <button type="button" @click="removeTag(index)" 
-                        class="ml-1 hover:text-blue-900">
-                  <i class="fas fa-times text-xs"></i>
-                </button>
-              </span>
+          <div class="space-y-4">
+            <!-- 已选择的标签 -->
+            <div v-if="form.tags.length > 0">
+              <div class="text-xs font-medium text-gray-600 mb-2">已选择的标签:</div>
+              <div class="flex flex-wrap gap-2">
+                <span v-for="(tag, index) in form.tags" :key="'selected-' + index" 
+                      class="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
+                  {{ tag }}
+                  <button type="button" @click="removeTag(index)" 
+                          class="ml-1 hover:text-blue-900">
+                    <i class="fas fa-times text-xs"></i>
+                  </button>
+                </span>
+              </div>
             </div>
             
-            <!-- 标签输入 -->
-            <div class="flex gap-2">
-              <input 
-                v-model="newTag" 
-                type="text" 
-                class="form-input flex-1"
-                placeholder="输入新标签名称"
-                @keypress.enter.prevent="addTag"
-              >
-              <button type="button" @click="addTag" 
-                      class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
-                <i class="fas fa-plus"></i>
-              </button>
+            <!-- 可选择的已有标签 -->
+            <div v-if="unselectedTags.length > 0">
+              <div class="text-xs font-medium text-gray-600 mb-2">点击选择已有标签:</div>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="tag in unselectedTags"
+                  :key="'available-' + tag"
+                  type="button"
+                  @click="selectTag(tag)"
+                  class="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full hover:bg-blue-100 hover:text-blue-700 transition-colors"
+                >
+                  <i class="fas fa-tag text-gray-500 text-xs"></i>
+                  {{ tag }}
+                </button>
+              </div>
             </div>
+            
+            <!-- 创建新标签 -->
+            <div>
+              <div class="text-xs font-medium text-gray-600 mb-2">创建新标签:</div>
+              <div class="flex gap-2">
+                <input 
+                  v-model="newTag" 
+                  type="text" 
+                  class="form-input flex-1"
+                  placeholder="输入新标签名称"
+                  @keypress.enter.prevent="addTag"
+                >
+                <button type="button" @click="addTag" 
+                        class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
+                  <i class="fas fa-plus"></i>
+                </button>
+              </div>
+            </div>
+            
             <p class="text-xs text-gray-500">用于标记不同团队或用途，方便筛选管理</p>
           </div>
         </div>
@@ -86,7 +110,7 @@
                   placeholder="无限制" 
                   class="form-input w-full text-sm"
                 >
-                <p class="text-xs text-gray-500 mt-0.5">时间段单位</p>
+                <p class="text-xs text-gray-500 mt-0.5 ml-2">时间段单位</p>
               </div>
               
               <div>
@@ -98,7 +122,7 @@
                   placeholder="无限制" 
                   class="form-input w-full text-sm"
                 >
-                <p class="text-xs text-gray-500 mt-0.5">窗口内最大请求</p>
+                <p class="text-xs text-gray-500 mt-0.5 ml-2">窗口内最大请求</p>
               </div>
               
               <div>
@@ -109,7 +133,7 @@
                   placeholder="无限制" 
                   class="form-input w-full text-sm"
                 >
-                <p class="text-xs text-gray-500 mt-0.5">窗口内最大Token</p>
+                <p class="text-xs text-gray-500 mt-0.5 ml-2">窗口内最大Token</p>
               </div>
             </div>
             
@@ -394,6 +418,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { showToast } from '@/utils/toast'
 import { useAuthStore } from '@/stores/auth'
 import { useClientsStore } from '@/stores/clients'
+import { useApiKeysStore } from '@/stores/apiKeys'
 import { apiClient } from '@/config/api'
 
 const props = defineProps({
@@ -407,6 +432,7 @@ const emit = defineEmits(['close', 'success'])
 
 const authStore = useAuthStore()
 const clientsStore = useClientsStore()
+const apiKeysStore = useApiKeysStore()
 const loading = ref(false)
 
 // 表单验证状态
@@ -416,6 +442,12 @@ const errors = ref({
 
 // 标签相关
 const newTag = ref('')
+const availableTags = ref([])
+
+// 计算未选择的标签
+const unselectedTags = computed(() => {
+  return availableTags.value.filter(tag => !form.tags.includes(tag))
+})
 
 // 支持的客户端列表
 const supportedClients = ref([])
@@ -443,9 +475,10 @@ const form = reactive({
   tags: []
 })
 
-// 加载支持的客户端
+// 加载支持的客户端和已存在的标签
 onMounted(async () => {
   supportedClients.value = await clientsStore.loadSupportedClients()
+  availableTags.value = await apiKeysStore.fetchTags()
 })
 
 // 计算最小日期时间
@@ -533,6 +566,12 @@ const addTag = () => {
       form.tags.push(tag)
     }
     newTag.value = ''
+  }
+}
+
+const selectTag = (tag) => {
+  if (!form.tags.includes(tag)) {
+    form.tags.push(tag)
   }
 }
 

@@ -463,7 +463,7 @@ const requestLogger = (req, res, next) => {
   
   // 记录请求开始
   if (req.originalUrl !== '/health') { // 避免健康检查日志过多
-    logger.request(`▶️ [${requestId}] ${req.method} ${req.originalUrl} | IP: ${clientIP}`);
+    logger.info(`▶️ [${requestId}] ${req.method} ${req.originalUrl} | IP: ${clientIP}`);
   }
   
   res.on('finish', () => {
@@ -489,7 +489,7 @@ const requestLogger = (req, res, next) => {
     } else if (res.statusCode >= 400) {
       logger.warn(`◀️ [${requestId}] ${req.method} ${req.originalUrl} | ${res.statusCode} | ${duration}ms | ${contentLength}B`, logMetadata);
     } else if (req.originalUrl !== '/health') {
-      logger.request(`◀️ [${requestId}] ${req.method} ${req.originalUrl} | ${res.statusCode} | ${duration}ms | ${contentLength}B`, logMetadata);
+      logger.request( req.method, req.originalUrl, res.statusCode, duration, logMetadata);
     }
     
     // API Key相关日志

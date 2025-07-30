@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <div class="fixed inset-0 modal z-50 flex items-center justify-center p-4">
-      <div class="modal-content w-full max-w-md p-8 mx-auto max-h-[90vh] flex flex-col">
+      <div class="modal-content w-full max-w-4xl p-8 mx-auto max-h-[90vh] flex flex-col">
       <div class="flex items-center justify-between mb-6">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
@@ -32,95 +32,116 @@
         <!-- 标签 -->
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-3">标签</label>
-          <div class="space-y-3">
-            <!-- 已添加的标签 -->
-            <div v-if="form.tags.length > 0" class="flex flex-wrap gap-2">
-              <span v-for="(tag, index) in form.tags" :key="index" 
-                    class="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
-                {{ tag }}
-                <button type="button" @click="removeTag(index)" 
-                        class="ml-1 hover:text-blue-900">
-                  <i class="fas fa-times text-xs"></i>
-                </button>
-              </span>
+          <div class="space-y-4">
+            <!-- 已选择的标签 -->
+            <div v-if="form.tags.length > 0">
+              <div class="text-xs font-medium text-gray-600 mb-2">已选择的标签:</div>
+              <div class="flex flex-wrap gap-2">
+                <span v-for="(tag, index) in form.tags" :key="'selected-' + index" 
+                      class="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
+                  {{ tag }}
+                  <button type="button" @click="removeTag(index)" 
+                          class="ml-1 hover:text-blue-900">
+                    <i class="fas fa-times text-xs"></i>
+                  </button>
+                </span>
+              </div>
             </div>
             
-            <!-- 标签输入 -->
-            <div class="flex gap-2">
-              <input 
-                v-model="newTag" 
-                type="text" 
-                class="form-input flex-1"
-                placeholder="输入新标签名称"
-                @keypress.enter.prevent="addTag"
-              >
-              <button type="button" @click="addTag" 
-                      class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
-                <i class="fas fa-plus"></i>
-              </button>
+            <!-- 可选择的已有标签 -->
+            <div v-if="unselectedTags.length > 0">
+              <div class="text-xs font-medium text-gray-600 mb-2">点击选择已有标签:</div>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="tag in unselectedTags"
+                  :key="'available-' + tag"
+                  type="button"
+                  @click="selectTag(tag)"
+                  class="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full hover:bg-blue-100 hover:text-blue-700 transition-colors"
+                >
+                  <i class="fas fa-tag text-gray-500 text-xs"></i>
+                  {{ tag }}
+                </button>
+              </div>
             </div>
+            
+            <!-- 创建新标签 -->
+            <div>
+              <div class="text-xs font-medium text-gray-600 mb-2">创建新标签:</div>
+              <div class="flex gap-2">
+                <input 
+                  v-model="newTag" 
+                  type="text" 
+                  class="form-input flex-1"
+                  placeholder="输入新标签名称"
+                  @keypress.enter.prevent="addTag"
+                >
+                <button type="button" @click="addTag" 
+                        class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
+                  <i class="fas fa-plus"></i>
+                </button>
+              </div>
+            </div>
+            
             <p class="text-xs text-gray-500">用于标记不同团队或用途，方便筛选管理</p>
           </div>
         </div>
         
         <!-- 速率限制设置 -->
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-4">
-          <div class="flex items-start gap-3 mb-3">
-            <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
-              <i class="fas fa-tachometer-alt text-white text-sm"></i>
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div class="flex items-center gap-2 mb-2">
+            <div class="w-6 h-6 bg-blue-500 rounded flex items-center justify-center flex-shrink-0">
+              <i class="fas fa-tachometer-alt text-white text-xs"></i>
             </div>
-            <div class="flex-1">
-              <h4 class="font-semibold text-gray-800 mb-1">速率限制设置</h4>
-              <p class="text-sm text-gray-600">控制 API Key 的使用频率和资源消耗</p>
+            <h4 class="font-semibold text-gray-800 text-sm">速率限制设置 (可选)</h4>
+          </div>
+          
+          <div class="space-y-2">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-2">
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">时间窗口 (分钟)</label>
+                <input 
+                  v-model="form.rateLimitWindow" 
+                  type="number" 
+                  min="1"
+                  placeholder="无限制" 
+                  class="form-input w-full text-sm"
+                >
+                <p class="text-xs text-gray-500 mt-0.5 ml-2">时间段单位</p>
+              </div>
+              
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">请求次数限制</label>
+                <input 
+                  v-model="form.rateLimitRequests" 
+                  type="number" 
+                  min="1"
+                  placeholder="无限制" 
+                  class="form-input w-full text-sm"
+                >
+                <p class="text-xs text-gray-500 mt-0.5 ml-2">窗口内最大请求</p>
+              </div>
+              
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Token 限制</label>
+                <input 
+                  v-model="form.tokenLimit" 
+                  type="number" 
+                  placeholder="无限制" 
+                  class="form-input w-full text-sm"
+                >
+                <p class="text-xs text-gray-500 mt-0.5 ml-2">窗口内最大Token</p>
+              </div>
             </div>
-          </div>
-          
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口 (分钟)</label>
-            <input 
-              v-model="form.rateLimitWindow" 
-              type="number" 
-              min="1"
-              placeholder="留空表示无限制" 
-              class="form-input w-full"
-            >
-            <p class="text-xs text-gray-500 mt-2">设置一个时间段（以分钟为单位），用于计算速率限制</p>
-          </div>
-          
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口内的请求次数限制</label>
-            <input 
-              v-model="form.rateLimitRequests" 
-              type="number" 
-              min="1"
-              placeholder="留空表示无限制" 
-              class="form-input w-full"
-            >
-            <p class="text-xs text-gray-500 mt-2">在时间窗口内允许的最大请求次数（需要先设置时间窗口）</p>
-          </div>
-          
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-3">时间窗口内的 Token 使用量限制</label>
-            <input 
-              v-model="form.tokenLimit" 
-              type="number" 
-              min="0"
-              placeholder="0 表示无限制" 
-              class="form-input w-full"
-            >
-            <p class="text-xs text-gray-500 mt-2">在时间窗口内允许消耗的最大 Token 数量（需要先设置时间窗口），0 或留空表示无限制</p>
-          </div>
-          
-          <!-- 示例说明 -->
-          <div class="bg-blue-100 rounded-lg p-3 mt-3">
-            <h5 class="text-sm font-semibold text-blue-800 mb-2">💡 使用示例</h5>
-            <div class="text-xs text-blue-700 space-y-1">
-              <p><strong>示例1:</strong> 时间窗口=60，请求次数限制=100</p>
-              <p class="ml-4">→ 每60分钟内最多允许100次请求</p>
-              <p class="mt-2"><strong>示例2:</strong> 时间窗口=10，Token限制=50000</p>
-              <p class="ml-4">→ 每10分钟内最多消耗50,000个Token</p>
-              <p class="mt-2"><strong>示例3:</strong> 时间窗口=30，请求次数限制=50，Token限制=100000</p>
-              <p class="ml-4">→ 每30分钟内最多50次请求且总Token不超过100,000</p>
+            
+            <!-- 示例说明 -->
+            <div class="bg-blue-100 rounded-lg p-2">
+              <h5 class="text-xs font-semibold text-blue-800 mb-1">💡 使用示例</h5>
+              <div class="text-xs text-blue-700 space-y-0.5">
+                <div><strong>示例1:</strong> 时间窗口=60，请求次数=1000 → 每60分钟最多1000次请求</div>
+                <div><strong>示例2:</strong> 时间窗口=1，Token=10000 → 每分钟最多10,000个Token</div>
+                <div><strong>示例3:</strong> 窗口=30，请求=50，Token=100000 → 每30分钟50次请求且不超10万Token</div>
+              </div>
             </div>
           </div>
         </div>
@@ -351,10 +372,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { showToast } from '@/utils/toast'
 import { useAuthStore } from '@/stores/auth'
 import { useClientsStore } from '@/stores/clients'
+import { useApiKeysStore } from '@/stores/apiKeys'
 import { apiClient } from '@/config/api'
 
 const props = defineProps({
@@ -372,6 +394,7 @@ const emit = defineEmits(['close', 'success'])
 
 const authStore = useAuthStore()
 const clientsStore = useClientsStore()
+const apiKeysStore = useApiKeysStore()
 const loading = ref(false)
 
 // 支持的客户端列表
@@ -379,6 +402,12 @@ const supportedClients = ref([])
 
 // 标签相关
 const newTag = ref('')
+const availableTags = ref([])
+
+// 计算未选择的标签
+const unselectedTags = computed(() => {
+  return availableTags.value.filter(tag => !form.tags.includes(tag))
+})
 
 // 表单数据
 const form = reactive({
@@ -421,6 +450,12 @@ const addTag = () => {
       form.tags.push(tag)
     }
     newTag.value = ''
+  }
+}
+
+const selectTag = (tag) => {
+  if (!form.tags.includes(tag)) {
+    form.tags.push(tag)
   }
 }
 
@@ -471,8 +506,9 @@ const updateApiKey = async () => {
 
 // 初始化表单数据
 onMounted(async () => {
-  // 加载支持的客户端
+  // 加载支持的客户端和已存在的标签
   supportedClients.value = await clientsStore.loadSupportedClients()
+  availableTags.value = await apiKeysStore.fetchTags()
   
   form.name = props.apiKey.name
   form.tokenLimit = props.apiKey.tokenLimit || ''
