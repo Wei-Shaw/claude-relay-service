@@ -176,7 +176,7 @@
               实时TPM 
               <span class="text-xs text-gray-400">({{ dashboardData.metricsWindow }}分钟)</span>
             </p>
-            <p class="text-3xl font-bold text-rose-600">{{ dashboardData.realtimeTPM || 0 }}</p>
+            <p class="text-3xl font-bold text-rose-600">{{ formatNumber(dashboardData.realtimeTPM || 0) }}</p>
             <p class="text-xs text-gray-500 mt-1">
               每分钟Token数
               <span v-if="dashboardData.isHistoricalMetrics" class="text-yellow-600">
@@ -618,6 +618,22 @@ function createUsageTrendChart() {
         tooltip: {
           mode: 'index',
           intersect: false,
+          itemSort: function(a, b) {
+            // 按值倒序排列，费用和请求数特殊处理
+            const aLabel = a.dataset.label || ''
+            const bLabel = b.dataset.label || ''
+            
+            // 费用和请求数使用不同的轴，单独处理
+            if (aLabel === '费用 (USD)' || bLabel === '费用 (USD)') {
+              return aLabel === '费用 (USD)' ? -1 : 1
+            }
+            if (aLabel === '请求数' || bLabel === '请求数') {
+              return aLabel === '请求数' ? 1 : -1
+            }
+            
+            // 其他按token值倒序
+            return b.parsed.y - a.parsed.y
+          },
           callbacks: {
             label: function(context) {
               const label = context.dataset.label || ''
@@ -633,7 +649,14 @@ function createUsageTrendChart() {
               } else if (label === '请求数') {
                 return label + ': ' + value.toLocaleString() + ' 次'
               } else {
-                return label + ': ' + value.toLocaleString() + ' tokens'
+                // 格式化token数显示
+                if (value >= 1000000) {
+                  return label + ': ' + (value / 1000000).toFixed(2) + 'M tokens'
+                } else if (value >= 1000) {
+                  return label + ': ' + (value / 1000).toFixed(2) + 'K tokens'
+                } else {
+                  return label + ': ' + value.toLocaleString() + ' tokens'
+                }
               }
             }
           }
@@ -781,12 +804,52 @@ function createApiKeysUsageTrendChart() {
         tooltip: {
           mode: 'index',
           intersect: false,
+          itemSort: function(a, b) {
+            // 按值倒序排列
+            return b.parsed.y - a.parsed.y
+          },
           callbacks: {
             label: function(context) {
               const label = context.dataset.label || ''
               const value = context.parsed.y
-              const unit = apiKeysTrendMetric.value === 'tokens' ? ' tokens' : ' 次'
-              return label + ': ' + value.toLocaleString() + unit
+              const dataIndex = context.dataIndex
+              const dataPoint = apiKeysTrendData.value.data[dataIndex]
+              
+              // 获取所有数据集在这个时间点的值，用于排名
+              const allValues = context.chart.data.datasets.map((dataset, idx) => ({
+                value: dataset.data[dataIndex] || 0,
+                index: idx
+              })).sort((a, b) => b.value - a.value)
+              
+              // 找出当前数据集的排名
+              const rank = allValues.findIndex(item => item.index === context.datasetIndex) + 1
+              
+              // 准备排名标识
+              let rankIcon = ''
+              if (rank === 1) rankIcon = '🥇 '
+              else if (rank === 2) rankIcon = '🥈 '
+              else if (rank === 3) rankIcon = '🥉 '
+              
+              if (apiKeysTrendMetric.value === 'tokens') {
+                // 格式化token显示
+                let formattedValue = ''
+                if (value >= 1000000) {
+                  formattedValue = (value / 1000000).toFixed(2) + 'M'
+                } else if (value >= 1000) {
+                  formattedValue = (value / 1000).toFixed(2) + 'K'
+                } else {
+                  formattedValue = value.toLocaleString()
+                }
+                
+                // 获取对应API Key的费用信息
+                const apiKeyId = apiKeysTrendData.value.topApiKeys[context.datasetIndex]
+                const apiKeyData = dataPoint?.apiKeys?.[apiKeyId]
+                const cost = apiKeyData?.formattedCost || '$0.00'
+                
+                return `${rankIcon}${label}: ${formattedValue} tokens (${cost})`
+              } else {
+                return `${rankIcon}${label}: ${value.toLocaleString()} 次`
+              }
             }
           }
         }

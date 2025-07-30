@@ -1073,7 +1073,7 @@ class RedisClient {
         totalCacheReadTokens
       };
       
-      logger.debug(`🔍 Realtime metrics - Final result:`, result);
+      logger.debug('🔍 Realtime metrics - Final result:', result);
       
       return result;
     } catch (error) {

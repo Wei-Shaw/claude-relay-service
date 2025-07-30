@@ -1986,15 +1986,27 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
           const data = await client.hgetall(key);
           
           if (data && apiKeyMap.has(apiKeyId)) {
-            const totalTokens = (parseInt(data.inputTokens) || 0) + 
-                              (parseInt(data.outputTokens) || 0) + 
-                              (parseInt(data.cacheCreateTokens) || 0) + 
-                              (parseInt(data.cacheReadTokens) || 0);
+            const inputTokens = parseInt(data.inputTokens) || 0;
+            const outputTokens = parseInt(data.outputTokens) || 0;
+            const cacheCreateTokens = parseInt(data.cacheCreateTokens) || 0;
+            const cacheReadTokens = parseInt(data.cacheReadTokens) || 0;
+            const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens;
+            
+            // 计算费用 - 使用默认模型价格，因为小时级别的数据没有模型信息
+            const usage = {
+              input_tokens: inputTokens,
+              output_tokens: outputTokens,
+              cache_creation_input_tokens: cacheCreateTokens,
+              cache_read_input_tokens: cacheReadTokens
+            };
+            const costResult = CostCalculator.calculateCost(usage, 'claude-3-5-haiku-20241022');
             
             hourData.apiKeys[apiKeyId] = {
               name: apiKeyMap.get(apiKeyId).name,
               tokens: totalTokens,
-              requests: parseInt(data.requests) || 0
+              requests: parseInt(data.requests) || 0,
+              cost: costResult.costs.total,
+              formattedCost: costResult.formatted.total
             };
           }
         }
@@ -2031,15 +2043,27 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
           const data = await client.hgetall(key);
           
           if (data && apiKeyMap.has(apiKeyId)) {
-            const totalTokens = (parseInt(data.inputTokens) || 0) + 
-                              (parseInt(data.outputTokens) || 0) + 
-                              (parseInt(data.cacheCreateTokens) || 0) + 
-                              (parseInt(data.cacheReadTokens) || 0);
+            const inputTokens = parseInt(data.inputTokens) || 0;
+            const outputTokens = parseInt(data.outputTokens) || 0;
+            const cacheCreateTokens = parseInt(data.cacheCreateTokens) || 0;
+            const cacheReadTokens = parseInt(data.cacheReadTokens) || 0;
+            const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens;
+            
+            // 计算费用 - 使用默认模型价格，因为日级别的汇总数据没有模型信息
+            const usage = {
+              input_tokens: inputTokens,
+              output_tokens: outputTokens,
+              cache_creation_input_tokens: cacheCreateTokens,
+              cache_read_input_tokens: cacheReadTokens
+            };
+            const costResult = CostCalculator.calculateCost(usage, 'claude-3-5-haiku-20241022');
             
             dayData.apiKeys[apiKeyId] = {
               name: apiKeyMap.get(apiKeyId).name,
               tokens: totalTokens,
-              requests: parseInt(data.requests) || 0
+              requests: parseInt(data.requests) || 0,
+              cost: costResult.costs.total,
+              formattedCost: costResult.formatted.total
             };
           }
         }
