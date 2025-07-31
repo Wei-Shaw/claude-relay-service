@@ -11,6 +11,7 @@ const config = require('../config/config');
 const logger = require('./utils/logger');
 const redis = require('./models/redis');
 const pricingService = require('./services/pricingService');
+const backupScheduler = require('./services/backupScheduler');
 
 // Import routes
 const apiRoutes = require('./routes/api');
@@ -47,6 +48,10 @@ class Application {
       // 💰 初始化价格服务
       logger.info('🔄 Initializing pricing service...');
       await pricingService.initialize();
+      
+      // 📅 启动备份调度器
+      logger.info('🔄 Starting backup scheduler...');
+      await backupScheduler.start();
       
       // 🔧 初始化管理员凭据
       logger.info('🔄 Initializing admin credentials...');

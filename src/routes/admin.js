@@ -11,9 +11,10 @@ const CostCalculator = require('../utils/costCalculator');
 const pricingService = require('../services/pricingService');
 const claudeCodeHeadersService = require('../services/claudeCodeHeadersService');
 const axios = require('axios');
-const fs = require('fs');
+const fs = require('fs').promises;
 const path = require('path');
 const config = require('../../config/config');
+const backupService = require('../services/backupService');
 
 const router = express.Router();
 
@@ -2657,6 +2658,303 @@ function compareVersions(current, latest) {
   }
   return currentV.patch - latestV.patch;
 }
+
+// 💾 备份还原管理
+
+// 获取备份设置
+router.get('/backup-settings', authenticateAdmin, async (req, res) => {
+  try {
+    const settings = await backupService.getBackupSettings();
+    res.json({
+      success: true,
+      data: settings
+    });
+  } catch (error) {
+    logger.error('❌ Failed to get backup settings:', error);
+    res.status(500).json({ error: 'Failed to get backup settings', message: error.message });
+  }
+});
+
+// 更新备份设置
+router.put('/backup-settings', authenticateAdmin, async (req, res) => {
+  try {
+    const { autoBackupEnabled, autoBackupInterval, backupPath, maxBackups } = req.body;
+    
+    // 验证输入
+    if (autoBackupInterval !== undefined && (!Number.isInteger(autoBackupInterval) || autoBackupInterval < 1)) {
+      return res.status(400).json({ error: 'Auto backup interval must be a positive integer' });
+    }
+    
+    if (maxBackups !== undefined && (!Number.isInteger(maxBackups) || maxBackups < 1)) {
+      return res.status(400).json({ error: 'Max backups must be a positive integer' });
+    }
+    
+    const settings = {
+      autoBackupEnabled: autoBackupEnabled || false,
+      autoBackupInterval: autoBackupInterval || 7,
+      backupPath: backupPath || path.join(process.cwd(), 'backups'),
+      maxBackups: maxBackups || 10
+    };
+    
+    await backupService.updateBackupSettings(settings);
+    
+    // 重启备份调度器
+    const backupScheduler = require('../services/backupScheduler');
+    await backupScheduler.restart();
+    
+    logger.info('✅ Backup settings updated');
+    res.json({
+      success: true,
+      message: 'Backup settings updated successfully',
+      data: settings
+    });
+  } catch (error) {
+    logger.error('❌ Failed to update backup settings:', error);
+    res.status(500).json({ error: 'Failed to update backup settings', message: error.message });
+  }
+});
+
+// 重置备份设置
+router.delete('/backup-settings', authenticateAdmin, async (req, res) => {
+  try {
+    const defaultSettings = await backupService.resetBackupSettings();
+    
+    // 重启备份调度器
+    const backupScheduler = require('../services/backupScheduler');
+    await backupScheduler.restart();
+    
+    logger.info('✅ Backup settings reset to defaults');
+    res.json({
+      success: true,
+      message: 'Backup settings reset to defaults',
+      data: defaultSettings
+    });
+  } catch (error) {
+    logger.error('❌ Failed to reset backup settings:', error);
+    res.status(500).json({ error: 'Failed to reset backup settings', message: error.message });
+  }
+});
+
+// 创建备份
+router.post('/backup', authenticateAdmin, async (req, res) => {
+  try {
+    logger.info('📦 Manual backup initiated by admin');
+    const backupInfo = await backupService.createBackup();
+    
+    res.json({
+      success: true,
+      message: 'Backup created successfully',
+      data: backupInfo
+    });
+  } catch (error) {
+    logger.error('❌ Failed to create backup:', error);
+    res.status(500).json({ error: 'Failed to create backup', message: error.message });
+  }
+});
+
+// 获取备份历史
+router.get('/backup-history', authenticateAdmin, async (req, res) => {
+  try {
+    const { limit = 20 } = req.query;
+    const history = await backupService.getBackupHistory(parseInt(limit));
+    
+    res.json({
+      success: true,
+      data: history
+    });
+  } catch (error) {
+    logger.error('❌ Failed to get backup history:', error);
+    res.status(500).json({ error: 'Failed to get backup history', message: error.message });
+  }
+});
+
+// 下载备份文件
+router.get('/backup/:backupId/download', authenticateAdmin, async (req, res) => {
+  try {
+    const { backupId } = req.params;
+    const filePath = await backupService.getBackupFilePath(backupId);
+    
+    // 设置正确的 Content-Type 为 zip
+    res.setHeader('Content-Type', 'application/zip');
+    res.download(filePath, `${backupId}.zip`, (err) => {
+      if (err) {
+        logger.error('❌ Failed to download backup:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Failed to download backup', message: err.message });
+        }
+      } else {
+        logger.info(`📥 Backup downloaded: ${backupId}`);
+      }
+    });
+  } catch (error) {
+    logger.error('❌ Failed to download backup:', error);
+    res.status(404).json({ error: 'Backup not found', message: error.message });
+  }
+});
+
+// 还原备份
+router.post('/backup/:backupId/restore', authenticateAdmin, async (req, res) => {
+  try {
+    const { backupId } = req.params;
+    
+    logger.warn(`⚠️ Restore initiated by admin for backup: ${backupId}`);
+    const result = await backupService.restoreBackup(backupId);
+    
+    res.json({
+      success: true,
+      message: 'Backup restored successfully',
+      data: result
+    });
+  } catch (error) {
+    logger.error('❌ Failed to restore backup:', error);
+    res.status(500).json({ error: 'Failed to restore backup', message: error.message });
+  }
+});
+
+// 删除备份
+router.delete('/backup/:backupId', authenticateAdmin, async (req, res) => {
+  try {
+    const { backupId } = req.params;
+    
+    await backupService.deleteBackup(backupId);
+    
+    logger.info(`🗑️ Backup deleted: ${backupId}`);
+    res.json({
+      success: true,
+      message: 'Backup deleted successfully'
+    });
+  } catch (error) {
+    logger.error('❌ Failed to delete backup:', error);
+    res.status(500).json({ error: 'Failed to delete backup', message: error.message });
+  }
+});
+
+// 导入备份文件
+router.post('/backup/import', authenticateAdmin, async (req, res) => {
+  const multer = require('multer');
+  const upload = multer({ 
+    dest: path.join(process.cwd(), 'temp', 'uploads'),
+    limits: {
+      fileSize: 100 * 1024 * 1024 // 100MB 限制
+    }
+  }).single('backup');
+
+  upload(req, res, async (err) => {
+    if (err) {
+      logger.error('❌ Upload error:', err);
+      return res.status(400).json({ 
+        error: 'Upload failed', 
+        message: err.message 
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ 
+        error: 'No file uploaded',
+        message: 'Please select a backup file to import'
+      });
+    }
+
+    try {
+      const { restore } = req.body;
+      const shouldRestore = restore === 'true' || restore === true;
+      
+      logger.info(`📥 Importing backup file: ${req.file.originalname}`);
+      
+      // 验证文件扩展名
+      if (!req.file.originalname.endsWith('.zip')) {
+        await fs.unlink(req.file.path);
+        return res.status(400).json({
+          error: 'Invalid file type',
+          message: 'Only .zip backup files are supported'
+        });
+      }
+      
+      // 导入备份
+      const result = await backupService.importBackup(req.file.path, {
+        restore: shouldRestore
+      });
+      
+      // 清理上传的临时文件
+      await fs.unlink(req.file.path);
+      
+      res.json({
+        success: true,
+        message: shouldRestore ? 'Backup imported and restored successfully' : 'Backup imported successfully',
+        data: result
+      });
+    } catch (error) {
+      // 清理上传的临时文件
+      try {
+        await fs.unlink(req.file.path);
+      } catch (cleanupError) {
+        logger.warn('⚠️ Failed to cleanup upload file:', cleanupError.message);
+      }
+      
+      logger.error('❌ Failed to import backup:', error);
+      res.status(500).json({ 
+        error: 'Import failed', 
+        message: error.message 
+      });
+    }
+  });
+});
+
+// 验证备份文件
+router.post('/backup/validate', authenticateAdmin, async (req, res) => {
+  const multer = require('multer');
+  const upload = multer({ 
+    dest: path.join(process.cwd(), 'temp', 'uploads'),
+    limits: {
+      fileSize: 100 * 1024 * 1024 // 100MB 限制
+    }
+  }).single('backup');
+
+  upload(req, res, async (err) => {
+    if (err) {
+      logger.error('❌ Upload error:', err);
+      return res.status(400).json({ 
+        error: 'Upload failed', 
+        message: err.message 
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ 
+        error: 'No file uploaded',
+        message: 'Please select a backup file to validate'
+      });
+    }
+
+    try {
+      logger.info(`🔍 Validating backup file: ${req.file.originalname}`);
+      
+      // 验证备份文件
+      const validation = await backupService.validateBackupFile(req.file.path);
+      
+      // 清理上传的临时文件
+      await fs.unlink(req.file.path);
+      
+      res.json({
+        success: true,
+        data: validation
+      });
+    } catch (error) {
+      // 清理上传的临时文件
+      try {
+        await fs.unlink(req.file.path);
+      } catch (cleanupError) {
+        logger.warn('⚠️ Failed to cleanup upload file:', cleanupError.message);
+      }
+      
+      logger.error('❌ Failed to validate backup:', error);
+      res.status(500).json({ 
+        error: 'Validation failed', 
+        message: error.message 
+      });
+    }
+  });
+});
 
 // 🎨 OEM设置管理
 

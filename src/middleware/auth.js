@@ -312,7 +312,8 @@ const authenticateAdmin = async (req, res, next) => {
     // 安全提取token，支持多种方式
     const token = req.headers['authorization']?.replace(/^Bearer\s+/i, '') || 
                   req.cookies?.adminToken ||
-                  req.headers['x-admin-token'];
+                  req.headers['x-admin-token'] ||
+                  req.query?.token; // 支持查询参数（用于下载等场景）
     
     if (!token) {
       logger.security(`🔒 Missing admin token attempt from ${req.ip || 'unknown'}`);
@@ -323,7 +324,7 @@ const authenticateAdmin = async (req, res, next) => {
     }
 
     // 基本token格式验证
-    if (typeof token !== 'string' || token.length < 32 || token.length > 512) {
+    if (typeof token !== 'string' || token.length < 10) {
       logger.security(`🔒 Invalid admin token format from ${req.ip || 'unknown'}`);
       return res.status(401).json({
         error: 'Invalid admin token format',
