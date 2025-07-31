@@ -14,7 +14,7 @@
           <!-- Token统计时间范围选择 -->
           <select 
             v-model="apiKeyStatsTimeRange" 
-            class="form-input px-3 py-2 text-sm"
+            class="px-2 py-1 text-sm text-gray-700 bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-300 transition-colors"
             @change="loadApiKeys()"
           >
             <option value="today">
@@ -33,7 +33,8 @@
           <!-- 标签筛选器 -->
           <select 
             v-model="selectedTagFilter" 
-            class="form-input px-3 py-2 text-sm"
+            class="px-2 py-1 text-sm text-gray-700 bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-300 transition-colors"
+            @change="currentPage = 1"
           >
             <option value="">
               所有标签
@@ -47,7 +48,7 @@
             </option>
           </select>
           <button 
-            class="btn btn-primary px-6 py-3 flex items-center gap-2"
+            class="btn btn-primary px-4 py-1.5 text-sm flex items-center gap-2"
             @click.stop="openCreateApiKeyModal"
           >
             <i class="fas fa-plus" />创建新 Key
@@ -460,10 +461,10 @@
                             :default-time="defaultTime"
                             size="small"
                             style="width: 280px;"
-                            @update:model-value="(value) => onApiKeyCustomDateRangeChange(key.id, value)"
                             class="api-key-date-picker"
                             :clearable="true"
                             :unlink-panels="false"
+                            @update:model-value="(value) => onApiKeyCustomDateRangeChange(key.id, value)"
                           />
                         </div>
                       </div>
@@ -603,6 +604,99 @@
           </tbody>
         </table>
       </div>
+      
+      <!-- 分页组件 -->
+      <div
+        v-if="filteredAndSortedApiKeys.length > 0"
+        class="mt-6 flex flex-col sm:flex-row justify-between items-center gap-4"
+      >
+        <div class="flex items-center gap-3">
+          <span class="text-sm text-gray-600">
+            共 {{ filteredAndSortedApiKeys.length }} 条记录
+          </span>
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-gray-600">每页显示</span>
+            <select 
+              v-model="pageSize" 
+              class="px-2 py-1 text-sm text-gray-700 bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-300 transition-colors"
+              @change="currentPage = 1"
+            >
+              <option 
+                v-for="size in pageSizeOptions" 
+                :key="size" 
+                :value="size"
+              >
+                {{ size }}
+              </option>
+            </select>
+            <span class="text-sm text-gray-600">条</span>
+          </div>
+        </div>
+        
+        <div class="flex items-center gap-2">
+          <!-- 上一页 -->
+          <button 
+            class="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="currentPage === 1"
+            @click="currentPage--"
+          >
+            <i class="fas fa-chevron-left" />
+          </button>
+          
+          <!-- 页码 -->
+          <div class="flex items-center gap-1">
+            <!-- 第一页 -->
+            <button 
+              v-if="currentPage > 3"
+              class="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              @click="currentPage = 1"
+            >
+              1
+            </button>
+            <span
+              v-if="currentPage > 4"
+              class="px-2 text-gray-500"
+            >...</span>
+            
+            <!-- 中间页码 -->
+            <button 
+              v-for="page in pageNumbers" 
+              :key="page"
+              :class="[
+                'px-3 py-1 text-sm font-medium rounded-md',
+                page === currentPage 
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+              ]"
+              @click="currentPage = page"
+            >
+              {{ page }}
+            </button>
+            
+            <!-- 最后一页 -->
+            <span
+              v-if="currentPage < totalPages - 3"
+              class="px-2 text-gray-500"
+            >...</span>
+            <button 
+              v-if="totalPages > 1 && currentPage < totalPages - 2"
+              class="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              @click="currentPage = totalPages"
+            >
+              {{ totalPages }}
+            </button>
+          </div>
+          
+          <!-- 下一页 -->
+          <button 
+            class="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="currentPage === totalPages || totalPages === 0"
+            @click="currentPage++"
+          >
+            <i class="fas fa-chevron-right" />
+          </button>
+        </div>
+      </div>
     </div>
     
     <!-- 模态框组件 -->
@@ -659,6 +753,11 @@ const apiKeyDateFilters = ref({})
 const defaultTime = ref([new Date(2000, 1, 1, 0, 0, 0), new Date(2000, 2, 1, 23, 59, 59)])
 const accounts = ref({ claude: [], gemini: [] })
 
+// 分页相关
+const currentPage = ref(1)
+const pageSize = ref(10)
+const pageSizeOptions = [5, 10, 20, 50, 100]
+
 // 标签相关
 const selectedTagFilter = ref('')
 const availableTags = ref([])
@@ -672,8 +771,8 @@ const editingApiKey = ref(null)
 const renewingApiKey = ref(null)
 const newApiKeyData = ref(null)
 
-// 计算排序后的API Keys
-const sortedApiKeys = computed(() => {
+// 计算筛选和排序后的API Keys（未分页）
+const filteredAndSortedApiKeys = computed(() => {
   // 先进行标签筛选
   let filteredKeys = apiKeys.value
   if (selectedTagFilter.value) {
@@ -708,6 +807,37 @@ const sortedApiKeys = computed(() => {
   })
   
   return sorted
+})
+
+// 计算总页数
+const totalPages = computed(() => {
+  return Math.ceil(filteredAndSortedApiKeys.value.length / pageSize.value)
+})
+
+// 计算当前页显示的API Keys
+const sortedApiKeys = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return filteredAndSortedApiKeys.value.slice(start, end)
+})
+
+// 计算要显示的页码
+const pageNumbers = computed(() => {
+  const pages = []
+  const maxPagesToShow = 5
+  let startPage = Math.max(1, currentPage.value - Math.floor(maxPagesToShow / 2))
+  let endPage = Math.min(totalPages.value, startPage + maxPagesToShow - 1)
+  
+  // 调整起始页
+  if (endPage - startPage < maxPagesToShow - 1) {
+    startPage = Math.max(1, endPage - maxPagesToShow + 1)
+  }
+  
+  for (let i = startPage; i <= endPage; i++) {
+    pages.push(i)
+  }
+  
+  return pages
 })
 
 // 加载账户列表
@@ -771,6 +901,9 @@ const loadApiKeys = async () => {
         }
       })
       availableTags.value = Array.from(tagsSet).sort()
+      
+      // 重置到第一页
+      currentPage.value = 1
     }
   } catch (error) {
     showToast('加载 API Keys 失败', 'error')
@@ -787,6 +920,8 @@ const sortApiKeys = (field) => {
     apiKeysSortBy.value = field
     apiKeysSortOrder.value = 'asc'
   }
+  // 排序时重置到第一页
+  currentPage.value = 1
 }
 
 // 格式化数字
@@ -1093,7 +1228,7 @@ const deleteApiKey = async (keyId) => {
 const copyApiStatsLink = (apiKey) => {
   // 构建统计页面的完整URL
   const baseUrl = window.location.origin
-  const statsUrl = `${baseUrl}/admin/api-stats?apiId=${apiKey.id}`
+  const statsUrl = `${baseUrl}/admin-next/api-stats?apiId=${apiKey.id}`
   
   // 使用传统的textarea方法复制到剪贴板
   const textarea = document.createElement('textarea')
@@ -1173,4 +1308,5 @@ onMounted(async () => {
 .api-key-date-picker :deep(.el-range-separator) {
   @apply text-gray-500;
 }
+
 </style>

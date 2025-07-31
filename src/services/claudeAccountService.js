@@ -861,14 +861,18 @@ class ClaudeAccountService {
       if (accountData.sessionWindowStart && accountData.sessionWindowEnd) {
         const windowEnd = new Date(accountData.sessionWindowEnd).getTime();
         
-        // 如果当前时间在窗口内，不需要更新
+        // 如果当前时间在窗口内，只更新最后请求时间
         if (currentTime < windowEnd) {
           accountData.lastRequestTime = now.toISOString();
           return accountData;
         }
+        
+        // 窗口已过期，记录日志
+        const windowStart = new Date(accountData.sessionWindowStart);
+        logger.info(`⏰ Session window expired for account ${accountData.name} (${accountId}): ${windowStart.toISOString()} - ${new Date(windowEnd).toISOString()}`);
       }
 
-      // 计算新的会话窗口
+      // 基于当前时间计算新的会话窗口
       const windowStart = this._calculateSessionWindowStart(now);
       const windowEnd = this._calculateSessionWindowEnd(windowStart);
 
@@ -877,7 +881,7 @@ class ClaudeAccountService {
       accountData.sessionWindowEnd = windowEnd.toISOString();
       accountData.lastRequestTime = now.toISOString();
 
-      logger.info(`🕐 Updated session window for account ${accountData.name} (${accountId}): ${windowStart.toISOString()} - ${windowEnd.toISOString()}`);
+      logger.info(`🕐 Created new session window for account ${accountData.name} (${accountId}): ${windowStart.toISOString()} - ${windowEnd.toISOString()}`);
 
       return accountData;
     } catch (error) {

@@ -110,11 +110,43 @@ const commands = {
         const windowStart = new Date(account.sessionWindowStart);
         const windowEnd = new Date(account.sessionWindowEnd);
         const now = new Date();
+        const isActive = now < windowEnd;
         
         console.log(`   会话窗口: ${windowStart.toLocaleString()} - ${windowEnd.toLocaleString()}`);
-        console.log(`   窗口状态: ${now < windowEnd ? '✅ 活跃' : '❌ 已过期'}`);
+        console.log(`   窗口状态: ${isActive ? '✅ 活跃' : '❌ 已过期'}`);
+        
+        // 只有在窗口已过期时才显示可恢复窗口
+        if (!isActive && account.lastUsedAt) {
+          const lastUsed = new Date(account.lastUsedAt);
+          const recoveredWindowStart = claudeAccountService._calculateSessionWindowStart(lastUsed);
+          const recoveredWindowEnd = claudeAccountService._calculateSessionWindowEnd(recoveredWindowStart);
+          
+          if (now < recoveredWindowEnd) {
+            stats.canRecover++;
+            console.log(`   可恢复窗口: ✅ ${recoveredWindowStart.toLocaleString()} - ${recoveredWindowEnd.toLocaleString()}`);
+          } else {
+            stats.expired++;
+            console.log(`   可恢复窗口: ❌ 已过期 (${recoveredWindowStart.toLocaleString()} - ${recoveredWindowEnd.toLocaleString()})`);
+          }
+        }
       } else {
         console.log(`   会话窗口: ❌ 无`);
+        
+        // 没有会话窗口时，检查是否有可恢复的窗口
+        if (account.lastUsedAt) {
+          const lastUsed = new Date(account.lastUsedAt);
+          const now = new Date();
+          const windowStart = claudeAccountService._calculateSessionWindowStart(lastUsed);
+          const windowEnd = claudeAccountService._calculateSessionWindowEnd(windowStart);
+          
+          if (now < windowEnd) {
+            stats.canRecover++;
+            console.log(`   可恢复窗口: ✅ ${windowStart.toLocaleString()} - ${windowEnd.toLocaleString()}`);
+          } else {
+            stats.expired++;
+            console.log(`   可恢复窗口: ❌ 已过期 (${windowStart.toLocaleString()} - ${windowEnd.toLocaleString()})`);
+          }
+        }
       }
       
       if (account.lastUsedAt) {
@@ -124,18 +156,6 @@ const commands = {
         const minutesAgo = Math.round((now - lastUsed) / (1000 * 60));
         
         console.log(`   最后使用: ${lastUsed.toLocaleString()} (${minutesAgo}分钟前)`);
-        
-        // 计算基于lastUsedAt的窗口
-        const windowStart = claudeAccountService._calculateSessionWindowStart(lastUsed);
-        const windowEnd = claudeAccountService._calculateSessionWindowEnd(windowStart);
-        
-        if (now < windowEnd) {
-          stats.canRecover++;
-          console.log(`   可恢复窗口: ✅ ${windowStart.toLocaleString()} - ${windowEnd.toLocaleString()}`);
-        } else {
-          stats.expired++;
-          console.log(`   可恢复窗口: ❌ 已过期 (${windowStart.toLocaleString()} - ${windowEnd.toLocaleString()})`);
-        }
       } else {
         console.log(`   最后使用: ❌ 无记录`);
       }
