@@ -299,10 +299,10 @@ class UnifiedClaudeScheduler {
   }
 
   // 🚫 标记账户为限流状态
-  async markAccountRateLimited(accountId, accountType, sessionHash = null) {
+  async markAccountRateLimited(accountId, accountType, sessionHash = null, rateLimitResetTimestamp = null) {
     try {
       if (accountType === 'claude-official') {
-        await claudeAccountService.markAccountRateLimited(accountId, sessionHash);
+        await claudeAccountService.markAccountRateLimited(accountId, sessionHash, rateLimitResetTimestamp);
       } else if (accountType === 'claude-console') {
         await claudeConsoleAccountService.markAccountRateLimited(accountId);
       }

@@ -142,23 +142,37 @@ class ClaudeRelayService {
       // 检查响应是否为限流错误
       if (response.statusCode !== 200 && response.statusCode !== 201) {
         let isRateLimited = false;
-        try {
-          const responseBody = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;
-          if (responseBody && responseBody.error && responseBody.error.message && 
-              responseBody.error.message.toLowerCase().includes('exceed your account\'s rate limit')) {
-            isRateLimited = true;
+        let rateLimitResetTimestamp = null;
+        
+        // 检查是否为429状态码
+        if (response.statusCode === 429) {
+          isRateLimited = true;
+          
+          // 提取限流重置时间戳
+          if (response.headers && response.headers['anthropic-ratelimit-unified-reset']) {
+            rateLimitResetTimestamp = parseInt(response.headers['anthropic-ratelimit-unified-reset']);
+            logger.info(`🕐 Extracted rate limit reset timestamp: ${rateLimitResetTimestamp} (${new Date(rateLimitResetTimestamp * 1000).toISOString()})`);
           }
-        } catch (e) {
-          // 如果解析失败，检查原始字符串
-          if (response.body && response.body.toLowerCase().includes('exceed your account\'s rate limit')) {
-            isRateLimited = true;
+        } else {
+          // 检查响应体中的错误信息
+          try {
+            const responseBody = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;
+            if (responseBody && responseBody.error && responseBody.error.message && 
+                responseBody.error.message.toLowerCase().includes('exceed your account\'s rate limit')) {
+              isRateLimited = true;
+            }
+          } catch (e) {
+            // 如果解析失败，检查原始字符串
+            if (response.body && response.body.toLowerCase().includes('exceed your account\'s rate limit')) {
+              isRateLimited = true;
+            }
           }
         }
         
         if (isRateLimited) {
           logger.warn(`🚫 Rate limit detected for account ${accountId}, status: ${response.statusCode}`);
-          // 标记账号为限流状态并删除粘性会话映射
-          await claudeAccountService.markAccountRateLimited(accountId, sessionHash);
+          // 标记账号为限流状态并删除粘性会话映射，传递准确的重置时间戳
+          await claudeAccountService.markAccountRateLimited(accountId, sessionHash, rateLimitResetTimestamp);
         }
       } else if (response.statusCode === 200 || response.statusCode === 201) {
         // 如果请求成功，检查并移除限流状态
@@ -832,8 +846,15 @@ class ClaudeRelayService {
           
           // 处理限流状态
           if (rateLimitDetected || res.statusCode === 429) {
+            // 提取限流重置时间戳
+            let rateLimitResetTimestamp = null;
+            if (res.headers && res.headers['anthropic-ratelimit-unified-reset']) {
+              rateLimitResetTimestamp = parseInt(res.headers['anthropic-ratelimit-unified-reset']);
+              logger.info(`🕐 Extracted rate limit reset timestamp from stream: ${rateLimitResetTimestamp} (${new Date(rateLimitResetTimestamp * 1000).toISOString()})`);
+            }
+            
             // 标记账号为限流状态并删除粘性会话映射
-            await claudeAccountService.markAccountRateLimited(accountId, sessionHash);
+            await claudeAccountService.markAccountRateLimited(accountId, sessionHash, rateLimitResetTimestamp);
           } else if (res.statusCode === 200) {
             // 如果请求成功，检查并移除限流状态
             const isRateLimited = await claudeAccountService.isAccountRateLimited(accountId);

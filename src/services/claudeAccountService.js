@@ -732,32 +732,50 @@ class ClaudeAccountService {
   }
 
   // 🚫 标记账号为限流状态
-  async markAccountRateLimited(accountId, sessionHash = null) {
+  async markAccountRateLimited(accountId, sessionHash = null, rateLimitResetTimestamp = null) {
     try {
       const accountData = await redis.getClaudeAccount(accountId);
       if (!accountData || Object.keys(accountData).length === 0) {
         throw new Error('Account not found');
       }
 
-      // 获取或创建会话窗口
-      const updatedAccountData = await this.updateSessionWindow(accountId, accountData);
-
       // 设置限流状态和时间
+      const updatedAccountData = { ...accountData };
       updatedAccountData.rateLimitedAt = new Date().toISOString();
       updatedAccountData.rateLimitStatus = 'limited';
       
-      // 限流结束时间 = 会话窗口结束时间
-      if (updatedAccountData.sessionWindowEnd) {
-        updatedAccountData.rateLimitEndAt = updatedAccountData.sessionWindowEnd;
-        const windowEnd = new Date(updatedAccountData.sessionWindowEnd);
+      // 如果提供了准确的限流重置时间戳（来自API响应头）
+      if (rateLimitResetTimestamp) {
+        // 将Unix时间戳（秒）转换为毫秒并创建Date对象
+        const resetTime = new Date(rateLimitResetTimestamp * 1000);
+        updatedAccountData.rateLimitEndAt = resetTime.toISOString();
+        
+        // 计算当前会话窗口的开始时间（重置时间减去5小时）
+        const windowStartTime = new Date(resetTime.getTime() - (5 * 60 * 60 * 1000));
+        updatedAccountData.sessionWindowStart = windowStartTime.toISOString();
+        updatedAccountData.sessionWindowEnd = resetTime.toISOString();
+        
         const now = new Date();
-        const minutesUntilEnd = Math.ceil((windowEnd - now) / (1000 * 60));
-        logger.warn(`🚫 Account marked as rate limited until session window ends: ${accountData.name} (${accountId}) - ${minutesUntilEnd} minutes remaining`);
+        const minutesUntilEnd = Math.ceil((resetTime - now) / (1000 * 60));
+        logger.warn(`🚫 Account marked as rate limited with accurate reset time: ${accountData.name} (${accountId}) - ${minutesUntilEnd} minutes remaining until ${resetTime.toISOString()}`);
       } else {
-        // 如果没有会话窗口，使用默认1小时（兼容旧逻辑）
-        const oneHourLater = new Date(Date.now() + 60 * 60 * 1000);
-        updatedAccountData.rateLimitEndAt = oneHourLater.toISOString();
-        logger.warn(`🚫 Account marked as rate limited (1 hour default): ${accountData.name} (${accountId})`);
+        // 获取或创建会话窗口（预估方式）
+        const windowData = await this.updateSessionWindow(accountId, updatedAccountData);
+        Object.assign(updatedAccountData, windowData);
+        
+        // 限流结束时间 = 会话窗口结束时间
+        if (updatedAccountData.sessionWindowEnd) {
+          updatedAccountData.rateLimitEndAt = updatedAccountData.sessionWindowEnd;
+          const windowEnd = new Date(updatedAccountData.sessionWindowEnd);
+          const now = new Date();
+          const minutesUntilEnd = Math.ceil((windowEnd - now) / (1000 * 60));
+          logger.warn(`🚫 Account marked as rate limited until estimated session window ends: ${accountData.name} (${accountId}) - ${minutesUntilEnd} minutes remaining`);
+        } else {
+          // 如果没有会话窗口，使用默认1小时（兼容旧逻辑）
+          const oneHourLater = new Date(Date.now() + 60 * 60 * 1000);
+          updatedAccountData.rateLimitEndAt = oneHourLater.toISOString();
+          logger.warn(`🚫 Account marked as rate limited (1 hour default): ${accountData.name} (${accountId})`);
+        }
       }
       
       await redis.setClaudeAccount(accountId, updatedAccountData);
