@@ -739,10 +739,28 @@ class ClaudeAccountService {
         throw new Error('Account not found');
       }
 
+      // 获取或创建会话窗口
+      const updatedAccountData = await this.updateSessionWindow(accountId, accountData);
+
       // 设置限流状态和时间
-      accountData.rateLimitedAt = new Date().toISOString();
-      accountData.rateLimitStatus = 'limited';
-      await redis.setClaudeAccount(accountId, accountData);
+      updatedAccountData.rateLimitedAt = new Date().toISOString();
+      updatedAccountData.rateLimitStatus = 'limited';
+      
+      // 限流结束时间 = 会话窗口结束时间
+      if (updatedAccountData.sessionWindowEnd) {
+        updatedAccountData.rateLimitEndAt = updatedAccountData.sessionWindowEnd;
+        const windowEnd = new Date(updatedAccountData.sessionWindowEnd);
+        const now = new Date();
+        const minutesUntilEnd = Math.ceil((windowEnd - now) / (1000 * 60));
+        logger.warn(`🚫 Account marked as rate limited until session window ends: ${accountData.name} (${accountId}) - ${minutesUntilEnd} minutes remaining`);
+      } else {
+        // 如果没有会话窗口，使用默认1小时（兼容旧逻辑）
+        const oneHourLater = new Date(Date.now() + 60 * 60 * 1000);
+        updatedAccountData.rateLimitEndAt = oneHourLater.toISOString();
+        logger.warn(`🚫 Account marked as rate limited (1 hour default): ${accountData.name} (${accountId})`);
+      }
+      
+      await redis.setClaudeAccount(accountId, updatedAccountData);
 
       // 如果有会话哈希，删除粘性会话映射
       if (sessionHash) {
@@ -750,7 +768,6 @@ class ClaudeAccountService {
         logger.info(`🗑️ Deleted sticky session mapping for rate limited account: ${accountId}`);
       }
 
-      logger.warn(`🚫 Account marked as rate limited: ${accountData.name} (${accountId})`);
       return { success: true };
     } catch (error) {
       logger.error(`❌ Failed to mark account as rate limited: ${accountId}`, error);
@@ -769,6 +786,7 @@ class ClaudeAccountService {
       // 清除限流状态
       delete accountData.rateLimitedAt;
       delete accountData.rateLimitStatus;
+      delete accountData.rateLimitEndAt;  // 清除限流结束时间
       await redis.setClaudeAccount(accountId, accountData);
 
       logger.success(`✅ Rate limit removed for account: ${accountData.name} (${accountId})`);
@@ -789,17 +807,32 @@ class ClaudeAccountService {
 
       // 检查是否有限流状态
       if (accountData.rateLimitStatus === 'limited' && accountData.rateLimitedAt) {
-        const rateLimitedAt = new Date(accountData.rateLimitedAt);
         const now = new Date();
-        const hoursSinceRateLimit = (now - rateLimitedAt) / (1000 * 60 * 60);
+        
+        // 优先使用 rateLimitEndAt（基于会话窗口）
+        if (accountData.rateLimitEndAt) {
+          const rateLimitEndAt = new Date(accountData.rateLimitEndAt);
+          
+          // 如果当前时间超过限流结束时间，自动解除
+          if (now >= rateLimitEndAt) {
+            await this.removeAccountRateLimit(accountId);
+            return false;
+          }
+          
+          return true;
+        } else {
+          // 兼容旧数据：使用1小时限流
+          const rateLimitedAt = new Date(accountData.rateLimitedAt);
+          const hoursSinceRateLimit = (now - rateLimitedAt) / (1000 * 60 * 60);
 
-        // 如果限流超过1小时，自动解除
-        if (hoursSinceRateLimit >= 1) {
-          await this.removeAccountRateLimit(accountId);
-          return false;
+          // 如果限流超过1小时，自动解除
+          if (hoursSinceRateLimit >= 1) {
+            await this.removeAccountRateLimit(accountId);
+            return false;
+          }
+
+          return true;
         }
-
-        return true;
       }
 
       return false;
@@ -821,13 +854,29 @@ class ClaudeAccountService {
         const rateLimitedAt = new Date(accountData.rateLimitedAt);
         const now = new Date();
         const minutesSinceRateLimit = Math.floor((now - rateLimitedAt) / (1000 * 60));
-        const minutesRemaining = Math.max(0, 60 - minutesSinceRateLimit);
+        
+        let minutesRemaining;
+        let rateLimitEndAt;
+        
+        // 优先使用 rateLimitEndAt（基于会话窗口）
+        if (accountData.rateLimitEndAt) {
+          rateLimitEndAt = accountData.rateLimitEndAt;
+          const endTime = new Date(accountData.rateLimitEndAt);
+          minutesRemaining = Math.max(0, Math.ceil((endTime - now) / (1000 * 60)));
+        } else {
+          // 兼容旧数据：使用1小时限流
+          minutesRemaining = Math.max(0, 60 - minutesSinceRateLimit);
+          // 计算预期的结束时间
+          const endTime = new Date(rateLimitedAt.getTime() + 60 * 60 * 1000);
+          rateLimitEndAt = endTime.toISOString();
+        }
 
         return {
           isRateLimited: minutesRemaining > 0,
           rateLimitedAt: accountData.rateLimitedAt,
           minutesSinceRateLimit,
-          minutesRemaining
+          minutesRemaining,
+          rateLimitEndAt  // 新增：限流结束时间
         };
       }
 
@@ -835,7 +884,8 @@ class ClaudeAccountService {
         isRateLimited: false,
         rateLimitedAt: null,
         minutesSinceRateLimit: 0,
-        minutesRemaining: 0
+        minutesRemaining: 0,
+        rateLimitEndAt: null
       };
     } catch (error) {
       logger.error(`❌ Failed to get rate limit info for account: ${accountId}`, error);
@@ -881,7 +931,7 @@ class ClaudeAccountService {
       accountData.sessionWindowEnd = windowEnd.toISOString();
       accountData.lastRequestTime = now.toISOString();
 
-      logger.info(`🕐 Created new session window for account ${accountData.name} (${accountId}): ${windowStart.toISOString()} - ${windowEnd.toISOString()}`);
+      logger.info(`🕐 Created new session window for account ${accountData.name} (${accountId}): ${windowStart.toISOString()} - ${windowEnd.toISOString()} (from current time)`);
 
       return accountData;
     } catch (error) {
@@ -892,11 +942,8 @@ class ClaudeAccountService {
 
   // 🕐 计算会话窗口开始时间
   _calculateSessionWindowStart(requestTime) {
-    const hour = requestTime.getHours();
-    const windowStartHour = Math.floor(hour / 5) * 5; // 向下取整到最近的5小时边界
-    
+    // 从当前时间开始创建窗口，只将分钟取整到整点
     const windowStart = new Date(requestTime);
-    windowStart.setHours(windowStartHour);
     windowStart.setMinutes(0);
     windowStart.setSeconds(0);
     windowStart.setMilliseconds(0);
