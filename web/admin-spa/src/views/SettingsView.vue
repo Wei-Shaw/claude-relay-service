@@ -5,7 +5,7 @@
       <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
         <div>
           <h3 class="text-xl font-bold text-gray-900 mb-2">
-            其他设置
+            网站设置
           </h3>
           <p class="text-gray-600">
             自定义网站名称和图标
@@ -647,10 +647,12 @@ const handleBackupImport = async (event) => {
     const formData = new FormData()
     formData.append('backup', file)
     
+    const token = localStorage.getItem('authToken') || localStorage.getItem('adminToken')
+    
     const response = await fetch('/admin/backup/import', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        'Authorization': `Bearer ${token}`
       },
       body: formData
     })

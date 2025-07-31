@@ -56,6 +56,7 @@
     "inquirer": "^8.2.6",
     "ioredis": "^5.3.2",
     "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
     "ora": "^5.4.1",
     "rate-limiter-flexible": "^5.0.5",
     "socks-proxy-agent": "^8.0.2",

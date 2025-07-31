@@ -8,7 +8,7 @@ const logger = require('../utils/logger');
 class BackupService {
   constructor() {
     // 默认备份路径 - 与init.json同级
-    this.defaultBackupPath = path.join(process.cwd(), 'config', 'backups');
+    this.defaultBackupPath = path.join(process.cwd(), 'data', 'backups');
     // 临时文件路径
     this.tempPath = path.join(process.cwd(), 'temp');
     // 确保备份目录存在
@@ -146,13 +146,22 @@ class BackupService {
               case 'set':
                 value = await client.smembers(key);
                 break;
-              case 'zset':
-                const members = await client.zrange(key, 0, -1, 'WITHSCORES');
+              case 'zset': {
+                // 兼容不同版本的 Redis 客户端
+                let members;
+                try {
+                  // 新版本语法
+                  members = await client.zrange(key, 0, -1, { WITHSCORES: true });
+                } catch (err) {
+                  // 旧版本语法
+                  members = await client.zrange(key, 0, -1, 'WITHSCORES');
+                }
                 value = [];
                 for (let j = 0; j < members.length; j += 2) {
                   value.push({ member: members[j], score: parseFloat(members[j + 1]) });
                 }
                 break;
+              }
               default:
                 logger.warn(`⚠️ Unsupported type ${type} for key ${key}`);
                 continue;

@@ -13,6 +13,7 @@ const claudeCodeHeadersService = require('../services/claudeCodeHeadersService')
 const axios = require('axios');
 const fs = require('fs').promises;
 const path = require('path');
+const multer = require('multer');
 const config = require('../../config/config');
 const backupService = require('../services/backupService');
 
@@ -2829,25 +2830,17 @@ router.delete('/backup/:backupId', authenticateAdmin, async (req, res) => {
   }
 });
 
+// 配置备份上传
+const backupUpload = multer({
+  dest: path.join(process.cwd(), 'temp', 'uploads'),
+  limits: {
+    fileSize: 100 * 1024 * 1024 // 100MB 限制
+  }
+}).single('backup');
+
 // 导入备份文件
-router.post('/backup/import', authenticateAdmin, async (req, res) => {
-  const multer = require('multer');
-  const upload = multer({
-    dest: path.join(process.cwd(), 'temp', 'uploads'),
-    limits: {
-      fileSize: 100 * 1024 * 1024 // 100MB 限制
-    }
-  }).single('backup');
-
-  upload(req, res, async (err) => {
-    if (err) {
-      logger.error('❌ Upload error:', err);
-      return res.status(400).json({
-        error: 'Upload failed',
-        message: err.message
-      });
-    }
-
+router.post('/backup/import', backupUpload, authenticateAdmin, async (req, res) => {
+  try {
     if (!req.file) {
       return res.status(400).json({
         error: 'No file uploaded',
@@ -2855,70 +2848,62 @@ router.post('/backup/import', authenticateAdmin, async (req, res) => {
       });
     }
 
-    try {
-      const { restore } = req.body;
-      const shouldRestore = restore === 'true' || restore === true;
+    const { restore } = req.body;
+    const shouldRestore = restore === 'true' || restore === true;
 
-      logger.info(`📥 Importing backup file: ${req.file.originalname}`);
+    logger.info(`📥 Importing backup file: ${req.file.originalname}`);
 
-      // 验证文件扩展名
-      if (!req.file.originalname.endsWith('.zip')) {
-        await fs.unlink(req.file.path);
-        return res.status(400).json({
-          error: 'Invalid file type',
-          message: 'Only .zip backup files are supported'
-        });
-      }
-
-      // 导入备份
-      const result = await backupService.importBackup(req.file.path, {
-        restore: shouldRestore
-      });
-
-      // 清理上传的临时文件
+    // 验证文件扩展名
+    if (!req.file.originalname.endsWith('.zip')) {
       await fs.unlink(req.file.path);
-
-      res.json({
-        success: true,
-        message: shouldRestore ? 'Backup imported and restored successfully' : 'Backup imported successfully',
-        data: result
+      return res.status(400).json({
+        error: 'Invalid file type',
+        message: 'Only .zip backup files are supported'
       });
-    } catch (error) {
-      // 清理上传的临时文件
+    }
+
+    // 导入备份
+    const result = await backupService.importBackup(req.file.path, {
+      restore: shouldRestore
+    });
+
+    // 清理上传的临时文件
+    await fs.unlink(req.file.path);
+
+    res.json({
+      success: true,
+      message: shouldRestore ? 'Backup imported and restored successfully' : 'Backup imported successfully',
+      data: result
+    });
+  } catch (error) {
+    // 清理上传的临时文件
+    if (req.file && req.file.path) {
       try {
         await fs.unlink(req.file.path);
       } catch (cleanupError) {
         logger.warn('⚠️ Failed to cleanup upload file:', cleanupError.message);
       }
-
-      logger.error('❌ Failed to import backup:', error);
-      res.status(500).json({
-        error: 'Import failed',
-        message: error.message
-      });
     }
-  });
+
+    logger.error('❌ Failed to import backup:', error);
+    res.status(500).json({
+      error: 'Import failed',
+      message: error.message
+    });
+  }
 });
 
+// 配置验证文件上传
+const validateUpload = multer({
+  dest: path.join(process.cwd(), 'temp', 'uploads'),
+  limits: {
+    fileSize: 100 * 1024 * 1024 // 100MB 限制
+  }
+}).single('backup');
+
 // 验证备份文件
-router.post('/backup/validate', authenticateAdmin, async (req, res) => {
-  const multer = require('multer');
-  const upload = multer({
-    dest: path.join(process.cwd(), 'temp', 'uploads'),
-    limits: {
-      fileSize: 100 * 1024 * 1024 // 100MB 限制
-    }
-  }).single('backup');
-
-  upload(req, res, async (err) => {
-    if (err) {
-      logger.error('❌ Upload error:', err);
-      return res.status(400).json({
-        error: 'Upload failed',
-        message: err.message
-      });
-    }
-
+router.post('/backup/validate', validateUpload, authenticateAdmin, async (req, res) => {
+  try {
     if (!req.file) {
       return res.status(400).json({
         error: 'No file uploaded',
@@ -2926,34 +2911,34 @@ router.post('/backup/validate', authenticateAdmin, async (req, res) => {
       });
     }
 
-    try {
-      logger.info(`🔍 Validating backup file: ${req.file.originalname}`);
+    logger.info(`🔍 Validating backup file: ${req.file.originalname}`);
 
-      // 验证备份文件
-      const validation = await backupService.validateBackupFile(req.file.path);
+    // 验证备份文件
+    const validation = await backupService.validateBackupFile(req.file.path);
 
-      // 清理上传的临时文件
-      await fs.unlink(req.file.path);
+    // 清理上传的临时文件
+    await fs.unlink(req.file.path);
 
-      res.json({
-        success: true,
-        data: validation
-      });
-    } catch (error) {
-      // 清理上传的临时文件
+    res.json({
+      success: true,
+      data: validation
+    });
+  } catch (error) {
+    // 清理上传的临时文件
+    if (req.file && req.file.path) {
       try {
         await fs.unlink(req.file.path);
       } catch (cleanupError) {
         logger.warn('⚠️ Failed to cleanup upload file:', cleanupError.message);
       }
-
-      logger.error('❌ Failed to validate backup:', error);
-      res.status(500).json({
-        error: 'Validation failed',
-        message: error.message
-      });
     }
-  });
+
+    logger.error('❌ Failed to validate backup:', error);
+    res.status(500).json({
+      error: 'Validation failed',
+      message: error.message
+    });
+  }
 });
 
 // 🎨 OEM设置管理
