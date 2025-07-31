@@ -155,7 +155,25 @@
       >
         <!-- 自动备份设置 -->
         <div class="border-b border-gray-200 pb-6">
-          <h4 class="text-lg font-semibold text-gray-900 mb-4">自动备份设置</h4>
+          <div class="flex items-center justify-between mb-4">
+            <h4 class="text-lg font-semibold text-gray-900">自动备份设置</h4>
+            <!-- 手动备份按钮 -->
+            <button
+              class="btn bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm px-3 py-1.5"
+              :disabled="creatingBackup"
+              @click="createBackup"
+            >
+              <div
+                v-if="creatingBackup"
+                class="loading-spinner mr-2"
+              />
+              <i
+                v-else
+                class="fas fa-download mr-1.5 text-xs"
+              />
+              {{ creatingBackup ? '备份中...' : '手动备份' }}
+            </button>
+          </div>
           <div class="space-y-4">
             <!-- 启用自动备份 -->
             <div class="flex items-center justify-between">
@@ -182,18 +200,16 @@
             </div>
 
             <!-- 备份间隔 -->
-            <div
-              v-if="backupSettings.autoBackupEnabled"
-              class="ml-11"
-            >
+            <div class="ml-11">
               <label class="block text-sm font-medium text-gray-700 mb-2">
                 备份间隔（小时）
               </label>
               <input
                 v-model.number="backupSettings.autoBackupInterval"
                 type="number"
-                min="1"
+                min="0.0001"
                 max="168"
+                step="0.0001"
                 class="form-input w-32"
               >
               <p class="text-xs text-gray-500 mt-1">
@@ -221,42 +237,42 @@
           </div>
         </div>
 
-        <!-- 手动备份 -->
-        <div class="border-b border-gray-200 pb-6">
-          <h4 class="text-lg font-semibold text-gray-900 mb-4">手动备份</h4>
-          <div class="flex items-center gap-4">
-            <button
-              class="btn btn-success"
-              :disabled="creatingBackup"
-              @click="createBackup"
-            >
-              <div
-                v-if="creatingBackup"
-                class="loading-spinner mr-2"
-              />
-              <i
-                v-else
-                class="fas fa-database mr-2"
-              />
-              {{ creatingBackup ? '备份中...' : '立即备份' }}
-            </button>
-            <p class="text-sm text-gray-600">
-              创建当前数据的完整备份
-            </p>
-          </div>
-        </div>
-
         <!-- 备份历史 -->
         <div>
           <div class="flex justify-between items-center mb-4">
             <h4 class="text-lg font-semibold text-gray-900">备份历史</h4>
-            <button
-              class="text-blue-600 hover:text-blue-800 text-sm font-medium"
-              @click="loadBackupHistory"
-            >
-              <i class="fas fa-sync-alt mr-1" />
-              刷新
-            </button>
+            <div class="flex items-center gap-3">
+              <button
+                class="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                @click="loadBackupHistory"
+              >
+                <i class="fas fa-sync-alt mr-1" />
+                刷新
+              </button>
+              <!-- 导入备份按钮 -->
+              <input
+                ref="backupFileInput"
+                type="file"
+                accept=".zip"
+                class="hidden"
+                @change="handleBackupImport"
+              >
+              <button
+                class="btn bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm px-3 py-1.5"
+                :disabled="importingBackup"
+                @click="$refs.backupFileInput.click()"
+              >
+                <div
+                  v-if="importingBackup"
+                  class="loading-spinner mr-2"
+                />
+                <i
+                  v-else
+                  class="fas fa-upload mr-1.5 text-xs"
+                />
+                {{ importingBackup ? '导入中...' : '导入备份' }}
+              </button>
+            </div>
           </div>
 
           <div
@@ -279,97 +295,56 @@
 
           <div
             v-else
-            class="space-y-3"
+            class="space-y-2"
           >
             <div
               v-for="backup in backupHistory"
               :key="backup.id"
-              class="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors"
+              class="border border-gray-200 rounded-md p-2.5 hover:border-gray-300 transition-colors"
             >
               <div class="flex items-center justify-between">
-                <div>
-                  <h5 class="font-medium text-gray-900">
-                    {{ backup.fileName }}
-                  </h5>
-                  <div class="flex items-center gap-4 text-sm text-gray-500 mt-1">
-                    <span>
-                      <i class="fas fa-clock mr-1" />
-                      {{ formatDateTime(backup.timestamp) }}
-                    </span>
-                    <span>
-                      <i class="fas fa-file mr-1" />
-                      {{ formatFileSize(backup.size) }}
-                    </span>
-                    <span>
-                      <i class="fas fa-key mr-1" />
-                      {{ backup.keysCount }} 个键
-                    </span>
-                  </div>
+                <div class="flex-1 min-w-0 flex items-center gap-3 text-sm">
+                  <span class="text-gray-900 font-medium">
+                    {{ formatDateTime(backup.timestamp) }}
+                  </span>
+                  <span class="text-gray-500">
+                    {{ formatFileSize(backup.size) }}
+                  </span>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1 ml-4">
                   <button
-                    class="btn btn-sm bg-blue-600 text-white hover:bg-blue-700"
+                    class="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
+                    title="下载"
                     @click="downloadBackup(backup.id)"
                   >
-                    <i class="fas fa-download mr-1" />
-                    下载
+                    <i class="fas fa-download text-xs" />
                   </button>
                   <button
-                    class="btn btn-sm bg-orange-600 text-white hover:bg-orange-700"
+                    class="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
+                    :class="restoringBackup === backup.id ? 'opacity-50 cursor-not-allowed' : ''"
                     :disabled="restoringBackup === backup.id"
+                    title="还原"
                     @click="restoreBackup(backup.id)"
                   >
                     <div
                       v-if="restoringBackup === backup.id"
-                      class="loading-spinner mr-1"
+                      class="loading-spinner w-3 h-3"
                     />
                     <i
                       v-else
-                      class="fas fa-undo mr-1"
+                      class="fas fa-undo text-xs"
                     />
-                    还原
                   </button>
                   <button
-                    class="btn btn-sm bg-red-600 text-white hover:bg-red-700"
+                    class="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
+                    title="删除"
                     @click="deleteBackup(backup.id)"
                   >
-                    <i class="fas fa-trash" />
+                    <i class="fas fa-trash text-xs" />
                   </button>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-
-        <!-- 导入备份 -->
-        <div class="border-t border-gray-200 pt-6">
-          <h4 class="text-lg font-semibold text-gray-900 mb-4">导入备份</h4>
-          <div class="flex items-center gap-4">
-            <input
-              ref="backupFileInput"
-              type="file"
-              accept=".zip"
-              class="hidden"
-              @change="handleBackupImport"
-            >
-            <button
-              class="btn btn-primary"
-              :disabled="importingBackup"
-              @click="$refs.backupFileInput.click()"
-            >
-              <div
-                v-if="importingBackup"
-                class="loading-spinner mr-2"
-              />
-              <i
-                v-else
-                class="fas fa-upload mr-2"
-              />
-              {{ importingBackup ? '导入中...' : '选择备份文件' }}
-            </button>
-            <p class="text-sm text-gray-600">
-              支持导入 .zip 格式的备份文件
-            </p>
           </div>
         </div>
       </div>
@@ -591,24 +566,23 @@ const loadBackupHistory = async () => {
 // 下载备份
 const downloadBackup = async (backupId) => {
   try {
-    const response = await fetch(`/admin/backup/${backupId}/download`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-      }
-    })
-    
-    if (!response.ok) {
-      throw new Error('下载失败')
+    // 获取正确的 token key - 与其他 API 调用保持一致
+    const token = localStorage.getItem('authToken') || localStorage.getItem('adminToken')
+    if (!token) {
+      showToast('请先登录', 'error')
+      return
     }
     
-    const blob = await response.blob()
-    const url = window.URL.createObjectURL(blob)
+    // 构建带 token 的下载 URL
+    const downloadUrl = `/admin/backup/${backupId}/download?token=${encodeURIComponent(token)}`
+    
+    // 创建隐藏的 a 标签进行下载
     const a = document.createElement('a')
-    a.href = url
-    a.download = response.headers.get('content-disposition')?.split('filename=')[1]?.replace(/"/g, '') || `backup_${backupId}.zip`
+    a.href = downloadUrl
+    a.download = `backup_${backupId}.zip`
+    a.style.display = 'none'
     document.body.appendChild(a)
     a.click()
-    window.URL.revokeObjectURL(url)
     document.body.removeChild(a)
   } catch (error) {
     console.error('Failed to download backup:', error)
@@ -624,7 +598,7 @@ const restoreBackup = async (backupId) => {
   try {
     const result = await apiClient.post(`/admin/backup/${backupId}/restore`)
     if (result && result.success) {
-      showToast('备份还原成功', 'success')
+      showToast('还原成功', 'success')
       // 刷新页面以应用新数据
       setTimeout(() => {
         window.location.reload()

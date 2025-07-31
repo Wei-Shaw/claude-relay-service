@@ -7,8 +7,8 @@ const logger = require('../utils/logger');
 
 class BackupService {
   constructor() {
-    // 默认备份路径
-    this.defaultBackupPath = path.join(process.cwd(), 'backups');
+    // 默认备份路径 - 与init.json同级
+    this.defaultBackupPath = path.join(process.cwd(), 'config', 'backups');
     // 临时文件路径
     this.tempPath = path.join(process.cwd(), 'temp');
     // 确保备份目录存在
@@ -55,7 +55,7 @@ class BackupService {
     // 返回默认设置
     return {
       autoBackupEnabled: false,
-      autoBackupInterval: 7, // 默认7天
+      autoBackupInterval: 24, // 默认24小时
       backupPath: this.defaultBackupPath,
       maxBackups: 10 // 最多保留10个备份
     };
@@ -208,7 +208,7 @@ class BackupService {
       // 清理临时文件
       await fs.rm(tempDir, { recursive: true, force: true });
       
-      // 记录备份信息到Redis
+      // 获取文件信息
       const stat = await fs.stat(zipPath);
       const backupInfo = {
         id: backupId,
@@ -221,9 +221,6 @@ class BackupService {
         format: 'zip',
         version: '3.0'
       };
-      
-      await client.lpush('backup:history', JSON.stringify(backupInfo));
-      await client.ltrim('backup:history', 0, 99); // 只保留最近100条记录
       
       logger.success(`✅ Backup completed: ${backupId} (${backupInfo.duration}ms)`);
       
@@ -267,33 +264,58 @@ class BackupService {
     });
   }
 
-  // 获取备份历史
+  // 获取备份历史（扫描目录）
   async getBackupHistory(limit = 20) {
     try {
-      const client = redis.getClientSafe();
-      const history = await client.lrange('backup:history', 0, limit - 1);
-      
       const backupPath = await this.getBackupPath();
       const backups = [];
       
-      for (const item of history) {
+      // 确保备份目录存在
+      await fs.mkdir(backupPath, { recursive: true });
+      
+      // 读取目录中的所有文件
+      const files = await fs.readdir(backupPath);
+      
+      // 过滤出备份文件
+      const backupFiles = files.filter(file => file.startsWith('backup_') && file.endsWith('.zip'));
+      
+      // 获取每个备份文件的信息
+      for (const fileName of backupFiles) {
         try {
-          const backupInfo = JSON.parse(item);
-          // 检查文件是否存在
-          const filePath = path.join(backupPath, backupInfo.fileName);
-          try {
-            await fs.access(filePath);
-            backupInfo.exists = true;
-          } catch {
-            backupInfo.exists = false;
-          }
+          const filePath = path.join(backupPath, fileName);
+          const stat = await fs.stat(filePath);
+          
+          // 从文件名提取备份ID和时间戳
+          const id = fileName.replace('.zip', '');
+          // backup_2025-07-31T08-13-18-066Z -> 2025-07-31T08:13:18.066Z
+          const timestampMatch = id.match(/backup_(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z)/);
+          if (!timestampMatch) continue;
+          
+          const timestamp = timestampMatch[1].replace(/-(\d{2})-(\d{2})-(\d{3}Z)$/, ':$1:$2.$3');
+          
+          const backupInfo = {
+            id: id,
+            fileName: fileName,
+            filePath: filePath,
+            timestamp: timestamp,
+            size: stat.size,
+            keysCount: 0, // 无法从文件名获取，设为0
+            exists: true,
+            format: 'zip',
+            version: '3.0'
+          };
+          
           backups.push(backupInfo);
         } catch (error) {
-          logger.warn('⚠️ Failed to parse backup history item:', error.message);
+          logger.warn(`⚠️ Failed to read backup file ${fileName}:`, error.message);
         }
       }
       
-      return backups;
+      // 按时间戳降序排序（最新的在前）
+      backups.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      
+      // 限制返回数量
+      return backups.slice(0, limit);
     } catch (error) {
       logger.error('❌ Failed to get backup history:', error);
       return [];
@@ -380,7 +402,6 @@ class BackupService {
       
       // 保存重要数据
       logger.info('📦 Saving important data before restore...');
-      const backupHistory = await client.lrange('backup:history', 0, -1);
       const backupSettings = await client.get('backup:settings');
       
       // 清空数据库
@@ -404,11 +425,7 @@ class BackupService {
                 break;
               case 'hash':
                 if (Object.keys(value).length > 0) {
-                  const hashData = [];
-                  for (const [field, val] of Object.entries(value)) {
-                    hashData.push(field, val);
-                  }
-                  await client.hset(key, ...hashData);
+                  await client.hset(key, value);
                 }
                 break;
               case 'list':
@@ -453,10 +470,7 @@ class BackupService {
       }
       
       // 恢复重要数据
-      logger.info('📋 Restoring backup history and settings...');
-      if (backupHistory && backupHistory.length > 0) {
-        await client.rpush('backup:history', ...backupHistory);
-      }
+      logger.info('📋 Restoring backup settings...');
       if (backupSettings) {
         await client.set('backup:settings', backupSettings);
       }
@@ -508,27 +522,17 @@ class BackupService {
       const fileName = `${backupId}.zip`;
       const filePath = path.join(backupPath, fileName);
       
-      // 删除文件
-      await fs.unlink(filePath);
-      
-      // 从历史记录中移除
-      const client = redis.getClientSafe();
-      const history = await client.lrange('backup:history', 0, -1);
-      const newHistory = history.filter(item => {
-        try {
-          const backupInfo = JSON.parse(item);
-          return backupInfo.id !== backupId;
-        } catch {
-          return true;
-        }
-      });
-      
-      await client.del('backup:history');
-      if (newHistory.length > 0) {
-        await client.rpush('backup:history', ...newHistory);
+      // 删除zip文件
+      try {
+        await fs.access(filePath);
+        await fs.unlink(filePath);
+        logger.info(`🗑️ Deleted backup: ${fileName}`);
+      } catch (error) {
+        logger.warn(`⚠️ Backup file not found: ${fileName}`);
+        // 文件不存在时不抛出错误，只记录警告
+        return false;
       }
       
-      logger.info(`🗑️ Backup deleted: ${backupId}`);
       return true;
     } catch (error) {
       logger.error(`❌ Failed to delete backup ${backupId}:`, error);
@@ -602,9 +606,8 @@ class BackupService {
       const destPath = path.join(backupPath, `${importedBackupId}.zip`);
       await fs.copyFile(filePath, destPath);
       
-      // 记录到备份历史
+      // 创建备份信息（仅用于返回）
       const stat = await fs.stat(destPath);
-      const client = redis.getClientSafe();
       const backupInfo = {
         id: importedBackupId,
         fileName: `${importedBackupId}.zip`,
@@ -618,9 +621,6 @@ class BackupService {
         imported: true,
         importedAt: new Date().toISOString()
       };
-      
-      await client.lpush('backup:history', JSON.stringify(backupInfo));
-      await client.ltrim('backup:history', 0, 99);
       
       // 清理临时文件
       await fs.rm(tempDir, { recursive: true, force: true });

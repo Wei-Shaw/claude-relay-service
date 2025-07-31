@@ -28,15 +28,15 @@ router.get('/api-keys/:keyId/cost-debug', authenticateAdmin, async (req, res) =>
     const dailyCost = await redis.getDailyCost(keyId);
     const today = redis.getDateStringInTimezone();
     const client = redis.getClientSafe();
-    
+
     // 获取所有相关的Redis键
     const costKeys = await client.keys(`usage:cost:*:${keyId}:*`);
     const keyValues = {};
-    
+
     for (const key of costKeys) {
       keyValues[key] = await client.get(key);
     }
-    
+
     res.json({
       keyId,
       today,
@@ -56,11 +56,11 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
   try {
     const { timeRange = 'all' } = req.query; // all, 7days, monthly
     const apiKeys = await apiKeyService.getAllApiKeys();
-    
+
     // 根据时间范围计算查询模式
     const now = new Date();
     let searchPatterns = [];
-    
+
     if (timeRange === 'today') {
       // 今日 - 使用时区日期
       const redis = require('../models/redis');
@@ -84,11 +84,11 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
       const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`;
       searchPatterns.push(`usage:monthly:*:${currentMonth}`);
     }
-    
+
     // 为每个API Key计算准确的费用和统计数据
     for (const apiKey of apiKeys) {
       const client = redis.getClientSafe();
-      
+
       if (timeRange === 'all') {
         // 全部时间：保持原有逻辑
         if (apiKey.usage && apiKey.usage.total) {
@@ -96,15 +96,15 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
           // 获取所有时间的模型统计数据
           const monthlyKeys = await client.keys(`usage:${apiKey.id}:model:monthly:*:*`);
         const modelStatsMap = new Map();
-        
+
         // 汇总所有月份的数据
         for (const key of monthlyKeys) {
           const match = key.match(/usage:.+:model:monthly:(.+):\d{4}-\d{2}$/);
           if (!match) continue;
-          
+
           const model = match[1];
           const data = await client.hgetall(key);
-          
+
           if (data && Object.keys(data).length > 0) {
             if (!modelStatsMap.has(model)) {
               modelStatsMap.set(model, {
@@ -114,7 +114,7 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
                 cacheReadTokens: 0
               });
             }
-            
+
             const stats = modelStatsMap.get(model);
             stats.inputTokens += parseInt(data.totalInputTokens) || parseInt(data.inputTokens) || 0;
             stats.outputTokens += parseInt(data.totalOutputTokens) || parseInt(data.outputTokens) || 0;
@@ -122,9 +122,9 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
             stats.cacheReadTokens += parseInt(data.totalCacheReadTokens) || parseInt(data.cacheReadTokens) || 0;
           }
         }
-        
+
         let totalCost = 0;
-        
+
         // 计算每个模型的费用
         for (const [model, stats] of modelStatsMap) {
           const usage = {
@@ -133,11 +133,11 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
             cache_creation_input_tokens: stats.cacheCreateTokens,
             cache_read_input_tokens: stats.cacheReadTokens
           };
-          
+
           const costResult = CostCalculator.calculateCost(usage, model);
           totalCost += costResult.costs.total;
         }
-        
+
         // 如果没有详细的模型数据，使用总量数据和默认模型计算
         if (modelStatsMap.size === 0) {
           const usage = {
@@ -146,11 +146,11 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
             cache_creation_input_tokens: apiKey.usage.total.cacheCreateTokens || 0,
             cache_read_input_tokens: apiKey.usage.total.cacheReadTokens || 0
           };
-          
+
           const costResult = CostCalculator.calculateCost(usage, 'claude-3-5-haiku-20241022');
           totalCost = costResult.costs.total;
         }
-        
+
           // 添加格式化的费用到响应数据
           apiKey.usage.total.cost = totalCost;
           apiKey.usage.total.formattedCost = CostCalculator.formatCost(totalCost);
@@ -166,11 +166,11 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
           cacheCreateTokens: 0,
           cacheReadTokens: 0
         };
-        
+
         // 获取指定时间范围的统计数据
         for (const pattern of searchPatterns) {
           const keys = await client.keys(pattern.replace('*', apiKey.id));
-          
+
           for (const key of keys) {
             const data = await client.hgetall(key);
             if (data && Object.keys(data).length > 0) {
@@ -185,22 +185,22 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
             }
           }
         }
-        
+
         // 计算指定时间范围的费用
         let totalCost = 0;
         const redis = require('../models/redis');
         const tzToday = redis.getDateStringInTimezone(now);
         const tzDate = redis.getDateInTimezone(now);
         const tzMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`;
-        
-        const modelKeys = timeRange === 'today' 
+
+        const modelKeys = timeRange === 'today'
           ? await client.keys(`usage:${apiKey.id}:model:daily:*:${tzToday}`)
-          : timeRange === '7days' 
+          : timeRange === '7days'
           ? await client.keys(`usage:${apiKey.id}:model:daily:*:*`)
           : await client.keys(`usage:${apiKey.id}:model:monthly:*:${tzMonth}`);
-        
+
         const modelStatsMap = new Map();
-        
+
         // 过滤和汇总相应时间范围的模型数据
         for (const key of modelKeys) {
           if (timeRange === '7days') {
@@ -214,13 +214,13 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
           } else if (timeRange === 'today') {
             // today选项已经在查询时过滤了，不需要额外处理
           }
-          
+
           const modelMatch = key.match(/usage:.+:model:(?:daily|monthly):(.+):\d{4}-\d{2}(?:-\d{2})?$/);
           if (!modelMatch) continue;
-          
+
           const model = modelMatch[1];
           const data = await client.hgetall(key);
-          
+
           if (data && Object.keys(data).length > 0) {
             if (!modelStatsMap.has(model)) {
               modelStatsMap.set(model, {
@@ -230,7 +230,7 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
                 cacheReadTokens: 0
               });
             }
-            
+
             const stats = modelStatsMap.get(model);
             stats.inputTokens += parseInt(data.totalInputTokens) || parseInt(data.inputTokens) || 0;
             stats.outputTokens += parseInt(data.totalOutputTokens) || parseInt(data.outputTokens) || 0;
@@ -238,7 +238,7 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
             stats.cacheReadTokens += parseInt(data.totalCacheReadTokens) || parseInt(data.cacheReadTokens) || 0;
           }
         }
-        
+
         // 计算费用
         for (const [model, stats] of modelStatsMap) {
           const usage = {
@@ -247,11 +247,11 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
             cache_creation_input_tokens: stats.cacheCreateTokens,
             cache_read_input_tokens: stats.cacheReadTokens
           };
-          
+
           const costResult = CostCalculator.calculateCost(usage, model);
           totalCost += costResult.costs.total;
         }
-        
+
         // 如果没有模型数据，使用临时统计数据计算
         if (modelStatsMap.size === 0 && tempUsage.tokens > 0) {
           const usage = {
@@ -260,14 +260,14 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
             cache_creation_input_tokens: tempUsage.cacheCreateTokens,
             cache_read_input_tokens: tempUsage.cacheReadTokens
           };
-          
+
           const costResult = CostCalculator.calculateCost(usage, 'claude-3-5-haiku-20241022');
           totalCost = costResult.costs.total;
         }
-        
+
         // 使用从Redis读取的allTokens，如果没有则计算
         const allTokens = tempUsage.allTokens || (tempUsage.inputTokens + tempUsage.outputTokens + tempUsage.cacheCreateTokens + tempUsage.cacheReadTokens);
-        
+
         // 更新API Key的usage数据为指定时间范围的数据
         apiKey.usage[timeRange] = {
           ...tempUsage,
@@ -276,12 +276,12 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
           cost: totalCost,
           formattedCost: CostCalculator.formatCost(totalCost)
         };
-        
+
         // 为了保持兼容性，也更新total字段
         apiKey.usage.total = apiKey.usage[timeRange];
       }
     }
-    
+
     res.json({ success: true, data: apiKeys });
   } catch (error) {
     logger.error('❌ Failed to get API keys:', error);
@@ -309,7 +309,7 @@ router.get('/api-keys/tags', authenticateAdmin, async (req, res) => {
   try {
     const apiKeys = await apiKeyService.getAllApiKeys();
     const tagSet = new Set();
-    
+
     // 收集所有API Keys的标签
     for (const apiKey of apiKeys) {
       if (apiKey.tags && Array.isArray(apiKey.tags)) {
@@ -320,10 +320,10 @@ router.get('/api-keys/tags', authenticateAdmin, async (req, res) => {
         });
       }
     }
-    
+
     // 转换为数组并排序
     const tags = Array.from(tagSet).sort();
-    
+
     logger.info(`📋 Retrieved ${tags.length} unique tags from API keys`);
     res.json({ success: true, data: tags });
   } catch (error) {
@@ -376,11 +376,11 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
     if (concurrencyLimit !== undefined && concurrencyLimit !== null && concurrencyLimit !== '' && (!Number.isInteger(Number(concurrencyLimit)) || Number(concurrencyLimit) < 0)) {
       return res.status(400).json({ error: 'Concurrency limit must be a non-negative integer' });
     }
-    
+
     if (rateLimitWindow !== undefined && rateLimitWindow !== null && rateLimitWindow !== '' && (!Number.isInteger(Number(rateLimitWindow)) || Number(rateLimitWindow) < 1)) {
       return res.status(400).json({ error: 'Rate limit window must be a positive integer (minutes)' });
     }
-    
+
     if (rateLimitRequests !== undefined && rateLimitRequests !== null && rateLimitRequests !== '' && (!Number.isInteger(Number(rateLimitRequests)) || Number(rateLimitRequests) < 1)) {
       return res.status(400).json({ error: 'Rate limit requests must be a positive integer' });
     }
@@ -407,7 +407,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
     if (tags !== undefined && !Array.isArray(tags)) {
       return res.status(400).json({ error: 'Tags must be an array' });
     }
-    
+
     if (tags && tags.some(tag => typeof tag !== 'string' || tag.trim().length === 0)) {
       return res.status(400).json({ error: 'All tags must be non-empty strings' });
     }
@@ -448,7 +448,7 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
 
     // 只允许更新指定字段
     const updates = {};
-    
+
     if (tokenLimit !== undefined && tokenLimit !== null && tokenLimit !== '') {
       if (!Number.isInteger(Number(tokenLimit)) || Number(tokenLimit) < 0) {
         return res.status(400).json({ error: 'Token limit must be a non-negative integer' });
@@ -462,14 +462,14 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       }
       updates.concurrencyLimit = Number(concurrencyLimit);
     }
-    
+
     if (rateLimitWindow !== undefined && rateLimitWindow !== null && rateLimitWindow !== '') {
       if (!Number.isInteger(Number(rateLimitWindow)) || Number(rateLimitWindow) < 0) {
         return res.status(400).json({ error: 'Rate limit window must be a non-negative integer (minutes)' });
       }
       updates.rateLimitWindow = Number(rateLimitWindow);
     }
-    
+
     if (rateLimitRequests !== undefined && rateLimitRequests !== null && rateLimitRequests !== '') {
       if (!Number.isInteger(Number(rateLimitRequests)) || Number(rateLimitRequests) < 0) {
         return res.status(400).json({ error: 'Rate limit requests must be a non-negative integer' });
@@ -481,7 +481,7 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       // 空字符串表示解绑，null或空字符串都设置为空字符串
       updates.claudeAccountId = claudeAccountId || '';
     }
-    
+
     if (claudeConsoleAccountId !== undefined) {
       // 空字符串表示解绑，null或空字符串都设置为空字符串
       updates.claudeConsoleAccountId = claudeConsoleAccountId || '';
@@ -566,7 +566,7 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
     }
 
     await apiKeyService.updateApiKey(keyId, updates);
-    
+
     logger.success(`📝 Admin updated API key: ${keyId}`);
     res.json({ success: true, message: 'API key updated successfully' });
   } catch (error) {
@@ -579,9 +579,9 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
 router.delete('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
   try {
     const { keyId } = req.params;
-    
+
     await apiKeyService.deleteApiKey(keyId);
-    
+
     logger.success(`🗑️ Admin deleted API key: ${keyId}`);
     res.json({ success: true, message: 'API key deleted successfully' });
   } catch (error) {
@@ -597,7 +597,7 @@ router.post('/claude-accounts/generate-auth-url', authenticateAdmin, async (req,
   try {
     const { proxy } = req.body; // 接收代理配置
     const oauthParams = await oauthHelper.generateOAuthParams();
-    
+
     // 将codeVerifier和state临时存储到Redis，用于后续验证
     const sessionId = require('crypto').randomUUID();
     await redis.setOAuthSession(sessionId, {
@@ -608,10 +608,10 @@ router.post('/claude-accounts/generate-auth-url', authenticateAdmin, async (req,
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10分钟过期
     });
-    
+
     logger.success('🔗 Generated OAuth authorization URL with proxy support');
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       data: {
         authUrl: oauthParams.authUrl,
         sessionId: sessionId,
@@ -634,33 +634,33 @@ router.post('/claude-accounts/generate-auth-url', authenticateAdmin, async (req,
 router.post('/claude-accounts/exchange-code', authenticateAdmin, async (req, res) => {
   try {
     const { sessionId, authorizationCode, callbackUrl } = req.body;
-    
+
     if (!sessionId || (!authorizationCode && !callbackUrl)) {
       return res.status(400).json({ error: 'Session ID and authorization code (or callback URL) are required' });
     }
-    
+
     // 从Redis获取OAuth会话信息
     const oauthSession = await redis.getOAuthSession(sessionId);
     if (!oauthSession) {
       return res.status(400).json({ error: 'Invalid or expired OAuth session' });
     }
-    
+
     // 检查会话是否过期
     if (new Date() > new Date(oauthSession.expiresAt)) {
       await redis.deleteOAuthSession(sessionId);
       return res.status(400).json({ error: 'OAuth session has expired, please generate a new authorization URL' });
     }
-    
+
     // 统一处理授权码输入（可能是直接的code或完整的回调URL）
     let finalAuthCode;
     const inputValue = callbackUrl || authorizationCode;
-    
+
     try {
       finalAuthCode = oauthHelper.parseCallbackUrl(inputValue);
     } catch (parseError) {
       return res.status(400).json({ error: 'Failed to parse authorization input', message: parseError.message });
     }
-    
+
     // 交换访问令牌
     const tokenData = await oauthHelper.exchangeCodeForTokens(
       finalAuthCode,
@@ -668,13 +668,13 @@ router.post('/claude-accounts/exchange-code', authenticateAdmin, async (req, res
       oauthSession.state,
       oauthSession.proxy // 传递代理配置
     );
-    
+
     // 清理OAuth会话
     await redis.deleteOAuthSession(sessionId);
-    
+
     logger.success('🎉 Successfully exchanged authorization code for tokens');
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       data: {
         claudeAiOauth: tokenData
       }
@@ -695,7 +695,7 @@ router.post('/claude-accounts/exchange-code', authenticateAdmin, async (req, res
 router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
   try {
     const accounts = await claudeAccountService.getAllAccounts();
-    
+
     // 为每个账户添加使用统计信息
     const accountsWithStats = await Promise.all(accounts.map(async (account) => {
       try {
@@ -721,7 +721,7 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
         };
       }
     }));
-    
+
     res.json({ success: true, data: accountsWithStats });
   } catch (error) {
     logger.error('❌ Failed to get Claude accounts:', error);
@@ -790,7 +790,7 @@ router.put('/claude-accounts/:accountId', authenticateAdmin, async (req, res) =>
     }
 
     await claudeAccountService.updateAccount(accountId, updates);
-    
+
     logger.success(`📝 Admin updated Claude account: ${accountId}`);
     res.json({ success: true, message: 'Claude account updated successfully' });
   } catch (error) {
@@ -803,9 +803,9 @@ router.put('/claude-accounts/:accountId', authenticateAdmin, async (req, res) =>
 router.delete('/claude-accounts/:accountId', authenticateAdmin, async (req, res) => {
   try {
     const { accountId } = req.params;
-    
+
     await claudeAccountService.deleteAccount(accountId);
-    
+
     logger.success(`🗑️ Admin deleted Claude account: ${accountId}`);
     res.json({ success: true, message: 'Claude account deleted successfully' });
   } catch (error) {
@@ -818,9 +818,9 @@ router.delete('/claude-accounts/:accountId', authenticateAdmin, async (req, res)
 router.post('/claude-accounts/:accountId/refresh', authenticateAdmin, async (req, res) => {
   try {
     const { accountId } = req.params;
-    
+
     const result = await claudeAccountService.refreshAccountToken(accountId);
-    
+
     logger.success(`🔄 Admin refreshed token for Claude account: ${accountId}`);
     res.json({ success: true, data: result });
   } catch (error) {
@@ -833,17 +833,17 @@ router.post('/claude-accounts/:accountId/refresh', authenticateAdmin, async (req
 router.put('/claude-accounts/:accountId/toggle-schedulable', authenticateAdmin, async (req, res) => {
   try {
     const { accountId } = req.params;
-    
+
     const accounts = await claudeAccountService.getAllAccounts();
     const account = accounts.find(acc => acc.id === accountId);
-    
+
     if (!account) {
       return res.status(404).json({ error: 'Account not found' });
     }
-    
+
     const newSchedulable = !account.schedulable;
     await claudeAccountService.updateAccount(accountId, { schedulable: newSchedulable });
-    
+
     logger.success(`🔄 Admin toggled Claude account schedulable status: ${accountId} -> ${newSchedulable ? 'schedulable' : 'not schedulable'}`);
     res.json({ success: true, schedulable: newSchedulable });
   } catch (error) {
@@ -858,7 +858,7 @@ router.put('/claude-accounts/:accountId/toggle-schedulable', authenticateAdmin, 
 router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
   try {
     const accounts = await claudeConsoleAccountService.getAllAccounts();
-    
+
     // 为每个账户添加使用统计信息
     const accountsWithStats = await Promise.all(accounts.map(async (account) => {
       try {
@@ -883,7 +883,7 @@ router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
         };
       }
     }));
-    
+
     res.json({ success: true, data: accountsWithStats });
   } catch (error) {
     logger.error('❌ Failed to get Claude Console accounts:', error);
@@ -954,7 +954,7 @@ router.put('/claude-console-accounts/:accountId', authenticateAdmin, async (req,
     }
 
     await claudeConsoleAccountService.updateAccount(accountId, updates);
-    
+
     logger.success(`📝 Admin updated Claude Console account: ${accountId}`);
     res.json({ success: true, message: 'Claude Console account updated successfully' });
   } catch (error) {
@@ -967,9 +967,9 @@ router.put('/claude-console-accounts/:accountId', authenticateAdmin, async (req,
 router.delete('/claude-console-accounts/:accountId', authenticateAdmin, async (req, res) => {
   try {
     const { accountId } = req.params;
-    
+
     await claudeConsoleAccountService.deleteAccount(accountId);
-    
+
     logger.success(`🗑️ Admin deleted Claude Console account: ${accountId}`);
     res.json({ success: true, message: 'Claude Console account deleted successfully' });
   } catch (error) {
@@ -983,15 +983,15 @@ router.delete('/claude-console-accounts/:accountId', authenticateAdmin, async (r
 router.put('/claude-console-accounts/:accountId/toggle', authenticateAdmin, async (req, res) => {
   try {
     const { accountId } = req.params;
-    
+
     const account = await claudeConsoleAccountService.getAccount(accountId);
     if (!account) {
       return res.status(404).json({ error: 'Account not found' });
     }
-    
+
     const newStatus = !account.isActive;
     await claudeConsoleAccountService.updateAccount(accountId, { isActive: newStatus });
-    
+
     logger.success(`🔄 Admin toggled Claude Console account status: ${accountId} -> ${newStatus ? 'active' : 'inactive'}`);
     res.json({ success: true, isActive: newStatus });
   } catch (error) {
@@ -1004,15 +1004,15 @@ router.put('/claude-console-accounts/:accountId/toggle', authenticateAdmin, asyn
 router.put('/claude-console-accounts/:accountId/toggle-schedulable', authenticateAdmin, async (req, res) => {
   try {
     const { accountId } = req.params;
-    
+
     const account = await claudeConsoleAccountService.getAccount(accountId);
     if (!account) {
       return res.status(404).json({ error: 'Account not found' });
     }
-    
+
     const newSchedulable = !account.schedulable;
     await claudeConsoleAccountService.updateAccount(accountId, { schedulable: newSchedulable });
-    
+
     logger.success(`🔄 Admin toggled Claude Console account schedulable status: ${accountId} -> ${newSchedulable ? 'schedulable' : 'not schedulable'}`);
     res.json({ success: true, schedulable: newSchedulable });
   } catch (error) {
@@ -1027,14 +1027,14 @@ router.put('/claude-console-accounts/:accountId/toggle-schedulable', authenticat
 router.post('/gemini-accounts/generate-auth-url', authenticateAdmin, async (req, res) => {
   try {
     const { state } = req.body;
-    
+
     // 使用固定的 localhost:45462 作为回调地址
     const redirectUri = 'http://localhost:45462';
-    
+
     logger.info(`Generating Gemini OAuth URL with redirect_uri: ${redirectUri}`);
-    
+
     const { authUrl, state: authState } = await geminiAccountService.generateAuthUrl(state, redirectUri);
-    
+
     // 创建 OAuth 会话
     const sessionId = authState;
     await redis.setOAuthSession(sessionId, {
@@ -1043,14 +1043,14 @@ router.post('/gemini-accounts/generate-auth-url', authenticateAdmin, async (req,
       redirectUri: redirectUri, // 保存固定的 redirect_uri 用于 token 交换
       createdAt: new Date().toISOString()
     });
-    
+
     logger.info(`Generated Gemini OAuth URL with session: ${sessionId}`);
-    res.json({ 
-      success: true, 
-      data: { 
+    res.json({
+      success: true,
+      data: {
         authUrl,
         sessionId
-      } 
+      }
     });
   } catch (error) {
     logger.error('❌ Failed to generate Gemini auth URL:', error);
@@ -1062,13 +1062,13 @@ router.post('/gemini-accounts/generate-auth-url', authenticateAdmin, async (req,
 router.post('/gemini-accounts/poll-auth-status', authenticateAdmin, async (req, res) => {
   try {
     const { sessionId } = req.body;
-    
+
     if (!sessionId) {
       return res.status(400).json({ error: 'Session ID is required' });
     }
-    
+
     const result = await geminiAccountService.pollAuthorizationStatus(sessionId);
-    
+
     if (result.success) {
       logger.success(`✅ Gemini OAuth authorization successful for session: ${sessionId}`);
       res.json({ success: true, data: { tokens: result.tokens } });
@@ -1085,22 +1085,22 @@ router.post('/gemini-accounts/poll-auth-status', authenticateAdmin, async (req, 
 router.post('/gemini-accounts/exchange-code', authenticateAdmin, async (req, res) => {
   try {
     const { code, sessionId } = req.body;
-    
+
     if (!code) {
       return res.status(400).json({ error: 'Authorization code is required' });
     }
-    
+
     // 使用固定的 localhost:45462 作为 redirect_uri
     const redirectUri = 'http://localhost:45462';
     logger.info(`Using fixed redirect_uri: ${redirectUri}`);
-    
+
     const tokens = await geminiAccountService.exchangeCodeForTokens(code, redirectUri);
-    
+
     // 清理 OAuth 会话
     if (sessionId) {
       await redis.deleteOAuthSession(sessionId);
     }
-    
+
     logger.success('✅ Successfully exchanged Gemini authorization code');
     res.json({ success: true, data: { tokens } });
   } catch (error) {
@@ -1113,7 +1113,7 @@ router.post('/gemini-accounts/exchange-code', authenticateAdmin, async (req, res
 router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
   try {
     const accounts = await geminiAccountService.getAllAccounts();
-    
+
     // 为Gemini账户添加空的使用统计（暂时）
     const accountsWithStats = accounts.map(account => ({
       ...account,
@@ -1123,7 +1123,7 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
         averages: { rpm: 0, tpm: 0 }
       }
     }));
-    
+
     res.json({ success: true, data: accountsWithStats });
   } catch (error) {
     logger.error('❌ Failed to get Gemini accounts:', error);
@@ -1135,14 +1135,14 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
 router.post('/gemini-accounts', authenticateAdmin, async (req, res) => {
   try {
     const accountData = req.body;
-    
+
     // 输入验证
     if (!accountData.name) {
       return res.status(400).json({ error: 'Account name is required' });
     }
-    
+
     const newAccount = await geminiAccountService.createAccount(accountData);
-    
+
     logger.success(`🏢 Admin created new Gemini account: ${accountData.name}`);
     res.json({ success: true, data: newAccount });
   } catch (error) {
@@ -1156,9 +1156,9 @@ router.put('/gemini-accounts/:accountId', authenticateAdmin, async (req, res) =>
   try {
     const { accountId } = req.params;
     const updates = req.body;
-    
+
     const updatedAccount = await geminiAccountService.updateAccount(accountId, updates);
-    
+
     logger.success(`📝 Admin updated Gemini account: ${accountId}`);
     res.json({ success: true, data: updatedAccount });
   } catch (error) {
@@ -1171,9 +1171,9 @@ router.put('/gemini-accounts/:accountId', authenticateAdmin, async (req, res) =>
 router.delete('/gemini-accounts/:accountId', authenticateAdmin, async (req, res) => {
   try {
     const { accountId } = req.params;
-    
+
     await geminiAccountService.deleteAccount(accountId);
-    
+
     logger.success(`🗑️ Admin deleted Gemini account: ${accountId}`);
     res.json({ success: true, message: 'Gemini account deleted successfully' });
   } catch (error) {
@@ -1186,9 +1186,9 @@ router.delete('/gemini-accounts/:accountId', authenticateAdmin, async (req, res)
 router.post('/gemini-accounts/:accountId/refresh', authenticateAdmin, async (req, res) => {
   try {
     const { accountId } = req.params;
-    
+
     const result = await geminiAccountService.refreshAccountToken(accountId);
-    
+
     logger.success(`🔄 Admin refreshed token for Gemini account: ${accountId}`);
     res.json({ success: true, data: result });
   } catch (error) {
@@ -1203,7 +1203,7 @@ router.post('/gemini-accounts/:accountId/refresh', authenticateAdmin, async (req
 router.get('/accounts/usage-stats', authenticateAdmin, async (req, res) => {
   try {
     const accountsStats = await redis.getAllAccountsUsageStats();
-    
+
     res.json({
       success: true,
       data: accountsStats,
@@ -1230,7 +1230,7 @@ router.get('/accounts/:accountId/usage-stats', authenticateAdmin, async (req, re
   try {
     const { accountId } = req.params;
     const accountStats = await redis.getAccountUsageStats(accountId);
-    
+
     // 获取账户基本信息
     const accountData = await claudeAccountService.getAccount(accountId);
     if (!accountData) {
@@ -1239,7 +1239,7 @@ router.get('/accounts/:accountId/usage-stats', authenticateAdmin, async (req, re
         error: 'Account not found'
       });
     }
-    
+
     res.json({
       success: true,
       data: {
@@ -1288,7 +1288,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
     const totalCacheCreateTokensUsed = apiKeys.reduce((sum, key) => sum + (key.usage?.total?.cacheCreateTokens || 0), 0);
     const totalCacheReadTokensUsed = apiKeys.reduce((sum, key) => sum + (key.usage?.total?.cacheReadTokens || 0), 0);
     const totalAllTokensUsed = apiKeys.reduce((sum, key) => sum + (key.usage?.total?.allTokens || 0), 0);
-    
+
     const activeApiKeys = apiKeys.filter(key => key.isActive).length;
     const activeClaudeAccounts = claudeAccounts.filter(acc => acc.isActive && acc.status === 'active').length;
     const rateLimitedClaudeAccounts = claudeAccounts.filter(acc => acc.rateLimitStatus && acc.rateLimitStatus.isRateLimited).length;
@@ -1354,10 +1354,10 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
 router.get('/usage-stats', authenticateAdmin, async (req, res) => {
   try {
     const { period = 'daily' } = req.query; // daily, monthly
-    
+
     // 获取基础API Key统计
     const apiKeys = await apiKeyService.getAllApiKeys();
-    
+
     const stats = apiKeys.map(key => ({
       keyId: key.id,
       keyName: key.name,
@@ -1378,36 +1378,36 @@ router.get('/model-stats', authenticateAdmin, async (req, res) => {
     const today = redis.getDateStringInTimezone();
     const tzDate = redis.getDateInTimezone();
     const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`;
-    
+
     logger.info(`📊 Getting global model stats, period: ${period}, today: ${today}, currentMonth: ${currentMonth}`);
-    
+
     const client = redis.getClientSafe();
-    
+
     // 获取所有模型的统计数据
     const pattern = period === 'daily' ? `usage:model:daily:*:${today}` : `usage:model:monthly:*:${currentMonth}`;
     logger.info(`📊 Searching pattern: ${pattern}`);
-    
+
     const keys = await client.keys(pattern);
     logger.info(`📊 Found ${keys.length} matching keys:`, keys);
-    
+
     const modelStats = [];
-    
+
     for (const key of keys) {
-      const match = key.match(period === 'daily' ? 
-        /usage:model:daily:(.+):\d{4}-\d{2}-\d{2}$/ : 
+      const match = key.match(period === 'daily' ?
+        /usage:model:daily:(.+):\d{4}-\d{2}-\d{2}$/ :
         /usage:model:monthly:(.+):\d{4}-\d{2}$/
       );
-      
+
       if (!match) {
         logger.warn(`📊 Pattern mismatch for key: ${key}`);
         continue;
       }
-      
+
       const model = match[1];
       const data = await client.hgetall(key);
-      
+
       logger.info(`📊 Model ${model} data:`, data);
-      
+
       if (data && Object.keys(data).length > 0) {
         const usage = {
           input_tokens: parseInt(data.inputTokens) || 0,
@@ -1415,10 +1415,10 @@ router.get('/model-stats', authenticateAdmin, async (req, res) => {
           cache_creation_input_tokens: parseInt(data.cacheCreateTokens) || 0,
           cache_read_input_tokens: parseInt(data.cacheReadTokens) || 0
         };
-        
+
         // 计算费用
         const costData = CostCalculator.calculateCost(usage, model);
-        
+
         modelStats.push({
           model,
           period,
@@ -1442,12 +1442,12 @@ router.get('/model-stats', authenticateAdmin, async (req, res) => {
         });
       }
     }
-    
+
     // 按总费用排序
     modelStats.sort((a, b) => b.costs.total - a.costs.total);
-    
+
     logger.info(`📊 Returning ${modelStats.length} global model stats for period ${period}:`, modelStats);
-    
+
     res.json({ success: true, data: modelStats });
   } catch (error) {
     logger.error('❌ Failed to get model stats:', error);
@@ -1464,11 +1464,11 @@ router.post('/cleanup', authenticateAdmin, async (req, res) => {
       apiKeyService.cleanupExpiredKeys(),
       claudeAccountService.cleanupErrorAccounts()
     ]);
-    
+
     await redis.cleanup();
-    
+
     logger.success(`🧹 Admin triggered cleanup: ${expiredKeys} expired keys, ${errorAccounts} error accounts`);
-    
+
     res.json({
       success: true,
       message: 'Cleanup completed',
@@ -1488,18 +1488,18 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
   try {
     const { days = 7, granularity = 'day', startDate, endDate } = req.query;
     const client = redis.getClientSafe();
-    
+
     const trendData = [];
-    
+
     if (granularity === 'hour') {
       // 小时粒度统计
       let startTime, endTime;
-      
+
       if (startDate && endDate) {
         // 使用自定义时间范围
         startTime = new Date(startDate);
         endTime = new Date(endDate);
-        
+
         // 调试日志
         logger.info('📊 Usage trend hour granularity - received times:');
         logger.info(`  startDate (raw): ${startDate}`);
@@ -1512,19 +1512,19 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
         endTime = new Date();
         startTime = new Date(endTime.getTime() - 24 * 60 * 60 * 1000);
       }
-      
+
       // 确保时间范围不超过24小时
       const timeDiff = endTime - startTime;
       if (timeDiff > 24 * 60 * 60 * 1000) {
-        return res.status(400).json({ 
-          error: '小时粒度查询时间范围不能超过24小时' 
+        return res.status(400).json({
+          error: '小时粒度查询时间范围不能超过24小时'
         });
       }
-      
+
       // 按小时遍历
       const currentHour = new Date(startTime);
       currentHour.setMinutes(0, 0, 0);
-      
+
       while (currentHour <= endTime) {
         // 注意：前端发送的时间已经是UTC时间，不需要再次转换
         // 直接从currentHour生成对应系统时区的日期和小时
@@ -1532,38 +1532,38 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
         const dateStr = redis.getDateStringInTimezone(currentHour);
         const hour = String(tzCurrentHour.getUTCHours()).padStart(2, '0');
         const hourKey = `${dateStr}:${hour}`;
-        
+
         // 获取当前小时的模型统计数据
         const modelPattern = `usage:model:hourly:*:${hourKey}`;
         const modelKeys = await client.keys(modelPattern);
-        
+
         let hourInputTokens = 0;
         let hourOutputTokens = 0;
         let hourRequests = 0;
         let hourCacheCreateTokens = 0;
         let hourCacheReadTokens = 0;
         let hourCost = 0;
-        
+
         for (const modelKey of modelKeys) {
           const modelMatch = modelKey.match(/usage:model:hourly:(.+):\d{4}-\d{2}-\d{2}:\d{2}$/);
           if (!modelMatch) continue;
-          
+
           const model = modelMatch[1];
           const data = await client.hgetall(modelKey);
-          
+
           if (data && Object.keys(data).length > 0) {
             const modelInputTokens = parseInt(data.inputTokens) || 0;
             const modelOutputTokens = parseInt(data.outputTokens) || 0;
             const modelCacheCreateTokens = parseInt(data.cacheCreateTokens) || 0;
             const modelCacheReadTokens = parseInt(data.cacheReadTokens) || 0;
             const modelRequests = parseInt(data.requests) || 0;
-            
+
             hourInputTokens += modelInputTokens;
             hourOutputTokens += modelOutputTokens;
             hourCacheCreateTokens += modelCacheCreateTokens;
             hourCacheReadTokens += modelCacheReadTokens;
             hourRequests += modelRequests;
-            
+
             const modelUsage = {
               input_tokens: modelInputTokens,
               output_tokens: modelOutputTokens,
@@ -1574,12 +1574,12 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
             hourCost += modelCostResult.costs.total;
           }
         }
-        
+
         // 如果没有模型级别的数据，尝试API Key级别的数据
         if (modelKeys.length === 0) {
           const pattern = `usage:hourly:*:${hourKey}`;
           const keys = await client.keys(pattern);
-          
+
           for (const key of keys) {
             const data = await client.hgetall(key);
             if (data) {
@@ -1590,7 +1590,7 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
               hourCacheReadTokens += parseInt(data.cacheReadTokens) || 0;
             }
           }
-          
+
           const usage = {
             input_tokens: hourInputTokens,
             output_tokens: hourOutputTokens,
@@ -1600,13 +1600,13 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
           const costResult = CostCalculator.calculateCost(usage, 'unknown');
           hourCost = costResult.costs.total;
         }
-        
+
         // 格式化时间标签 - 使用系统时区的显示
         const tzDateForLabel = redis.getDateInTimezone(currentHour);
         const month = String(tzDateForLabel.getUTCMonth() + 1).padStart(2, '0');
         const day = String(tzDateForLabel.getUTCDate()).padStart(2, '0');
         const hourStr = String(tzDateForLabel.getUTCHours()).padStart(2, '0');
-        
+
         trendData.push({
           // 对于小时粒度，只返回hour字段，不返回date字段
           hour: currentHour.toISOString(), // 保留原始ISO时间用于排序
@@ -1619,62 +1619,62 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
           totalTokens: hourInputTokens + hourOutputTokens + hourCacheCreateTokens + hourCacheReadTokens,
           cost: hourCost
         });
-        
+
         // 移到下一个小时
         currentHour.setHours(currentHour.getHours() + 1);
       }
-      
+
     } else {
       // 天粒度统计（保持原有逻辑）
       const daysCount = parseInt(days) || 7;
       const today = new Date();
-      
+
       // 获取过去N天的数据
       for (let i = 0; i < daysCount; i++) {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
         const dateStr = redis.getDateStringInTimezone(date);
-        
+
         // 汇总当天所有API Key的使用数据
         const pattern = `usage:daily:*:${dateStr}`;
         const keys = await client.keys(pattern);
-      
+
       let dayInputTokens = 0;
       let dayOutputTokens = 0;
       let dayRequests = 0;
       let dayCacheCreateTokens = 0;
       let dayCacheReadTokens = 0;
       let dayCost = 0;
-      
+
       // 按模型统计使用量
       // const modelUsageMap = new Map();
-      
+
       // 获取当天所有模型的使用数据
       const modelPattern = `usage:model:daily:*:${dateStr}`;
       const modelKeys = await client.keys(modelPattern);
-      
+
       for (const modelKey of modelKeys) {
         // 解析模型名称
         const modelMatch = modelKey.match(/usage:model:daily:(.+):\d{4}-\d{2}-\d{2}$/);
         if (!modelMatch) continue;
-        
+
         const model = modelMatch[1];
         const data = await client.hgetall(modelKey);
-        
+
         if (data && Object.keys(data).length > 0) {
           const modelInputTokens = parseInt(data.inputTokens) || 0;
           const modelOutputTokens = parseInt(data.outputTokens) || 0;
           const modelCacheCreateTokens = parseInt(data.cacheCreateTokens) || 0;
           const modelCacheReadTokens = parseInt(data.cacheReadTokens) || 0;
           const modelRequests = parseInt(data.requests) || 0;
-          
+
           // 累加总数
           dayInputTokens += modelInputTokens;
           dayOutputTokens += modelOutputTokens;
           dayCacheCreateTokens += modelCacheCreateTokens;
           dayCacheReadTokens += modelCacheReadTokens;
           dayRequests += modelRequests;
-          
+
           // 按模型计算费用
           const modelUsage = {
             input_tokens: modelInputTokens,
@@ -1686,7 +1686,7 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
           dayCost += modelCostResult.costs.total;
         }
       }
-      
+
       // 如果没有模型级别的数据，回退到原始方法
       if (modelKeys.length === 0 && keys.length > 0) {
         for (const key of keys) {
@@ -1699,7 +1699,7 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
             dayCacheReadTokens += parseInt(data.cacheReadTokens) || 0;
           }
         }
-        
+
         // 使用默认模型价格计算
         const usage = {
           input_tokens: dayInputTokens,
@@ -1710,7 +1710,7 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
         const costResult = CostCalculator.calculateCost(usage, 'unknown');
         dayCost = costResult.costs.total;
       }
-      
+
       trendData.push({
         date: dateStr,
         inputTokens: dayInputTokens,
@@ -1723,16 +1723,16 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
         formattedCost: CostCalculator.formatCost(dayCost)
       });
     }
-    
+
     }
-    
+
     // 按日期正序排列
     if (granularity === 'hour') {
       trendData.sort((a, b) => new Date(a.hour) - new Date(b.hour));
     } else {
       trendData.sort((a, b) => new Date(a.date) - new Date(b.date));
     }
-    
+
     res.json({ success: true, data: trendData, granularity });
   } catch (error) {
     logger.error('❌ Failed to get usage trend:', error);
@@ -1745,68 +1745,68 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
   try {
     const { keyId } = req.params;
     const { period = 'monthly', startDate, endDate } = req.query;
-    
+
     logger.info(`📊 Getting model stats for API key: ${keyId}, period: ${period}, startDate: ${startDate}, endDate: ${endDate}`);
-    
+
     const client = redis.getClientSafe();
     const today = redis.getDateStringInTimezone();
     const tzDate = redis.getDateInTimezone();
     const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`;
-    
+
     let searchPatterns = [];
-    
+
     if (period === 'custom' && startDate && endDate) {
       // 自定义日期范围，生成多个日期的搜索模式
       const start = new Date(startDate);
       const end = new Date(endDate);
-      
+
       // 确保日期范围有效
       if (start > end) {
         return res.status(400).json({ error: 'Start date must be before or equal to end date' });
       }
-      
+
       // 限制最大范围为31天
       const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
       if (daysDiff > 31) {
         return res.status(400).json({ error: 'Date range cannot exceed 31 days' });
       }
-      
+
       // 生成日期范围内所有日期的搜索模式
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         const dateStr = redis.getDateStringInTimezone(d);
         searchPatterns.push(`usage:${keyId}:model:daily:*:${dateStr}`);
       }
-      
+
       logger.info(`📊 Custom date range patterns: ${searchPatterns.length} days from ${startDate} to ${endDate}`);
     } else {
       // 原有的预设期间逻辑
-      const pattern = period === 'daily' ? 
-        `usage:${keyId}:model:daily:*:${today}` : 
+      const pattern = period === 'daily' ?
+        `usage:${keyId}:model:daily:*:${today}` :
         `usage:${keyId}:model:monthly:*:${currentMonth}`;
       searchPatterns = [pattern];
       logger.info(`📊 Preset period pattern: ${pattern}`);
     }
-    
+
     // 汇总所有匹配的数据
     const modelStatsMap = new Map();
     const modelStats = []; // 定义结果数组
-    
+
     for (const pattern of searchPatterns) {
       const keys = await client.keys(pattern);
       logger.info(`📊 Pattern ${pattern} found ${keys.length} keys`);
-      
+
       for (const key of keys) {
-        const match = key.match(/usage:.+:model:daily:(.+):\d{4}-\d{2}-\d{2}$/) || 
+        const match = key.match(/usage:.+:model:daily:(.+):\d{4}-\d{2}-\d{2}$/) ||
                      key.match(/usage:.+:model:monthly:(.+):\d{4}-\d{2}$/);
-        
+
         if (!match) {
           logger.warn(`📊 Pattern mismatch for key: ${key}`);
           continue;
         }
-        
+
         const model = match[1];
         const data = await client.hgetall(key);
-        
+
         if (data && Object.keys(data).length > 0) {
           // 累加同一模型的数据
           if (!modelStatsMap.has(model)) {
@@ -1819,7 +1819,7 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
               allTokens: 0
             });
           }
-          
+
           const stats = modelStatsMap.get(model);
           stats.requests += parseInt(data.requests) || 0;
           stats.inputTokens += parseInt(data.inputTokens) || 0;
@@ -1830,21 +1830,21 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
         }
       }
     }
-    
+
     // 将汇总的数据转换为最终结果
     for (const [model, stats] of modelStatsMap) {
       logger.info(`📊 Model ${model} aggregated data:`, stats);
-      
+
       const usage = {
         input_tokens: stats.inputTokens,
         output_tokens: stats.outputTokens,
         cache_creation_input_tokens: stats.cacheCreateTokens,
         cache_read_input_tokens: stats.cacheReadTokens
       };
-      
+
       // 使用CostCalculator计算费用
       const costData = CostCalculator.calculateCost(usage, model);
-      
+
       modelStats.push({
         model,
         requests: stats.requests,
@@ -1860,19 +1860,19 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
         usingDynamicPricing: costData.usingDynamicPricing
       });
     }
-    
+
     // 如果没有找到模型级别的详细数据，尝试从汇总数据中生成展示
     if (modelStats.length === 0) {
       logger.info(`📊 No detailed model stats found, trying to get aggregate data for API key ${keyId}`);
-      
+
       // 尝试从API Keys列表中获取usage数据作为备选方案
       try {
         const apiKeys = await apiKeyService.getAllApiKeys();
         const targetApiKey = apiKeys.find(key => key.id === keyId);
-        
+
         if (targetApiKey && targetApiKey.usage) {
           logger.info(`📊 Found API key usage data from getAllApiKeys for ${keyId}:`, targetApiKey.usage);
-          
+
           // 从汇总数据创建展示条目
           let usageData;
           if (period === 'custom' || period === 'daily') {
@@ -1882,7 +1882,7 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
             // 对于月统计，使用monthly数据或total数据
             usageData = targetApiKey.usage.monthly || targetApiKey.usage.total;
           }
-          
+
           if (usageData && usageData.allTokens > 0) {
             const usage = {
               input_tokens: usageData.inputTokens || 0,
@@ -1890,10 +1890,10 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
               cache_creation_input_tokens: usageData.cacheCreateTokens || 0,
               cache_read_input_tokens: usageData.cacheReadTokens || 0
             };
-            
+
             // 对于汇总数据，使用默认模型计算费用
             const costData = CostCalculator.calculateCost(usage, 'claude-3-5-sonnet-20241022');
-            
+
             modelStats.push({
               model: '总体使用 (历史数据)',
               requests: usageData.requests || 0,
@@ -1908,7 +1908,7 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
               pricing: costData.pricing,
               usingDynamicPricing: costData.usingDynamicPricing
             });
-            
+
             logger.info('📊 Generated display data from API key usage stats');
           } else {
             logger.info(`📊 No usage data found for period ${period} in API key data`);
@@ -1920,12 +1920,12 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
         logger.error('❌ Error fetching API key usage data:', error);
       }
     }
-    
+
     // 按总token数降序排列
     modelStats.sort((a, b) => b.allTokens - a.allTokens);
-    
+
     logger.info(`📊 Returning ${modelStats.length} model stats for API key ${keyId}:`, modelStats);
-    
+
     res.json({ success: true, data: modelStats });
   } catch (error) {
     logger.error('❌ Failed to get API key model stats:', error);
@@ -1938,20 +1938,20 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
 router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
   try {
     const { granularity = 'day', days = 7, startDate, endDate } = req.query;
-    
+
     logger.info(`📊 Getting API keys usage trend, granularity: ${granularity}, days: ${days}`);
-    
+
     const client = redis.getClientSafe();
     const trendData = [];
-    
+
     // 获取所有API Keys
     const apiKeys = await apiKeyService.getAllApiKeys();
     const apiKeyMap = new Map(apiKeys.map(key => [key.id, key]));
-    
+
     if (granularity === 'hour') {
       // 小时粒度统计
       let endTime, startTime;
-      
+
       if (startDate && endDate) {
         // 自定义时间范围
         startTime = new Date(startDate);
@@ -1961,50 +1961,50 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
         endTime = new Date();
         startTime = new Date(endTime.getTime() - 24 * 60 * 60 * 1000);
       }
-      
+
       // 按小时遍历
       const currentHour = new Date(startTime);
       currentHour.setMinutes(0, 0, 0);
-      
+
       while (currentHour <= endTime) {
         // 使用时区转换后的时间来生成键
         const tzCurrentHour = redis.getDateInTimezone(currentHour);
         const dateStr = redis.getDateStringInTimezone(currentHour);
         const hour = String(tzCurrentHour.getUTCHours()).padStart(2, '0');
         const hourKey = `${dateStr}:${hour}`;
-        
+
         // 获取这个小时所有API Key的数据
         const pattern = `usage:hourly:*:${hourKey}`;
         const keys = await client.keys(pattern);
-        
+
         // 格式化时间标签
         const tzDateForLabel = redis.getDateInTimezone(currentHour);
         const monthLabel = String(tzDateForLabel.getUTCMonth() + 1).padStart(2, '0');
         const dayLabel = String(tzDateForLabel.getUTCDate()).padStart(2, '0');
         const hourLabel = String(tzDateForLabel.getUTCHours()).padStart(2, '0');
-        
+
         const hourData = {
           hour: currentHour.toISOString(), // 使用原始时间，不进行时区转换
           label: `${monthLabel}/${dayLabel} ${hourLabel}:00`, // 添加格式化的标签
           apiKeys: {}
         };
-        
+
         // 先收集基础数据
         const apiKeyDataMap = new Map();
         for (const key of keys) {
           const match = key.match(/usage:hourly:(.+?):\d{4}-\d{2}-\d{2}:\d{2}/);
           if (!match) continue;
-          
+
           const apiKeyId = match[1];
           const data = await client.hgetall(key);
-          
+
           if (data && apiKeyMap.has(apiKeyId)) {
             const inputTokens = parseInt(data.inputTokens) || 0;
             const outputTokens = parseInt(data.outputTokens) || 0;
             const cacheCreateTokens = parseInt(data.cacheCreateTokens) || 0;
             const cacheReadTokens = parseInt(data.cacheReadTokens) || 0;
             const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens;
-            
+
             apiKeyDataMap.set(apiKeyId, {
               name: apiKeyMap.get(apiKeyId).name,
               tokens: totalTokens,
@@ -2016,20 +2016,20 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
             });
           }
         }
-        
+
         // 获取该小时的模型级别数据来计算准确费用
         const modelPattern = `usage:*:model:hourly:*:${hourKey}`;
         const modelKeys = await client.keys(modelPattern);
         const apiKeyCostMap = new Map();
-        
+
         for (const modelKey of modelKeys) {
           const match = modelKey.match(/usage:(.+?):model:hourly:(.+?):\d{4}-\d{2}-\d{2}:\d{2}/);
           if (!match) continue;
-          
+
           const apiKeyId = match[1];
           const model = match[2];
           const modelData = await client.hgetall(modelKey);
-          
+
           if (modelData && apiKeyDataMap.has(apiKeyId)) {
             const usage = {
               input_tokens: parseInt(modelData.inputTokens) || 0,
@@ -2037,21 +2037,21 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
               cache_creation_input_tokens: parseInt(modelData.cacheCreateTokens) || 0,
               cache_read_input_tokens: parseInt(modelData.cacheReadTokens) || 0
             };
-            
+
             const costResult = CostCalculator.calculateCost(usage, model);
             const currentCost = apiKeyCostMap.get(apiKeyId) || 0;
             apiKeyCostMap.set(apiKeyId, currentCost + costResult.costs.total);
           }
         }
-        
+
         // 组合数据
         for (const [apiKeyId, data] of apiKeyDataMap) {
           const cost = apiKeyCostMap.get(apiKeyId) || 0;
-          
+
           // 如果没有模型级别数据，使用默认模型计算（降级方案）
           let finalCost = cost;
           let formattedCost = CostCalculator.formatCost(cost);
-          
+
           if (cost === 0 && data.tokens > 0) {
             const usage = {
               input_tokens: data.inputTokens,
@@ -2063,7 +2063,7 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
             finalCost = fallbackResult.costs.total;
             formattedCost = fallbackResult.formatted.total;
           }
-          
+
           hourData.apiKeys[apiKeyId] = {
             name: data.name,
             tokens: data.tokens,
@@ -2072,47 +2072,47 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
             formattedCost: formattedCost
           };
         }
-        
+
         trendData.push(hourData);
         currentHour.setHours(currentHour.getHours() + 1);
       }
-      
+
     } else {
       // 天粒度统计
       const daysCount = parseInt(days) || 7;
       const today = new Date();
-      
+
       // 获取过去N天的数据
       for (let i = 0; i < daysCount; i++) {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
         const dateStr = redis.getDateStringInTimezone(date);
-        
+
         // 获取这一天所有API Key的数据
         const pattern = `usage:daily:*:${dateStr}`;
         const keys = await client.keys(pattern);
-        
+
         const dayData = {
           date: dateStr,
           apiKeys: {}
         };
-        
+
         // 先收集基础数据
         const apiKeyDataMap = new Map();
         for (const key of keys) {
           const match = key.match(/usage:daily:(.+?):\d{4}-\d{2}-\d{2}/);
           if (!match) continue;
-          
+
           const apiKeyId = match[1];
           const data = await client.hgetall(key);
-          
+
           if (data && apiKeyMap.has(apiKeyId)) {
             const inputTokens = parseInt(data.inputTokens) || 0;
             const outputTokens = parseInt(data.outputTokens) || 0;
             const cacheCreateTokens = parseInt(data.cacheCreateTokens) || 0;
             const cacheReadTokens = parseInt(data.cacheReadTokens) || 0;
             const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens;
-            
+
             apiKeyDataMap.set(apiKeyId, {
               name: apiKeyMap.get(apiKeyId).name,
               tokens: totalTokens,
@@ -2124,20 +2124,20 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
             });
           }
         }
-        
+
         // 获取该天的模型级别数据来计算准确费用
         const modelPattern = `usage:*:model:daily:*:${dateStr}`;
         const modelKeys = await client.keys(modelPattern);
         const apiKeyCostMap = new Map();
-        
+
         for (const modelKey of modelKeys) {
           const match = modelKey.match(/usage:(.+?):model:daily:(.+?):\d{4}-\d{2}-\d{2}/);
           if (!match) continue;
-          
+
           const apiKeyId = match[1];
           const model = match[2];
           const modelData = await client.hgetall(modelKey);
-          
+
           if (modelData && apiKeyDataMap.has(apiKeyId)) {
             const usage = {
               input_tokens: parseInt(modelData.inputTokens) || 0,
@@ -2145,21 +2145,21 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
               cache_creation_input_tokens: parseInt(modelData.cacheCreateTokens) || 0,
               cache_read_input_tokens: parseInt(modelData.cacheReadTokens) || 0
             };
-            
+
             const costResult = CostCalculator.calculateCost(usage, model);
             const currentCost = apiKeyCostMap.get(apiKeyId) || 0;
             apiKeyCostMap.set(apiKeyId, currentCost + costResult.costs.total);
           }
         }
-        
+
         // 组合数据
         for (const [apiKeyId, data] of apiKeyDataMap) {
           const cost = apiKeyCostMap.get(apiKeyId) || 0;
-          
+
           // 如果没有模型级别数据，使用默认模型计算（降级方案）
           let finalCost = cost;
           let formattedCost = CostCalculator.formatCost(cost);
-          
+
           if (cost === 0 && data.tokens > 0) {
             const usage = {
               input_tokens: data.inputTokens,
@@ -2171,7 +2171,7 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
             finalCost = fallbackResult.costs.total;
             formattedCost = fallbackResult.formatted.total;
           }
-          
+
           dayData.apiKeys[apiKeyId] = {
             name: data.name,
             tokens: data.tokens,
@@ -2180,18 +2180,18 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
             formattedCost: formattedCost
           };
         }
-        
+
         trendData.push(dayData);
       }
     }
-    
+
     // 按时间正序排列
     if (granularity === 'hour') {
       trendData.sort((a, b) => new Date(a.hour) - new Date(b.hour));
     } else {
       trendData.sort((a, b) => new Date(a.date) - new Date(b.date));
     }
-    
+
     // 计算每个API Key的总token数，用于排序
     const apiKeyTotals = new Map();
     for (const point of trendData) {
@@ -2199,16 +2199,16 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
         apiKeyTotals.set(apiKeyId, (apiKeyTotals.get(apiKeyId) || 0) + data.tokens);
       }
     }
-    
+
     // 获取前10个使用量最多的API Key
     const topApiKeys = Array.from(apiKeyTotals.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10)
       .map(([apiKeyId]) => apiKeyId);
-    
-    res.json({ 
-      success: true, 
-      data: trendData, 
+
+    res.json({
+      success: true,
+      data: trendData,
       granularity,
       topApiKeys,
       totalApiKeys: apiKeyTotals.size
@@ -2223,12 +2223,12 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
 router.get('/usage-costs', authenticateAdmin, async (req, res) => {
   try {
     const { period = 'all' } = req.query; // all, today, monthly
-    
+
     logger.info(`💰 Calculating usage costs for period: ${period}`);
-    
+
     // 获取所有API Keys的使用统计
     const apiKeys = await apiKeyService.getAllApiKeys();
-    
+
     let totalCosts = {
       inputCost: 0,
       outputCost: 0,
@@ -2236,15 +2236,15 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
       cacheReadCost: 0,
       totalCost: 0
     };
-    
+
     let modelCosts = {};
-    
+
     // 按模型统计费用
     const client = redis.getClientSafe();
     const today = redis.getDateStringInTimezone();
     const tzDate = redis.getDateInTimezone();
     const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`;
-    
+
     let pattern;
     if (period === 'today') {
       pattern = `usage:model:daily:*:${today}`;
@@ -2254,19 +2254,19 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
       // 全部时间，先尝试从Redis获取所有历史模型统计数据（只使用monthly数据避免重复计算）
       const allModelKeys = await client.keys('usage:model:monthly:*:*');
       logger.info(`💰 Total period calculation: found ${allModelKeys.length} monthly model keys`);
-      
+
       if (allModelKeys.length > 0) {
         // 如果有详细的模型统计数据，使用模型级别的计算
         const modelUsageMap = new Map();
-        
+
         for (const key of allModelKeys) {
           // 解析模型名称（只处理monthly数据）
           let modelMatch = key.match(/usage:model:monthly:(.+):(\d{4}-\d{2})$/);
           if (!modelMatch) continue;
-          
+
           const model = modelMatch[1];
           const data = await client.hgetall(key);
-          
+
           if (data && Object.keys(data).length > 0) {
             if (!modelUsageMap.has(model)) {
               modelUsageMap.set(model, {
@@ -2276,7 +2276,7 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
                 cacheReadTokens: 0
               });
             }
-            
+
             const modelUsage = modelUsageMap.get(model);
             modelUsage.inputTokens += parseInt(data.inputTokens) || 0;
             modelUsage.outputTokens += parseInt(data.outputTokens) || 0;
@@ -2284,10 +2284,10 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
             modelUsage.cacheReadTokens += parseInt(data.cacheReadTokens) || 0;
           }
         }
-        
+
         // 使用模型级别的数据计算费用
         logger.info(`💰 Processing ${modelUsageMap.size} unique models for total cost calculation`);
-        
+
         for (const [model, usage] of modelUsageMap) {
           const usageData = {
             input_tokens: usage.inputTokens,
@@ -2295,16 +2295,16 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
             cache_creation_input_tokens: usage.cacheCreateTokens,
             cache_read_input_tokens: usage.cacheReadTokens
           };
-          
+
           const costResult = CostCalculator.calculateCost(usageData, model);
           totalCosts.inputCost += costResult.costs.input;
           totalCosts.outputCost += costResult.costs.output;
           totalCosts.cacheCreateCost += costResult.costs.cacheWrite;
           totalCosts.cacheReadCost += costResult.costs.cacheRead;
           totalCosts.totalCost += costResult.costs.total;
-          
+
           logger.info(`💰 Model ${model}: ${usage.inputTokens + usage.outputTokens + usage.cacheCreateTokens + usage.cacheReadTokens} tokens, cost: ${costResult.formatted.total}`);
-          
+
           // 记录模型费用
           modelCosts[model] = {
             model,
@@ -2318,7 +2318,7 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
       } else {
         // 如果没有详细的模型统计数据，回退到API Key汇总数据
         logger.warn('No detailed model statistics found, falling back to API Key aggregated data');
-        
+
         for (const apiKey of apiKeys) {
           if (apiKey.usage && apiKey.usage.total) {
             const usage = {
@@ -2327,7 +2327,7 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
               cache_creation_input_tokens: apiKey.usage.total.cacheCreateTokens || 0,
               cache_read_input_tokens: apiKey.usage.total.cacheReadTokens || 0
             };
-            
+
             // 使用加权平均价格计算（基于当前活跃模型的价格分布）
             const costResult = CostCalculator.calculateCost(usage, 'claude-3-5-haiku-20241022');
             totalCosts.inputCost += costResult.costs.input;
@@ -2338,7 +2338,7 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
           }
         }
       }
-      
+
       res.json({
         success: true,
         data: {
@@ -2359,21 +2359,21 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
       });
       return;
     }
-    
+
     // 对于今日或本月，从Redis获取详细的模型统计
     const keys = await client.keys(pattern);
-    
+
     for (const key of keys) {
-      const match = key.match(period === 'today' ? 
-        /usage:model:daily:(.+):\d{4}-\d{2}-\d{2}$/ : 
+      const match = key.match(period === 'today' ?
+        /usage:model:daily:(.+):\d{4}-\d{2}-\d{2}$/ :
         /usage:model:monthly:(.+):\d{4}-\d{2}$/
       );
-      
+
       if (!match) continue;
-      
+
       const model = match[1];
       const data = await client.hgetall(key);
-      
+
       if (data && Object.keys(data).length > 0) {
         const usage = {
           input_tokens: parseInt(data.inputTokens) || 0,
@@ -2381,16 +2381,16 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
           cache_creation_input_tokens: parseInt(data.cacheCreateTokens) || 0,
           cache_read_input_tokens: parseInt(data.cacheReadTokens) || 0
         };
-        
+
         const costResult = CostCalculator.calculateCost(usage, model);
-        
+
         // 累加总费用
         totalCosts.inputCost += costResult.costs.input;
         totalCosts.outputCost += costResult.costs.output;
         totalCosts.cacheCreateCost += costResult.costs.cacheWrite;
         totalCosts.cacheReadCost += costResult.costs.cacheRead;
         totalCosts.totalCost += costResult.costs.total;
-        
+
         // 记录模型费用
         modelCosts[model] = {
           model,
@@ -2402,7 +2402,7 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
         };
       }
     }
-    
+
     res.json({
       success: true,
       data: {
@@ -2431,14 +2431,14 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
 router.get('/claude-code-headers', authenticateAdmin, async (req, res) => {
   try {
     const allHeaders = await claudeCodeHeadersService.getAllAccountHeaders();
-    
+
     // 获取所有 Claude 账号信息
     const accounts = await claudeAccountService.getAllAccounts();
     const accountMap = {};
     accounts.forEach(account => {
       accountMap[account.id] = account.name;
     });
-    
+
     // 格式化输出
     const formattedData = Object.entries(allHeaders).map(([accountId, data]) => ({
       accountId,
@@ -2448,7 +2448,7 @@ router.get('/claude-code-headers', authenticateAdmin, async (req, res) => {
       updatedAt: data.updatedAt,
       headers: data.headers
     }));
-    
+
     res.json({
       success: true,
       data: formattedData
@@ -2464,7 +2464,7 @@ router.delete('/claude-code-headers/:accountId', authenticateAdmin, async (req, 
   try {
     const { accountId } = req.params;
     await claudeCodeHeadersService.clearAccountHeaders(accountId);
-    
+
     res.json({
       success: true,
       message: `Claude Code headers cleared for account ${accountId}`
@@ -2491,16 +2491,16 @@ router.get('/check-updates', authenticateAdmin, async (req, res) => {
     // 从缓存获取
     const cacheKey = 'version_check_cache';
     const cached = await redis.getClient().get(cacheKey);
-    
+
     if (cached && !req.query.force) {
       const cachedData = JSON.parse(cached);
       const cacheAge = Date.now() - cachedData.timestamp;
-      
+
       // 缓存有效期1小时
       if (cacheAge < 3600000) {
         // 实时计算 hasUpdate，不使用缓存的值
         const hasUpdate = compareVersions(currentVersion, cachedData.latest) < 0;
-        
+
         return res.json({
           success: true,
           data: {
@@ -2529,10 +2529,10 @@ router.get('/check-updates', authenticateAdmin, async (req, res) => {
 
     const release = response.data;
     const latestVersion = release.tag_name.replace(/^v/, '');
-    
+
     // 比较版本
     const hasUpdate = compareVersions(currentVersion, latestVersion) < 0;
-    
+
     const releaseInfo = {
       name: release.name,
       body: release.body,
@@ -2570,9 +2570,9 @@ router.get('/check-updates', authenticateAdmin, async (req, res) => {
       } : null,
       request: error.request ? 'Request was made but no response received' : null
     };
-    
+
     logger.error('❌ Failed to check for updates:', errorDetails.message);
-    
+
     // 处理 404 错误 - 仓库或版本不存在
     if (error.response && error.response.status === 404) {
       return res.json({
@@ -2591,17 +2591,17 @@ router.get('/check-updates', authenticateAdmin, async (req, res) => {
         }
       });
     }
-    
+
     // 如果是网络错误，尝试返回缓存的数据
     if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND') {
       const cacheKey = 'version_check_cache';
       const cached = await redis.getClient().get(cacheKey);
-      
+
       if (cached) {
         const cachedData = JSON.parse(cached);
         // 实时计算 hasUpdate
         const hasUpdate = compareVersions(currentVersion, cachedData.latest) < 0;
-        
+
         return res.json({
           success: true,
           data: {
@@ -2615,7 +2615,7 @@ router.get('/check-updates', authenticateAdmin, async (req, res) => {
         });
       }
     }
-    
+
     // 其他错误返回当前版本信息
     res.json({
       success: true,
@@ -2646,10 +2646,10 @@ function compareVersions(current, latest) {
       patch: parts[2] || 0
     };
   };
-  
+
   const currentV = parseVersion(current);
   const latestV = parseVersion(latest);
-  
+
   if (currentV.major !== latestV.major) {
     return currentV.major - latestV.major;
   }
@@ -2679,29 +2679,29 @@ router.get('/backup-settings', authenticateAdmin, async (req, res) => {
 router.put('/backup-settings', authenticateAdmin, async (req, res) => {
   try {
     const { autoBackupEnabled, autoBackupInterval, backupPath, maxBackups } = req.body;
-    
+
     // 验证输入
-    if (autoBackupInterval !== undefined && (!Number.isInteger(autoBackupInterval) || autoBackupInterval < 1)) {
-      return res.status(400).json({ error: 'Auto backup interval must be a positive integer' });
+    if (autoBackupInterval !== undefined && (!Number.isFinite(autoBackupInterval) || autoBackupInterval < 0.0001)) {
+      return res.status(400).json({ error: 'Auto backup interval must be a positive number (minimum 0.0001 hours)' });
     }
-    
+
     if (maxBackups !== undefined && (!Number.isInteger(maxBackups) || maxBackups < 1)) {
       return res.status(400).json({ error: 'Max backups must be a positive integer' });
     }
-    
+
     const settings = {
       autoBackupEnabled: autoBackupEnabled || false,
-      autoBackupInterval: autoBackupInterval || 7,
+      autoBackupInterval: autoBackupInterval || 24,
       backupPath: backupPath || path.join(process.cwd(), 'backups'),
       maxBackups: maxBackups || 10
     };
-    
+
     await backupService.updateBackupSettings(settings);
-    
+
     // 重启备份调度器
     const backupScheduler = require('../services/backupScheduler');
     await backupScheduler.restart();
-    
+
     logger.info('✅ Backup settings updated');
     res.json({
       success: true,
@@ -2718,11 +2718,11 @@ router.put('/backup-settings', authenticateAdmin, async (req, res) => {
 router.delete('/backup-settings', authenticateAdmin, async (req, res) => {
   try {
     const defaultSettings = await backupService.resetBackupSettings();
-    
+
     // 重启备份调度器
     const backupScheduler = require('../services/backupScheduler');
     await backupScheduler.restart();
-    
+
     logger.info('✅ Backup settings reset to defaults');
     res.json({
       success: true,
@@ -2740,7 +2740,7 @@ router.post('/backup', authenticateAdmin, async (req, res) => {
   try {
     logger.info('📦 Manual backup initiated by admin');
     const backupInfo = await backupService.createBackup();
-    
+
     res.json({
       success: true,
       message: 'Backup created successfully',
@@ -2757,7 +2757,7 @@ router.get('/backup-history', authenticateAdmin, async (req, res) => {
   try {
     const { limit = 20 } = req.query;
     const history = await backupService.getBackupHistory(parseInt(limit));
-    
+
     res.json({
       success: true,
       data: history
@@ -2773,7 +2773,7 @@ router.get('/backup/:backupId/download', authenticateAdmin, async (req, res) => 
   try {
     const { backupId } = req.params;
     const filePath = await backupService.getBackupFilePath(backupId);
-    
+
     // 设置正确的 Content-Type 为 zip
     res.setHeader('Content-Type', 'application/zip');
     res.download(filePath, `${backupId}.zip`, (err) => {
@@ -2796,10 +2796,10 @@ router.get('/backup/:backupId/download', authenticateAdmin, async (req, res) => 
 router.post('/backup/:backupId/restore', authenticateAdmin, async (req, res) => {
   try {
     const { backupId } = req.params;
-    
+
     logger.warn(`⚠️ Restore initiated by admin for backup: ${backupId}`);
     const result = await backupService.restoreBackup(backupId);
-    
+
     res.json({
       success: true,
       message: 'Backup restored successfully',
@@ -2815,9 +2815,9 @@ router.post('/backup/:backupId/restore', authenticateAdmin, async (req, res) => 
 router.delete('/backup/:backupId', authenticateAdmin, async (req, res) => {
   try {
     const { backupId } = req.params;
-    
+
     await backupService.deleteBackup(backupId);
-    
+
     logger.info(`🗑️ Backup deleted: ${backupId}`);
     res.json({
       success: true,
@@ -2832,7 +2832,7 @@ router.delete('/backup/:backupId', authenticateAdmin, async (req, res) => {
 // 导入备份文件
 router.post('/backup/import', authenticateAdmin, async (req, res) => {
   const multer = require('multer');
-  const upload = multer({ 
+  const upload = multer({
     dest: path.join(process.cwd(), 'temp', 'uploads'),
     limits: {
       fileSize: 100 * 1024 * 1024 // 100MB 限制
@@ -2842,14 +2842,14 @@ router.post('/backup/import', authenticateAdmin, async (req, res) => {
   upload(req, res, async (err) => {
     if (err) {
       logger.error('❌ Upload error:', err);
-      return res.status(400).json({ 
-        error: 'Upload failed', 
-        message: err.message 
+      return res.status(400).json({
+        error: 'Upload failed',
+        message: err.message
       });
     }
 
     if (!req.file) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'No file uploaded',
         message: 'Please select a backup file to import'
       });
@@ -2858,9 +2858,9 @@ router.post('/backup/import', authenticateAdmin, async (req, res) => {
     try {
       const { restore } = req.body;
       const shouldRestore = restore === 'true' || restore === true;
-      
+
       logger.info(`📥 Importing backup file: ${req.file.originalname}`);
-      
+
       // 验证文件扩展名
       if (!req.file.originalname.endsWith('.zip')) {
         await fs.unlink(req.file.path);
@@ -2869,15 +2869,15 @@ router.post('/backup/import', authenticateAdmin, async (req, res) => {
           message: 'Only .zip backup files are supported'
         });
       }
-      
+
       // 导入备份
       const result = await backupService.importBackup(req.file.path, {
         restore: shouldRestore
       });
-      
+
       // 清理上传的临时文件
       await fs.unlink(req.file.path);
-      
+
       res.json({
         success: true,
         message: shouldRestore ? 'Backup imported and restored successfully' : 'Backup imported successfully',
@@ -2890,11 +2890,11 @@ router.post('/backup/import', authenticateAdmin, async (req, res) => {
       } catch (cleanupError) {
         logger.warn('⚠️ Failed to cleanup upload file:', cleanupError.message);
       }
-      
+
       logger.error('❌ Failed to import backup:', error);
-      res.status(500).json({ 
-        error: 'Import failed', 
-        message: error.message 
+      res.status(500).json({
+        error: 'Import failed',
+        message: error.message
       });
     }
   });
@@ -2903,7 +2903,7 @@ router.post('/backup/import', authenticateAdmin, async (req, res) => {
 // 验证备份文件
 router.post('/backup/validate', authenticateAdmin, async (req, res) => {
   const multer = require('multer');
-  const upload = multer({ 
+  const upload = multer({
     dest: path.join(process.cwd(), 'temp', 'uploads'),
     limits: {
       fileSize: 100 * 1024 * 1024 // 100MB 限制
@@ -2913,14 +2913,14 @@ router.post('/backup/validate', authenticateAdmin, async (req, res) => {
   upload(req, res, async (err) => {
     if (err) {
       logger.error('❌ Upload error:', err);
-      return res.status(400).json({ 
-        error: 'Upload failed', 
-        message: err.message 
+      return res.status(400).json({
+        error: 'Upload failed',
+        message: err.message
       });
     }
 
     if (!req.file) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'No file uploaded',
         message: 'Please select a backup file to validate'
       });
@@ -2928,13 +2928,13 @@ router.post('/backup/validate', authenticateAdmin, async (req, res) => {
 
     try {
       logger.info(`🔍 Validating backup file: ${req.file.originalname}`);
-      
+
       // 验证备份文件
       const validation = await backupService.validateBackupFile(req.file.path);
-      
+
       // 清理上传的临时文件
       await fs.unlink(req.file.path);
-      
+
       res.json({
         success: true,
         data: validation
@@ -2946,11 +2946,11 @@ router.post('/backup/validate', authenticateAdmin, async (req, res) => {
       } catch (cleanupError) {
         logger.warn('⚠️ Failed to cleanup upload file:', cleanupError.message);
       }
-      
+
       logger.error('❌ Failed to validate backup:', error);
-      res.status(500).json({ 
-        error: 'Validation failed', 
-        message: error.message 
+      res.status(500).json({
+        error: 'Validation failed',
+        message: error.message
       });
     }
   });
@@ -2963,7 +2963,7 @@ router.get('/oem-settings', async (req, res) => {
   try {
     const client = redis.getClient();
     const oemSettings = await client.get('oem:settings');
-    
+
     // 默认设置
     const defaultSettings = {
       siteName: 'Claude Relay Service',
@@ -2971,7 +2971,7 @@ router.get('/oem-settings', async (req, res) => {
       siteIconData: '', // Base64编码的图标数据
       updatedAt: new Date().toISOString()
     };
-    
+
     let settings = defaultSettings;
     if (oemSettings) {
       try {
@@ -2980,7 +2980,7 @@ router.get('/oem-settings', async (req, res) => {
         logger.warn('⚠️ Failed to parse OEM settings, using defaults:', err.message);
       }
     }
-    
+
     res.json({
       success: true,
       data: settings
@@ -2995,21 +2995,21 @@ router.get('/oem-settings', async (req, res) => {
 router.put('/oem-settings', authenticateAdmin, async (req, res) => {
   try {
     const { siteName, siteIcon, siteIconData } = req.body;
-    
+
     // 验证输入
     if (!siteName || typeof siteName !== 'string' || siteName.trim().length === 0) {
       return res.status(400).json({ error: 'Site name is required' });
     }
-    
+
     if (siteName.length > 100) {
       return res.status(400).json({ error: 'Site name must be less than 100 characters' });
     }
-    
+
     // 验证图标数据大小（如果是base64）
     if (siteIconData && siteIconData.length > 500000) { // 约375KB
       return res.status(400).json({ error: 'Icon file must be less than 350KB' });
     }
-    
+
     // 验证图标URL（如果提供）
     if (siteIcon && !siteIconData) {
       // 简单验证URL格式
@@ -3019,19 +3019,19 @@ router.put('/oem-settings', authenticateAdmin, async (req, res) => {
         return res.status(400).json({ error: 'Invalid icon URL format' });
       }
     }
-    
+
     const settings = {
       siteName: siteName.trim(),
       siteIcon: (siteIcon || '').trim(),
       siteIconData: (siteIconData || '').trim(), // Base64数据
       updatedAt: new Date().toISOString()
     };
-    
+
     const client = redis.getClient();
     await client.set('oem:settings', JSON.stringify(settings));
-    
+
     logger.info(`✅ OEM settings updated: ${siteName}`);
-    
+
     res.json({
       success: true,
       message: 'OEM settings updated successfully',

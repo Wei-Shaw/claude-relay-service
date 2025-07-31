@@ -1,11 +1,11 @@
-const CronJob = require('cron').CronJob;
 const backupService = require('./backupService');
 const logger = require('../utils/logger');
 
 class BackupScheduler {
   constructor() {
-    this.job = null;
+    this.intervalId = null;
     this.isRunning = false;
+    this.checkInterval = 10000; // 默认每10秒检查一次
   }
 
   // 启动定时备份任务
@@ -21,15 +21,16 @@ class BackupScheduler {
       // 停止现有任务
       this.stop();
 
-      // 计算cron表达式
-      // 每天凌晨2点执行
-      const cronExpression = '0 2 * * *';
-      
-      this.job = new CronJob(cronExpression, async () => {
-        await this.checkAndRunBackup();
-      }, null, true, 'Asia/Shanghai');
+      // 动态计算检查间隔：备份间隔的1/10，最小10秒，最大5分钟
+      const intervalMs = settings.autoBackupInterval * 60 * 60 * 1000; // 转换为毫秒
+      this.checkInterval = Math.max(10000, Math.min(intervalMs / 10, 300000));
 
-      logger.info(`📅 Backup scheduler started with interval: ${settings.autoBackupInterval} days`);
+      // 使用 setInterval 定期检查是否需要备份
+      this.intervalId = setInterval(async () => {
+        await this.checkAndRunBackup();
+      }, this.checkInterval);
+
+      logger.info(`📅 Backup scheduler started with interval: ${settings.autoBackupInterval} hours (checking every ${this.checkInterval/1000}s)`);
       
       // 立即检查是否需要备份
       await this.checkAndRunBackup();
@@ -61,10 +62,10 @@ class BackupScheduler {
       if (lastBackup && lastBackup.timestamp) {
         const lastBackupTime = new Date(lastBackup.timestamp);
         const now = new Date();
-        const daysSinceLastBackup = Math.floor((now - lastBackupTime) / (1000 * 60 * 60 * 24));
+        const hoursSinceLastBackup = (now - lastBackupTime) / (1000 * 60 * 60);
         
-        if (daysSinceLastBackup < settings.autoBackupInterval) {
-          logger.info(`📅 Last backup was ${daysSinceLastBackup} days ago, next backup in ${settings.autoBackupInterval - daysSinceLastBackup} days`);
+        if (hoursSinceLastBackup < settings.autoBackupInterval) {
+          logger.info(`📅 Last backup was ${hoursSinceLastBackup.toFixed(4)} hours ago, next backup in ${(settings.autoBackupInterval - hoursSinceLastBackup).toFixed(4)} hours`);
           return;
         }
       }
@@ -82,9 +83,9 @@ class BackupScheduler {
 
   // 停止定时任务
   stop() {
-    if (this.job) {
-      this.job.stop();
-      this.job = null;
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
       logger.info('📅 Backup scheduler stopped');
     }
   }
@@ -98,9 +99,9 @@ class BackupScheduler {
   // 获取任务状态
   getStatus() {
     return {
-      isScheduled: !!this.job,
+      isScheduled: !!this.intervalId,
       isRunning: this.isRunning,
-      nextRun: this.job ? this.job.nextDates(1)[0] : null
+      checkInterval: this.checkInterval
     };
   }
 }

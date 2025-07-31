@@ -7,13 +7,13 @@ const config = require('../../config/config');
 // 🔑 API Key验证中间件（优化版）
 const authenticateApiKey = async (req, res, next) => {
   const startTime = Date.now();
-  
+
   try {
     // 安全提取API Key，支持多种格式
-    const apiKey = req.headers['x-api-key'] || 
+    const apiKey = req.headers['x-api-key'] ||
                    req.headers['authorization']?.replace(/^Bearer\s+/i, '') ||
                    req.headers['api-key'];
-    
+
     if (!apiKey) {
       logger.security(`🔒 Missing API key attempt from ${req.ip || 'unknown'}`);
       return res.status(401).json({
@@ -33,7 +33,7 @@ const authenticateApiKey = async (req, res, next) => {
 
     // 验证API Key（带缓存优化）
     const validation = await apiKeyService.validateApiKey(apiKey);
-    
+
     if (!validation.valid) {
       const clientIP = req.ip || req.connection?.remoteAddress || 'unknown';
       logger.security(`🔒 Invalid API key attempt: ${validation.error} from ${clientIP}`);
@@ -47,22 +47,22 @@ const authenticateApiKey = async (req, res, next) => {
     if (validation.keyData.enableClientRestriction && validation.keyData.allowedClients?.length > 0) {
       const userAgent = req.headers['user-agent'] || '';
       const clientIP = req.ip || req.connection?.remoteAddress || 'unknown';
-      
+
       // 记录客户端限制检查开始
       logger.api(`🔍 Checking client restriction for key: ${validation.keyData.id} (${validation.keyData.name})`);
       logger.api(`   User-Agent: "${userAgent}"`);
       logger.api(`   Allowed clients: ${validation.keyData.allowedClients.join(', ')}`);
-      
+
       let clientAllowed = false;
       let matchedClient = null;
-      
+
       // 遍历允许的客户端列表
       for (const allowedClientId of validation.keyData.allowedClients) {
         // 在预定义客户端列表中查找
         const predefinedClient = config.clientRestrictions.predefinedClients.find(
           client => client.id === allowedClientId
         );
-        
+
         if (predefinedClient) {
           // 使用预定义的正则表达式匹配 User-Agent
           if (predefinedClient.userAgentPattern.test(userAgent)) {
@@ -76,7 +76,7 @@ const authenticateApiKey = async (req, res, next) => {
           continue;
         }
       }
-      
+
       if (!clientAllowed) {
         logger.security(`🚫 Client restriction failed for key: ${validation.keyData.id} (${validation.keyData.name}) from ${clientIP}, User-Agent: ${userAgent}`);
         return res.status(403).json({
@@ -85,7 +85,7 @@ const authenticateApiKey = async (req, res, next) => {
           allowedClients: validation.keyData.allowedClients
         });
       }
-      
+
       logger.api(`✅ Client validated: ${matchedClient} for key: ${validation.keyData.id} (${validation.keyData.name})`);
       logger.api(`   Matched client: ${matchedClient} with User-Agent: "${userAgent}"`);
     }
@@ -95,7 +95,7 @@ const authenticateApiKey = async (req, res, next) => {
     if (concurrencyLimit > 0) {
       const currentConcurrency = await redis.incrConcurrency(validation.keyData.id);
       logger.api(`📈 Incremented concurrency for key: ${validation.keyData.id} (${validation.keyData.name}), current: ${currentConcurrency}, limit: ${concurrencyLimit}`);
-      
+
       if (currentConcurrency > concurrencyLimit) {
         // 如果超过限制，立即减少计数
         await redis.decrConcurrency(validation.keyData.id);
@@ -107,10 +107,10 @@ const authenticateApiKey = async (req, res, next) => {
           concurrencyLimit
         });
       }
-      
+
       // 使用标志位确保只减少一次
       let concurrencyDecremented = false;
-      
+
       const decrementConcurrency = async () => {
         if (!concurrencyDecremented) {
           concurrencyDecremented = true;
@@ -122,26 +122,26 @@ const authenticateApiKey = async (req, res, next) => {
           }
         }
       };
-      
+
       // 监听最可靠的事件（避免重复监听）
       // res.on('close') 是最可靠的，会在连接关闭时触发
       res.once('close', () => {
         logger.api(`🔌 Response closed for key: ${validation.keyData.id} (${validation.keyData.name})`);
         decrementConcurrency();
       });
-      
+
       // req.on('close') 作为备用，处理请求端断开
       req.once('close', () => {
         logger.api(`🔌 Request closed for key: ${validation.keyData.id} (${validation.keyData.name})`);
         decrementConcurrency();
       });
-      
+
       // res.on('finish') 处理正常完成的情况
       res.once('finish', () => {
         logger.api(`✅ Response finished for key: ${validation.keyData.id} (${validation.keyData.name})`);
         decrementConcurrency();
       });
-      
+
       // 存储并发信息到请求对象，便于后续处理
       req.concurrencyInfo = {
         apiKeyId: validation.keyData.id,
@@ -153,18 +153,18 @@ const authenticateApiKey = async (req, res, next) => {
     // 检查时间窗口限流
     const rateLimitWindow = validation.keyData.rateLimitWindow || 0;
     const rateLimitRequests = validation.keyData.rateLimitRequests || 0;
-    
+
     if (rateLimitWindow > 0 && (rateLimitRequests > 0 || validation.keyData.tokenLimit > 0)) {
       const windowStartKey = `rate_limit:window_start:${validation.keyData.id}`;
       const requestCountKey = `rate_limit:requests:${validation.keyData.id}`;
       const tokenCountKey = `rate_limit:tokens:${validation.keyData.id}`;
-      
+
       const now = Date.now();
       const windowDuration = rateLimitWindow * 60 * 1000; // 转换为毫秒
-      
+
       // 获取窗口开始时间
       let windowStart = await redis.getClient().get(windowStartKey);
-      
+
       if (!windowStart) {
         // 第一次请求，设置窗口开始时间
         await redis.getClient().set(windowStartKey, now, 'PX', windowDuration);
@@ -173,7 +173,7 @@ const authenticateApiKey = async (req, res, next) => {
         windowStart = now;
       } else {
         windowStart = parseInt(windowStart);
-        
+
         // 检查窗口是否已过期
         if (now - windowStart >= windowDuration) {
           // 窗口已过期，重置
@@ -183,18 +183,18 @@ const authenticateApiKey = async (req, res, next) => {
           windowStart = now;
         }
       }
-      
+
       // 获取当前计数
       const currentRequests = parseInt(await redis.getClient().get(requestCountKey) || '0');
       const currentTokens = parseInt(await redis.getClient().get(tokenCountKey) || '0');
-      
+
       // 检查请求次数限制
       if (rateLimitRequests > 0 && currentRequests >= rateLimitRequests) {
         const resetTime = new Date(windowStart + windowDuration);
         const remainingMinutes = Math.ceil((resetTime - now) / 60000);
-        
+
         logger.security(`🚦 Rate limit exceeded (requests) for key: ${validation.keyData.id} (${validation.keyData.name}), requests: ${currentRequests}/${rateLimitRequests}`);
-        
+
         return res.status(429).json({
           error: 'Rate limit exceeded',
           message: `已达到请求次数限制 (${rateLimitRequests} 次)，将在 ${remainingMinutes} 分钟后重置`,
@@ -204,15 +204,15 @@ const authenticateApiKey = async (req, res, next) => {
           remainingMinutes
         });
       }
-      
+
       // 检查Token使用量限制
       const tokenLimit = parseInt(validation.keyData.tokenLimit);
       if (tokenLimit > 0 && currentTokens >= tokenLimit) {
         const resetTime = new Date(windowStart + windowDuration);
         const remainingMinutes = Math.ceil((resetTime - now) / 60000);
-        
+
         logger.security(`🚦 Rate limit exceeded (tokens) for key: ${validation.keyData.id} (${validation.keyData.name}), tokens: ${currentTokens}/${tokenLimit}`);
-        
+
         return res.status(429).json({
           error: 'Rate limit exceeded',
           message: `已达到 Token 使用限制 (${tokenLimit} tokens)，将在 ${remainingMinutes} 分钟后重置`,
@@ -222,10 +222,10 @@ const authenticateApiKey = async (req, res, next) => {
           remainingMinutes
         });
       }
-      
+
       // 增加请求计数
       await redis.getClient().incr(requestCountKey);
-      
+
       // 存储限流信息到请求对象
       req.rateLimitInfo = {
         windowStart,
@@ -238,15 +238,15 @@ const authenticateApiKey = async (req, res, next) => {
         tokenLimit
       };
     }
-    
+
     // 检查每日费用限制
     const dailyCostLimit = validation.keyData.dailyCostLimit || 0;
     if (dailyCostLimit > 0) {
       const dailyCost = validation.keyData.dailyCost || 0;
-      
+
       if (dailyCost >= dailyCostLimit) {
         logger.security(`💰 Daily cost limit exceeded for key: ${validation.keyData.id} (${validation.keyData.name}), cost: $${dailyCost.toFixed(2)}/$${dailyCostLimit}`);
-        
+
         return res.status(429).json({
           error: 'Daily cost limit exceeded',
           message: `已达到每日费用限制 ($${dailyCostLimit})`,
@@ -255,11 +255,11 @@ const authenticateApiKey = async (req, res, next) => {
           resetAt: new Date(new Date().setHours(24, 0, 0, 0)).toISOString() // 明天0点重置
         });
       }
-      
+
       // 记录当前费用使用情况
       logger.api(`💰 Cost usage for key: ${validation.keyData.id} (${validation.keyData.name}), current: $${dailyCost.toFixed(2)}/$${dailyCostLimit}`);
     }
-    
+
     // 将验证信息添加到请求对象（只包含必要信息）
     req.apiKey = {
       id: validation.keyData.id,
@@ -280,12 +280,12 @@ const authenticateApiKey = async (req, res, next) => {
       usage: validation.keyData.usage
     };
     req.usage = validation.keyData.usage;
-    
+
     const authDuration = Date.now() - startTime;
     const userAgent = req.headers['user-agent'] || 'No User-Agent';
     logger.api(`🔓 Authenticated request from key: ${validation.keyData.name} (${validation.keyData.id}) in ${authDuration}ms`);
     logger.api(`   User-Agent: "${userAgent}"`);
-    
+
     next();
   } catch (error) {
     const authDuration = Date.now() - startTime;
@@ -296,7 +296,7 @@ const authenticateApiKey = async (req, res, next) => {
       userAgent: req.get('User-Agent'),
       url: req.originalUrl
     });
-    
+
     res.status(500).json({
       error: 'Authentication error',
       message: 'Internal server error during authentication'
@@ -307,14 +307,14 @@ const authenticateApiKey = async (req, res, next) => {
 // 🛡️ 管理员验证中间件（优化版）
 const authenticateAdmin = async (req, res, next) => {
   const startTime = Date.now();
-  
+
   try {
     // 安全提取token，支持多种方式
-    const token = req.headers['authorization']?.replace(/^Bearer\s+/i, '') || 
+    const token = req.headers['authorization']?.replace(/^Bearer\s+/i, '') ||
                   req.cookies?.adminToken ||
                   req.headers['x-admin-token'] ||
-                  req.query?.token; // 支持查询参数（用于下载等场景）
-    
+                  req.query?.token;
+
     if (!token) {
       logger.security(`🔒 Missing admin token attempt from ${req.ip || 'unknown'}`);
       return res.status(401).json({
@@ -323,7 +323,6 @@ const authenticateAdmin = async (req, res, next) => {
       });
     }
 
-    // 基本token格式验证
     if (typeof token !== 'string' || token.length < 10) {
       logger.security(`🔒 Invalid admin token format from ${req.ip || 'unknown'}`);
       return res.status(401).json({
@@ -335,11 +334,11 @@ const authenticateAdmin = async (req, res, next) => {
     // 获取管理员会话（带超时处理）
     const adminSession = await Promise.race([
       redis.getSession(token),
-      new Promise((_, reject) => 
+      new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Session lookup timeout')), 5000)
       )
     ]);
-    
+
     if (!adminSession || Object.keys(adminSession).length === 0) {
       logger.security(`🔒 Invalid admin token attempt from ${req.ip || 'unknown'}`);
       return res.status(401).json({
@@ -378,10 +377,10 @@ const authenticateAdmin = async (req, res, next) => {
       sessionId: token,
       loginTime: adminSession.loginTime
     };
-    
+
     const authDuration = Date.now() - startTime;
     logger.security(`🔐 Admin authenticated: ${adminSession.username} in ${authDuration}ms`);
-    
+
     next();
   } catch (error) {
     const authDuration = Date.now() - startTime;
@@ -391,7 +390,7 @@ const authenticateAdmin = async (req, res, next) => {
       userAgent: req.get('User-Agent'),
       url: req.originalUrl
     });
-    
+
     res.status(500).json({
       error: 'Authentication error',
       message: 'Internal server error during admin authentication'
@@ -405,7 +404,7 @@ const authenticateAdmin = async (req, res, next) => {
 // 🚦 CORS中间件（优化版）
 const corsMiddleware = (req, res, next) => {
   const origin = req.headers.origin;
-  
+
   // 允许的源（可以从配置文件读取）
   const allowedOrigins = [
     'http://localhost:3000',
@@ -413,32 +412,32 @@ const corsMiddleware = (req, res, next) => {
     'http://127.0.0.1:3000',
     'https://127.0.0.1:3000'
   ];
-  
+
   // 设置CORS头
   if (allowedOrigins.includes(origin) || !origin) {
     res.header('Access-Control-Allow-Origin', origin || '*');
   }
-  
+
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', [
     'Origin',
-    'X-Requested-With', 
-    'Content-Type', 
-    'Accept', 
-    'Authorization', 
+    'X-Requested-With',
+    'Content-Type',
+    'Accept',
+    'Authorization',
     'x-api-key',
     'api-key',
     'x-admin-token'
   ].join(', '));
-  
+
   res.header('Access-Control-Expose-Headers', [
     'X-Request-ID',
     'Content-Type'
   ].join(', '));
-  
+
   res.header('Access-Control-Max-Age', '86400'); // 24小时预检缓存
   res.header('Access-Control-Allow-Credentials', 'true');
-  
+
   if (req.method === 'OPTIONS') {
     res.status(204).end();
   } else {
@@ -450,25 +449,25 @@ const corsMiddleware = (req, res, next) => {
 const requestLogger = (req, res, next) => {
   const start = Date.now();
   const requestId = Math.random().toString(36).substring(2, 15);
-  
+
   // 添加请求ID到请求对象
   req.requestId = requestId;
   res.setHeader('X-Request-ID', requestId);
-  
+
   // 获取客户端信息
   const clientIP = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || 'unknown';
   const userAgent = req.get('User-Agent') || 'unknown';
   const referer = req.get('Referer') || 'none';
-  
+
   // 记录请求开始
   if (req.originalUrl !== '/health') { // 避免健康检查日志过多
     logger.info(`▶️ [${requestId}] ${req.method} ${req.originalUrl} | IP: ${clientIP}`);
   }
-  
+
   res.on('finish', () => {
     const duration = Date.now() - start;
     const contentLength = res.get('Content-Length') || '0';
-    
+
     // 构建日志元数据
     const logMetadata = {
       requestId,
@@ -481,7 +480,7 @@ const requestLogger = (req, res, next) => {
       userAgent,
       referer
     };
-    
+
     // 根据状态码选择日志级别
     if (res.statusCode >= 500) {
       logger.error(`◀️ [${requestId}] ${req.method} ${req.originalUrl} | ${res.statusCode} | ${duration}ms | ${contentLength}B`, logMetadata);
@@ -490,23 +489,23 @@ const requestLogger = (req, res, next) => {
     } else if (req.originalUrl !== '/health') {
       logger.request( req.method, req.originalUrl, res.statusCode, duration, logMetadata);
     }
-    
+
     // API Key相关日志
     if (req.apiKey) {
       logger.api(`📱 [${requestId}] Request from ${req.apiKey.name} (${req.apiKey.id}) | ${duration}ms`);
     }
-    
+
     // 慢请求警告
     if (duration > 5000) {
       logger.warn(`🐌 [${requestId}] Slow request detected: ${duration}ms for ${req.method} ${req.originalUrl}`);
     }
   });
-  
+
   res.on('error', (error) => {
     const duration = Date.now() - start;
     logger.error(`💥 [${requestId}] Response error after ${duration}ms:`, error);
   });
-  
+
   next();
 };
 
@@ -517,23 +516,23 @@ const securityMiddleware = (req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  
+
   // 添加更多安全头
   res.setHeader('X-DNS-Prefetch-Control', 'off');
   res.setHeader('X-Download-Options', 'noopen');
   res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
-  
+
   // Cross-Origin-Opener-Policy (仅对可信来源设置)
   const host = req.get('host') || '';
   const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1') || host.includes('0.0.0.0');
   const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https';
-  
+
   if (isLocalhost || isHttps) {
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
     res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
     res.setHeader('Origin-Agent-Cluster', '?1');
   }
-  
+
   // Content Security Policy (适用于web界面)
   if (req.path.startsWith('/web') || req.path === '/') {
     res.setHeader('Content-Security-Policy', [
@@ -548,21 +547,21 @@ const securityMiddleware = (req, res, next) => {
       'form-action \'self\''
     ].join('; '));
   }
-  
+
   // Strict Transport Security (HTTPS)
   if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
     res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
   }
-  
+
   // 移除泄露服务器信息的头
   res.removeHeader('X-Powered-By');
   res.removeHeader('Server');
-  
+
   // 防止信息泄露
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
-  
+
   next();
 };
 
@@ -570,7 +569,7 @@ const securityMiddleware = (req, res, next) => {
 const errorHandler = (error, req, res, _next) => {
   const requestId = req.requestId || 'unknown';
   const isDevelopment = process.env.NODE_ENV === 'development';
-  
+
   // 记录详细错误信息
   logger.error(`💥 [${requestId}] Unhandled error:`, {
     error: error.message,
@@ -582,16 +581,16 @@ const errorHandler = (error, req, res, _next) => {
     apiKey: req.apiKey ? req.apiKey.id : 'none',
     admin: req.admin ? req.admin.username : 'none'
   });
-  
+
   // 确定HTTP状态码
   let statusCode = 500;
   let errorMessage = 'Internal Server Error';
   let userMessage = 'Something went wrong';
-  
+
   if (error.status && error.status >= 400 && error.status < 600) {
     statusCode = error.status;
   }
-  
+
   // 根据错误类型提供友好的错误消息
   switch (error.name) {
     case 'ValidationError':
@@ -625,10 +624,10 @@ const errorHandler = (error, req, res, _next) => {
         }
       }
   }
-  
+
   // 设置响应头
   res.setHeader('X-Request-ID', requestId);
-  
+
   // 构建错误响应
   const errorResponse = {
     error: errorMessage,
@@ -636,14 +635,14 @@ const errorHandler = (error, req, res, _next) => {
     requestId,
     timestamp: new Date().toISOString()
   };
-  
+
   // 在开发环境中包含更多调试信息
   if (isDevelopment) {
     errorResponse.stack = error.stack;
     errorResponse.url = req.originalUrl;
     errorResponse.method = req.method;
   }
-  
+
   res.status(statusCode).json(errorResponse);
 };
 
@@ -658,7 +657,7 @@ const getRateLimiter = () => {
         logger.warn('⚠️ Redis client not available for rate limiter');
         return null;
       }
-      
+
       rateLimiter = new RateLimiterRedis({
         storeClient: client,
         keyPrefix: 'global_rate_limit',
@@ -666,7 +665,7 @@ const getRateLimiter = () => {
         duration: 900, // 15分钟 (900秒)
         blockDuration: 900, // 阻塞时间15分钟
       });
-      
+
       logger.info('✅ Rate limiter initialized successfully');
     } catch (error) {
       logger.warn('⚠️ Rate limiter initialization failed, using fallback', { error: error.message });
@@ -681,31 +680,31 @@ const globalRateLimit = async (req, res, next) => {
   if (req.path === '/health' || req.path === '/api/health') {
     return next();
   }
-  
+
   const limiter = getRateLimiter();
   if (!limiter) {
     // 如果Redis不可用，直接跳过速率限制
     return next();
   }
-  
+
   const clientIP = req.ip || req.connection?.remoteAddress || 'unknown';
-  
+
   try {
     await limiter.consume(clientIP);
     next();
   } catch (rejRes) {
     const remainingPoints = rejRes.remainingPoints || 0;
     const msBeforeNext = rejRes.msBeforeNext || 900000;
-    
+
     logger.security(`🚦 Global rate limit exceeded for IP: ${clientIP}`);
-    
+
     res.set({
       'Retry-After': Math.round(msBeforeNext / 1000) || 900,
       'X-RateLimit-Limit': 1000,
       'X-RateLimit-Remaining': remainingPoints,
       'X-RateLimit-Reset': new Date(Date.now() + msBeforeNext).toISOString()
     });
-    
+
     res.status(429).json({
       error: 'Too Many Requests',
       message: 'Too many requests from this IP, please try again later.',
@@ -718,7 +717,7 @@ const globalRateLimit = async (req, res, next) => {
 const requestSizeLimit = (req, res, next) => {
   const maxSize = 10 * 1024 * 1024; // 10MB
   const contentLength = parseInt(req.headers['content-length'] || '0');
-  
+
   if (contentLength > maxSize) {
     logger.security(`🚨 Request too large: ${contentLength} bytes from ${req.ip}`);
     return res.status(413).json({
@@ -727,7 +726,7 @@ const requestSizeLimit = (req, res, next) => {
       limit: '10MB'
     });
   }
-  
+
   next();
 };
 
