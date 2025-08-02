@@ -433,15 +433,6 @@
                   <option value="">
                     使用共享账号池
                   </option>
-<<<<<<< Updated upstream
-                  <option 
-                    v-for="account in accounts.claude.filter(a => a.isDedicated)" 
-                    :key="account.id" 
-                    :value="account.id"
-                  >
-                    {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
-                  </option>
-=======
                   <optgroup
                     v-if="localAccounts.claude.filter(a => a.isDedicated && a.platform === 'claude-oauth').length > 0"
                     label="Claude OAuth 账号"
@@ -466,7 +457,6 @@
                       {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
                     </option>
                   </optgroup>
->>>>>>> Stashed changes
                 </select>
               </div>
               <div>
@@ -891,27 +881,6 @@ const createApiKey = async () => {
       dailyCostLimit: form.dailyCostLimit !== '' && form.dailyCostLimit !== null ? parseFloat(form.dailyCostLimit) : 0,
       expiresAt: form.expiresAt || undefined,
       permissions: form.permissions,
-<<<<<<< Updated upstream
-      claudeAccountId: form.claudeAccountId || undefined,
-      geminiAccountId: form.geminiAccountId || undefined,
-      tags: form.tags.length > 0 ? form.tags : undefined
-    }
-    
-    // 模型限制 - 始终提交这些字段
-    data.enableModelRestriction = form.enableModelRestriction
-    data.restrictedModels = form.restrictedModels
-    
-    // 客户端限制 - 始终提交这些字段
-    data.enableClientRestriction = form.enableClientRestriction
-    data.allowedClients = form.allowedClients
-    
-    const result = await apiClient.post('/admin/api-keys', data)
-    
-    if (result.success) {
-      showToast('API Key 创建成功', 'success')
-      emit('success', result.data)
-      emit('close')
-=======
       tags: form.tags.length > 0 ? form.tags : undefined,
       enableModelRestriction: form.enableModelRestriction,
       restrictedModels: form.restrictedModels,
@@ -951,7 +920,6 @@ const createApiKey = async () => {
       } else {
         showToast(result.message || '创建失败', 'error')
       }
->>>>>>> Stashed changes
     } else {
       // 批量创建
       const data = {

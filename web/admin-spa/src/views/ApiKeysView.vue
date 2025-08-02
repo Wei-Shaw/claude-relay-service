@@ -12,44 +12,11 @@
         </div>
         <div class="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
           <!-- Token统计时间范围选择 -->
-<<<<<<< Updated upstream
-          <select 
-            v-model="apiKeyStatsTimeRange" 
-            class="form-input px-3 py-2 text-sm"
-            @change="loadApiKeys()"
-          >
-            <option value="today">
-              今日
-            </option>
-            <option value="7days">
-              最近7天
-            </option>
-            <option value="monthly">
-              本月
-            </option>
-            <option value="all">
-              全部时间
-            </option>
-          </select>
-          <!-- 标签筛选器 -->
-          <select 
-            v-model="selectedTagFilter" 
-            class="form-input px-3 py-2 text-sm"
-          >
-            <option value="">
-              所有标签
-            </option>
-            <option
-              v-for="tag in availableTags"
-              :key="tag"
-              :value="tag"
-=======
           <div class="flex flex-wrap gap-2 items-center">
             <select 
               v-model="apiKeyStatsTimeRange" 
               class="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-300 transition-colors"
               @change="loadApiKeys()"
->>>>>>> Stashed changes
             >
               <option value="today">
                 今日
@@ -83,11 +50,7 @@
             </select>
           </div>
           <button 
-<<<<<<< Updated upstream
-            class="btn btn-primary px-6 py-3 flex items-center gap-2"
-=======
             class="btn btn-primary px-4 py-2 text-sm flex items-center gap-2 w-full sm:w-auto justify-center"
->>>>>>> Stashed changes
             @click.stop="openCreateApiKeyModal"
           >
             <i class="fas fa-plus" />创建新 Key
@@ -645,8 +608,6 @@
           </tbody>
         </table>
       </div>
-<<<<<<< Updated upstream
-=======
       
       <!-- 移动端卡片视图 -->
       <div
@@ -945,7 +906,6 @@
           </button>
         </div>
       </div>
->>>>>>> Stashed changes
     </div>
     
     <!-- 模态框组件 -->
