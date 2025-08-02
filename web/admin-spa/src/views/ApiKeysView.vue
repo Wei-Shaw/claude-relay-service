@@ -174,7 +174,7 @@
           </thead>
           <tbody class="divide-y divide-gray-200/50">
             <template
-              v-for="key in sortedApiKeys"
+              v-for="key in paginatedApiKeys"
               :key="key.id"
             >
               <!-- API Key 主行 -->
@@ -615,7 +615,7 @@
         class="md:hidden space-y-3"
       >
         <div
-          v-for="key in sortedApiKeys"
+          v-for="key in paginatedApiKeys"
           :key="key.id"
           class="card p-4 hover:shadow-lg transition-shadow"
         >
@@ -816,12 +816,12 @@
       
       <!-- 分页组件 -->
       <div
-        v-if="filteredAndSortedApiKeys.length > 0"
+        v-if="sortedApiKeys.length > 0"
         class="mt-4 sm:mt-6 flex flex-col sm:flex-row justify-between items-center gap-4"
       >
         <div class="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
           <span class="text-xs sm:text-sm text-gray-600">
-            共 {{ filteredAndSortedApiKeys.length }} 条记录
+            共 {{ sortedApiKeys.length }} 条记录
           </span>
           <div class="flex items-center gap-2">
             <span class="text-xs sm:text-sm text-gray-600">每页显示</span>
@@ -956,7 +956,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
 import { useClientsStore } from '@/stores/clients'
@@ -988,6 +988,11 @@ const availableTags = ref([])
 
 // 移动端展开状态
 const expandedKeys = ref([])
+
+// 分页相关
+const currentPage = ref(1)
+const pageSize = ref(10)
+const pageSizeOptions = [10, 20, 50, 100]
 
 // 模态框状态
 const showCreateApiKeyModal = ref(false)
@@ -1036,6 +1041,50 @@ const sortedApiKeys = computed(() => {
   })
   
   return sorted
+})
+
+// 计算总页数
+const totalPages = computed(() => {
+  const total = sortedApiKeys.value.length
+  return Math.ceil(total / pageSize.value) || 0
+})
+
+// 计算显示的页码数组
+const pageNumbers = computed(() => {
+  const pages = []
+  const current = currentPage.value
+  const total = totalPages.value
+  
+  if (total <= 7) {
+    // 如果总页数小于等于7，显示所有页码
+    for (let i = 1; i <= total; i++) {
+      pages.push(i)
+    }
+  } else {
+    // 如果总页数大于7，显示部分页码
+    let start = Math.max(1, current - 2)
+    let end = Math.min(total, current + 2)
+    
+    // 调整起始和结束页码
+    if (current <= 3) {
+      end = 5
+    } else if (current >= total - 2) {
+      start = total - 4
+    }
+    
+    for (let i = start; i <= end; i++) {
+      pages.push(i)
+    }
+  }
+  
+  return pages
+})
+
+// 获取分页后的数据
+const paginatedApiKeys = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return sortedApiKeys.value.slice(start, end)
 })
 
 // 加载账户列表
@@ -1516,6 +1565,11 @@ const showApiKey = async (apiKey) => {
     showToast('获取API Key信息失败', 'error')
   }
 }
+
+// 监听筛选条件变化，重置页码
+watch([selectedTagFilter, apiKeyStatsTimeRange], () => {
+  currentPage.value = 1
+})
 
 onMounted(async () => {
   // 并行加载所有需要的数据

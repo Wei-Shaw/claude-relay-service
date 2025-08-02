@@ -694,7 +694,12 @@ onMounted(async () => {
   availableTags.value = await apiKeysStore.fetchTags()
   
   // 初始化账号数据
-  localAccounts.value = props.accounts
+  if (props.accounts) {
+    localAccounts.value = {
+      claude: props.accounts.claude || [],
+      gemini: props.accounts.gemini || []
+    }
+  }
   
   form.name = props.apiKey.name
   form.tokenLimit = props.apiKey.tokenLimit || ''
