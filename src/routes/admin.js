@@ -291,11 +291,26 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
 // 获取支持的客户端列表
 router.get('/supported-clients', authenticateAdmin, async (req, res) => {
   try {
-    const clients = config.clientRestrictions.predefinedClients.map(client => ({
+    // 检查配置是否存在，如果不存在则使用默认值
+    const predefinedClients = config.clientRestrictions?.predefinedClients || [
+      {
+        id: 'claude_code',
+        name: 'ClaudeCode',
+        description: 'Official Claude Code CLI'
+      },
+      {
+        id: 'gemini_cli',
+        name: 'Gemini-CLI',
+        description: 'Gemini Command Line Interface'
+      }
+    ];
+    
+    const clients = predefinedClients.map(client => ({
       id: client.id,
       name: client.name,
       description: client.description
     }));
+    
     res.json({ success: true, data: clients });
   } catch (error) {
     logger.error('❌ Failed to get supported clients:', error);
@@ -434,6 +449,114 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
   } catch (error) {
     logger.error('❌ Failed to create API key:', error);
     res.status(500).json({ error: 'Failed to create API key', message: error.message });
+  }
+});
+
+// 批量创建API Keys
+router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
+  try {
+    const {
+      baseName,
+      count,
+      description,
+      tokenLimit,
+      expiresAt,
+      claudeAccountId,
+      claudeConsoleAccountId,
+      geminiAccountId,
+      permissions,
+      concurrencyLimit,
+      rateLimitWindow,
+      rateLimitRequests,
+      enableModelRestriction,
+      restrictedModels,
+      enableClientRestriction,
+      allowedClients,
+      dailyCostLimit,
+      tags
+    } = req.body;
+
+    // 输入验证
+    if (!baseName || typeof baseName !== 'string' || baseName.trim().length === 0) {
+      return res.status(400).json({ error: 'Base name is required and must be a non-empty string' });
+    }
+
+    if (!count || !Number.isInteger(count) || count < 2 || count > 500) {
+      return res.status(400).json({ error: 'Count must be an integer between 2 and 500' });
+    }
+
+    if (baseName.length > 90) {
+      return res.status(400).json({ error: 'Base name must be less than 90 characters to allow for numbering' });
+    }
+
+    // 生成批量API Keys
+    const createdKeys = [];
+    const errors = [];
+
+    for (let i = 1; i <= count; i++) {
+      try {
+        const name = `${baseName}_${i}`;
+        const newKey = await apiKeyService.generateApiKey({
+          name,
+          description,
+          tokenLimit,
+          expiresAt,
+          claudeAccountId,
+          claudeConsoleAccountId,
+          geminiAccountId,
+          permissions,
+          concurrencyLimit,
+          rateLimitWindow,
+          rateLimitRequests,
+          enableModelRestriction,
+          restrictedModels,
+          enableClientRestriction,
+          allowedClients,
+          dailyCostLimit,
+          tags
+        });
+        
+        // 保留原始 API Key 供返回
+        createdKeys.push({
+          ...newKey,
+          apiKey: newKey.apiKey
+        });
+      } catch (error) {
+        errors.push({
+          index: i,
+          name: `${baseName}_${i}`,
+          error: error.message
+        });
+      }
+    }
+
+    // 如果有部分失败，返回部分成功的结果
+    if (errors.length > 0 && createdKeys.length === 0) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Failed to create any API keys', 
+        errors 
+      });
+    }
+
+    // 返回创建的keys（包含完整的apiKey）
+    res.json({ 
+      success: true,
+      data: createdKeys,
+      errors: errors.length > 0 ? errors : undefined,
+      summary: {
+        requested: count,
+        created: createdKeys.length,
+        failed: errors.length
+      }
+    });
+  } catch (error) {
+    logger.error('Failed to batch create API keys:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to batch create API keys', 
+      message: error.message 
+    });
   }
 });
 

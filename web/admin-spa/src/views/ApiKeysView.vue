@@ -1,17 +1,18 @@
 <template>
   <div class="tab-content">
-    <div class="card p-6">
-      <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+    <div class="card p-4 sm:p-6">
+      <div class="flex flex-col gap-4 mb-4 sm:mb-6">
         <div>
-          <h3 class="text-xl font-bold text-gray-900 mb-2">
+          <h3 class="text-lg sm:text-xl font-bold text-gray-900 mb-1 sm:mb-2">
             API Keys 管理
           </h3>
-          <p class="text-gray-600">
+          <p class="text-sm sm:text-base text-gray-600">
             管理和监控您的 API 密钥
           </p>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
           <!-- Token统计时间范围选择 -->
+<<<<<<< Updated upstream
           <select 
             v-model="apiKeyStatsTimeRange" 
             class="form-input px-3 py-2 text-sm"
@@ -42,12 +43,51 @@
               v-for="tag in availableTags"
               :key="tag"
               :value="tag"
+=======
+          <div class="flex flex-wrap gap-2 items-center">
+            <select 
+              v-model="apiKeyStatsTimeRange" 
+              class="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-300 transition-colors"
+              @change="loadApiKeys()"
+>>>>>>> Stashed changes
             >
-              {{ tag }}
-            </option>
-          </select>
+              <option value="today">
+                今日
+              </option>
+              <option value="7days">
+                最近7天
+              </option>
+              <option value="monthly">
+                本月
+              </option>
+              <option value="all">
+                全部时间
+              </option>
+            </select>
+            <!-- 标签筛选器 -->
+            <select 
+              v-model="selectedTagFilter" 
+              class="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-300 transition-colors"
+              @change="currentPage = 1"
+            >
+              <option value="">
+                所有标签
+              </option>
+              <option
+                v-for="tag in availableTags"
+                :key="tag"
+                :value="tag"
+              >
+                {{ tag }}
+              </option>
+            </select>
+          </div>
           <button 
+<<<<<<< Updated upstream
             class="btn btn-primary px-6 py-3 flex items-center gap-2"
+=======
+            class="btn btn-primary px-4 py-2 text-sm flex items-center gap-2 w-full sm:w-auto justify-center"
+>>>>>>> Stashed changes
             @click.stop="openCreateApiKeyModal"
           >
             <i class="fas fa-plus" />创建新 Key
@@ -80,9 +120,10 @@
         </p>
       </div>
       
+      <!-- 桌面端表格视图 -->
       <div
         v-else
-        class="table-container"
+        class="hidden md:block table-container"
       >
         <table class="min-w-full">
           <thead class="bg-gray-50/80 backdrop-blur-sm">
@@ -103,9 +144,6 @@
               </th>
               <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                 标签
-              </th>
-              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                API Key
               </th>
               <th
                 class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
@@ -216,11 +254,6 @@
                       v-if="!key.tags || key.tags.length === 0" 
                       class="text-xs text-gray-400"
                     >无标签</span>
-                  </div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="text-sm font-mono text-gray-600 bg-gray-50 px-3 py-1 rounded-lg">
-                    {{ (key.apiKey || '').substring(0, 20) }}...
                   </div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
@@ -336,34 +369,43 @@
                   {{ new Date(key.createdAt).toLocaleDateString() }}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm">
-                  <div v-if="key.expiresAt">
-                    <div
-                      v-if="isApiKeyExpired(key.expiresAt)"
-                      class="text-red-600"
-                    >
-                      <i class="fas fa-exclamation-circle mr-1" />
-                      已过期
-                    </div>
-                    <div
-                      v-else-if="isApiKeyExpiringSoon(key.expiresAt)"
-                      class="text-orange-600"
-                    >
-                      <i class="fas fa-clock mr-1" />
-                      {{ formatExpireDate(key.expiresAt) }}
-                    </div>
-                    <div
+                  <div class="inline-flex items-center gap-1 group">
+                    <span v-if="key.expiresAt">
+                      <span
+                        v-if="isApiKeyExpired(key.expiresAt)"
+                        class="text-red-600"
+                      >
+                        <i class="fas fa-exclamation-circle mr-1" />
+                        已过期
+                      </span>
+                      <span
+                        v-else-if="isApiKeyExpiringSoon(key.expiresAt)"
+                        class="text-orange-600"
+                      >
+                        <i class="fas fa-clock mr-1" />
+                        {{ formatExpireDate(key.expiresAt) }}
+                      </span>
+                      <span
+                        v-else
+                        class="text-gray-600"
+                      >
+                        {{ formatExpireDate(key.expiresAt) }}
+                      </span>
+                    </span>
+                    <span
                       v-else
-                      class="text-gray-600"
+                      class="text-gray-400"
                     >
-                      {{ formatExpireDate(key.expiresAt) }}
-                    </div>
-                  </div>
-                  <div
-                    v-else
-                    class="text-gray-400"
-                  >
-                    <i class="fas fa-infinity mr-1" />
-                    永不过期
+                      <i class="fas fa-infinity mr-1" />
+                      永不过期
+                    </span>
+                    <button
+                      class="opacity-0 group-hover:opacity-100 p-0.5 text-gray-400 hover:text-blue-600 rounded transition-all duration-200"
+                      title="快速修改过期时间"
+                      @click.stop="startEditExpiry(key)"
+                    >
+                      <i class="fas fa-pencil-alt text-xs" />
+                    </button>
                   </div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm">
@@ -401,7 +443,7 @@
               <!-- 模型统计展开区域 -->
               <tr v-if="key && key.id && expandedApiKeys[key.id]">
                 <td
-                  colspan="7"
+                  colspan="6"
                   class="px-6 py-4 bg-gray-50"
                 >
                   <div
@@ -603,6 +645,307 @@
           </tbody>
         </table>
       </div>
+<<<<<<< Updated upstream
+=======
+      
+      <!-- 移动端卡片视图 -->
+      <div
+        v-if="!apiKeysLoading && sortedApiKeys.length > 0"
+        class="md:hidden space-y-3"
+      >
+        <div
+          v-for="key in sortedApiKeys"
+          :key="key.id"
+          class="card p-4 hover:shadow-lg transition-shadow"
+        >
+          <!-- 卡片头部 -->
+          <div class="flex items-start justify-between mb-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-key text-white text-sm" />
+              </div>
+              <div>
+                <h4 class="text-sm font-semibold text-gray-900">
+                  {{ key.name }}
+                </h4>
+                <p class="text-xs text-gray-500 mt-0.5">
+                  {{ key.id }}
+                </p>
+              </div>
+            </div>
+            <span
+              :class="['inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold', 
+                       key.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800']"
+            >
+              <div
+                :class="['w-1.5 h-1.5 rounded-full mr-1.5', 
+                         key.isActive ? 'bg-green-500' : 'bg-red-500']"
+              />
+              {{ key.isActive ? '活跃' : '已停用' }}
+            </span>
+          </div>
+          
+          <!-- 绑定信息 -->
+          <div class="mb-3 text-xs text-gray-600">
+            <span v-if="key.claudeAccountId || key.claudeConsoleAccountId">
+              <i class="fas fa-link mr-1" />
+              绑定: {{ getBoundAccountName(key.claudeAccountId, key.claudeConsoleAccountId) }}
+            </span>
+            <span v-else>
+              <i class="fas fa-share-alt mr-1" />
+              使用共享池
+            </span>
+          </div>
+          
+          <!-- 统计信息 -->
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <p class="text-xs text-gray-500">
+                使用量
+              </p>
+              <p class="text-sm font-semibold text-gray-900">
+                {{ formatNumber((key.usage && key.usage.total && key.usage.total.requests) || 0) }} 次
+              </p>
+              <p class="text-xs text-gray-500 mt-0.5">
+                {{ formatNumber((key.usage && key.usage.total && key.usage.total.tokens) || 0) }} tokens
+              </p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500">
+                费用
+              </p>
+              <p class="text-sm font-semibold text-green-600">
+                {{ calculateApiKeyCost(key.usage) }}
+              </p>
+            </div>
+          </div>
+          
+          <!-- 时间信息 -->
+          <div class="text-xs text-gray-500 mb-3">
+            <div class="flex justify-between mb-1">
+              <span>创建时间</span>
+              <span>{{ formatDate(key.createdAt) }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span>过期时间</span>
+              <span :class="isApiKeyExpiringSoon(key.expiresAt) ? 'text-orange-600 font-semibold' : ''">
+                {{ key.expiresAt ? formatDate(key.expiresAt) : '永不过期' }}
+              </span>
+            </div>
+          </div>
+          
+          <!-- 标签 -->
+          <div
+            v-if="key.tags && key.tags.length > 0"
+            class="flex flex-wrap gap-1 mb-3"
+          >
+            <span
+              v-for="tag in key.tags"
+              :key="tag" 
+              class="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full"
+            >
+              {{ tag }}
+            </span>
+          </div>
+          
+          <!-- 操作按钮 -->
+          <div class="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+            <button 
+              class="flex-1 px-3 py-2 text-xs text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors flex items-center justify-center gap-1"
+              @click="toggleExpanded(key.id)"
+            >
+              <i :class="['fas', expandedKeys.includes(key.id) ? 'fa-chevron-up' : 'fa-chevron-down']" />
+              {{ expandedKeys.includes(key.id) ? '收起' : '详情' }}
+            </button>
+            <button 
+              class="flex-1 px-3 py-2 text-xs text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+              @click="openEditApiKeyModal(key)"
+            >
+              <i class="fas fa-edit mr-1" />
+              编辑
+            </button>
+            <button 
+              v-if="key.expiresAt && (isApiKeyExpired(key.expiresAt) || isApiKeyExpiringSoon(key.expiresAt))"
+              class="flex-1 px-3 py-2 text-xs text-orange-600 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors"
+              @click="openRenewApiKeyModal(key)"
+            >
+              <i class="fas fa-clock mr-1" />
+              续期
+            </button>
+            <button 
+              class="px-3 py-2 text-xs text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+              @click="deleteApiKey(key.id)"
+            >
+              <i class="fas fa-trash" />
+            </button>
+          </div>
+          
+          <!-- 展开的详细统计 -->
+          <div
+            v-if="expandedKeys.includes(key.id)"
+            class="mt-3 pt-3 border-t border-gray-100"
+          >
+            <h5 class="text-xs font-semibold text-gray-700 mb-2">
+              详细信息
+            </h5>
+            
+            <!-- 更多统计数据 -->
+            <div class="space-y-2 text-xs">
+              <div class="flex justify-between">
+                <span class="text-gray-600">并发限制:</span>
+                <span class="font-medium text-purple-600">{{ key.concurrencyLimit > 0 ? key.concurrencyLimit : '无限制' }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-600">当前并发:</span>
+                <span :class="['font-medium', key.currentConcurrency > 0 ? 'text-orange-600' : 'text-gray-600']">
+                  {{ key.currentConcurrency || 0 }}
+                  <span v-if="key.concurrencyLimit > 0" class="text-xs text-gray-500">/ {{ key.concurrencyLimit }}</span>
+                </span>
+              </div>
+              <div v-if="key.dailyCostLimit > 0" class="flex justify-between">
+                <span class="text-gray-600">今日费用:</span>
+                <span :class="['font-medium', (key.dailyCost || 0) >= key.dailyCostLimit ? 'text-red-600' : 'text-blue-600']">
+                  ${{ (key.dailyCost || 0).toFixed(2) }} / ${{ key.dailyCostLimit.toFixed(2) }}
+                </span>
+              </div>
+              <div v-if="key.rateLimitWindow > 0" class="flex justify-between">
+                <span class="text-gray-600">时间窗口:</span>
+                <span class="font-medium text-indigo-600">{{ key.rateLimitWindow }} 分钟</span>
+              </div>
+              <div v-if="key.rateLimitRequests > 0" class="flex justify-between">
+                <span class="text-gray-600">请求限制:</span>
+                <span class="font-medium text-indigo-600">{{ key.rateLimitRequests }} 次/窗口</span>
+              </div>
+              
+              <!-- Token 细节 -->
+              <div class="pt-2 mt-2 border-t border-gray-100">
+                <div class="flex justify-between">
+                  <span class="text-gray-600">输入 Token:</span>
+                  <span class="font-medium">{{ formatNumber((key.usage && key.usage.total && key.usage.total.inputTokens) || 0) }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-gray-600">输出 Token:</span>
+                  <span class="font-medium">{{ formatNumber((key.usage && key.usage.total && key.usage.total.outputTokens) || 0) }}</span>
+                </div>
+                <div v-if="((key.usage && key.usage.total && key.usage.total.cacheCreateTokens) || 0) > 0" class="flex justify-between">
+                  <span class="text-gray-600">缓存创建:</span>
+                  <span class="font-medium text-purple-600">{{ formatNumber((key.usage && key.usage.total && key.usage.total.cacheCreateTokens) || 0) }}</span>
+                </div>
+                <div v-if="((key.usage && key.usage.total && key.usage.total.cacheReadTokens) || 0) > 0" class="flex justify-between">
+                  <span class="text-gray-600">缓存读取:</span>
+                  <span class="font-medium text-purple-600">{{ formatNumber((key.usage && key.usage.total && key.usage.total.cacheReadTokens) || 0) }}</span>
+                </div>
+              </div>
+              
+              <!-- 今日统计 -->
+              <div class="pt-2 mt-2 border-t border-gray-100">
+                <div class="flex justify-between">
+                  <span class="text-gray-600">今日请求:</span>
+                  <span class="font-medium text-green-600">{{ formatNumber((key.usage && key.usage.daily && key.usage.daily.requests) || 0) }} 次</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-gray-600">今日 Token:</span>
+                  <span class="font-medium text-green-600">{{ formatNumber((key.usage && key.usage.daily && key.usage.daily.tokens) || 0) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 分页组件 -->
+      <div
+        v-if="filteredAndSortedApiKeys.length > 0"
+        class="mt-4 sm:mt-6 flex flex-col sm:flex-row justify-between items-center gap-4"
+      >
+        <div class="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+          <span class="text-xs sm:text-sm text-gray-600">
+            共 {{ filteredAndSortedApiKeys.length }} 条记录
+          </span>
+          <div class="flex items-center gap-2">
+            <span class="text-xs sm:text-sm text-gray-600">每页显示</span>
+            <select 
+              v-model="pageSize" 
+              class="px-2 py-1 text-xs sm:text-sm text-gray-700 bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-300 transition-colors"
+              @change="currentPage = 1"
+            >
+              <option 
+                v-for="size in pageSizeOptions" 
+                :key="size" 
+                :value="size"
+              >
+                {{ size }}
+              </option>
+            </select>
+            <span class="text-xs sm:text-sm text-gray-600">条</span>
+          </div>
+        </div>
+        
+        <div class="flex items-center gap-2">
+          <!-- 上一页 -->
+          <button 
+            class="px-3 py-1.5 sm:py-1 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="currentPage === 1"
+            @click="currentPage--"
+          >
+            <i class="fas fa-chevron-left" />
+          </button>
+          
+          <!-- 页码 -->
+          <div class="flex items-center gap-1">
+            <!-- 第一页 -->
+            <button 
+              v-if="currentPage > 3"
+              class="hidden sm:block px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              @click="currentPage = 1"
+            >
+              1
+            </button>
+            <span
+              v-if="currentPage > 4"
+              class="hidden sm:inline px-2 text-gray-500"
+            >...</span>
+            
+            <!-- 中间页码 -->
+            <button 
+              v-for="page in pageNumbers" 
+              :key="page"
+              :class="[
+                'px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium rounded-md',
+                page === currentPage 
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+              ]"
+              @click="currentPage = page"
+            >
+              {{ page }}
+            </button>
+            
+            <!-- 最后一页 -->
+            <span
+              v-if="currentPage < totalPages - 3"
+              class="hidden sm:inline px-2 text-gray-500"
+            >...</span>
+            <button 
+              v-if="totalPages > 1 && currentPage < totalPages - 2"
+              class="hidden sm:block px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              @click="currentPage = totalPages"
+            >
+              {{ totalPages }}
+            </button>
+          </div>
+          
+          <!-- 下一页 -->
+          <button 
+            class="px-3 py-1.5 sm:py-1 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="currentPage === totalPages || totalPages === 0"
+            @click="currentPage++"
+          >
+            <i class="fas fa-chevron-right" />
+          </button>
+        </div>
+      </div>
+>>>>>>> Stashed changes
     </div>
     
     <!-- 模态框组件 -->
@@ -611,6 +954,7 @@
       :accounts="accounts"
       @close="showCreateApiKeyModal = false"
       @success="handleCreateSuccess"
+      @batch-success="handleBatchCreateSuccess"
     />
     
     <EditApiKeyModal 
@@ -633,6 +977,21 @@
       :api-key="newApiKeyData"
       @close="showNewApiKeyModal = false"
     />
+    
+    <BatchApiKeyModal 
+      v-if="showBatchApiKeyModal"
+      :api-keys="batchApiKeyData"
+      @close="showBatchApiKeyModal = false"
+    />
+    
+    <!-- 过期时间编辑弹窗 -->
+    <ExpiryEditModal
+      ref="expiryEditModalRef"
+      :show="!!editingExpiryKey"
+      :api-key="editingExpiryKey || { id: null, expiresAt: null, name: '' }"
+      @close="closeExpiryEdit"
+      @save="handleSaveExpiry"
+    />
   </div>
 </template>
 
@@ -645,6 +1004,8 @@ import CreateApiKeyModal from '@/components/apikeys/CreateApiKeyModal.vue'
 import EditApiKeyModal from '@/components/apikeys/EditApiKeyModal.vue'
 import RenewApiKeyModal from '@/components/apikeys/RenewApiKeyModal.vue'
 import NewApiKeyModal from '@/components/apikeys/NewApiKeyModal.vue'
+import BatchApiKeyModal from '@/components/apikeys/BatchApiKeyModal.vue'
+import ExpiryEditModal from '@/components/apikeys/ExpiryEditModal.vue'
 
 // 响应式数据
 const clientsStore = useClientsStore()
@@ -658,19 +1019,26 @@ const apiKeyModelStats = ref({})
 const apiKeyDateFilters = ref({})
 const defaultTime = ref([new Date(2000, 1, 1, 0, 0, 0), new Date(2000, 2, 1, 23, 59, 59)])
 const accounts = ref({ claude: [], gemini: [] })
+const editingExpiryKey = ref(null)
+const expiryEditModalRef = ref(null)
 
 // 标签相关
 const selectedTagFilter = ref('')
 const availableTags = ref([])
+
+// 移动端展开状态
+const expandedKeys = ref([])
 
 // 模态框状态
 const showCreateApiKeyModal = ref(false)
 const showEditApiKeyModal = ref(false)
 const showRenewApiKeyModal = ref(false)
 const showNewApiKeyModal = ref(false)
+const showBatchApiKeyModal = ref(false)
 const editingApiKey = ref(null)
 const renewingApiKey = ref(null)
 const newApiKeyData = ref(null)
+const batchApiKeyData = ref([])
 
 // 计算排序后的API Keys
 const sortedApiKeys = computed(() => {
@@ -990,12 +1358,16 @@ const resetApiKeyDateFilter = (keyId) => {
 }
 
 // 打开创建模态框
-const openCreateApiKeyModal = () => {
+const openCreateApiKeyModal = async () => {
+  // 重新加载账号数据，确保显示最新的专属账号
+  await loadAccounts()
   showCreateApiKeyModal.value = true
 }
 
 // 打开编辑模态框
-const openEditApiKeyModal = (apiKey) => {
+const openEditApiKeyModal = async (apiKey) => {
+  // 重新加载账号数据，确保显示最新的专属账号
+  await loadAccounts()
   editingApiKey.value = apiKey
   showEditApiKeyModal.value = true
 }
@@ -1011,6 +1383,14 @@ const handleCreateSuccess = (data) => {
   showCreateApiKeyModal.value = false
   newApiKeyData.value = data
   showNewApiKeyModal.value = true
+  loadApiKeys()
+}
+
+// 处理批量创建成功
+const handleBatchCreateSuccess = (data) => {
+  showCreateApiKeyModal.value = false
+  batchApiKeyData.value = data
+  showBatchApiKeyModal.value = true
   loadApiKeys()
 }
 
@@ -1090,6 +1470,90 @@ const copyApiStatsLink = (apiKey) => {
     console.log('统计页面链接:', statsUrl)
   } finally {
     document.body.removeChild(textarea)
+  }
+}
+
+// 开始编辑过期时间
+const startEditExpiry = (apiKey) => {
+  editingExpiryKey.value = apiKey
+}
+
+// 关闭过期时间编辑
+const closeExpiryEdit = () => {
+  editingExpiryKey.value = null
+}
+
+// 保存过期时间
+const handleSaveExpiry = async ({ keyId, expiresAt }) => {
+  try {
+    const data = await apiClient.put(`/admin/api-keys/${keyId}`, {
+      expiresAt: expiresAt || null
+    })
+    
+    if (data.success) {
+      showToast('过期时间已更新', 'success')
+      // 更新本地数据
+      const key = apiKeys.value.find(k => k.id === keyId)
+      if (key) {
+        key.expiresAt = expiresAt || null
+      }
+      closeExpiryEdit()
+    } else {
+      showToast(data.message || '更新失败', 'error')
+      // 重置保存状态
+      if (expiryEditModalRef.value) {
+        expiryEditModalRef.value.resetSaving()
+      }
+    }
+  } catch (error) {
+    showToast('更新失败', 'error')
+    // 重置保存状态
+    if (expiryEditModalRef.value) {
+      expiryEditModalRef.value.resetSaving()
+    }
+  }
+}
+
+// 切换移动端卡片展开状态
+const toggleExpanded = (keyId) => {
+  const index = expandedKeys.value.indexOf(keyId)
+  if (index > -1) {
+    expandedKeys.value.splice(index, 1)
+  } else {
+    expandedKeys.value.push(keyId)
+  }
+}
+
+// 格式化日期时间
+const formatDate = (dateString) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).replace(/\//g, '-')
+}
+
+// 显示API Key详情
+const showApiKey = async (apiKey) => {
+  try {
+    // 重新获取API Key的完整信息（包含实际的key值）
+    const response = await apiClient.get(`/admin/api-keys/${apiKey.id}`)
+    if (response.success && response.data) {
+      newApiKeyData.value = {
+        ...response.data,
+        key: response.data.key || response.data.apiKey // 兼容不同的字段名
+      }
+      showNewApiKeyModal.value = true
+    } else {
+      showToast('获取API Key信息失败', 'error')
+    }
+  } catch (error) {
+    console.error('Error fetching API key:', error)
+    showToast('获取API Key信息失败', 'error')
   }
 }
 

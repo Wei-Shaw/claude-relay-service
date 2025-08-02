@@ -2,21 +2,21 @@
   <div class="stat-card">
     <div class="flex items-start justify-between">
       <div class="flex-1">
-        <p class="text-sm font-medium text-gray-600 mb-1">
+        <p class="text-xs sm:text-sm font-medium text-gray-600 mb-1">
           {{ title }}
         </p>
-        <p class="text-3xl font-bold text-gray-800">
+        <p class="text-2xl sm:text-3xl font-bold text-gray-800">
           {{ value }}
         </p>
         <p
           v-if="subtitle"
-          class="text-sm text-gray-500 mt-2"
+          class="text-xs sm:text-sm text-gray-500 mt-1.5 sm:mt-2"
         >
           {{ subtitle }}
         </p>
       </div>
-      <div :class="['stat-icon', iconBgClass]">
-        <i :class="icon" />
+      <div :class="['stat-icon flex-shrink-0', iconBgClass]">
+        <i :class="[icon, 'text-sm sm:text-base']" />
       </div>
     </div>
   </div>

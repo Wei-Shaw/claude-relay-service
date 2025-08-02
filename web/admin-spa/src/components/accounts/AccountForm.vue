@@ -2,50 +2,50 @@
   <Teleport to="body">
     <div
       v-if="show"
-      class="fixed inset-0 modal z-50 flex items-center justify-center p-4"
+      class="fixed inset-0 modal z-50 flex items-center justify-center p-3 sm:p-4"
     >
-      <div class="modal-content w-full max-w-2xl p-8 mx-auto max-h-[90vh] overflow-y-auto custom-scrollbar">
-        <div class="flex items-center justify-between mb-6">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
-              <i class="fas fa-user-circle text-white" />
+      <div class="modal-content w-full max-w-2xl p-4 sm:p-6 md:p-8 mx-auto max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <div class="flex items-center justify-between mb-4 sm:mb-6">
+          <div class="flex items-center gap-2 sm:gap-3">
+            <div class="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-lg sm:rounded-xl flex items-center justify-center">
+              <i class="fas fa-user-circle text-white text-sm sm:text-base" />
             </div>
-            <h3 class="text-xl font-bold text-gray-900">
+            <h3 class="text-lg sm:text-xl font-bold text-gray-900">
               {{ isEdit ? '编辑账户' : '添加账户' }}
             </h3>
           </div>
           <button 
-            class="text-gray-400 hover:text-gray-600 transition-colors"
+            class="text-gray-400 hover:text-gray-600 transition-colors p-1"
             @click="$emit('close')"
           >
-            <i class="fas fa-times text-xl" />
+            <i class="fas fa-times text-lg sm:text-xl" />
           </button>
         </div>
         
         <!-- 步骤指示器 -->
         <div
           v-if="!isEdit && form.addType === 'oauth'"
-          class="flex items-center justify-center mb-8"
+          class="flex items-center justify-center mb-4 sm:mb-8"
         >
-          <div class="flex items-center space-x-4">
+          <div class="flex items-center space-x-2 sm:space-x-4">
             <div class="flex items-center">
               <div
-                :class="['w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold', 
+                :class="['w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-semibold', 
                          oauthStep >= 1 ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-500']"
               >
                 1
               </div>
-              <span class="ml-2 text-sm font-medium text-gray-700">基本信息</span>
+              <span class="ml-1.5 sm:ml-2 text-xs sm:text-sm font-medium text-gray-700">基本信息</span>
             </div>
-            <div class="w-8 h-0.5 bg-gray-300" />
+            <div class="w-4 sm:w-8 h-0.5 bg-gray-300" />
             <div class="flex items-center">
               <div
-                :class="['w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold', 
+                :class="['w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-semibold', 
                          oauthStep >= 2 ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-500']"
               >
                 2
               </div>
-              <span class="ml-2 text-sm font-medium text-gray-700">授权认证</span>
+              <span class="ml-1.5 sm:ml-2 text-xs sm:text-sm font-medium text-gray-700">授权认证</span>
             </div>
           </div>
         </div>

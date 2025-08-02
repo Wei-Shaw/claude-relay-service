@@ -1,19 +1,19 @@
 <template>
   <div class="accounts-container">
-    <div class="card p-6">
-      <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+    <div class="card p-4 sm:p-6">
+      <div class="flex flex-col gap-4 mb-4 sm:mb-6">
         <div>
-          <h3 class="text-xl font-bold text-gray-900 mb-2">
+          <h3 class="text-lg sm:text-xl font-bold text-gray-900 mb-1 sm:mb-2">
             账户管理
           </h3>
-          <p class="text-gray-600">
+          <p class="text-sm sm:text-base text-gray-600">
             管理您的 Claude 和 Gemini 账户及代理配置
           </p>
         </div>
-        <div class="flex gap-2">
+        <div class="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
           <select
             v-model="accountSortBy"
-            class="form-input px-3 py-2 text-sm"
+            class="form-input px-3 py-2 text-sm w-full sm:w-auto"
             @change="sortAccounts()"
           >
             <option value="name">
@@ -33,7 +33,7 @@
             </option>
           </select>
           <button 
-            class="btn btn-success px-6 py-3 flex items-center gap-2"
+            class="btn btn-success px-4 sm:px-6 py-2 sm:py-3 flex items-center gap-2 w-full sm:w-auto justify-center"
             @click.stop="openCreateAccountModal"
           >
             <i class="fas fa-plus" />添加账户
@@ -66,9 +66,10 @@
         </p>
       </div>
       
+      <!-- 桌面端表格视图 -->
       <div
         v-else
-        class="table-container"
+        class="hidden lg:block table-container"
       >
         <table class="min-w-full">
           <thead class="bg-gray-50/80 backdrop-blur-sm">
@@ -442,6 +443,183 @@
           </tbody>
         </table>
       </div>
+      
+      <!-- 移动端卡片视图 -->
+      <div
+        v-if="!accountsLoading && sortedAccounts.length > 0"
+        class="lg:hidden space-y-3"
+      >
+        <div
+          v-for="account in sortedAccounts"
+          :key="account.id"
+          class="card p-4 hover:shadow-lg transition-shadow"
+        >
+          <!-- 卡片头部 -->
+          <div class="flex items-start justify-between mb-3">
+            <div class="flex items-center gap-3">
+              <div
+                :class="[
+                  'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0',
+                  account.platform === 'claude' 
+                    ? 'bg-gradient-to-br from-purple-500 to-purple-600' 
+                    : 'bg-gradient-to-br from-blue-500 to-blue-600'
+                ]"
+              >
+                <i
+                  :class="[
+                    'text-white text-sm',
+                    account.platform === 'claude' ? 'fas fa-brain' : 'fas fa-robot'
+                  ]"
+                />
+              </div>
+              <div>
+                <h4 class="text-sm font-semibold text-gray-900">
+                  {{ account.name || account.email }}
+                </h4>
+                <div class="flex items-center gap-2 mt-0.5">
+                  <span class="text-xs text-gray-500">{{ account.platform }}</span>
+                  <span class="text-xs text-gray-400">|</span>
+                  <span class="text-xs text-gray-500">{{ account.type }}</span>
+                </div>
+              </div>
+            </div>
+            <span
+              :class="[
+                'inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold',
+                getAccountStatusClass(account)
+              ]"
+            >
+              <div
+                :class="[
+                  'w-1.5 h-1.5 rounded-full mr-1.5',
+                  getAccountStatusDotClass(account)
+                ]"
+              />
+              {{ getAccountStatusText(account) }}
+            </span>
+          </div>
+          
+          <!-- 使用统计 -->
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <p class="text-xs text-gray-500">
+                今日使用
+              </p>
+              <p class="text-sm font-semibold text-gray-900">
+                {{ formatNumber(account.usage?.dailyRequests || 0) }} 次
+              </p>
+              <p class="text-xs text-gray-500 mt-0.5">
+                {{ formatNumber(account.usage?.dailyTokens || 0) }} tokens
+              </p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500">
+                总使用量
+              </p>
+              <p class="text-sm font-semibold text-gray-900">
+                {{ formatNumber(account.usage?.totalRequests || 0) }} 次
+              </p>
+              <p class="text-xs text-gray-500 mt-0.5">
+                {{ formatNumber(account.usage?.totalTokens || 0) }} tokens
+              </p>
+            </div>
+          </div>
+          
+          <!-- 状态信息 -->
+          <div class="space-y-2 mb-3">
+            <!-- 会话窗口 -->
+            <div
+              v-if="account.sessionWindow"
+              class="flex items-center justify-between text-xs"
+            >
+              <span class="text-gray-500">会话窗口</span>
+              <div class="flex items-center gap-2">
+                <span
+                  :class="[
+                    'font-medium',
+                    account.sessionWindow.remaining <= 20 ? 'text-orange-600' : 'text-gray-900'
+                  ]"
+                >
+                  {{ account.sessionWindow.remaining || 0 }} / {{ account.sessionWindow.total || 0 }}
+                </span>
+                <div class="w-20 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                    class="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-300"
+                    :style="{ width: `${getSessionWindowPercentage(account)}%` }"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <!-- 最后使用时间 -->
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-gray-500">最后使用</span>
+              <span class="text-gray-700">
+                {{ account.lastUsedAt ? formatRelativeTime(account.lastUsedAt) : '从未使用' }}
+              </span>
+            </div>
+            
+            <!-- 代理配置 -->
+            <div
+              v-if="account.proxyConfig && account.proxyConfig.type !== 'none'"
+              class="flex items-center justify-between text-xs"
+            >
+              <span class="text-gray-500">代理</span>
+              <span class="text-gray-700">
+                {{ account.proxyConfig.type.toUpperCase() }}
+              </span>
+            </div>
+            
+            <!-- 调度优先级 -->
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-gray-500">优先级</span>
+              <span class="text-gray-700 font-medium">
+                {{ account.priority || 0 }}
+              </span>
+            </div>
+          </div>
+          
+          <!-- 操作按钮 -->
+          <div class="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+            <button 
+              v-if="account.platform === 'claude' && account.type === 'oauth'"
+              class="flex-1 px-3 py-2 text-xs text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors flex items-center justify-center gap-1"
+              :disabled="refreshingTokens[account.id]"
+              @click="refreshAccountToken(account)"
+            >
+              <i :class="['fas fa-sync-alt', { 'animate-spin': refreshingTokens[account.id] }]" />
+              {{ refreshingTokens[account.id] ? '刷新中' : '刷新' }}
+            </button>
+            
+            <button 
+              class="flex-1 px-3 py-2 text-xs rounded-lg transition-colors flex items-center justify-center gap-1"
+              :class="account.schedulable 
+                ? 'text-gray-600 bg-gray-50 hover:bg-gray-100' 
+                : 'text-green-600 bg-green-50 hover:bg-green-100'"
+              @click="toggleSchedulable(account)"
+              :disabled="account.isTogglingSchedulable"
+            >
+              <i :class="['fas', account.schedulable ? 'fa-pause' : 'fa-play']" />
+              {{ account.schedulable ? '暂停' : '启用' }}
+            </button>
+            
+            <button 
+              class="flex-1 px-3 py-2 text-xs text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+              @click="editAccount(account)"
+            >
+              <i class="fas fa-edit mr-1" />
+              编辑
+            </button>
+            
+            <button 
+              class="px-3 py-2 text-xs text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+              @click="deleteAccount(account)"
+            >
+              <i class="fas fa-trash" />
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
     
     <!-- 添加账户模态框 -->
@@ -491,6 +669,7 @@ const accountSortBy = ref('name')
 const accountsSortBy = ref('')
 const accountsSortOrder = ref('asc')
 const apiKeys = ref([])
+const refreshingTokens = ref({})
 
 // 模态框状态
 const showCreateAccountModal = ref(false)
@@ -810,6 +989,96 @@ const handleEditSuccess = () => {
   showEditAccountModal.value = false
   showToast('账户更新成功', 'success')
   loadAccounts()
+}
+
+// 获取账户状态文本
+const getAccountStatusText = (account) => {
+  // 检查是否被封锁
+  if (account.status === 'blocked') return '已封锁'
+  // 检查是否限流
+  if (account.isRateLimited || account.status === 'rate_limited' || 
+      (account.rateLimitStatus && account.rateLimitStatus.isRateLimited)) return '限流中'
+  // 检查是否错误
+  if (account.status === 'error' || !account.isActive) return '错误'
+  // 检查是否可调度
+  if (account.schedulable === false) return '已暂停'
+  // 否则正常
+  return '正常'
+}
+
+// 获取账户状态样式类
+const getAccountStatusClass = (account) => {
+  if (account.status === 'blocked') {
+    return 'bg-red-100 text-red-800'
+  }
+  if (account.isRateLimited || account.status === 'rate_limited' || 
+      (account.rateLimitStatus && account.rateLimitStatus.isRateLimited)) {
+    return 'bg-orange-100 text-orange-800'
+  }
+  if (account.status === 'error' || !account.isActive) {
+    return 'bg-red-100 text-red-800'
+  }
+  if (account.schedulable === false) {
+    return 'bg-gray-100 text-gray-800'
+  }
+  return 'bg-green-100 text-green-800'
+}
+
+// 获取账户状态点样式类
+const getAccountStatusDotClass = (account) => {
+  if (account.status === 'blocked') {
+    return 'bg-red-500'
+  }
+  if (account.isRateLimited || account.status === 'rate_limited' || 
+      (account.rateLimitStatus && account.rateLimitStatus.isRateLimited)) {
+    return 'bg-orange-500'
+  }
+  if (account.status === 'error' || !account.isActive) {
+    return 'bg-red-500'
+  }
+  if (account.schedulable === false) {
+    return 'bg-gray-500'
+  }
+  return 'bg-green-500'
+}
+
+// 获取会话窗口百分比
+const getSessionWindowPercentage = (account) => {
+  if (!account.sessionWindow) return 100
+  const { remaining, total } = account.sessionWindow
+  if (!total || total === 0) return 100
+  return Math.round((remaining / total) * 100)
+}
+
+// 格式化相对时间
+const formatRelativeTime = (dateString) => {
+  return formatLastUsed(dateString)
+}
+
+// 刷新账户Token
+const refreshAccountToken = async (account) => {
+  if (refreshingTokens.value[account.id]) return
+  
+  try {
+    refreshingTokens.value[account.id] = true
+    const data = await apiClient.post(`/admin/claude-accounts/${account.id}/refresh`)
+    
+    if (data.success) {
+      showToast('Token刷新成功', 'success')
+      loadAccounts()
+    } else {
+      showToast(data.message || 'Token刷新失败', 'error')
+    }
+  } catch (error) {
+    showToast('Token刷新失败', 'error')
+  } finally {
+    refreshingTokens.value[account.id] = false
+  }
+}
+
+// 切换调度状态
+const toggleDispatch = async (account) => {
+  await toggleSchedulable(account)
 }
 
 // 监听排序选择变化

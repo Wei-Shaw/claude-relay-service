@@ -1,44 +1,44 @@
 <template>
   <Teleport to="body">
-    <div class="fixed inset-0 modal z-50 flex items-center justify-center p-4">
-      <div class="modal-content w-full max-w-4xl p-8 mx-auto max-h-[90vh] flex flex-col">
-        <div class="flex items-center justify-between mb-6">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-              <i class="fas fa-edit text-white" />
+    <div class="fixed inset-0 modal z-50 flex items-center justify-center p-3 sm:p-4">
+      <div class="modal-content w-full max-w-4xl p-4 sm:p-6 md:p-8 mx-auto max-h-[90vh] flex flex-col">
+        <div class="flex items-center justify-between mb-4 sm:mb-6">
+          <div class="flex items-center gap-2 sm:gap-3">
+            <div class="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg sm:rounded-xl flex items-center justify-center">
+              <i class="fas fa-edit text-white text-sm sm:text-base" />
             </div>
-            <h3 class="text-xl font-bold text-gray-900">
+            <h3 class="text-lg sm:text-xl font-bold text-gray-900">
               编辑 API Key
             </h3>
           </div>
           <button 
-            class="text-gray-400 hover:text-gray-600 transition-colors"
+            class="text-gray-400 hover:text-gray-600 transition-colors p-1"
             @click="$emit('close')"
           >
-            <i class="fas fa-times text-xl" />
+            <i class="fas fa-times text-lg sm:text-xl" />
           </button>
         </div>
       
         <form
-          class="space-y-6 modal-scroll-content custom-scrollbar flex-1"
+          class="space-y-4 sm:space-y-6 modal-scroll-content custom-scrollbar flex-1"
           @submit.prevent="updateApiKey"
         >
           <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-3">名称</label>
+            <label class="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-3">名称</label>
             <input 
               :value="form.name" 
               type="text" 
               disabled
-              class="form-input w-full bg-gray-100 cursor-not-allowed"
+              class="form-input w-full bg-gray-100 cursor-not-allowed text-sm"
             >
-            <p class="text-xs text-gray-500 mt-2">
+            <p class="text-xs text-gray-500 mt-1 sm:mt-2">
               名称不可修改
             </p>
           </div>
         
           <!-- 标签 -->
           <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-3">标签</label>
+            <label class="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-3">标签</label>
             <div class="space-y-4">
               <!-- 已选择的标签 -->
               <div v-if="form.tags.length > 0">
@@ -278,7 +278,19 @@
           </div>
         
           <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-3">专属账号绑定</label>
+            <div class="flex items-center justify-between mb-3">
+              <label class="text-sm font-semibold text-gray-700">专属账号绑定</label>
+              <button
+                type="button"
+                class="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="刷新账号列表"
+                :disabled="accountsLoading"
+                @click="refreshAccounts"
+              >
+                <i :class="['fas', accountsLoading ? 'fa-spinner fa-spin' : 'fa-sync-alt', 'text-xs']" />
+                <span>{{ accountsLoading ? '刷新中...' : '刷新账号' }}</span>
+              </button>
+            </div>
             <div class="grid grid-cols-1 gap-3">
               <div>
                 <label class="block text-sm font-medium text-gray-600 mb-1">Claude 专属账号</label>
@@ -290,6 +302,7 @@
                   <option value="">
                     使用共享账号池
                   </option>
+<<<<<<< Updated upstream
                   <option 
                     v-for="account in accounts.claude" 
                     :key="account.id" 
@@ -297,6 +310,32 @@
                   >
                     {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
                   </option>
+=======
+                  <optgroup
+                    v-if="localAccounts.claude.filter(a => a.isDedicated && a.platform === 'claude-oauth').length > 0"
+                    label="Claude OAuth 账号"
+                  >
+                    <option 
+                      v-for="account in localAccounts.claude.filter(a => a.isDedicated && a.platform === 'claude-oauth')" 
+                      :key="account.id" 
+                      :value="account.id"
+                    >
+                      {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
+                    </option>
+                  </optgroup>
+                  <optgroup
+                    v-if="localAccounts.claude.filter(a => a.isDedicated && a.platform === 'claude-console').length > 0"
+                    label="Claude Console 账号"
+                  >
+                    <option 
+                      v-for="account in localAccounts.claude.filter(a => a.isDedicated && a.platform === 'claude-console')" 
+                      :key="account.id" 
+                      :value="`console:${account.id}`"
+                    >
+                      {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
+                    </option>
+                  </optgroup>
+>>>>>>> Stashed changes
                 </select>
               </div>
               <div>
@@ -310,7 +349,7 @@
                     使用共享账号池
                   </option>
                   <option 
-                    v-for="account in accounts.gemini" 
+                    v-for="account in localAccounts.gemini.filter(a => a.isDedicated)" 
                     :key="account.id" 
                     :value="account.id"
                   >
@@ -498,6 +537,8 @@ const authStore = useAuthStore()
 const clientsStore = useClientsStore()
 const apiKeysStore = useApiKeysStore()
 const loading = ref(false)
+const accountsLoading = ref(false)
+const localAccounts = ref({ claude: [], gemini: [] })
 
 // 支持的客户端列表
 const supportedClients = ref([])
@@ -606,11 +647,64 @@ const updateApiKey = async () => {
   }
 }
 
+// 刷新账号列表
+const refreshAccounts = async () => {
+  accountsLoading.value = true
+  try {
+    const [claudeData, claudeConsoleData, geminiData] = await Promise.all([
+      apiClient.get('/admin/claude-accounts'),
+      apiClient.get('/admin/claude-console-accounts'),
+      apiClient.get('/admin/gemini-accounts')
+    ])
+    
+    // 合并Claude OAuth账户和Claude Console账户
+    const claudeAccounts = []
+    
+    if (claudeData.success) {
+      claudeData.data?.forEach(account => {
+        claudeAccounts.push({
+          ...account,
+          platform: 'claude-oauth',
+          isDedicated: account.accountType === 'dedicated'
+        })
+      })
+    }
+    
+    if (claudeConsoleData.success) {
+      claudeConsoleData.data?.forEach(account => {
+        claudeAccounts.push({
+          ...account,
+          platform: 'claude-console',
+          isDedicated: account.accountType === 'dedicated'
+        })
+      })
+    }
+    
+    localAccounts.value.claude = claudeAccounts
+    
+    if (geminiData.success) {
+      localAccounts.value.gemini = (geminiData.data || []).map(account => ({
+        ...account,
+        isDedicated: account.accountType === 'dedicated'
+      }))
+    }
+    
+    showToast('账号列表已刷新', 'success')
+  } catch (error) {
+    showToast('刷新账号列表失败', 'error')
+  } finally {
+    accountsLoading.value = false
+  }
+}
+
 // 初始化表单数据
 onMounted(async () => {
   // 加载支持的客户端和已存在的标签
   supportedClients.value = await clientsStore.loadSupportedClients()
   availableTags.value = await apiKeysStore.fetchTags()
+  
+  // 初始化账号数据
+  localAccounts.value = props.accounts
   
   form.name = props.apiKey.name
   form.tokenLimit = props.apiKey.tokenLimit || ''
