@@ -1486,29 +1486,65 @@ router.get('/usage-stats', authenticateAdmin, async (req, res) => {
 // 获取按模型的使用统计和费用
 router.get('/model-stats', authenticateAdmin, async (req, res) => {
   try {
-    const { period = 'daily' } = req.query; // daily, monthly
+    const { period = 'daily', startDate, endDate } = req.query; // daily, monthly, 支持自定义时间范围
     const today = redis.getDateStringInTimezone();
     const tzDate = redis.getDateInTimezone();
     const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`;
     
-    logger.info(`📊 Getting global model stats, period: ${period}, today: ${today}, currentMonth: ${currentMonth}`);
+    logger.info(`📊 Getting global model stats, period: ${period}, startDate: ${startDate}, endDate: ${endDate}, today: ${today}, currentMonth: ${currentMonth}`);
     
     const client = redis.getClientSafe();
     
     // 获取所有模型的统计数据
-    const pattern = period === 'daily' ? `usage:model:daily:*:${today}` : `usage:model:monthly:*:${currentMonth}`;
-    logger.info(`📊 Searching pattern: ${pattern}`);
+    let searchPatterns = [];
     
-    const keys = await client.keys(pattern);
-    logger.info(`📊 Found ${keys.length} matching keys:`, keys);
+    if (startDate && endDate) {
+      // 自定义日期范围，生成多个日期的搜索模式
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      // 确保日期范围有效
+      if (start > end) {
+        return res.status(400).json({ error: 'Start date must be before or equal to end date' });
+      }
+      
+      // 限制最大范围为31天
+      const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+      if (daysDiff > 31) {
+        return res.status(400).json({ error: 'Date range cannot exceed 31 days' });
+      }
+      
+      // 生成日期范围内所有日期的搜索模式
+      const currentDate = new Date(start);
+      while (currentDate <= end) {
+        const dateStr = redis.getDateStringInTimezone(currentDate);
+        searchPatterns.push(`usage:model:daily:*:${dateStr}`);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      
+      logger.info(`📊 Generated ${searchPatterns.length} search patterns for date range`);
+    } else {
+      // 使用默认的period
+      const pattern = period === 'daily' ? `usage:model:daily:*:${today}` : `usage:model:monthly:*:${currentMonth}`;
+      searchPatterns = [pattern];
+    }
     
-    const modelStats = [];
+    logger.info(`📊 Searching patterns:`, searchPatterns);
     
-    for (const key of keys) {
-      const match = key.match(period === 'daily' ? 
-        /usage:model:daily:(.+):\d{4}-\d{2}-\d{2}$/ : 
-        /usage:model:monthly:(.+):\d{4}-\d{2}$/
-      );
+    // 获取所有匹配的keys
+    const allKeys = [];
+    for (const pattern of searchPatterns) {
+      const keys = await client.keys(pattern);
+      allKeys.push(...keys);
+    }
+    
+    logger.info(`📊 Found ${allKeys.length} matching keys in total`);
+    
+    // 聚合相同模型的数据
+    const modelStatsMap = new Map();
+    
+    for (const key of allKeys) {
+      const match = key.match(/usage:model:daily:(.+):\d{4}-\d{2}-\d{2}$/);
       
       if (!match) {
         logger.warn(`📊 Pattern mismatch for key: ${key}`);
@@ -1518,41 +1554,62 @@ router.get('/model-stats', authenticateAdmin, async (req, res) => {
       const model = match[1];
       const data = await client.hgetall(key);
       
-      logger.info(`📊 Model ${model} data:`, data);
-      
       if (data && Object.keys(data).length > 0) {
-        const usage = {
-          input_tokens: parseInt(data.inputTokens) || 0,
-          output_tokens: parseInt(data.outputTokens) || 0,
-          cache_creation_input_tokens: parseInt(data.cacheCreateTokens) || 0,
-          cache_read_input_tokens: parseInt(data.cacheReadTokens) || 0
+        const stats = modelStatsMap.get(model) || {
+          requests: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheCreateTokens: 0,
+          cacheReadTokens: 0,
+          allTokens: 0
         };
         
-        // 计算费用
-        const costData = CostCalculator.calculateCost(usage, model);
+        stats.requests += parseInt(data.requests) || 0;
+        stats.inputTokens += parseInt(data.inputTokens) || 0;
+        stats.outputTokens += parseInt(data.outputTokens) || 0;
+        stats.cacheCreateTokens += parseInt(data.cacheCreateTokens) || 0;
+        stats.cacheReadTokens += parseInt(data.cacheReadTokens) || 0;
+        stats.allTokens += parseInt(data.allTokens) || 0;
         
-        modelStats.push({
-          model,
-          period,
-          requests: parseInt(data.requests) || 0,
+        modelStatsMap.set(model, stats);
+      }
+    }
+    
+    // 转换为数组并计算费用
+    const modelStats = [];
+    
+    for (const [model, stats] of modelStatsMap) {
+      const usage = {
+        input_tokens: stats.inputTokens,
+        output_tokens: stats.outputTokens,
+        cache_creation_input_tokens: stats.cacheCreateTokens,
+        cache_read_input_tokens: stats.cacheReadTokens
+      };
+      
+      // 计算费用
+      const costData = CostCalculator.calculateCost(usage, model);
+      
+      modelStats.push({
+        model,
+        period: startDate && endDate ? 'custom' : period,
+        requests: stats.requests,
+        inputTokens: usage.input_tokens,
+        outputTokens: usage.output_tokens,
+        cacheCreateTokens: usage.cache_creation_input_tokens,
+        cacheReadTokens: usage.cache_read_input_tokens,
+        allTokens: stats.allTokens,
+        usage: {
+          requests: stats.requests,
           inputTokens: usage.input_tokens,
           outputTokens: usage.output_tokens,
           cacheCreateTokens: usage.cache_creation_input_tokens,
           cacheReadTokens: usage.cache_read_input_tokens,
-          allTokens: parseInt(data.allTokens) || 0,
-          usage: {
-            requests: parseInt(data.requests) || 0,
-            inputTokens: usage.input_tokens,
-            outputTokens: usage.output_tokens,
-            cacheCreateTokens: usage.cache_creation_input_tokens,
-            cacheReadTokens: usage.cache_read_input_tokens,
-            totalTokens: usage.input_tokens + usage.output_tokens + usage.cache_creation_input_tokens + usage.cache_read_input_tokens
-          },
-          costs: costData.costs,
-          formatted: costData.formatted,
-          pricing: costData.pricing
-        });
-      }
+          totalTokens: usage.input_tokens + usage.output_tokens + usage.cache_creation_input_tokens + usage.cache_read_input_tokens
+        },
+        costs: costData.costs,
+        formatted: costData.formatted,
+        pricing: costData.pricing
+      });
     }
     
     // 按总费用排序
