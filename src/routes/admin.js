@@ -1320,19 +1320,20 @@ router.post('/gemini-accounts/generate-auth-url', authenticateAdmin, async (req,
   try {
     const { state } = req.body;
     
-    // 使用固定的 localhost:45462 作为回调地址
-    const redirectUri = 'http://localhost:45462';
+    // 使用新的 codeassist.google.com 回调地址
+    const redirectUri = 'https://codeassist.google.com/authcode';
     
     logger.info(`Generating Gemini OAuth URL with redirect_uri: ${redirectUri}`);
     
-    const { authUrl, state: authState } = await geminiAccountService.generateAuthUrl(state, redirectUri);
+    const { authUrl, state: authState, codeVerifier, redirectUri: finalRedirectUri } = await geminiAccountService.generateAuthUrl(state, redirectUri);
     
-    // 创建 OAuth 会话
+    // 创建 OAuth 会话，包含 codeVerifier
     const sessionId = authState;
     await redis.setOAuthSession(sessionId, {
       state: authState,
       type: 'gemini',
-      redirectUri: redirectUri, // 保存固定的 redirect_uri 用于 token 交换
+      redirectUri: finalRedirectUri,
+      codeVerifier: codeVerifier, // 保存 PKCE code verifier
       createdAt: new Date().toISOString()
     });
     
@@ -1382,11 +1383,20 @@ router.post('/gemini-accounts/exchange-code', authenticateAdmin, async (req, res
       return res.status(400).json({ error: 'Authorization code is required' });
     }
     
-    // 使用固定的 localhost:45462 作为 redirect_uri
-    const redirectUri = 'http://localhost:45462';
-    logger.info(`Using fixed redirect_uri: ${redirectUri}`);
+    let redirectUri = 'https://codeassist.google.com/authcode';
+    let codeVerifier = null;
     
-    const tokens = await geminiAccountService.exchangeCodeForTokens(code, redirectUri);
+    // 如果提供了 sessionId，从 OAuth 会话中获取信息
+    if (sessionId) {
+      const sessionData = await redis.getOAuthSession(sessionId);
+      if (sessionData) {
+        redirectUri = sessionData.redirectUri || redirectUri;
+        codeVerifier = sessionData.codeVerifier;
+        logger.info(`Using session redirect_uri: ${redirectUri}, has codeVerifier: ${!!codeVerifier}`);
+      }
+    }
+    
+    const tokens = await geminiAccountService.exchangeCodeForTokens(code, redirectUri, codeVerifier);
     
     // 清理 OAuth 会话
     if (sessionId) {
@@ -1721,7 +1731,7 @@ router.get('/model-stats', authenticateAdmin, async (req, res) => {
       searchPatterns = [pattern];
     }
     
-    logger.info(`📊 Searching patterns:`, searchPatterns);
+    logger.info('📊 Searching patterns:', searchPatterns);
     
     // 获取所有匹配的keys
     const allKeys = [];

@@ -213,19 +213,16 @@
                     2
                   </div>
                   <div class="flex-1">
-                    <p class="font-medium text-green-900 mb-2">
+                    <p class="font-medium text-blue-900 mb-2">
                       在浏览器中打开链接并完成授权
                     </p>
-                    <ol class="text-sm text-green-800 space-y-1 list-decimal list-inside mb-3">
-                      <li>点击上方的授权链接，在新页面中完成Google账号登录</li>
-                      <li>点击“登录”按钮后可能会加载很慢（这是正常的）</li>
-                      <li>如果超过1分钟还在加载，请按 F5 刷新页面</li>
-                      <li>授权完成后会跳转到 http://localhost:45462 (可能显示无法访问)</li>
-                    </ol>
-                    <div class="bg-green-100 p-3 rounded border border-green-300">
-                      <p class="text-xs text-green-700">
-                        <i class="fas fa-lightbulb mr-1" />
-                        <strong>提示：</strong>如果页面一直无法跳转，可以打开浏览器开发者工具（F12），F5刷新一下授权页再点击页面的登录按钮，在“网络”标签中找到以 localhost:45462 开头的请求，复制其完整URL。
+                    <p class="text-sm text-blue-700 mb-2">
+                      请在新标签页中打开授权链接，登录您的 Gemini 账户并授权。
+                    </p>
+                    <div class="bg-yellow-50 p-3 rounded border border-yellow-300">
+                      <p class="text-xs text-yellow-800">
+                        <i class="fas fa-exclamation-triangle mr-1" />
+                        <strong>注意：</strong>如果您设置了代理，请确保浏览器也使用相同的代理访问授权页面。
                       </p>
                     </div>
                   </div>
@@ -240,31 +237,27 @@
                   </div>
                   <div class="flex-1">
                     <p class="font-medium text-green-900 mb-2">
-                      复制oauth后的链接
+                      输入 Authorization Code
                     </p>
                     <p class="text-sm text-green-700 mb-3">
-                      复制浏览器地址栏的完整链接并粘贴到下方输入框：
+                      授权完成后，页面会显示一个 Authorization Code，请将其复制并粘贴到下方输入框：
                     </p>
                     <div class="space-y-3">
                       <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-2">
-                          <i class="fas fa-key text-green-500 mr-2" />复制oauth后的链接
+                          <i class="fas fa-key text-green-500 mr-2" />Authorization Code
                         </label>
                         <textarea 
                           v-model="authCode" 
                           rows="3" 
                           class="form-input w-full resize-none font-mono text-sm"
-                          placeholder="粘贴以 http://localhost:45462 开头的完整链接..."
+                          placeholder="粘贴从Gemini页面获取的Authorization Code..."
                         />
                       </div>
                       <div class="mt-2 space-y-1">
                         <p class="text-xs text-gray-600">
                           <i class="fas fa-check-circle text-green-500 mr-1" />
-                          支持粘贴完整链接，系统会自动提取授权码
-                        </p>
-                        <p class="text-xs text-gray-600">
-                          <i class="fas fa-check-circle text-green-500 mr-1" />
-                          也可以直接粘贴授权码（code参数的值）
+                          请粘贴从Gemini页面复制的Authorization Code 
                         </p>
                       </div>
                     </div>

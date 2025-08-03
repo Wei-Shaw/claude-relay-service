@@ -77,19 +77,31 @@ function createOAuth2Client(redirectUri = null) {
   );
 }
 
-// 生成授权 URL
+// 生成授权 URL (支持 PKCE)
 async function generateAuthUrl(state = null, redirectUri = null) {
-  const oAuth2Client = createOAuth2Client(redirectUri);
+  // 使用新的 redirect URI
+  const finalRedirectUri = redirectUri || 'https://codeassist.google.com/authcode';
+  const oAuth2Client = createOAuth2Client(finalRedirectUri);
+  
+  // 生成 PKCE code verifier
+  const codeVerifier = await oAuth2Client.generateCodeVerifierAsync();
+  const stateValue = state || crypto.randomBytes(32).toString('hex');
+  
   const authUrl = oAuth2Client.generateAuthUrl({
+    redirect_uri: finalRedirectUri,
     access_type: 'offline',
     scope: OAUTH_SCOPES,
-    prompt: 'select_account',
-    state: state || uuidv4()
+    code_challenge_method: 'S256',
+    code_challenge: codeVerifier.codeChallenge,
+    state: stateValue,
+    prompt: 'select_account'
   });
   
   return {
     authUrl,
-    state: state || authUrl.split('state=')[1].split('&')[0]
+    state: stateValue,
+    codeVerifier: codeVerifier.codeVerifier,
+    redirectUri: finalRedirectUri
   };
 }
 
@@ -145,12 +157,22 @@ async function pollAuthorizationStatus(sessionId, maxAttempts = 60, interval = 2
   };
 }
 
-// 交换授权码获取 tokens
-async function exchangeCodeForTokens(code, redirectUri = null) {
+// 交换授权码获取 tokens (支持 PKCE)
+async function exchangeCodeForTokens(code, redirectUri = null, codeVerifier = null) {
   const oAuth2Client = createOAuth2Client(redirectUri);
   
   try {
-    const { tokens } = await oAuth2Client.getToken(code);
+    const tokenParams = {
+      code: code,
+      redirect_uri: redirectUri
+    };
+    
+    // 如果提供了 codeVerifier，添加到参数中
+    if (codeVerifier) {
+      tokenParams.codeVerifier = codeVerifier;
+    }
+    
+    const { tokens } = await oAuth2Client.getToken(tokenParams);
     
     // 转换为兼容格式
     return {
