@@ -446,11 +446,11 @@
                     </option>
                   </optgroup>
                   <optgroup
-                    v-if="localAccounts.claude.filter(a => a.isDedicated && a.platform === 'claude-oauth').length > 0"
-                    label="Claude OAuth 账号"
+                    v-if="localAccounts.claude.filter(a => a.accountType === 'dedicated' && a.platform === 'claude-oauth').length > 0"
+                    label="Claude OAuth 专属账号"
                   >
                     <option 
-                      v-for="account in localAccounts.claude.filter(a => a.isDedicated && a.platform === 'claude-oauth')" 
+                      v-for="account in localAccounts.claude.filter(a => a.accountType === 'dedicated' && a.platform === 'claude-oauth')" 
                       :key="account.id" 
                       :value="account.id"
                     >
@@ -458,11 +458,11 @@
                     </option>
                   </optgroup>
                   <optgroup
-                    v-if="localAccounts.claude.filter(a => a.isDedicated && a.platform === 'claude-console').length > 0"
-                    label="Claude Console 账号"
+                    v-if="localAccounts.claude.filter(a => a.accountType === 'dedicated' && a.platform === 'claude-console').length > 0"
+                    label="Claude Console 专属账号"
                   >
                     <option 
-                      v-for="account in localAccounts.claude.filter(a => a.isDedicated && a.platform === 'claude-console')" 
+                      v-for="account in localAccounts.claude.filter(a => a.accountType === 'dedicated' && a.platform === 'claude-console')" 
                       :key="account.id" 
                       :value="`console:${account.id}`"
                     >
@@ -494,11 +494,11 @@
                     </option>
                   </optgroup>
                   <optgroup
-                    v-if="localAccounts.gemini.filter(a => a.isDedicated).length > 0"
-                    label="Gemini 账号"
+                    v-if="localAccounts.gemini.filter(a => a.accountType === 'dedicated').length > 0"
+                    label="Gemini 专属账号"
                   >
                     <option 
-                      v-for="account in localAccounts.gemini.filter(a => a.isDedicated)" 
+                      v-for="account in localAccounts.gemini.filter(a => a.accountType === 'dedicated')" 
                       :key="account.id" 
                       :value="account.id"
                     >
@@ -757,7 +757,7 @@ const refreshAccounts = async () => {
         claudeAccounts.push({
           ...account,
           platform: 'claude-oauth',
-          isDedicated: account.accountType === 'dedicated'
+          isDedicated: account.accountType === 'dedicated' // 保留以便向后兼容
         })
       })
     }
@@ -767,7 +767,7 @@ const refreshAccounts = async () => {
         claudeAccounts.push({
           ...account,
           platform: 'claude-console',
-          isDedicated: account.accountType === 'dedicated'
+          isDedicated: account.accountType === 'dedicated' // 保留以便向后兼容
         })
       })
     }
@@ -777,7 +777,7 @@ const refreshAccounts = async () => {
     if (geminiData.success) {
       localAccounts.value.gemini = (geminiData.data || []).map(account => ({
         ...account,
-        isDedicated: account.accountType === 'dedicated'
+        isDedicated: account.accountType === 'dedicated' // 保留以便向后兼容
       }))
     }
     

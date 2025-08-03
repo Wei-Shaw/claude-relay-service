@@ -985,7 +985,7 @@ const expandedApiKeys = ref({})
 const apiKeyModelStats = ref({})
 const apiKeyDateFilters = ref({})
 const defaultTime = ref([new Date(2000, 1, 1, 0, 0, 0), new Date(2000, 2, 1, 23, 59, 59)])
-const accounts = ref({ claude: [], gemini: [] })
+const accounts = ref({ claude: [], gemini: [], claudeGroups: [], geminiGroups: [] })
 const editingExpiryKey = ref(null)
 const expiryEditModalRef = ref(null)
 
@@ -1097,17 +1097,35 @@ const paginatedApiKeys = computed(() => {
 // 加载账户列表
 const loadAccounts = async () => {
   try {
-    const [claudeData, geminiData] = await Promise.all([
+    const [claudeData, claudeConsoleData, geminiData, groupsData] = await Promise.all([
       apiClient.get('/admin/claude-accounts'),
-      apiClient.get('/admin/gemini-accounts')
+      apiClient.get('/admin/claude-console-accounts'),
+      apiClient.get('/admin/gemini-accounts'),
+      apiClient.get('/admin/account-groups')
     ])
     
     if (claudeData.success) {
       accounts.value.claude = claudeData.data || []
     }
     
+    if (claudeConsoleData.success) {
+      // 将 Claude Console 账号合并到 claude 数组中
+      const consoleAccounts = (claudeConsoleData.data || []).map(acc => ({
+        ...acc,
+        platform: 'claude-console'
+      }))
+      accounts.value.claude = [...accounts.value.claude, ...consoleAccounts]
+    }
+    
     if (geminiData.success) {
       accounts.value.gemini = geminiData.data || []
+    }
+    
+    if (groupsData.success) {
+      // 处理分组数据
+      const allGroups = groupsData.data || []
+      accounts.value.claudeGroups = allGroups.filter(g => g.platform === 'claude')
+      accounts.value.geminiGroups = allGroups.filter(g => g.platform === 'gemini')
     }
   } catch (error) {
     console.error('加载账户列表失败:', error)

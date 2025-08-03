@@ -330,6 +330,7 @@ class ClaudeAccountService {
           errorMessage: account.errorMessage,
           accountType: account.accountType || 'shared', // 兼容旧数据，默认为共享
           priority: parseInt(account.priority) || 50, // 兼容旧数据，默认优先级50
+          platform: 'claude-oauth', // 添加平台标识，用于前端区分
           createdAt: account.createdAt,
           lastUsedAt: account.lastUsedAt,
           lastRefreshAt: account.lastRefreshAt,
