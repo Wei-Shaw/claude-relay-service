@@ -1,5 +1,6 @@
 const claudeAccountService = require('./claudeAccountService');
 const claudeConsoleAccountService = require('./claudeConsoleAccountService');
+const accountGroupService = require('./accountGroupService');
 const redis = require('../models/redis');
 const logger = require('../utils/logger');
 
@@ -11,8 +12,16 @@ class UnifiedClaudeScheduler {
   // 🎯 统一调度Claude账号（官方和Console）
   async selectAccountForApiKey(apiKeyData, sessionHash = null, requestedModel = null) {
     try {
-      // 如果API Key绑定了专属账户，优先使用
+      // 如果API Key绑定了专属账户或分组，优先使用
       if (apiKeyData.claudeAccountId) {
+        // 检查是否是分组
+        if (apiKeyData.claudeAccountId.startsWith('group:')) {
+          const groupId = apiKeyData.claudeAccountId.replace('group:', '');
+          logger.info(`🎯 API key ${apiKeyData.name} is bound to group ${groupId}, selecting from group`);
+          return await this.selectAccountFromGroup(groupId, sessionHash, requestedModel, apiKeyData);
+        }
+        
+        // 普通专属账户
         const boundAccount = await redis.getClaudeAccount(apiKeyData.claudeAccountId);
         if (boundAccount && boundAccount.isActive === 'true' && boundAccount.status !== 'error') {
           logger.info(`🎯 Using bound dedicated Claude account: ${boundAccount.name} (${apiKeyData.claudeAccountId}) for API key ${apiKeyData.name}`);
@@ -311,6 +320,132 @@ class UnifiedClaudeScheduler {
       return { success: true };
     } catch (error) {
       logger.error(`❌ Failed to block console account: ${accountId}`, error);
+      throw error;
+    }
+  }
+
+  // 👥 从分组中选择账户
+  async selectAccountFromGroup(groupId, sessionHash = null, requestedModel = null, apiKeyData = null) {
+    try {
+      // 获取分组信息
+      const group = await accountGroupService.getGroup(groupId);
+      if (!group) {
+        throw new Error(`Group ${groupId} not found`);
+      }
+
+      logger.info(`👥 Selecting account from group: ${group.name} (${group.platform})`);
+
+      // 如果有会话哈希，检查是否有已映射的账户
+      if (sessionHash) {
+        const mappedAccount = await this._getSessionMapping(sessionHash);
+        if (mappedAccount) {
+          // 验证映射的账户是否属于这个分组
+          const memberIds = await accountGroupService.getGroupMembers(groupId);
+          if (memberIds.includes(mappedAccount.accountId)) {
+            const isAvailable = await this._isAccountAvailable(mappedAccount.accountId, mappedAccount.accountType);
+            if (isAvailable) {
+              logger.info(`🎯 Using sticky session account from group: ${mappedAccount.accountId} (${mappedAccount.accountType}) for session ${sessionHash}`);
+              return mappedAccount;
+            }
+          }
+          // 如果映射的账户不可用或不在分组中，删除映射
+          await this._deleteSessionMapping(sessionHash);
+        }
+      }
+
+      // 获取分组内的所有账户
+      const memberIds = await accountGroupService.getGroupMembers(groupId);
+      if (memberIds.length === 0) {
+        throw new Error(`Group ${group.name} has no members`);
+      }
+
+      const availableAccounts = [];
+
+      // 获取所有成员账户的详细信息
+      for (const memberId of memberIds) {
+        let account = null;
+        let accountType = null;
+
+        // 根据平台类型获取账户
+        if (group.platform === 'claude') {
+          // 先尝试官方账户
+          account = await redis.getClaudeAccount(memberId);
+          if (account) {
+            accountType = 'claude-official';
+          } else {
+            // 尝试Console账户
+            account = await claudeConsoleAccountService.getAccount(memberId);
+            if (account) {
+              accountType = 'claude-console';
+            }
+          }
+        } else if (group.platform === 'gemini') {
+          // Gemini暂时不支持，预留接口
+          logger.warn(`⚠️ Gemini group scheduling not yet implemented`);
+          continue;
+        }
+
+        if (!account) {
+          logger.warn(`⚠️ Account ${memberId} not found in group ${group.name}`);
+          continue;
+        }
+
+        // 检查账户是否可用
+        const isActive = accountType === 'claude-official' 
+          ? account.isActive === 'true' 
+          : account.isActive === true;
+        
+        const status = accountType === 'claude-official'
+          ? account.status !== 'error' && account.status !== 'blocked'
+          : account.status === 'active';
+
+        if (isActive && status && account.schedulable !== false) {
+          // 检查模型支持（Console账户）
+          if (accountType === 'claude-console' && requestedModel && account.supportedModels && account.supportedModels.length > 0) {
+            if (!account.supportedModels.includes(requestedModel)) {
+              logger.info(`🚫 Account ${account.name} in group does not support model ${requestedModel}`);
+              continue;
+            }
+          }
+
+          // 检查是否被限流
+          const isRateLimited = await this.isAccountRateLimited(account.id, accountType);
+          if (!isRateLimited) {
+            availableAccounts.push({
+              ...account,
+              accountId: account.id,
+              accountType: accountType,
+              priority: parseInt(account.priority) || 50,
+              lastUsedAt: account.lastUsedAt || '0'
+            });
+          }
+        }
+      }
+
+      if (availableAccounts.length === 0) {
+        throw new Error(`No available accounts in group ${group.name}`);
+      }
+
+      // 使用现有的优先级排序逻辑
+      const sortedAccounts = this._sortAccountsByPriority(availableAccounts);
+
+      // 选择第一个账户
+      const selectedAccount = sortedAccounts[0];
+
+      // 如果有会话哈希，建立新的映射
+      if (sessionHash) {
+        await this._setSessionMapping(sessionHash, selectedAccount.accountId, selectedAccount.accountType);
+        logger.info(`🎯 Created new sticky session mapping in group: ${selectedAccount.name} (${selectedAccount.accountId}, ${selectedAccount.accountType}) for session ${sessionHash}`);
+      }
+
+      logger.info(`🎯 Selected account from group ${group.name}: ${selectedAccount.name} (${selectedAccount.accountId}, ${selectedAccount.accountType}) with priority ${selectedAccount.priority}`);
+      
+      return {
+        accountId: selectedAccount.accountId,
+        accountType: selectedAccount.accountType
+      };
+    } catch (error) {
+      logger.error(`❌ Failed to select account from group ${groupId}:`, error);
       throw error;
     }
   }

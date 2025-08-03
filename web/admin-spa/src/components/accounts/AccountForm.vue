@@ -159,10 +159,48 @@
                   >
                   <span class="text-sm text-gray-700">专属账户</span>
                 </label>
+                <label class="flex items-center cursor-pointer">
+                  <input 
+                    v-model="form.accountType" 
+                    type="radio" 
+                    value="group" 
+                    class="mr-2"
+                  >
+                  <span class="text-sm text-gray-700">分组调度</span>
+                </label>
               </div>
               <p class="text-xs text-gray-500 mt-2">
-                共享账户：供所有API Key使用；专属账户：仅供特定API Key使用
+                共享账户：供所有API Key使用；专属账户：仅供特定API Key使用；分组调度：加入分组供分组内调度
               </p>
+            </div>
+            
+            <!-- 分组选择器 -->
+            <div v-if="form.accountType === 'group'">
+              <label class="block text-sm font-semibold text-gray-700 mb-3">选择分组 *</label>
+              <div class="flex gap-2">
+                <select 
+                  v-model="form.groupId" 
+                  class="form-input flex-1"
+                  required
+                >
+                  <option value="">请选择分组</option>
+                  <option 
+                    v-for="group in filteredGroups" 
+                    :key="group.id" 
+                    :value="group.id"
+                  >
+                    {{ group.name }} ({{ group.memberCount || 0 }} 个成员)
+                  </option>
+                  <option value="__new__">+ 新建分组</option>
+                </select>
+                <button
+                  type="button"
+                  class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  @click="refreshGroups"
+                >
+                  <i class="fas fa-sync-alt" :class="{ 'animate-spin': loadingGroups }" />
+                </button>
+              </div>
             </div>
             
             <!-- Gemini 项目编号字段 -->
@@ -499,10 +537,48 @@
                 >
                 <span class="text-sm text-gray-700">专属账户</span>
               </label>
+              <label class="flex items-center cursor-pointer">
+                <input 
+                  v-model="form.accountType" 
+                  type="radio" 
+                  value="group" 
+                  class="mr-2"
+                >
+                <span class="text-sm text-gray-700">分组调度</span>
+              </label>
             </div>
             <p class="text-xs text-gray-500 mt-2">
-              共享账户：供所有API Key使用；专属账户：仅供特定API Key使用
+              共享账户：供所有API Key使用；专属账户：仅供特定API Key使用；分组调度：加入分组供分组内调度
             </p>
+          </div>
+          
+          <!-- 分组选择器 -->
+          <div v-if="form.accountType === 'group'">
+            <label class="block text-sm font-semibold text-gray-700 mb-3">选择分组 *</label>
+            <div class="flex gap-2">
+              <select 
+                v-model="form.groupId" 
+                class="form-input flex-1"
+                required
+              >
+                <option value="">请选择分组</option>
+                <option 
+                  v-for="group in filteredGroups" 
+                  :key="group.id" 
+                  :value="group.id"
+                >
+                  {{ group.name }} ({{ group.memberCount || 0 }} 个成员)
+                </option>
+                <option value="__new__">+ 新建分组</option>
+              </select>
+              <button
+                type="button"
+                class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                @click="refreshGroups"
+              >
+                <i class="fas fa-sync-alt" :class="{ 'animate-spin': loadingGroups }" />
+              </button>
+            </div>
           </div>
           
           <!-- Gemini 项目编号字段 -->
@@ -701,17 +777,26 @@
       @confirm="handleConfirm"
       @cancel="handleCancel"
     />
+    
+    <!-- 分组管理模态框 -->
+    <GroupManagementModal
+      v-if="showGroupManagement"
+      @close="showGroupManagement = false"
+      @refresh="handleGroupRefresh"
+    />
   </Teleport>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { showToast } from '@/utils/toast'
+import { apiClient } from '@/config/api'
 import { useAccountsStore } from '@/stores/accounts'
 import { useConfirm } from '@/composables/useConfirm'
 import ProxyConfig from './ProxyConfig.vue'
 import OAuthFlow from './OAuthFlow.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
+import GroupManagementModal from './GroupManagementModal.vue'
 
 const props = defineProps({
   account: {
@@ -762,6 +847,7 @@ const form = ref({
   name: props.account?.name || '',
   description: props.account?.description || '',
   accountType: props.account?.accountType || 'shared',
+  groupId: '',
   projectId: props.account?.projectId || '',
   accessToken: '',
   refreshToken: '',
@@ -808,6 +894,12 @@ const nextStep = async () => {
     return
   }
   
+  // 分组类型验证
+  if (form.value.accountType === 'group' && (!form.value.groupId || form.value.groupId.trim() === '')) {
+    showToast('请选择一个分组', 'error')
+    return
+  }
+  
   // 对于Gemini账户，检查项目编号
   if (form.value.platform === 'gemini' && oauthStep.value === 1 && form.value.addType === 'oauth') {
     if (!form.value.projectId || form.value.projectId.trim() === '') {
@@ -835,6 +927,7 @@ const handleOAuthSuccess = async (tokenInfo) => {
       name: form.value.name,
       description: form.value.description,
       accountType: form.value.accountType,
+      groupId: form.value.accountType === 'group' ? form.value.groupId : undefined,
       proxy: form.value.proxy.enabled ? {
         type: form.value.proxy.type,
         host: form.value.proxy.host,
@@ -901,6 +994,12 @@ const createAccount = async () => {
     hasError = true
   }
   
+  // 分组类型验证
+  if (form.value.accountType === 'group' && (!form.value.groupId || form.value.groupId.trim() === '')) {
+    showToast('请选择一个分组', 'error')
+    hasError = true
+  }
+  
   if (hasError) {
     return
   }
@@ -911,6 +1010,7 @@ const createAccount = async () => {
       name: form.value.name,
       description: form.value.description,
       accountType: form.value.accountType,
+      groupId: form.value.accountType === 'group' ? form.value.groupId : undefined,
       proxy: form.value.proxy.enabled ? {
         type: form.value.proxy.type,
         host: form.value.proxy.host,
@@ -990,6 +1090,12 @@ const updateAccount = async () => {
     return
   }
   
+  // 分组类型验证
+  if (form.value.accountType === 'group' && (!form.value.groupId || form.value.groupId.trim() === '')) {
+    showToast('请选择一个分组', 'error')
+    return
+  }
+  
   // 对于Gemini账户，检查项目编号
   if (form.value.platform === 'gemini') {
     if (!form.value.projectId || form.value.projectId.trim() === '') {
@@ -1012,6 +1118,7 @@ const updateAccount = async () => {
       name: form.value.name,
       description: form.value.description,
       accountType: form.value.accountType,
+      groupId: form.value.accountType === 'group' ? form.value.groupId : undefined,
       proxy: form.value.proxy.enabled ? {
         type: form.value.proxy.type,
         host: form.value.proxy.host,
@@ -1118,10 +1225,70 @@ watch(() => form.value.apiKey, () => {
   }
 })
 
+// 分组相关数据
+const groups = ref([])
+const loadingGroups = ref(false)
+const showGroupManagement = ref(false)
+
+// 根据平台筛选分组
+const filteredGroups = computed(() => {
+  const platformFilter = form.value.platform === 'claude-console' ? 'claude' : form.value.platform
+  return groups.value.filter(g => g.platform === platformFilter)
+})
+
+// 加载分组列表
+const loadGroups = async () => {
+  loadingGroups.value = true
+  try {
+    const response = await apiClient.get('/admin/account-groups')
+    groups.value = response.data || []
+  } catch (error) {
+    showToast('加载分组列表失败', 'error')
+    groups.value = []
+  } finally {
+    loadingGroups.value = false
+  }
+}
+
+// 刷新分组列表
+const refreshGroups = async () => {
+  await loadGroups()
+  showToast('分组列表已刷新', 'success')
+}
+
+// 处理分组管理模态框刷新
+const handleGroupRefresh = async () => {
+  await loadGroups()
+}
+
 // 监听平台变化，重置表单
 watch(() => form.value.platform, (newPlatform) => {
   if (newPlatform === 'claude-console') {
     form.value.addType = 'manual' // Claude Console 只支持手动模式
+  }
+  
+  // 平台变化时，清空分组选择
+  if (form.value.accountType === 'group') {
+    form.value.groupId = ''
+  }
+})
+
+// 监听账户类型变化
+watch(() => form.value.accountType, (newType) => {
+  if (newType === 'group') {
+    // 如果选择分组类型，加载分组列表
+    if (groups.value.length === 0) {
+      loadGroups()
+    }
+  }
+})
+
+// 监听分组选择
+watch(() => form.value.groupId, (newGroupId) => {
+  if (newGroupId === '__new__') {
+    // 触发创建新分组
+    form.value.groupId = ''
+    showGroupManagement.value = true
   }
 })
 
@@ -1172,6 +1339,7 @@ watch(() => props.account, (newAccount) => {
       name: newAccount.name,
       description: newAccount.description || '',
       accountType: newAccount.accountType || 'shared',
+      groupId: '',
       projectId: newAccount.projectId || '',
       accessToken: '',
       refreshToken: '',
@@ -1183,6 +1351,22 @@ watch(() => props.account, (newAccount) => {
       supportedModels: newAccount.supportedModels?.join('\n') || '',
       userAgent: newAccount.userAgent || '',
       rateLimitDuration: newAccount.rateLimitDuration || 60
+    }
+    
+    // 如果是分组类型，加载分组ID
+    if (newAccount.accountType === 'group') {
+      // 先加载分组列表
+      loadGroups().then(() => {
+        // 查找账户所属的分组
+        groups.value.forEach(group => {
+          apiClient.get(`/admin/account-groups/${group.id}/members`).then(response => {
+            const members = response.data || []
+            if (members.some(m => m.id === newAccount.id)) {
+              form.value.groupId = group.id
+            }
+          }).catch(() => {})
+        })
+      })
     }
   }
 }, { immediate: true })

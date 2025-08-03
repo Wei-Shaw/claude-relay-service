@@ -3,6 +3,7 @@ const apiKeyService = require('../services/apiKeyService');
 const claudeAccountService = require('../services/claudeAccountService');
 const claudeConsoleAccountService = require('../services/claudeConsoleAccountService');
 const geminiAccountService = require('../services/geminiAccountService');
+const accountGroupService = require('../services/accountGroupService');
 const redis = require('../models/redis');
 const { authenticateAdmin } = require('../middleware/auth');
 const logger = require('../utils/logger');
@@ -705,6 +706,118 @@ router.delete('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
   }
 });
 
+// 👥 账户分组管理
+
+// 创建账户分组
+router.post('/account-groups', authenticateAdmin, async (req, res) => {
+  try {
+    const { name, platform, description } = req.body;
+    
+    const group = await accountGroupService.createGroup({
+      name,
+      platform,
+      description
+    });
+    
+    res.json({ success: true, data: group });
+  } catch (error) {
+    logger.error('❌ Failed to create account group:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// 获取所有分组
+router.get('/account-groups', authenticateAdmin, async (req, res) => {
+  try {
+    const { platform } = req.query;
+    const groups = await accountGroupService.getAllGroups(platform);
+    res.json({ success: true, data: groups });
+  } catch (error) {
+    logger.error('❌ Failed to get account groups:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 获取分组详情
+router.get('/account-groups/:groupId', authenticateAdmin, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const group = await accountGroupService.getGroup(groupId);
+    
+    if (!group) {
+      return res.status(404).json({ error: '分组不存在' });
+    }
+    
+    res.json({ success: true, data: group });
+  } catch (error) {
+    logger.error('❌ Failed to get account group:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 更新分组
+router.put('/account-groups/:groupId', authenticateAdmin, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const updates = req.body;
+    
+    const updatedGroup = await accountGroupService.updateGroup(groupId, updates);
+    res.json({ success: true, data: updatedGroup });
+  } catch (error) {
+    logger.error('❌ Failed to update account group:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// 删除分组
+router.delete('/account-groups/:groupId', authenticateAdmin, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    await accountGroupService.deleteGroup(groupId);
+    res.json({ success: true, message: '分组删除成功' });
+  } catch (error) {
+    logger.error('❌ Failed to delete account group:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// 获取分组成员
+router.get('/account-groups/:groupId/members', authenticateAdmin, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const memberIds = await accountGroupService.getGroupMembers(groupId);
+    
+    // 获取成员详细信息
+    const members = [];
+    for (const memberId of memberIds) {
+      // 尝试从不同的服务获取账户信息
+      let account = null;
+      
+      // 先尝试Claude OAuth账户
+      account = await claudeAccountService.getAccount(memberId);
+      
+      // 如果找不到，尝试Claude Console账户
+      if (!account) {
+        account = await claudeConsoleAccountService.getAccount(memberId);
+      }
+      
+      // 如果还找不到，尝试Gemini账户
+      if (!account) {
+        account = await geminiAccountService.getAccount(memberId);
+      }
+      
+      if (account) {
+        members.push(account);
+      }
+    }
+    
+    res.json({ success: true, data: members });
+  } catch (error) {
+    logger.error('❌ Failed to get group members:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // 🏢 Claude 账户管理
 
 // 生成OAuth授权URL
@@ -856,7 +969,8 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       claudeAiOauth,
       proxy,
       accountType,
-      priority
+      priority,
+      groupId
     } = req.body;
 
     if (!name) {
@@ -864,8 +978,13 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
     }
 
     // 验证accountType的有效性
-    if (accountType && !['shared', 'dedicated'].includes(accountType)) {
-      return res.status(400).json({ error: 'Invalid account type. Must be "shared" or "dedicated"' });
+    if (accountType && !['shared', 'dedicated', 'group'].includes(accountType)) {
+      return res.status(400).json({ error: 'Invalid account type. Must be "shared", "dedicated" or "group"' });
+    }
+
+    // 如果是分组类型，验证groupId
+    if (accountType === 'group' && !groupId) {
+      return res.status(400).json({ error: 'Group ID is required for group type accounts' });
     }
 
     // 验证priority的有效性
@@ -884,6 +1003,11 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       accountType: accountType || 'shared', // 默认为共享类型
       priority: priority || 50 // 默认优先级为50
     });
+
+    // 如果是分组类型，将账户添加到分组
+    if (accountType === 'group' && groupId) {
+      await accountGroupService.addAccountToGroup(newAccount.id, groupId, newAccount.platform);
+    }
 
     logger.success(`🏢 Admin created new Claude account: ${name} (${accountType || 'shared'})`);
     res.json({ success: true, data: newAccount });
@@ -904,6 +1028,39 @@ router.put('/claude-accounts/:accountId', authenticateAdmin, async (req, res) =>
       return res.status(400).json({ error: 'Priority must be a number between 1 and 100' });
     }
 
+    // 验证accountType的有效性
+    if (updates.accountType && !['shared', 'dedicated', 'group'].includes(updates.accountType)) {
+      return res.status(400).json({ error: 'Invalid account type. Must be "shared", "dedicated" or "group"' });
+    }
+
+    // 如果更新为分组类型，验证groupId
+    if (updates.accountType === 'group' && !updates.groupId) {
+      return res.status(400).json({ error: 'Group ID is required for group type accounts' });
+    }
+
+    // 获取账户当前信息以处理分组变更
+    const currentAccount = await claudeAccountService.getAccount(accountId);
+    if (!currentAccount) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+
+    // 处理分组的变更
+    if (updates.accountType !== undefined) {
+      // 如果之前是分组类型，需要从原分组中移除
+      if (currentAccount.accountType === 'group') {
+        const oldGroup = await accountGroupService.getAccountGroup(accountId);
+        if (oldGroup) {
+          await accountGroupService.removeAccountFromGroup(accountId, oldGroup.id);
+        }
+      }
+
+      // 如果新类型是分组，添加到新分组
+      if (updates.accountType === 'group' && updates.groupId) {
+        // 从路由知道这是 Claude OAuth 账户，平台为 'claude'
+        await accountGroupService.addAccountToGroup(accountId, updates.groupId, 'claude');
+      }
+    }
+
     await claudeAccountService.updateAccount(accountId, updates);
     
     logger.success(`📝 Admin updated Claude account: ${accountId}`);
@@ -918,6 +1075,15 @@ router.put('/claude-accounts/:accountId', authenticateAdmin, async (req, res) =>
 router.delete('/claude-accounts/:accountId', authenticateAdmin, async (req, res) => {
   try {
     const { accountId } = req.params;
+    
+    // 获取账户信息以检查是否在分组中
+    const account = await claudeAccountService.getAccount(accountId);
+    if (account && account.accountType === 'group') {
+      const group = await accountGroupService.getAccountGroup(accountId);
+      if (group) {
+        await accountGroupService.removeAccountFromGroup(accountId, group.id);
+      }
+    }
     
     await claudeAccountService.deleteAccount(accountId);
     
@@ -1019,7 +1185,8 @@ router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
       userAgent,
       rateLimitDuration,
       proxy,
-      accountType
+      accountType,
+      groupId
     } = req.body;
 
     if (!name || !apiUrl || !apiKey) {
@@ -1032,8 +1199,13 @@ router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
     }
 
     // 验证accountType的有效性
-    if (accountType && !['shared', 'dedicated'].includes(accountType)) {
-      return res.status(400).json({ error: 'Invalid account type. Must be "shared" or "dedicated"' });
+    if (accountType && !['shared', 'dedicated', 'group'].includes(accountType)) {
+      return res.status(400).json({ error: 'Invalid account type. Must be "shared", "dedicated" or "group"' });
+    }
+
+    // 如果是分组类型，验证groupId
+    if (accountType === 'group' && !groupId) {
+      return res.status(400).json({ error: 'Group ID is required for group type accounts' });
     }
 
     const newAccount = await claudeConsoleAccountService.createAccount({
@@ -1048,6 +1220,11 @@ router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
       proxy,
       accountType: accountType || 'shared'
     });
+
+    // 如果是分组类型，将账户添加到分组
+    if (accountType === 'group' && groupId) {
+      await accountGroupService.addAccountToGroup(newAccount.id, groupId, 'claude');
+    }
 
     logger.success(`🎮 Admin created Claude Console account: ${name}`);
     res.json({ success: true, data: newAccount });
@@ -1256,7 +1433,22 @@ router.post('/gemini-accounts', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Account name is required' });
     }
     
+    // 验证accountType的有效性
+    if (accountData.accountType && !['shared', 'dedicated', 'group'].includes(accountData.accountType)) {
+      return res.status(400).json({ error: 'Invalid account type. Must be "shared", "dedicated" or "group"' });
+    }
+    
+    // 如果是分组类型，验证groupId
+    if (accountData.accountType === 'group' && !accountData.groupId) {
+      return res.status(400).json({ error: 'Group ID is required for group type accounts' });
+    }
+    
     const newAccount = await geminiAccountService.createAccount(accountData);
+    
+    // 如果是分组类型，将账户添加到分组
+    if (accountData.accountType === 'group' && accountData.groupId) {
+      await accountGroupService.addAccountToGroup(newAccount.id, accountData.groupId, 'gemini');
+    }
     
     logger.success(`🏢 Admin created new Gemini account: ${accountData.name}`);
     res.json({ success: true, data: newAccount });

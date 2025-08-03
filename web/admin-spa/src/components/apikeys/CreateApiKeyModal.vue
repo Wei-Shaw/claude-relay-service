@@ -434,6 +434,18 @@
                     使用共享账号池
                   </option>
                   <optgroup
+                    v-if="localAccounts.claudeGroups && localAccounts.claudeGroups.length > 0"
+                    label="调度分组"
+                  >
+                    <option 
+                      v-for="group in localAccounts.claudeGroups" 
+                      :key="`group:${group.id}`" 
+                      :value="`group:${group.id}`"
+                    >
+                      {{ group.name }} ({{ group.memberCount || 0 }} 个成员)
+                    </option>
+                  </optgroup>
+                  <optgroup
                     v-if="localAccounts.claude.filter(a => a.isDedicated && a.platform === 'claude-oauth').length > 0"
                     label="Claude OAuth 账号"
                   >
@@ -469,13 +481,30 @@
                   <option value="">
                     使用共享账号池
                   </option>
-                  <option 
-                    v-for="account in localAccounts.gemini.filter(a => a.isDedicated)" 
-                    :key="account.id" 
-                    :value="account.id"
+                  <optgroup
+                    v-if="localAccounts.geminiGroups && localAccounts.geminiGroups.length > 0"
+                    label="调度分组"
                   >
-                    {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
-                  </option>
+                    <option 
+                      v-for="group in localAccounts.geminiGroups" 
+                      :key="`group:${group.id}`" 
+                      :value="`group:${group.id}`"
+                    >
+                      {{ group.name }} ({{ group.memberCount || 0 }} 个成员)
+                    </option>
+                  </optgroup>
+                  <optgroup
+                    v-if="localAccounts.gemini.filter(a => a.isDedicated).length > 0"
+                    label="Gemini 账号"
+                  >
+                    <option 
+                      v-for="account in localAccounts.gemini.filter(a => a.isDedicated)" 
+                      :key="account.id" 
+                      :value="account.id"
+                    >
+                      {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
+                    </option>
+                  </optgroup>
                 </select>
               </div>
             </div>
@@ -650,7 +679,7 @@ const clientsStore = useClientsStore()
 const apiKeysStore = useApiKeysStore()
 const loading = ref(false)
 const accountsLoading = ref(false)
-const localAccounts = ref({ claude: [], gemini: [] })
+const localAccounts = ref({ claude: [], gemini: [], claudeGroups: [], geminiGroups: [] })
 
 // 表单验证状态
 const errors = ref({
@@ -702,7 +731,9 @@ onMounted(async () => {
   if (props.accounts) {
     localAccounts.value = {
       claude: props.accounts.claude || [],
-      gemini: props.accounts.gemini || []
+      gemini: props.accounts.gemini || [],
+      claudeGroups: props.accounts.claudeGroups || [],
+      geminiGroups: props.accounts.geminiGroups || []
     }
   }
 })
@@ -711,10 +742,11 @@ onMounted(async () => {
 const refreshAccounts = async () => {
   accountsLoading.value = true
   try {
-    const [claudeData, claudeConsoleData, geminiData] = await Promise.all([
+    const [claudeData, claudeConsoleData, geminiData, groupsData] = await Promise.all([
       apiClient.get('/admin/claude-accounts'),
       apiClient.get('/admin/claude-console-accounts'),
-      apiClient.get('/admin/gemini-accounts')
+      apiClient.get('/admin/gemini-accounts'),
+      apiClient.get('/admin/account-groups')
     ])
     
     // 合并Claude OAuth账户和Claude Console账户
@@ -747,6 +779,13 @@ const refreshAccounts = async () => {
         ...account,
         isDedicated: account.accountType === 'dedicated'
       }))
+    }
+    
+    // 处理分组数据
+    if (groupsData.success) {
+      const allGroups = groupsData.data || []
+      localAccounts.value.claudeGroups = allGroups.filter(g => g.platform === 'claude')
+      localAccounts.value.geminiGroups = allGroups.filter(g => g.platform === 'gemini')
     }
     
     showToast('账号列表已刷新', 'success')

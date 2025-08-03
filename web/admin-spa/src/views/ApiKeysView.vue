@@ -88,11 +88,11 @@
         v-else
         class="hidden md:block table-container"
       >
-        <table class="min-w-full">
+        <table class="w-full table-fixed">
           <thead class="bg-gray-50/80 backdrop-blur-sm">
             <tr>
               <th
-                class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                class="px-3 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-[25%] min-w-[200px]"
                 @click="sortApiKeys('name')"
               >
                 名称
@@ -105,11 +105,11 @@
                   class="fas fa-sort ml-1 text-gray-400"
                 />
               </th>
-              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+              <th class="px-3 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-[10%] min-w-[80px]">
                 标签
               </th>
               <th
-                class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                class="px-3 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-[8%] min-w-[70px]"
                 @click="sortApiKeys('status')"
               >
                 状态
@@ -122,7 +122,7 @@
                   class="fas fa-sort ml-1 text-gray-400"
                 />
               </th>
-              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+              <th class="px-3 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-[17%] min-w-[140px]">
                 使用统计
                 <span
                   class="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
@@ -140,7 +140,7 @@
                 </span>
               </th>
               <th
-                class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                class="px-3 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-[10%] min-w-[90px]"
                 @click="sortApiKeys('createdAt')"
               >
                 创建时间
@@ -154,7 +154,7 @@
                 />
               </th>
               <th
-                class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                class="px-3 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-[10%] min-w-[90px]"
                 @click="sortApiKeys('expiresAt')"
               >
                 过期时间
@@ -167,7 +167,7 @@
                   class="fas fa-sort ml-1 text-gray-400"
                 />
               </th>
-              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+              <th class="px-3 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-[20%] min-w-[180px]">
                 操作
               </th>
             </tr>
@@ -179,32 +179,32 @@
             >
               <!-- API Key 主行 -->
               <tr class="table-row">
-                <td class="px-6 py-4 whitespace-nowrap">
+                <td class="px-3 py-4">
                   <div class="flex items-center">
-                    <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center mr-3">
+                    <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center mr-2 flex-shrink-0">
                       <i class="fas fa-key text-white text-xs" />
                     </div>
-                    <div>
-                      <div class="text-sm font-semibold text-gray-900">
+                    <div class="min-w-0">
+                      <div class="text-sm font-semibold text-gray-900 truncate" :title="key.name">
                         {{ key.name }}
                       </div>
-                      <div class="text-xs text-gray-500">
+                      <div class="text-xs text-gray-500 truncate" :title="key.id">
                         {{ key.id }}
                       </div>
-                      <div class="text-xs text-gray-500 mt-1">
-                        <span v-if="key.claudeAccountId">
+                      <div class="text-xs text-gray-500 mt-1 truncate">
+                        <span v-if="key.claudeAccountId" :title="`绑定: ${getBoundAccountName(key.claudeAccountId)}`">
                           <i class="fas fa-link mr-1" />
-                          绑定: {{ getBoundAccountName(key.claudeAccountId) }}
+                          {{ getBoundAccountName(key.claudeAccountId) }}
                         </span>
                         <span v-else>
                           <i class="fas fa-share-alt mr-1" />
-                          使用共享池
+                          共享池
                         </span>
                       </div>
                     </div>
                   </div>
                 </td>
-                <td class="px-6 py-4">
+                <td class="px-3 py-4">
                   <div class="flex flex-wrap gap-1">
                     <span
                       v-for="tag in (key.tags || [])"
@@ -219,7 +219,7 @@
                     >无标签</span>
                   </div>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap">
+                <td class="px-3 py-4 whitespace-nowrap">
                   <span
                     :class="['inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold', 
                              key.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800']"
@@ -231,7 +231,7 @@
                     {{ key.isActive ? '活跃' : '禁用' }}
                   </span>
                 </td>
-                <td class="px-6 py-4">
+                <td class="px-3 py-4">
                   <div class="space-y-1">
                     <!-- 请求统计 -->
                     <div class="flex justify-between text-sm">
@@ -328,10 +328,10 @@
                     </div>
                   </div>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">
                   {{ new Date(key.createdAt).toLocaleDateString() }}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                <td class="px-3 py-4 whitespace-nowrap text-sm">
                   <div class="inline-flex items-center gap-1 group">
                     <span v-if="key.expiresAt">
                       <span
@@ -371,33 +371,40 @@
                     </button>
                   </div>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                  <div class="flex gap-2">
+                <td class="px-3 py-4 whitespace-nowrap text-sm">
+                  <div class="flex gap-1">
                     <button 
-                      class="text-purple-600 hover:text-purple-900 font-medium hover:bg-purple-50 px-3 py-1 rounded-lg transition-colors" 
+                      class="text-purple-600 hover:text-purple-900 font-medium hover:bg-purple-50 px-2 py-1 rounded transition-colors text-xs" 
                       title="复制统计页面链接"
                       @click="copyApiStatsLink(key)"
                     >
-                      <i class="fas fa-chart-bar mr-1" />统计
+                      <i class="fas fa-chart-bar" />
+                      <span class="hidden xl:inline ml-1">统计</span>
                     </button>
                     <button 
-                      class="text-blue-600 hover:text-blue-900 font-medium hover:bg-blue-50 px-3 py-1 rounded-lg transition-colors" 
+                      class="text-blue-600 hover:text-blue-900 font-medium hover:bg-blue-50 px-2 py-1 rounded transition-colors text-xs" 
+                      title="编辑"
                       @click="openEditApiKeyModal(key)"
                     >
-                      <i class="fas fa-edit mr-1" />编辑
+                      <i class="fas fa-edit" />
+                      <span class="hidden xl:inline ml-1">编辑</span>
                     </button>
                     <button 
                       v-if="key.expiresAt && (isApiKeyExpired(key.expiresAt) || isApiKeyExpiringSoon(key.expiresAt))"
-                      class="text-green-600 hover:text-green-900 font-medium hover:bg-green-50 px-3 py-1 rounded-lg transition-colors" 
+                      class="text-green-600 hover:text-green-900 font-medium hover:bg-green-50 px-2 py-1 rounded transition-colors text-xs" 
+                      title="续期"
                       @click="openRenewApiKeyModal(key)"
                     >
-                      <i class="fas fa-clock mr-1" />续期
+                      <i class="fas fa-clock" />
+                      <span class="hidden xl:inline ml-1">续期</span>
                     </button>
                     <button 
-                      class="text-red-600 hover:text-red-900 font-medium hover:bg-red-50 px-3 py-1 rounded-lg transition-colors" 
+                      class="text-red-600 hover:text-red-900 font-medium hover:bg-red-50 px-2 py-1 rounded transition-colors text-xs" 
+                      title="删除"
                       @click="deleteApiKey(key.id)"
                     >
-                      <i class="fas fa-trash mr-1" />删除
+                      <i class="fas fa-trash" />
+                      <span class="hidden xl:inline ml-1">删除</span>
                     </button>
                   </div>
                 </td>
@@ -406,8 +413,8 @@
               <!-- 模型统计展开区域 -->
               <tr v-if="key && key.id && expandedApiKeys[key.id]">
                 <td
-                  colspan="6"
-                  class="px-6 py-4 bg-gray-50"
+                  colspan="7"
+                  class="px-3 py-4 bg-gray-50"
                 >
                   <div
                     v-if="!apiKeyModelStats[key.id]"

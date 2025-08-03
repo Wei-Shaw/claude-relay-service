@@ -15,7 +15,19 @@ const ApiStatsView = () => import('@/views/ApiStatsView.vue')
 const routes = [
   {
     path: '/',
-    redirect: '/api-stats'
+    redirect: () => {
+      // 智能重定向：避免循环
+      const currentPath = window.location.pathname
+      const basePath = APP_CONFIG.basePath.replace(/\/$/, '') // 移除末尾斜杠
+      
+      // 如果当前路径已经是 basePath 或 basePath/，重定向到 api-stats
+      if (currentPath === basePath || currentPath === basePath + '/') {
+        return '/api-stats'
+      }
+      
+      // 否则保持默认重定向
+      return '/api-stats'
+    }
   },
   {
     path: '/login',
@@ -88,6 +100,11 @@ const routes = [
         component: SettingsView
       }
     ]
+  },
+  // 捕获所有未匹配的路由
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/api-stats'
   }
 ]
 
@@ -103,9 +120,15 @@ router.beforeEach((to, from, next) => {
   console.log('路由导航:', {
     to: to.path,
     from: from.path,
+    fullPath: to.fullPath,
     requiresAuth: to.meta.requiresAuth,
     isAuthenticated: authStore.isAuthenticated
   })
+  
+  // 防止重定向循环：如果已经在目标路径，直接放行
+  if (to.path === from.path && to.fullPath === from.fullPath) {
+    return next()
+  }
   
   // API Stats 页面不需要认证，直接放行
   if (to.path === '/api-stats' || to.path.startsWith('/api-stats')) {

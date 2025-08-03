@@ -68,7 +68,7 @@ class ClaudeAccountService {
         lastRefreshAt: '',
         status: 'active', // 有OAuth数据的账户直接设为active
         errorMessage: '',
-        schedulable: schedulable.toString() // 是否可被调度
+        schedulable: schedulable.toString(), // 是否可被调度
       };
     } else {
       // 兼容旧格式
@@ -91,7 +91,7 @@ class ClaudeAccountService {
         lastRefreshAt: '',
         status: 'created', // created, active, expired, error
         errorMessage: '',
-        schedulable: schedulable.toString() // 是否可被调度
+        schedulable: schedulable.toString(), // 是否可被调度
       };
     }
 
@@ -230,6 +230,23 @@ class ClaudeAccountService {
       if (lockAcquired) {
         await tokenRefreshService.releaseRefreshLock(accountId, 'claude');
       }
+    }
+  }
+
+  // 🔍 获取账户信息
+  async getAccount(accountId) {
+    try {
+      const accountData = await redis.getClaudeAccount(accountId);
+      
+      if (!accountData || Object.keys(accountData).length === 0) {
+        return null;
+      }
+      
+      
+      return accountData;
+    } catch (error) {
+      logger.error('❌ Failed to get Claude account:', error);
+      return null;
     }
   }
 
