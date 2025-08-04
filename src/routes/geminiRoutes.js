@@ -291,9 +291,9 @@ router.get('/key-info', authenticateApiKey, async (req, res) => {
   }
 });
 
-router.post('/v1internal\\:loadCodeAssist', authenticateApiKey, async (req, res) => {
+// 共用的 loadCodeAssist 处理函数
+async function handleLoadCodeAssist(req, res) {
   try {
-
     const sessionHash = sessionHelper.generateSessionHash(req.body);
 
     // 使用统一调度选择账号（传递请求的模型）
@@ -304,7 +304,8 @@ router.post('/v1internal\\:loadCodeAssist', authenticateApiKey, async (req, res)
 
     const { metadata, cloudaicompanionProject } = req.body;
 
-    logger.info('LoadCodeAssist request', {
+    const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal';
+    logger.info(`LoadCodeAssist request (${version})`, {
       metadata: metadata || {},
       cloudaicompanionProject: cloudaicompanionProject || null,
       apiKeyId: req.apiKey?.id || 'unknown'
@@ -314,15 +315,17 @@ router.post('/v1internal\\:loadCodeAssist', authenticateApiKey, async (req, res)
     const response = await geminiAccountService.loadCodeAssist(client, cloudaicompanionProject);
     res.json(response);
   } catch (error) {
-    logger.error('Error in loadCodeAssist endpoint', { error: error.message });
+    const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal';
+    logger.error(`Error in loadCodeAssist endpoint (${version})`, { error: error.message });
     res.status(500).json({
       error: 'Internal server error',
       message: error.message
     });
   }
-});
+}
 
-router.post('/v1internal\\:onboardUser', authenticateApiKey, async (req, res) => {
+// 共用的 onboardUser 处理函数
+async function handleOnboardUser(req, res) {
   try {
     const { tierId, cloudaicompanionProject, metadata } = req.body;
     const sessionHash = sessionHelper.generateSessionHash(req.body);
@@ -332,7 +335,8 @@ router.post('/v1internal\\:onboardUser', authenticateApiKey, async (req, res) =>
     const { accountId } = await unifiedGeminiScheduler.selectAccountForApiKey(req.apiKey, sessionHash, requestedModel);
     const { accessToken, refreshToken } = await geminiAccountService.getAccount(accountId);
 
-    logger.info('OnboardUser request', {
+    const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal';
+    logger.info(`OnboardUser request (${version})`, {
       tierId: tierId || 'not provided',
       cloudaicompanionProject: cloudaicompanionProject || null,
       metadata: metadata || {},
@@ -351,15 +355,17 @@ router.post('/v1internal\\:onboardUser', authenticateApiKey, async (req, res) =>
       res.json(response);
     }
   } catch (error) {
-    logger.error('Error in onboardUser endpoint', { error: error.message });
+    const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal';
+    logger.error(`Error in onboardUser endpoint (${version})`, { error: error.message });
     res.status(500).json({
       error: 'Internal server error',
       message: error.message
     });
   }
-});
+}
 
-router.post('/v1internal\\:countTokens', authenticateApiKey, async (req, res) => {
+// 共用的 countTokens 处理函数
+async function handleCountTokens(req, res) {
   try {
     // 处理请求体结构，支持直接 contents 或 request.contents
     const requestData = req.body.request || req.body;
@@ -380,7 +386,8 @@ router.post('/v1internal\\:countTokens', authenticateApiKey, async (req, res) =>
     const { accountId } = await unifiedGeminiScheduler.selectAccountForApiKey(req.apiKey, sessionHash, model);
     const { accessToken, refreshToken } = await geminiAccountService.getAccount(accountId);
 
-    logger.info('CountTokens request', {
+    const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal';
+    logger.info(`CountTokens request (${version})`, {
       model: model,
       contentsLength: contents.length,
       apiKeyId: req.apiKey?.id || 'unknown'
@@ -391,7 +398,8 @@ router.post('/v1internal\\:countTokens', authenticateApiKey, async (req, res) =>
 
     res.json(response);
   } catch (error) {
-    logger.error('Error in countTokens endpoint', { error: error.message });
+    const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal';
+    logger.error(`Error in countTokens endpoint (${version})`, { error: error.message });
     res.status(500).json({
       error: {
         message: error.message || 'Internal server error',
@@ -399,9 +407,10 @@ router.post('/v1internal\\:countTokens', authenticateApiKey, async (req, res) =>
       }
     });
   }
-});
+}
 
-router.post('/v1internal\\:generateContent', authenticateApiKey, async (req, res) => {
+// 共用的 generateContent 处理函数
+async function handleGenerateContent(req, res) {
   try {
     const { model, project, user_prompt_id, request: requestData } = req.body;
     const sessionHash = sessionHelper.generateSessionHash(req.body);
@@ -421,7 +430,8 @@ router.post('/v1internal\\:generateContent', authenticateApiKey, async (req, res
     const account = await geminiAccountService.getAccount(accountId);
     const { accessToken, refreshToken } = account;
 
-    logger.info('GenerateContent request', {
+    const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal';
+    logger.info(`GenerateContent request (${version})`, {
       model: model,
       userPromptId: user_prompt_id,
       projectId: project || account.projectId,
@@ -439,7 +449,8 @@ router.post('/v1internal\\:generateContent', authenticateApiKey, async (req, res
 
     res.json(response);
   } catch (error) {
-    logger.error('Error in generateContent endpoint', { error: error.message });
+    const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal';
+    logger.error(`Error in generateContent endpoint (${version})`, { error: error.message });
     res.status(500).json({
       error: {
         message: error.message || 'Internal server error',
@@ -447,9 +458,10 @@ router.post('/v1internal\\:generateContent', authenticateApiKey, async (req, res
       }
     });
   }
-});
+}
 
-router.post('/v1internal\\:streamGenerateContent', authenticateApiKey, async (req, res) => {
+// 共用的 streamGenerateContent 处理函数
+async function handleStreamGenerateContent(req, res) {
   let abortController = null;
 
   try {
@@ -471,7 +483,8 @@ router.post('/v1internal\\:streamGenerateContent', authenticateApiKey, async (re
     const account = await geminiAccountService.getAccount(accountId);
     const { accessToken, refreshToken } = account;
 
-    logger.info('StreamGenerateContent request', {
+    const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal';
+    logger.info(`StreamGenerateContent request (${version})`, {
       model: model,
       userPromptId: user_prompt_id,
       projectId: project || account.projectId,
@@ -528,7 +541,8 @@ router.post('/v1internal\\:streamGenerateContent', authenticateApiKey, async (re
     });
 
   } catch (error) {
-    logger.error('Error in streamGenerateContent endpoint', { error: error.message });
+    const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal';
+    logger.error(`Error in streamGenerateContent endpoint (${version})`, { error: error.message });
 
     if (!res.headersSent) {
       res.status(500).json({
@@ -544,6 +558,21 @@ router.post('/v1internal\\:streamGenerateContent', authenticateApiKey, async (re
       abortController = null;
     }
   }
-});
+}
+
+// 注册所有路由端点
+// v1internal 版本的端点
+router.post('/v1internal\\:loadCodeAssist', authenticateApiKey, handleLoadCodeAssist);
+router.post('/v1internal\\:onboardUser', authenticateApiKey, handleOnboardUser);
+router.post('/v1internal\\:countTokens', authenticateApiKey, handleCountTokens);
+router.post('/v1internal\\:generateContent', authenticateApiKey, handleGenerateContent);
+router.post('/v1internal\\:streamGenerateContent', authenticateApiKey, handleStreamGenerateContent);
+
+// v1beta 版本的端点
+router.post('/v1beta\\:loadCodeAssist', authenticateApiKey, handleLoadCodeAssist);
+router.post('/v1beta\\:onboardUser', authenticateApiKey, handleOnboardUser);
+router.post('/v1beta\\:countTokens', authenticateApiKey, handleCountTokens);
+router.post('/v1beta\\:generateContent', authenticateApiKey, handleGenerateContent);
+router.post('/v1beta\\:streamGenerateContent', authenticateApiKey, handleStreamGenerateContent);
 
 module.exports = router;
