@@ -1,19 +1,22 @@
 <template>
-  <div class="card p-6">
-    <div class="mb-6">
-      <h3 class="text-xl font-bold flex items-center text-gray-900">
-        <i class="fas fa-robot mr-3 text-indigo-500" />
-        模型使用统计 <span class="text-sm font-normal text-gray-600 ml-2">({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span>
+  <div class="card p-4 md:p-6">
+    <div class="mb-4 md:mb-6">
+      <h3 class="text-lg md:text-xl font-bold flex flex-col sm:flex-row sm:items-center text-gray-900">
+        <span class="flex items-center">
+          <i class="fas fa-robot mr-2 md:mr-3 text-indigo-500 text-sm md:text-base" />
+          模型使用统计
+        </span>
+        <span class="text-xs md:text-sm font-normal text-gray-600 sm:ml-2">({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span>
       </h3>
     </div>
 
     <!-- 模型统计加载状态 -->
     <div
       v-if="modelStatsLoading"
-      class="text-center py-8"
+      class="text-center py-6 md:py-8"
     >
-      <i class="fas fa-spinner loading-spinner text-2xl mb-2 text-gray-600" />
-      <p class="text-gray-600">
+      <i class="fas fa-spinner loading-spinner text-xl md:text-2xl mb-2 text-gray-600" />
+      <p class="text-gray-600 text-sm md:text-base">
         加载模型统计数据中...
       </p>
     </div>
@@ -21,33 +24,33 @@
     <!-- 模型统计数据 -->
     <div
       v-else-if="modelStats.length > 0"
-      class="space-y-4"
+      class="space-y-3 md:space-y-4"
     >
       <div 
         v-for="(model, index) in modelStats" 
         :key="index"
         class="model-usage-item"
       >
-        <div class="flex justify-between items-start mb-3">
-          <div>
-            <h4 class="font-bold text-lg text-gray-900">
+        <div class="flex justify-between items-start mb-2 md:mb-3">
+          <div class="flex-1 min-w-0">
+            <h4 class="font-bold text-base md:text-lg text-gray-900 break-all">
               {{ model.model }}
             </h4>
-            <p class="text-gray-600 text-sm">
+            <p class="text-gray-600 text-xs md:text-sm">
               {{ model.requests }} 次请求
             </p>
           </div>
-          <div class="text-right">
-            <div class="text-lg font-bold text-green-600">
+          <div class="text-right flex-shrink-0 ml-3">
+            <div class="text-base md:text-lg font-bold text-green-600">
               {{ model.formatted?.total || '$0.000000' }}
             </div>
-            <div class="text-sm text-gray-600">
+            <div class="text-xs md:text-sm text-gray-600">
               总费用
             </div>
           </div>
         </div>
         
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 text-xs md:text-sm">
           <div class="bg-gray-50 rounded p-2">
             <div class="text-gray-600">
               输入 Token
@@ -87,10 +90,12 @@
     <!-- 无模型数据 -->
     <div
       v-else
-      class="text-center py-8 text-gray-500"
+      class="text-center py-6 md:py-8 text-gray-500"
     >
-      <i class="fas fa-chart-pie text-3xl mb-3" />
-      <p>暂无{{ statsPeriod === 'daily' ? '今日' : '本月' }}模型使用数据</p>
+      <i class="fas fa-chart-pie text-2xl md:text-3xl mb-3" />
+      <p class="text-sm md:text-base">
+        暂无{{ statsPeriod === 'daily' ? '今日' : '本月' }}模型使用数据
+      </p>
     </div>
   </div>
 </template>
@@ -157,10 +162,16 @@ const formatNumber = (num) => {
   background: rgba(255, 255, 255, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 12px;
-  padding: 16px;
+  padding: 12px;
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .model-usage-item {
+    padding: 16px;
+  }
 }
 
 .model-usage-item::before {
@@ -196,11 +207,14 @@ const formatNumber = (num) => {
 @media (max-width: 768px) {
   .model-usage-item .grid {
     grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
   }
 }
 
 @media (max-width: 480px) {
+  .model-usage-item {
+    padding: 10px;
+  }
+  
   .model-usage-item .grid {
     grid-template-columns: 1fr;
   }

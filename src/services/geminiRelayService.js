@@ -3,7 +3,7 @@ const { HttpsProxyAgent } = require('https-proxy-agent');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 const logger = require('../utils/logger');
 const config = require('../../config/config');
-const { recordUsageMetrics } = require('./apiKeyService');
+const apiKeyService = require('./apiKeyService');
 
 // Gemini API 配置
 const GEMINI_API_BASE = 'https://cloudcode.googleapis.com/v1';
@@ -123,7 +123,7 @@ function convertGeminiResponse(geminiResponse, model, stream = false) {
 }
 
 // 处理流式响应
-async function* handleStreamResponse(response, model, apiKeyId) {
+async function* handleStreamResponse(response, model, apiKeyId, accountId = null) {
   let buffer = '';
   let totalUsage = {
     promptTokenCount: 0,
@@ -135,15 +135,23 @@ async function* handleStreamResponse(response, model, apiKeyId) {
     for await (const chunk of response.data) {
       buffer += chunk.toString();
       
-      // 处理可能的多个 JSON 对象
+      // 处理 SSE 格式的数据
       const lines = buffer.split('\n');
       buffer = lines.pop() || ''; // 保留最后一个不完整的行
       
       for (const line of lines) {
         if (!line.trim()) continue;
         
+        // 处理 SSE 格式: "data: {...}"
+        let jsonData = line;
+        if (line.startsWith('data: ')) {
+          jsonData = line.substring(6).trim();
+        }
+
+        if (!jsonData || jsonData === '[DONE]') continue;
+
         try {
-          const data = JSON.parse(line);
+          const data = JSON.parse(jsonData);
           
           // 更新使用量统计
           if (data.usageMetadata) {
@@ -160,10 +168,16 @@ async function* handleStreamResponse(response, model, apiKeyId) {
           if (data.candidates?.[0]?.finishReason === 'STOP') {
             // 记录使用量
             if (apiKeyId && totalUsage.totalTokenCount > 0) {
-              await recordUsageMetrics(apiKeyId, {
-                inputTokens: totalUsage.promptTokenCount,
-                outputTokens: totalUsage.candidatesTokenCount,
-                model: model
+              await apiKeyService.recordUsage(
+                apiKeyId,
+                totalUsage.promptTokenCount || 0,    // inputTokens
+                totalUsage.candidatesTokenCount || 0, // outputTokens
+                0,                                    // cacheCreateTokens (Gemini 没有这个概念)
+                0,                                    // cacheReadTokens (Gemini 没有这个概念)
+                model,
+                accountId
+              ).catch(error => {
+                logger.error('❌ Failed to record Gemini usage:', error);
               });
             }
             
@@ -171,7 +185,7 @@ async function* handleStreamResponse(response, model, apiKeyId) {
             return;
           }
         } catch (e) {
-          logger.debug('Error parsing JSON line:', e.message);
+          logger.debug('Error parsing JSON line:', e.message, 'Line:', jsonData);
         }
       }
     }
@@ -179,10 +193,17 @@ async function* handleStreamResponse(response, model, apiKeyId) {
     // 处理剩余的 buffer
     if (buffer.trim()) {
       try {
-        const data = JSON.parse(buffer);
-        const openaiResponse = convertGeminiResponse(data, model, true);
-        if (openaiResponse) {
-          yield `data: ${JSON.stringify(openaiResponse)}\n\n`;
+        let jsonData = buffer.trim();
+        if (jsonData.startsWith('data: ')) {
+          jsonData = jsonData.substring(6).trim();
+        }
+
+        if (jsonData && jsonData !== '[DONE]') {
+          const data = JSON.parse(jsonData);
+          const openaiResponse = convertGeminiResponse(data, model, true);
+          if (openaiResponse) {
+            yield `data: ${JSON.stringify(openaiResponse)}\n\n`;
+          }
         }
       } catch (e) {
         logger.debug('Error parsing final buffer:', e.message);
@@ -191,13 +212,18 @@ async function* handleStreamResponse(response, model, apiKeyId) {
     
     yield 'data: [DONE]\n\n';
   } catch (error) {
-    logger.error('Stream processing error:', error);
-    yield `data: ${JSON.stringify({
-      error: {
-        message: error.message,
-        type: 'stream_error'
-      }
-    })}\n\n`;
+    // 检查是否是请求被中止
+    if (error.name === 'CanceledError' || error.code === 'ECONNABORTED') {
+      logger.info('Stream request was aborted by client');
+    } else {
+      logger.error('Stream processing error:', error);
+      yield `data: ${JSON.stringify({
+        error: {
+          message: error.message,
+          type: 'stream_error'
+        }
+      })}\n\n`;
+    }
   }
 }
 
@@ -211,8 +237,10 @@ async function sendGeminiRequest({
   accessToken,
   proxy,
   apiKeyId,
+  signal,
   projectId,
-  location = 'us-central1'
+  location = 'us-central1',
+  accountId = null
 }) {
   // 确保模型名称格式正确
   if (!model.startsWith('models/')) {
@@ -266,6 +294,12 @@ async function sendGeminiRequest({
     logger.debug('Using proxy for Gemini request');
   }
   
+  // 添加 AbortController 信号支持
+  if (signal) {
+    axiosConfig.signal = signal;
+    logger.debug('AbortController signal attached to request');
+  }
+  
   if (stream) {
     axiosConfig.responseType = 'stream';
   }
@@ -275,23 +309,42 @@ async function sendGeminiRequest({
     const response = await axios(axiosConfig);
     
     if (stream) {
-      return handleStreamResponse(response, model, apiKeyId);
+      return handleStreamResponse(response, model, apiKeyId, accountId);
     } else {
       // 非流式响应
       const openaiResponse = convertGeminiResponse(response.data, model, false);
       
       // 记录使用量
       if (apiKeyId && openaiResponse.usage) {
-        await recordUsageMetrics(apiKeyId, {
-          inputTokens: openaiResponse.usage.prompt_tokens,
-          outputTokens: openaiResponse.usage.completion_tokens,
-          model: model
+        await apiKeyService.recordUsage(
+          apiKeyId,
+          openaiResponse.usage.prompt_tokens || 0,
+          openaiResponse.usage.completion_tokens || 0,
+          0,  // cacheCreateTokens
+          0,  // cacheReadTokens
+          model,
+          accountId
+        ).catch(error => {
+          logger.error('❌ Failed to record Gemini usage:', error);
         });
       }
       
       return openaiResponse;
     }
   } catch (error) {
+    // 检查是否是请求被中止
+    if (error.name === 'CanceledError' || error.code === 'ECONNABORTED') {
+      logger.info('Gemini request was aborted by client');
+      throw {
+        status: 499,
+        error: {
+          message: 'Request canceled by client',
+          type: 'canceled',
+          code: 'request_canceled'
+        }
+      };
+    }
+    
     logger.error('Gemini API request failed:', error.response?.data || error.message);
     
     // 转换错误格式

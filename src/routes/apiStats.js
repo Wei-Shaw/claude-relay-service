@@ -269,6 +269,28 @@ router.post('/api/user-stats', async (req, res) => {
       }
     }
 
+    // 获取当前使用量
+    let currentWindowRequests = 0;
+    let currentWindowTokens = 0;
+    let currentDailyCost = 0;
+    
+    try {
+      // 获取当前时间窗口的请求次数和Token使用量
+      if (fullKeyData.rateLimitWindow > 0) {
+        const client = redis.getClientSafe();
+        const requestCountKey = `rate_limit:requests:${keyId}`;
+        const tokenCountKey = `rate_limit:tokens:${keyId}`;
+        
+        currentWindowRequests = parseInt(await client.get(requestCountKey) || '0');
+        currentWindowTokens = parseInt(await client.get(tokenCountKey) || '0');
+      }
+      
+      // 获取当日费用
+      currentDailyCost = await redis.getDailyCost(keyId) || 0;
+    } catch (error) {
+      logger.warn(`Failed to get current usage for key ${keyId}:`, error);
+    }
+
     // 构建响应数据（只返回该API Key自己的信息，确保不泄露其他信息）
     const responseData = {
       id: keyId,
@@ -296,13 +318,17 @@ router.post('/api/user-stats', async (req, res) => {
         }
       },
       
-      // 限制信息（只显示配置，不显示当前使用量）
+      // 限制信息（显示配置和当前使用量）
       limits: {
         tokenLimit: fullKeyData.tokenLimit || 0,
         concurrencyLimit: fullKeyData.concurrencyLimit || 0,
         rateLimitWindow: fullKeyData.rateLimitWindow || 0,
         rateLimitRequests: fullKeyData.rateLimitRequests || 0,
-        dailyCostLimit: fullKeyData.dailyCostLimit || 0
+        dailyCostLimit: fullKeyData.dailyCostLimit || 0,
+        // 当前使用量
+        currentWindowRequests: currentWindowRequests,
+        currentWindowTokens: currentWindowTokens,
+        currentDailyCost: currentDailyCost
       },
       
       // 绑定的账户信息（只显示ID，不显示敏感信息）

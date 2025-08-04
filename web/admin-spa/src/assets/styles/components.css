@@ -297,6 +297,114 @@
     transition: transform 0.3s ease-in-out;
 }
 
+/* 响应式设计 - 移动端优化 */
+@media (max-width: 640px) {
+    /* 玻璃态容器 */
+    .glass,
+    .glass-strong {
+        margin: 12px;
+        border-radius: 16px;
+        padding: 16px;
+    }
+    
+    /* 统计卡片 */
+    .stat-card {
+        padding: 12px;
+        border-radius: 12px;
+    }
+    
+    .stat-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 16px;
+    }
+    
+    /* 标签按钮 */
+    .tab-btn {
+        font-size: 12px;
+        padding: 10px 6px;
+    }
+    
+    /* 模态框 */
+    .modal-content {
+        margin: 8px;
+        max-width: calc(100vw - 24px);
+        padding: 16px;
+    }
+    
+    .modal-scroll-content {
+        max-height: calc(90vh - 100px);
+    }
+    
+    /* 卡片 */
+    .card {
+        border-radius: 12px;
+    }
+    
+    /* 表单元素 */
+    .form-input,
+    .form-select,
+    .form-textarea {
+        font-size: 14px;
+        padding: 8px 12px;
+    }
+    
+    /* 按钮 */
+    .btn {
+        font-size: 14px;
+        padding: 8px 16px;
+    }
+    
+    /* 表格 */
+    .table-container table {
+        font-size: 12px;
+    }
+    
+    .table-container th,
+    .table-container td {
+        padding: 8px 12px;
+    }
+    
+    /* Toast通知 */
+    .toast {
+        min-width: 280px;
+        max-width: calc(100vw - 40px);
+        right: 12px;
+        top: 60px;
+    }
+    
+    /* 加载动画 */
+    .loading-spinner {
+        width: 16px;
+        height: 16px;
+    }
+}
+
+@media (max-width: 768px) {
+    /* 玻璃态容器 */
+    .glass,
+    .glass-strong {
+        margin: 16px;
+        border-radius: 20px;
+    }
+    
+    /* 统计卡片 */
+    .stat-card {
+        padding: 16px;
+    }
+    
+    /* 标签按钮 */
+    .tab-btn {
+        font-size: 14px;
+        padding: 12px 8px;
+    }
+    
+    /* 模态框滚动内容 */
+    .modal-scroll-content {
+        max-height: calc(85vh - 120px);
+    }
+}
+
 .toast.show {
     transform: translateX(0);
 }

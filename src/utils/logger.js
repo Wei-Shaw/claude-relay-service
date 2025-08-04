@@ -5,6 +5,49 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
+// 安全的 JSON 序列化函数，处理循环引用
+const safeStringify = (obj, maxDepth = 3) => {
+  const seen = new WeakSet();
+  
+  const replacer = (key, value, depth = 0) => {
+    if (depth > maxDepth) return '[Max Depth Reached]';
+    
+    if (value !== null && typeof value === 'object') {
+      if (seen.has(value)) {
+        return '[Circular Reference]';
+      }
+      seen.add(value);
+      
+      // 过滤掉常见的循环引用对象
+      if (value.constructor) {
+        const constructorName = value.constructor.name;
+        if (['Socket', 'TLSSocket', 'HTTPParser', 'IncomingMessage', 'ServerResponse'].includes(constructorName)) {
+          return `[${constructorName} Object]`;
+        }
+      }
+      
+      // 递归处理对象属性
+      if (Array.isArray(value)) {
+        return value.map((item, index) => replacer(index, item, depth + 1));
+      } else {
+        const result = {};
+        for (const [k, v] of Object.entries(value)) {
+          result[k] = replacer(k, v, depth + 1);
+        }
+        return result;
+      }
+    }
+    
+    return value;
+  };
+  
+  try {
+    return JSON.stringify(replacer('', obj));
+  } catch (error) {
+    return JSON.stringify({ error: 'Failed to serialize object', message: error.message });
+  }
+};
+
 // 📝 增强的日志格式
 const createLogFormat = (colorize = false) => {
   const formats = [
@@ -31,7 +74,7 @@ const createLogFormat = (colorize = false) => {
       
       // 添加元数据
       if (metadata && Object.keys(metadata).length > 0) {
-        logMessage += ` | ${JSON.stringify(metadata)}`;
+        logMessage += ` | ${safeStringify(metadata)}`;
       }
       
       // 添加其他属性
@@ -42,7 +85,7 @@ const createLogFormat = (colorize = false) => {
       delete additionalData.stack;
       
       if (Object.keys(additionalData).length > 0) {
-        logMessage += ` | ${JSON.stringify(additionalData)}`;
+        logMessage += ` | ${safeStringify(additionalData)}`;
       }
       
       return stack ? `${logMessage}\n${stack}` : logMessage;

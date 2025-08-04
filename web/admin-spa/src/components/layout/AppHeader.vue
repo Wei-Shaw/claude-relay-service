@@ -1,11 +1,11 @@
 <template>
   <!-- 顶部导航 -->
   <div
-    class="glass-strong rounded-3xl p-6 mb-8 shadow-xl"
+    class="glass-strong rounded-xl sm:rounded-2xl md:rounded-3xl p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 md:mb-8 shadow-xl"
     style="z-index: 10; position: relative;"
   >
-    <div class="flex flex-col md:flex-row justify-between items-center gap-4">
-      <div class="flex items-center gap-4">
+    <div class="flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-4">
+      <div class="flex items-center gap-2 sm:gap-3 md:gap-4 w-full sm:w-auto justify-center sm:justify-start">
         <LogoTitle 
           :loading="oemLoading"
           :title="oemSettings.siteName"
@@ -15,8 +15,8 @@
         >
           <template #after-title>
             <!-- 版本信息 -->
-            <div class="flex items-center gap-2">
-              <span class="text-sm text-gray-400 font-mono">v{{ versionInfo.current || '...' }}</span>
+            <div class="flex items-center gap-1 sm:gap-2">
+              <span class="text-xs sm:text-sm text-gray-400 font-mono">v{{ versionInfo.current || '...' }}</span>
               <!-- 更新提示 -->
               <a 
                 v-if="versionInfo.hasUpdate" 
@@ -35,11 +35,11 @@
       <!-- 用户菜单 -->
       <div class="relative user-menu-container">
         <button 
-          class="btn btn-primary px-4 py-3 flex items-center gap-2 relative"
+          class="btn btn-primary px-3 sm:px-4 py-2 sm:py-3 flex items-center gap-1 sm:gap-2 relative text-sm sm:text-base"
           @click="userMenuOpen = !userMenuOpen"
         >
           <i class="fas fa-user-circle" />
-          <span>{{ currentUser.username || 'Admin' }}</span>
+          <span class="hidden sm:inline">{{ currentUser.username || 'Admin' }}</span>
           <i
             class="fas fa-chevron-down text-xs transition-transform duration-200"
             :class="{ 'rotate-180': userMenuOpen }"
@@ -49,7 +49,7 @@
         <!-- 悬浮菜单 -->
         <div 
           v-if="userMenuOpen" 
-          class="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-200 py-2 user-menu-dropdown"
+          class="absolute right-0 top-full mt-2 w-48 sm:w-56 bg-white rounded-xl shadow-xl border border-gray-200 py-2 user-menu-dropdown"
           style="z-index: 999999;"
           @click.stop
         >
@@ -138,9 +138,9 @@
   <!-- 修改账户信息模态框 -->
   <div
     v-if="showChangePasswordModal"
-    class="fixed inset-0 modal z-50 flex items-center justify-center p-4"
+    class="fixed inset-0 modal z-50 flex items-center justify-center p-3 sm:p-4"
   >
-    <div class="modal-content w-full max-w-md p-8 mx-auto max-h-[90vh] flex flex-col">
+    <div class="modal-content w-full max-w-md p-4 sm:p-6 md:p-8 mx-auto max-h-[90vh] flex flex-col">
       <div class="flex items-center justify-between mb-6">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">

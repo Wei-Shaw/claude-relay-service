@@ -1,4 +1,22 @@
-# 🐳 使用官方 Node.js 18 Alpine 镜像
+# 🎯 前端构建阶段
+FROM node:18-alpine AS frontend-builder
+
+# 📁 设置工作目录
+WORKDIR /app/web/admin-spa
+
+# 📦 复制前端依赖文件
+COPY web/admin-spa/package*.json ./
+
+# 🔽 安装前端依赖
+RUN npm ci
+
+# 📋 复制前端源代码
+COPY web/admin-spa/ ./
+
+# 🏗️ 构建前端
+RUN npm run build
+
+# 🐳 主应用阶段
 FROM node:18-alpine
 
 # 📋 设置标签
@@ -25,6 +43,9 @@ RUN npm ci --only=production && \
 
 # 📋 复制应用代码
 COPY . .
+
+# 📦 从构建阶段复制前端产物
+COPY --from=frontend-builder /app/web/admin-spa/dist /app/web/admin-spa/dist
 
 # 🔧 复制并设置启动脚本权限
 COPY docker-entrypoint.sh /usr/local/bin/

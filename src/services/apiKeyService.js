@@ -192,6 +192,7 @@ class ApiKeyService {
   async getAllApiKeys() {
     try {
       const apiKeys = await redis.getAllApiKeys();
+      const client = redis.getClientSafe();
       
       // 为每个key添加使用统计和当前并发数
       for (const key of apiKeys) {
@@ -207,6 +208,19 @@ class ApiKeyService {
         key.permissions = key.permissions || 'all'; // 兼容旧数据
         key.dailyCostLimit = parseFloat(key.dailyCostLimit || 0);
         key.dailyCost = await redis.getDailyCost(key.id) || 0;
+        
+        // 获取当前时间窗口的请求次数和Token使用量
+        if (key.rateLimitWindow > 0) {
+          const requestCountKey = `rate_limit:requests:${key.id}`;
+          const tokenCountKey = `rate_limit:tokens:${key.id}`;
+          
+          key.currentWindowRequests = parseInt(await client.get(requestCountKey) || '0');
+          key.currentWindowTokens = parseInt(await client.get(tokenCountKey) || '0');
+        } else {
+          key.currentWindowRequests = 0;
+          key.currentWindowTokens = 0;
+        }
+        
         try {
           key.restrictedModels = key.restrictedModels ? JSON.parse(key.restrictedModels) : [];
         } catch (e) {

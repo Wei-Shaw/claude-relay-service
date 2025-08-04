@@ -1,12 +1,12 @@
 <template>
-  <div class="min-h-screen p-6">
+  <div class="min-h-screen p-3 sm:p-4 md:p-6">
     <!-- 顶部导航 -->
     <AppHeader />
     
     <!-- 主内容区域 -->
     <div
-      class="glass-strong rounded-3xl p-6 shadow-xl"
-      style="z-index: 1; min-height: calc(100vh - 240px);"
+      class="glass-strong rounded-xl sm:rounded-2xl md:rounded-3xl p-3 sm:p-4 md:p-6 shadow-xl"
+      style="z-index: 1; min-height: calc(100vh - 120px);"
     >
       <!-- 标签栏 -->
       <TabBar

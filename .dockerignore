@@ -55,11 +55,14 @@ coverage/
 .nyc_output/
 
 # Build files
-dist/
+# dist/  # 前端构建阶段需要复制源文件，所以不能忽略
 build/
 *.pid
 *.seed
 *.pid.lock
+
+# 但可以忽略本地已构建的 dist 目录
+web/admin-spa/dist/
 
 # CI/CD
 .travis.yml

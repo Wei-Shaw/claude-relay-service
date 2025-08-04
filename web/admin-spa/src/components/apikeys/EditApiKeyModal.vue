@@ -1,44 +1,44 @@
 <template>
   <Teleport to="body">
-    <div class="fixed inset-0 modal z-50 flex items-center justify-center p-4">
-      <div class="modal-content w-full max-w-4xl p-8 mx-auto max-h-[90vh] flex flex-col">
-        <div class="flex items-center justify-between mb-6">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-              <i class="fas fa-edit text-white" />
+    <div class="fixed inset-0 modal z-50 flex items-center justify-center p-3 sm:p-4">
+      <div class="modal-content w-full max-w-4xl p-4 sm:p-6 md:p-8 mx-auto max-h-[90vh] flex flex-col">
+        <div class="flex items-center justify-between mb-4 sm:mb-6">
+          <div class="flex items-center gap-2 sm:gap-3">
+            <div class="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg sm:rounded-xl flex items-center justify-center">
+              <i class="fas fa-edit text-white text-sm sm:text-base" />
             </div>
-            <h3 class="text-xl font-bold text-gray-900">
+            <h3 class="text-lg sm:text-xl font-bold text-gray-900">
               编辑 API Key
             </h3>
           </div>
           <button 
-            class="text-gray-400 hover:text-gray-600 transition-colors"
+            class="text-gray-400 hover:text-gray-600 transition-colors p-1"
             @click="$emit('close')"
           >
-            <i class="fas fa-times text-xl" />
+            <i class="fas fa-times text-lg sm:text-xl" />
           </button>
         </div>
       
         <form
-          class="space-y-6 modal-scroll-content custom-scrollbar flex-1"
+          class="space-y-4 sm:space-y-6 modal-scroll-content custom-scrollbar flex-1"
           @submit.prevent="updateApiKey"
         >
           <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-3">名称</label>
+            <label class="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-3">名称</label>
             <input 
               :value="form.name" 
               type="text" 
               disabled
-              class="form-input w-full bg-gray-100 cursor-not-allowed"
+              class="form-input w-full bg-gray-100 cursor-not-allowed text-sm"
             >
-            <p class="text-xs text-gray-500 mt-2">
+            <p class="text-xs text-gray-500 mt-1 sm:mt-2">
               名称不可修改
             </p>
           </div>
         
           <!-- 标签 -->
           <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-3">标签</label>
+            <label class="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-3">标签</label>
             <div class="space-y-4">
               <!-- 已选择的标签 -->
               <div v-if="form.tags.length > 0">
@@ -278,56 +278,43 @@
           </div>
         
           <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-3">专属账号绑定</label>
+            <div class="flex items-center justify-between mb-3">
+              <label class="text-sm font-semibold text-gray-700">专属账号绑定</label>
+              <button
+                type="button"
+                class="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="刷新账号列表"
+                :disabled="accountsLoading"
+                @click="refreshAccounts"
+              >
+                <i :class="['fas', accountsLoading ? 'fa-spinner fa-spin' : 'fa-sync-alt', 'text-xs']" />
+                <span>{{ accountsLoading ? '刷新中...' : '刷新账号' }}</span>
+              </button>
+            </div>
             <div class="grid grid-cols-1 gap-3">
               <div>
                 <label class="block text-sm font-medium text-gray-600 mb-1">Claude 专属账号</label>
-                <select 
-                  v-model="form.claudeAccountId" 
-                  class="form-input w-full"
+                <AccountSelector
+                  v-model="form.claudeAccountId"
+                  platform="claude"
+                  :accounts="localAccounts.claude"
+                  :groups="localAccounts.claudeGroups"
                   :disabled="form.permissions === 'gemini'"
-                >
-                  <option value="">
-                    使用共享账号池
-                  </option>
-                  <optgroup v-if="accounts.claude.filter(a => a.isDedicated && a.platform === 'claude-oauth').length > 0" label="Claude OAuth 账号">
-                    <option 
-                      v-for="account in accounts.claude.filter(a => a.isDedicated && a.platform === 'claude-oauth')" 
-                      :key="account.id" 
-                      :value="account.id"
-                    >
-                      {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
-                    </option>
-                  </optgroup>
-                  <optgroup v-if="accounts.claude.filter(a => a.isDedicated && a.platform === 'claude-console').length > 0" label="Claude Console 账号">
-                    <option 
-                      v-for="account in accounts.claude.filter(a => a.isDedicated && a.platform === 'claude-console')" 
-                      :key="account.id" 
-                      :value="`console:${account.id}`"
-                    >
-                      {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
-                    </option>
-                  </optgroup>
-                </select>
+                  placeholder="请选择Claude账号"
+                  default-option-text="使用共享账号池"
+                />
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-600 mb-1">Gemini 专属账号</label>
-                <select 
-                  v-model="form.geminiAccountId" 
-                  class="form-input w-full"
+                <AccountSelector
+                  v-model="form.geminiAccountId"
+                  platform="gemini"
+                  :accounts="localAccounts.gemini"
+                  :groups="localAccounts.geminiGroups"
                   :disabled="form.permissions === 'claude'"
-                >
-                  <option value="">
-                    使用共享账号池
-                  </option>
-                  <option 
-                    v-for="account in accounts.gemini" 
-                    :key="account.id" 
-                    :value="account.id"
-                  >
-                    {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
-                  </option>
-                </select>
+                  placeholder="请选择Gemini账号"
+                  default-option-text="使用共享账号池"
+                />
               </div>
             </div>
             <p class="text-xs text-gray-500 mt-2">
@@ -487,9 +474,11 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { showToast } from '@/utils/toast'
+import { useAuthStore } from '@/stores/auth'
 import { useClientsStore } from '@/stores/clients'
 import { useApiKeysStore } from '@/stores/apiKeys'
 import { apiClient } from '@/config/api'
+import AccountSelector from '@/components/common/AccountSelector.vue'
 
 const props = defineProps({
   apiKey: {
@@ -504,9 +493,12 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'success'])
 
+const authStore = useAuthStore()
 const clientsStore = useClientsStore()
 const apiKeysStore = useApiKeysStore()
 const loading = ref(false)
+const accountsLoading = ref(false)
+const localAccounts = ref({ claude: [], gemini: [], claudeGroups: [], geminiGroups: [] })
 
 // 支持的客户端列表
 const supportedClients = ref([])
@@ -590,6 +582,29 @@ const updateApiKey = async () => {
       tags: form.tags
     }
     
+    // 处理Claude账户绑定（区分OAuth和Console）
+    if (form.claudeAccountId) {
+      if (form.claudeAccountId.startsWith('console:')) {
+        // Claude Console账户
+        data.claudeConsoleAccountId = form.claudeAccountId.substring(8);
+      } else if (!form.claudeAccountId.startsWith('group:')) {
+        // Claude OAuth账户（非分组）
+        data.claudeAccountId = form.claudeAccountId;
+      } else {
+        // 分组
+        data.claudeAccountId = form.claudeAccountId;
+      }
+    } else {
+      data.claudeAccountId = null;
+    }
+    
+    // Gemini账户绑定
+    if (form.geminiAccountId) {
+      data.geminiAccountId = form.geminiAccountId;
+    } else {
+      data.geminiAccountId = null;
+    }
+    
     // 模型限制 - 始终提交这些字段
     data.enableModelRestriction = form.enableModelRestriction
     data.restrictedModels = form.restrictedModels
@@ -597,25 +612,6 @@ const updateApiKey = async () => {
     // 客户端限制 - 始终提交这些字段
     data.enableClientRestriction = form.enableClientRestriction
     data.allowedClients = form.allowedClients
-    
-    // 处理Claude账户绑定（区分OAuth和Console）
-    if (form.claudeAccountId) {
-      if (form.claudeAccountId.startsWith('console:')) {
-        // Claude Console账户
-        data.claudeConsoleAccountId = form.claudeAccountId.substring(8);
-        data.claudeAccountId = null; // 清空OAuth绑定
-      } else {
-        // Claude OAuth账户
-        data.claudeAccountId = form.claudeAccountId;
-        data.claudeConsoleAccountId = null; // 清空Console绑定
-      }
-    } else {
-      data.claudeAccountId = null;
-      data.claudeConsoleAccountId = null;
-    }
-    
-    // Gemini账户绑定
-    data.geminiAccountId = form.geminiAccountId || null;
     
     const result = await apiClient.put(`/admin/api-keys/${props.apiKey.id}`, data)
     
@@ -632,11 +628,79 @@ const updateApiKey = async () => {
   }
 }
 
+// 刷新账号列表
+const refreshAccounts = async () => {
+  accountsLoading.value = true
+  try {
+    const [claudeData, claudeConsoleData, geminiData, groupsData] = await Promise.all([
+      apiClient.get('/admin/claude-accounts'),
+      apiClient.get('/admin/claude-console-accounts'),
+      apiClient.get('/admin/gemini-accounts'),
+      apiClient.get('/admin/account-groups')
+    ])
+    
+    // 合并Claude OAuth账户和Claude Console账户
+    const claudeAccounts = []
+    
+    if (claudeData.success) {
+      claudeData.data?.forEach(account => {
+        claudeAccounts.push({
+          ...account,
+          platform: 'claude-oauth',
+          isDedicated: account.accountType === 'dedicated' // 保留以便向后兼容
+        })
+      })
+    }
+    
+    if (claudeConsoleData.success) {
+      claudeConsoleData.data?.forEach(account => {
+        claudeAccounts.push({
+          ...account,
+          platform: 'claude-console',
+          isDedicated: account.accountType === 'dedicated' // 保留以便向后兼容
+        })
+      })
+    }
+    
+    localAccounts.value.claude = claudeAccounts
+    
+    if (geminiData.success) {
+      localAccounts.value.gemini = (geminiData.data || []).map(account => ({
+        ...account,
+        isDedicated: account.accountType === 'dedicated'
+      }))
+    }
+    
+    // 处理分组数据
+    if (groupsData.success) {
+      const allGroups = groupsData.data || []
+      localAccounts.value.claudeGroups = allGroups.filter(g => g.platform === 'claude')
+      localAccounts.value.geminiGroups = allGroups.filter(g => g.platform === 'gemini')
+    }
+    
+    showToast('账号列表已刷新', 'success')
+  } catch (error) {
+    showToast('刷新账号列表失败', 'error')
+  } finally {
+    accountsLoading.value = false
+  }
+}
+
 // 初始化表单数据
 onMounted(async () => {
   // 加载支持的客户端和已存在的标签
   supportedClients.value = await clientsStore.loadSupportedClients()
   availableTags.value = await apiKeysStore.fetchTags()
+  
+  // 初始化账号数据
+  if (props.accounts) {
+    localAccounts.value = {
+      claude: props.accounts.claude || [],
+      gemini: props.accounts.gemini || [],
+      claudeGroups: props.accounts.claudeGroups || [],
+      geminiGroups: props.accounts.geminiGroups || []
+    }
+  }
   
   form.name = props.apiKey.name
   form.tokenLimit = props.apiKey.tokenLimit || ''
@@ -645,15 +709,12 @@ onMounted(async () => {
   form.concurrencyLimit = props.apiKey.concurrencyLimit || ''
   form.dailyCostLimit = props.apiKey.dailyCostLimit || ''
   form.permissions = props.apiKey.permissions || 'all'
-  // 处理Claude账户绑定初始化
-  if (props.apiKey.claudeAccountId) {
-    form.claudeAccountId = props.apiKey.claudeAccountId;
-  } else if (props.apiKey.claudeConsoleAccountId) {
-    form.claudeAccountId = `console:${props.apiKey.claudeConsoleAccountId}`;
+  // 处理 Claude 账号（区分 OAuth 和 Console）
+  if (props.apiKey.claudeConsoleAccountId) {
+    form.claudeAccountId = `console:${props.apiKey.claudeConsoleAccountId}`
   } else {
-    form.claudeAccountId = '';
+    form.claudeAccountId = props.apiKey.claudeAccountId || ''
   }
-  
   form.geminiAccountId = props.apiKey.geminiAccountId || ''
   form.restrictedModels = props.apiKey.restrictedModels || []
   form.allowedClients = props.apiKey.allowedClients || []

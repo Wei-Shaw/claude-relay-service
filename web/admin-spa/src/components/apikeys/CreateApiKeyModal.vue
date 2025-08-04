@@ -1,21 +1,21 @@
 <template>
   <Teleport to="body">
-    <div class="fixed inset-0 modal z-50 flex items-center justify-center p-4">
-      <div class="modal-content w-full max-w-4xl p-6 mx-auto max-h-[90vh] flex flex-col">
+    <div class="fixed inset-0 modal z-50 flex items-center justify-center p-3 sm:p-4">
+      <div class="modal-content w-full max-w-4xl p-4 sm:p-6 mx-auto max-h-[90vh] flex flex-col">
         <div class="flex items-center justify-between mb-4">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-              <i class="fas fa-key text-white" />
+          <div class="flex items-center gap-2 sm:gap-3">
+            <div class="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg sm:rounded-xl flex items-center justify-center">
+              <i class="fas fa-key text-white text-sm sm:text-base" />
             </div>
-            <h3 class="text-xl font-bold text-gray-900">
+            <h3 class="text-lg sm:text-xl font-bold text-gray-900">
               创建新的 API Key
             </h3>
           </div>
           <button 
-            class="text-gray-400 hover:text-gray-600 transition-colors"
+            class="text-gray-400 hover:text-gray-600 transition-colors p-1"
             @click="$emit('close')"
           >
-            <i class="fas fa-times text-xl" />
+            <i class="fas fa-times text-lg sm:text-xl" />
           </button>
         </div>
       
@@ -23,15 +23,78 @@
           class="space-y-4 modal-scroll-content custom-scrollbar flex-1"
           @submit.prevent="createApiKey"
         >
+          <!-- 创建类型选择 -->
+          <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3 sm:p-4 border border-blue-200">
+            <div :class="['flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3', form.createType === 'batch' ? 'mb-3' : '']">
+              <label class="text-xs sm:text-sm font-semibold text-gray-700 flex items-center h-full">创建类型</label>
+              <div class="flex gap-3 sm:gap-4 items-center">
+                <label class="flex items-center cursor-pointer">
+                  <input 
+                    v-model="form.createType" 
+                    type="radio" 
+                    value="single" 
+                    class="mr-1.5 sm:mr-2 text-blue-600"
+                  >
+                  <span class="text-xs sm:text-sm text-gray-700 flex items-center">
+                    <i class="fas fa-key mr-1 text-xs" />
+                    单个创建
+                  </span>
+                </label>
+                <label class="flex items-center cursor-pointer">
+                  <input 
+                    v-model="form.createType" 
+                    type="radio" 
+                    value="batch" 
+                    class="mr-1.5 sm:mr-2 text-blue-600"
+                  >
+                  <span class="text-xs sm:text-sm text-gray-700 flex items-center">
+                    <i class="fas fa-layer-group mr-1 text-xs" />
+                    批量创建
+                  </span>
+                </label>
+              </div>
+            </div>
+            
+            <!-- 批量创建数量输入 -->
+            <div
+              v-if="form.createType === 'batch'"
+              class="mt-3"
+            >
+              <div class="flex items-center gap-4">
+                <div class="flex-1">
+                  <label class="block text-xs font-medium text-gray-600 mb-1">创建数量</label>
+                  <div class="flex items-center gap-2">
+                    <input 
+                      v-model.number="form.batchCount" 
+                      type="number" 
+                      min="2"
+                      max="500"
+                      required 
+                      class="form-input w-full text-sm"
+                      placeholder="输入数量 (2-500)"
+                    >
+                    <div class="text-xs text-gray-500 whitespace-nowrap">
+                      最大支持 500 个
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <p class="text-xs text-amber-600 mt-2 flex items-start">
+                <i class="fas fa-info-circle mr-1 mt-0.5 flex-shrink-0" />
+                <span>批量创建时，每个 Key 的名称会自动添加序号后缀，例如：{{ form.name || 'MyKey' }}_1, {{ form.name || 'MyKey' }}_2 ...</span>
+              </p>
+            </div>
+          </div>
+          
           <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">名称 <span class="text-red-500">*</span></label>
+            <label class="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-2">名称 <span class="text-red-500">*</span></label>
             <input 
               v-model="form.name" 
               type="text" 
               required 
-              class="form-input w-full"
+              class="form-input w-full text-sm"
               :class="{ 'border-red-500': errors.name }"
-              placeholder="为您的 API Key 取一个名称"
+              :placeholder="form.createType === 'batch' ? '输入基础名称（将自动添加序号）' : '为您的 API Key 取一个名称'"
               @input="errors.name = ''"
             >
             <p
@@ -346,56 +409,43 @@
           </div>
         
           <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">专属账号绑定 (可选)</label>
+            <div class="flex items-center justify-between mb-2">
+              <label class="text-sm font-semibold text-gray-700">专属账号绑定 (可选)</label>
+              <button
+                type="button"
+                class="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="刷新账号列表"
+                :disabled="accountsLoading"
+                @click="refreshAccounts"
+              >
+                <i :class="['fas', accountsLoading ? 'fa-spinner fa-spin' : 'fa-sync-alt', 'text-xs']" />
+                <span>{{ accountsLoading ? '刷新中...' : '刷新账号' }}</span>
+              </button>
+            </div>
             <div class="grid grid-cols-1 gap-3">
               <div>
                 <label class="block text-sm font-medium text-gray-600 mb-1">Claude 专属账号</label>
-                <select 
-                  v-model="form.claudeAccountId" 
-                  class="form-input w-full"
+                <AccountSelector
+                  v-model="form.claudeAccountId"
+                  platform="claude"
+                  :accounts="localAccounts.claude"
+                  :groups="localAccounts.claudeGroups"
                   :disabled="form.permissions === 'gemini'"
-                >
-                  <option value="">
-                    使用共享账号池
-                  </option>
-                  <optgroup v-if="accounts.claude.filter(a => a.isDedicated && a.platform === 'claude-oauth').length > 0" label="Claude OAuth 账号">
-                    <option 
-                      v-for="account in accounts.claude.filter(a => a.isDedicated && a.platform === 'claude-oauth')" 
-                      :key="account.id" 
-                      :value="account.id"
-                    >
-                      {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
-                    </option>
-                  </optgroup>
-                  <optgroup v-if="accounts.claude.filter(a => a.isDedicated && a.platform === 'claude-console').length > 0" label="Claude Console 账号">
-                    <option 
-                      v-for="account in accounts.claude.filter(a => a.isDedicated && a.platform === 'claude-console')" 
-                      :key="account.id" 
-                      :value="`console:${account.id}`"
-                    >
-                      {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
-                    </option>
-                  </optgroup>
-                </select>
+                  placeholder="请选择Claude账号"
+                  default-option-text="使用共享账号池"
+                />
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-600 mb-1">Gemini 专属账号</label>
-                <select 
-                  v-model="form.geminiAccountId" 
-                  class="form-input w-full"
+                <AccountSelector
+                  v-model="form.geminiAccountId"
+                  platform="gemini"
+                  :accounts="localAccounts.gemini"
+                  :groups="localAccounts.geminiGroups"
                   :disabled="form.permissions === 'claude'"
-                >
-                  <option value="">
-                    使用共享账号池
-                  </option>
-                  <option 
-                    v-for="account in accounts.gemini.filter(a => a.isDedicated)" 
-                    :key="account.id" 
-                    :value="account.id"
-                  >
-                    {{ account.name }} ({{ account.status === 'active' ? '正常' : '异常' }})
-                  </option>
-                </select>
+                  placeholder="请选择Gemini账号"
+                  default-option-text="使用共享账号池"
+                />
               </div>
             </div>
             <p class="text-xs text-gray-500 mt-2">
@@ -552,10 +602,10 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { showToast } from '@/utils/toast'
-import { useAuthStore } from '@/stores/auth'
 import { useClientsStore } from '@/stores/clients'
 import { useApiKeysStore } from '@/stores/apiKeys'
 import { apiClient } from '@/config/api'
+import AccountSelector from '@/components/common/AccountSelector.vue'
 
 const props = defineProps({
   accounts: {
@@ -564,12 +614,13 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'success'])
+const emit = defineEmits(['close', 'success', 'batch-success'])
 
-const authStore = useAuthStore()
 const clientsStore = useClientsStore()
 const apiKeysStore = useApiKeysStore()
 const loading = ref(false)
+const accountsLoading = ref(false)
+const localAccounts = ref({ claude: [], gemini: [], claudeGroups: [], geminiGroups: [] })
 
 // 表单验证状态
 const errors = ref({
@@ -590,6 +641,8 @@ const supportedClients = ref([])
 
 // 表单数据
 const form = reactive({
+  createType: 'single',
+  batchCount: 10,
   name: '',
   description: '',
   tokenLimit: '',
@@ -615,7 +668,74 @@ const form = reactive({
 onMounted(async () => {
   supportedClients.value = await clientsStore.loadSupportedClients()
   availableTags.value = await apiKeysStore.fetchTags()
+  // 初始化账号数据
+  if (props.accounts) {
+    localAccounts.value = {
+      claude: props.accounts.claude || [],
+      gemini: props.accounts.gemini || [],
+      claudeGroups: props.accounts.claudeGroups || [],
+      geminiGroups: props.accounts.geminiGroups || []
+    }
+  }
 })
+
+// 刷新账号列表
+const refreshAccounts = async () => {
+  accountsLoading.value = true
+  try {
+    const [claudeData, claudeConsoleData, geminiData, groupsData] = await Promise.all([
+      apiClient.get('/admin/claude-accounts'),
+      apiClient.get('/admin/claude-console-accounts'),
+      apiClient.get('/admin/gemini-accounts'),
+      apiClient.get('/admin/account-groups')
+    ])
+    
+    // 合并Claude OAuth账户和Claude Console账户
+    const claudeAccounts = []
+    
+    if (claudeData.success) {
+      claudeData.data?.forEach(account => {
+        claudeAccounts.push({
+          ...account,
+          platform: 'claude-oauth',
+          isDedicated: account.accountType === 'dedicated' // 保留以便向后兼容
+        })
+      })
+    }
+    
+    if (claudeConsoleData.success) {
+      claudeConsoleData.data?.forEach(account => {
+        claudeAccounts.push({
+          ...account,
+          platform: 'claude-console',
+          isDedicated: account.accountType === 'dedicated' // 保留以便向后兼容
+        })
+      })
+    }
+    
+    localAccounts.value.claude = claudeAccounts
+    
+    if (geminiData.success) {
+      localAccounts.value.gemini = (geminiData.data || []).map(account => ({
+        ...account,
+        isDedicated: account.accountType === 'dedicated' // 保留以便向后兼容
+      }))
+    }
+    
+    // 处理分组数据
+    if (groupsData.success) {
+      const allGroups = groupsData.data || []
+      localAccounts.value.claudeGroups = allGroups.filter(g => g.platform === 'claude')
+      localAccounts.value.geminiGroups = allGroups.filter(g => g.platform === 'gemini')
+    }
+    
+    showToast('账号列表已刷新', 'success')
+  } catch (error) {
+    showToast('刷新账号列表失败', 'error')
+  } finally {
+    accountsLoading.value = false
+  }
+}
 
 // 计算最小日期时间
 const minDateTime = computed(() => {
@@ -725,12 +845,19 @@ const createApiKey = async () => {
     return
   }
   
+  // 批量创建时验证数量
+  if (form.createType === 'batch') {
+    if (!form.batchCount || form.batchCount < 2 || form.batchCount > 500) {
+      showToast('批量创建数量必须在 2-500 之间', 'error')
+      return
+    }
+  }
+  
   loading.value = true
   
   try {
     // 准备提交的数据
-    const data = {
-      name: form.name,
+    const baseData = {
       description: form.description || undefined,
       tokenLimit: form.tokenLimit !== '' && form.tokenLimit !== null ? parseInt(form.tokenLimit) : null,
       rateLimitWindow: form.rateLimitWindow !== '' && form.rateLimitWindow !== null ? parseInt(form.rateLimitWindow) : null,
@@ -739,41 +866,63 @@ const createApiKey = async () => {
       dailyCostLimit: form.dailyCostLimit !== '' && form.dailyCostLimit !== null ? parseFloat(form.dailyCostLimit) : 0,
       expiresAt: form.expiresAt || undefined,
       permissions: form.permissions,
-      tags: form.tags.length > 0 ? form.tags : undefined
+      tags: form.tags.length > 0 ? form.tags : undefined,
+      enableModelRestriction: form.enableModelRestriction,
+      restrictedModels: form.restrictedModels,
+      enableClientRestriction: form.enableClientRestriction,
+      allowedClients: form.allowedClients
     }
     
     // 处理Claude账户绑定（区分OAuth和Console）
     if (form.claudeAccountId) {
       if (form.claudeAccountId.startsWith('console:')) {
         // Claude Console账户
-        data.claudeConsoleAccountId = form.claudeAccountId.substring(8);
+        baseData.claudeConsoleAccountId = form.claudeAccountId.substring(8);
       } else {
         // Claude OAuth账户
-        data.claudeAccountId = form.claudeAccountId;
+        baseData.claudeAccountId = form.claudeAccountId;
       }
     }
     
     // Gemini账户绑定
     if (form.geminiAccountId) {
-      data.geminiAccountId = form.geminiAccountId;
+      baseData.geminiAccountId = form.geminiAccountId;
     }
     
-    // 模型限制 - 始终提交这些字段
-    data.enableModelRestriction = form.enableModelRestriction
-    data.restrictedModels = form.restrictedModels
-    
-    // 客户端限制 - 始终提交这些字段
-    data.enableClientRestriction = form.enableClientRestriction
-    data.allowedClients = form.allowedClients
-    
-    const result = await apiClient.post('/admin/api-keys', data)
-    
-    if (result.success) {
-      showToast('API Key 创建成功', 'success')
-      emit('success', result.data)
-      emit('close')
+    if (form.createType === 'single') {
+      // 单个创建
+      const data = {
+        ...baseData,
+        name: form.name
+      }
+      
+      const result = await apiClient.post('/admin/api-keys', data)
+      
+      if (result.success) {
+        showToast('API Key 创建成功', 'success')
+        emit('success', result.data)
+        emit('close')
+      } else {
+        showToast(result.message || '创建失败', 'error')
+      }
     } else {
-      showToast(result.message || '创建失败', 'error')
+      // 批量创建
+      const data = {
+        ...baseData,
+        createType: 'batch',
+        baseName: form.name,
+        count: form.batchCount
+      }
+      
+      const result = await apiClient.post('/admin/api-keys/batch', data)
+      
+      if (result.success) {
+        showToast(`成功创建 ${result.data.length} 个 API Key`, 'success')
+        emit('batch-success', result.data)
+        emit('close')
+      } else {
+        showToast(result.message || '批量创建失败', 'error')
+      }
     }
   } catch (error) {
     showToast('创建失败', 'error')

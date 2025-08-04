@@ -133,6 +133,71 @@
 
 ---
 
+## 🚀 脚本部署（推荐）
+
+推荐使用管理脚本进行一键部署，简单快捷，自动处理所有依赖和配置。
+
+### 快速安装
+
+```bash
+# 下载并运行管理脚本
+curl -fsSL https://raw.githubusercontent.com/Wei-Shaw/claude-relay-service/main/scripts/manage.sh -o manage.sh
+chmod +x manage.sh
+./manage.sh install
+
+# 安装后可以使用 crs 命令管理服务
+crs  # 显示交互式菜单
+```
+
+### 脚本功能
+
+- ✅ **一键安装**: 自动检测系统环境，安装 Node.js 18+、Redis 等依赖
+- ✅ **交互式配置**: 友好的配置向导，设置端口、Redis 连接等
+- ✅ **自动启动**: 安装完成后自动启动服务并显示访问地址
+- ✅ **便捷管理**: 通过 `crs` 命令随时管理服务状态
+
+### 管理命令
+
+```bash
+crs install   # 安装服务
+crs start     # 启动服务
+crs stop      # 停止服务
+crs restart   # 重启服务
+crs status    # 查看状态
+crs update    # 更新服务
+crs uninstall # 卸载服务
+```
+
+### 安装示例
+
+```bash
+$ crs install
+
+# 会依次询问：
+安装目录 (默认: ~/claude-relay-service): 
+服务端口 (默认: 3000): 8080
+Redis 地址 (默认: localhost): 
+Redis 端口 (默认: 6379): 
+Redis 密码 (默认: 无密码): 
+
+# 安装完成后自动启动并显示：
+服务已成功安装并启动！
+
+访问地址：
+  本地 Web: http://localhost:8080/web
+  公网 Web: http://YOUR_IP:8080/web
+
+管理员账号信息已保存到: data/init.json
+```
+
+### 系统要求
+
+- 支持系统: Ubuntu/Debian、CentOS/RedHat、Arch Linux、macOS
+- 自动安装 Node.js 18+ 和 Redis
+- Redis 使用系统默认位置，数据独立于应用
+
+---
+
 ## 📦 手动部署
 
 ### 第一步：环境准备
@@ -204,7 +269,17 @@ module.exports = {
 }
 ```
 
-### 第四步：启动服务
+### 第四步：安装前端依赖并构建
+
+```bash
+# 安装前端依赖
+npm run install:web
+
+# 构建前端（生成 dist 目录）
+npm run build:web
+```
+
+### 第五步：启动服务
 
 ```bash
 # 初始化
@@ -214,7 +289,7 @@ npm run setup # 会随机生成后台账号密码信息，存储在 data/init.js
 # export ADMIN_PASSWORD=your-secure-password
 
 # 启动服务
-npm run service:start:daemon   # 后台运行（推荐）
+npm run service:start:daemon   # 后台运行
 
 # 查看状态
 npm run service:status
@@ -222,11 +297,11 @@ npm run service:status
 
 ---
 
-## 🐳 Docker 部署（推荐）
+## 🐳 Docker 部署
 
 ### 使用 Docker Hub 镜像（最简单）
 
-> 🚀 推荐使用官方镜像，自动构建，始终保持最新版本
+> 🚀 使用官方镜像，自动构建，始终保持最新版本
 
 ```bash
 # 拉取镜像（支持 amd64 和 arm64）
@@ -245,7 +320,7 @@ docker run -d \
   -e ADMIN_PASSWORD=my_secure_password \
   weishaw/claude-relay-service:latest
 
-# 或使用 docker-compose（推荐）
+# 或使用 docker-compose
 # 创建 .env 文件用于 docker-compose 的环境变量：
 cat > .env << 'EOF'
 # 必填：安全密钥（请修改为随机值）
@@ -294,35 +369,6 @@ EOF
 docker-compose up -d
 ```
 
-### 从源码构建
-
-```bash
-# 1. 克隆项目
-git clone https://github.com/Wei-Shaw//claude-relay-service.git
-cd claude-relay-service
-
-# 2. 创建环境变量文件
-cat > .env << 'EOF'
-# 必填：安全密钥（请修改为随机值）
-JWT_SECRET=your-random-secret-key-at-least-32-chars
-ENCRYPTION_KEY=your-32-character-encryption-key
-
-# 可选：管理员凭据
-ADMIN_USERNAME=cr_admin_custom
-ADMIN_PASSWORD=your-secure-password
-EOF
-
-# 3. 启动服务
-docker-compose up -d
-
-# 4. 查看管理员凭据
-# 自动生成的情况下：
-docker logs claude-relay-service | grep "管理员"
-
-# 或者直接查看挂载的文件：
-cat ./data/init.json
-```
-
 ### Docker Compose 配置
 
 docker-compose.yml 已包含：
@@ -347,7 +393,7 @@ docker-compose.yml 已包含：
 
 ### 管理员凭据获取方式
 
-1. **查看容器日志**（推荐）
+1. **查看容器日志**
    ```bash
    docker logs claude-relay-service
    ```
@@ -405,19 +451,31 @@ docker-compose.yml 已包含：
    - **客户端限制**: 限制只允许特定客户端使用（如ClaudeCode、Gemini-CLI等）
 5. 保存，记下生成的Key
 
-### 4. 开始使用Claude code
+### 4. 开始使用 Claude Code 和 Gemini CLI
 
 现在你可以用自己的服务替换官方API了：
 
-**设置环境变量：**
+**Claude Code 设置环境变量：**
 ```bash
 export ANTHROPIC_BASE_URL="http://127.0.0.1:3000/api/" # 根据实际填写你服务器的ip地址或者域名
 export ANTHROPIC_AUTH_TOKEN="后台创建的API密钥"
 ```
 
-**使用claude：**
+**Gemini CLI 设置环境变量：**
+```bash
+export CODE_ASSIST_ENDPOINT="http://127.0.0.1:3000/gemini" # 根据实际填写你服务器的ip地址或者域名
+export GOOGLE_CLOUD_ACCESS_TOKEN="后台创建的API密钥"  # 使用相同的API密钥即可
+export GOOGLE_GENAI_USE_GCA="true"
+```
+
+**使用 Claude Code：**
 ```bash
 claude
+```
+
+**使用 Gemini CLI：**
+```bash
+gemini  # 或其他 Gemini CLI 命令
 ```
 
 ### 5. 第三方工具API接入
@@ -426,7 +484,7 @@ claude
 
 **Claude标准格式：**
 ```
-# 如果工具支持Claude标准格式 那么推荐使用该接口
+# 如果工具支持Claude标准格式，请使用该接口
 http://你的服务器:3000/claude/  
 ```
 
@@ -490,10 +548,14 @@ git add package-lock.json
 # 3. 安装新的依赖（如果有）
 npm install
 
-# 4. 重启服务
+# 4. 安装并构建前端
+npm run install:web
+npm run build:web
+
+# 5. 重启服务
 npm run service:restart:daemon
 
-# 5. 检查服务状态
+# 6. 检查服务状态
 npm run service:status
 ```
 
@@ -588,7 +650,7 @@ redis-cli ping
 
 **强烈建议使用Caddy反向代理（自动HTTPS）**
 
-推荐使用Caddy作为反向代理，它会自动申请和更新SSL证书，配置更简单：
+建议使用Caddy作为反向代理，它会自动申请和更新SSL证书，配置更简单：
 
 **1. 安装Caddy**
 ```bash
