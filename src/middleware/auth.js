@@ -11,6 +11,7 @@ const authenticateApiKey = async (req, res, next) => {
   try {
     // 安全提取API Key，支持多种格式（包括Gemini CLI支持）
     const apiKey = req.headers['x-api-key'] || 
+                   req.headers['x-goog-api-key'] || 
                    req.headers['authorization']?.replace(/^Bearer\s+/i, '') ||
                    req.headers['api-key'] ||
                    req.headers['x-goog-api-key'] ||

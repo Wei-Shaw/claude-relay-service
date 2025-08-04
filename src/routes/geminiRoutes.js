@@ -415,24 +415,28 @@ async function handleGenerateContent(req, res) {
     const { model, project, user_prompt_id, request: requestData } = req.body;
     const sessionHash = sessionHelper.generateSessionHash(req.body);
     
-    // 处理 OpenAI 格式请求（没有 request 字段的情况）
+    // 处理不同格式的请求
     let actualRequestData = requestData;
-    if (!requestData && req.body.messages) {
-      // 这是 OpenAI 格式的请求，构建 Gemini 格式的 request 对象
-      actualRequestData = {
-        contents: req.body.messages.map(msg => ({
-          role: msg.role === 'assistant' ? 'model' : msg.role,
-          parts: [{ text: msg.content }]
-        })),
-        generationConfig: {
-          temperature: req.body.temperature !== undefined ? req.body.temperature : 0.7,
-          maxOutputTokens: req.body.max_tokens !== undefined ? req.body.max_tokens : 4096,
-          topP: req.body.top_p !== undefined ? req.body.top_p : 0.95,
-          topK: req.body.top_k !== undefined ? req.body.top_k : 40
-        }
-      };
+    if (!requestData) {
+      if (req.body.messages) {
+        // 这是 OpenAI 格式的请求，构建 Gemini 格式的 request 对象
+        actualRequestData = {
+          contents: req.body.messages.map(msg => ({
+            role: msg.role === 'assistant' ? 'model' : msg.role,
+            parts: [{ text: msg.content }]
+          })),
+          generationConfig: {
+            temperature: req.body.temperature !== undefined ? req.body.temperature : 0.7,
+            maxOutputTokens: req.body.max_tokens !== undefined ? req.body.max_tokens : 4096,
+            topP: req.body.top_p !== undefined ? req.body.top_p : 0.95,
+            topK: req.body.top_k !== undefined ? req.body.top_k : 40
+          }
+        };
+      } else if (req.body.contents) {
+        // 直接的 Gemini 格式请求（没有 request 包装）
+        actualRequestData = req.body;
+      }
     }
-    console.log(321, actualRequestData);
 
     // 验证必需参数
     if (!actualRequestData || !actualRequestData.contents) {
@@ -468,6 +472,7 @@ async function handleGenerateContent(req, res) {
 
     res.json(response);
   } catch (error) {
+    console.log(321, error.response);
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal';
     logger.error(`Error in generateContent endpoint (${version})`, { error: error.message });
     res.status(500).json({
@@ -487,22 +492,27 @@ async function handleStreamGenerateContent(req, res) {
     const { model, project, user_prompt_id, request: requestData } = req.body;
     const sessionHash = sessionHelper.generateSessionHash(req.body);
 
-    // 处理 OpenAI 格式请求（没有 request 字段的情况）
+    // 处理不同格式的请求
     let actualRequestData = requestData;
-    if (!requestData && req.body.messages) {
-      // 这是 OpenAI 格式的请求，构建 Gemini 格式的 request 对象
-      actualRequestData = {
-        contents: req.body.messages.map(msg => ({
-          role: msg.role === 'assistant' ? 'model' : msg.role,
-          parts: [{ text: msg.content }]
-        })),
-        generationConfig: {
-          temperature: req.body.temperature !== undefined ? req.body.temperature : 0.7,
-          maxOutputTokens: req.body.max_tokens !== undefined ? req.body.max_tokens : 4096,
-          topP: req.body.top_p !== undefined ? req.body.top_p : 0.95,
-          topK: req.body.top_k !== undefined ? req.body.top_k : 40
-        }
-      };
+    if (!requestData) {
+      if (req.body.messages) {
+        // 这是 OpenAI 格式的请求，构建 Gemini 格式的 request 对象
+        actualRequestData = {
+          contents: req.body.messages.map(msg => ({
+            role: msg.role === 'assistant' ? 'model' : msg.role,
+            parts: [{ text: msg.content }]
+          })),
+          generationConfig: {
+            temperature: req.body.temperature !== undefined ? req.body.temperature : 0.7,
+            maxOutputTokens: req.body.max_tokens !== undefined ? req.body.max_tokens : 4096,
+            topP: req.body.top_p !== undefined ? req.body.top_p : 0.95,
+            topK: req.body.top_k !== undefined ? req.body.top_k : 40
+          }
+        };
+      } else if (req.body.contents) {
+        // 直接的 Gemini 格式请求（没有 request 包装）
+        actualRequestData = req.body;
+      }
     }
 
     // 验证必需参数
