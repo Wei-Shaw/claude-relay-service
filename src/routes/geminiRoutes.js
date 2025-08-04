@@ -414,6 +414,7 @@ async function handleGenerateContent(req, res) {
   try {
     const { model, project, user_prompt_id, request: requestData } = req.body;
     const sessionHash = sessionHelper.generateSessionHash(req.body);
+    console.log(321, requestData);
 
     // 验证必需参数
     if (!requestData || !requestData.contents) {
