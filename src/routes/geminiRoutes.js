@@ -425,10 +425,10 @@ async function handleGenerateContent(req, res) {
           parts: [{ text: msg.content }]
         })),
         generationConfig: {
-          temperature: req.body.temperature,
-          maxOutputTokens: req.body.max_tokens,
-          topP: req.body.top_p,
-          topK: req.body.top_k
+          temperature: req.body.temperature !== undefined ? req.body.temperature : 0.7,
+          maxOutputTokens: req.body.max_tokens !== undefined ? req.body.max_tokens : 4096,
+          topP: req.body.top_p !== undefined ? req.body.top_p : 0.95,
+          topK: req.body.top_k !== undefined ? req.body.top_k : 40
         }
       };
     }
@@ -497,10 +497,10 @@ async function handleStreamGenerateContent(req, res) {
           parts: [{ text: msg.content }]
         })),
         generationConfig: {
-          temperature: req.body.temperature,
-          maxOutputTokens: req.body.max_tokens,
-          topP: req.body.top_p,
-          topK: req.body.top_k
+          temperature: req.body.temperature !== undefined ? req.body.temperature : 0.7,
+          maxOutputTokens: req.body.max_tokens !== undefined ? req.body.max_tokens : 4096,
+          topP: req.body.top_p !== undefined ? req.body.top_p : 0.95,
+          topK: req.body.top_k !== undefined ? req.body.top_k : 40
         }
       };
     }
