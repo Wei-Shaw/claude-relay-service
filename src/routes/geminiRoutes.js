@@ -569,10 +569,10 @@ router.post('/v1internal\\:generateContent', authenticateApiKey, handleGenerateC
 router.post('/v1internal\\:streamGenerateContent', authenticateApiKey, handleStreamGenerateContent);
 
 // v1beta 版本的端点
-router.post('/v1beta\\:loadCodeAssist', authenticateApiKey, handleLoadCodeAssist);
-router.post('/v1beta\\:onboardUser', authenticateApiKey, handleOnboardUser);
-router.post('/v1beta\\:countTokens', authenticateApiKey, handleCountTokens);
-router.post('/v1beta\\:generateContent', authenticateApiKey, handleGenerateContent);
-router.post('/v1beta\\:streamGenerateContent', authenticateApiKey, handleStreamGenerateContent);
+router.post('/v1beta/models\\:loadCodeAssist', authenticateApiKey, handleLoadCodeAssist);
+router.post('/v1beta/models\\:onboardUser', authenticateApiKey, handleOnboardUser);
+router.post('/v1beta/models\\:countTokens', authenticateApiKey, handleCountTokens);
+router.post('/v1beta/models\\:generateContent', authenticateApiKey, handleGenerateContent);
+router.post('/v1beta/models\\:streamGenerateContent', authenticateApiKey, handleStreamGenerateContent);
 
 module.exports = router;
