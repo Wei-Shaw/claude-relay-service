@@ -414,7 +414,6 @@ async function handleGenerateContent(req, res) {
   try {
     const { model, project, user_prompt_id, request: requestData } = req.body;
     const sessionHash = sessionHelper.generateSessionHash(req.body);
-    console.log(321, requestData);
     
     // 处理 OpenAI 格式请求（没有 request 字段的情况）
     let actualRequestData = requestData;
@@ -433,6 +432,7 @@ async function handleGenerateContent(req, res) {
         }
       };
     }
+    console.log(321, actualRequestData);
 
     // 验证必需参数
     if (!actualRequestData || !actualRequestData.contents) {
