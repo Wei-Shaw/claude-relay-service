@@ -5,6 +5,7 @@ const path = require('path');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const claudeAccountService = require('./claudeAccountService');
+const unifiedClaudeScheduler = require('./unifiedClaudeScheduler');
 const sessionHelper = require('../utils/sessionHelper');
 const logger = require('../utils/logger');
 const config = require('../../config/config');
@@ -91,9 +92,11 @@ class ClaudeRelayService {
       const sessionHash = sessionHelper.generateSessionHash(requestBody);
       
       // 选择可用的Claude账户（支持专属绑定和sticky会话）
-      const accountId = await claudeAccountService.selectAccountForApiKey(apiKeyData, sessionHash);
+      const accountSelection = await unifiedClaudeScheduler.selectAccountForApiKey(apiKeyData, sessionHash, requestBody.model);
+      const accountId = accountSelection.accountId;
+      const accountType = accountSelection.accountType;
       
-      logger.info(`📤 Processing API request for key: ${apiKeyData.name || apiKeyData.id}, account: ${accountId}${sessionHash ? `, session: ${sessionHash}` : ''}`);
+      logger.info(`📤 Processing API request for key: ${apiKeyData.name || apiKeyData.id}, account: ${accountId} (${accountType})${sessionHash ? `, session: ${sessionHash}` : ''}`);
       
       // 获取有效的访问token
       const accessToken = await claudeAccountService.getValidAccessToken(accountId);
@@ -172,13 +175,13 @@ class ClaudeRelayService {
         if (isRateLimited) {
           logger.warn(`🚫 Rate limit detected for account ${accountId}, status: ${response.statusCode}`);
           // 标记账号为限流状态并删除粘性会话映射，传递准确的重置时间戳
-          await claudeAccountService.markAccountRateLimited(accountId, sessionHash, rateLimitResetTimestamp);
+          await unifiedClaudeScheduler.markAccountRateLimited(accountId, accountType, sessionHash, rateLimitResetTimestamp);
         }
       } else if (response.statusCode === 200 || response.statusCode === 201) {
         // 如果请求成功，检查并移除限流状态
-        const isRateLimited = await claudeAccountService.isAccountRateLimited(accountId);
+        const isRateLimited = await unifiedClaudeScheduler.isAccountRateLimited(accountId, accountType);
         if (isRateLimited) {
-          await claudeAccountService.removeAccountRateLimit(accountId);
+          await unifiedClaudeScheduler.removeAccountRateLimit(accountId, accountType);
         }
         
         // 只有真实的 Claude Code 请求才更新 headers
@@ -621,9 +624,11 @@ class ClaudeRelayService {
       const sessionHash = sessionHelper.generateSessionHash(requestBody);
       
       // 选择可用的Claude账户（支持专属绑定和sticky会话）
-      const accountId = await claudeAccountService.selectAccountForApiKey(apiKeyData, sessionHash);
+      const accountSelection = await unifiedClaudeScheduler.selectAccountForApiKey(apiKeyData, sessionHash, requestBody.model);
+      const accountId = accountSelection.accountId;
+      const accountType = accountSelection.accountType;
       
-      logger.info(`📡 Processing streaming API request with usage capture for key: ${apiKeyData.name || apiKeyData.id}, account: ${accountId}${sessionHash ? `, session: ${sessionHash}` : ''}`);
+      logger.info(`📡 Processing streaming API request with usage capture for key: ${apiKeyData.name || apiKeyData.id}, account: ${accountId} (${accountType})${sessionHash ? `, session: ${sessionHash}` : ''}`);
       
       // 获取有效的访问token
       const accessToken = await claudeAccountService.getValidAccessToken(accountId);
@@ -638,7 +643,7 @@ class ClaudeRelayService {
       return await this._makeClaudeStreamRequestWithUsageCapture(processedBody, accessToken, proxyAgent, clientHeaders, responseStream, (usageData) => {
         // 在usageCallback中添加accountId
         usageCallback({ ...usageData, accountId });
-      }, accountId, sessionHash, streamTransformer, options);
+      }, accountId, accountType, sessionHash, streamTransformer, options);
     } catch (error) {
       logger.error('❌ Claude stream relay with usage capture failed:', error);
       throw error;
@@ -646,7 +651,7 @@ class ClaudeRelayService {
   }
 
   // 🌊 发送流式请求到Claude API（带usage数据捕获）
-  async _makeClaudeStreamRequestWithUsageCapture(body, accessToken, proxyAgent, clientHeaders, responseStream, usageCallback, accountId, sessionHash, streamTransformer = null, requestOptions = {}) {
+  async _makeClaudeStreamRequestWithUsageCapture(body, accessToken, proxyAgent, clientHeaders, responseStream, usageCallback, accountId, accountType, sessionHash, streamTransformer = null, requestOptions = {}) {
     // 获取过滤后的客户端 headers
     const filteredHeaders = this._filterClientHeaders(clientHeaders);
     
@@ -854,12 +859,12 @@ class ClaudeRelayService {
             }
             
             // 标记账号为限流状态并删除粘性会话映射
-            await claudeAccountService.markAccountRateLimited(accountId, sessionHash, rateLimitResetTimestamp);
+            await unifiedClaudeScheduler.markAccountRateLimited(accountId, accountType, sessionHash, rateLimitResetTimestamp);
           } else if (res.statusCode === 200) {
             // 如果请求成功，检查并移除限流状态
-            const isRateLimited = await claudeAccountService.isAccountRateLimited(accountId);
+            const isRateLimited = await unifiedClaudeScheduler.isAccountRateLimited(accountId, accountType);
             if (isRateLimited) {
-              await claudeAccountService.removeAccountRateLimit(accountId);
+              await unifiedClaudeScheduler.removeAccountRateLimit(accountId, accountType);
             }
             
             // 只有真实的 Claude Code 请求才更新 headers（流式请求）

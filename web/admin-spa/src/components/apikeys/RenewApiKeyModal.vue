@@ -231,7 +231,7 @@ const renewApiKey = async () => {
       expiresAt: form.renewDuration === 'permanent' ? null : form.newExpiresAt
     }
     
-    const result = await apiClient.put(`/admin/api-keys/${props.apiKey.id}/renew`, data)
+    const result = await apiClient.put(`/admin/api-keys/${props.apiKey.id}`, data)
     
     if (result.success) {
       showToast('API Key 续期成功', 'success')

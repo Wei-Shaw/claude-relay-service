@@ -9,6 +9,16 @@ class UnifiedClaudeScheduler {
     this.SESSION_MAPPING_PREFIX = 'unified_claude_session_mapping:';
   }
 
+  // 🔧 辅助方法：检查账户是否可调度（兼容字符串和布尔值）
+  _isSchedulable(schedulable) {
+    // 如果是 undefined 或 null，默认为可调度
+    if (schedulable === undefined || schedulable === null) {
+      return true;
+    }
+    // 明确设置为 false（布尔值）或 'false'（字符串）时不可调度
+    return schedulable !== false && schedulable !== 'false';
+  }
+
   // 🎯 统一调度Claude账号（官方和Console）
   async selectAccountForApiKey(apiKeyData, sessionHash = null, requestedModel = null) {
     try {
@@ -152,7 +162,7 @@ class UnifiedClaudeScheduler {
           account.status !== 'error' &&
           account.status !== 'blocked' &&
           (account.accountType === 'shared' || !account.accountType) && // 兼容旧数据
-          account.schedulable !== 'false') { // 检查是否可调度
+          this._isSchedulable(account.schedulable)) { // 检查是否可调度
         
         // 检查是否被限流
         const isRateLimited = await claudeAccountService.isAccountRateLimited(account.id);
@@ -179,7 +189,7 @@ class UnifiedClaudeScheduler {
       if (account.isActive === true && 
           account.status === 'active' &&
           account.accountType === 'shared' &&
-          account.schedulable !== false) { // 检查是否可调度
+          this._isSchedulable(account.schedulable)) { // 检查是否可调度
         
         // 检查模型支持（如果有请求的模型）
         if (requestedModel && account.supportedModels) {
@@ -246,7 +256,7 @@ class UnifiedClaudeScheduler {
           return false;
         }
         // 检查是否可调度
-        if (account.schedulable === 'false') {
+        if (!this._isSchedulable(account.schedulable)) {
           logger.info(`🚫 Account ${accountId} is not schedulable`);
           return false;
         }
@@ -257,7 +267,7 @@ class UnifiedClaudeScheduler {
           return false;
         }
         // 检查是否可调度
-        if (account.schedulable === false) {
+        if (!this._isSchedulable(account.schedulable)) {
           logger.info(`🚫 Claude Console account ${accountId} is not schedulable`);
           return false;
         }
@@ -444,7 +454,7 @@ class UnifiedClaudeScheduler {
           ? account.status !== 'error' && account.status !== 'blocked'
           : account.status === 'active';
 
-        if (isActive && status && account.schedulable !== false) {
+        if (isActive && status && this._isSchedulable(account.schedulable)) {
           // 检查模型支持（Console账户）
           if (accountType === 'claude-console' && requestedModel && account.supportedModels && account.supportedModels.length > 0) {
             if (!account.supportedModels.includes(requestedModel)) {

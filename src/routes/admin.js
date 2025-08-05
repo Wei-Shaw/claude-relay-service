@@ -1252,6 +1252,38 @@ router.put('/claude-console-accounts/:accountId', authenticateAdmin, async (req,
       return res.status(400).json({ error: 'Priority must be between 1 and 100' });
     }
 
+    // 验证accountType的有效性
+    if (updates.accountType && !['shared', 'dedicated', 'group'].includes(updates.accountType)) {
+      return res.status(400).json({ error: 'Invalid account type. Must be "shared", "dedicated" or "group"' });
+    }
+
+    // 如果更新为分组类型，验证groupId
+    if (updates.accountType === 'group' && !updates.groupId) {
+      return res.status(400).json({ error: 'Group ID is required for group type accounts' });
+    }
+
+    // 获取账户当前信息以处理分组变更
+    const currentAccount = await claudeConsoleAccountService.getAccount(accountId);
+    if (!currentAccount) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+
+    // 处理分组的变更
+    if (updates.accountType !== undefined) {
+      // 如果之前是分组类型，需要从原分组中移除
+      if (currentAccount.accountType === 'group') {
+        const oldGroup = await accountGroupService.getAccountGroup(accountId);
+        if (oldGroup) {
+          await accountGroupService.removeAccountFromGroup(accountId, oldGroup.id);
+        }
+      }
+      // 如果新类型是分组，添加到新分组
+      if (updates.accountType === 'group' && updates.groupId) {
+        // Claude Console 账户在分组中被视为 'claude' 平台
+        await accountGroupService.addAccountToGroup(accountId, updates.groupId, 'claude');
+      }
+    }
+
     await claudeConsoleAccountService.updateAccount(accountId, updates);
     
     logger.success(`📝 Admin updated Claude Console account: ${accountId}`);
@@ -1266,6 +1298,15 @@ router.put('/claude-console-accounts/:accountId', authenticateAdmin, async (req,
 router.delete('/claude-console-accounts/:accountId', authenticateAdmin, async (req, res) => {
   try {
     const { accountId } = req.params;
+    
+    // 获取账户信息以检查是否在分组中
+    const account = await claudeConsoleAccountService.getAccount(accountId);
+    if (account && account.accountType === 'group') {
+      const group = await accountGroupService.getAccountGroup(accountId);
+      if (group) {
+        await accountGroupService.removeAccountFromGroup(accountId, group.id);
+      }
+    }
     
     await claudeConsoleAccountService.deleteAccount(accountId);
     
@@ -1497,6 +1538,37 @@ router.put('/gemini-accounts/:accountId', authenticateAdmin, async (req, res) =>
     const { accountId } = req.params;
     const updates = req.body;
     
+    // 验证accountType的有效性
+    if (updates.accountType && !['shared', 'dedicated', 'group'].includes(updates.accountType)) {
+      return res.status(400).json({ error: 'Invalid account type. Must be "shared", "dedicated" or "group"' });
+    }
+    
+    // 如果更新为分组类型，验证groupId
+    if (updates.accountType === 'group' && !updates.groupId) {
+      return res.status(400).json({ error: 'Group ID is required for group type accounts' });
+    }
+    
+    // 获取账户当前信息以处理分组变更
+    const currentAccount = await geminiAccountService.getAccount(accountId);
+    if (!currentAccount) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+    
+    // 处理分组的变更
+    if (updates.accountType !== undefined) {
+      // 如果之前是分组类型，需要从原分组中移除
+      if (currentAccount.accountType === 'group') {
+        const oldGroup = await accountGroupService.getAccountGroup(accountId);
+        if (oldGroup) {
+          await accountGroupService.removeAccountFromGroup(accountId, oldGroup.id);
+        }
+      }
+      // 如果新类型是分组，添加到新分组
+      if (updates.accountType === 'group' && updates.groupId) {
+        await accountGroupService.addAccountToGroup(accountId, updates.groupId, 'gemini');
+      }
+    }
+    
     const updatedAccount = await geminiAccountService.updateAccount(accountId, updates);
     
     logger.success(`📝 Admin updated Gemini account: ${accountId}`);
@@ -1511,6 +1583,15 @@ router.put('/gemini-accounts/:accountId', authenticateAdmin, async (req, res) =>
 router.delete('/gemini-accounts/:accountId', authenticateAdmin, async (req, res) => {
   try {
     const { accountId } = req.params;
+    
+    // 获取账户信息以检查是否在分组中
+    const account = await geminiAccountService.getAccount(accountId);
+    if (account && account.accountType === 'group') {
+      const group = await accountGroupService.getAccountGroup(accountId);
+      if (group) {
+        await accountGroupService.removeAccountFromGroup(accountId, group.id);
+      }
+    }
     
     await geminiAccountService.deleteAccount(accountId);
     

@@ -1,28 +1,37 @@
 <template>
-  <div 
-    v-if="show" 
-    class="fixed inset-0 z-50 overflow-y-auto" 
-    @click.self="close"
-  >
-    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+  <Teleport to="body">
+    <div 
+      v-if="show" 
+      class="fixed inset-0 modal z-50 flex items-center justify-center p-3 sm:p-4"
+    >
       <!-- 背景遮罩 -->
       <div 
-        class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
+        class="fixed inset-0 bg-gray-900 bg-opacity-50 backdrop-blur-sm" 
         @click="close"
       />
-
+      
       <!-- 模态框 -->
-      <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+      <div class="modal-content w-[95%] sm:w-full max-w-2xl sm:max-w-3xl p-4 sm:p-6 md:p-8 mx-auto max-h-[90vh] flex flex-col relative">
         <!-- 标题栏 -->
-        <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
-          <h3 class="text-lg font-semibold text-white flex items-center">
-            <i class="fas fa-chart-line mr-2" />
-            使用统计详情 - {{ apiKey.name }}
-          </h3>
+        <div class="flex items-center justify-between mb-4 sm:mb-6">
+          <div class="flex items-center gap-2 sm:gap-3">
+            <div class="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg sm:rounded-xl flex items-center justify-center">
+              <i class="fas fa-chart-line text-white text-sm sm:text-base" />
+            </div>
+            <h3 class="text-lg sm:text-xl font-bold text-gray-900">
+              使用统计详情 - {{ apiKey.name }}
+            </h3>
+          </div>
+          <button 
+            class="text-gray-400 hover:text-gray-600 transition-colors p-1"
+            @click="close"
+          >
+            <i class="fas fa-times text-lg sm:text-xl" />
+          </button>
         </div>
         
         <!-- 内容区 -->
-        <div class="px-6 py-4 max-h-[70vh] overflow-y-auto">
+        <div class="modal-scroll-content custom-scrollbar flex-1 overflow-y-auto">
           <!-- 总体统计卡片 -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <!-- 请求统计卡片 -->
@@ -236,10 +245,10 @@
         </div>
 
         <!-- 底部按钮 -->
-        <div class="bg-gray-50 px-6 py-3 flex justify-end">
+        <div class="mt-4 sm:mt-6 flex justify-end gap-2 sm:gap-3">
           <button
             type="button"
-            class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400"
+            class="btn btn-secondary px-4 py-2 text-sm"
             @click="close"
           >
             关闭
@@ -247,7 +256,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -342,19 +351,5 @@ const close = () => {
 </script>
 
 <style scoped>
-/* 添加过渡动画 */
-.transform {
-  animation: modalSlideIn 0.3s ease-out;
-}
-
-@keyframes modalSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+/* 使用项目的通用样式，不需要额外定义 */
 </style>

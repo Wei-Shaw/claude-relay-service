@@ -12,7 +12,7 @@ const { authenticateApiKey } = require('../middleware/auth');
 const claudeRelayService = require('../services/claudeRelayService');
 const openaiToClaude = require('../services/openaiToClaude');
 const apiKeyService = require('../services/apiKeyService');
-const claudeAccountService = require('../services/claudeAccountService');
+const unifiedClaudeScheduler = require('../services/unifiedClaudeScheduler');
 const claudeCodeHeadersService = require('../services/claudeCodeHeadersService');
 const sessionHelper = require('../utils/sessionHelper');
 
@@ -206,7 +206,8 @@ async function handleChatCompletion(req, res, apiKeyData) {
     const sessionHash = sessionHelper.generateSessionHash(claudeRequest);
     
     // 选择可用的Claude账户
-    const accountId = await claudeAccountService.selectAccountForApiKey(apiKeyData, sessionHash);
+    const accountSelection = await unifiedClaudeScheduler.selectAccountForApiKey(apiKeyData, sessionHash, claudeRequest.model);
+    const accountId = accountSelection.accountId;
     
     // 获取该账号存储的 Claude Code headers
     const claudeCodeHeaders = await claudeCodeHeadersService.getAccountHeaders(accountId);

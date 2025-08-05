@@ -8,6 +8,16 @@ class UnifiedGeminiScheduler {
     this.SESSION_MAPPING_PREFIX = 'unified_gemini_session_mapping:';
   }
 
+  // 🔧 辅助方法：检查账户是否可调度（兼容字符串和布尔值）
+  _isSchedulable(schedulable) {
+    // 如果是 undefined 或 null，默认为可调度
+    if (schedulable === undefined || schedulable === null) {
+      return true;
+    }
+    // 明确设置为 false（布尔值）或 'false'（字符串）时不可调度
+    return schedulable !== false && schedulable !== 'false';
+  }
+
   // 🎯 统一调度Gemini账号
   async selectAccountForApiKey(apiKeyData, sessionHash = null, requestedModel = null) {
     try {
@@ -128,7 +138,7 @@ class UnifiedGeminiScheduler {
       if (account.isActive === 'true' && 
           account.status !== 'error' &&
           (account.accountType === 'shared' || !account.accountType) && // 兼容旧数据
-          account.schedulable !== 'false') { // 检查是否可调度
+          this._isSchedulable(account.schedulable)) { // 检查是否可调度
         
         // 检查token是否过期
         const isExpired = geminiAccountService.isTokenExpired(account);
@@ -192,7 +202,7 @@ class UnifiedGeminiScheduler {
           return false;
         }
         // 检查是否可调度
-        if (account.schedulable === 'false') {
+        if (!this._isSchedulable(account.schedulable)) {
           logger.info(`🚫 Gemini account ${accountId} is not schedulable`);
           return false;
         }
@@ -347,7 +357,7 @@ class UnifiedGeminiScheduler {
         // 检查账户是否可用
         if (account.isActive === 'true' && 
             account.status !== 'error' && 
-            account.schedulable !== 'false') {
+            this._isSchedulable(account.schedulable)) {
           
           // 检查token是否过期
           const isExpired = geminiAccountService.isTokenExpired(account);

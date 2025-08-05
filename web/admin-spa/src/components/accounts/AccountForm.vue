@@ -1395,15 +1395,20 @@ watch(() => props.account, (newAccount) => {
     if (newAccount.accountType === 'group') {
       // 先加载分组列表
       loadGroups().then(() => {
-        // 查找账户所属的分组
-        groups.value.forEach(group => {
-          apiClient.get(`/admin/account-groups/${group.id}/members`).then(response => {
-            const members = response.data || []
-            if (members.some(m => m.id === newAccount.id)) {
-              form.value.groupId = group.id
-            }
-          }).catch(() => {})
-        })
+        // 如果账户有 groupInfo，直接使用它的 groupId
+        if (newAccount.groupInfo && newAccount.groupInfo.id) {
+          form.value.groupId = newAccount.groupInfo.id
+        } else {
+          // 否则查找账户所属的分组
+          groups.value.forEach(group => {
+            apiClient.get(`/admin/account-groups/${group.id}/members`).then(response => {
+              const members = response.data || []
+              if (members.some(m => m.id === newAccount.id)) {
+                form.value.groupId = group.id
+              }
+            }).catch(() => {})
+          })
+        }
       })
     }
   }

@@ -3,6 +3,7 @@ const router = express.Router();
 const logger = require('../utils/logger');
 const { authenticateApiKey } = require('../middleware/auth');
 const geminiAccountService = require('../services/geminiAccountService');
+const unifiedGeminiScheduler = require('../services/unifiedGeminiScheduler');
 const { getAvailableModels } = require('../services/geminiRelayService');
 const crypto = require('crypto');
 
@@ -167,6 +168,8 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
   const startTime = Date.now();
   let abortController = null;
   let account = null; // Declare account outside try block for error handling
+  let accountSelection = null; // Declare accountSelection for error handling
+  let sessionHash = null; // Declare sessionHash for error handling
   
   try {
     const apiKeyData = req.apiKey;
@@ -263,13 +266,16 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
     }
     
     // 生成会话哈希用于粘性会话
-    const sessionHash = generateSessionHash(req);
+    sessionHash = generateSessionHash(req);
     
     // 选择可用的 Gemini 账户
-    account = await geminiAccountService.selectAvailableAccount(
-      apiKeyData.id,
-      sessionHash
-    );
+    try {
+      accountSelection = await unifiedGeminiScheduler.selectAccountForApiKey(apiKeyData, sessionHash, model);
+      account = await geminiAccountService.getAccount(accountSelection.accountId);
+    } catch (error) {
+      logger.error('Failed to select Gemini account:', error);
+      account = null;
+    }
     
     if (!account) {
       return res.status(503).json({
@@ -339,6 +345,14 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
       };
       res.write(`data: ${JSON.stringify(initialChunk)}\n\n`);
       
+      // 用于收集usage数据
+      let totalUsage = {
+        promptTokenCount: 0,
+        candidatesTokenCount: 0,
+        totalTokenCount: 0
+      };
+      let usageReported = false;
+
       streamResponse.on('data', (chunk) => {
         try {
           const chunkStr = chunk.toString();
@@ -364,6 +378,12 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
             
             try {
               const data = JSON.parse(jsonData);
+              
+              // 捕获usage数据
+              if (data.response?.usageMetadata) {
+                totalUsage = data.response.usageMetadata;
+                logger.debug('📊 Captured Gemini usage data:', totalUsage);
+              }
               
               // 转换为 OpenAI 流式格式
               if (data.response?.candidates && data.response.candidates.length > 0) {
@@ -430,8 +450,28 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
         }
       });
       
-      streamResponse.on('end', () => {
+      streamResponse.on('end', async () => {
         logger.info('Stream completed successfully');
+        
+        // 记录使用统计
+        if (!usageReported && totalUsage.totalTokenCount > 0) {
+          try {
+            const apiKeyService = require('../services/apiKeyService');
+            await apiKeyService.recordUsage(
+              apiKeyData.id,
+              totalUsage.promptTokenCount || 0,
+              totalUsage.candidatesTokenCount || 0,
+              0, // cacheCreateTokens
+              0, // cacheReadTokens
+              model,
+              account.id
+            );
+            logger.info(`📊 Recorded Gemini stream usage - Input: ${totalUsage.promptTokenCount}, Output: ${totalUsage.candidatesTokenCount}, Total: ${totalUsage.totalTokenCount}`);
+          } catch (error) {
+            logger.error('Failed to record Gemini usage:', error);
+          }
+        }
+        
         if (!res.headersSent) {
           res.write('data: [DONE]\n\n');
         }
@@ -473,6 +513,26 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
       
       // 转换为 OpenAI 格式并返回
       const openaiResponse = convertGeminiResponseToOpenAI(response, model, false);
+      
+      // 记录使用统计
+      if (openaiResponse.usage) {
+        try {
+          const apiKeyService = require('../services/apiKeyService');
+          await apiKeyService.recordUsage(
+            apiKeyData.id,
+            openaiResponse.usage.prompt_tokens || 0,
+            openaiResponse.usage.completion_tokens || 0,
+            0, // cacheCreateTokens
+            0, // cacheReadTokens
+            model,
+            account.id
+          );
+          logger.info(`📊 Recorded Gemini usage - Input: ${openaiResponse.usage.prompt_tokens}, Output: ${openaiResponse.usage.completion_tokens}, Total: ${openaiResponse.usage.total_tokens}`);
+        } catch (error) {
+          logger.error('Failed to record Gemini usage:', error);
+        }
+      }
+      
       res.json(openaiResponse);
     }
     
@@ -484,8 +544,8 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
     
     // 处理速率限制
     if (error.status === 429) {
-      if (req.apiKey && account) {
-        await geminiAccountService.setAccountRateLimited(account.id, true);
+      if (req.apiKey && account && accountSelection) {
+        await unifiedGeminiScheduler.markAccountRateLimited(account.id, 'gemini', sessionHash);
       }
     }
     
@@ -525,7 +585,13 @@ router.get('/v1/models', authenticateApiKey, async (req, res) => {
     }
     
     // 选择账户获取模型列表
-    const account = await geminiAccountService.selectAvailableAccount(apiKeyData.id);
+    let account = null;
+    try {
+      const accountSelection = await unifiedGeminiScheduler.selectAccountForApiKey(apiKeyData, null, null);
+      account = await geminiAccountService.getAccount(accountSelection.accountId);
+    } catch (error) {
+      logger.warn('Failed to select Gemini account for models endpoint:', error);
+    }
     
     let models = [];
     

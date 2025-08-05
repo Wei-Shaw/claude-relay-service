@@ -1,6 +1,6 @@
+import { apiClient } from '@/config/api'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { apiClient } from '@/config/api'
 
 export const useApiKeysStore = defineStore('apiKeys', () => {
   // 状态
@@ -97,7 +97,7 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.put(`/admin/api-keys/${id}/renew`, data)
+      const response = await apiClient.put(`/admin/api-keys/${id}`, data)
       if (response.success) {
         await fetchApiKeys()
         return response

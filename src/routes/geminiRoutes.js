@@ -7,6 +7,7 @@ const { sendGeminiRequest, getAvailableModels } = require('../services/geminiRel
 const crypto = require('crypto');
 const sessionHelper = require('../utils/sessionHelper');
 const unifiedGeminiScheduler = require('../services/unifiedGeminiScheduler');
+const apiKeyService = require('../services/apiKeyService');
 // const { OAuth2Client } = require('google-auth-library'); // OAuth2Client is not used in this file
 
 // 生成会话哈希
@@ -195,7 +196,13 @@ router.get('/models', authenticateApiKey, async (req, res) => {
     }
 
     // 选择账户获取模型列表
-    const account = await geminiAccountService.selectAvailableAccount(apiKeyData.id);
+    let account = null;
+    try {
+      const accountSelection = await unifiedGeminiScheduler.selectAccountForApiKey(apiKeyData, null, null);
+      account = await geminiAccountService.getAccount(accountSelection.accountId);
+    } catch (error) {
+      logger.warn('Failed to select Gemini account for models endpoint:', error);
+    }
 
     if (!account) {
       // 返回默认模型列表
@@ -470,6 +477,25 @@ async function handleGenerateContent(req, res) {
       req.apiKey?.id // 使用 API Key ID 作为 session ID
     );
 
+    // 记录使用统计
+    if (response?.response?.usageMetadata) {
+      try {
+        const usage = response.response.usageMetadata;
+        await apiKeyService.recordUsage(
+          req.apiKey.id,
+          usage.promptTokenCount || 0,
+          usage.candidatesTokenCount || 0,
+          0, // cacheCreateTokens
+          0, // cacheReadTokens
+          model,
+          account.id
+        );
+        logger.info(`📊 Recorded Gemini usage - Input: ${usage.promptTokenCount}, Output: ${usage.candidatesTokenCount}, Total: ${usage.totalTokenCount}`);
+      } catch (error) {
+        logger.error('Failed to record Gemini usage:', error);
+      }
+    }
+
     res.json(response);
   } catch (error) {
     console.log(321, error.response);
@@ -565,11 +591,73 @@ async function handleStreamGenerateContent(req, res) {
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
 
-    // 直接管道转发流式响应，不进行额外处理
-    streamResponse.pipe(res, { end: false });
+    // 处理流式响应并捕获usage数据
+    let buffer = '';
+    let totalUsage = {
+      promptTokenCount: 0,
+      candidatesTokenCount: 0,
+      totalTokenCount: 0
+    };
+    let usageReported = false;
 
-    streamResponse.on('end', () => {
+    streamResponse.on('data', (chunk) => {
+      try {
+        const chunkStr = chunk.toString();
+        
+        // 直接转发数据到客户端
+        if (!res.destroyed) {
+          res.write(chunkStr);
+        }
+
+        // 同时解析数据以捕获usage信息
+        buffer += chunkStr;
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ') && line.length > 6) {
+            try {
+              const jsonStr = line.slice(6);
+              if (jsonStr && jsonStr !== '[DONE]') {
+                const data = JSON.parse(jsonStr);
+                
+                // 从响应中提取usage数据
+                if (data.response?.usageMetadata) {
+                  totalUsage = data.response.usageMetadata;
+                  logger.debug('📊 Captured Gemini usage data:', totalUsage);
+                }
+              }
+            } catch (e) {
+              // 忽略解析错误
+            }
+          }
+        }
+      } catch (error) {
+        logger.error('Error processing stream chunk:', error);
+      }
+    });
+
+    streamResponse.on('end', async () => {
       logger.info('Stream completed successfully');
+      
+      // 记录使用统计
+      if (!usageReported && totalUsage.totalTokenCount > 0) {
+        try {
+          await apiKeyService.recordUsage(
+            req.apiKey.id,
+            totalUsage.promptTokenCount || 0,
+            totalUsage.candidatesTokenCount || 0,
+            0, // cacheCreateTokens
+            0, // cacheReadTokens
+            model,
+            account.id
+          );
+          logger.info(`📊 Recorded Gemini stream usage - Input: ${totalUsage.promptTokenCount}, Output: ${totalUsage.candidatesTokenCount}, Total: ${totalUsage.totalTokenCount}`);
+        } catch (error) {
+          logger.error('Failed to record Gemini usage:', error);
+        }
+      }
+      
       res.end();
     });
 
