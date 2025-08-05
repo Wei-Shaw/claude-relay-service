@@ -68,7 +68,7 @@ class ClaudeConsoleRelayService {
       // 构建完整的API URL
       const cleanUrl = account.apiUrl.replace(/\/$/, ''); // 移除末尾斜杠
       const apiEndpoint = cleanUrl.endsWith('/v1/messages') 
-        ? cleanUrl 
+        ? cleanUrl
         : `${cleanUrl}/v1/messages`;
       
       logger.debug(`🎯 Final API endpoint: ${apiEndpoint}`);
@@ -89,6 +89,8 @@ class ClaudeConsoleRelayService {
           'x-api-key': account.apiKey,
           'anthropic-version': '2023-06-01',
           'User-Agent': account.userAgent || this.defaultUserAgent,
+          'anthropic-dangerous-direct-browser-access': true,
+          'anthropic-beta': 'fine-grained-tool-streaming-2025-05-14',
           ...filteredHeaders
         },
         httpsAgent: proxyAgent,
@@ -212,11 +214,15 @@ class ClaudeConsoleRelayService {
       // 构建完整的API URL
       const cleanUrl = account.apiUrl.replace(/\/$/, ''); // 移除末尾斜杠
       const apiEndpoint = cleanUrl.endsWith('/v1/messages') 
-        ? cleanUrl 
+        ? cleanUrl
         : `${cleanUrl}/v1/messages`;
       
       logger.debug(`🎯 Final API endpoint for stream: ${apiEndpoint}`);
 
+      // 过滤客户端请求头
+      const filteredHeaders = this._filterClientHeaders(clientHeaders);
+      logger.debug(`[DEBUG] Filtered client headers: ${JSON.stringify(filteredHeaders)}`);
+      
       // 准备请求配置
       const requestConfig = {
         method: 'POST',
@@ -227,7 +233,9 @@ class ClaudeConsoleRelayService {
           'x-api-key': account.apiKey,
           'anthropic-version': '2023-06-01',
           'User-Agent': account.userAgent || this.defaultUserAgent,
-          ...this._filterClientHeaders(clientHeaders)
+          'anthropic-dangerous-direct-browser-access': true,
+          'anthropic-beta': 'fine-grained-tool-streaming-2025-05-14',
+          ...filteredHeaders
         },
         httpsAgent: proxyAgent,
         timeout: config.proxy.timeout || 60000,
@@ -450,6 +458,7 @@ class ClaudeConsoleRelayService {
   // 🔧 过滤客户端请求头
   _filterClientHeaders(clientHeaders) {
     const sensitiveHeaders = [
+      "user-agent",
       'x-api-key',
       'authorization',
       'host',
