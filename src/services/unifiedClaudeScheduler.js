@@ -425,7 +425,7 @@ class UnifiedClaudeScheduler {
         if (group.platform === 'claude') {
           // 先尝试官方账户
           account = await redis.getClaudeAccount(memberId);
-          if (account) {
+          if (account?.id) {
             accountType = 'claude-official';
           } else {
             // 尝试Console账户
