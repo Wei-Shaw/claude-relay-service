@@ -320,7 +320,18 @@ async function createAccount(accountData) {
   }
 
   logger.info(`Created Gemini account: ${id}`);
-  return account;
+  
+  // 返回时解析代理配置
+  const returnAccount = { ...account };
+  if (returnAccount.proxy) {
+    try {
+      returnAccount.proxy = JSON.parse(returnAccount.proxy);
+    } catch (e) {
+      returnAccount.proxy = null;
+    }
+  }
+  
+  return returnAccount;
 }
 
 // 获取账户
@@ -343,6 +354,16 @@ async function getAccount(accountId) {
     accountData.refreshToken = decrypt(accountData.refreshToken);
   }
 
+  // 解析代理配置
+  if (accountData.proxy) {
+    try {
+      accountData.proxy = JSON.parse(accountData.proxy);
+    } catch (e) {
+      // 如果解析失败，保持原样或设置为null
+      accountData.proxy = null;
+    }
+  }
+
   return accountData;
 }
 
@@ -360,6 +381,11 @@ async function updateAccount(accountId, updates) {
   // existingAccount.refreshToken 已经是解密后的值了（从 getAccount 返回）
   const oldRefreshToken = existingAccount.refreshToken || '';
   let needUpdateExpiry = false;
+
+  // 处理代理设置
+  if (updates.proxy !== undefined) {
+    updates.proxy = updates.proxy ? JSON.stringify(updates.proxy) : '';
+  }
 
   // 加密敏感字段
   if (updates.geminiOauth) {
@@ -423,7 +449,20 @@ async function updateAccount(accountId, updates) {
   );
 
   logger.info(`Updated Gemini account: ${accountId}`);
-  return { ...existingAccount, ...updates };
+  
+  // 合并更新后的账户数据
+  const updatedAccount = { ...existingAccount, ...updates };
+  
+  // 返回时解析代理配置
+  if (updatedAccount.proxy && typeof updatedAccount.proxy === 'string') {
+    try {
+      updatedAccount.proxy = JSON.parse(updatedAccount.proxy);
+    } catch (e) {
+      updatedAccount.proxy = null;
+    }
+  }
+  
+  return updatedAccount;
 }
 
 // 删除账户
@@ -464,6 +503,16 @@ async function getAllAccounts() {
   for (const key of keys) {
     const accountData = await client.hgetall(key);
     if (accountData && Object.keys(accountData).length > 0) {
+      // 解析代理配置
+      if (accountData.proxy) {
+        try {
+          accountData.proxy = JSON.parse(accountData.proxy);
+        } catch (e) {
+          // 如果解析失败，设置为null
+          accountData.proxy = null;
+        }
+      }
+      
       // 不解密敏感字段，只返回基本信息
       accounts.push({
         ...accountData,

@@ -1288,9 +1288,13 @@ const handleGroupRefresh = async () => {
 }
 
 // 监听平台变化，重置表单
-watch(() => form.value.platform, (newPlatform) => {
+watch(() => form.value.platform, (newPlatform, oldPlatform) => {
+  // 处理添加方式的自动切换
   if (newPlatform === 'claude-console') {
     form.value.addType = 'manual' // Claude Console 只支持手动模式
+  } else if (oldPlatform === 'claude-console' && (newPlatform === 'claude' || newPlatform === 'gemini')) {
+    // 从 Claude Console 切换到其他平台时，恢复为 OAuth
+    form.value.addType = 'oauth'
   }
   
   // 平台变化时，清空分组选择

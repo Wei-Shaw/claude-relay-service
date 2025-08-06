@@ -343,18 +343,18 @@
                   {{ new Date(key.createdAt).toLocaleDateString() }}
                 </td>
                 <td class="px-3 py-4 whitespace-nowrap text-sm">
-                  <div class="inline-flex items-center gap-1 group">
+                  <div class="inline-flex items-center gap-1.5">
                     <span v-if="key.expiresAt">
                       <span
                         v-if="isApiKeyExpired(key.expiresAt)"
-                        class="text-red-600"
+                        class="text-red-600 inline-flex items-center"
                       >
                         <i class="fas fa-exclamation-circle mr-1" />
                         已过期
                       </span>
                       <span
                         v-else-if="isApiKeyExpiringSoon(key.expiresAt)"
-                        class="text-orange-600"
+                        class="text-orange-600 inline-flex items-center"
                       >
                         <i class="fas fa-clock mr-1" />
                         {{ formatExpireDate(key.expiresAt) }}
@@ -368,17 +368,19 @@
                     </span>
                     <span
                       v-else
-                      class="text-gray-400"
+                      class="text-gray-400 inline-flex items-center"
                     >
                       <i class="fas fa-infinity mr-1" />
                       永不过期
                     </span>
                     <button
-                      class="opacity-0 group-hover:opacity-100 p-0.5 text-gray-400 hover:text-blue-600 rounded transition-all duration-200"
-                      title="快速修改过期时间"
+                      class="inline-flex items-center justify-center w-6 h-6 text-gray-300 hover:text-blue-500 hover:bg-blue-50 rounded-md transition-all duration-200"
+                      title="编辑过期时间"
                       @click.stop="startEditExpiry(key)"
                     >
-                      <i class="fas fa-pencil-alt text-xs" />
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                      </svg>
                     </button>
                   </div>
                 </td>
@@ -793,11 +795,22 @@
               <span>创建时间</span>
               <span>{{ formatDate(key.createdAt) }}</span>
             </div>
-            <div class="flex justify-between">
+            <div class="flex justify-between items-center">
               <span>过期时间</span>
-              <span :class="isApiKeyExpiringSoon(key.expiresAt) ? 'text-orange-600 font-semibold' : ''">
-                {{ key.expiresAt ? formatDate(key.expiresAt) : '永不过期' }}
-              </span>
+              <div class="flex items-center gap-1">
+                <span :class="isApiKeyExpiringSoon(key.expiresAt) ? 'text-orange-600 font-semibold' : ''">
+                  {{ key.expiresAt ? formatDate(key.expiresAt) : '永不过期' }}
+                </span>
+                <button
+                  class="inline-flex items-center justify-center w-5 h-5 text-gray-300 hover:text-blue-500 hover:bg-blue-50 rounded transition-all duration-200"
+                  title="编辑过期时间"
+                  @click.stop="startEditExpiry(key)"
+                >
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
           

@@ -12,6 +12,8 @@ class PricingService {
     this.pricingData = null;
     this.lastUpdated = null;
     this.updateInterval = 24 * 60 * 60 * 1000; // 24小时
+    this.fileWatcher = null; // 文件监听器
+    this.reloadDebounceTimer = null; // 防抖定时器
   }
 
   // 初始化价格服务
@@ -30,6 +32,9 @@ class PricingService {
       setInterval(() => {
         this.checkAndUpdatePricing();
       }, this.updateInterval);
+
+      // 设置文件监听器
+      this.setupFileWatcher();
 
       logger.success('💰 Pricing service initialized successfully');
     } catch (error) {
@@ -111,6 +116,10 @@ class PricingService {
             this.lastUpdated = new Date();
             
             logger.success(`💰 Downloaded pricing data for ${Object.keys(jsonData).length} models`);
+            
+            // 设置或重新设置文件监听器
+            this.setupFileWatcher();
+            
             resolve();
           } catch (error) {
             reject(new Error(`Failed to parse pricing data: ${error.message}`));
@@ -166,6 +175,9 @@ class PricingService {
         // 更新内存中的数据
         this.pricingData = jsonData;
         this.lastUpdated = new Date();
+        
+        // 设置或重新设置文件监听器
+        this.setupFileWatcher();
         
         logger.warn(`⚠️  Using fallback pricing data for ${Object.keys(jsonData).length} models`);
         logger.info('💡 Note: This fallback data may be outdated. The system will try to update from the remote source on next check.');
@@ -274,6 +286,120 @@ class PricingService {
         success: false, 
         message: `Download failed: ${error.message}. Using fallback pricing data instead.` 
       };
+    }
+  }
+
+  // 设置文件监听器
+  setupFileWatcher() {
+    try {
+      // 如果已有监听器，先关闭
+      if (this.fileWatcher) {
+        this.fileWatcher.close();
+        this.fileWatcher = null;
+      }
+
+      // 只有文件存在时才设置监听器
+      if (!fs.existsSync(this.pricingFile)) {
+        logger.debug('💰 Pricing file does not exist yet, skipping file watcher setup');
+        return;
+      }
+
+      // 使用 fs.watchFile 作为更可靠的文件监听方式
+      // 它使用轮询，虽然性能稍差，但更可靠
+      const watchOptions = { 
+        persistent: true, 
+        interval: 60000 // 每60秒检查一次
+      };
+      
+      // 记录初始的修改时间
+      let lastMtime = fs.statSync(this.pricingFile).mtimeMs;
+      
+      fs.watchFile(this.pricingFile, watchOptions, (curr, prev) => {
+        // 检查文件是否真的被修改了（不仅仅是访问）
+        if (curr.mtimeMs !== lastMtime) {
+          lastMtime = curr.mtimeMs;
+          logger.debug(`💰 Detected change in pricing file (mtime: ${new Date(curr.mtime).toISOString()})`);
+          this.handleFileChange();
+        }
+      });
+      
+      // 保存引用以便清理
+      this.fileWatcher = {
+        close: () => fs.unwatchFile(this.pricingFile)
+      };
+
+      logger.info('👁️  File watcher set up for model_pricing.json (polling every 60s)');
+    } catch (error) {
+      logger.error('❌ Failed to setup file watcher:', error);
+    }
+  }
+
+  // 处理文件变化（带防抖）
+  handleFileChange() {
+    // 清除之前的定时器
+    if (this.reloadDebounceTimer) {
+      clearTimeout(this.reloadDebounceTimer);
+    }
+
+    // 设置新的定时器（防抖500ms）
+    this.reloadDebounceTimer = setTimeout(async () => {
+      logger.info('🔄 Reloading pricing data due to file change...');
+      await this.reloadPricingData();
+    }, 500);
+  }
+
+  // 重新加载价格数据
+  async reloadPricingData() {
+    try {
+      // 验证文件是否存在
+      if (!fs.existsSync(this.pricingFile)) {
+        logger.warn('💰 Pricing file was deleted, using fallback');
+        await this.useFallbackPricing();
+        // 重新设置文件监听器（fallback会创建新文件）
+        this.setupFileWatcher();
+        return;
+      }
+
+      // 读取文件内容
+      const data = fs.readFileSync(this.pricingFile, 'utf8');
+      
+      // 尝试解析JSON
+      const jsonData = JSON.parse(data);
+      
+      // 验证数据结构
+      if (typeof jsonData !== 'object' || Object.keys(jsonData).length === 0) {
+        throw new Error('Invalid pricing data structure');
+      }
+
+      // 更新内存中的数据
+      this.pricingData = jsonData;
+      this.lastUpdated = new Date();
+      
+      const modelCount = Object.keys(jsonData).length;
+      logger.success(`💰 Reloaded pricing data for ${modelCount} models from file`);
+      
+      // 显示一些统计信息
+      const claudeModels = Object.keys(jsonData).filter(k => k.includes('claude')).length;
+      const gptModels = Object.keys(jsonData).filter(k => k.includes('gpt')).length;
+      const geminiModels = Object.keys(jsonData).filter(k => k.includes('gemini')).length;
+      
+      logger.debug(`💰 Model breakdown: Claude=${claudeModels}, GPT=${gptModels}, Gemini=${geminiModels}`);
+    } catch (error) {
+      logger.error('❌ Failed to reload pricing data:', error);
+      logger.warn('💰 Keeping existing pricing data in memory');
+    }
+  }
+
+  // 清理资源
+  cleanup() {
+    if (this.fileWatcher) {
+      this.fileWatcher.close();
+      this.fileWatcher = null;
+      logger.debug('💰 File watcher closed');
+    }
+    if (this.reloadDebounceTimer) {
+      clearTimeout(this.reloadDebounceTimer);
+      this.reloadDebounceTimer = null;
     }
   }
 }

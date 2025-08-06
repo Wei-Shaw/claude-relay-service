@@ -472,6 +472,14 @@ class Application {
         this.server.close(async () => {
           logger.info('🚪 HTTP server closed');
           
+          // 清理 pricing service 的文件监听器
+          try {
+            pricingService.cleanup();
+            logger.info('💰 Pricing service cleaned up');
+          } catch (error) {
+            logger.error('❌ Error cleaning up pricing service:', error);
+          }
+          
           try {
             await redis.disconnect();
             logger.info('👋 Redis disconnected');
