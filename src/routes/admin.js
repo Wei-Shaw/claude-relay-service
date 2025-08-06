@@ -2724,7 +2724,7 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
 // 计算总体使用费用
 router.get('/usage-costs', authenticateAdmin, async (req, res) => {
   try {
-    const { period = 'all' } = req.query; // all, today, monthly
+    const { period = 'all' } = req.query; // all, today, monthly, 7days
     
     logger.info(`💰 Calculating usage costs for period: ${period}`);
     
@@ -2752,6 +2752,95 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
       pattern = `usage:model:daily:*:${today}`;
     } else if (period === 'monthly') {
       pattern = `usage:model:monthly:*:${currentMonth}`;
+    } else if (period === '7days') {
+      // 最近7天：汇总daily数据
+      const modelUsageMap = new Map();
+      
+      // 获取最近7天的所有daily统计数据
+      for (let i = 0; i < 7; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const tzDate = redis.getDateInTimezone(date);
+        const dateStr = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}-${String(tzDate.getUTCDate()).padStart(2, '0')}`;
+        const dayPattern = `usage:model:daily:*:${dateStr}`;
+        
+        const dayKeys = await client.keys(dayPattern);
+        
+        for (const key of dayKeys) {
+          const modelMatch = key.match(/usage:model:daily:(.+):\d{4}-\d{2}-\d{2}$/);
+          if (!modelMatch) continue;
+          
+          const model = modelMatch[1];
+          const data = await client.hgetall(key);
+          
+          if (data && Object.keys(data).length > 0) {
+            if (!modelUsageMap.has(model)) {
+              modelUsageMap.set(model, {
+                inputTokens: 0,
+                outputTokens: 0,
+                cacheCreateTokens: 0,
+                cacheReadTokens: 0
+              });
+            }
+            
+            const modelUsage = modelUsageMap.get(model);
+            modelUsage.inputTokens += parseInt(data.inputTokens) || 0;
+            modelUsage.outputTokens += parseInt(data.outputTokens) || 0;
+            modelUsage.cacheCreateTokens += parseInt(data.cacheCreateTokens) || 0;
+            modelUsage.cacheReadTokens += parseInt(data.cacheReadTokens) || 0;
+          }
+        }
+      }
+      
+      // 计算7天统计的费用
+      logger.info(`💰 Processing ${modelUsageMap.size} unique models for 7days cost calculation`);
+      
+      for (const [model, usage] of modelUsageMap) {
+        const usageData = {
+          input_tokens: usage.inputTokens,
+          output_tokens: usage.outputTokens,
+          cache_creation_input_tokens: usage.cacheCreateTokens,
+          cache_read_input_tokens: usage.cacheReadTokens
+        };
+        
+        const costResult = CostCalculator.calculateCost(usageData, model);
+        totalCosts.inputCost += costResult.costs.input;
+        totalCosts.outputCost += costResult.costs.output;
+        totalCosts.cacheCreateCost += costResult.costs.cacheWrite;
+        totalCosts.cacheReadCost += costResult.costs.cacheRead;
+        totalCosts.totalCost += costResult.costs.total;
+        
+        logger.info(`💰 Model ${model} (7days): ${usage.inputTokens + usage.outputTokens + usage.cacheCreateTokens + usage.cacheReadTokens} tokens, cost: ${costResult.formatted.total}`);
+        
+        // 记录模型费用
+        modelCosts[model] = {
+          model,
+          requests: 0, // 7天汇总数据没有请求数统计
+          usage: usageData,
+          costs: costResult.costs,
+          formatted: costResult.formatted,
+          usingDynamicPricing: costResult.usingDynamicPricing
+        };
+      }
+      
+      // 返回7天统计结果
+      return res.json({
+        success: true,
+        data: {
+          period,
+          totalCosts: {
+            ...totalCosts,
+            formatted: {
+              inputCost: CostCalculator.formatCost(totalCosts.inputCost),
+              outputCost: CostCalculator.formatCost(totalCosts.outputCost),
+              cacheCreateCost: CostCalculator.formatCost(totalCosts.cacheCreateCost),
+              cacheReadCost: CostCalculator.formatCost(totalCosts.cacheReadCost),
+              totalCost: CostCalculator.formatCost(totalCosts.totalCost)
+            }
+          },
+          modelCosts: Object.values(modelCosts)
+        }
+      });
     } else {
       // 全部时间，先尝试从Redis获取所有历史模型统计数据（只使用monthly数据避免重复计算）
       const allModelKeys = await client.keys('usage:model:monthly:*:*');

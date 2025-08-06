@@ -1306,7 +1306,7 @@ const loadApiKeyModelStats = async (keyId, forceReload = false) => {
       params.append('endDate', filter.customEnd)
       params.append('period', 'custom')
     } else {
-      const period = filter.preset === 'today' ? 'daily' : 'monthly'
+      const period = filter.preset === 'today' ? 'daily' : filter.preset === '7days' ? 'daily' : 'monthly'
       params.append('period', period)
     }
     

@@ -120,13 +120,26 @@ export const useDashboardStore = defineStore('dashboard', () => {
   }
   
   // 方法
-  async function loadDashboardData() {
+  async function loadDashboardData(timeRange = null) {
     loading.value = true
     try {
+      // 根据timeRange动态设置costs查询参数
+      let costsParams = { today: 'today', all: 'all' }
+      
+      if (timeRange) {
+        const periodMapping = {
+          'today': { today: 'today', all: 'today' },
+          '7days': { today: '7days', all: '7days' }, 
+          'monthly': { today: 'monthly', all: 'monthly' },
+          'all': { today: 'today', all: 'all' }
+        }
+        costsParams = periodMapping[timeRange] || costsParams
+      }
+      
       const [dashboardResponse, todayCostsResponse, totalCostsResponse] = await Promise.all([
         apiClient.get('/admin/dashboard'),
-        apiClient.get('/admin/usage-costs?period=today'),
-        apiClient.get('/admin/usage-costs?period=all')
+        apiClient.get(`/admin/usage-costs?period=${costsParams.today}`),
+        apiClient.get(`/admin/usage-costs?period=${costsParams.all}`)
       ])
       
       if (dashboardResponse.success) {

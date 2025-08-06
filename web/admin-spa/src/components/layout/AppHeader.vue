@@ -381,7 +381,7 @@ const changePassword = async () => {
   changePasswordLoading.value = true
   
   try {
-    const data = await apiClient.post('/admin/change-password', {
+    const data = await apiClient.post('/web/auth/change-password', {
       currentPassword: changePasswordForm.currentPassword,
       newPassword: changePasswordForm.newPassword,
       newUsername: changePasswordForm.newUsername || undefined

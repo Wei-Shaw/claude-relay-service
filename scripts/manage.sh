@@ -421,6 +421,12 @@ install_service() {
     print_info "安装项目依赖..."
     npm install
     
+    # 确保脚本有执行权限
+    if [ -f "$APP_DIR/scripts/manage.sh" ]; then
+        chmod +x "$APP_DIR/scripts/manage.sh"
+        print_success "已设置脚本执行权限"
+    fi
+    
     # 创建配置文件
     print_info "创建配置文件..."
     
@@ -454,17 +460,60 @@ EOF
     print_info "运行初始化设置..."
     npm run setup
     
-    # 安装Web界面依赖
-    print_info "安装Web界面依赖..."
-    npm run install:web
+    # 获取预构建的前端文件
+    print_info "获取预构建的前端文件..."
     
-    # 构建前端
-    print_info "构建前端界面..."
-    npm run build:web
+    # 创建目标目录
+    mkdir -p web/admin-spa/dist
     
-    # 创建systemd服务文件（Linux）
-    if [[ "$OS" == "debian" || "$OS" == "redhat" || "$OS" == "arch" ]]; then
-        create_systemd_service
+    # 从 web-dist 分支获取构建好的文件
+    if git ls-remote --heads origin web-dist | grep -q web-dist; then
+        print_info "从 web-dist 分支下载前端文件..."
+        
+        # 创建临时目录用于 clone
+        TEMP_CLONE_DIR=$(mktemp -d)
+        
+        # 使用 sparse-checkout 来只获取需要的文件
+        git clone --depth 1 --branch web-dist --single-branch \
+            https://github.com/Wei-Shaw/claude-relay-service.git \
+            "$TEMP_CLONE_DIR" 2>/dev/null || {
+            # 如果 HTTPS 失败，尝试使用当前仓库的 remote URL
+            REPO_URL=$(git config --get remote.origin.url)
+            git clone --depth 1 --branch web-dist --single-branch "$REPO_URL" "$TEMP_CLONE_DIR"
+        }
+        
+        # 复制文件到目标目录（排除 .git 和 README.md）
+        rsync -av --exclude='.git' --exclude='README.md' "$TEMP_CLONE_DIR/" web/admin-spa/dist/ 2>/dev/null || {
+            # 如果没有 rsync，使用 cp
+            cp -r "$TEMP_CLONE_DIR"/* web/admin-spa/dist/ 2>/dev/null
+            rm -rf web/admin-spa/dist/.git 2>/dev/null
+            rm -f web/admin-spa/dist/README.md 2>/dev/null
+        }
+        
+        # 清理临时目录
+        rm -rf "$TEMP_CLONE_DIR"
+        
+        print_success "前端文件下载完成"
+    else
+        print_warning "web-dist 分支不存在，尝试本地构建..."
+        
+        # 检查是否有 Node.js 和 npm
+        if command_exists npm; then
+            # 回退到原始构建方式
+            if [ -f "web/admin-spa/package.json" ]; then
+                print_info "开始本地构建前端..."
+                cd web/admin-spa
+                npm install
+                npm run build
+                cd ../..
+                print_success "前端本地构建完成"
+            else
+                print_error "无法找到前端项目文件"
+            fi
+        else
+            print_error "无法获取前端文件，且本地环境不支持构建"
+            print_info "请确保仓库已正确配置 web-dist 分支"
+        fi
     fi
     
     # 创建软链接
@@ -499,34 +548,6 @@ EOF
     echo "  重启服务: crs restart"
 }
 
-# 创建systemd服务
-create_systemd_service() {
-    local service_file="/etc/systemd/system/claude-relay.service"
-    
-    print_info "创建 systemd 服务..."
-    
-    sudo tee $service_file > /dev/null << EOF
-[Unit]
-Description=Claude Relay Service
-After=network.target redis.service
-
-[Service]
-Type=simple
-User=$USER
-WorkingDirectory=$APP_DIR
-ExecStart=$(which node) $APP_DIR/src/app.js
-Restart=on-failure
-RestartSec=10
-StandardOutput=append:$APP_DIR/logs/service.log
-StandardError=append:$APP_DIR/logs/service-error.log
-
-[Install]
-WantedBy=multi-user.target
-EOF
-    
-    sudo systemctl daemon-reload
-    print_success "systemd 服务创建完成"
-}
 
 # 更新服务
 update_service() {
@@ -539,26 +560,113 @@ update_service() {
     
     cd "$APP_DIR"
     
-    # 停止服务
-    stop_service
+    # 保存当前运行状态
+    local was_running=false
+    if pgrep -f "node.*src/app.js" > /dev/null; then
+        was_running=true
+        print_info "检测到服务正在运行，将在更新后自动重启..."
+        stop_service
+    fi
+    
+    # 备份配置文件
+    print_info "备份配置文件..."
+    if [ -f ".env" ]; then
+        cp .env .env.backup.$(date +%Y%m%d%H%M%S)
+    fi
+    if [ -f "config/config.js" ]; then
+        cp config/config.js config/config.js.backup.$(date +%Y%m%d%H%M%S)
+    fi
     
     # 拉取最新代码
     print_info "拉取最新代码..."
-    git pull origin main
+    if ! git pull origin main; then
+        print_error "拉取代码失败，请检查网络连接"
+        return 1
+    fi
     
     # 更新依赖
     print_info "更新依赖..."
     npm install
-    npm run install:web
     
-    # 构建前端
-    print_info "构建前端界面..."
-    npm run build:web
+    # 确保脚本有执行权限
+    if [ -f "$APP_DIR/scripts/manage.sh" ]; then
+        chmod +x "$APP_DIR/scripts/manage.sh"
+    fi
     
-    # 启动服务
-    start_service
+    # 获取最新的预构建前端文件
+    print_info "更新前端文件..."
+    
+    # 创建目标目录
+    mkdir -p web/admin-spa/dist
+    
+    # 清理旧的前端文件
+    rm -rf web/admin-spa/dist/*
+    
+    # 从 web-dist 分支获取构建好的文件
+    if git ls-remote --heads origin web-dist | grep -q web-dist; then
+        print_info "从 web-dist 分支下载最新前端文件..."
+        
+        # 创建临时目录用于 clone
+        TEMP_CLONE_DIR=$(mktemp -d)
+        
+        # 使用 sparse-checkout 来只获取需要的文件
+        git clone --depth 1 --branch web-dist --single-branch \
+            https://github.com/Wei-Shaw/claude-relay-service.git \
+            "$TEMP_CLONE_DIR" 2>/dev/null || {
+            # 如果 HTTPS 失败，尝试使用当前仓库的 remote URL
+            REPO_URL=$(git config --get remote.origin.url)
+            git clone --depth 1 --branch web-dist --single-branch "$REPO_URL" "$TEMP_CLONE_DIR"
+        }
+        
+        # 复制文件到目标目录（排除 .git 和 README.md）
+        rsync -av --exclude='.git' --exclude='README.md' "$TEMP_CLONE_DIR/" web/admin-spa/dist/ 2>/dev/null || {
+            # 如果没有 rsync，使用 cp
+            cp -r "$TEMP_CLONE_DIR"/* web/admin-spa/dist/ 2>/dev/null
+            rm -rf web/admin-spa/dist/.git 2>/dev/null
+            rm -f web/admin-spa/dist/README.md 2>/dev/null
+        }
+        
+        # 清理临时目录
+        rm -rf "$TEMP_CLONE_DIR"
+        
+        print_success "前端文件更新完成"
+    else
+        print_warning "web-dist 分支不存在，尝试本地构建..."
+        
+        # 检查是否有 Node.js 和 npm
+        if command_exists npm; then
+            # 回退到原始构建方式
+            if [ -f "web/admin-spa/package.json" ]; then
+                print_info "开始本地构建前端..."
+                cd web/admin-spa
+                npm install
+                npm run build
+                cd ../..
+                print_success "前端本地构建完成"
+            else
+                print_error "无法找到前端项目文件"
+            fi
+        else
+            print_error "无法获取前端文件，且本地环境不支持构建"
+            print_info "请确保仓库已正确配置 web-dist 分支"
+        fi
+    fi
+    
+    # 更新软链接到最新版本
+    create_symlink
+    
+    # 如果之前在运行，则重新启动服务
+    if [ "$was_running" = true ]; then
+        print_info "重新启动服务..."
+        start_service
+    fi
     
     print_success "更新完成！"
+    
+    # 显示版本信息
+    if [ -f "$APP_DIR/VERSION" ]; then
+        echo -e "\n当前版本: ${GREEN}$(cat "$APP_DIR/VERSION")${NC}"
+    fi
 }
 
 # 卸载服务
@@ -586,13 +694,6 @@ uninstall_service() {
     
     # 停止服务
     stop_service
-    
-    # 删除systemd服务
-    if [ -f "/etc/systemd/system/claude-relay.service" ]; then
-        sudo systemctl disable claude-relay.service
-        sudo rm /etc/systemd/system/claude-relay.service
-        sudo systemctl daemon-reload
-    fi
     
     # 备份数据
     echo -n "是否备份数据？(y/N): "
@@ -634,38 +735,100 @@ start_service() {
     cd "$APP_DIR"
     
     # 检查是否已运行
-    if pgrep -f "node.*claude-relay" > /dev/null; then
+    if pgrep -f "node.*src/app.js" > /dev/null; then
         print_warning "服务已在运行"
         return 0
     fi
     
-    # 使用不同方式启动
-    if [ -f "/etc/systemd/system/claude-relay.service" ]; then
-        sudo systemctl start claude-relay.service
-        print_success "服务已通过 systemd 启动"
+    # 确保日志目录存在
+    mkdir -p "$APP_DIR/logs"
+    
+    # 检查pm2是否可用并且不是从package.json脚本调用的
+    if command_exists pm2 && [ "$1" != "--no-pm2" ]; then
+        print_info "使用 pm2 启动服务..."
+        # 直接使用pm2启动，避免循环调用
+        pm2 start "$APP_DIR/src/app.js" --name "claude-relay" --log "$APP_DIR/logs/pm2.log" 2>/dev/null
+        sleep 2
+        
+        # 检查是否启动成功
+        if pm2 list 2>/dev/null | grep -q "claude-relay"; then
+            print_success "服务已通过 pm2 启动"
+            pm2 save 2>/dev/null || true
+        else
+            print_warning "pm2 启动失败，尝试直接启动..."
+            start_service_direct
+        fi
     else
-        # 使用npm启动
-        npm run service:start:daemon
-        print_success "服务已启动"
+        start_service_direct
     fi
     
     sleep 2
-    show_status
+    
+    # 验证服务是否成功启动
+    if pgrep -f "node.*src/app.js" > /dev/null; then
+        show_status
+    else
+        print_error "服务启动失败，请查看日志: $APP_DIR/logs/service.log"
+        if [ -f "$APP_DIR/logs/service.log" ]; then
+            echo "最近的错误日志："
+            tail -n 20 "$APP_DIR/logs/service.log"
+        fi
+        return 1
+    fi
+}
+
+# 直接启动服务（不使用pm2）
+start_service_direct() {
+    print_info "使用后台进程启动服务..."
+    
+    # 使用setsid创建新会话，确保进程完全脱离终端
+    if command_exists setsid; then
+        # setsid方式（推荐）
+        setsid nohup node "$APP_DIR/src/app.js" > "$APP_DIR/logs/service.log" 2>&1 < /dev/null &
+        local pid=$!
+        sleep 1
+        
+        # 获取实际的子进程PID
+        local real_pid=$(pgrep -f "node.*src/app.js" | head -1)
+        if [ -n "$real_pid" ]; then
+            echo $real_pid > "$APP_DIR/.pid"
+            print_success "服务已在后台启动 (PID: $real_pid)"
+        else
+            echo $pid > "$APP_DIR/.pid"
+            print_success "服务已在后台启动 (PID: $pid)"
+        fi
+    else
+        # 备用方式：使用nohup和disown
+        nohup node "$APP_DIR/src/app.js" > "$APP_DIR/logs/service.log" 2>&1 < /dev/null &
+        local pid=$!
+        disown $pid 2>/dev/null || true
+        echo $pid > "$APP_DIR/.pid"
+        print_success "服务已在后台启动 (PID: $pid)"
+    fi
 }
 
 # 停止服务
 stop_service() {
     print_info "停止服务..."
     
-    if [ -f "/etc/systemd/system/claude-relay.service" ]; then
-        sudo systemctl stop claude-relay.service
-    else
-        if command_exists pm2; then
-            cd "$APP_DIR" 2>/dev/null && npm run service:stop
-        else
-            pkill -f "node.*claude-relay" || true
+    # 尝试使用pm2停止
+    if command_exists pm2 && [ -n "$APP_DIR" ] && [ -d "$APP_DIR" ]; then
+        cd "$APP_DIR" 2>/dev/null
+        pm2 stop claude-relay 2>/dev/null || true
+        pm2 delete claude-relay 2>/dev/null || true
+    fi
+    
+    # 使用PID文件停止
+    if [ -f "$APP_DIR/.pid" ]; then
+        local pid=$(cat "$APP_DIR/.pid")
+        if kill -0 $pid 2>/dev/null; then
+            kill $pid
+            rm -f "$APP_DIR/.pid"
         fi
     fi
+    
+    # 强制停止所有相关进程
+    pkill -f "node.*src/app.js" 2>/dev/null || true
     
     print_success "服务已停止"
 }
@@ -676,6 +839,36 @@ restart_service() {
     stop_service
     sleep 2
     start_service
+}
+
+# 更新模型价格
+update_model_pricing() {
+    if ! check_installation; then
+        print_error "服务未安装，请先运行: $0 install"
+        return 1
+    fi
+    
+    print_info "更新模型价格数据..."
+    
+    cd "$APP_DIR"
+    
+    # 运行更新脚本
+    if npm run update:pricing; then
+        print_success "模型价格数据更新完成"
+        
+        # 显示更新后的信息
+        if [ -f "data/model_pricing.json" ]; then
+            local model_count=$(grep -o '"[^"]*"\s*:' data/model_pricing.json | wc -l)
+            local file_size=$(du -h data/model_pricing.json | cut -f1)
+            echo -e "\n更新信息:"
+            echo -e "  模型数量: ${GREEN}$model_count${NC}"
+            echo -e "  文件大小: ${GREEN}$file_size${NC}"
+            echo -e "  文件位置: $APP_DIR/data/model_pricing.json"
+        fi
+    else
+        print_error "模型价格数据更新失败"
+        return 1
+    fi
 }
 
 # 显示状态
@@ -690,12 +883,18 @@ show_status() {
     actual_port=${actual_port:-3000}
     
     # 检查进程
-    if pgrep -f "node.*claude-relay" > /dev/null; then
+    local pid=$(pgrep -f "node.*src/app.js" | head -1)
+    if [ -n "$pid" ]; then
         echo -e "服务状态: ${GREEN}运行中${NC}"
-        
-        # 获取进程信息
-        local pid=$(pgrep -f "node.*claude-relay" | head -1)
         echo "进程 PID: $pid"
+        
+        # 显示进程信息
+        if command_exists ps; then
+            local proc_info=$(ps -p $pid -o comm,etime,rss --no-headers 2>/dev/null)
+            if [ -n "$proc_info" ]; then
+                echo "进程信息: $proc_info"
+            fi
+        fi
         echo "服务端口: $actual_port"
         
         # 获取公网IP
@@ -751,15 +950,16 @@ show_help() {
     echo "用法: $0 [命令]"
     echo ""
     echo "命令:"
-    echo "  install   - 安装服务"
-    echo "  update    - 更新服务"
-    echo "  uninstall - 卸载服务"
-    echo "  start     - 启动服务"
-    echo "  stop      - 停止服务"
-    echo "  restart   - 重启服务"
-    echo "  status    - 查看状态"
-    echo "  symlink   - 创建 crs 快捷命令"
-    echo "  help      - 显示帮助"
+    echo "  install        - 安装服务"
+    echo "  update         - 更新服务"
+    echo "  uninstall      - 卸载服务"
+    echo "  start          - 启动服务"
+    echo "  stop           - 停止服务"
+    echo "  restart        - 重启服务"
+    echo "  status         - 查看状态"
+    echo "  update-pricing - 更新模型价格数据"
+    echo "  symlink        - 创建 crs 快捷命令"
+    echo "  help           - 显示帮助"
     echo ""
 }
 
@@ -784,9 +984,9 @@ show_menu() {
         actual_port=${actual_port:-3000}
         
         # 检查服务状态
-        if pgrep -f "node.*claude-relay" > /dev/null; then
+        local pid=$(pgrep -f "node.*src/app.js" | head -1)
+        if [ -n "$pid" ]; then
             echo -e "  运行状态: ${GREEN}运行中${NC}"
-            local pid=$(pgrep -f "node.*claude-relay" | head -1)
             echo -e "  进程 PID: $pid"
             echo -e "  服务端口: $actual_port"
             
@@ -834,10 +1034,11 @@ show_menu() {
         echo "  3) 停止服务"
         echo "  4) 重启服务"
         echo "  5) 更新服务"
-        echo "  6) 卸载服务"
-        echo "  7) 退出"
+        echo "  6) 更新模型价格"
+        echo "  7) 卸载服务"
+        echo "  8) 退出"
         echo ""
-        echo -n "请输入选项 [1-7]: "
+        echo -n "请输入选项 [1-8]: "
     fi
 }
 
@@ -925,12 +1126,18 @@ handle_menu_choice() {
                 ;;
             6)
                 echo ""
+                update_model_pricing
+                echo -n "按回车键继续..."
+                read
+                ;;
+            7)
+                echo ""
                 uninstall_service
                 if [ $? -eq 0 ]; then
                     exit 0
                 fi
                 ;;
-            7)
+            8)
                 echo "退出管理工具"
                 exit 0
                 ;;
@@ -950,6 +1157,8 @@ create_symlink() {
     # 优先使用项目中的 manage.sh（在 app/scripts 目录下）
     if [ -n "$APP_DIR" ] && [ -f "$APP_DIR/scripts/manage.sh" ]; then
         script_path="$APP_DIR/scripts/manage.sh"
+        # 确保脚本有执行权限
+        chmod +x "$script_path" 2>/dev/null || sudo chmod +x "$script_path" 2>/dev/null || true
     elif [ -f "/app/scripts/manage.sh" ] && [ "$(basename "$0")" = "manage.sh" ]; then
         # Docker 容器中的路径
         script_path="/app/scripts/manage.sh"
@@ -984,21 +1193,13 @@ create_symlink() {
         return 1
     fi
     
-    # 检查是否已存在
+    # 如果已存在，直接删除并重新创建（默认使用代码中的最新版本）
     if [ -L "$symlink_path" ] || [ -f "$symlink_path" ]; then
-        print_warning "$symlink_path 已存在"
-        echo -n "是否覆盖？(y/N): "
-        read -n 1 overwrite
-        echo
-        
-        if [[ "$overwrite" =~ ^[Yy]$ ]]; then
-            sudo rm -f "$symlink_path" || {
-                print_error "删除旧文件失败"
-                return 1
-            }
-        else
-            return 0
-        fi
+        print_info "更新已存在的软链接..."
+        sudo rm -f "$symlink_path" 2>/dev/null || {
+            print_error "删除旧文件失败"
+            return 1
+        }
     fi
     
     # 创建软链接
@@ -1108,6 +1309,9 @@ main() {
             ;;
         status)
             show_status
+            ;;
+        update-pricing)
+            update_model_pricing
             ;;
         symlink)
             # 单独创建软链接

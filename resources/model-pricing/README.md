@@ -34,4 +34,4 @@ The file contains JSON data with model pricing information including:
 - Context window sizes
 - Model capabilities
 
-Last updated: 2025-07-29
+Last updated: 2025-08-06

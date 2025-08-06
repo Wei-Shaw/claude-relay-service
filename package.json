@@ -8,6 +8,7 @@
     "dev": "nodemon src/app.js",
     "build:web": "cd web/admin-spa && npm run build",
     "install:web": "cd web/admin-spa && npm install",
+    "update:pricing": "node scripts/update-model-pricing.js",
     "setup": "node scripts/setup.js",
     "cli": "node cli/index.js",
     "init:costs": "node src/cli/initCosts.js",

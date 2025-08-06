@@ -458,6 +458,7 @@ class ClaudeConsoleRelayService {
   // 🔧 过滤客户端请求头
   _filterClientHeaders(clientHeaders) {
     const sensitiveHeaders = [
+      'content-type',
       "user-agent",
       'x-api-key',
       'authorization',
