@@ -12,13 +12,14 @@ const redis = require('./models/redis')
 const pricingService = require('./services/pricingService')
 
 // Import routes
-const apiRoutes = require('./routes/api')
-const adminRoutes = require('./routes/admin')
-const webRoutes = require('./routes/web')
-const apiStatsRoutes = require('./routes/apiStats')
-const geminiRoutes = require('./routes/geminiRoutes')
-const openaiGeminiRoutes = require('./routes/openaiGeminiRoutes')
-const openaiClaudeRoutes = require('./routes/openaiClaudeRoutes')
+const apiRoutes = require('./routes/api');
+const adminRoutes = require('./routes/admin');
+const webRoutes = require('./routes/web');
+const apiStatsRoutes = require('./routes/apiStats');
+const geminiRoutes = require('./routes/geminiRoutes');
+const geminiV1betaRoutes = require('./routes/geminiV1betaRoutes');
+const openaiGeminiRoutes = require('./routes/openaiGeminiRoutes');
+const openaiClaudeRoutes = require('./routes/openaiClaudeRoutes');
 
 // Import middleware
 const {
@@ -225,9 +226,10 @@ class Application {
       }
 
       // 🛣️ 路由
-      this.app.use('/api', apiRoutes)
-      this.app.use('/claude', apiRoutes) // /claude 路由别名，与 /api 功能相同
-      this.app.use('/admin', adminRoutes)
+      this.app.use('/api', apiRoutes);
+      this.app.use('/api', geminiV1betaRoutes); // Gemini CLI v1beta API 支持
+      this.app.use('/claude', apiRoutes); // /claude 路由别名，与 /api 功能相同
+      this.app.use('/admin', adminRoutes);
       // 使用 web 路由（包含 auth 和页面重定向）
       this.app.use('/web', webRoutes)
       this.app.use('/apiStats', apiStatsRoutes)
