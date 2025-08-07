@@ -65,10 +65,12 @@
     "ioredis": "^5.3.2",
     "morgan": "^1.10.0",
     "ora": "^5.4.1",
+    "prettier-plugin-tailwindcss": "^0.6.14",
     "rate-limiter-flexible": "^5.0.5",
     "socks-proxy-agent": "^8.0.2",
     "table": "^6.8.1",
     "uuid": "^9.0.1",
+    "vite-plugin-checker": "^0.10.2",
     "winston": "^3.11.0",
     "winston-daily-rotate-file": "^4.7.1"
   },
