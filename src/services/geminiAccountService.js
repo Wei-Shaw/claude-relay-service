@@ -1147,5 +1147,5 @@ module.exports = {
   generateContent,
   generateContentStream,
   OAUTH_CLIENT_ID,
-  OAUTH_SCOPES
-}
+  OAUTH_SCOPES,
+};
