@@ -280,13 +280,13 @@ class Application {
           const health = {
             status: 'healthy',
             service: 'claude-relay-service',
-            version: version,
+            version,
             timestamp: new Date().toISOString(),
             uptime: process.uptime(),
             memory: {
-              used: Math.round(memory.heapUsed / 1024 / 1024) + 'MB',
-              total: Math.round(memory.heapTotal / 1024 / 1024) + 'MB',
-              external: Math.round(memory.external / 1024 / 1024) + 'MB'
+              used: `${Math.round(memory.heapUsed / 1024 / 1024)}MB`,
+              total: `${Math.round(memory.heapTotal / 1024 / 1024)}MB`,
+              external: `${Math.round(memory.external / 1024 / 1024)}MB`
             },
             components: {
               redis: redisHealth,
@@ -364,7 +364,7 @@ class Application {
       // 存储到Redis（每次启动都覆盖，确保与 init.json 同步）
       const adminCredentials = {
         username: initData.adminUsername,
-        passwordHash: passwordHash,
+        passwordHash,
         createdAt: initData.initializedAt || new Date().toISOString(),
         lastLogin: null,
         updatedAt: initData.updatedAt || null
