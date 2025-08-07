@@ -15,7 +15,7 @@ const authenticateApiKey = async (req, res, next) => {
       req.headers['x-goog-api-key'] ||
       req.headers['authorization']?.replace(/^Bearer\s+/i, '') ||
       req.headers['api-key'] ||
-      req.query.key;
+      req.query.key
 
     if (!apiKey) {
       logger.security(`🔒 Missing API key attempt from ${req.ip || 'unknown'}`)
