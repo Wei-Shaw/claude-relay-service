@@ -215,7 +215,7 @@ npm run service:status
 
 ### 1. Open Management Interface
 
-Browser visit: `http://your-server-IP:3000/web`
+Browser visit: `http://your-server-IP:3000/admin-next`
 
 Default admin account: Look in data/init.json
 
@@ -280,7 +280,7 @@ npm run service:stop
 
 ### Monitor Usage
 
-- **Web Interface**: `http://your-domain:3000/web` - View usage statistics
+- **Web Interface**: `http://your-domain:3000/admin-next` - View usage statistics
 - **Health Check**: `http://your-domain:3000/health` - Confirm service is normal
 - **Log Files**: Various log files in `logs/` directory
 

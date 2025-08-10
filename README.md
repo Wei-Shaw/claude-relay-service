@@ -184,8 +184,8 @@ Redis 密码 (默认: 无密码):
 服务已成功安装并启动！
 
 访问地址：
-  本地 Web: http://localhost:8080/web
-  公网 Web: http://YOUR_IP:8080/web
+  本地 Web: http://localhost:8080/admin-next
+  公网 Web: http://YOUR_IP:8080/admin-next
 
 管理员账号信息已保存到: data/init.json
 ```
@@ -416,7 +416,7 @@ docker-compose.yml 已包含：
 
 ### 1. 打开管理界面
 
-浏览器访问：`http://你的服务器IP:3000/web`
+浏览器访问：`http://你的服务器IP:3000/admin-next`
 
 管理员账号：
 - 自动生成：查看 data/init.json
@@ -526,7 +526,7 @@ npm run service:stop
 
 ### 监控使用情况
 
-- **Web界面**: `http://你的域名:3000/web` - 查看使用统计
+- **Web界面**: `http://你的域名:3000/admin-next` - 查看使用统计
 - **健康检查**: `http://你的域名:3000/health` - 确认服务正常
 - **日志文件**: `logs/` 目录下的各种日志文件
 
