@@ -67,7 +67,12 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
       null
 
     // 从请求体中提取模型和流式标志
-    const requestedModel = req.body?.model || null
+    let requestedModel = req.body?.model || null
+    // 如果模型名称以 gpt-5 开头，则映射为基础模型 gpt-5
+    if (requestedModel?.startsWith('gpt-5')) {
+      req.body.model = 'gpt-5'
+      requestedModel = 'gpt-5'
+    }
     const isStream = req.body?.stream !== false // 默认为流式（兼容现有行为）
 
     // 判断是否为 Codex CLI 的请求
