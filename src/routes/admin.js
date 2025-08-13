@@ -18,7 +18,6 @@ const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
 const config = require('../../config/config')
-const { v4: uuidv4 } = require('uuid')
 
 const router = express.Router()
 
@@ -1548,7 +1547,8 @@ router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
       priority: priority || 50,
       supportedModels: supportedModels || [],
       userAgent,
-      rateLimitDuration: rateLimitDuration || 60,
+      rateLimitDuration:
+        rateLimitDuration !== undefined && rateLimitDuration !== null ? rateLimitDuration : 60,
       proxy,
       accountType: accountType || 'shared'
     })
@@ -4658,7 +4658,6 @@ router.post('/openai-accounts', authenticateAdmin, async (req, res) => {
       proxy,
       accountType,
       groupId,
-      dedicatedApiKeys,
       rateLimitDuration,
       priority
     } = req.body
@@ -4675,7 +4674,8 @@ router.post('/openai-accounts', authenticateAdmin, async (req, res) => {
       description: description || '',
       accountType: accountType || 'shared',
       priority: priority || 50,
-      rateLimitDuration: rateLimitDuration || 60,
+      rateLimitDuration:
+        rateLimitDuration !== undefined && rateLimitDuration !== null ? rateLimitDuration : 60,
       openaiOauth: openaiOauth || {},
       accountInfo: accountInfo || {},
       proxy: proxy?.enabled

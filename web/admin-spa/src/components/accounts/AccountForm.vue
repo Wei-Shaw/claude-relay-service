@@ -1443,8 +1443,7 @@ const form = ref({
     return ''
   })(),
   userAgent: props.account?.userAgent || '',
-  enableRateLimit:
-    props.account?.rateLimitDuration && props.account?.rateLimitDuration > 0 ? true : false,
+  enableRateLimit: props.account ? props.account.rateLimitDuration > 0 : true,
   rateLimitDuration: props.account?.rateLimitDuration || 60,
   // Bedrock 特定字段
   accessKeyId: props.account?.accessKeyId || '',
