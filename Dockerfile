@@ -8,7 +8,7 @@ WORKDIR /app/web/admin-spa
 COPY web/admin-spa/package*.json ./
 
 # 🔽 安装前端依赖
-RUN npm i --registry http://mirrors.tencent.com/npm/
+RUN npm i 
 
 # 📋 复制前端源代码
 COPY web/admin-spa/ ./
@@ -25,7 +25,7 @@ LABEL description="Claude Code API Relay Service"
 LABEL version="1.0.0"
 
 # 🔧 安装系统依赖
-RUN HTTPS_PROXY=http://114.113.120.5:3128 apk add --no-cache \
+RUN apk add --no-cache \
     curl \
     dumb-init \
     sed \
@@ -38,7 +38,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # 🔽 安装依赖 (生产环境)
-RUN npm i --only=production --registry http://mirrors.tencent.com/npm/ && \
+RUN npm i --only=production && \
     npm cache clean --force
 
 # 📋 复制应用代码
