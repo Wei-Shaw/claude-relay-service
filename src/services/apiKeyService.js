@@ -498,6 +498,17 @@ class ApiKeyService {
       for (const key of userKeys) {
         const usage = await redis.getUsageStats(key.id)
         const dailyCost = (await redis.getDailyCost(key.id)) || 0
+        const costStats = await redis.getCostStats(key.id)
+
+        logger.debug(`🔍 getUserApiKeys: Key ${key.id} (${key.name}) usage:`, {
+          keyId: key.id,
+          keyName: key.name,
+          userId: key.userId,
+          rawUsage: usage,
+          dailyCost,
+          costStats,
+          lastUsedAt: key.lastUsedAt
+        })
 
         userKeysWithUsage.push({
           id: key.id,
@@ -509,8 +520,9 @@ class ApiKeyService {
           createdAt: key.createdAt,
           lastUsedAt: key.lastUsedAt,
           expiresAt: key.expiresAt,
-          usage: usage || { requests: 0, inputTokens: 0, outputTokens: 0, totalCost: 0 },
+          usage: usage,
           dailyCost,
+          totalCost: costStats.total,
           dailyCostLimit: parseFloat(key.dailyCostLimit || 0),
           userId: key.userId,
           userUsername: key.userUsername,
