@@ -11,6 +11,13 @@
         />
         <div class="flex items-center gap-3">
           <router-link
+            class="user-login-button flex items-center gap-2 rounded-xl px-3 py-2 text-white transition-all duration-300 md:px-4 md:py-2"
+            to="/user-login"
+          >
+            <i class="fas fa-user text-sm" />
+            <span class="text-xs font-medium md:text-sm">用户登录</span>
+          </router-link>
+          <router-link
             class="admin-button flex items-center gap-2 rounded-xl px-3 py-2 text-white transition-all duration-300 md:px-4 md:py-2"
             to="/dashboard"
           >
@@ -253,6 +260,40 @@ watch(apiKey, (newValue) => {
   background-clip: text;
   font-weight: 700;
   letter-spacing: -0.025em;
+}
+
+/* 用户登录按钮 */
+.user-login-button {
+  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  text-decoration: none;
+  box-shadow:
+    0 4px 6px -1px rgba(52, 211, 153, 0.3),
+    0 2px 4px -1px rgba(52, 211, 153, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.user-login-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.user-login-button:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 10px 15px -3px rgba(52, 211, 153, 0.4),
+    0 4px 6px -2px rgba(52, 211, 153, 0.15);
+}
+
+.user-login-button:hover::before {
+  left: 100%;
 }
 
 /* 管理后台按钮 */
