@@ -3,7 +3,9 @@
     v-if="show"
     class="fixed inset-0 z-50 h-full w-full overflow-y-auto bg-gray-600 bg-opacity-50"
   >
-    <div class="relative top-20 mx-auto w-96 rounded-md border bg-white p-5 shadow-lg">
+    <div
+      class="relative top-20 mx-auto w-[768px] max-w-4xl rounded-md border bg-white p-5 shadow-lg"
+    >
       <div class="mt-3">
         <div class="mb-4 flex items-center justify-between">
           <h3 class="text-lg font-medium text-gray-900">API Key Details</h3>
@@ -192,61 +194,6 @@
               >
                 {{ formatDate(apiKey.expiresAt) }}
               </span>
-            </div>
-          </div>
-
-          <!-- Usage Instructions -->
-          <div class="border-t border-gray-200 pt-4">
-            <label class="mb-2 block text-sm font-medium text-gray-700">Usage Instructions</label>
-            <div class="rounded-md bg-gray-50 p-3">
-              <p class="mb-2 text-xs text-gray-600">
-                Set these environment variables to use this API key:
-              </p>
-              <div class="space-y-1 font-mono text-xs">
-                <div class="flex items-center justify-between">
-                  <code class="text-gray-800"
-                    >export ANTHROPIC_BASE_URL="http://your-server:3000/api/"</code
-                  >
-                  <button
-                    class="ml-2 text-gray-400 hover:text-gray-600"
-                    @click="
-                      copyToClipboard(
-                        `export ANTHROPIC_BASE_URL=&quot;http://your-server:3000/api/&quot;`
-                      )
-                    "
-                  >
-                    <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                      />
-                    </svg>
-                  </button>
-                </div>
-                <div class="flex items-center justify-between">
-                  <code class="text-gray-800"
-                    >export ANTHROPIC_AUTH_TOKEN="{{ apiKey.keyPreview || 'your-api-key' }}"</code
-                  >
-                  <button
-                    v-if="apiKey.key"
-                    class="ml-2 text-gray-400 hover:text-gray-600"
-                    @click="
-                      copyToClipboard(`export ANTHROPIC_AUTH_TOKEN=&quot;${apiKey.key}&quot;`)
-                    "
-                  >
-                    <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
 

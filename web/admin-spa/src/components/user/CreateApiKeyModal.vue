@@ -3,7 +3,9 @@
     v-if="show"
     class="fixed inset-0 z-50 h-full w-full overflow-y-auto bg-gray-600 bg-opacity-50"
   >
-    <div class="relative top-20 mx-auto w-96 rounded-md border bg-white p-5 shadow-lg">
+    <div
+      class="relative top-20 mx-auto w-[768px] max-w-4xl rounded-md border bg-white p-5 shadow-lg"
+    >
       <div class="mt-3">
         <div class="mb-4 flex items-center justify-between">
           <h3 class="text-lg font-medium text-gray-900">Create New API Key</h3>
@@ -45,58 +47,6 @@
               placeholder="Optional description"
               rows="3"
             ></textarea>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700" for="tokenLimit">
-              Token Limit (optional)
-            </label>
-            <input
-              id="tokenLimit"
-              v-model.number="form.tokenLimit"
-              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-              :disabled="loading"
-              min="0"
-              placeholder="0 = unlimited"
-              type="number"
-            />
-            <p class="mt-1 text-xs text-gray-500">Set to 0 for unlimited tokens</p>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700" for="dailyCostLimit">
-              Daily Cost Limit (optional)
-            </label>
-            <div class="relative mt-1 rounded-md shadow-sm">
-              <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                <span class="text-gray-500 sm:text-sm">$</span>
-              </div>
-              <input
-                id="dailyCostLimit"
-                v-model.number="form.dailyCostLimit"
-                class="block w-full rounded-md border-gray-300 pl-7 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                :disabled="loading"
-                min="0"
-                placeholder="0.00"
-                step="0.01"
-                type="number"
-              />
-            </div>
-            <p class="mt-1 text-xs text-gray-500">Set to 0 for unlimited daily cost</p>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700" for="expiresAt">
-              Expiration Date (optional)
-            </label>
-            <input
-              id="expiresAt"
-              v-model="form.expiresAt"
-              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-              :disabled="loading"
-              type="datetime-local"
-            />
-            <p class="mt-1 text-xs text-gray-500">Leave empty for no expiration</p>
           </div>
 
           <div v-if="error" class="rounded-md border border-red-200 bg-red-50 p-3">
@@ -242,18 +192,12 @@ const newApiKey = ref(null)
 
 const form = reactive({
   name: '',
-  description: '',
-  tokenLimit: null,
-  dailyCostLimit: null,
-  expiresAt: ''
+  description: ''
 })
 
 const resetForm = () => {
   form.name = ''
   form.description = ''
-  form.tokenLimit = null
-  form.dailyCostLimit = null
-  form.expiresAt = ''
   error.value = ''
   newApiKey.value = null
 }
@@ -270,10 +214,7 @@ const handleSubmit = async () => {
   try {
     const apiKeyData = {
       name: form.name.trim(),
-      description: form.description.trim() || undefined,
-      tokenLimit: form.tokenLimit || undefined,
-      dailyCostLimit: form.dailyCostLimit || undefined,
-      expiresAt: form.expiresAt || undefined
+      description: form.description.trim() || undefined
     }
 
     const result = await userStore.createApiKey(apiKeyData)
