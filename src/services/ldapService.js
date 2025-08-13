@@ -51,6 +51,49 @@ class LdapService {
     }
   }
 
+  // 🔍 提取LDAP条目的DN
+  extractDN(ldapEntry) {
+    if (!ldapEntry) {
+      return null
+    }
+
+    // Try different ways to get the DN
+    let dn = null
+    
+    // Method 1: Direct dn property
+    if (ldapEntry.dn) {
+      dn = ldapEntry.dn
+    }
+    // Method 2: objectName property (common in some LDAP implementations)
+    else if (ldapEntry.objectName) {
+      dn = ldapEntry.objectName
+    }
+    // Method 3: distinguishedName property
+    else if (ldapEntry.distinguishedName) {
+      dn = ldapEntry.distinguishedName
+    }
+    // Method 4: Check if the entry itself is a DN string
+    else if (typeof ldapEntry === 'string' && ldapEntry.includes('=')) {
+      dn = ldapEntry
+    }
+
+    // Convert DN to string if it's an object
+    if (dn && typeof dn === 'object') {
+      if (dn.toString && typeof dn.toString === 'function') {
+        dn = dn.toString()
+      } else if (dn.dn && typeof dn.dn === 'string') {
+        dn = dn.dn
+      }
+    }
+
+    // Validate the DN format
+    if (typeof dn === 'string' && dn.trim() !== '' && dn.includes('=')) {
+      return dn.trim()
+    }
+
+    return null
+  }
+
   // 🔗 创建LDAP客户端连接
   createClient() {
     try {
@@ -192,6 +235,14 @@ class LdapService {
         }
 
         res.on('searchEntry', (entry) => {
+          logger.debug('🔍 LDAP search entry received:', {
+            dn: entry.dn,
+            objectName: entry.objectName,
+            type: typeof entry.dn,
+            entryType: typeof entry,
+            hasAttributes: !!entry.attributes,
+            attributeCount: entry.attributes ? entry.attributes.length : 0
+          })
           entries.push(entry)
         })
 
@@ -209,11 +260,23 @@ class LdapService {
           
           if (entries.length === 0) {
             resolve(null)
-          } else if (entries.length === 1) {
-            resolve(entries[0])
           } else {
-            logger.warn(`⚠️ Multiple LDAP entries found for username: ${username}`)
-            resolve(entries[0]) // 使用第一个结果
+            // Log the structure of the first entry for debugging
+            if (entries[0]) {
+              logger.debug('🔍 Full LDAP entry structure:', {
+                entryType: typeof entries[0],
+                entryConstructor: entries[0].constructor?.name,
+                entryKeys: Object.keys(entries[0]),
+                entryStringified: JSON.stringify(entries[0], null, 2).substring(0, 500)
+              })
+            }
+            
+            if (entries.length === 1) {
+              resolve(entries[0])
+            } else {
+              logger.warn(`⚠️ Multiple LDAP entries found for username: ${username}`)
+              resolve(entries[0]) // 使用第一个结果
+            }
           }
         })
       })
@@ -345,12 +408,29 @@ class LdapService {
       }
 
       // 3. 获取用户DN
-      const userDN = ldapEntry.dn
-      logger.debug(`👤 Found user DN: ${userDN}`)
+      logger.debug('🔍 LDAP entry details for DN extraction:', {
+        hasEntry: !!ldapEntry,
+        entryType: typeof ldapEntry,
+        entryKeys: Object.keys(ldapEntry || {}),
+        dn: ldapEntry.dn,
+        objectName: ldapEntry.objectName,
+        dnType: typeof ldapEntry.dn,
+        objectNameType: typeof ldapEntry.objectName
+      })
+
+      // Use the helper method to extract DN
+      const userDN = this.extractDN(ldapEntry)
+
+      logger.debug(`👤 Extracted user DN: ${userDN} (type: ${typeof userDN})`)
 
       // 验证用户DN
-      if (!userDN || typeof userDN !== 'string') {
-        logger.error(`❌ Invalid or missing DN for user: ${username}`)
+      if (!userDN) {
+        logger.error(`❌ Invalid or missing DN for user: ${username}`, {
+          ldapEntryDn: ldapEntry.dn,
+          ldapEntryObjectName: ldapEntry.objectName,
+          ldapEntryType: typeof ldapEntry,
+          extractedDN: userDN
+        })
         return { success: false, message: 'Authentication service error' }
       }
 
