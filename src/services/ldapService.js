@@ -12,20 +12,76 @@ class LdapService {
   // 🔗 创建LDAP客户端连接
   createClient() {
     try {
-      const client = ldap.createClient({
+      const clientOptions = {
         url: this.config.server.url,
         timeout: this.config.server.timeout,
         connectTimeout: this.config.server.connectTimeout,
         reconnect: true
-      })
+      }
+
+      // 如果使用 LDAPS (SSL/TLS)，添加 TLS 选项
+      if (this.config.server.url.toLowerCase().startsWith('ldaps://')) {
+        const tlsOptions = {}
+        
+        // 证书验证设置
+        if (this.config.server.tls) {
+          if (typeof this.config.server.tls.rejectUnauthorized === 'boolean') {
+            tlsOptions.rejectUnauthorized = this.config.server.tls.rejectUnauthorized
+          }
+          
+          // CA 证书
+          if (this.config.server.tls.ca) {
+            tlsOptions.ca = this.config.server.tls.ca
+          }
+          
+          // 客户端证书和私钥 (双向认证)
+          if (this.config.server.tls.cert) {
+            tlsOptions.cert = this.config.server.tls.cert
+          }
+          
+          if (this.config.server.tls.key) {
+            tlsOptions.key = this.config.server.tls.key
+          }
+          
+          // 服务器名称 (SNI)
+          if (this.config.server.tls.servername) {
+            tlsOptions.servername = this.config.server.tls.servername
+          }
+        }
+        
+        clientOptions.tlsOptions = tlsOptions
+        
+        logger.debug('🔒 Creating LDAPS client with TLS options:', {
+          url: this.config.server.url,
+          rejectUnauthorized: tlsOptions.rejectUnauthorized,
+          hasCA: !!tlsOptions.ca,
+          hasCert: !!tlsOptions.cert,
+          hasKey: !!tlsOptions.key,
+          servername: tlsOptions.servername
+        })
+      }
+
+      const client = ldap.createClient(clientOptions)
 
       // 设置错误处理
       client.on('error', (err) => {
-        logger.error('🔌 LDAP client error:', err)
+        if (err.code === 'CERT_HAS_EXPIRED' || err.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE') {
+          logger.error('🔒 LDAP TLS certificate error:', {
+            code: err.code,
+            message: err.message,
+            hint: 'Consider setting LDAP_TLS_REJECT_UNAUTHORIZED=false for self-signed certificates'
+          })
+        } else {
+          logger.error('🔌 LDAP client error:', err)
+        }
       })
 
       client.on('connect', () => {
-        logger.info('🔗 LDAP client connected successfully')
+        if (this.config.server.url.toLowerCase().startsWith('ldaps://')) {
+          logger.info('🔒 LDAPS client connected successfully')
+        } else {
+          logger.info('🔗 LDAP client connected successfully')
+        }
       })
 
       client.on('connectTimeout', () => {
@@ -280,16 +336,30 @@ class LdapService {
 
   // 📊 获取LDAP配置信息（不包含敏感信息）
   getConfigInfo() {
-    return {
+    const configInfo = {
       enabled: this.config.enabled,
       server: {
         url: this.config.server.url,
         searchBase: this.config.server.searchBase,
         searchFilter: this.config.server.searchFilter,
-        timeout: this.config.server.timeout
+        timeout: this.config.server.timeout,
+        connectTimeout: this.config.server.connectTimeout
       },
       userMapping: this.config.userMapping
     }
+
+    // 添加 TLS 配置信息（不包含敏感数据）
+    if (this.config.server.url.toLowerCase().startsWith('ldaps://') && this.config.server.tls) {
+      configInfo.server.tls = {
+        rejectUnauthorized: this.config.server.tls.rejectUnauthorized,
+        hasCA: !!this.config.server.tls.ca,
+        hasCert: !!this.config.server.tls.cert,
+        hasKey: !!this.config.server.tls.key,
+        servername: this.config.server.tls.servername
+      }
+    }
+
+    return configInfo
   }
 }
 

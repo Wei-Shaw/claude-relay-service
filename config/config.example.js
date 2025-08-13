@@ -131,7 +131,20 @@ const config = {
       searchFilter: process.env.LDAP_SEARCH_FILTER || '(uid={{username}})',
       searchAttributes: process.env.LDAP_SEARCH_ATTRIBUTES ? process.env.LDAP_SEARCH_ATTRIBUTES.split(',') : ['dn', 'uid', 'cn', 'mail', 'givenName', 'sn'],
       timeout: parseInt(process.env.LDAP_TIMEOUT) || 5000,
-      connectTimeout: parseInt(process.env.LDAP_CONNECT_TIMEOUT) || 10000
+      connectTimeout: parseInt(process.env.LDAP_CONNECT_TIMEOUT) || 10000,
+      // TLS/SSL 配置
+      tls: {
+        // 是否忽略证书错误 (用于自签名证书)
+        rejectUnauthorized: process.env.LDAP_TLS_REJECT_UNAUTHORIZED !== 'false', // 默认验证证书，设置为false则忽略
+        // CA证书文件路径 (可选，用于自定义CA证书)
+        ca: process.env.LDAP_TLS_CA_FILE ? require('fs').readFileSync(process.env.LDAP_TLS_CA_FILE) : undefined,
+        // 客户端证书文件路径 (可选，用于双向认证)
+        cert: process.env.LDAP_TLS_CERT_FILE ? require('fs').readFileSync(process.env.LDAP_TLS_CERT_FILE) : undefined,
+        // 客户端私钥文件路径 (可选，用于双向认证)  
+        key: process.env.LDAP_TLS_KEY_FILE ? require('fs').readFileSync(process.env.LDAP_TLS_KEY_FILE) : undefined,
+        // 服务器名称 (用于SNI，可选)
+        servername: process.env.LDAP_TLS_SERVERNAME || undefined
+      }
     },
     userMapping: {
       username: process.env.LDAP_USER_ATTR_USERNAME || 'uid',
