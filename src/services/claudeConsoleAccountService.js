@@ -123,7 +123,9 @@ class ClaudeConsoleAccountService {
             priority: parseInt(accountData.priority) || 50,
             supportedModels: JSON.parse(accountData.supportedModels || '[]'),
             userAgent: accountData.userAgent,
-            rateLimitDuration: (Number.isNaN(parseInt(accountData.rateLimitDuration)) ? 60 : parseInt(accountData.rateLimitDuration)),
+            rateLimitDuration: Number.isNaN(parseInt(accountData.rateLimitDuration))
+              ? 60
+              : parseInt(accountData.rateLimitDuration),
             isActive: accountData.isActive === 'true',
             proxy: accountData.proxy ? JSON.parse(accountData.proxy) : null,
             accountType: accountData.accountType || 'shared',
@@ -373,7 +375,10 @@ class ClaudeConsoleAccountService {
         const minutesSinceRateLimit = (now - rateLimitedAt) / (1000 * 60)
 
         // 使用账户配置的限流时间
-        const rateLimitDuration = (typeof account.rateLimitDuration === 'number' && !Number.isNaN(account.rateLimitDuration)) ? account.rateLimitDuration : 60
+        const rateLimitDuration =
+          typeof account.rateLimitDuration === 'number' && !Number.isNaN(account.rateLimitDuration)
+            ? account.rateLimitDuration
+            : 60
 
         if (minutesSinceRateLimit >= rateLimitDuration) {
           await this.removeAccountRateLimit(accountId)

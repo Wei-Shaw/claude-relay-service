@@ -1548,7 +1548,8 @@ router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
       priority: priority || 50,
       supportedModels: supportedModels || [],
       userAgent,
-      rateLimitDuration: (rateLimitDuration !== undefined && rateLimitDuration !== null) ? rateLimitDuration : 60,
+      rateLimitDuration:
+        rateLimitDuration !== undefined && rateLimitDuration !== null ? rateLimitDuration : 60,
       proxy,
       accountType: accountType || 'shared'
     })
@@ -4628,7 +4629,8 @@ router.post('/openai-accounts', authenticateAdmin, async (req, res) => {
       description: description || '',
       accountType: accountType || 'shared',
       priority: priority || 50,
-      rateLimitDuration: (rateLimitDuration !== undefined && rateLimitDuration !== null) ? rateLimitDuration : 60,
+      rateLimitDuration:
+        rateLimitDuration !== undefined && rateLimitDuration !== null ? rateLimitDuration : 60,
       openaiOauth: openaiOauth || {},
       accountInfo: accountInfo || {},
       proxy: proxy?.enabled
