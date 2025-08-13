@@ -7,7 +7,7 @@ class LdapService {
   constructor() {
     this.config = config.ldap
     this.client = null
-    
+
     // 验证配置
     if (this.config.enabled) {
       this.validateConfiguration()
@@ -17,31 +17,34 @@ class LdapService {
   // 🔍 验证LDAP配置
   validateConfiguration() {
     const errors = []
-    
+
     if (!this.config.server) {
       errors.push('LDAP server configuration is missing')
     } else {
       if (!this.config.server.url || typeof this.config.server.url !== 'string') {
         errors.push('LDAP server URL is not configured or invalid')
       }
-      
+
       if (!this.config.server.bindDN || typeof this.config.server.bindDN !== 'string') {
         errors.push('LDAP bind DN is not configured or invalid')
       }
-      
-      if (!this.config.server.bindCredentials || typeof this.config.server.bindCredentials !== 'string') {
+
+      if (
+        !this.config.server.bindCredentials ||
+        typeof this.config.server.bindCredentials !== 'string'
+      ) {
         errors.push('LDAP bind credentials are not configured or invalid')
       }
-      
+
       if (!this.config.server.searchBase || typeof this.config.server.searchBase !== 'string') {
         errors.push('LDAP search base is not configured or invalid')
       }
-      
+
       if (!this.config.server.searchFilter || typeof this.config.server.searchFilter !== 'string') {
         errors.push('LDAP search filter is not configured or invalid')
       }
     }
-    
+
     if (errors.length > 0) {
       logger.error('❌ LDAP configuration validation failed:', errors)
       // Don't throw error during initialization, just log warnings
@@ -59,7 +62,7 @@ class LdapService {
 
     // Try different ways to get the DN
     let dn = null
-    
+
     // Method 1: Direct dn property
     if (ldapEntry.dn) {
       dn = ldapEntry.dn
@@ -107,35 +110,35 @@ class LdapService {
       // 如果使用 LDAPS (SSL/TLS)，添加 TLS 选项
       if (this.config.server.url.toLowerCase().startsWith('ldaps://')) {
         const tlsOptions = {}
-        
+
         // 证书验证设置
         if (this.config.server.tls) {
           if (typeof this.config.server.tls.rejectUnauthorized === 'boolean') {
             tlsOptions.rejectUnauthorized = this.config.server.tls.rejectUnauthorized
           }
-          
+
           // CA 证书
           if (this.config.server.tls.ca) {
             tlsOptions.ca = this.config.server.tls.ca
           }
-          
+
           // 客户端证书和私钥 (双向认证)
           if (this.config.server.tls.cert) {
             tlsOptions.cert = this.config.server.tls.cert
           }
-          
+
           if (this.config.server.tls.key) {
             tlsOptions.key = this.config.server.tls.key
           }
-          
+
           // 服务器名称 (SNI)
           if (this.config.server.tls.servername) {
             tlsOptions.servername = this.config.server.tls.servername
           }
         }
-        
+
         clientOptions.tlsOptions = tlsOptions
-        
+
         logger.debug('🔒 Creating LDAPS client with TLS options:', {
           url: this.config.server.url,
           rejectUnauthorized: tlsOptions.rejectUnauthorized,
@@ -184,23 +187,23 @@ class LdapService {
   async bindClient(client) {
     return new Promise((resolve, reject) => {
       // 验证绑定凭据
-      const bindDN = this.config.server.bindDN
-      const bindCredentials = this.config.server.bindCredentials
-      
+      const { bindDN } = this.config.server
+      const { bindCredentials } = this.config.server
+
       if (!bindDN || typeof bindDN !== 'string') {
         const error = new Error('LDAP bind DN is not configured or invalid')
         logger.error('❌ LDAP configuration error:', error.message)
         reject(error)
         return
       }
-      
+
       if (!bindCredentials || typeof bindCredentials !== 'string') {
         const error = new Error('LDAP bind credentials are not configured or invalid')
         logger.error('❌ LDAP configuration error:', error.message)
         reject(error)
         return
       }
-      
+
       client.bind(bindDN, bindCredentials, (err) => {
         if (err) {
           logger.error('❌ LDAP bind failed:', err)
@@ -226,7 +229,7 @@ class LdapService {
       logger.debug(`🔍 Searching for user: ${username} with filter: ${searchFilter}`)
 
       const entries = []
-      
+
       client.search(this.config.server.searchBase, searchOptions, (err, res) => {
         if (err) {
           logger.error('❌ LDAP search error:', err)
@@ -256,8 +259,10 @@ class LdapService {
         })
 
         res.on('end', (result) => {
-          logger.debug(`✅ LDAP search completed. Status: ${result.status}, Found ${entries.length} entries`)
-          
+          logger.debug(
+            `✅ LDAP search completed. Status: ${result.status}, Found ${entries.length} entries`
+          )
+
           if (entries.length === 0) {
             resolve(null)
           } else {
@@ -270,7 +275,7 @@ class LdapService {
                 entryStringified: JSON.stringify(entries[0], null, 2).substring(0, 500)
               })
             }
-            
+
             if (entries.length === 1) {
               resolve(entries[0])
             } else {
@@ -293,18 +298,18 @@ class LdapService {
         reject(error)
         return
       }
-      
+
       if (!password || typeof password !== 'string') {
         logger.debug(`🚫 Invalid or empty password for DN: ${userDN}`)
         resolve(false)
         return
       }
-      
+
       const authClient = this.createClient()
-      
+
       authClient.bind(userDN, password, (err) => {
         authClient.unbind() // 立即关闭认证客户端
-        
+
         if (err) {
           if (err.name === 'InvalidCredentialsError') {
             logger.debug(`🚫 Invalid credentials for DN: ${userDN}`)
@@ -329,7 +334,7 @@ class LdapService {
 
       // 创建属性映射
       const attrMap = {}
-      attributes.forEach(attr => {
+      attributes.forEach((attr) => {
         const name = attr.type || attr.name
         const values = Array.isArray(attr.values) ? attr.values : [attr.values]
         attrMap[name] = values.length === 1 ? values[0] : values
@@ -337,7 +342,7 @@ class LdapService {
 
       // 根据配置映射用户属性
       const mapping = this.config.userMapping
-      
+
       userInfo.displayName = attrMap[mapping.displayName] || username
       userInfo.email = attrMap[mapping.email] || ''
       userInfo.firstName = attrMap[mapping.firstName] || ''
@@ -386,7 +391,10 @@ class LdapService {
       throw new Error('LDAP bind DN is not configured')
     }
 
-    if (!this.config.server.bindCredentials || typeof this.config.server.bindCredentials !== 'string') {
+    if (
+      !this.config.server.bindCredentials ||
+      typeof this.config.server.bindCredentials !== 'string'
+    ) {
       throw new Error('LDAP bind credentials are not configured')
     }
 
@@ -450,9 +458,9 @@ class LdapService {
       // 7. 检查用户是否被禁用
       if (!user.isActive) {
         logger.security(`🔒 Disabled user LDAP login attempt: ${username} from LDAP authentication`)
-        return { 
-          success: false, 
-          message: 'Your account has been disabled. Please contact administrator.' 
+        return {
+          success: false,
+          message: 'Your account has been disabled. Please contact administrator.'
         }
       }
 
@@ -470,7 +478,6 @@ class LdapService {
         sessionToken,
         message: 'Authentication successful'
       }
-
     } catch (error) {
       logger.error('❌ LDAP authentication error:', error)
       return {
@@ -499,7 +506,7 @@ class LdapService {
 
     try {
       await this.bindClient(client)
-      
+
       return {
         success: true,
         message: 'LDAP connection successful',

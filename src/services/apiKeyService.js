@@ -492,8 +492,8 @@ class ApiKeyService {
     try {
       const allKeys = await redis.getAllApiKeys()
       return allKeys
-        .filter(key => key.userId === userId)
-        .map(key => ({
+        .filter((key) => key.userId === userId)
+        .map((key) => ({
           id: key.id,
           name: key.name,
           description: key.description,
@@ -520,7 +520,9 @@ class ApiKeyService {
   async getApiKeyById(keyId, userId = null) {
     try {
       const keyData = await redis.getApiKey(keyId)
-      if (!keyData) return null
+      if (!keyData) {
+        return null
+      }
 
       // 如果指定了用户ID，检查权限
       if (userId && keyData.userId !== userId) {

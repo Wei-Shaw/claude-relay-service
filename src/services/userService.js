@@ -1,6 +1,5 @@
 const redis = require('../models/redis')
 const crypto = require('crypto')
-const bcrypt = require('bcryptjs')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
 
@@ -88,7 +87,9 @@ class UserService {
   async getUserByUsername(username) {
     try {
       const userId = await redis.get(`${this.usernamePrefix}${username}`)
-      if (!userId) return null
+      if (!userId) {
+        return null
+      }
 
       const userData = await redis.get(`${this.userPrefix}${userId}`)
       return userData ? JSON.parse(userData) : null
@@ -99,13 +100,97 @@ class UserService {
   }
 
   // 👤 通过ID获取用户
-  async getUserById(userId) {
+  async getUserById(userId, calculateUsage = true) {
     try {
       const userData = await redis.get(`${this.userPrefix}${userId}`)
-      return userData ? JSON.parse(userData) : null
+      if (!userData) {
+        return null
+      }
+
+      const user = JSON.parse(userData)
+
+      // Calculate totalUsage by aggregating user's API keys usage (if requested)
+      if (calculateUsage) {
+        try {
+          const usageStats = await this.calculateUserUsageStats(userId)
+          user.totalUsage = usageStats.totalUsage
+          user.apiKeyCount = usageStats.apiKeyCount
+        } catch (error) {
+          logger.error('❌ Error calculating user usage stats:', error)
+          // Fallback to stored values if calculation fails
+          user.totalUsage = user.totalUsage || {
+            requests: 0,
+            inputTokens: 0,
+            outputTokens: 0,
+            totalCost: 0
+          }
+          user.apiKeyCount = user.apiKeyCount || 0
+        }
+      }
+
+      return user
     } catch (error) {
       logger.error('❌ Error getting user by ID:', error)
       throw error
+    }
+  }
+
+  // 📊 计算用户使用统计（通过聚合API Keys）
+  async calculateUserUsageStats(userId) {
+    try {
+      // Use redis directly to avoid circular dependency
+      const client = redis.getClientSafe()
+      const pattern = 'api_key:*'
+      const keys = await client.keys(pattern)
+
+      const userApiKeys = []
+      for (const key of keys) {
+        const keyData = await client.get(key)
+        if (keyData) {
+          const apiKey = JSON.parse(keyData)
+          if (apiKey.userId === userId) {
+            // Get usage stats for this API key
+            const usage = await redis.getUsageStats(apiKey.id)
+            userApiKeys.push({
+              id: apiKey.id,
+              name: apiKey.name,
+              usage
+            })
+          }
+        }
+      }
+
+      const totalUsage = {
+        requests: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        totalCost: 0
+      }
+
+      for (const apiKey of userApiKeys) {
+        if (apiKey.usage) {
+          totalUsage.requests += apiKey.usage.requests || 0
+          totalUsage.inputTokens += apiKey.usage.inputTokens || 0
+          totalUsage.outputTokens += apiKey.usage.outputTokens || 0
+          totalUsage.totalCost += apiKey.usage.totalCost || 0
+        }
+      }
+
+      return {
+        totalUsage,
+        apiKeyCount: userApiKeys.length
+      }
+    } catch (error) {
+      logger.error('❌ Error calculating user usage stats:', error)
+      return {
+        totalUsage: {
+          requests: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          totalCost: 0
+        },
+        apiKeyCount: 0
+      }
     }
   }
 
@@ -116,17 +201,21 @@ class UserService {
       const { page = 1, limit = 20, role, isActive } = options
       const pattern = `${this.userPrefix}*`
       const keys = await client.keys(pattern)
-      
+
       const users = []
       for (const key of keys) {
         const userData = await client.get(key)
         if (userData) {
           const user = JSON.parse(userData)
-          
+
           // 应用过滤条件
-          if (role && user.role !== role) continue
-          if (typeof isActive === 'boolean' && user.isActive !== isActive) continue
-          
+          if (role && user.role !== role) {
+            continue
+          }
+          if (typeof isActive === 'boolean' && user.isActive !== isActive) {
+            continue
+          }
+
           users.push(user)
         }
       }
@@ -153,7 +242,7 @@ class UserService {
   // 🔄 更新用户状态
   async updateUserStatus(userId, isActive) {
     try {
-      const user = await this.getUserById(userId)
+      const user = await this.getUserById(userId, false) // Skip usage calculation
       if (!user) {
         throw new Error('User not found')
       }
@@ -179,7 +268,7 @@ class UserService {
   // 🔄 更新用户角色
   async updateUserRole(userId, role) {
     try {
-      const user = await this.getUserById(userId)
+      const user = await this.getUserById(userId, false) // Skip usage calculation
       if (!user) {
         throw new Error('User not found')
       }
@@ -197,46 +286,22 @@ class UserService {
     }
   }
 
-  // 📊 更新用户使用统计
-  async updateUserUsage(userId, usage) {
-    try {
-      const user = await this.getUserById(userId)
-      if (!user) return
-
-      const { requests = 0, inputTokens = 0, outputTokens = 0, cost = 0 } = usage
-
-      user.totalUsage.requests += requests
-      user.totalUsage.inputTokens += inputTokens
-      user.totalUsage.outputTokens += outputTokens
-      user.totalUsage.totalCost += cost
-      user.updatedAt = new Date().toISOString()
-
-      await redis.set(`${this.userPrefix}${userId}`, JSON.stringify(user))
-    } catch (error) {
-      logger.error('❌ Error updating user usage:', error)
-    }
-  }
-
-  // 📊 更新用户API Key数量
-  async updateUserApiKeyCount(userId, count) {
-    try {
-      const user = await this.getUserById(userId)
-      if (!user) return
-
-      user.apiKeyCount = count
-      user.updatedAt = new Date().toISOString()
-
-      await redis.set(`${this.userPrefix}${userId}`, JSON.stringify(user))
-    } catch (error) {
-      logger.error('❌ Error updating user API key count:', error)
-    }
+  // 📊 更新用户API Key数量 (已废弃，现在通过聚合计算)
+  async updateUserApiKeyCount(userId, _count) {
+    // This method is deprecated since apiKeyCount is now calculated dynamically
+    // in getUserById by aggregating the user's API keys
+    logger.debug(
+      `📊 updateUserApiKeyCount called for ${userId} but is now deprecated (count auto-calculated)`
+    )
   }
 
   // 📝 记录用户登录
   async recordUserLogin(userId) {
     try {
-      const user = await this.getUserById(userId)
-      if (!user) return
+      const user = await this.getUserById(userId, false) // Skip usage calculation
+      if (!user) {
+        return
+      }
 
       user.lastLoginAt = new Date().toISOString()
       await redis.set(`${this.userPrefix}${userId}`, JSON.stringify(user))
@@ -272,10 +337,12 @@ class UserService {
   async validateUserSession(sessionToken) {
     try {
       const sessionData = await redis.get(`${this.userSessionPrefix}${sessionToken}`)
-      if (!sessionData) return null
+      if (!sessionData) {
+        return null
+      }
 
       const session = JSON.parse(sessionData)
-      
+
       // 检查会话是否过期
       if (new Date() > new Date(session.expiresAt)) {
         await this.invalidateUserSession(sessionToken)
@@ -283,7 +350,7 @@ class UserService {
       }
 
       // 获取用户信息
-      const user = await this.getUserById(session.userId)
+      const user = await this.getUserById(session.userId, false) // Skip usage calculation for validation
       if (!user || !user.isActive) {
         await this.invalidateUserSession(sessionToken)
         return null
@@ -312,7 +379,7 @@ class UserService {
       const client = redis.getClientSafe()
       const pattern = `${this.userSessionPrefix}*`
       const keys = await client.keys(pattern)
-      
+
       for (const key of keys) {
         const sessionData = await client.get(key)
         if (sessionData) {
@@ -322,7 +389,7 @@ class UserService {
           }
         }
       }
-      
+
       logger.info(`🚫 Invalidated all sessions for user: ${userId}`)
     } catch (error) {
       logger.error('❌ Error invalidating user sessions:', error)
@@ -332,7 +399,7 @@ class UserService {
   // 🗑️ 删除用户（软删除，标记为不活跃）
   async deleteUser(userId) {
     try {
-      const user = await this.getUserById(userId)
+      const user = await this.getUserById(userId, false) // Skip usage calculation
       if (!user) {
         throw new Error('User not found')
       }
@@ -343,10 +410,10 @@ class UserService {
       user.updatedAt = new Date().toISOString()
 
       await redis.set(`${this.userPrefix}${userId}`, JSON.stringify(user))
-      
+
       // 删除所有会话
       await this.invalidateUserSessions(userId)
-      
+
       logger.info(`🗑️ Soft deleted user: ${user.username} (${userId})`)
       return user
     } catch (error) {
@@ -361,7 +428,7 @@ class UserService {
       const client = redis.getClientSafe()
       const pattern = `${this.userPrefix}*`
       const keys = await client.keys(pattern)
-      
+
       const stats = {
         totalUsers: 0,
         activeUsers: 0,
@@ -381,17 +448,17 @@ class UserService {
         if (userData) {
           const user = JSON.parse(userData)
           stats.totalUsers++
-          
+
           if (user.isActive) {
             stats.activeUsers++
           }
-          
+
           if (user.role === 'admin') {
             stats.adminUsers++
           } else {
             stats.regularUsers++
           }
-          
+
           stats.totalApiKeys += user.apiKeyCount || 0
           stats.totalUsage.requests += user.totalUsage?.requests || 0
           stats.totalUsage.inputTokens += user.totalUsage?.inputTokens || 0

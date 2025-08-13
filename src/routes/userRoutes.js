@@ -66,7 +66,6 @@ router.post('/login', async (req, res) => {
       },
       sessionToken: authResult.sessionToken
     })
-
   } catch (error) {
     logger.error('❌ User login error:', error)
     res.status(500).json({
@@ -80,14 +79,13 @@ router.post('/login', async (req, res) => {
 router.post('/logout', authenticateUser, async (req, res) => {
   try {
     await userService.invalidateUserSession(req.user.sessionToken)
-    
+
     logger.info(`👋 User logout: ${req.user.username}`)
 
     res.json({
       success: true,
       message: 'Logout successful'
     })
-
   } catch (error) {
     logger.error('❌ User logout error:', error)
     res.status(500).json({
@@ -125,7 +123,6 @@ router.get('/profile', authenticateUser, async (req, res) => {
         totalUsage: user.totalUsage
       }
     })
-
   } catch (error) {
     logger.error('❌ Get user profile error:', error)
     res.status(500).json({
@@ -139,9 +136,9 @@ router.get('/profile', authenticateUser, async (req, res) => {
 router.get('/api-keys', authenticateUser, async (req, res) => {
   try {
     const apiKeys = await apiKeyService.getUserApiKeys(req.user.id)
-    
+
     // 移除敏感信息
-    const safeApiKeys = apiKeys.map(key => ({
+    const safeApiKeys = apiKeys.map((key) => ({
       id: key.id,
       name: key.name,
       description: key.description,
@@ -154,7 +151,9 @@ router.get('/api-keys', authenticateUser, async (req, res) => {
       dailyCost: key.dailyCost,
       dailyCostLimit: key.dailyCostLimit,
       // 不返回实际的key值，只返回前缀和后几位
-      keyPreview: key.key ? `${key.key.substring(0, 8)}...${key.key.substring(key.key.length - 4)}` : null
+      keyPreview: key.key
+        ? `${key.key.substring(0, 8)}...${key.key.substring(key.key.length - 4)}`
+        : null
     }))
 
     res.json({
@@ -162,7 +161,6 @@ router.get('/api-keys', authenticateUser, async (req, res) => {
       apiKeys: safeApiKeys,
       total: safeApiKeys.length
     })
-
   } catch (error) {
     logger.error('❌ Get user API keys error:', error)
     res.status(500).json({
@@ -207,7 +205,7 @@ router.post('/api-keys', authenticateUser, async (req, res) => {
     }
 
     const newApiKey = await apiKeyService.createApiKey(apiKeyData)
-    
+
     // 更新用户API Key数量
     await userService.updateUserApiKeyCount(req.user.id, userApiKeys.length + 1)
 
@@ -227,7 +225,6 @@ router.post('/api-keys', authenticateUser, async (req, res) => {
         createdAt: newApiKey.createdAt
       }
     })
-
   } catch (error) {
     logger.error('❌ Create user API key error:', error)
     res.status(500).json({
@@ -265,7 +262,6 @@ router.post('/api-keys/:keyId/regenerate', authenticateUser, async (req, res) =>
         updatedAt: newKey.updatedAt
       }
     })
-
   } catch (error) {
     logger.error('❌ Regenerate user API key error:', error)
     res.status(500).json({
@@ -301,7 +297,6 @@ router.delete('/api-keys/:keyId', authenticateUser, async (req, res) => {
       success: true,
       message: 'API key deleted successfully'
     })
-
   } catch (error) {
     logger.error('❌ Delete user API key error:', error)
     res.status(500).json({
@@ -318,7 +313,7 @@ router.get('/usage-stats', authenticateUser, async (req, res) => {
 
     // 获取用户的API Keys
     const userApiKeys = await apiKeyService.getUserApiKeys(req.user.id)
-    const apiKeyIds = userApiKeys.map(key => key.id)
+    const apiKeyIds = userApiKeys.map((key) => key.id)
 
     if (apiKeyIds.length === 0) {
       return res.json({
@@ -341,7 +336,6 @@ router.get('/usage-stats', authenticateUser, async (req, res) => {
       success: true,
       stats
     })
-
   } catch (error) {
     logger.error('❌ Get user usage stats error:', error)
     res.status(500).json({
@@ -371,10 +365,11 @@ router.get('/', authenticateUserOrAdmin, requireAdmin, async (req, res) => {
     let filteredUsers = result.users
     if (search) {
       const searchLower = search.toLowerCase()
-      filteredUsers = result.users.filter(user => 
-        user.username.toLowerCase().includes(searchLower) ||
-        user.displayName.toLowerCase().includes(searchLower) ||
-        user.email.toLowerCase().includes(searchLower)
+      filteredUsers = result.users.filter(
+        (user) =>
+          user.username.toLowerCase().includes(searchLower) ||
+          user.displayName.toLowerCase().includes(searchLower) ||
+          user.email.toLowerCase().includes(searchLower)
       )
     }
 
@@ -388,7 +383,6 @@ router.get('/', authenticateUserOrAdmin, requireAdmin, async (req, res) => {
         totalPages: result.totalPages
       }
     })
-
   } catch (error) {
     logger.error('❌ Get users list error:', error)
     res.status(500).json({
@@ -418,7 +412,7 @@ router.get('/:userId', authenticateUserOrAdmin, requireAdmin, async (req, res) =
       success: true,
       user: {
         ...user,
-        apiKeys: apiKeys.map(key => ({
+        apiKeys: apiKeys.map((key) => ({
           id: key.id,
           name: key.name,
           description: key.description,
@@ -426,11 +420,12 @@ router.get('/:userId', authenticateUserOrAdmin, requireAdmin, async (req, res) =
           createdAt: key.createdAt,
           lastUsedAt: key.lastUsedAt,
           usage: key.usage,
-          keyPreview: key.key ? `${key.key.substring(0, 8)}...${key.key.substring(key.key.length - 4)}` : null
+          keyPreview: key.key
+            ? `${key.key.substring(0, 8)}...${key.key.substring(key.key.length - 4)}`
+            : null
         }))
       }
     })
-
   } catch (error) {
     logger.error('❌ Get user details error:', error)
     res.status(500).json({
@@ -456,7 +451,9 @@ router.patch('/:userId/status', authenticateUserOrAdmin, requireAdmin, async (re
     const updatedUser = await userService.updateUserStatus(userId, isActive)
 
     const adminUser = req.admin?.username || req.user?.username
-    logger.info(`🔄 Admin ${adminUser} ${isActive ? 'enabled' : 'disabled'} user: ${updatedUser.username}`)
+    logger.info(
+      `🔄 Admin ${adminUser} ${isActive ? 'enabled' : 'disabled'} user: ${updatedUser.username}`
+    )
 
     res.json({
       success: true,
@@ -468,7 +465,6 @@ router.patch('/:userId/status', authenticateUserOrAdmin, requireAdmin, async (re
         updatedAt: updatedUser.updatedAt
       }
     })
-
   } catch (error) {
     logger.error('❌ Update user status error:', error)
     res.status(500).json({
@@ -507,7 +503,6 @@ router.patch('/:userId/role', authenticateUserOrAdmin, requireAdmin, async (req,
         updatedAt: updatedUser.updatedAt
       }
     })
-
   } catch (error) {
     logger.error('❌ Update user role error:', error)
     res.status(500).json({
@@ -540,7 +535,6 @@ router.post('/:userId/disable-keys', authenticateUserOrAdmin, requireAdmin, asyn
       message: `Disabled ${result.count} API keys for user ${user.username}`,
       disabledCount: result.count
     })
-
   } catch (error) {
     logger.error('❌ Disable user API keys error:', error)
     res.status(500).json({
@@ -566,7 +560,7 @@ router.get('/:userId/usage-stats', authenticateUserOrAdmin, requireAdmin, async 
 
     // 获取用户的API Keys
     const userApiKeys = await apiKeyService.getUserApiKeys(userId)
-    const apiKeyIds = userApiKeys.map(key => key.id)
+    const apiKeyIds = userApiKeys.map((key) => key.id)
 
     if (apiKeyIds.length === 0) {
       return res.json({
@@ -599,7 +593,6 @@ router.get('/:userId/usage-stats', authenticateUserOrAdmin, requireAdmin, async 
       },
       stats
     })
-
   } catch (error) {
     logger.error('❌ Get user usage stats (admin) error:', error)
     res.status(500).json({
@@ -618,7 +611,6 @@ router.get('/stats/overview', authenticateUserOrAdmin, requireAdmin, async (req,
       success: true,
       stats
     })
-
   } catch (error) {
     logger.error('❌ Get user stats overview error:', error)
     res.status(500).json({
@@ -638,7 +630,6 @@ router.get('/admin/ldap-test', authenticateUserOrAdmin, requireAdmin, async (req
       ldapTest: testResult,
       config: ldapService.getConfigInfo()
     })
-
   } catch (error) {
     logger.error('❌ LDAP test error:', error)
     res.status(500).json({

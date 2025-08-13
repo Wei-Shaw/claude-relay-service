@@ -490,7 +490,9 @@ const authenticateUser = async (req, res, next) => {
 
     // 检查用户是否被禁用
     if (!user.isActive) {
-      logger.security(`🔒 Disabled user login attempt: ${user.username} from ${req.ip || 'unknown'}`)
+      logger.security(
+        `🔒 Disabled user login attempt: ${user.username} from ${req.ip || 'unknown'}`
+      )
       return res.status(403).json({
         error: 'Account disabled',
         message: 'Your account has been disabled. Please contact administrator.'
@@ -506,7 +508,7 @@ const authenticateUser = async (req, res, next) => {
       firstName: user.firstName,
       lastName: user.lastName,
       role: user.role,
-      sessionToken: sessionToken,
+      sessionToken,
       sessionCreatedAt: session.createdAt
     }
 
@@ -559,7 +561,7 @@ const authenticateUserOrAdmin = async (req, res, next) => {
             loginTime: adminSession.loginTime
           }
           req.userType = 'admin'
-          
+
           const authDuration = Date.now() - startTime
           logger.security(`🔐 Admin authenticated: ${adminSession.username} in ${authDuration}ms`)
           return next()
@@ -575,7 +577,7 @@ const authenticateUserOrAdmin = async (req, res, next) => {
         const sessionValidation = await userService.validateUserSession(userToken)
         if (sessionValidation) {
           const { session, user } = sessionValidation
-          
+
           if (user.isActive) {
             req.user = {
               id: user.id,
@@ -589,7 +591,7 @@ const authenticateUserOrAdmin = async (req, res, next) => {
               sessionCreatedAt: session.createdAt
             }
             req.userType = 'user'
-            
+
             const authDuration = Date.now() - startTime
             logger.info(`👤 User authenticated: ${user.username} (${user.id}) in ${authDuration}ms`)
             return next()
@@ -606,7 +608,6 @@ const authenticateUserOrAdmin = async (req, res, next) => {
       error: 'Authentication required',
       message: 'Please login as user or admin to access this resource'
     })
-
   } catch (error) {
     const authDuration = Date.now() - startTime
     logger.error(`❌ User/Admin authentication error (${authDuration}ms):`, {
@@ -624,34 +625,34 @@ const authenticateUserOrAdmin = async (req, res, next) => {
 }
 
 // 🛡️ 权限检查中间件
-const requireRole = (allowedRoles) => {
-  return (req, res, next) => {
-    // 管理员始终有权限
-    if (req.admin) {
-      return next()
-    }
-
-    // 检查用户角色
-    if (req.user) {
-      const userRole = req.user.role
-      const allowed = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles]
-      
-      if (allowed.includes(userRole)) {
-        return next()
-      } else {
-        logger.security(`🚫 Access denied for user ${req.user.username} (role: ${userRole}) to ${req.originalUrl}`)
-        return res.status(403).json({
-          error: 'Insufficient permissions',
-          message: `This resource requires one of the following roles: ${allowed.join(', ')}`
-        })
-      }
-    }
-
-    return res.status(401).json({
-      error: 'Authentication required',
-      message: 'Please login to access this resource'
-    })
+const requireRole = (allowedRoles) => (req, res, next) => {
+  // 管理员始终有权限
+  if (req.admin) {
+    return next()
   }
+
+  // 检查用户角色
+  if (req.user) {
+    const userRole = req.user.role
+    const allowed = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles]
+
+    if (allowed.includes(userRole)) {
+      return next()
+    } else {
+      logger.security(
+        `🚫 Access denied for user ${req.user.username} (role: ${userRole}) to ${req.originalUrl}`
+      )
+      return res.status(403).json({
+        error: 'Insufficient permissions',
+        message: `This resource requires one of the following roles: ${allowed.join(', ')}`
+      })
+    }
+  }
+
+  return res.status(401).json({
+    error: 'Authentication required',
+    message: 'Please login to access this resource'
+  })
 }
 
 // 🔒 管理员权限检查中间件
@@ -665,7 +666,9 @@ const requireAdmin = (req, res, next) => {
     return next()
   }
 
-  logger.security(`🚫 Admin access denied for ${req.user?.username || 'unknown'} from ${req.ip || 'unknown'}`)
+  logger.security(
+    `🚫 Admin access denied for ${req.user?.username || 'unknown'} from ${req.ip || 'unknown'}`
+  )
   return res.status(403).json({
     error: 'Admin access required',
     message: 'This resource requires administrator privileges'
