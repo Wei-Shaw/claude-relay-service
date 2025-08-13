@@ -764,6 +764,21 @@ async function refreshAccountToken(accountId) {
           status: 'error',
           errorMessage: error.message
         })
+
+        // 发送Webhook通知
+        try {
+          const webhookNotifier = require('../utils/webhookNotifier')
+          await webhookNotifier.sendAccountAnomalyNotification({
+            accountId,
+            accountName: account.name,
+            platform: 'gemini',
+            status: 'error',
+            errorCode: 'GEMINI_ERROR',
+            reason: `Token refresh failed: ${error.message}`
+          })
+        } catch (webhookError) {
+          logger.error('Failed to send webhook notification:', webhookError)
+        }
       } catch (updateError) {
         logger.error('Failed to update account status after refresh error:', updateError)
       }

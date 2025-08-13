@@ -228,6 +228,21 @@ class ClaudeAccountService {
         accountData.status = 'error'
         accountData.errorMessage = error.message
         await redis.setClaudeAccount(accountId, accountData)
+
+        // 发送Webhook通知
+        try {
+          const webhookNotifier = require('../utils/webhookNotifier')
+          await webhookNotifier.sendAccountAnomalyNotification({
+            accountId,
+            accountName: accountData.name,
+            platform: 'claude-oauth',
+            status: 'error',
+            errorCode: 'CLAUDE_OAUTH_ERROR',
+            reason: `Token refresh failed: ${error.message}`
+          })
+        } catch (webhookError) {
+          logger.error('Failed to send webhook notification:', webhookError)
+        }
       }
 
       logger.error(`❌ Failed to refresh token for account ${accountId}:`, error)
@@ -1222,6 +1237,21 @@ class ClaudeAccountService {
       logger.warn(
         `⚠️ Account ${accountData.name} (${accountId}) marked as unauthorized and disabled for scheduling`
       )
+
+      // 发送Webhook通知
+      try {
+        const webhookNotifier = require('../utils/webhookNotifier')
+        await webhookNotifier.sendAccountAnomalyNotification({
+          accountId,
+          accountName: accountData.name,
+          platform: 'claude-oauth',
+          status: 'unauthorized',
+          errorCode: 'CLAUDE_OAUTH_UNAUTHORIZED',
+          reason: 'Account unauthorized (401 errors detected)'
+        })
+      } catch (webhookError) {
+        logger.error('Failed to send webhook notification:', webhookError)
+      }
 
       return { success: true }
     } catch (error) {

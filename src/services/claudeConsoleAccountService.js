@@ -395,6 +395,9 @@ class ClaudeConsoleAccountService {
     try {
       const client = redis.getClientSafe()
 
+      // 获取账户信息用于webhook通知
+      const accountData = await client.hgetall(`${this.ACCOUNT_KEY_PREFIX}${accountId}`)
+
       const updates = {
         status: 'blocked',
         errorMessage: reason,
@@ -404,6 +407,24 @@ class ClaudeConsoleAccountService {
       await client.hset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, updates)
 
       logger.warn(`🚫 Claude Console account blocked: ${accountId} - ${reason}`)
+
+      // 发送Webhook通知
+      if (accountData && Object.keys(accountData).length > 0) {
+        try {
+          const webhookNotifier = require('../utils/webhookNotifier')
+          await webhookNotifier.sendAccountAnomalyNotification({
+            accountId,
+            accountName: accountData.name || 'Unknown Account',
+            platform: 'claude-console',
+            status: 'blocked',
+            errorCode: 'CLAUDE_CONSOLE_BLOCKED',
+            reason: reason
+          })
+        } catch (webhookError) {
+          logger.error('Failed to send webhook notification:', webhookError)
+        }
+      }
+
       return { success: true }
     } catch (error) {
       logger.error(`❌ Failed to block Claude Console account: ${accountId}`, error)
