@@ -18,6 +18,8 @@ const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
 const config = require('../../config/config')
+const { SocksProxyAgent } = require('socks-proxy-agent')
+const { HttpsProxyAgent } = require('https-proxy-agent')
 
 const router = express.Router()
 
@@ -4501,12 +4503,16 @@ router.post('/openai-accounts/exchange-code', authenticateAdmin, async (req, res
 
     if (sessionData.proxy) {
       const { type, host, port, username, password } = sessionData.proxy
-      if (type === 'http' || type === 'https') {
-        axiosConfig.proxy = {
-          host,
-          port: parseInt(port),
-          auth: username && password ? { username, password } : undefined
-        }
+      if (type === 'socks5') {
+        // SOCKS5 代理
+        const auth = username && password ? `${username}:${password}@` : ''
+        const socksUrl = `socks5://${auth}${host}:${port}`
+        axiosConfig.httpsAgent = new SocksProxyAgent(socksUrl)
+      } else if (type === 'http' || type === 'https') {
+        // HTTP/HTTPS 代理
+        const auth = username && password ? `${username}:${password}@` : ''
+        const proxyUrl = `${type}://${auth}${host}:${port}`
+        axiosConfig.httpsAgent = new HttpsProxyAgent(proxyUrl)
       }
     }
 
@@ -4678,15 +4684,7 @@ router.post('/openai-accounts', authenticateAdmin, async (req, res) => {
         rateLimitDuration !== undefined && rateLimitDuration !== null ? rateLimitDuration : 60,
       openaiOauth: openaiOauth || {},
       accountInfo: accountInfo || {},
-      proxy: proxy?.enabled
-        ? {
-            type: proxy.type,
-            host: proxy.host,
-            port: proxy.port,
-            username: proxy.username || null,
-            password: proxy.password || null
-          }
-        : null,
+      proxy: proxy || null,
       isActive: true,
       schedulable: true
     }

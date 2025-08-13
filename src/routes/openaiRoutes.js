@@ -8,6 +8,31 @@ const unifiedOpenAIScheduler = require('../services/unifiedOpenAIScheduler')
 const openaiAccountService = require('../services/openaiAccountService')
 const apiKeyService = require('../services/apiKeyService')
 const crypto = require('crypto')
+const { SocksProxyAgent } = require('socks-proxy-agent')
+const { HttpsProxyAgent } = require('https-proxy-agent')
+
+// 创建代理 Agent
+function createProxyAgent(proxy) {
+  if (!proxy) {
+    return null
+  }
+
+  try {
+    if (proxy.type === 'socks5') {
+      const auth = proxy.username && proxy.password ? `${proxy.username}:${proxy.password}@` : ''
+      const socksUrl = `socks5://${auth}${proxy.host}:${proxy.port}`
+      return new SocksProxyAgent(socksUrl)
+    } else if (proxy.type === 'http' || proxy.type === 'https') {
+      const auth = proxy.username && proxy.password ? `${proxy.username}:${proxy.password}@` : ''
+      const proxyUrl = `${proxy.type}://${auth}${proxy.host}:${proxy.port}`
+      return new HttpsProxyAgent(proxyUrl)
+    }
+  } catch (error) {
+    logger.warn('Failed to create proxy agent:', error)
+  }
+
+  return null
+}
 
 // 使用统一调度器选择 OpenAI 账户
 async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel = null) {
@@ -40,11 +65,22 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
       throw new Error('Failed to decrypt OpenAI accessToken')
     }
 
+    // 解析代理配置
+    let proxy = null
+    if (account.proxy) {
+      try {
+        proxy = typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
+      } catch (e) {
+        logger.warn('Failed to parse proxy configuration:', e)
+      }
+    }
+
     logger.info(`Selected OpenAI account: ${account.name} (${result.accountId})`)
     return {
       accessToken,
       accountId: result.accountId,
-      accountName: account.name
+      accountName: account.name,
+      proxy
     }
   } catch (error) {
     logger.error('Failed to get OpenAI auth token:', error)
@@ -108,7 +144,7 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
     }
 
     // 使用调度器选择账户
-    const { accessToken, accountId } = await getOpenAIAuthToken(
+    const { accessToken, accountId, proxy } = await getOpenAIAuthToken(
       apiKeyData,
       sessionId,
       requestedModel
@@ -133,22 +169,36 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
     headers['content-type'] = 'application/json'
     req.body['store'] = false
 
+    // 创建代理 agent
+    const proxyAgent = createProxyAgent(proxy)
+
+    // 配置请求选项
+    const axiosConfig = {
+      headers,
+      timeout: 60000,
+      validateStatus: () => true
+    }
+
+    // 如果有代理，添加代理配置
+    if (proxyAgent) {
+      axiosConfig.httpsAgent = proxyAgent
+      logger.info('Using proxy for OpenAI request')
+    }
+
     // 根据 stream 参数决定请求类型
     if (isStream) {
       // 流式请求
       upstream = await axios.post('https://chatgpt.com/backend-api/codex/responses', req.body, {
-        headers,
-        responseType: 'stream',
-        timeout: 60000,
-        validateStatus: () => true
+        ...axiosConfig,
+        responseType: 'stream'
       })
     } else {
       // 非流式请求
-      upstream = await axios.post('https://chatgpt.com/backend-api/codex/responses', req.body, {
-        headers,
-        timeout: 60000,
-        validateStatus: () => true
-      })
+      upstream = await axios.post(
+        'https://chatgpt.com/backend-api/codex/responses',
+        req.body,
+        axiosConfig
+      )
     }
     res.status(upstream.status)
 

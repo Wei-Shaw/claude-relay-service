@@ -1687,6 +1687,7 @@ const handleOAuthSuccess = async (tokenInfo) => {
     } else if (form.value.platform === 'openai') {
       data.openaiOauth = tokenInfo.tokens || tokenInfo
       data.accountInfo = tokenInfo.accountInfo
+      data.priority = form.value.priority || 50
     }
 
     let result
