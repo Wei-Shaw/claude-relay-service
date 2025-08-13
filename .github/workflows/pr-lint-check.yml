@@ -8,12 +8,14 @@ on:
       - '**.jsx'
       - '**.ts'
       - '**.tsx'
+      - '**.vue'
       - '**.json'
       - '**.cjs'
       - '**.mjs'
       - '.prettierrc'
       - '.eslintrc.cjs'
       - 'package.json'
+      - 'web/admin-spa/**'
 
 permissions:
   contents: read
@@ -64,6 +66,7 @@ jobs:
             **/*.jsx
             **/*.ts
             **/*.tsx
+            **/*.vue
             **/*.cjs
             **/*.mjs
             **/*.json
@@ -92,17 +95,35 @@ jobs:
           for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
             if [ -f "$file" ]; then
               echo "Checking: $file"
-              # 使用 prettier --check 来检查格式
-              if ! npx prettier --check "$file" 2>&1; then
-                PRETTIER_FAILED=true
-                # 获取需要格式化的差异
-                DIFF=$(npx prettier "$file" | diff -u "$file" - || true)
-                if [ -n "$DIFF" ]; then
-                  PRETTIER_OUTPUT="${PRETTIER_OUTPUT}❌ File needs formatting: $file\n"
-                  PRETTIER_OUTPUT="${PRETTIER_OUTPUT}\`\`\`diff\n${DIFF}\n\`\`\`\n\n"
+              
+              # 根据文件位置选择正确的 prettier 配置
+              if [[ "$file" == web/admin-spa/* ]]; then
+                # 前端文件：进入前端目录运行 prettier
+                cd web/admin-spa
+                RELATIVE_FILE="${file#web/admin-spa/}"
+                if ! npx prettier --check "$RELATIVE_FILE" 2>&1; then
+                  PRETTIER_FAILED=true
+                  DIFF=$(npx prettier "$RELATIVE_FILE" | diff -u "$RELATIVE_FILE" - || true)
+                  if [ -n "$DIFF" ]; then
+                    PRETTIER_OUTPUT="${PRETTIER_OUTPUT}❌ File needs formatting: $file\n"
+                    PRETTIER_OUTPUT="${PRETTIER_OUTPUT}\`\`\`diff\n${DIFF}\n\`\`\`\n\n"
+                  fi
+                else
+                  echo "✅ $file is properly formatted"
                 fi
+                cd ../..
               else
-                echo "✅ $file is properly formatted"
+                # 后端文件：使用根目录的 prettier
+                if ! npx prettier --check "$file" 2>&1; then
+                  PRETTIER_FAILED=true
+                  DIFF=$(npx prettier "$file" | diff -u "$file" - || true)
+                  if [ -n "$DIFF" ]; then
+                    PRETTIER_OUTPUT="${PRETTIER_OUTPUT}❌ File needs formatting: $file\n"
+                    PRETTIER_OUTPUT="${PRETTIER_OUTPUT}\`\`\`diff\n${DIFF}\n\`\`\`\n\n"
+                  fi
+                else
+                  echo "✅ $file is properly formatted"
+                fi
               fi
             fi
           done
@@ -110,9 +131,9 @@ jobs:
           # 输出结果
           if [ "$PRETTIER_FAILED" = true ]; then
             echo "prettier_failed=true" >> $GITHUB_OUTPUT
-            # 将格式化建议保存到文件
             echo -e "$PRETTIER_OUTPUT" > prettier-report.md
-            echo "❌ Some files are not properly formatted. Please run: npm run format"
+            echo "❌ Some files are not properly formatted."
+            echo "Please run: npm run format (backend) or cd web/admin-spa && npm run format (frontend)"
             exit 1
           else
             echo "prettier_failed=false" >> $GITHUB_OUTPUT
@@ -125,49 +146,72 @@ jobs:
         run: |
           echo "🔍 Running ESLint on changed files..."
           
-          # 过滤出 JavaScript 文件
-          JS_FILES=""
+          # 分离前端和后端文件
+          BACKEND_FILES=""
+          FRONTEND_FILES=""
+          
           for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
-            if [[ "$file" =~ \.(js|jsx|cjs|mjs)$ ]] && [ -f "$file" ]; then
-              JS_FILES="$JS_FILES $file"
+            if [[ "$file" =~ \.(js|jsx|vue|cjs|mjs)$ ]] && [ -f "$file" ]; then
+              if [[ "$file" == web/admin-spa/* ]]; then
+                FRONTEND_FILES="$FRONTEND_FILES ${file#web/admin-spa/}"
+              else
+                BACKEND_FILES="$BACKEND_FILES $file"
+              fi
             fi
           done
           
-          if [ -n "$JS_FILES" ]; then
-            echo "Linting files: $JS_FILES"
-            
-            # 运行 ESLint 并捕获输出
+          ESLINT_FAILED=false
+          ESLINT_OUTPUT=""
+          
+          # 检查后端文件
+          if [ -n "$BACKEND_FILES" ]; then
+            echo "Linting backend files: $BACKEND_FILES"
             set +e
-            ESLINT_OUTPUT=$(npx eslint $JS_FILES --format stylish 2>&1)
-            ESLINT_EXIT_CODE=$?
+            BACKEND_OUTPUT=$(npx eslint $BACKEND_FILES --format stylish 2>&1)
+            BACKEND_EXIT_CODE=$?
             set -e
             
-            # 保存 ESLint 报告
-            echo "$ESLINT_OUTPUT" > eslint-report.txt
-            
-            if [ $ESLINT_EXIT_CODE -ne 0 ]; then
-              echo "eslint_failed=true" >> $GITHUB_OUTPUT
-              echo "❌ ESLint found issues:"
-              echo "$ESLINT_OUTPUT"
-              
-              # 创建更友好的错误报告
-              echo "## ESLint Report" > eslint-report.md
-              echo '```' >> eslint-report.md
-              echo "$ESLINT_OUTPUT" >> eslint-report.md
-              echo '```' >> eslint-report.md
-              echo "" >> eslint-report.md
-              echo "Please fix these issues by running:" >> eslint-report.md
-              echo '```bash' >> eslint-report.md
-              echo "npx eslint --fix $JS_FILES" >> eslint-report.md
-              echo '```' >> eslint-report.md
-              
-              exit 1
-            else
-              echo "eslint_failed=false" >> $GITHUB_OUTPUT
-              echo "✅ ESLint check passed"
+            if [ $BACKEND_EXIT_CODE -ne 0 ]; then
+              ESLINT_FAILED=true
+              ESLINT_OUTPUT="${ESLINT_OUTPUT}### Backend ESLint Issues\n\`\`\`\n${BACKEND_OUTPUT}\n\`\`\`\n\n"
             fi
+          fi
+          
+          # 检查前端文件
+          if [ -n "$FRONTEND_FILES" ]; then
+            echo "Linting frontend files: $FRONTEND_FILES"
+            cd web/admin-spa
+            set +e
+            FRONTEND_OUTPUT=$(npx eslint $FRONTEND_FILES --format stylish 2>&1)
+            FRONTEND_EXIT_CODE=$?
+            set -e
+            cd ../..
+            
+            if [ $FRONTEND_EXIT_CODE -ne 0 ]; then
+              ESLINT_FAILED=true
+              ESLINT_OUTPUT="${ESLINT_OUTPUT}### Frontend ESLint Issues\n\`\`\`\n${FRONTEND_OUTPUT}\n\`\`\`\n\n"
+            fi
+          fi
+          
+          # 输出结果
+          if [ "$ESLINT_FAILED" = true ]; then
+            echo "eslint_failed=true" >> $GITHUB_OUTPUT
+            echo "❌ ESLint found issues"
+            
+            # 创建错误报告
+            echo "## ESLint Report" > eslint-report.md
+            echo "$ESLINT_OUTPUT" >> eslint-report.md
+            echo "" >> eslint-report.md
+            echo "Please fix these issues by running:" >> eslint-report.md
+            echo '```bash' >> eslint-report.md
+            echo "# Backend: npm run lint" >> eslint-report.md
+            echo "# Frontend: cd web/admin-spa && npm run lint" >> eslint-report.md
+            echo '```' >> eslint-report.md
+            
+            exit 1
           else
-            echo "No JavaScript files to lint"
+            echo "eslint_failed=false" >> $GITHUB_OUTPUT
+            echo "✅ ESLint check passed"
           fi
 
       - name: Debug PR Context
@@ -206,8 +250,14 @@ jobs:
             comment += '\n---\n';
             comment += '💡 **提示**: 在本地运行以下命令来自动修复大部分问题:\n';
             comment += '```bash\n';
-            comment += 'npm run format    # 修复 Prettier 格式问题\n';
-            comment += 'npm run lint:fix  # 修复 ESLint 问题\n';
+            comment += '# 后端代码\n';
+            comment += 'npm run format    # 修复后端 Prettier 格式问题\n';
+            comment += 'npm run lint      # 修复后端 ESLint 问题\n';
+            comment += '\n';
+            comment += '# 前端代码\n';
+            comment += 'cd web/admin-spa\n';
+            comment += 'npm run format    # 修复前端 Prettier 格式问题\n';
+            comment += 'npm run lint      # 修复前端 ESLint 问题\n';
             comment += '```\n';
             
             // 查找是否已有机器人评论
