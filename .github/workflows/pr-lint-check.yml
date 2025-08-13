@@ -15,6 +15,11 @@ on:
       - '.eslintrc.cjs'
       - 'package.json'
 
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
 jobs:
   lint-and-format:
     runs-on: ubuntu-latest
