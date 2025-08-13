@@ -366,7 +366,7 @@ const loadUsageStats = async () => {
       userStore.getUserUsageStats({ period: selectedPeriod.value }),
       userStore.getUserApiKeys()
     ])
-    
+
     usageStats.value = stats
     userApiKeys.value = apiKeys
   } catch (error) {

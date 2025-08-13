@@ -296,17 +296,17 @@ const showApiKey = (apiKey) => {
 const regenerateApiKey = async (apiKey) => {
   try {
     const result = await userStore.regenerateApiKey(apiKey.id)
-    
+
     if (result.success) {
       showToast('API key regenerated successfully', 'success')
-      
+
       // 显示新的API key
       selectedApiKey.value = {
         ...apiKey,
         key: result.apiKey.key
       }
       showViewModal.value = true
-      
+
       // 重新加载列表
       await loadApiKeys()
     }
@@ -324,7 +324,7 @@ const deleteApiKey = (apiKey) => {
 const handleDeleteConfirm = async () => {
   try {
     const result = await userStore.deleteApiKey(selectedApiKey.value.id)
-    
+
     if (result.success) {
       showToast('API key deleted successfully', 'success')
       await loadApiKeys()

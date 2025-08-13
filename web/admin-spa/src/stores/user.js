@@ -23,7 +23,7 @@ export const useUserStore = defineStore('user', {
       this.loading = true
       try {
         const response = await axios.post(`${API_BASE}/login`, credentials)
-        
+
         if (response.data.success) {
           this.user = response.data.user
           this.sessionToken = response.data.sessionToken
@@ -52,9 +52,13 @@ export const useUserStore = defineStore('user', {
     async logout() {
       try {
         if (this.sessionToken) {
-          await axios.post(`${API_BASE}/logout`, {}, {
-            headers: { 'x-user-token': this.sessionToken }
-          })
+          await axios.post(
+            `${API_BASE}/logout`,
+            {},
+            {
+              headers: { 'x-user-token': this.sessionToken }
+            }
+          )
         }
       } catch (error) {
         console.error('Logout request failed:', error)
@@ -93,7 +97,7 @@ export const useUserStore = defineStore('user', {
     async getUserProfile() {
       try {
         const response = await axios.get(`${API_BASE}/profile`)
-        
+
         if (response.data.success) {
           this.user = response.data.user
           localStorage.setItem('userData', JSON.stringify(this.user))
@@ -167,10 +171,10 @@ export const useUserStore = defineStore('user', {
       this.user = null
       this.sessionToken = null
       this.isAuthenticated = false
-      
+
       localStorage.removeItem('userToken')
       localStorage.removeItem('userData')
-      
+
       // 清除 axios 默认头部
       delete axios.defaults.headers.common['x-user-token']
     },
