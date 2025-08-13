@@ -7,6 +7,48 @@ class LdapService {
   constructor() {
     this.config = config.ldap
     this.client = null
+    
+    // 验证配置
+    if (this.config.enabled) {
+      this.validateConfiguration()
+    }
+  }
+
+  // 🔍 验证LDAP配置
+  validateConfiguration() {
+    const errors = []
+    
+    if (!this.config.server) {
+      errors.push('LDAP server configuration is missing')
+    } else {
+      if (!this.config.server.url || typeof this.config.server.url !== 'string') {
+        errors.push('LDAP server URL is not configured or invalid')
+      }
+      
+      if (!this.config.server.bindDN || typeof this.config.server.bindDN !== 'string') {
+        errors.push('LDAP bind DN is not configured or invalid')
+      }
+      
+      if (!this.config.server.bindCredentials || typeof this.config.server.bindCredentials !== 'string') {
+        errors.push('LDAP bind credentials are not configured or invalid')
+      }
+      
+      if (!this.config.server.searchBase || typeof this.config.server.searchBase !== 'string') {
+        errors.push('LDAP search base is not configured or invalid')
+      }
+      
+      if (!this.config.server.searchFilter || typeof this.config.server.searchFilter !== 'string') {
+        errors.push('LDAP search filter is not configured or invalid')
+      }
+    }
+    
+    if (errors.length > 0) {
+      logger.error('❌ LDAP configuration validation failed:', errors)
+      // Don't throw error during initialization, just log warnings
+      logger.warn('⚠️ LDAP authentication may not work properly due to configuration errors')
+    } else {
+      logger.info('✅ LDAP configuration validation passed')
+    }
   }
 
   // 🔗 创建LDAP客户端连接
@@ -98,7 +140,25 @@ class LdapService {
   // 🔒 绑定LDAP连接（管理员认证）
   async bindClient(client) {
     return new Promise((resolve, reject) => {
-      client.bind(this.config.server.bindDN, this.config.server.bindCredentials, (err) => {
+      // 验证绑定凭据
+      const bindDN = this.config.server.bindDN
+      const bindCredentials = this.config.server.bindCredentials
+      
+      if (!bindDN || typeof bindDN !== 'string') {
+        const error = new Error('LDAP bind DN is not configured or invalid')
+        logger.error('❌ LDAP configuration error:', error.message)
+        reject(error)
+        return
+      }
+      
+      if (!bindCredentials || typeof bindCredentials !== 'string') {
+        const error = new Error('LDAP bind credentials are not configured or invalid')
+        logger.error('❌ LDAP configuration error:', error.message)
+        reject(error)
+        return
+      }
+      
+      client.bind(bindDN, bindCredentials, (err) => {
         if (err) {
           logger.error('❌ LDAP bind failed:', err)
           reject(err)
@@ -163,6 +223,20 @@ class LdapService {
   // 🔐 验证用户密码
   async authenticateUser(userDN, password) {
     return new Promise((resolve, reject) => {
+      // 验证输入参数
+      if (!userDN || typeof userDN !== 'string') {
+        const error = new Error('User DN is not provided or invalid')
+        logger.error('❌ LDAP authentication error:', error.message)
+        reject(error)
+        return
+      }
+      
+      if (!password || typeof password !== 'string') {
+        logger.debug(`🚫 Invalid or empty password for DN: ${userDN}`)
+        resolve(false)
+        return
+      }
+      
       const authClient = this.createClient()
       
       authClient.bind(userDN, password, (err) => {
@@ -232,8 +306,29 @@ class LdapService {
       throw new Error('LDAP authentication is not enabled')
     }
 
-    if (!username || !password) {
-      throw new Error('Username and password are required')
+    if (!username || typeof username !== 'string' || username.trim() === '') {
+      throw new Error('Username is required and must be a non-empty string')
+    }
+
+    if (!password || typeof password !== 'string' || password.trim() === '') {
+      throw new Error('Password is required and must be a non-empty string')
+    }
+
+    // 验证LDAP服务器配置
+    if (!this.config.server || !this.config.server.url) {
+      throw new Error('LDAP server URL is not configured')
+    }
+
+    if (!this.config.server.bindDN || typeof this.config.server.bindDN !== 'string') {
+      throw new Error('LDAP bind DN is not configured')
+    }
+
+    if (!this.config.server.bindCredentials || typeof this.config.server.bindCredentials !== 'string') {
+      throw new Error('LDAP bind credentials are not configured')
+    }
+
+    if (!this.config.server.searchBase || typeof this.config.server.searchBase !== 'string') {
+      throw new Error('LDAP search base is not configured')
     }
 
     const client = this.createClient()
@@ -252,6 +347,12 @@ class LdapService {
       // 3. 获取用户DN
       const userDN = ldapEntry.dn
       logger.debug(`👤 Found user DN: ${userDN}`)
+
+      // 验证用户DN
+      if (!userDN || typeof userDN !== 'string') {
+        logger.error(`❌ Invalid or missing DN for user: ${username}`)
+        return { success: false, message: 'Authentication service error' }
+      }
 
       // 4. 验证用户密码
       const isPasswordValid = await this.authenticateUser(userDN, password)
