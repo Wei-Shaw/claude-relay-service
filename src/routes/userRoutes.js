@@ -220,7 +220,7 @@ router.post('/api-keys', authenticateUser, async (req, res) => {
         id: newApiKey.id,
         name: newApiKey.name,
         description: newApiKey.description,
-        key: newApiKey.key, // 只在创建时返回完整key
+        key: newApiKey.apiKey, // 只在创建时返回完整key
         tokenLimit: newApiKey.tokenLimit,
         expiresAt: newApiKey.expiresAt,
         dailyCostLimit: newApiKey.dailyCostLimit,
