@@ -1,106 +1,113 @@
 <template>
-  <div v-if="show" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+  <div
+    v-if="show"
+    class="fixed inset-0 z-50 h-full w-full overflow-y-auto bg-gray-600 bg-opacity-50"
+  >
+    <div class="relative top-20 mx-auto w-96 rounded-md border bg-white p-5 shadow-lg">
       <div class="mt-3">
-        <div class="flex items-center justify-between mb-4">
+        <div class="mb-4 flex items-center justify-between">
           <h3 class="text-lg font-medium text-gray-900">Create New API Key</h3>
-          <button
-            @click="$emit('close')"
-            class="text-gray-400 hover:text-gray-600"
-          >
-            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          <button class="text-gray-400 hover:text-gray-600" @click="$emit('close')">
+            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                d="M6 18L18 6M6 6l12 12"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+              />
             </svg>
           </button>
         </div>
 
-        <form @submit.prevent="handleSubmit" class="space-y-4">
+        <form class="space-y-4" @submit.prevent="handleSubmit">
           <div>
-            <label for="name" class="block text-sm font-medium text-gray-700">
-              Name *
-            </label>
+            <label class="block text-sm font-medium text-gray-700" for="name"> Name * </label>
             <input
               id="name"
               v-model="form.name"
-              type="text"
-              required
+              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
               :disabled="loading"
-              class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               placeholder="Enter API key name"
+              required
+              type="text"
             />
           </div>
 
           <div>
-            <label for="description" class="block text-sm font-medium text-gray-700">
+            <label class="block text-sm font-medium text-gray-700" for="description">
               Description
             </label>
             <textarea
               id="description"
               v-model="form.description"
-              rows="3"
+              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
               :disabled="loading"
-              class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               placeholder="Optional description"
+              rows="3"
             ></textarea>
           </div>
 
           <div>
-            <label for="tokenLimit" class="block text-sm font-medium text-gray-700">
+            <label class="block text-sm font-medium text-gray-700" for="tokenLimit">
               Token Limit (optional)
             </label>
             <input
               id="tokenLimit"
               v-model.number="form.tokenLimit"
-              type="number"
-              min="0"
+              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
               :disabled="loading"
-              class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              min="0"
               placeholder="0 = unlimited"
+              type="number"
             />
             <p class="mt-1 text-xs text-gray-500">Set to 0 for unlimited tokens</p>
           </div>
 
           <div>
-            <label for="dailyCostLimit" class="block text-sm font-medium text-gray-700">
+            <label class="block text-sm font-medium text-gray-700" for="dailyCostLimit">
               Daily Cost Limit (optional)
             </label>
-            <div class="mt-1 relative rounded-md shadow-sm">
-              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <div class="relative mt-1 rounded-md shadow-sm">
+              <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                 <span class="text-gray-500 sm:text-sm">$</span>
               </div>
               <input
                 id="dailyCostLimit"
                 v-model.number="form.dailyCostLimit"
-                type="number"
-                min="0"
-                step="0.01"
+                class="block w-full rounded-md border-gray-300 pl-7 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 :disabled="loading"
-                class="pl-7 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                min="0"
                 placeholder="0.00"
+                step="0.01"
+                type="number"
               />
             </div>
             <p class="mt-1 text-xs text-gray-500">Set to 0 for unlimited daily cost</p>
           </div>
 
           <div>
-            <label for="expiresAt" class="block text-sm font-medium text-gray-700">
+            <label class="block text-sm font-medium text-gray-700" for="expiresAt">
               Expiration Date (optional)
             </label>
             <input
               id="expiresAt"
               v-model="form.expiresAt"
-              type="datetime-local"
+              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
               :disabled="loading"
-              class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              type="datetime-local"
             />
             <p class="mt-1 text-xs text-gray-500">Leave empty for no expiration</p>
           </div>
 
-          <div v-if="error" class="bg-red-50 border border-red-200 rounded-md p-3">
+          <div v-if="error" class="rounded-md border border-red-200 bg-red-50 p-3">
             <div class="flex">
               <div class="flex-shrink-0">
-                <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    clip-rule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                    fill-rule="evenodd"
+                  />
                 </svg>
               </div>
               <div class="ml-3">
@@ -111,22 +118,38 @@
 
           <div class="flex justify-end space-x-3 pt-4">
             <button
+              class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+              :disabled="loading"
               type="button"
               @click="$emit('close')"
-              :disabled="loading"
-              class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
-              type="submit"
+              class="rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               :disabled="loading || !form.name.trim()"
-              class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              type="submit"
             >
               <span v-if="loading" class="flex items-center">
-                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <svg
+                  class="-ml-1 mr-2 h-4 w-4 animate-spin text-white"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <circle
+                    class="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    stroke-width="4"
+                  ></circle>
+                  <path
+                    class="opacity-75"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    fill="currentColor"
+                  ></path>
                 </svg>
                 Creating...
               </span>
@@ -136,28 +159,45 @@
         </form>
 
         <!-- Success Modal for showing the new API key -->
-        <div v-if="newApiKey" class="mt-6 p-4 bg-green-50 border border-green-200 rounded-md">
+        <div v-if="newApiKey" class="mt-6 rounded-md border border-green-200 bg-green-50 p-4">
           <div class="flex items-start">
             <div class="flex-shrink-0">
-              <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+              <svg class="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  clip-rule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                  fill-rule="evenodd"
+                />
               </svg>
             </div>
             <div class="ml-3 flex-1">
               <h4 class="text-sm font-medium text-green-800">API Key Created Successfully!</h4>
               <div class="mt-3">
-                <p class="text-sm text-green-700 mb-2">
-                  <strong>Important:</strong> Copy your API key now. You won't be able to see it again!
+                <p class="mb-2 text-sm text-green-700">
+                  <strong>Important:</strong> Copy your API key now. You won't be able to see it
+                  again!
                 </p>
-                <div class="bg-white p-3 border border-green-300 rounded-md">
+                <div class="rounded-md border border-green-300 bg-white p-3">
                   <div class="flex items-center justify-between">
-                    <code class="text-sm font-mono text-gray-900 break-all">{{ newApiKey.key }}</code>
+                    <code class="break-all font-mono text-sm text-gray-900">{{
+                      newApiKey.key
+                    }}</code>
                     <button
+                      class="ml-3 inline-flex flex-shrink-0 items-center rounded border border-transparent bg-green-100 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
                       @click="copyToClipboard(newApiKey.key)"
-                      class="ml-3 flex-shrink-0 inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-green-700 bg-green-100 hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                     >
-                      <svg class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      <svg
+                        class="mr-1 h-3 w-3"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                        />
                       </svg>
                       Copy
                     </button>
@@ -166,8 +206,8 @@
               </div>
               <div class="mt-4 flex justify-end">
                 <button
+                  class="rounded-md border border-transparent bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
                   @click="handleClose"
-                  class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                 >
                   Done
                 </button>
@@ -269,11 +309,14 @@ const handleClose = () => {
 }
 
 // Reset form when modal is shown
-watch(() => props.show, (newValue) => {
-  if (newValue) {
-    resetForm()
+watch(
+  () => props.show,
+  (newValue) => {
+    if (newValue) {
+      resetForm()
+    }
   }
-})
+)
 </script>
 
 <style scoped>
