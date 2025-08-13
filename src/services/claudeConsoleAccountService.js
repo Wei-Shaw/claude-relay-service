@@ -123,7 +123,7 @@ class ClaudeConsoleAccountService {
             priority: parseInt(accountData.priority) || 50,
             supportedModels: JSON.parse(accountData.supportedModels || '[]'),
             userAgent: accountData.userAgent,
-            rateLimitDuration: parseInt(accountData.rateLimitDuration) || 60,
+            rateLimitDuration: (Number.isNaN(parseInt(accountData.rateLimitDuration)) ? 60 : parseInt(accountData.rateLimitDuration)),
             isActive: accountData.isActive === 'true',
             proxy: accountData.proxy ? JSON.parse(accountData.proxy) : null,
             accountType: accountData.accountType || 'shared',
@@ -172,7 +172,10 @@ class ClaudeConsoleAccountService {
 
     accountData.supportedModels = parsedModels
     accountData.priority = parseInt(accountData.priority) || 50
-    accountData.rateLimitDuration = parseInt(accountData.rateLimitDuration) || 60
+    {
+      const _parsedDuration = parseInt(accountData.rateLimitDuration)
+      accountData.rateLimitDuration = Number.isNaN(_parsedDuration) ? 60 : _parsedDuration
+    }
     accountData.isActive = accountData.isActive === 'true'
     accountData.schedulable = accountData.schedulable !== 'false' // 默认为true
 
@@ -370,7 +373,7 @@ class ClaudeConsoleAccountService {
         const minutesSinceRateLimit = (now - rateLimitedAt) / (1000 * 60)
 
         // 使用账户配置的限流时间
-        const rateLimitDuration = account.rateLimitDuration || 60
+        const rateLimitDuration = (typeof account.rateLimitDuration === 'number' && !Number.isNaN(account.rateLimitDuration)) ? account.rateLimitDuration : 60
 
         if (minutesSinceRateLimit >= rateLimitDuration) {
           await this.removeAccountRateLimit(accountId)
@@ -510,7 +513,8 @@ class ClaudeConsoleAccountService {
       const rateLimitedAt = new Date(accountData.rateLimitedAt)
       const now = new Date()
       const minutesSinceRateLimit = Math.floor((now - rateLimitedAt) / (1000 * 60))
-      const rateLimitDuration = parseInt(accountData.rateLimitDuration) || 60
+      const __parsedDuration = parseInt(accountData.rateLimitDuration)
+      const rateLimitDuration = Number.isNaN(__parsedDuration) ? 60 : __parsedDuration
       const minutesRemaining = Math.max(0, rateLimitDuration - minutesSinceRateLimit)
 
       return {

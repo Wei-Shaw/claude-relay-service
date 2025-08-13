@@ -146,7 +146,7 @@ async function createAccount(accountData) {
     accountType: accountData.accountType || 'shared',
     groupId: accountData.groupId || null,
     priority: accountData.priority || 50,
-    rateLimitDuration: accountData.rateLimitDuration || 60,
+    rateLimitDuration: (accountData.rateLimitDuration !== undefined && accountData.rateLimitDuration !== null) ? accountData.rateLimitDuration : 60,
     // OAuth相关字段（加密存储）
     idToken: encrypt(oauthData.idToken || ''),
     accessToken: encrypt(oauthData.accessToken || ''),
