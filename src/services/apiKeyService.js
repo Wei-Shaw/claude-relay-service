@@ -62,7 +62,9 @@ class ApiKeyService {
       createdAt: new Date().toISOString(),
       lastUsedAt: '',
       expiresAt: expiresAt || '',
-      createdBy: 'admin' // 可以根据需要扩展用户系统
+      createdBy: options.createdBy || 'admin',
+      userId: options.userId || '',
+      userUsername: options.userUsername || ''
     }
 
     // 保存API Key数据并建立哈希映射
@@ -476,6 +478,201 @@ class ApiKeyService {
   // 📈 获取所有账户使用统计
   async getAllAccountsUsageStats() {
     return await redis.getAllAccountsUsageStats()
+  }
+
+  // === 用户相关方法 ===
+
+  // 🔑 创建API Key（支持用户）
+  async createApiKey(options = {}) {
+    return await this.generateApiKey(options)
+  }
+
+  // 👤 获取用户的API Keys
+  async getUserApiKeys(userId) {
+    try {
+      const allKeys = await redis.getAllApiKeys()
+      return allKeys
+        .filter(key => key.userId === userId)
+        .map(key => ({
+          id: key.id,
+          name: key.name,
+          description: key.description,
+          key: key.apiKey ? `${this.prefix}****${key.apiKey.slice(-4)}` : null, // 只显示前缀和后4位
+          tokenLimit: parseInt(key.tokenLimit || 0),
+          isActive: key.isActive === 'true',
+          createdAt: key.createdAt,
+          lastUsedAt: key.lastUsedAt,
+          expiresAt: key.expiresAt,
+          usage: key.usage || { requests: 0, inputTokens: 0, outputTokens: 0, totalCost: 0 },
+          dailyCost: key.dailyCost || 0,
+          dailyCostLimit: parseFloat(key.dailyCostLimit || 0),
+          userId: key.userId,
+          userUsername: key.userUsername,
+          createdBy: key.createdBy
+        }))
+    } catch (error) {
+      logger.error('❌ Failed to get user API keys:', error)
+      return []
+    }
+  }
+
+  // 🔍 通过ID获取API Key（检查权限）
+  async getApiKeyById(keyId, userId = null) {
+    try {
+      const keyData = await redis.getApiKey(keyId)
+      if (!keyData) return null
+
+      // 如果指定了用户ID，检查权限
+      if (userId && keyData.userId !== userId) {
+        return null
+      }
+
+      return {
+        id: keyData.id,
+        name: keyData.name,
+        description: keyData.description,
+        key: keyData.apiKey,
+        tokenLimit: parseInt(keyData.tokenLimit || 0),
+        isActive: keyData.isActive === 'true',
+        createdAt: keyData.createdAt,
+        lastUsedAt: keyData.lastUsedAt,
+        expiresAt: keyData.expiresAt,
+        userId: keyData.userId,
+        userUsername: keyData.userUsername,
+        createdBy: keyData.createdBy,
+        permissions: keyData.permissions,
+        dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0)
+      }
+    } catch (error) {
+      logger.error('❌ Failed to get API key by ID:', error)
+      return null
+    }
+  }
+
+  // 🔄 重新生成API Key
+  async regenerateApiKey(keyId) {
+    try {
+      const existingKey = await redis.getApiKey(keyId)
+      if (!existingKey) {
+        throw new Error('API key not found')
+      }
+
+      // 生成新的key
+      const newApiKey = `${this.prefix}${this._generateSecretKey()}`
+      const newHashedKey = this._hashApiKey(newApiKey)
+
+      // 删除旧的哈希映射
+      const oldHashedKey = existingKey.apiKey
+      await redis.deleteApiKeyHash(oldHashedKey)
+
+      // 更新key数据
+      const updatedKeyData = {
+        ...existingKey,
+        apiKey: newHashedKey,
+        updatedAt: new Date().toISOString()
+      }
+
+      // 保存新数据并建立新的哈希映射
+      await redis.setApiKey(keyId, updatedKeyData, newHashedKey)
+
+      logger.info(`🔄 Regenerated API key: ${existingKey.name} (${keyId})`)
+
+      return {
+        id: keyId,
+        name: existingKey.name,
+        key: newApiKey, // 返回完整的新key
+        updatedAt: updatedKeyData.updatedAt
+      }
+    } catch (error) {
+      logger.error('❌ Failed to regenerate API key:', error)
+      throw error
+    }
+  }
+
+  // 🗑️ 删除API Key
+  async deleteApiKey(keyId) {
+    try {
+      const keyData = await redis.getApiKey(keyId)
+      if (!keyData) {
+        throw new Error('API key not found')
+      }
+
+      // 删除key数据和哈希映射
+      await redis.deleteApiKey(keyId)
+      await redis.deleteApiKeyHash(keyData.apiKey)
+
+      logger.info(`🗑️ Deleted API key: ${keyData.name} (${keyId})`)
+      return true
+    } catch (error) {
+      logger.error('❌ Failed to delete API key:', error)
+      throw error
+    }
+  }
+
+  // 🚫 禁用用户的所有API Keys
+  async disableUserApiKeys(userId) {
+    try {
+      const userKeys = await this.getUserApiKeys(userId)
+      let disabledCount = 0
+
+      for (const key of userKeys) {
+        if (key.isActive) {
+          await this.updateApiKey(key.id, { isActive: false })
+          disabledCount++
+        }
+      }
+
+      logger.info(`🚫 Disabled ${disabledCount} API keys for user: ${userId}`)
+      return { count: disabledCount }
+    } catch (error) {
+      logger.error('❌ Failed to disable user API keys:', error)
+      throw error
+    }
+  }
+
+  // 📊 获取使用统计（支持多个API Key）
+  async getUsageStats(keyIds, options = {}) {
+    try {
+      if (!Array.isArray(keyIds)) {
+        keyIds = [keyIds]
+      }
+
+      const { period = 'week', model } = options
+      const stats = {
+        totalRequests: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        totalCost: 0,
+        dailyStats: [],
+        modelStats: []
+      }
+
+      // 汇总所有API Key的统计数据
+      for (const keyId of keyIds) {
+        const keyStats = await redis.getUsageStats(keyId)
+        if (keyStats) {
+          stats.totalRequests += keyStats.requests || 0
+          stats.totalInputTokens += keyStats.inputTokens || 0
+          stats.totalOutputTokens += keyStats.outputTokens || 0
+          stats.totalCost += keyStats.totalCost || 0
+        }
+      }
+
+      // TODO: 实现日期范围和模型统计
+      // 这里可以根据需要添加更详细的统计逻辑
+
+      return stats
+    } catch (error) {
+      logger.error('❌ Failed to get usage stats:', error)
+      return {
+        totalRequests: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        totalCost: 0,
+        dailyStats: [],
+        modelStats: []
+      }
+    }
   }
 
   // 🧹 清理过期的API Keys

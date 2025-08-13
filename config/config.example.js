@@ -120,6 +120,36 @@ const config = {
     allowCustomClients: process.env.ALLOW_CUSTOM_CLIENTS === 'true'
   },
 
+  // 🔐 LDAP 认证配置
+  ldap: {
+    enabled: process.env.LDAP_ENABLED === 'true',
+    server: {
+      url: process.env.LDAP_URL || 'ldap://localhost:389',
+      bindDN: process.env.LDAP_BIND_DN || 'cn=admin,dc=example,dc=com',
+      bindCredentials: process.env.LDAP_BIND_PASSWORD || 'admin',
+      searchBase: process.env.LDAP_SEARCH_BASE || 'dc=example,dc=com',
+      searchFilter: process.env.LDAP_SEARCH_FILTER || '(uid={{username}})',
+      searchAttributes: process.env.LDAP_SEARCH_ATTRIBUTES ? process.env.LDAP_SEARCH_ATTRIBUTES.split(',') : ['dn', 'uid', 'cn', 'mail', 'givenName', 'sn'],
+      timeout: parseInt(process.env.LDAP_TIMEOUT) || 5000,
+      connectTimeout: parseInt(process.env.LDAP_CONNECT_TIMEOUT) || 10000
+    },
+    userMapping: {
+      username: process.env.LDAP_USER_ATTR_USERNAME || 'uid',
+      displayName: process.env.LDAP_USER_ATTR_DISPLAY_NAME || 'cn',
+      email: process.env.LDAP_USER_ATTR_EMAIL || 'mail',
+      firstName: process.env.LDAP_USER_ATTR_FIRST_NAME || 'givenName',
+      lastName: process.env.LDAP_USER_ATTR_LAST_NAME || 'sn'
+    }
+  },
+
+  // 👥 用户管理配置
+  userManagement: {
+    enabled: process.env.USER_MANAGEMENT_ENABLED === 'true',
+    defaultUserRole: process.env.DEFAULT_USER_ROLE || 'user',
+    userSessionTimeout: parseInt(process.env.USER_SESSION_TIMEOUT) || 86400000, // 24小时
+    maxApiKeysPerUser: parseInt(process.env.MAX_API_KEYS_PER_USER) || 5
+  },
+
   // 🛠️ 开发配置
   development: {
     debug: process.env.DEBUG === 'true',

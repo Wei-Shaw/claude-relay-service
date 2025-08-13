@@ -1,0 +1,266 @@
+<template>
+  <div class="min-h-screen bg-gray-50">
+    <!-- 导航栏 -->
+    <nav class="bg-white shadow">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16">
+          <div class="flex items-center">
+            <div class="flex-shrink-0 flex items-center">
+              <svg class="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span class="ml-2 text-xl font-bold text-gray-900">Claude Relay</span>
+            </div>
+            <div class="ml-10">
+              <div class="flex items-baseline space-x-4">
+                <button
+                  :class="[
+                    'px-3 py-2 rounded-md text-sm font-medium',
+                    activeTab === 'overview' 
+                      ? 'bg-blue-100 text-blue-700' 
+                      : 'text-gray-500 hover:text-gray-700'
+                  ]"
+                  @click="activeTab = 'overview'"
+                >
+                  Overview
+                </button>
+                <button
+                  :class="[
+                    'px-3 py-2 rounded-md text-sm font-medium',
+                    activeTab === 'api-keys' 
+                      ? 'bg-blue-100 text-blue-700' 
+                      : 'text-gray-500 hover:text-gray-700'
+                  ]"
+                  @click="activeTab = 'api-keys'"
+                >
+                  API Keys
+                </button>
+                <button
+                  :class="[
+                    'px-3 py-2 rounded-md text-sm font-medium',
+                    activeTab === 'usage' 
+                      ? 'bg-blue-100 text-blue-700' 
+                      : 'text-gray-500 hover:text-gray-700'
+                  ]"
+                  @click="activeTab = 'usage'"
+                >
+                  Usage Stats
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center space-x-4">
+            <div class="text-sm text-gray-700">
+              Welcome, <span class="font-medium">{{ userStore.userName }}</span>
+            </div>
+            <button
+              @click="handleLogout"
+              class="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- 主内容 -->
+    <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+      <!-- Overview Tab -->
+      <div v-if="activeTab === 'overview'" class="space-y-6">
+        <div>
+          <h1 class="text-2xl font-semibold text-gray-900">Dashboard Overview</h1>
+          <p class="mt-2 text-sm text-gray-600">Welcome to your Claude Relay dashboard</p>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <svg class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m0 0a2 2 0 012 2m-2-2h-6m6 0v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9a2 2 0 012-2h6z" />
+                  </svg>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">API Keys</dt>
+                    <dd class="text-lg font-medium text-gray-900">{{ userProfile?.apiKeyCount || 0 }}</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <svg class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">Total Requests</dt>
+                    <dd class="text-lg font-medium text-gray-900">{{ formatNumber(userProfile?.totalUsage?.requests || 0) }}</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <svg class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">Input Tokens</dt>
+                    <dd class="text-lg font-medium text-gray-900">{{ formatNumber(userProfile?.totalUsage?.inputTokens || 0) }}</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <svg class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                  </svg>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">Total Cost</dt>
+                    <dd class="text-lg font-medium text-gray-900">${{ (userProfile?.totalUsage?.totalCost || 0).toFixed(4) }}</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- User Info -->
+        <div class="bg-white shadow rounded-lg">
+          <div class="px-4 py-5 sm:p-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900">Account Information</h3>
+            <div class="mt-5 border-t border-gray-200">
+              <dl class="divide-y divide-gray-200">
+                <div class="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4">
+                  <dt class="text-sm font-medium text-gray-500">Username</dt>
+                  <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ userProfile?.username }}</dd>
+                </div>
+                <div class="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4">
+                  <dt class="text-sm font-medium text-gray-500">Display Name</dt>
+                  <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ userProfile?.displayName || 'N/A' }}</dd>
+                </div>
+                <div class="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4">
+                  <dt class="text-sm font-medium text-gray-500">Email</dt>
+                  <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ userProfile?.email || 'N/A' }}</dd>
+                </div>
+                <div class="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4">
+                  <dt class="text-sm font-medium text-gray-500">Role</dt>
+                  <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      {{ userProfile?.role || 'user' }}
+                    </span>
+                  </dd>
+                </div>
+                <div class="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4">
+                  <dt class="text-sm font-medium text-gray-500">Member Since</dt>
+                  <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ formatDate(userProfile?.createdAt) }}</dd>
+                </div>
+                <div class="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4">
+                  <dt class="text-sm font-medium text-gray-500">Last Login</dt>
+                  <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ formatDate(userProfile?.lastLoginAt) || 'N/A' }}</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- API Keys Tab -->
+      <div v-else-if="activeTab === 'api-keys'">
+        <UserApiKeysManager />
+      </div>
+
+      <!-- Usage Stats Tab -->
+      <div v-else-if="activeTab === 'usage'">
+        <UserUsageStats />
+      </div>
+    </main>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/user'
+import { showToast } from '@/utils/toast'
+import UserApiKeysManager from '@/components/user/UserApiKeysManager.vue'
+import UserUsageStats from '@/components/user/UserUsageStats.vue'
+
+const router = useRouter()
+const userStore = useUserStore()
+
+const activeTab = ref('overview')
+const userProfile = ref(null)
+
+const formatNumber = (num) => {
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1) + 'M'
+  } else if (num >= 1000) {
+    return (num / 1000).toFixed(1) + 'K'
+  }
+  return num.toString()
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return null
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+const handleLogout = async () => {
+  try {
+    await userStore.logout()
+    showToast('Logged out successfully', 'success')
+    router.push('/user-login')
+  } catch (error) {
+    console.error('Logout error:', error)
+    showToast('Logout failed', 'error')
+  }
+}
+
+const loadUserProfile = async () => {
+  try {
+    userProfile.value = await userStore.getUserProfile()
+  } catch (error) {
+    console.error('Failed to load user profile:', error)
+    showToast('Failed to load user profile', 'error')
+  }
+}
+
+onMounted(() => {
+  loadUserProfile()
+})
+</script>
+
+<style scoped>
+/* 组件特定样式 */
+</style>

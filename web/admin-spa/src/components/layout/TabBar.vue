@@ -46,6 +46,7 @@ const tabs = [
   { key: 'dashboard', name: '仪表板', shortName: '仪表板', icon: 'fas fa-tachometer-alt' },
   { key: 'apiKeys', name: 'API Keys', shortName: 'API', icon: 'fas fa-key' },
   { key: 'accounts', name: '账户管理', shortName: '账户', icon: 'fas fa-user-circle' },
+  { key: 'userManagement', name: '用户管理', shortName: '用户', icon: 'fas fa-users' },
   { key: 'tutorial', name: '使用教程', shortName: '教程', icon: 'fas fa-graduation-cap' },
   { key: 'settings', name: '其他设置', shortName: '设置', icon: 'fas fa-cogs' }
 ]
