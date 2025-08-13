@@ -447,10 +447,19 @@ class LdapService {
       // 6. 创建或更新本地用户
       const user = await userService.createOrUpdateUser(userInfo)
 
-      // 7. 记录登录
+      // 7. 检查用户是否被禁用
+      if (!user.isActive) {
+        logger.security(`🔒 Disabled user LDAP login attempt: ${username} from LDAP authentication`)
+        return { 
+          success: false, 
+          message: 'Your account has been disabled. Please contact administrator.' 
+        }
+      }
+
+      // 8. 记录登录
       await userService.recordUserLogin(user.id)
 
-      // 8. 创建用户会话
+      // 9. 创建用户会话
       const sessionToken = await userService.createUserSession(user.id)
 
       logger.info(`✅ LDAP authentication successful for user: ${username}`)

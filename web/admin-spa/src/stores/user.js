@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
+import { showToast } from '@/utils/toast'
 
 const API_BASE = '/users'
 
@@ -104,8 +105,13 @@ export const useUserStore = defineStore('user', {
           return response.data.user
         }
       } catch (error) {
-        if (error.response?.status === 401) {
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          // 401: Invalid/expired session, 403: Account disabled
           this.clearAuth()
+          // If it's a disabled account error, throw a specific error
+          if (error.response?.status === 403) {
+            throw new Error(error.response.data?.message || 'Your account has been disabled')
+          }
         }
         throw error
       }
@@ -184,6 +190,28 @@ export const useUserStore = defineStore('user', {
       if (this.sessionToken) {
         axios.defaults.headers.common['x-user-token'] = this.sessionToken
       }
+    },
+
+    // 🔧 设置axios拦截器
+    setupAxiosInterceptors() {
+      // Response interceptor to handle disabled user responses globally
+      axios.interceptors.response.use(
+        (response) => response,
+        (error) => {
+          if (error.response?.status === 403) {
+            const message = error.response.data?.message
+            if (message && (message.includes('disabled') || message.includes('Account disabled'))) {
+              this.clearAuth()
+              showToast(message, 'error')
+              // Redirect to login page
+              if (window.location.pathname !== '/user-login') {
+                window.location.href = '/user-login'
+              }
+            }
+          }
+          return Promise.reject(error)
+        }
+      )
     }
   }
 })

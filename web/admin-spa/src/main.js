@@ -5,6 +5,7 @@ import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 import 'element-plus/dist/index.css'
 import App from './App.vue'
 import router from './router'
+import { useUserStore } from './stores/user'
 import './assets/styles/main.css'
 import './assets/styles/global.css'
 
@@ -22,6 +23,10 @@ app.use(router)
 app.use(ElementPlus, {
   locale: zhCn
 })
+
+// 设置axios拦截器
+const userStore = useUserStore()
+userStore.setupAxiosInterceptors()
 
 // 挂载应用
 app.mount('#app')

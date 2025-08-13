@@ -169,8 +169,18 @@ router.beforeEach(async (to, from, next) => {
   if (to.meta.requiresUserAuth) {
     if (!userStore.isAuthenticated) {
       // 尝试检查本地存储的认证信息
-      const isUserLoggedIn = await userStore.checkAuth()
-      if (!isUserLoggedIn) {
+      try {
+        const isUserLoggedIn = await userStore.checkAuth()
+        if (!isUserLoggedIn) {
+          return next('/user-login')
+        }
+      } catch (error) {
+        // If the error is about disabled account, redirect to login with error
+        if (error.message && error.message.includes('disabled')) {
+          // Import showToast to display the error
+          const { showToast } = await import('@/utils/toast')
+          showToast(error.message, 'error')
+        }
         return next('/user-login')
       }
     }
