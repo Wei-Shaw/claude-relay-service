@@ -347,7 +347,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import axios from 'axios'
+import { apiClient } from '@/config/api'
 import { showToast } from '@/utils/toast'
 
 const props = defineProps({
@@ -394,18 +394,18 @@ const loadUsageStats = async () => {
   loading.value = true
   try {
     const [statsResponse, userResponse] = await Promise.all([
-      axios.get(`/users/${props.user.id}/usage-stats`, {
+      apiClient.get(`/users/${props.user.id}/usage-stats`, {
         params: { period: selectedPeriod.value }
       }),
-      axios.get(`/users/${props.user.id}`)
+      apiClient.get(`/users/${props.user.id}`)
     ])
 
-    if (statsResponse.data.success) {
-      usageStats.value = statsResponse.data.stats
+    if (statsResponse.success) {
+      usageStats.value = statsResponse.stats
     }
 
-    if (userResponse.data.success) {
-      userDetails.value = userResponse.data.user
+    if (userResponse.success) {
+      userDetails.value = userResponse.user
     }
   } catch (error) {
     console.error('Failed to load user usage stats:', error)

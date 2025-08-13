@@ -192,7 +192,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import axios from 'axios'
+import { apiClient } from '@/config/api'
 import { showToast } from '@/utils/toast'
 
 const props = defineProps({
@@ -221,15 +221,15 @@ const handleSubmit = async () => {
   error.value = ''
 
   try {
-    const response = await axios.patch(`/users/${props.user.id}/role`, {
+    const response = await apiClient.patch(`/users/${props.user.id}/role`, {
       role: selectedRole.value
     })
 
-    if (response.data.success) {
+    if (response.success) {
       showToast(`User role updated to ${selectedRole.value}`, 'success')
       emit('updated')
     } else {
-      error.value = response.data.message || 'Failed to update user role'
+      error.value = response.message || 'Failed to update user role'
     }
   } catch (err) {
     console.error('Update user role error:', err)

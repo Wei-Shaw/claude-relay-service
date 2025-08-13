@@ -454,7 +454,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import axios from 'axios'
+import { apiClient } from '@/config/api'
 import { showToast } from '@/utils/toast'
 import { debounce } from 'lodash-es'
 import UserUsageStatsModal from '@/components/admin/UserUsageStatsModal.vue'
@@ -533,21 +533,21 @@ const loadUsers = async () => {
   loading.value = true
   try {
     const [usersResponse, statsResponse] = await Promise.all([
-      axios.get('/users', {
+      apiClient.get('/users', {
         params: {
           role: selectedRole.value || undefined,
           isActive: selectedStatus.value !== '' ? selectedStatus.value : undefined
         }
       }),
-      axios.get('/users/stats/overview')
+      apiClient.get('/users/stats/overview')
     ])
 
-    if (usersResponse.data.success) {
-      users.value = usersResponse.data.users
+    if (usersResponse.success) {
+      users.value = usersResponse.users
     }
 
-    if (statsResponse.data.success) {
-      userStats.value = statsResponse.data.stats
+    if (statsResponse.success) {
+      userStats.value = statsResponse.stats
     }
   } catch (error) {
     console.error('Failed to load users:', error)
@@ -605,11 +605,11 @@ const handleConfirmAction = async () => {
 
   try {
     if (action === 'toggleStatus') {
-      const response = await axios.patch(`/users/${user.id}/status`, {
+      const response = await apiClient.patch(`/users/${user.id}/status`, {
         isActive: !user.isActive
       })
 
-      if (response.data.success) {
+      if (response.success) {
         const userIndex = users.value.findIndex((u) => u.id === user.id)
         if (userIndex !== -1) {
           users.value[userIndex].isActive = !user.isActive
@@ -617,10 +617,10 @@ const handleConfirmAction = async () => {
         showToast(`User ${user.isActive ? 'disabled' : 'enabled'} successfully`, 'success')
       }
     } else if (action === 'disableKeys') {
-      const response = await axios.post(`/users/${user.id}/disable-keys`)
+      const response = await apiClient.post(`/users/${user.id}/disable-keys`)
 
-      if (response.data.success) {
-        showToast(`Disabled ${response.data.disabledCount} API keys`, 'success')
+      if (response.success) {
+        showToast(`Disabled ${response.disabledCount} API keys`, 'success')
         await loadUsers() // Refresh to get updated counts
       }
     }

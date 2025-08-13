@@ -149,6 +149,24 @@ class ApiClient {
     }
   }
 
+  // PATCH 请求
+  async patch(url, data = null, options = {}) {
+    const fullUrl = createApiUrl(url)
+    const config = this.buildConfig({
+      ...options,
+      method: 'PATCH',
+      body: data ? JSON.stringify(data) : undefined
+    })
+
+    try {
+      const response = await fetch(fullUrl, config)
+      return await this.handleResponse(response)
+    } catch (error) {
+      console.error('API PATCH Error:', error)
+      throw error
+    }
+  }
+
   // DELETE 请求
   async delete(url, options = {}) {
     const fullUrl = createApiUrl(url)
