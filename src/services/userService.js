@@ -138,27 +138,9 @@ class UserService {
   // 📊 计算用户使用统计（通过聚合API Keys）
   async calculateUserUsageStats(userId) {
     try {
-      // Use redis directly to avoid circular dependency
-      const client = redis.getClientSafe()
-      const pattern = 'api_key:*'
-      const keys = await client.keys(pattern)
-
-      const userApiKeys = []
-      for (const key of keys) {
-        const keyData = await client.get(key)
-        if (keyData) {
-          const apiKey = JSON.parse(keyData)
-          if (apiKey.userId === userId) {
-            // Get usage stats for this API key
-            const usage = await redis.getUsageStats(apiKey.id)
-            userApiKeys.push({
-              id: apiKey.id,
-              name: apiKey.name,
-              usage
-            })
-          }
-        }
-      }
+      // Use the existing apiKeyService method which already includes usage stats
+      const apiKeyService = require('./apiKeyService')
+      const userApiKeys = await apiKeyService.getUserApiKeys(userId)
 
       const totalUsage = {
         requests: 0,
@@ -175,6 +157,10 @@ class UserService {
           totalUsage.totalCost += apiKey.usage.totalCost || 0
         }
       }
+
+      logger.debug(
+        `📊 Calculated user ${userId} usage: ${totalUsage.requests} requests, ${totalUsage.inputTokens} input tokens, $${totalUsage.totalCost.toFixed(4)} total cost from ${userApiKeys.length} API keys`
+      )
 
       return {
         totalUsage,
