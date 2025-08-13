@@ -170,11 +170,20 @@ jobs:
             echo "No JavaScript files to lint"
           fi
 
+      - name: Debug PR Context
+        if: failure()
+        run: |
+          echo "PR Number: ${{ github.event.pull_request.number }}"
+          echo "Repo: ${{ github.repository }}"
+          echo "Event Name: ${{ github.event_name }}"
+          echo "Actor: ${{ github.actor }}"
+
       - name: Comment PR with results
         if: failure()
+        continue-on-error: true  # 即使评论失败也继续
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             let comment = '## 🚨 Code Quality Check Failed\n\n';
@@ -233,9 +242,10 @@ jobs:
 
       - name: Success comment
         if: success() && steps.changed-files.outputs.any_changed == 'true'
+        continue-on-error: true  # 即使评论失败也继续
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           script: |
             // 查找是否已有失败的评论
             const { data: comments } = await github.rest.issues.listComments({
