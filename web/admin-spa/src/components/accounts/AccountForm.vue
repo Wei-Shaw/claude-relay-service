@@ -355,8 +355,8 @@
                   <label class="inline-flex cursor-pointer items-center">
                     <input
                       v-model="form.enableRateLimit"
-                      type="checkbox"
                       class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200"
+                      type="checkbox"
                     />
                     <span class="text-sm text-gray-700">启用限流机制</span>
                   </label>
@@ -529,8 +529,8 @@
                   <label class="inline-flex cursor-pointer items-center">
                     <input
                       v-model="form.enableRateLimit"
-                      type="checkbox"
                       class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200"
+                      type="checkbox"
                     />
                     <span class="text-sm text-gray-700">启用限流机制</span>
                   </label>
@@ -1115,8 +1115,8 @@
                 <label class="inline-flex cursor-pointer items-center">
                   <input
                     v-model="form.enableRateLimit"
-                    type="checkbox"
                     class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200"
+                    type="checkbox"
                   />
                   <span class="text-sm text-gray-700">启用限流机制</span>
                 </label>
@@ -1234,8 +1234,8 @@
                 <label class="inline-flex cursor-pointer items-center">
                   <input
                     v-model="form.enableRateLimit"
-                    type="checkbox"
                     class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200"
+                    type="checkbox"
                   />
                   <span class="text-sm text-gray-700">启用限流机制</span>
                 </label>
@@ -1443,7 +1443,7 @@ const form = ref({
     return ''
   })(),
   userAgent: props.account?.userAgent || '',
-  enableRateLimit: props.account ? (props.account.rateLimitDuration > 0) : true,
+  enableRateLimit: props.account ? props.account.rateLimitDuration > 0 : true,
   rateLimitDuration: props.account?.rateLimitDuration || 60,
   // Bedrock 特定字段
   accessKeyId: props.account?.accessKeyId || '',
