@@ -137,24 +137,43 @@ router.get('/api-keys', authenticateUser, async (req, res) => {
   try {
     const apiKeys = await apiKeyService.getUserApiKeys(req.user.id)
 
-    // 移除敏感信息
-    const safeApiKeys = apiKeys.map((key) => ({
-      id: key.id,
-      name: key.name,
-      description: key.description,
-      tokenLimit: key.tokenLimit,
-      isActive: key.isActive,
-      createdAt: key.createdAt,
-      lastUsedAt: key.lastUsedAt,
-      expiresAt: key.expiresAt,
-      usage: key.usage,
-      dailyCost: key.dailyCost,
-      dailyCostLimit: key.dailyCostLimit,
-      // 不返回实际的key值，只返回前缀和后几位
-      keyPreview: key.key
-        ? `${key.key.substring(0, 8)}...${key.key.substring(key.key.length - 4)}`
-        : null
-    }))
+    // 移除敏感信息并格式化usage数据
+    const safeApiKeys = apiKeys.map((key) => {
+      // Flatten usage structure for frontend compatibility
+      let flatUsage = {
+        requests: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        totalCost: 0
+      }
+
+      if (key.usage && key.usage.total) {
+        flatUsage = {
+          requests: key.usage.total.requests || 0,
+          inputTokens: key.usage.total.inputTokens || 0,
+          outputTokens: key.usage.total.outputTokens || 0,
+          totalCost: key.totalCost || 0
+        }
+      }
+
+      return {
+        id: key.id,
+        name: key.name,
+        description: key.description,
+        tokenLimit: key.tokenLimit,
+        isActive: key.isActive,
+        createdAt: key.createdAt,
+        lastUsedAt: key.lastUsedAt,
+        expiresAt: key.expiresAt,
+        usage: flatUsage,
+        dailyCost: key.dailyCost,
+        dailyCostLimit: key.dailyCostLimit,
+        // 不返回实际的key值，只返回前缀和后几位
+        keyPreview: key.key
+          ? `${key.key.substring(0, 8)}...${key.key.substring(key.key.length - 4)}`
+          : null
+      }
+    })
 
     res.json({
       success: true,

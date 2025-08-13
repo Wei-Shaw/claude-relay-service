@@ -150,10 +150,6 @@ class UserService {
       }
 
       for (const apiKey of userApiKeys) {
-        logger.debug(`🔍 Processing API key ${apiKey.id} (${apiKey.name}) for user ${userId}:`, {
-          hasUsage: !!apiKey.usage,
-          usage: apiKey.usage
-        })
         if (apiKey.usage && apiKey.usage.total) {
           totalUsage.requests += apiKey.usage.total.requests || 0
           totalUsage.inputTokens += apiKey.usage.total.inputTokens || 0

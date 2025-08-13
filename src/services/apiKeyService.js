@@ -500,16 +500,6 @@ class ApiKeyService {
         const dailyCost = (await redis.getDailyCost(key.id)) || 0
         const costStats = await redis.getCostStats(key.id)
 
-        logger.debug(`🔍 getUserApiKeys: Key ${key.id} (${key.name}) usage:`, {
-          keyId: key.id,
-          keyName: key.name,
-          userId: key.userId,
-          rawUsage: usage,
-          dailyCost,
-          costStats,
-          lastUsedAt: key.lastUsedAt
-        })
-
         userKeysWithUsage.push({
           id: key.id,
           name: key.name,
@@ -673,11 +663,12 @@ class ApiKeyService {
       // 汇总所有API Key的统计数据
       for (const keyId of keyIds) {
         const keyStats = await redis.getUsageStats(keyId)
-        if (keyStats) {
-          stats.totalRequests += keyStats.requests || 0
-          stats.totalInputTokens += keyStats.inputTokens || 0
-          stats.totalOutputTokens += keyStats.outputTokens || 0
-          stats.totalCost += keyStats.totalCost || 0
+        const costStats = await redis.getCostStats(keyId)
+        if (keyStats && keyStats.total) {
+          stats.totalRequests += keyStats.total.requests || 0
+          stats.totalInputTokens += keyStats.total.inputTokens || 0
+          stats.totalOutputTokens += keyStats.total.outputTokens || 0
+          stats.totalCost += costStats?.total || 0
         }
       }
 
