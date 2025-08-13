@@ -112,13 +112,14 @@ class UserService {
   // 📋 获取所有用户列表（管理员功能）
   async getAllUsers(options = {}) {
     try {
+      const client = redis.getClientSafe()
       const { page = 1, limit = 20, role, isActive } = options
       const pattern = `${this.userPrefix}*`
-      const keys = await redis.keys(pattern)
+      const keys = await client.keys(pattern)
       
       const users = []
       for (const key of keys) {
-        const userData = await redis.get(key)
+        const userData = await client.get(key)
         if (userData) {
           const user = JSON.parse(userData)
           
@@ -308,15 +309,16 @@ class UserService {
   // 🚫 使用户所有会话失效
   async invalidateUserSessions(userId) {
     try {
+      const client = redis.getClientSafe()
       const pattern = `${this.userSessionPrefix}*`
-      const keys = await redis.keys(pattern)
+      const keys = await client.keys(pattern)
       
       for (const key of keys) {
-        const sessionData = await redis.get(key)
+        const sessionData = await client.get(key)
         if (sessionData) {
           const session = JSON.parse(sessionData)
           if (session.userId === userId) {
-            await redis.del(key)
+            await client.del(key)
           }
         }
       }
@@ -356,8 +358,9 @@ class UserService {
   // 📊 获取用户统计信息
   async getUserStats() {
     try {
+      const client = redis.getClientSafe()
       const pattern = `${this.userPrefix}*`
-      const keys = await redis.keys(pattern)
+      const keys = await client.keys(pattern)
       
       const stats = {
         totalUsers: 0,
@@ -374,7 +377,7 @@ class UserService {
       }
 
       for (const key of keys) {
-        const userData = await redis.get(key)
+        const userData = await client.get(key)
         if (userData) {
           const user = JSON.parse(userData)
           stats.totalUsers++

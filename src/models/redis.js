@@ -1294,6 +1294,32 @@ class RedisClient {
       return 0
     }
   }
+
+  // 🔧 Basic Redis operations wrapper methods for convenience
+  async get(key) {
+    const client = this.getClientSafe()
+    return await client.get(key)
+  }
+
+  async set(key, value, ...args) {
+    const client = this.getClientSafe()
+    return await client.set(key, value, ...args)
+  }
+
+  async setex(key, ttl, value) {
+    const client = this.getClientSafe()
+    return await client.setex(key, ttl, value)
+  }
+
+  async del(...keys) {
+    const client = this.getClientSafe()
+    return await client.del(...keys)
+  }
+
+  async keys(pattern) {
+    const client = this.getClientSafe()
+    return await client.keys(pattern)
+  }
 }
 
 const redisClient = new RedisClient()
