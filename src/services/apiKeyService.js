@@ -491,9 +491,15 @@ class ApiKeyService {
   async getUserApiKeys(userId) {
     try {
       const allKeys = await redis.getAllApiKeys()
-      return allKeys
-        .filter((key) => key.userId === userId)
-        .map((key) => ({
+      const userKeys = allKeys.filter((key) => key.userId === userId)
+
+      // Populate usage stats for each user's API key (same as getAllApiKeys does)
+      const userKeysWithUsage = []
+      for (const key of userKeys) {
+        const usage = await redis.getUsageStats(key.id)
+        const dailyCost = (await redis.getDailyCost(key.id)) || 0
+
+        userKeysWithUsage.push({
           id: key.id,
           name: key.name,
           description: key.description,
@@ -503,13 +509,16 @@ class ApiKeyService {
           createdAt: key.createdAt,
           lastUsedAt: key.lastUsedAt,
           expiresAt: key.expiresAt,
-          usage: key.usage || { requests: 0, inputTokens: 0, outputTokens: 0, totalCost: 0 },
-          dailyCost: key.dailyCost || 0,
+          usage: usage || { requests: 0, inputTokens: 0, outputTokens: 0, totalCost: 0 },
+          dailyCost,
           dailyCostLimit: parseFloat(key.dailyCostLimit || 0),
           userId: key.userId,
           userUsername: key.userUsername,
           createdBy: key.createdBy
-        }))
+        })
+      }
+
+      return userKeysWithUsage
     } catch (error) {
       logger.error('❌ Failed to get user API keys:', error)
       return []
