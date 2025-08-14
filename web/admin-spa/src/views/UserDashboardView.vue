@@ -30,7 +30,7 @@
                       ? 'bg-blue-100 text-blue-700'
                       : 'text-gray-500 hover:text-gray-700'
                   ]"
-                  @click="activeTab = 'overview'"
+                  @click="handleTabChange('overview')"
                 >
                   Overview
                 </button>
@@ -41,7 +41,7 @@
                       ? 'bg-blue-100 text-blue-700'
                       : 'text-gray-500 hover:text-gray-700'
                   ]"
-                  @click="activeTab = 'api-keys'"
+                  @click="handleTabChange('api-keys')"
                 >
                   API Keys
                 </button>
@@ -52,7 +52,7 @@
                       ? 'bg-blue-100 text-blue-700'
                       : 'text-gray-500 hover:text-gray-700'
                   ]"
-                  @click="activeTab = 'usage'"
+                  @click="handleTabChange('usage')"
                 >
                   Usage Stats
                 </button>
@@ -84,13 +84,13 @@
         </div>
 
         <!-- Stats Cards -->
-        <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-5">
           <div class="overflow-hidden rounded-lg bg-white shadow">
             <div class="p-5">
               <div class="flex items-center">
                 <div class="flex-shrink-0">
                   <svg
-                    class="h-6 w-6 text-gray-400"
+                    class="h-6 w-6 text-green-400"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -105,9 +105,39 @@
                 </div>
                 <div class="ml-5 w-0 flex-1">
                   <dl>
-                    <dt class="truncate text-sm font-medium text-gray-500">API Keys</dt>
+                    <dt class="truncate text-sm font-medium text-gray-500">Active API Keys</dt>
                     <dd class="text-lg font-medium text-gray-900">
-                      {{ userProfile?.apiKeyCount || 0 }}
+                      {{ apiKeysStats.active }}
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="overflow-hidden rounded-lg bg-white shadow">
+            <div class="p-5">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <svg
+                    class="h-6 w-6 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                    />
+                  </svg>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt class="truncate text-sm font-medium text-gray-500">Deleted API Keys</dt>
+                    <dd class="text-lg font-medium text-gray-900">
+                      {{ apiKeysStats.deleted }}
                     </dd>
                   </dl>
                 </div>
@@ -282,8 +312,9 @@ import UserUsageStats from '@/components/user/UserUsageStats.vue'
 const router = useRouter()
 const userStore = useUserStore()
 
-const activeTab = ref('api-keys')
+const activeTab = ref('overview')
 const userProfile = ref(null)
+const apiKeysStats = ref({ active: 0, deleted: 0 })
 
 const formatNumber = (num) => {
   if (num >= 1000000) {
@@ -303,6 +334,14 @@ const formatDate = (dateString) => {
     hour: '2-digit',
     minute: '2-digit'
   })
+}
+
+const handleTabChange = (tab) => {
+  activeTab.value = tab
+  // Refresh API keys stats when switching to overview tab
+  if (tab === 'overview') {
+    loadApiKeysStats()
+  }
 }
 
 const handleLogout = async () => {
@@ -325,8 +364,26 @@ const loadUserProfile = async () => {
   }
 }
 
+const loadApiKeysStats = async () => {
+  try {
+    const allApiKeys = await userStore.getUserApiKeys(true) // Include deleted keys
+    const activeCount = allApiKeys.filter(
+      (key) => !(key.isDeleted === 'true' || key.deletedAt) && key.isActive
+    ).length
+    const deletedCount = allApiKeys.filter(
+      (key) => key.isDeleted === 'true' || key.deletedAt
+    ).length
+
+    apiKeysStats.value = { active: activeCount, deleted: deletedCount }
+  } catch (error) {
+    console.error('Failed to load API keys stats:', error)
+    apiKeysStats.value = { active: 0, deleted: 0 }
+  }
+}
+
 onMounted(() => {
   loadUserProfile()
+  loadApiKeysStats()
 })
 </script>
 
