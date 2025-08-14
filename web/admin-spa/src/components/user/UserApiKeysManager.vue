@@ -76,9 +76,9 @@
     </div>
 
     <!-- API Keys List -->
-    <div v-else-if="apiKeys.length > 0" class="overflow-hidden bg-white shadow sm:rounded-md">
+    <div v-else-if="sortedApiKeys.length > 0" class="overflow-hidden bg-white shadow sm:rounded-md">
       <ul class="divide-y divide-gray-200" role="list">
-        <li v-for="apiKey in apiKeys" :key="apiKey.id" class="px-6 py-4">
+        <li v-for="apiKey in sortedApiKeys" :key="apiKey.id" class="px-6 py-4">
           <div class="flex items-center justify-between">
             <div class="flex items-center">
               <div class="flex-shrink-0">
@@ -106,7 +106,7 @@
                     v-else-if="!apiKey.isActive"
                     class="ml-2 inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800"
                   >
-                    Disabled
+                    Deleted
                   </span>
                 </div>
                 <div class="mt-1">
@@ -159,7 +159,7 @@
                 </button>
 
                 <button
-                  v-if="!(apiKey.isDeleted === 'true' || apiKey.deletedAt)"
+                  v-if="!(apiKey.isDeleted === 'true' || apiKey.deletedAt) && apiKey.isActive"
                   class="inline-flex items-center rounded border border-transparent p-1 text-red-400 hover:text-red-600"
                   title="Delete API Key"
                   @click="deleteApiKey(apiKey)"
@@ -243,7 +243,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { showToast } from '@/utils/toast'
 import CreateApiKeyModal from './CreateApiKeyModal.vue'
@@ -260,6 +260,15 @@ const showCreateModal = ref(false)
 const showViewModal = ref(false)
 const showDeleteModal = ref(false)
 const selectedApiKey = ref(null)
+
+// Computed property to sort API keys by creation time (descending - newest first)
+const sortedApiKeys = computed(() => {
+  return [...apiKeys.value].sort((a, b) => {
+    const dateA = new Date(a.createdAt)
+    const dateB = new Date(b.createdAt)
+    return dateB - dateA // Descending order
+  })
+})
 
 const formatNumber = (num) => {
   if (num >= 1000000) {
