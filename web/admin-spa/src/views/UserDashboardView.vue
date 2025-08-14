@@ -367,14 +367,21 @@ const loadUserProfile = async () => {
 const loadApiKeysStats = async () => {
   try {
     const allApiKeys = await userStore.getUserApiKeys(true) // Include deleted keys
-    const activeCount = allApiKeys.filter(
+    console.log('All API Keys received:', allApiKeys)
+    
+    const activeKeys = allApiKeys.filter(
       (key) => !(key.isDeleted === 'true' || key.deletedAt) && key.isActive
-    ).length
-    const deletedCount = allApiKeys.filter(
+    )
+    const deletedKeys = allApiKeys.filter(
       (key) => key.isDeleted === 'true' || key.deletedAt
-    ).length
+    )
+    
+    console.log('Active keys:', activeKeys)
+    console.log('Deleted keys:', deletedKeys)
+    console.log('Active count:', activeKeys.length)
+    console.log('Deleted count:', deletedKeys.length)
 
-    apiKeysStats.value = { active: activeCount, deleted: deletedCount }
+    apiKeysStats.value = { active: activeKeys.length, deleted: deletedKeys.length }
   } catch (error) {
     console.error('Failed to load API keys stats:', error)
     apiKeysStats.value = { active: 0, deleted: 0 }

@@ -550,7 +550,12 @@ class ApiKeyService {
           dailyCostLimit: parseFloat(key.dailyCostLimit || 0),
           userId: key.userId,
           userUsername: key.userUsername,
-          createdBy: key.createdBy
+          createdBy: key.createdBy,
+          // Include deletion fields for deleted keys
+          isDeleted: key.isDeleted,
+          deletedAt: key.deletedAt,
+          deletedBy: key.deletedBy,
+          deletedByType: key.deletedByType
         })
       }
 

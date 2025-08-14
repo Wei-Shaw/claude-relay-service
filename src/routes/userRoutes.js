@@ -167,7 +167,12 @@ router.get('/api-keys', authenticateUser, async (req, res) => {
         // 不返回实际的key值，只返回前缀和后几位
         keyPreview: key.key
           ? `${key.key.substring(0, 8)}...${key.key.substring(key.key.length - 4)}`
-          : null
+          : null,
+        // Include deletion fields for deleted keys
+        isDeleted: key.isDeleted,
+        deletedAt: key.deletedAt,
+        deletedBy: key.deletedBy,
+        deletedByType: key.deletedByType
       }
     })
 
