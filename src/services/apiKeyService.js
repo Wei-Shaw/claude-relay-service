@@ -536,7 +536,7 @@ class ApiKeyService {
           createdAt: key.createdAt,
           lastUsedAt: key.lastUsedAt,
           expiresAt: key.expiresAt,
-          usage: usage,
+          usage,
           dailyCost,
           totalCost: costStats.total,
           dailyCostLimit: parseFloat(key.dailyCostLimit || 0),
@@ -628,8 +628,8 @@ class ApiKeyService {
     }
   }
 
-  // 🗑️ 删除API Key
-  async deleteApiKey(keyId) {
+  // 🗑️ 硬删除API Key (完全移除)
+  async hardDeleteApiKey(keyId) {
     try {
       const keyData = await redis.getApiKey(keyId)
       if (!keyData) {
@@ -669,14 +669,14 @@ class ApiKeyService {
     }
   }
 
-  // 📊 获取使用统计（支持多个API Key）
-  async getUsageStats(keyIds, options = {}) {
+  // 📊 获取聚合使用统计（支持多个API Key）
+  async getAggregatedUsageStats(keyIds, options = {}) {
     try {
       if (!Array.isArray(keyIds)) {
         keyIds = [keyIds]
       }
 
-      const { period = 'week', model } = options
+      const { period: _period = 'week', model: _model } = options
       const stats = {
         totalRequests: 0,
         totalInputTokens: 0,

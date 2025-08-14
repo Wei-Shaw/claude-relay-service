@@ -5,12 +5,7 @@ const userService = require('../services/userService')
 const apiKeyService = require('../services/apiKeyService')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
-const {
-  authenticateUser,
-  authenticateUserOrAdmin,
-  requireAdmin,
-  requireRole
-} = require('../middleware/auth')
+const { authenticateUser, authenticateUserOrAdmin, requireAdmin } = require('../middleware/auth')
 
 // 🔐 用户登录端点
 router.post('/login', async (req, res) => {
@@ -253,7 +248,6 @@ router.post('/api-keys', authenticateUser, async (req, res) => {
   }
 })
 
-
 // 🗑️ 删除API Key
 router.delete('/api-keys/:keyId', authenticateUser, async (req, res) => {
   try {
@@ -313,7 +307,7 @@ router.get('/usage-stats', authenticateUser, async (req, res) => {
     }
 
     // 获取使用统计
-    const stats = await apiKeyService.getUsageStats(apiKeyIds, { period, model })
+    const stats = await apiKeyService.getAggregatedUsageStats(apiKeyIds, { period, model })
 
     res.json({
       success: true,
@@ -584,7 +578,7 @@ router.get('/:userId/usage-stats', authenticateUserOrAdmin, requireAdmin, async 
     }
 
     // 获取使用统计
-    const stats = await apiKeyService.getUsageStats(apiKeyIds, { period, model })
+    const stats = await apiKeyService.getAggregatedUsageStats(apiKeyIds, { period, model })
 
     res.json({
       success: true,
