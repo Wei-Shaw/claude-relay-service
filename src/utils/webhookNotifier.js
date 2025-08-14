@@ -125,15 +125,18 @@ class WebhookNotifier {
     const errorCodes = {
       'claude-oauth': {
         unauthorized: 'CLAUDE_OAUTH_UNAUTHORIZED',
-        error: 'CLAUDE_OAUTH_ERROR'
+        error: 'CLAUDE_OAUTH_ERROR',
+        disabled: 'CLAUDE_OAUTH_MANUALLY_DISABLED'
       },
       'claude-console': {
         blocked: 'CLAUDE_CONSOLE_BLOCKED',
-        error: 'CLAUDE_CONSOLE_ERROR'
+        error: 'CLAUDE_CONSOLE_ERROR',
+        disabled: 'CLAUDE_CONSOLE_MANUALLY_DISABLED'
       },
       gemini: {
         error: 'GEMINI_ERROR',
-        unauthorized: 'GEMINI_UNAUTHORIZED'
+        unauthorized: 'GEMINI_UNAUTHORIZED',
+        disabled: 'GEMINI_MANUALLY_DISABLED'
       }
     }
 
