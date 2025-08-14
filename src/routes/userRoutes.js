@@ -130,7 +130,8 @@ router.get('/profile', authenticateUser, async (req, res) => {
 // 🔑 获取用户的API Keys
 router.get('/api-keys', authenticateUser, async (req, res) => {
   try {
-    const apiKeys = await apiKeyService.getUserApiKeys(req.user.id)
+    const { includeDeleted = 'false' } = req.query
+    const apiKeys = await apiKeyService.getUserApiKeys(req.user.id, includeDeleted === 'true')
 
     // 移除敏感信息并格式化usage数据
     const safeApiKeys = apiKeys.map((key) => {

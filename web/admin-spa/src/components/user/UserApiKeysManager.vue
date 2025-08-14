@@ -83,14 +83,27 @@
             <div class="flex items-center">
               <div class="flex-shrink-0">
                 <div
-                  :class="['h-2 w-2 rounded-full', apiKey.isActive ? 'bg-green-400' : 'bg-red-400']"
+                  :class="[
+                    'h-2 w-2 rounded-full',
+                    apiKey.isDeleted === 'true' || apiKey.deletedAt
+                      ? 'bg-gray-400'
+                      : apiKey.isActive
+                        ? 'bg-green-400'
+                        : 'bg-red-400'
+                  ]"
                 ></div>
               </div>
               <div class="ml-4">
                 <div class="flex items-center">
                   <p class="text-sm font-medium text-gray-900">{{ apiKey.name }}</p>
                   <span
-                    v-if="!apiKey.isActive"
+                    v-if="apiKey.isDeleted === 'true' || apiKey.deletedAt"
+                    class="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800"
+                  >
+                    Deleted
+                  </span>
+                  <span
+                    v-else-if="!apiKey.isActive"
                     class="ml-2 inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800"
                   >
                     Disabled
@@ -100,11 +113,17 @@
                   <p class="text-sm text-gray-500">{{ apiKey.description || 'No description' }}</p>
                   <div class="mt-1 flex items-center space-x-4 text-xs text-gray-400">
                     <span>Created: {{ formatDate(apiKey.createdAt) }}</span>
-                    <span v-if="apiKey.lastUsedAt"
+                    <span v-if="apiKey.isDeleted === 'true' || apiKey.deletedAt"
+                      >Deleted: {{ formatDate(apiKey.deletedAt) }}</span
+                    >
+                    <span v-else-if="apiKey.lastUsedAt"
                       >Last used: {{ formatDate(apiKey.lastUsedAt) }}</span
                     >
                     <span v-else>Never used</span>
-                    <span v-if="apiKey.expiresAt">Expires: {{ formatDate(apiKey.expiresAt) }}</span>
+                    <span
+                      v-if="apiKey.expiresAt && !(apiKey.isDeleted === 'true' || apiKey.deletedAt)"
+                      >Expires: {{ formatDate(apiKey.expiresAt) }}</span
+                    >
                   </div>
                 </div>
               </div>
@@ -140,6 +159,7 @@
                 </button>
 
                 <button
+                  v-if="!(apiKey.isDeleted === 'true' || apiKey.deletedAt)"
                   class="inline-flex items-center rounded border border-transparent p-1 text-red-400 hover:text-red-600"
                   title="Delete API Key"
                   @click="deleteApiKey(apiKey)"
@@ -264,7 +284,7 @@ const formatDate = (dateString) => {
 const loadApiKeys = async () => {
   loading.value = true
   try {
-    apiKeys.value = await userStore.getUserApiKeys()
+    apiKeys.value = await userStore.getUserApiKeys(true) // Include deleted keys
   } catch (error) {
     console.error('Failed to load API keys:', error)
     showToast('Failed to load API keys', 'error')

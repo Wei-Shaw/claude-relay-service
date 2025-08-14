@@ -118,9 +118,13 @@ export const useUserStore = defineStore('user', {
     },
 
     // 🔑 获取用户API Keys
-    async getUserApiKeys() {
+    async getUserApiKeys(includeDeleted = false) {
       try {
-        const response = await axios.get(`${API_BASE}/api-keys`)
+        const params = {}
+        if (includeDeleted) {
+          params.includeDeleted = 'true'
+        }
+        const response = await axios.get(`${API_BASE}/api-keys`, { params })
         return response.data.success ? response.data.apiKeys : []
       } catch (error) {
         console.error('Failed to fetch API keys:', error)

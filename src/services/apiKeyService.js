@@ -208,6 +208,14 @@ class ApiKeyService {
       // 为每个key添加使用统计和当前并发数
       for (const key of apiKeys) {
         key.usage = await redis.getUsageStats(key.id)
+        const costStats = await redis.getCostStats(key.id)
+        // Add cost information to usage object for frontend compatibility
+        if (key.usage && costStats) {
+          key.usage.total = key.usage.total || {}
+          key.usage.total.cost = costStats.total
+          key.usage.totalCost = costStats.total
+        }
+        key.totalCost = costStats ? costStats.total : 0
         key.tokenLimit = parseInt(key.tokenLimit)
         key.concurrencyLimit = parseInt(key.concurrencyLimit || 0)
         key.rateLimitWindow = parseInt(key.rateLimitWindow || 0)
