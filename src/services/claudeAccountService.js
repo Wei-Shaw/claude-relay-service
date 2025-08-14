@@ -550,6 +550,26 @@ class ClaudeAccountService {
 
       updatedData.updatedAt = new Date().toISOString()
 
+      // 检查是否手动禁用了账号，如果是则发送webhook通知
+      if (updates.isActive === 'false' && accountData.isActive === 'true') {
+        try {
+          const webhookNotifier = require('../utils/webhookNotifier')
+          await webhookNotifier.sendAccountAnomalyNotification({
+            accountId,
+            accountName: updatedData.name || 'Unknown Account',
+            platform: 'claude-oauth',
+            status: 'disabled',
+            errorCode: 'CLAUDE_OAUTH_MANUALLY_DISABLED',
+            reason: 'Account manually disabled by administrator'
+          })
+        } catch (webhookError) {
+          logger.error(
+            'Failed to send webhook notification for manual account disable:',
+            webhookError
+          )
+        }
+      }
+
       await redis.setClaudeAccount(accountId, updatedData)
 
       logger.success(`📝 Updated Claude account: ${accountId}`)

@@ -455,6 +455,23 @@ async function updateAccount(accountId, updates) {
     }
   }
 
+  // 检查是否手动禁用了账号，如果是则发送webhook通知
+  if (updates.isActive === 'false' && existingAccount.isActive !== 'false') {
+    try {
+      const webhookNotifier = require('../utils/webhookNotifier')
+      await webhookNotifier.sendAccountAnomalyNotification({
+        accountId,
+        accountName: updates.name || existingAccount.name || 'Unknown Account',
+        platform: 'gemini',
+        status: 'disabled',
+        errorCode: 'GEMINI_MANUALLY_DISABLED',
+        reason: 'Account manually disabled by administrator'
+      })
+    } catch (webhookError) {
+      logger.error('Failed to send webhook notification for manual account disable:', webhookError)
+    }
+  }
+
   await client.hset(`${GEMINI_ACCOUNT_KEY_PREFIX}${accountId}`, updates)
 
   logger.info(`Updated Gemini account: ${accountId}`)
