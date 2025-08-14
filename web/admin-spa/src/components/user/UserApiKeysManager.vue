@@ -140,21 +140,6 @@
                 </button>
 
                 <button
-                  class="inline-flex items-center rounded border border-transparent p-1 text-gray-400 hover:text-gray-600"
-                  title="Regenerate API Key"
-                  @click="regenerateApiKey(apiKey)"
-                >
-                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                    />
-                  </svg>
-                </button>
-
-                <button
                   class="inline-flex items-center rounded border border-transparent p-1 text-red-400 hover:text-red-600"
                   title="Delete API Key"
                   @click="deleteApiKey(apiKey)"
@@ -291,29 +276,6 @@ const loadApiKeys = async () => {
 const showApiKey = (apiKey) => {
   selectedApiKey.value = apiKey
   showViewModal.value = true
-}
-
-const regenerateApiKey = async (apiKey) => {
-  try {
-    const result = await userStore.regenerateApiKey(apiKey.id)
-
-    if (result.success) {
-      showToast('API key regenerated successfully', 'success')
-
-      // 显示新的API key
-      selectedApiKey.value = {
-        ...apiKey,
-        key: result.apiKey.key
-      }
-      showViewModal.value = true
-
-      // 重新加载列表
-      await loadApiKeys()
-    }
-  } catch (error) {
-    console.error('Failed to regenerate API key:', error)
-    showToast('Failed to regenerate API key', 'error')
-  }
 }
 
 const deleteApiKey = (apiKey) => {

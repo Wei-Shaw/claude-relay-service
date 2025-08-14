@@ -139,17 +139,6 @@ export const useUserStore = defineStore('user', {
       }
     },
 
-    // 🔄 重新生成API Key
-    async regenerateApiKey(keyId) {
-      try {
-        const response = await axios.post(`${API_BASE}/api-keys/${keyId}/regenerate`)
-        return response.data
-      } catch (error) {
-        console.error('Failed to regenerate API key:', error)
-        throw error
-      }
-    },
-
     // 🗑️ 删除API Key
     async deleteApiKey(keyId) {
       try {

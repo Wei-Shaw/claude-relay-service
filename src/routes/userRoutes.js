@@ -253,42 +253,6 @@ router.post('/api-keys', authenticateUser, async (req, res) => {
   }
 })
 
-// 🔑 重新生成API Key
-router.post('/api-keys/:keyId/regenerate', authenticateUser, async (req, res) => {
-  try {
-    const { keyId } = req.params
-
-    // 检查API Key是否属于当前用户
-    const existingKey = await apiKeyService.getApiKeyById(keyId)
-    if (!existingKey || existingKey.userId !== req.user.id) {
-      return res.status(404).json({
-        error: 'API key not found',
-        message: 'API key not found or you do not have permission to access it'
-      })
-    }
-
-    const newKey = await apiKeyService.regenerateApiKey(keyId)
-
-    logger.info(`🔄 User ${req.user.username} regenerated API key: ${existingKey.name}`)
-
-    res.json({
-      success: true,
-      message: 'API key regenerated successfully',
-      apiKey: {
-        id: newKey.id,
-        name: newKey.name,
-        key: newKey.key, // 返回新的key
-        updatedAt: newKey.updatedAt
-      }
-    })
-  } catch (error) {
-    logger.error('❌ Regenerate user API key error:', error)
-    res.status(500).json({
-      error: 'API Key regeneration error',
-      message: 'Failed to regenerate API key'
-    })
-  }
-})
 
 // 🗑️ 删除API Key
 router.delete('/api-keys/:keyId', authenticateUser, async (req, res) => {
