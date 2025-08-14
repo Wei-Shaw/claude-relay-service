@@ -424,25 +424,44 @@ router.get('/:userId', authenticateUserOrAdmin, requireAdmin, async (req, res) =
       })
     }
 
-    // 获取用户的API Keys
-    const apiKeys = await apiKeyService.getUserApiKeys(userId)
+    // 获取用户的API Keys（包括已删除的以保留统计数据）
+    const apiKeys = await apiKeyService.getUserApiKeys(userId, true)
 
     res.json({
       success: true,
       user: {
         ...user,
-        apiKeys: apiKeys.map((key) => ({
-          id: key.id,
-          name: key.name,
-          description: key.description,
-          isActive: key.isActive,
-          createdAt: key.createdAt,
-          lastUsedAt: key.lastUsedAt,
-          usage: key.usage,
-          keyPreview: key.key
-            ? `${key.key.substring(0, 8)}...${key.key.substring(key.key.length - 4)}`
-            : null
-        }))
+        apiKeys: apiKeys.map((key) => {
+          // Flatten usage structure for frontend compatibility
+          let flatUsage = {
+            requests: 0,
+            inputTokens: 0,
+            outputTokens: 0,
+            totalCost: 0
+          }
+
+          if (key.usage && key.usage.total) {
+            flatUsage = {
+              requests: key.usage.total.requests || 0,
+              inputTokens: key.usage.total.inputTokens || 0,
+              outputTokens: key.usage.total.outputTokens || 0,
+              totalCost: key.totalCost || 0
+            }
+          }
+
+          return {
+            id: key.id,
+            name: key.name,
+            description: key.description,
+            isActive: key.isActive,
+            createdAt: key.createdAt,
+            lastUsedAt: key.lastUsedAt,
+            usage: flatUsage,
+            keyPreview: key.key
+              ? `${key.key.substring(0, 8)}...${key.key.substring(key.key.length - 4)}`
+              : null
+          }
+        })
       }
     })
   } catch (error) {
