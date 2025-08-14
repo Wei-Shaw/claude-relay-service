@@ -577,8 +577,8 @@ router.get('/:userId/usage-stats', authenticateUserOrAdmin, requireAdmin, async 
       })
     }
 
-    // 获取用户的API Keys
-    const userApiKeys = await apiKeyService.getUserApiKeys(userId)
+    // 获取用户的API Keys（包括已删除的以保留统计数据）
+    const userApiKeys = await apiKeyService.getUserApiKeys(userId, true)
     const apiKeyIds = userApiKeys.map((key) => key.id)
 
     if (apiKeyIds.length === 0) {

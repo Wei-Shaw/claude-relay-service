@@ -205,6 +205,23 @@ class UserService {
             continue
           }
 
+          // Calculate dynamic usage stats for each user
+          try {
+            const usageStats = await this.calculateUserUsageStats(user.id)
+            user.totalUsage = usageStats.totalUsage
+            user.apiKeyCount = usageStats.apiKeyCount
+          } catch (error) {
+            logger.error(`❌ Error calculating usage for user ${user.id}:`, error)
+            // Fallback to stored values
+            user.totalUsage = user.totalUsage || {
+              requests: 0,
+              inputTokens: 0,
+              outputTokens: 0,
+              totalCost: 0
+            }
+            user.apiKeyCount = user.apiKeyCount || 0
+          }
+
           users.push(user)
         }
       }
@@ -448,11 +465,23 @@ class UserService {
             stats.regularUsers++
           }
 
-          stats.totalApiKeys += user.apiKeyCount || 0
-          stats.totalUsage.requests += user.totalUsage?.requests || 0
-          stats.totalUsage.inputTokens += user.totalUsage?.inputTokens || 0
-          stats.totalUsage.outputTokens += user.totalUsage?.outputTokens || 0
-          stats.totalUsage.totalCost += user.totalUsage?.totalCost || 0
+          // Calculate dynamic usage stats for each user
+          try {
+            const usageStats = await this.calculateUserUsageStats(user.id)
+            stats.totalApiKeys += usageStats.apiKeyCount
+            stats.totalUsage.requests += usageStats.totalUsage.requests
+            stats.totalUsage.inputTokens += usageStats.totalUsage.inputTokens
+            stats.totalUsage.outputTokens += usageStats.totalUsage.outputTokens
+            stats.totalUsage.totalCost += usageStats.totalUsage.totalCost
+          } catch (error) {
+            logger.error(`❌ Error calculating usage for user ${user.id} in stats:`, error)
+            // Fallback to stored values if calculation fails
+            stats.totalApiKeys += user.apiKeyCount || 0
+            stats.totalUsage.requests += user.totalUsage?.requests || 0
+            stats.totalUsage.inputTokens += user.totalUsage?.inputTokens || 0
+            stats.totalUsage.outputTokens += user.totalUsage?.outputTokens || 0
+            stats.totalUsage.totalCost += user.totalUsage?.totalCost || 0
+          }
         }
       }
 
