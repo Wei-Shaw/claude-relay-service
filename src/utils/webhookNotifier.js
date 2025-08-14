@@ -119,9 +119,9 @@ class WebhookNotifier {
    * 获取错误代码映射
    * @param {string} platform - 平台类型
    * @param {string} status - 状态
-   * @param {string} reason - 原因
+   * @param {string} _reason - 原因 (未使用)
    */
-  _getErrorCode(platform, status, reason) {
+  _getErrorCode(platform, status, _reason) {
     const errorCodes = {
       'claude-oauth': {
         unauthorized: 'CLAUDE_OAUTH_UNAUTHORIZED',

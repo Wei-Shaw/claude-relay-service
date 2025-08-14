@@ -103,7 +103,7 @@ const config = {
         description: 'Official Claude Code CLI',
         // 匹配 Claude CLI 的 User-Agent
         // 示例: claude-cli/1.0.58 (external, cli)
-        userAgentPattern: /^claude-cli\/[\d\.]+\s+\(/i
+        userAgentPattern: /^claude-cli\/[\d.]+\s+\(/i
       },
       {
         id: 'gemini_cli',
@@ -111,7 +111,7 @@ const config = {
         description: 'Gemini Command Line Interface',
         // 匹配 GeminiCLI 的 User-Agent
         // 示例: GeminiCLI/v18.20.8 (darwin; arm64)
-        userAgentPattern: /^GeminiCLI\/v?[\d\.]+\s+\(/i
+        userAgentPattern: /^GeminiCLI\/v?[\d.]+\s+\(/i
       }
       // 添加自定义客户端示例：
       // {

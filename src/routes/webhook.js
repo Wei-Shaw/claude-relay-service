@@ -35,14 +35,14 @@ router.post('/test', authenticateAdmin, async (req, res) => {
       res.json({
         success: true,
         message: 'Webhook test successful',
-        url: url
+        url
       })
     } else {
       logger.warn(`❌ Webhook test failed for: ${url} - ${result.error}`)
       res.status(400).json({
         success: false,
         message: 'Webhook test failed',
-        url: url,
+        url,
         error: result.error
       })
     }

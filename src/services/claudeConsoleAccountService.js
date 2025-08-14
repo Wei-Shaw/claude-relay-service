@@ -418,7 +418,7 @@ class ClaudeConsoleAccountService {
             platform: 'claude-console',
             status: 'blocked',
             errorCode: 'CLAUDE_CONSOLE_BLOCKED',
-            reason: reason
+            reason
           })
         } catch (webhookError) {
           logger.error('Failed to send webhook notification:', webhookError)
