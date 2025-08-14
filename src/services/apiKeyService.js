@@ -126,6 +126,20 @@ class ApiKeyService {
         return { valid: false, error: 'API key has expired' }
       }
 
+      // 如果API Key属于某个用户，检查用户是否被禁用
+      if (keyData.userId) {
+        try {
+          const userService = require('./userService')
+          const user = await userService.getUserById(keyData.userId, false)
+          if (!user || !user.isActive) {
+            return { valid: false, error: 'User account is disabled' }
+          }
+        } catch (error) {
+          logger.error('❌ Error checking user status during API key validation:', error)
+          return { valid: false, error: 'Unable to validate user status' }
+        }
+      }
+
       // 获取使用统计（供返回数据使用）
       const usage = await redis.getUsageStats(keyData.id)
 

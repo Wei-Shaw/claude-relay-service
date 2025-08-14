@@ -259,9 +259,18 @@ class UserService {
       await redis.set(`${this.userPrefix}${userId}`, JSON.stringify(user))
       logger.info(`🔄 Updated user status: ${user.username} -> ${isActive ? 'active' : 'disabled'}`)
 
-      // 如果禁用用户，删除所有会话
+      // 如果禁用用户，删除所有会话并禁用其所有API Keys
       if (!isActive) {
         await this.invalidateUserSessions(userId)
+
+        // Disable all user's API keys when user is disabled
+        try {
+          const apiKeyService = require('./apiKeyService')
+          const result = await apiKeyService.disableUserApiKeys(userId)
+          logger.info(`🔑 Disabled ${result.count} API keys for disabled user: ${user.username}`)
+        } catch (error) {
+          logger.error('❌ Error disabling user API keys during user disable:', error)
+        }
       }
 
       return user
@@ -419,6 +428,15 @@ class UserService {
 
       // 删除所有会话
       await this.invalidateUserSessions(userId)
+
+      // Disable all user's API keys when user is deleted
+      try {
+        const apiKeyService = require('./apiKeyService')
+        const result = await apiKeyService.disableUserApiKeys(userId)
+        logger.info(`🔑 Disabled ${result.count} API keys for deleted user: ${user.username}`)
+      } catch (error) {
+        logger.error('❌ Error disabling user API keys during user deletion:', error)
+      }
 
       logger.info(`🗑️ Soft deleted user: ${user.username} (${userId})`)
       return user
