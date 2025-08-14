@@ -1,5 +1,5 @@
-const path = require('path');
-require('dotenv').config();
+const path = require('path')
+require('dotenv').config()
 
 const config = {
   // 🌐 服务器配置
@@ -29,14 +29,16 @@ const config = {
     retryDelayOnFailover: 100,
     maxRetriesPerRequest: 3,
     lazyConnect: true,
-    enableTLS: process.env.REDIS_ENABLE_TLS === 'true',
+    enableTLS: process.env.REDIS_ENABLE_TLS === 'true'
   },
 
   // 🎯 Claude API配置
   claude: {
     apiUrl: process.env.CLAUDE_API_URL || 'https://api.anthropic.com/v1/messages',
     apiVersion: process.env.CLAUDE_API_VERSION || '2023-06-01',
-    betaHeader: process.env.CLAUDE_BETA_HEADER || 'claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14'
+    betaHeader:
+      process.env.CLAUDE_BETA_HEADER ||
+      'claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14'
   },
 
   // ☁️ Bedrock API配置
@@ -45,7 +47,8 @@ const config = {
     defaultRegion: process.env.AWS_REGION || 'us-east-1',
     smallFastModelRegion: process.env.ANTHROPIC_SMALL_FAST_MODEL_AWS_REGION,
     defaultModel: process.env.ANTHROPIC_MODEL || 'us.anthropic.claude-sonnet-4-20250514-v1:0',
-    smallFastModel: process.env.ANTHROPIC_SMALL_FAST_MODEL || 'us.anthropic.claude-3-5-haiku-20241022-v1:0',
+    smallFastModel:
+      process.env.ANTHROPIC_SMALL_FAST_MODEL || 'us.anthropic.claude-3-5-haiku-20241022-v1:0',
     maxOutputTokens: parseInt(process.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS) || 4096,
     maxThinkingTokens: parseInt(process.env.MAX_THINKING_TOKENS) || 1024,
     enablePromptCaching: process.env.DISABLE_PROMPT_CACHING !== '1'
@@ -82,7 +85,9 @@ const config = {
   // 🎨 Web界面配置
   web: {
     title: process.env.WEB_TITLE || 'Claude Relay Service',
-    description: process.env.WEB_DESCRIPTION || 'Multi-account Claude API relay service with beautiful management interface',
+    description:
+      process.env.WEB_DESCRIPTION ||
+      'Multi-account Claude API relay service with beautiful management interface',
     logoUrl: process.env.WEB_LOGO_URL || '/assets/logo.png',
     enableCors: process.env.ENABLE_CORS === 'true',
     sessionSecret: process.env.WEB_SESSION_SECRET || 'CHANGE-THIS-SESSION-SECRET'
@@ -98,7 +103,7 @@ const config = {
         description: 'Official Claude Code CLI',
         // 匹配 Claude CLI 的 User-Agent
         // 示例: claude-cli/1.0.58 (external, cli)
-        userAgentPattern: /^claude-cli\/[\d\.]+\s+\(/i
+        userAgentPattern: /^claude-cli\/[\d.]+\s+\(/i
       },
       {
         id: 'gemini_cli',
@@ -106,7 +111,7 @@ const config = {
         description: 'Gemini Command Line Interface',
         // 匹配 GeminiCLI 的 User-Agent
         // 示例: GeminiCLI/v18.20.8 (darwin; arm64)
-        userAgentPattern: /^GeminiCLI\/v?[\d\.]+\s+\(/i
+        userAgentPattern: /^GeminiCLI\/v?[\d.]+\s+\(/i
       }
       // 添加自定义客户端示例：
       // {
@@ -120,11 +125,21 @@ const config = {
     allowCustomClients: process.env.ALLOW_CUSTOM_CLIENTS === 'true'
   },
 
+  // 📢 Webhook通知配置
+  webhook: {
+    enabled: process.env.WEBHOOK_ENABLED !== 'false', // 默认启用
+    urls: process.env.WEBHOOK_URLS
+      ? process.env.WEBHOOK_URLS.split(',').map((url) => url.trim())
+      : [],
+    timeout: parseInt(process.env.WEBHOOK_TIMEOUT) || 10000, // 10秒超时
+    retries: parseInt(process.env.WEBHOOK_RETRIES) || 3 // 重试3次
+  },
+
   // 🛠️ 开发配置
   development: {
     debug: process.env.DEBUG === 'true',
     hotReload: process.env.HOT_RELOAD === 'true'
   }
-};
+}
 
-module.exports = config;
+module.exports = config
