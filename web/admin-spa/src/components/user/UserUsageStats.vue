@@ -298,10 +298,20 @@
                   <span
                     :class="[
                       'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
-                      apiKey.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      apiKey.isDeleted === 'true' || apiKey.deletedAt
+                        ? 'bg-gray-100 text-gray-800'
+                        : apiKey.isActive
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
                     ]"
                   >
-                    {{ apiKey.isActive ? 'Active' : 'Disabled' }}
+                    {{
+                      apiKey.isDeleted === 'true' || apiKey.deletedAt
+                        ? 'Deleted'
+                        : apiKey.isActive
+                          ? 'Active'
+                          : 'Disabled'
+                    }}
                   </span>
                 </td>
               </tr>
@@ -364,7 +374,7 @@ const loadUsageStats = async () => {
   try {
     const [stats, apiKeys] = await Promise.all([
       userStore.getUserUsageStats({ period: selectedPeriod.value }),
-      userStore.getUserApiKeys()
+      userStore.getUserApiKeys(true) // Include deleted keys
     ])
 
     usageStats.value = stats

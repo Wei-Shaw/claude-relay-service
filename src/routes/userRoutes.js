@@ -294,8 +294,8 @@ router.get('/usage-stats', authenticateUser, async (req, res) => {
   try {
     const { period = 'week', model } = req.query
 
-    // 获取用户的API Keys
-    const userApiKeys = await apiKeyService.getUserApiKeys(req.user.id)
+    // 获取用户的API Keys (including deleted ones for complete usage stats)
+    const userApiKeys = await apiKeyService.getUserApiKeys(req.user.id, true)
     const apiKeyIds = userApiKeys.map((key) => key.id)
 
     if (apiKeyIds.length === 0) {
