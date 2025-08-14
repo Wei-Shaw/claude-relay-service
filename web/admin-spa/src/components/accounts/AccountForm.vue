@@ -577,19 +577,10 @@
                   />
                   <span class="text-sm text-gray-700">Claude Pro</span>
                 </label>
-                <label class="flex cursor-pointer items-center">
-                  <input
-                    v-model="form.subscriptionType"
-                    class="mr-2"
-                    type="radio"
-                    value="claude_free"
-                  />
-                  <span class="text-sm text-gray-700">Claude Free</span>
-                </label>
               </div>
               <p class="mt-2 text-xs text-gray-500">
                 <i class="fas fa-info-circle mr-1" />
-                Pro 和 Free 账号不支持 Claude Opus 4 模型
+                Pro 账号不支持 Claude Opus 4 模型
               </p>
             </div>
 
@@ -1021,19 +1012,10 @@
                 />
                 <span class="text-sm text-gray-700">Claude Pro</span>
               </label>
-              <label class="flex cursor-pointer items-center">
-                <input
-                  v-model="form.subscriptionType"
-                  class="mr-2"
-                  type="radio"
-                  value="claude_free"
-                />
-                <span class="text-sm text-gray-700">Claude Free</span>
-              </label>
             </div>
             <p class="mt-2 text-xs text-gray-500">
               <i class="fas fa-info-circle mr-1" />
-              Pro 和 Free 账号不支持 Claude Opus 4 模型
+              Pro 账号不支持 Claude Opus 4 模型
             </p>
           </div>
 
