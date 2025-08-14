@@ -304,7 +304,7 @@ router.delete('/api-keys/:keyId', authenticateUser, async (req, res) => {
       })
     }
 
-    await apiKeyService.deleteApiKey(keyId)
+    await apiKeyService.deleteApiKey(keyId, req.user.username, 'user')
 
     // 更新用户API Key数量
     const userApiKeys = await apiKeyService.getUserApiKeys(req.user.id)

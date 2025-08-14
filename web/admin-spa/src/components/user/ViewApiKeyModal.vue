@@ -129,22 +129,6 @@
             </div>
           </div>
 
-          <!-- Limits -->
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Token Limit</label>
-              <p class="mt-1 text-sm text-gray-900">
-                {{ apiKey.tokenLimit ? apiKey.tokenLimit.toLocaleString() : 'Unlimited' }}
-              </p>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Daily Cost Limit</label>
-              <p class="mt-1 text-sm text-gray-900">
-                {{ apiKey.dailyCostLimit ? `$${apiKey.dailyCostLimit.toFixed(2)}` : 'Unlimited' }}
-              </p>
-            </div>
-          </div>
-
           <!-- Usage Stats -->
           <div v-if="apiKey.usage" class="border-t border-gray-200 pt-4">
             <label class="mb-2 block text-sm font-medium text-gray-700">Usage Statistics</label>

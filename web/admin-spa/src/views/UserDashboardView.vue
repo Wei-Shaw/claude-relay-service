@@ -282,7 +282,7 @@ import UserUsageStats from '@/components/user/UserUsageStats.vue'
 const router = useRouter()
 const userStore = useUserStore()
 
-const activeTab = ref('overview')
+const activeTab = ref('api-keys')
 const userProfile = ref(null)
 
 const formatNumber = (num) => {

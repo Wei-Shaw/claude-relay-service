@@ -140,7 +140,7 @@ class UserService {
     try {
       // Use the existing apiKeyService method which already includes usage stats
       const apiKeyService = require('./apiKeyService')
-      const userApiKeys = await apiKeyService.getUserApiKeys(userId)
+      const userApiKeys = await apiKeyService.getUserApiKeys(userId, true) // Include deleted keys for stats
 
       const totalUsage = {
         requests: 0,
@@ -162,9 +162,12 @@ class UserService {
         `📊 Calculated user ${userId} usage: ${totalUsage.requests} requests, ${totalUsage.inputTokens} input tokens, $${totalUsage.totalCost.toFixed(4)} total cost from ${userApiKeys.length} API keys`
       )
 
+      // Count only non-deleted API keys for the user's active count
+      const activeApiKeyCount = userApiKeys.filter((key) => key.isDeleted !== 'true').length
+
       return {
         totalUsage,
-        apiKeyCount: userApiKeys.length
+        apiKeyCount: activeApiKeyCount
       }
     } catch (error) {
       logger.error('❌ Error calculating user usage stats:', error)

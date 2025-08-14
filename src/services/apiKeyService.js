@@ -195,10 +195,15 @@ class ApiKeyService {
   }
 
   // 📋 获取所有API Keys
-  async getAllApiKeys() {
+  async getAllApiKeys(includeDeleted = false) {
     try {
-      const apiKeys = await redis.getAllApiKeys()
+      let apiKeys = await redis.getAllApiKeys()
       const client = redis.getClientSafe()
+
+      // 默认过滤掉已删除的API Keys
+      if (!includeDeleted) {
+        apiKeys = apiKeys.filter((key) => key.isDeleted !== 'true')
+      }
 
       // 为每个key添加使用统计和当前并发数
       for (const key of apiKeys) {
@@ -345,16 +350,32 @@ class ApiKeyService {
     }
   }
 
-  // 🗑️ 删除API Key
-  async deleteApiKey(keyId) {
+  // 🗑️ 软删除API Key (保留使用统计)
+  async deleteApiKey(keyId, deletedBy = 'system', deletedByType = 'system') {
     try {
-      const result = await redis.deleteApiKey(keyId)
-
-      if (result === 0) {
+      const keyData = await redis.getApiKey(keyId)
+      if (!keyData || Object.keys(keyData).length === 0) {
         throw new Error('API key not found')
       }
 
-      logger.success(`🗑️ Deleted API key: ${keyId}`)
+      // 标记为已删除，保留所有数据和统计信息
+      const updatedData = {
+        ...keyData,
+        isDeleted: 'true',
+        deletedAt: new Date().toISOString(),
+        deletedBy,
+        deletedByType, // 'user', 'admin', 'system'
+        isActive: 'false' // 同时禁用
+      }
+
+      await redis.setApiKey(keyId, updatedData)
+
+      // 从哈希映射中移除（这样就不能再使用这个key进行API调用）
+      if (keyData.apiKey) {
+        await redis.deleteApiKeyHash(keyData.apiKey)
+      }
+
+      logger.success(`🗑️ Soft deleted API key: ${keyId} by ${deletedBy} (${deletedByType})`)
 
       return { success: true }
     } catch (error) {
@@ -488,10 +509,15 @@ class ApiKeyService {
   }
 
   // 👤 获取用户的API Keys
-  async getUserApiKeys(userId) {
+  async getUserApiKeys(userId, includeDeleted = false) {
     try {
       const allKeys = await redis.getAllApiKeys()
-      const userKeys = allKeys.filter((key) => key.userId === userId)
+      let userKeys = allKeys.filter((key) => key.userId === userId)
+
+      // 默认过滤掉已删除的API Keys
+      if (!includeDeleted) {
+        userKeys = userKeys.filter((key) => key.isDeleted !== 'true')
+      }
 
       // Populate usage stats for each user's API key (same as getAllApiKeys does)
       const userKeysWithUsage = []
