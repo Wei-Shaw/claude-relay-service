@@ -292,15 +292,24 @@
                     <span class="text-xs font-medium text-gray-950">Oauth</span>
                   </div>
                   <div
-                    v-else
+                    v-else-if="account.platform === 'claude' || account.platform === 'claude-oauth'"
                     class="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-gradient-to-r from-indigo-100 to-blue-100 px-2.5 py-1"
                   >
                     <i class="fas fa-brain text-xs text-indigo-700" />
-                    <span class="text-xs font-semibold text-indigo-800">Claude</span>
+                    <span class="text-xs font-semibold text-indigo-800">{{
+                      getClaudeAccountType(account)
+                    }}</span>
                     <span class="mx-1 h-4 w-px bg-indigo-300" />
                     <span class="text-xs font-medium text-indigo-700">
                       {{ account.scopes && account.scopes.length > 0 ? 'OAuth' : '传统' }}
                     </span>
+                  </div>
+                  <div
+                    v-else
+                    class="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gradient-to-r from-gray-100 to-gray-200 px-2.5 py-1"
+                  >
+                    <i class="fas fa-question text-xs text-gray-700" />
+                    <span class="text-xs font-semibold text-gray-800">未知</span>
                   </div>
                 </div>
               </td>
@@ -1376,6 +1385,45 @@ const handleEditSuccess = () => {
   // 清空分组成员缓存，因为账户类型和分组可能发生变化
   groupMembersLoaded.value = false
   loadAccounts()
+}
+
+// 获取 Claude 账号类型显示
+const getClaudeAccountType = (account) => {
+  // 如果有订阅信息
+  if (account.subscriptionInfo) {
+    try {
+      // 如果 subscriptionInfo 是字符串，尝试解析
+      const info =
+        typeof account.subscriptionInfo === 'string'
+          ? JSON.parse(account.subscriptionInfo)
+          : account.subscriptionInfo
+
+      // 添加调试日志
+      console.log('Account subscription info:', {
+        accountName: account.name,
+        subscriptionInfo: info,
+        hasClaudeMax: info.hasClaudeMax,
+        hasClaudePro: info.hasClaudePro
+      })
+
+      // 根据 has_claude_max 和 has_claude_pro 判断
+      if (info.hasClaudeMax === true) {
+        return 'Claude Max'
+      } else if (info.hasClaudePro === true) {
+        return 'Claude Pro'
+      } else {
+        return 'Claude Free'
+      }
+    } catch (e) {
+      // 解析失败，返回默认值
+      console.error('Failed to parse subscription info:', e)
+      return 'Claude'
+    }
+  }
+
+  // 没有订阅信息，保持原有显示
+  console.log('No subscription info for account:', account.name)
+  return 'Claude'
 }
 
 // 获取账户状态文本
