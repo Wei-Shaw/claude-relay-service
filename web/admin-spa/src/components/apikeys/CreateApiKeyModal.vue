@@ -436,6 +436,18 @@
                   platform="openai"
                 />
               </div>
+              <div>
+                <label class="mb-1 block text-sm font-medium text-gray-600">Bedrock 专属账号</label>
+                <AccountSelector
+                  v-model="form.bedrockAccountId"
+                  :accounts="localAccounts.bedrock"
+                  default-option-text="使用共享账号池"
+                  :disabled="form.permissions === 'gemini' || form.permissions === 'openai'"
+                  :groups="[]"
+                  placeholder="请选择Bedrock账号"
+                  platform="bedrock"
+                />
+              </div>
             </div>
             <p class="mt-2 text-xs text-gray-500">
               选择专属账号后，此API Key将只使用该账号，不选择则使用共享账号池
@@ -618,6 +630,7 @@ const localAccounts = ref({
   claude: [],
   gemini: [],
   openai: [],
+  bedrock: [], // 添加 Bedrock 账号列表
   claudeGroups: [],
   geminiGroups: [],
   openaiGroups: []
@@ -658,6 +671,7 @@ const form = reactive({
   claudeAccountId: '',
   geminiAccountId: '',
   openaiAccountId: '',
+  bedrockAccountId: '', // 添加 Bedrock 账号ID
   enableModelRestriction: false,
   restrictedModels: [],
   modelInput: '',
@@ -676,6 +690,7 @@ onMounted(async () => {
       claude: props.accounts.claude || [],
       gemini: props.accounts.gemini || [],
       openai: props.accounts.openai || [],
+      bedrock: props.accounts.bedrock || [], // 添加 Bedrock 账号
       claudeGroups: props.accounts.claudeGroups || [],
       geminiGroups: props.accounts.geminiGroups || [],
       openaiGroups: props.accounts.openaiGroups || []
@@ -687,13 +702,15 @@ onMounted(async () => {
 const refreshAccounts = async () => {
   accountsLoading.value = true
   try {
-    const [claudeData, claudeConsoleData, geminiData, openaiData, groupsData] = await Promise.all([
-      apiClient.get('/admin/claude-accounts'),
-      apiClient.get('/admin/claude-console-accounts'),
-      apiClient.get('/admin/gemini-accounts'),
-      apiClient.get('/admin/openai-accounts'),
-      apiClient.get('/admin/account-groups')
-    ])
+    const [claudeData, claudeConsoleData, geminiData, openaiData, bedrockData, groupsData] =
+      await Promise.all([
+        apiClient.get('/admin/claude-accounts'),
+        apiClient.get('/admin/claude-console-accounts'),
+        apiClient.get('/admin/gemini-accounts'),
+        apiClient.get('/admin/openai-accounts'),
+        apiClient.get('/admin/bedrock-accounts'), // 添加 Bedrock 账号获取
+        apiClient.get('/admin/account-groups')
+      ])
 
     // 合并Claude OAuth账户和Claude Console账户
     const claudeAccounts = []
@@ -729,6 +746,13 @@ const refreshAccounts = async () => {
 
     if (openaiData.success) {
       localAccounts.value.openai = (openaiData.data || []).map((account) => ({
+        ...account,
+        isDedicated: account.accountType === 'dedicated' // 保留以便向后兼容
+      }))
+    }
+
+    if (bedrockData.success) {
+      localAccounts.value.bedrock = (bedrockData.data || []).map((account) => ({
         ...account,
         isDedicated: account.accountType === 'dedicated' // 保留以便向后兼容
       }))
@@ -937,6 +961,11 @@ const createApiKey = async () => {
     // OpenAI账户绑定
     if (form.openaiAccountId) {
       baseData.openaiAccountId = form.openaiAccountId
+    }
+
+    // Bedrock账户绑定
+    if (form.bedrockAccountId) {
+      baseData.bedrockAccountId = form.bedrockAccountId
     }
 
     if (form.createType === 'single') {

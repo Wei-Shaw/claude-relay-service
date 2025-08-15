@@ -432,6 +432,11 @@ class ClaudeAccountService {
             lastUsedAt: account.lastUsedAt,
             lastRefreshAt: account.lastRefreshAt,
             expiresAt: account.expiresAt,
+            // 添加 scopes 字段用于判断认证方式
+            // 处理空字符串的情况，避免返回 ['']
+            scopes: account.scopes && account.scopes.trim() ? account.scopes.split(' ') : [],
+            // 添加 refreshToken 是否存在的标记（不返回实际值）
+            hasRefreshToken: !!account.refreshToken,
             // 添加套餐信息（如果存在）
             subscriptionInfo: account.subscriptionInfo
               ? JSON.parse(account.subscriptionInfo)

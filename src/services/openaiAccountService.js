@@ -1,6 +1,9 @@
 const redisClient = require('../models/redis')
 const { v4: uuidv4 } = require('uuid')
 const crypto = require('crypto')
+const axios = require('axios')
+const { SocksProxyAgent } = require('socks-proxy-agent')
+const { HttpsProxyAgent } = require('https-proxy-agent')
 const config = require('../../config/config')
 const logger = require('../utils/logger')
 // const { maskToken } = require('../utils/tokenMask')
@@ -65,15 +68,85 @@ function decrypt(text) {
 }
 
 // 刷新访问令牌
-async function refreshAccessToken(_refreshToken) {
+async function refreshAccessToken(refreshToken, proxy = null) {
   try {
-    // OpenAI OAuth token 刷新实现
-    // TODO: 实现具体的 OpenAI OAuth token 刷新逻辑
-    logger.warn('OpenAI token refresh not yet implemented')
-    return null
+    // Codex CLI 的官方 CLIENT_ID
+    const CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann'
+    
+    // 准备请求数据
+    const requestData = new URLSearchParams({
+      grant_type: 'refresh_token',
+      client_id: CLIENT_ID,
+      refresh_token: refreshToken,
+      scope: 'openid profile email'
+    }).toString()
+
+    // 配置请求选项
+    const requestOptions = {
+      method: 'POST',
+      url: 'https://auth.openai.com/oauth/token',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': requestData.length
+      },
+      data: requestData,
+      timeout: 30000 // 30秒超时
+    }
+
+    // 配置代理（如果有）
+    if (proxy && proxy.host && proxy.port) {
+      if (proxy.type === 'socks5') {
+        const proxyAuth = proxy.username && proxy.password 
+          ? `${proxy.username}:${proxy.password}@` 
+          : ''
+        const socksProxy = `socks5://${proxyAuth}${proxy.host}:${proxy.port}`
+        requestOptions.httpsAgent = new SocksProxyAgent(socksProxy)
+      } else if (proxy.type === 'http' || proxy.type === 'https') {
+        const proxyAuth = proxy.username && proxy.password
+          ? `${proxy.username}:${proxy.password}@`
+          : ''
+        const httpProxy = `http://${proxyAuth}${proxy.host}:${proxy.port}`
+        requestOptions.httpsAgent = new HttpsProxyAgent(httpProxy)
+      }
+    }
+
+    // 发送请求
+    const response = await axios(requestOptions)
+
+    if (response.status === 200 && response.data) {
+      const result = response.data
+      
+      logger.info('✅ Successfully refreshed OpenAI token')
+      
+      // 返回新的 token 信息
+      return {
+        access_token: result.access_token,
+        id_token: result.id_token,
+        refresh_token: result.refresh_token || refreshToken, // 如果没有返回新的，保留原来的
+        expires_in: result.expires_in || 3600,
+        expiry_date: Date.now() + ((result.expires_in || 3600) * 1000) // 计算过期时间
+      }
+    } else {
+      throw new Error(`Failed to refresh token: ${response.status} ${response.statusText}`)
+    }
   } catch (error) {
-    logger.error('Error refreshing OpenAI access token:', error)
-    throw error
+    if (error.response) {
+      // 服务器响应了错误状态码
+      logger.error('OpenAI token refresh failed:', {
+        status: error.response.status,
+        data: error.response.data,
+        headers: error.response.headers
+      })
+      throw new Error(`Token refresh failed: ${error.response.status} - ${JSON.stringify(error.response.data)}`)
+    } else if (error.request) {
+      // 请求已发出但没有收到响应
+      logger.error('OpenAI token refresh no response:', error.message)
+      throw new Error(`Token refresh failed: No response from server - ${error.message}`)
+    } else {
+      // 设置请求时发生错误
+      logger.error('OpenAI token refresh error:', error.message)
+      throw new Error(`Token refresh failed: ${error.message}`)
+    }
   }
 }
 
@@ -102,17 +175,41 @@ async function refreshAccountToken(accountId) {
     throw new Error('No refresh token available')
   }
 
+  // 获取代理配置
+  let proxy = null
+  if (account.proxy) {
+    try {
+      proxy = typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
+    } catch (e) {
+      logger.warn(`Failed to parse proxy config for account ${accountId}:`, e)
+    }
+  }
+
   try {
-    const newTokens = await refreshAccessToken(refreshToken)
+    const newTokens = await refreshAccessToken(refreshToken, proxy)
     if (!newTokens) {
       throw new Error('Failed to refresh token')
     }
 
-    // 更新账户信息
-    await updateAccount(accountId, {
+    // 准备更新数据
+    const updates = {
       accessToken: encrypt(newTokens.access_token),
       expiresAt: new Date(newTokens.expiry_date).toISOString()
-    })
+    }
+
+    // 如果有新的 ID token，也更新它
+    if (newTokens.id_token) {
+      updates.idToken = encrypt(newTokens.id_token)
+    }
+
+    // 如果返回了新的 refresh token，更新它
+    if (newTokens.refresh_token && newTokens.refresh_token !== refreshToken) {
+      updates.refreshToken = encrypt(newTokens.refresh_token)
+      logger.info(`Updated refresh token for account ${accountId}`)
+    }
+
+    // 更新账户信息
+    await updateAccount(accountId, updates)
 
     logRefreshSuccess(accountId, accountName, 'openai', newTokens.expiry_date)
     return newTokens
@@ -374,6 +471,12 @@ async function getAllAccounts() {
         openaiOauth: accountData.openaiOauth ? '[ENCRYPTED]' : '',
         accessToken: accountData.accessToken ? '[ENCRYPTED]' : '',
         refreshToken: accountData.refreshToken ? '[ENCRYPTED]' : '',
+        // 添加 scopes 字段用于判断认证方式
+        // 处理空字符串的情况
+        scopes:
+          accountData.scopes && accountData.scopes.trim() ? accountData.scopes.split(' ') : [],
+        // 添加 hasRefreshToken 标记
+        hasRefreshToken: !!accountData.refreshToken,
         // 添加限流状态信息（统一格式）
         rateLimitStatus: rateLimitInfo
           ? {

@@ -291,7 +291,8 @@ async function createAccount(accountData) {
     accessToken: accessToken ? encrypt(accessToken) : '',
     refreshToken: refreshToken ? encrypt(refreshToken) : '',
     expiresAt,
-    scopes: accountData.scopes || OAUTH_SCOPES.join(' '),
+    // 只有OAuth方式才有scopes，手动添加的没有
+    scopes: accountData.geminiOauth ? accountData.scopes || OAUTH_SCOPES.join(' ') : '',
 
     // 代理设置
     proxy: accountData.proxy ? JSON.stringify(accountData.proxy) : '',
@@ -551,6 +552,12 @@ async function getAllAccounts() {
         geminiOauth: accountData.geminiOauth ? '[ENCRYPTED]' : '',
         accessToken: accountData.accessToken ? '[ENCRYPTED]' : '',
         refreshToken: accountData.refreshToken ? '[ENCRYPTED]' : '',
+        // 添加 scopes 字段用于判断认证方式
+        // 处理空字符串和默认值的情况
+        scopes:
+          accountData.scopes && accountData.scopes.trim() ? accountData.scopes.split(' ') : [],
+        // 添加 hasRefreshToken 标记
+        hasRefreshToken: !!accountData.refreshToken,
         // 添加限流状态信息（统一格式）
         rateLimitStatus: rateLimitInfo
           ? {

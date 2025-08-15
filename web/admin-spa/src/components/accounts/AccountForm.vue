@@ -584,14 +584,8 @@
               </p>
             </div>
 
-            <!-- Claude、Claude Console和Bedrock的优先级设置 -->
-            <div
-              v-if="
-                form.platform === 'claude' ||
-                form.platform === 'claude-console' ||
-                form.platform === 'bedrock'
-              "
-            >
+            <!-- 所有平台的优先级设置 -->
+            <div>
               <label class="mb-3 block text-sm font-semibold text-gray-700"
                 >调度优先级 (1-100)</label
               >
@@ -1019,14 +1013,8 @@
             </p>
           </div>
 
-          <!-- Claude、Claude Console和Bedrock的优先级设置（编辑模式） -->
-          <div
-            v-if="
-              form.platform === 'claude' ||
-              form.platform === 'claude-console' ||
-              form.platform === 'bedrock'
-            "
-          >
+          <!-- 所有平台的优先级设置（编辑模式） -->
+          <div>
             <label class="mb-3 block text-sm font-semibold text-gray-700">调度优先级 (1-100)</label>
             <input
               v-model.number="form.priority"
@@ -1750,6 +1738,8 @@ const handleOAuthSuccess = async (tokenInfo) => {
       if (form.value.projectId) {
         data.projectId = form.value.projectId
       }
+      // 添加 Gemini 优先级
+      data.priority = form.value.priority || 50
     } else if (form.value.platform === 'openai') {
       data.openaiOauth = tokenInfo.tokens || tokenInfo
       data.accountInfo = tokenInfo.accountInfo
@@ -1869,7 +1859,7 @@ const createAccount = async () => {
         accessToken: form.value.accessToken,
         refreshToken: form.value.refreshToken || '',
         expiresAt: Date.now() + expiresInMs,
-        scopes: ['user:inference']
+        scopes: [] // 手动添加没有 scopes
       }
       data.priority = form.value.priority || 50
       // 添加订阅类型信息
@@ -1896,6 +1886,9 @@ const createAccount = async () => {
       if (form.value.projectId) {
         data.projectId = form.value.projectId
       }
+
+      // 添加 Gemini 优先级
+      data.priority = form.value.priority || 50
     } else if (form.value.platform === 'openai') {
       // OpenAI手动模式需要构建openaiOauth对象
       const expiresInMs = form.value.refreshToken
@@ -2058,7 +2051,7 @@ const updateAccount = async () => {
           accessToken: form.value.accessToken || '',
           refreshToken: form.value.refreshToken || '',
           expiresAt: Date.now() + expiresInMs,
-          scopes: ['user:inference']
+          scopes: props.account.scopes || [] // 保持原有的 scopes，如果没有则为空数组
         }
       } else if (props.account.platform === 'gemini') {
         // Gemini需要构建geminiOauth对象
@@ -2106,6 +2099,11 @@ const updateAccount = async () => {
 
     // OpenAI 账号优先级更新
     if (props.account.platform === 'openai') {
+      data.priority = form.value.priority || 50
+    }
+
+    // Gemini 账号优先级更新
+    if (props.account.platform === 'gemini') {
       data.priority = form.value.priority || 50
     }
 

@@ -391,6 +391,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       claudeConsoleAccountId,
       geminiAccountId,
       openaiAccountId,
+      bedrockAccountId,
       permissions,
       concurrencyLimit,
       rateLimitWindow,
@@ -487,6 +488,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       claudeConsoleAccountId,
       geminiAccountId,
       openaiAccountId,
+      bedrockAccountId,
       permissions,
       concurrencyLimit,
       rateLimitWindow,
@@ -633,6 +635,7 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       claudeConsoleAccountId,
       geminiAccountId,
       openaiAccountId,
+      bedrockAccountId,
       permissions,
       enableModelRestriction,
       restrictedModels,
@@ -694,6 +697,11 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
     if (openaiAccountId !== undefined) {
       // 空字符串表示解绑，null或空字符串都设置为空字符串
       updates.openaiAccountId = openaiAccountId || ''
+    }
+
+    if (bedrockAccountId !== undefined) {
+      // 空字符串表示解绑，null或空字符串都设置为空字符串
+      updates.bedrockAccountId = bedrockAccountId || ''
     }
 
     if (permissions !== undefined) {

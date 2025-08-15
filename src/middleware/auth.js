@@ -303,7 +303,10 @@ const authenticateApiKey = async (req, res, next) => {
       name: validation.keyData.name,
       tokenLimit: validation.keyData.tokenLimit,
       claudeAccountId: validation.keyData.claudeAccountId,
+      claudeConsoleAccountId: validation.keyData.claudeConsoleAccountId, // 添加 Claude Console 账号ID
       geminiAccountId: validation.keyData.geminiAccountId,
+      openaiAccountId: validation.keyData.openaiAccountId, // 添加 OpenAI 账号ID
+      bedrockAccountId: validation.keyData.bedrockAccountId, // 添加 Bedrock 账号ID
       permissions: validation.keyData.permissions,
       concurrencyLimit: validation.keyData.concurrencyLimit,
       rateLimitWindow: validation.keyData.rateLimitWindow,

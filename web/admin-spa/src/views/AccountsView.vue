@@ -261,7 +261,7 @@
                     <span class="text-xs font-semibold text-yellow-800">Gemini</span>
                     <span class="mx-1 h-4 w-px bg-yellow-300" />
                     <span class="text-xs font-medium text-yellow-700">
-                      {{ account.scopes && account.scopes.length > 0 ? 'OAuth' : '传统' }}
+                      {{ getGeminiAuthType() }}
                     </span>
                   </div>
                   <div
@@ -289,7 +289,7 @@
                     <div class="fa-openai" />
                     <span class="text-xs font-semibold text-gray-950">OpenAi</span>
                     <span class="mx-1 h-4 w-px bg-gray-400" />
-                    <span class="text-xs font-medium text-gray-950">Oauth</span>
+                    <span class="text-xs font-medium text-gray-950">{{ getOpenAIAuthType() }}</span>
                   </div>
                   <div
                     v-else-if="account.platform === 'claude' || account.platform === 'claude-oauth'"
@@ -301,7 +301,7 @@
                     }}</span>
                     <span class="mx-1 h-4 w-px bg-indigo-300" />
                     <span class="text-xs font-medium text-indigo-700">
-                      {{ account.scopes && account.scopes.length > 0 ? 'OAuth' : '传统' }}
+                      {{ getClaudeAuthType(account) }}
                     </span>
                   </div>
                   <div
@@ -391,7 +391,9 @@
                   v-if="
                     account.platform === 'claude' ||
                     account.platform === 'claude-console' ||
-                    account.platform === 'bedrock'
+                    account.platform === 'bedrock' ||
+                    account.platform === 'gemini' ||
+                    account.platform === 'openai'
                   "
                   class="flex items-center gap-2"
                 >
@@ -491,21 +493,6 @@
               </td>
               <td class="whitespace-nowrap px-3 py-4 text-sm font-medium">
                 <div class="flex flex-wrap items-center gap-1">
-                  <button
-                    v-if="account.platform === 'claude' && account.scopes"
-                    :class="[
-                      'rounded px-2.5 py-1 text-xs font-medium transition-colors',
-                      account.isRefreshing
-                        ? 'cursor-not-allowed bg-gray-100 text-gray-400'
-                        : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                    ]"
-                    :disabled="account.isRefreshing"
-                    :title="account.isRefreshing ? '刷新中...' : '刷新Token'"
-                    @click="refreshToken(account)"
-                  >
-                    <i :class="['fas fa-sync-alt', account.isRefreshing ? 'animate-spin' : '']" />
-                    <span class="ml-1">刷新</span>
-                  </button>
                   <button
                     v-if="
                       account.platform === 'claude' &&
@@ -709,23 +696,13 @@
             <div class="flex items-center justify-between text-xs">
               <span class="text-gray-500">优先级</span>
               <span class="font-medium text-gray-700">
-                {{ account.priority || 0 }}
+                {{ account.priority || 50 }}
               </span>
             </div>
           </div>
 
           <!-- 操作按钮 -->
           <div class="mt-3 flex gap-2 border-t border-gray-100 pt-3">
-            <button
-              v-if="account.platform === 'claude' && account.type === 'oauth'"
-              class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-600 transition-colors hover:bg-blue-100"
-              :disabled="refreshingTokens[account.id]"
-              @click="refreshAccountToken(account)"
-            >
-              <i :class="['fas fa-sync-alt', { 'animate-spin': refreshingTokens[account.id] }]" />
-              {{ refreshingTokens[account.id] ? '刷新中' : '刷新' }}
-            </button>
-
             <button
               class="flex flex-1 items-center justify-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors"
               :class="
@@ -806,7 +783,6 @@ const accountSortBy = ref('name')
 const accountsSortBy = ref('')
 const accountsSortOrder = ref('asc')
 const apiKeys = ref([])
-const refreshingTokens = ref({})
 const accountGroups = ref([])
 const groupFilter = ref('all')
 const platformFilter = ref('all')
@@ -830,7 +806,7 @@ const platformOptions = ref([
   { value: 'all', label: '所有平台', icon: 'fa-globe' },
   { value: 'claude', label: 'Claude', icon: 'fa-brain' },
   { value: 'claude-console', label: 'Claude Console', icon: 'fa-terminal' },
-  { value: 'gemini', label: 'Gemini', icon: 'fa-robot' },
+  { value: 'gemini', label: 'Gemini', icon: 'fa-google' },
   { value: 'openai', label: 'OpenAi', icon: 'fa-openai' },
   { value: 'bedrock', label: 'Bedrock', icon: 'fab fa-aws' }
 ])
@@ -1275,26 +1251,6 @@ const deleteAccount = async (account) => {
   }
 }
 
-// 刷新Token
-const refreshToken = async (account) => {
-  if (account.isRefreshing) return
-
-  try {
-    account.isRefreshing = true
-    const data = await apiClient.post(`/admin/claude-accounts/${account.id}/refresh`)
-
-    if (data.success) {
-      showToast('Token刷新成功', 'success')
-      loadAccounts()
-    } else {
-      showToast(data.message || 'Token刷新失败', 'error')
-    }
-  } catch (error) {
-    showToast('Token刷新失败', 'error')
-  } finally {
-    account.isRefreshing = false
-  }
-}
 
 // 重置账户状态
 const resetAccountStatus = async (account) => {
@@ -1385,6 +1341,27 @@ const handleEditSuccess = () => {
   // 清空分组成员缓存，因为账户类型和分组可能发生变化
   groupMembersLoaded.value = false
   loadAccounts()
+}
+
+// 获取 Claude 账号的添加方式
+const getClaudeAuthType = (account) => {
+  // 基于 lastRefreshAt 判断：如果为空说明是 Setup Token（不能刷新），否则是 OAuth
+  if (!account.lastRefreshAt || account.lastRefreshAt === '') {
+    return 'Setup' // 缩短显示文本
+  }
+  return 'OAuth'
+}
+
+// 获取 Gemini 账号的添加方式
+const getGeminiAuthType = () => {
+  // Gemini 统一显示 OAuth
+  return 'OAuth'
+}
+
+// 获取 OpenAI 账号的添加方式
+const getOpenAIAuthType = () => {
+  // OpenAI 统一显示 OAuth
+  return 'OAuth'
 }
 
 // 获取 Claude 账号类型显示
@@ -1511,26 +1488,6 @@ const formatRelativeTime = (dateString) => {
   return formatLastUsed(dateString)
 }
 
-// 刷新账户Token
-const refreshAccountToken = async (account) => {
-  if (refreshingTokens.value[account.id]) return
-
-  try {
-    refreshingTokens.value[account.id] = true
-    const data = await apiClient.post(`/admin/claude-accounts/${account.id}/refresh`)
-
-    if (data.success) {
-      showToast('Token刷新成功', 'success')
-      loadAccounts()
-    } else {
-      showToast(data.message || 'Token刷新失败', 'error')
-    }
-  } catch (error) {
-    showToast('Token刷新失败', 'error')
-  } finally {
-    refreshingTokens.value[account.id] = false
-  }
-}
 
 // 切换调度状态
 // const toggleDispatch = async (account) => {
