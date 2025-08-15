@@ -1251,7 +1251,6 @@ const deleteAccount = async (account) => {
   }
 }
 
-
 // 重置账户状态
 const resetAccountStatus = async (account) => {
   if (account.isResetting) return
@@ -1487,7 +1486,6 @@ const getAccountStatusDotClass = (account) => {
 const formatRelativeTime = (dateString) => {
   return formatLastUsed(dateString)
 }
-
 
 // 切换调度状态
 // const toggleDispatch = async (account) => {
