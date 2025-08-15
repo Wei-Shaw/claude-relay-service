@@ -10,7 +10,7 @@
       <div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
         <button
           class="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-          :disabled="apiKeys.length >= maxApiKeys"
+          :disabled="activeApiKeysCount >= maxApiKeys"
           @click="showCreateModal = true"
         >
           <svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -28,7 +28,7 @@
 
     <!-- API Keys 数量限制提示 -->
     <div
-      v-if="apiKeys.length >= maxApiKeys"
+      v-if="activeApiKeysCount >= maxApiKeys"
       class="rounded-md border border-yellow-200 bg-yellow-50 p-4"
     >
       <div class="flex">
@@ -254,7 +254,7 @@ const userStore = useUserStore()
 
 const loading = ref(true)
 const apiKeys = ref([])
-const maxApiKeys = ref(5) // 从配置获取
+const maxApiKeys = computed(() => userStore.config?.maxApiKeysPerUser || 5)
 
 const showCreateModal = ref(false)
 const showViewModal = ref(false)
@@ -268,6 +268,11 @@ const sortedApiKeys = computed(() => {
     const dateB = new Date(b.createdAt)
     return dateB - dateA // Descending order
   })
+})
+
+// Computed property to count only active (non-deleted) API keys
+const activeApiKeysCount = computed(() => {
+  return apiKeys.value.filter((key) => !(key.isDeleted === 'true' || key.deletedAt)).length
 })
 
 const formatNumber = (num) => {

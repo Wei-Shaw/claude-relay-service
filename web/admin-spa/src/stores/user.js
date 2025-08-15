@@ -9,7 +9,8 @@ export const useUserStore = defineStore('user', {
     user: null,
     isAuthenticated: false,
     sessionToken: null,
-    loading: false
+    loading: false,
+    config: null
   }),
 
   getters: {
@@ -72,6 +73,7 @@ export const useUserStore = defineStore('user', {
     async checkAuth() {
       const token = localStorage.getItem('userToken')
       const userData = localStorage.getItem('userData')
+      const userConfig = localStorage.getItem('userConfig')
 
       if (!token || !userData) {
         this.clearAuth()
@@ -81,6 +83,7 @@ export const useUserStore = defineStore('user', {
       try {
         this.sessionToken = token
         this.user = JSON.parse(userData)
+        this.config = userConfig ? JSON.parse(userConfig) : null
         this.isAuthenticated = true
         this.setAuthHeader()
 
@@ -101,7 +104,9 @@ export const useUserStore = defineStore('user', {
 
         if (response.data.success) {
           this.user = response.data.user
+          this.config = response.data.config
           localStorage.setItem('userData', JSON.stringify(this.user))
+          localStorage.setItem('userConfig', JSON.stringify(this.config))
           return response.data.user
         }
       } catch (error) {
@@ -170,9 +175,11 @@ export const useUserStore = defineStore('user', {
       this.user = null
       this.sessionToken = null
       this.isAuthenticated = false
+      this.config = null
 
       localStorage.removeItem('userToken')
       localStorage.removeItem('userData')
+      localStorage.removeItem('userConfig')
 
       // 清除 axios 默认头部
       delete axios.defaults.headers.common['x-user-token']

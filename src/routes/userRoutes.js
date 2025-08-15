@@ -116,6 +116,9 @@ router.get('/profile', authenticateUser, async (req, res) => {
         lastLoginAt: user.lastLoginAt,
         apiKeyCount: user.apiKeyCount,
         totalUsage: user.totalUsage
+      },
+      config: {
+        maxApiKeysPerUser: config.userManagement.maxApiKeysPerUser
       }
     })
   } catch (error) {
