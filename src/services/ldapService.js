@@ -65,7 +65,7 @@ class LdapService {
 
     // Method 1: Direct dn property
     if (ldapEntry.dn) {
-      dn = ldapEntry.dn
+      ;({ dn } = ldapEntry)
     }
     // Method 2: objectName property (common in some LDAP implementations)
     else if (ldapEntry.objectName) {
@@ -85,7 +85,7 @@ class LdapService {
       if (dn.toString && typeof dn.toString === 'function') {
         dn = dn.toString()
       } else if (dn.dn && typeof dn.dn === 'string') {
-        dn = dn.dn
+        ;({ dn } = dn)
       }
     }
 
@@ -253,9 +253,9 @@ class LdapService {
           logger.debug('🔗 LDAP search referral:', referral.uris)
         })
 
-        res.on('error', (err) => {
-          logger.error('❌ LDAP search result error:', err)
-          reject(err)
+        res.on('error', (error) => {
+          logger.error('❌ LDAP search result error:', error)
+          reject(error)
         })
 
         res.on('end', (result) => {
@@ -368,15 +368,41 @@ class LdapService {
     }
   }
 
+  // 🔍 验证和清理用户名
+  validateAndSanitizeUsername(username) {
+    if (!username || typeof username !== 'string' || username.trim() === '') {
+      throw new Error('Username is required and must be a non-empty string')
+    }
+
+    const trimmedUsername = username.trim()
+
+    // 用户名只能包含字母、数字、下划线和连字符
+    const usernameRegex = /^[a-zA-Z0-9_-]+$/
+    if (!usernameRegex.test(trimmedUsername)) {
+      throw new Error('Username can only contain letters, numbers, underscores, and hyphens')
+    }
+
+    // 长度限制 (防止过长的输入)
+    if (trimmedUsername.length > 64) {
+      throw new Error('Username cannot exceed 64 characters')
+    }
+
+    // 不能以连字符开头或结尾
+    if (trimmedUsername.startsWith('-') || trimmedUsername.endsWith('-')) {
+      throw new Error('Username cannot start or end with a hyphen')
+    }
+
+    return trimmedUsername
+  }
+
   // 🔐 主要的登录验证方法
   async authenticateUserCredentials(username, password) {
     if (!this.config.enabled) {
       throw new Error('LDAP authentication is not enabled')
     }
 
-    if (!username || typeof username !== 'string' || username.trim() === '') {
-      throw new Error('Username is required and must be a non-empty string')
-    }
+    // 验证和清理用户名 (防止LDAP注入)
+    const sanitizedUsername = this.validateAndSanitizeUsername(username)
 
     if (!password || typeof password !== 'string' || password.trim() === '') {
       throw new Error('Password is required and must be a non-empty string')
@@ -408,10 +434,10 @@ class LdapService {
       // 1. 使用管理员凭据绑定
       await this.bindClient(client)
 
-      // 2. 搜索用户
-      const ldapEntry = await this.searchUser(client, username)
+      // 2. 搜索用户 (使用已验证的用户名)
+      const ldapEntry = await this.searchUser(client, sanitizedUsername)
       if (!ldapEntry) {
-        logger.info(`🚫 User not found in LDAP: ${username}`)
+        logger.info(`🚫 User not found in LDAP: ${sanitizedUsername}`)
         return { success: false, message: 'Invalid username or password' }
       }
 
@@ -433,7 +459,7 @@ class LdapService {
 
       // 验证用户DN
       if (!userDN) {
-        logger.error(`❌ Invalid or missing DN for user: ${username}`, {
+        logger.error(`❌ Invalid or missing DN for user: ${sanitizedUsername}`, {
           ldapEntryDn: ldapEntry.dn,
           ldapEntryObjectName: ldapEntry.objectName,
           ldapEntryType: typeof ldapEntry,
@@ -445,19 +471,21 @@ class LdapService {
       // 4. 验证用户密码
       const isPasswordValid = await this.authenticateUser(userDN, password)
       if (!isPasswordValid) {
-        logger.info(`🚫 Invalid password for user: ${username}`)
+        logger.info(`🚫 Invalid password for user: ${sanitizedUsername}`)
         return { success: false, message: 'Invalid username or password' }
       }
 
       // 5. 提取用户信息
-      const userInfo = this.extractUserInfo(ldapEntry, username)
+      const userInfo = this.extractUserInfo(ldapEntry, sanitizedUsername)
 
       // 6. 创建或更新本地用户
       const user = await userService.createOrUpdateUser(userInfo)
 
       // 7. 检查用户是否被禁用
       if (!user.isActive) {
-        logger.security(`🔒 Disabled user LDAP login attempt: ${username} from LDAP authentication`)
+        logger.security(
+          `🔒 Disabled user LDAP login attempt: ${sanitizedUsername} from LDAP authentication`
+        )
         return {
           success: false,
           message: 'Your account has been disabled. Please contact administrator.'
@@ -470,7 +498,7 @@ class LdapService {
       // 9. 创建用户会话
       const sessionToken = await userService.createUserSession(user.id)
 
-      logger.info(`✅ LDAP authentication successful for user: ${username}`)
+      logger.info(`✅ LDAP authentication successful for user: ${sanitizedUsername}`)
 
       return {
         success: true,
