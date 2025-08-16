@@ -96,22 +96,42 @@ async function handleMessagesRequest(req, res) {
             ) {
               const inputTokens = usageData.input_tokens || 0
               const outputTokens = usageData.output_tokens || 0
-              const cacheCreateTokens = usageData.cache_creation_input_tokens || 0
+              // 兼容处理：如果有详细的 cache_creation 对象，使用它；否则使用总的 cache_creation_input_tokens
+              let cacheCreateTokens = usageData.cache_creation_input_tokens || 0
+              let ephemeral5mTokens = 0
+              let ephemeral1hTokens = 0
+
+              if (usageData.cache_creation && typeof usageData.cache_creation === 'object') {
+                ephemeral5mTokens = usageData.cache_creation.ephemeral_5m_input_tokens || 0
+                ephemeral1hTokens = usageData.cache_creation.ephemeral_1h_input_tokens || 0
+                // 总的缓存创建 tokens 是两者之和
+                cacheCreateTokens = ephemeral5mTokens + ephemeral1hTokens
+              }
+
               const cacheReadTokens = usageData.cache_read_input_tokens || 0
               const model = usageData.model || 'unknown'
 
               // 记录真实的token使用量（包含模型信息和所有4种token以及账户ID）
               const { accountId: usageAccountId } = usageData
+
+              // 构建 usage 对象以传递给 recordUsage
+              const usageObject = {
+                input_tokens: inputTokens,
+                output_tokens: outputTokens,
+                cache_creation_input_tokens: cacheCreateTokens,
+                cache_read_input_tokens: cacheReadTokens
+              }
+
+              // 如果有详细的缓存创建数据，添加到 usage 对象中
+              if (ephemeral5mTokens > 0 || ephemeral1hTokens > 0) {
+                usageObject.cache_creation = {
+                  ephemeral_5m_input_tokens: ephemeral5mTokens,
+                  ephemeral_1h_input_tokens: ephemeral1hTokens
+                }
+              }
+
               apiKeyService
-                .recordUsage(
-                  req.apiKey.id,
-                  inputTokens,
-                  outputTokens,
-                  cacheCreateTokens,
-                  cacheReadTokens,
-                  model,
-                  usageAccountId
-                )
+                .recordUsageWithDetails(req.apiKey.id, usageObject, model, usageAccountId)
                 .catch((error) => {
                   logger.error('❌ Failed to record stream usage:', error)
                 })
@@ -161,22 +181,42 @@ async function handleMessagesRequest(req, res) {
             ) {
               const inputTokens = usageData.input_tokens || 0
               const outputTokens = usageData.output_tokens || 0
-              const cacheCreateTokens = usageData.cache_creation_input_tokens || 0
+              // 兼容处理：如果有详细的 cache_creation 对象，使用它；否则使用总的 cache_creation_input_tokens
+              let cacheCreateTokens = usageData.cache_creation_input_tokens || 0
+              let ephemeral5mTokens = 0
+              let ephemeral1hTokens = 0
+
+              if (usageData.cache_creation && typeof usageData.cache_creation === 'object') {
+                ephemeral5mTokens = usageData.cache_creation.ephemeral_5m_input_tokens || 0
+                ephemeral1hTokens = usageData.cache_creation.ephemeral_1h_input_tokens || 0
+                // 总的缓存创建 tokens 是两者之和
+                cacheCreateTokens = ephemeral5mTokens + ephemeral1hTokens
+              }
+
               const cacheReadTokens = usageData.cache_read_input_tokens || 0
               const model = usageData.model || 'unknown'
 
               // 记录真实的token使用量（包含模型信息和所有4种token以及账户ID）
               const usageAccountId = usageData.accountId
+
+              // 构建 usage 对象以传递给 recordUsage
+              const usageObject = {
+                input_tokens: inputTokens,
+                output_tokens: outputTokens,
+                cache_creation_input_tokens: cacheCreateTokens,
+                cache_read_input_tokens: cacheReadTokens
+              }
+
+              // 如果有详细的缓存创建数据，添加到 usage 对象中
+              if (ephemeral5mTokens > 0 || ephemeral1hTokens > 0) {
+                usageObject.cache_creation = {
+                  ephemeral_5m_input_tokens: ephemeral5mTokens,
+                  ephemeral_1h_input_tokens: ephemeral1hTokens
+                }
+              }
+
               apiKeyService
-                .recordUsage(
-                  req.apiKey.id,
-                  inputTokens,
-                  outputTokens,
-                  cacheCreateTokens,
-                  cacheReadTokens,
-                  model,
-                  usageAccountId
-                )
+                .recordUsageWithDetails(req.apiKey.id, usageObject, model, usageAccountId)
                 .catch((error) => {
                   logger.error('❌ Failed to record stream usage:', error)
                 })

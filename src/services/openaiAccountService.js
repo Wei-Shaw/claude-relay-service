@@ -72,7 +72,7 @@ async function refreshAccessToken(refreshToken, proxy = null) {
   try {
     // Codex CLI 的官方 CLIENT_ID
     const CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann'
-    
+
     // 准备请求数据
     const requestData = new URLSearchParams({
       grant_type: 'refresh_token',
@@ -96,15 +96,13 @@ async function refreshAccessToken(refreshToken, proxy = null) {
     // 配置代理（如果有）
     if (proxy && proxy.host && proxy.port) {
       if (proxy.type === 'socks5') {
-        const proxyAuth = proxy.username && proxy.password 
-          ? `${proxy.username}:${proxy.password}@` 
-          : ''
+        const proxyAuth =
+          proxy.username && proxy.password ? `${proxy.username}:${proxy.password}@` : ''
         const socksProxy = `socks5://${proxyAuth}${proxy.host}:${proxy.port}`
         requestOptions.httpsAgent = new SocksProxyAgent(socksProxy)
       } else if (proxy.type === 'http' || proxy.type === 'https') {
-        const proxyAuth = proxy.username && proxy.password
-          ? `${proxy.username}:${proxy.password}@`
-          : ''
+        const proxyAuth =
+          proxy.username && proxy.password ? `${proxy.username}:${proxy.password}@` : ''
         const httpProxy = `http://${proxyAuth}${proxy.host}:${proxy.port}`
         requestOptions.httpsAgent = new HttpsProxyAgent(httpProxy)
       }
@@ -115,16 +113,16 @@ async function refreshAccessToken(refreshToken, proxy = null) {
 
     if (response.status === 200 && response.data) {
       const result = response.data
-      
+
       logger.info('✅ Successfully refreshed OpenAI token')
-      
+
       // 返回新的 token 信息
       return {
         access_token: result.access_token,
         id_token: result.id_token,
         refresh_token: result.refresh_token || refreshToken, // 如果没有返回新的，保留原来的
         expires_in: result.expires_in || 3600,
-        expiry_date: Date.now() + ((result.expires_in || 3600) * 1000) // 计算过期时间
+        expiry_date: Date.now() + (result.expires_in || 3600) * 1000 // 计算过期时间
       }
     } else {
       throw new Error(`Failed to refresh token: ${response.status} ${response.statusText}`)
@@ -137,7 +135,9 @@ async function refreshAccessToken(refreshToken, proxy = null) {
         data: error.response.data,
         headers: error.response.headers
       })
-      throw new Error(`Token refresh failed: ${error.response.status} - ${JSON.stringify(error.response.data)}`)
+      throw new Error(
+        `Token refresh failed: ${error.response.status} - ${JSON.stringify(error.response.data)}`
+      )
     } else if (error.request) {
       // 请求已发出但没有收到响应
       logger.error('OpenAI token refresh no response:', error.message)
