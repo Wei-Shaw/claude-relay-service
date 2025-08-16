@@ -279,16 +279,10 @@ class ClaudeRelayService {
 
       if (responseBody && responseBody.usage) {
         const { usage } = responseBody
-        logger.info('📊 === Non-Stream Request Usage Summary ===', {
-          request_model: requestBody.model,
-          response_model: responseBody.model || requestBody.model,
-          input_tokens: usage.input_tokens || 0,
-          output_tokens: usage.output_tokens || 0,
-          cache_creation_tokens: usage.cache_creation_input_tokens || 0,
-          cache_read_tokens: usage.cache_read_input_tokens || 0,
-          api_key: apiKeyData.name,
-          account_id: accountId
-        })
+        // 打印原始usage数据为JSON字符串
+        logger.info(
+          `📊 === Non-Stream Request Usage Summary === Model: ${requestBody.model}, Usage: ${JSON.stringify(usage)}`
+        )
       } else {
         // 如果没有usage数据，使用估算值
         const inputTokens = requestBody.messages
@@ -1008,13 +1002,15 @@ class ClaudeRelayService {
 
                     // 如果已经收集到了input数据和output数据，这是一个完整的usage
                     if (currentUsageData.input_tokens !== undefined) {
-                      logger.info(
+                      logger.debug(
                         '🎯 Complete usage data collected for model:',
-                        currentUsageData.model
+                        currentUsageData.model,
+                        '- Input:',
+                        currentUsageData.input_tokens,
+                        'Output:',
+                        currentUsageData.output_tokens
                       )
-                      // 触发回调记录这个usage
-                      usageCallback(currentUsageData)
-                      // 保存到列表中
+                      // 保存到列表中，但不立即触发回调
                       allUsageData.push({ ...currentUsageData })
                       // 重置当前数据，准备接收下一个
                       currentUsageData = {}
@@ -1080,7 +1076,6 @@ class ClaudeRelayService {
             if (currentUsageData.output_tokens === undefined) {
               currentUsageData.output_tokens = 0 // 如果没有output，设为0
             }
-            usageCallback(currentUsageData)
             allUsageData.push(currentUsageData)
           }
 
@@ -1104,16 +1099,45 @@ class ClaudeRelayService {
               {}
             )
 
-            logger.info('📊 === Stream Request Usage Summary ===', {
-              request_body_model: body.model,
-              total_input_tokens: totalUsage.input_tokens,
-              total_output_tokens: totalUsage.output_tokens,
-              total_cache_creation: totalUsage.cache_creation_input_tokens,
-              total_cache_read: totalUsage.cache_read_input_tokens,
-              models_used: [...new Set(totalUsage.models)],
-              usage_events_count: allUsageData.length,
-              detailed_usage: allUsageData
+            // 打印原始的usage数据为JSON字符串，避免嵌套问题
+            logger.info(
+              `📊 === Stream Request Usage Summary === Model: ${body.model}, Total Events: ${allUsageData.length}, Usage Data: ${JSON.stringify(allUsageData)}`
+            )
+
+            // 一般一个请求只会使用一个模型，即使有多个usage事件也应该合并
+            // 计算总的usage
+            const finalUsage = {
+              input_tokens: totalUsage.input_tokens,
+              output_tokens: totalUsage.output_tokens,
+              cache_creation_input_tokens: totalUsage.cache_creation_input_tokens,
+              cache_read_input_tokens: totalUsage.cache_read_input_tokens,
+              model: allUsageData[allUsageData.length - 1].model || body.model // 使用最后一个模型或请求模型
+            }
+
+            // 如果有详细的cache_creation数据，合并它们
+            let totalEphemeral5m = 0
+            let totalEphemeral1h = 0
+            allUsageData.forEach((usage) => {
+              if (usage.cache_creation && typeof usage.cache_creation === 'object') {
+                totalEphemeral5m += usage.cache_creation.ephemeral_5m_input_tokens || 0
+                totalEphemeral1h += usage.cache_creation.ephemeral_1h_input_tokens || 0
+              }
             })
+
+            // 如果有详细的缓存数据，添加到finalUsage
+            if (totalEphemeral5m > 0 || totalEphemeral1h > 0) {
+              finalUsage.cache_creation = {
+                ephemeral_5m_input_tokens: totalEphemeral5m,
+                ephemeral_1h_input_tokens: totalEphemeral1h
+              }
+              logger.info(
+                '📊 Detailed cache creation breakdown:',
+                JSON.stringify(finalUsage.cache_creation)
+              )
+            }
+
+            // 调用一次usageCallback记录合并后的数据
+            usageCallback(finalUsage)
           }
 
           // 处理限流状态
