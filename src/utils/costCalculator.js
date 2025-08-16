@@ -69,6 +69,12 @@ class CostCalculator {
    * @returns {Object} 费用详情
    */
   static calculateCost(usage, model = 'unknown') {
+    // 如果 usage 包含详细的 cache_creation 对象，使用 pricingService 来处理
+    if (usage.cache_creation && typeof usage.cache_creation === 'object') {
+      return pricingService.calculateCost(usage, model)
+    }
+
+    // 否则使用旧的逻辑（向后兼容）
     const inputTokens = usage.input_tokens || 0
     const outputTokens = usage.output_tokens || 0
     const cacheCreateTokens = usage.cache_creation_input_tokens || 0

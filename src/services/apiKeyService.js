@@ -455,6 +455,104 @@ class ApiKeyService {
     }
   }
 
+  // 📊 记录使用情况（新版本，支持详细的缓存类型）
+  async recordUsageWithDetails(keyId, usageObject, model = 'unknown', accountId = null) {
+    try {
+      // 提取 token 数量
+      const inputTokens = usageObject.input_tokens || 0
+      const outputTokens = usageObject.output_tokens || 0
+      const cacheCreateTokens = usageObject.cache_creation_input_tokens || 0
+      const cacheReadTokens = usageObject.cache_read_input_tokens || 0
+
+      const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
+
+      // 计算费用（支持详细的缓存类型）
+      const pricingService = require('./pricingService')
+      const costInfo = pricingService.calculateCost(usageObject, model)
+
+      // 记录API Key级别的使用统计
+      await redis.incrementTokenUsage(
+        keyId,
+        totalTokens,
+        inputTokens,
+        outputTokens,
+        cacheCreateTokens,
+        cacheReadTokens,
+        model
+      )
+
+      // 记录费用统计
+      if (costInfo.totalCost > 0) {
+        await redis.incrementDailyCost(keyId, costInfo.totalCost)
+        logger.database(
+          `💰 Recorded cost for ${keyId}: $${costInfo.totalCost.toFixed(6)}, model: ${model}`
+        )
+
+        // 记录详细的缓存费用（如果有）
+        if (costInfo.ephemeral5mCost > 0 || costInfo.ephemeral1hCost > 0) {
+          logger.database(
+            `💰 Cache costs - 5m: $${costInfo.ephemeral5mCost.toFixed(6)}, 1h: $${costInfo.ephemeral1hCost.toFixed(6)}`
+          )
+        }
+      } else {
+        logger.debug(`💰 No cost recorded for ${keyId} - zero cost for model: ${model}`)
+      }
+
+      // 获取API Key数据以确定关联的账户
+      const keyData = await redis.getApiKey(keyId)
+      if (keyData && Object.keys(keyData).length > 0) {
+        // 更新最后使用时间
+        keyData.lastUsedAt = new Date().toISOString()
+        await redis.setApiKey(keyId, keyData)
+
+        // 记录账户级别的使用统计（只统计实际处理请求的账户）
+        if (accountId) {
+          await redis.incrementAccountUsage(
+            accountId,
+            totalTokens,
+            inputTokens,
+            outputTokens,
+            cacheCreateTokens,
+            cacheReadTokens,
+            model
+          )
+          logger.database(
+            `📊 Recorded account usage: ${accountId} - ${totalTokens} tokens (API Key: ${keyId})`
+          )
+        } else {
+          logger.debug(
+            '⚠️ No accountId provided for usage recording, skipping account-level statistics'
+          )
+        }
+      }
+
+      const logParts = [`Model: ${model}`, `Input: ${inputTokens}`, `Output: ${outputTokens}`]
+      if (cacheCreateTokens > 0) {
+        logParts.push(`Cache Create: ${cacheCreateTokens}`)
+
+        // 如果有详细的缓存创建数据，也记录它们
+        if (usageObject.cache_creation) {
+          const { ephemeral_5m_input_tokens, ephemeral_1h_input_tokens } =
+            usageObject.cache_creation
+          if (ephemeral_5m_input_tokens > 0) {
+            logParts.push(`5m: ${ephemeral_5m_input_tokens}`)
+          }
+          if (ephemeral_1h_input_tokens > 0) {
+            logParts.push(`1h: ${ephemeral_1h_input_tokens}`)
+          }
+        }
+      }
+      if (cacheReadTokens > 0) {
+        logParts.push(`Cache Read: ${cacheReadTokens}`)
+      }
+      logParts.push(`Total: ${totalTokens} tokens`)
+
+      logger.database(`📊 Recorded usage: ${keyId} - ${logParts.join(', ')}`)
+    } catch (error) {
+      logger.error('❌ Failed to record usage:', error)
+    }
+  }
+
   // 🔐 生成密钥
   _generateSecretKey() {
     return crypto.randomBytes(32).toString('hex')

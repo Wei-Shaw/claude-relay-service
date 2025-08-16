@@ -20,6 +20,41 @@ class PricingService {
     this.updateInterval = 24 * 60 * 60 * 1000 // 24小时
     this.fileWatcher = null // 文件监听器
     this.reloadDebounceTimer = null // 防抖定时器
+
+    // 硬编码的 1 小时缓存价格（美元/百万 token）
+    // ephemeral_5m 的价格使用 model_pricing.json 中的 cache_creation_input_token_cost
+    // ephemeral_1h 的价格需要硬编码
+    this.ephemeral1hPricing = {
+      // Opus 系列: $30/MTok
+      'claude-opus-4-1': 0.00003,
+      'claude-opus-4-1-20250805': 0.00003,
+      'claude-opus-4': 0.00003,
+      'claude-opus-4-20250514': 0.00003,
+      'claude-3-opus': 0.00003,
+      'claude-3-opus-latest': 0.00003,
+      'claude-3-opus-20240229': 0.00003,
+
+      // Sonnet 系列: $6/MTok
+      'claude-3-5-sonnet': 0.000006,
+      'claude-3-5-sonnet-latest': 0.000006,
+      'claude-3-5-sonnet-20241022': 0.000006,
+      'claude-3-5-sonnet-20240620': 0.000006,
+      'claude-3-sonnet': 0.000006,
+      'claude-3-sonnet-20240307': 0.000006,
+      'claude-sonnet-3': 0.000006,
+      'claude-sonnet-3-5': 0.000006,
+      'claude-sonnet-3-7': 0.000006,
+      'claude-sonnet-4': 0.000006,
+
+      // Haiku 系列: $1.6/MTok
+      'claude-3-5-haiku': 0.0000016,
+      'claude-3-5-haiku-latest': 0.0000016,
+      'claude-3-5-haiku-20241022': 0.0000016,
+      'claude-3-haiku': 0.0000016,
+      'claude-3-haiku-20240307': 0.0000016,
+      'claude-haiku-3': 0.0000016,
+      'claude-haiku-3-5': 0.0000016
+    }
   }
 
   // 初始化价格服务
@@ -258,6 +293,40 @@ class PricingService {
     return null
   }
 
+  // 获取 1 小时缓存价格
+  getEphemeral1hPricing(modelName) {
+    if (!modelName) {
+      return 0
+    }
+
+    // 尝试直接匹配
+    if (this.ephemeral1hPricing[modelName]) {
+      return this.ephemeral1hPricing[modelName]
+    }
+
+    // 处理各种模型名称变体
+    const modelLower = modelName.toLowerCase()
+
+    // 检查是否是 Opus 系列
+    if (modelLower.includes('opus')) {
+      return 0.00003 // $30/MTok
+    }
+
+    // 检查是否是 Sonnet 系列
+    if (modelLower.includes('sonnet')) {
+      return 0.000006 // $6/MTok
+    }
+
+    // 检查是否是 Haiku 系列
+    if (modelLower.includes('haiku')) {
+      return 0.0000016 // $1.6/MTok
+    }
+
+    // 默认返回 0（未知模型）
+    logger.debug(`💰 No 1h cache pricing found for model: ${modelName}`)
+    return 0
+  }
+
   // 计算使用费用
   calculateCost(usage, modelName) {
     const pricing = this.getModelPricing(modelName)
@@ -268,6 +337,8 @@ class PricingService {
         outputCost: 0,
         cacheCreateCost: 0,
         cacheReadCost: 0,
+        ephemeral5mCost: 0,
+        ephemeral1hCost: 0,
         totalCost: 0,
         hasPricing: false
       }
@@ -275,23 +346,52 @@ class PricingService {
 
     const inputCost = (usage.input_tokens || 0) * (pricing.input_cost_per_token || 0)
     const outputCost = (usage.output_tokens || 0) * (pricing.output_cost_per_token || 0)
-    const cacheCreateCost =
-      (usage.cache_creation_input_tokens || 0) * (pricing.cache_creation_input_token_cost || 0)
     const cacheReadCost =
       (usage.cache_read_input_tokens || 0) * (pricing.cache_read_input_token_cost || 0)
+
+    // 处理缓存创建费用：
+    // 1. 如果有详细的 cache_creation 对象，使用它
+    // 2. 否则使用总的 cache_creation_input_tokens（向后兼容）
+    let ephemeral5mCost = 0
+    let ephemeral1hCost = 0
+    let cacheCreateCost = 0
+
+    if (usage.cache_creation && typeof usage.cache_creation === 'object') {
+      // 有详细的缓存创建数据
+      const ephemeral5mTokens = usage.cache_creation.ephemeral_5m_input_tokens || 0
+      const ephemeral1hTokens = usage.cache_creation.ephemeral_1h_input_tokens || 0
+
+      // 5分钟缓存使用标准的 cache_creation_input_token_cost
+      ephemeral5mCost = ephemeral5mTokens * (pricing.cache_creation_input_token_cost || 0)
+
+      // 1小时缓存使用硬编码的价格
+      const ephemeral1hPrice = this.getEphemeral1hPricing(modelName)
+      ephemeral1hCost = ephemeral1hTokens * ephemeral1hPrice
+
+      // 总的缓存创建费用
+      cacheCreateCost = ephemeral5mCost + ephemeral1hCost
+    } else if (usage.cache_creation_input_tokens) {
+      // 旧格式，所有缓存创建 tokens 都按 5 分钟价格计算（向后兼容）
+      cacheCreateCost =
+        (usage.cache_creation_input_tokens || 0) * (pricing.cache_creation_input_token_cost || 0)
+      ephemeral5mCost = cacheCreateCost
+    }
 
     return {
       inputCost,
       outputCost,
       cacheCreateCost,
       cacheReadCost,
+      ephemeral5mCost,
+      ephemeral1hCost,
       totalCost: inputCost + outputCost + cacheCreateCost + cacheReadCost,
       hasPricing: true,
       pricing: {
         input: pricing.input_cost_per_token || 0,
         output: pricing.output_cost_per_token || 0,
         cacheCreate: pricing.cache_creation_input_token_cost || 0,
-        cacheRead: pricing.cache_read_input_token_cost || 0
+        cacheRead: pricing.cache_read_input_token_cost || 0,
+        ephemeral1h: this.getEphemeral1hPricing(modelName)
       }
     }
   }
