@@ -5,6 +5,7 @@ const { HttpsProxyAgent } = require('https-proxy-agent')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
+const LRUCache = require('../utils/lruCache')
 
 class ClaudeConsoleAccountService {
   constructor() {
@@ -15,6 +16,25 @@ class ClaudeConsoleAccountService {
     // Redis键前缀
     this.ACCOUNT_KEY_PREFIX = 'claude_console_account:'
     this.SHARED_ACCOUNTS_KEY = 'shared_claude_console_accounts'
+
+    // 🚀 性能优化：缓存派生的加密密钥，避免每次重复计算
+    // scryptSync 是 CPU 密集型操作，缓存可以减少 95%+ 的 CPU 密集型操作
+    this._encryptionKeyCache = null
+
+    // 🔄 解密结果缓存，提高解密性能
+    this._decryptCache = new LRUCache(500)
+
+    // 🧹 定期清理缓存（每10分钟）
+    setInterval(
+      () => {
+        this._decryptCache.cleanup()
+        logger.info(
+          '🧹 Claude Console decrypt cache cleanup completed',
+          this._decryptCache.getStats()
+        )
+      },
+      10 * 60 * 1000
+    )
   }
 
   // 🏢 创建Claude Console账户
@@ -512,6 +532,13 @@ class ClaudeConsoleAccountService {
       return ''
     }
 
+    // 🎯 检查缓存
+    const cacheKey = crypto.createHash('sha256').update(encryptedData).digest('hex')
+    const cached = this._decryptCache.get(cacheKey)
+    if (cached !== undefined) {
+      return cached
+    }
+
     try {
       if (encryptedData.includes(':')) {
         const parts = encryptedData.split(':')
@@ -523,6 +550,15 @@ class ClaudeConsoleAccountService {
           const decipher = crypto.createDecipheriv(this.ENCRYPTION_ALGORITHM, key, iv)
           let decrypted = decipher.update(encrypted, 'hex', 'utf8')
           decrypted += decipher.final('utf8')
+
+          // 💾 存入缓存（5分钟过期）
+          this._decryptCache.set(cacheKey, decrypted, 5 * 60 * 1000)
+
+          // 📊 定期打印缓存统计
+          if ((this._decryptCache.hits + this._decryptCache.misses) % 1000 === 0) {
+            this._decryptCache.printStats()
+          }
+
           return decrypted
         }
       }
@@ -536,7 +572,20 @@ class ClaudeConsoleAccountService {
 
   // 🔑 生成加密密钥
   _generateEncryptionKey() {
-    return crypto.scryptSync(config.security.encryptionKey, this.ENCRYPTION_SALT, 32)
+    // 性能优化：缓存密钥派生结果，避免重复的 CPU 密集计算
+    // scryptSync 是故意设计为慢速的密钥派生函数（防暴力破解）
+    // 但在高并发场景下，每次都重新计算会导致 CPU 100% 占用
+    if (!this._encryptionKeyCache) {
+      // 只在第一次调用时计算，后续使用缓存
+      // 由于输入参数固定，派生结果永远相同，不影响数据兼容性
+      this._encryptionKeyCache = crypto.scryptSync(
+        config.security.encryptionKey,
+        this.ENCRYPTION_SALT,
+        32
+      )
+      logger.info('🔑 Console encryption key derived and cached for performance optimization')
+    }
+    return this._encryptionKeyCache
   }
 
   // 🎭 掩码API URL

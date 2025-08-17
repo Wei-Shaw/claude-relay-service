@@ -10,6 +10,7 @@ const config = require('../config/config')
 const logger = require('./utils/logger')
 const redis = require('./models/redis')
 const pricingService = require('./services/pricingService')
+const cacheMonitor = require('./utils/cacheMonitor')
 
 // Import routes
 const apiRoutes = require('./routes/api')
@@ -48,6 +49,9 @@ class Application {
       // 💰 初始化价格服务
       logger.info('🔄 Initializing pricing service...')
       await pricingService.initialize()
+
+      // 📊 初始化缓存监控
+      await this.initializeCacheMonitoring()
 
       // 🔧 初始化管理员凭据
       logger.info('🔄 Initializing admin credentials...')
@@ -453,6 +457,40 @@ class Application {
     } catch (error) {
       logger.error('💥 Failed to start server:', error)
       process.exit(1)
+    }
+  }
+
+  // 📊 初始化缓存监控
+  async initializeCacheMonitoring() {
+    try {
+      logger.info('🔄 Initializing cache monitoring...')
+
+      // 注册各个服务的缓存实例
+      const services = [
+        { name: 'claudeAccount', service: require('./services/claudeAccountService') },
+        { name: 'claudeConsole', service: require('./services/claudeConsoleAccountService') },
+        { name: 'bedrockAccount', service: require('./services/bedrockAccountService') }
+      ]
+
+      // 注册已加载的服务缓存
+      for (const { name, service } of services) {
+        if (service && (service._decryptCache || service.decryptCache)) {
+          const cache = service._decryptCache || service.decryptCache
+          cacheMonitor.registerCache(`${name}_decrypt`, cache)
+          logger.info(`✅ Registered ${name} decrypt cache for monitoring`)
+        }
+      }
+
+      // 初始化时打印一次统计
+      setTimeout(() => {
+        const stats = cacheMonitor.getGlobalStats()
+        logger.info(`📊 Cache System - Registered: ${stats.cacheCount} caches`)
+      }, 5000)
+
+      logger.success('✅ Cache monitoring initialized')
+    } catch (error) {
+      logger.error('❌ Failed to initialize cache monitoring:', error)
+      // 不阻止应用启动
     }
   }
 
