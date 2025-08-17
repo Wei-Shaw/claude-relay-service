@@ -484,12 +484,12 @@ class ApiKeyService {
       // 提取详细的缓存创建数据
       let ephemeral5mTokens = 0
       let ephemeral1hTokens = 0
-      
+
       if (usageObject.cache_creation && typeof usageObject.cache_creation === 'object') {
         ephemeral5mTokens = usageObject.cache_creation.ephemeral_5m_input_tokens || 0
         ephemeral1hTokens = usageObject.cache_creation.ephemeral_1h_input_tokens || 0
       }
-      
+
       // 记录API Key级别的使用统计 - 这个必须执行
       await redis.incrementTokenUsage(
         keyId,
@@ -499,8 +499,8 @@ class ApiKeyService {
         cacheCreateTokens,
         cacheReadTokens,
         model,
-        ephemeral5mTokens,  // 传递5分钟缓存 tokens
-        ephemeral1hTokens   // 传递1小时缓存 tokens
+        ephemeral5mTokens, // 传递5分钟缓存 tokens
+        ephemeral1hTokens // 传递1小时缓存 tokens
       )
 
       // 记录费用统计

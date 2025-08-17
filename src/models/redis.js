@@ -192,8 +192,8 @@ class RedisClient {
     cacheCreateTokens = 0,
     cacheReadTokens = 0,
     model = 'unknown',
-    ephemeral5mTokens = 0,  // 新增：5分钟缓存 tokens
-    ephemeral1hTokens = 0   // 新增：1小时缓存 tokens
+    ephemeral5mTokens = 0, // 新增：5分钟缓存 tokens
+    ephemeral1hTokens = 0 // 新增：1小时缓存 tokens
   ) {
     const key = `usage:${keyId}`
     const now = new Date()

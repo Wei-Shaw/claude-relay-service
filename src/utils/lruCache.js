@@ -94,7 +94,7 @@ class LRUCache {
    * 清空缓存
    */
   clear() {
-    const size = this.cache.size
+    const { size } = this.cache
     this.cache.clear()
     this.hits = 0
     this.misses = 0

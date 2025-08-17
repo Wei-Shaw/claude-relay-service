@@ -81,7 +81,7 @@ class CacheMonitor {
 
     const totalRequests = stats.totalHits + stats.totalMisses
     stats.averageHitRate =
-      totalRequests > 0 ? ((stats.totalHits / totalRequests) * 100).toFixed(2) + '%' : '0%'
+      totalRequests > 0 ? `${((stats.totalHits / totalRequests) * 100).toFixed(2)}%` : '0%'
 
     return stats
   }
@@ -95,7 +95,7 @@ class CacheMonitor {
 
     for (const [name, monitor] of this.monitors) {
       try {
-        const cache = monitor.cache
+        const { cache } = monitor
         const beforeSize = cache.cache.size
 
         // 执行常规清理
@@ -251,8 +251,8 @@ class CacheMonitor {
   estimateMemoryUsage() {
     let totalBytes = 0
 
-    for (const [name, monitor] of this.monitors) {
-      const cache = monitor.cache.cache
+    for (const [, monitor] of this.monitors) {
+      const { cache } = monitor.cache
       for (const [key, item] of cache) {
         // 粗略估算：key 长度 + value 序列化长度
         totalBytes += key.length * 2 // UTF-16
@@ -275,7 +275,7 @@ class CacheMonitor {
     logger.error('🚨 EMERGENCY CLEANUP INITIATED')
 
     for (const [name, monitor] of this.monitors) {
-      const cache = monitor.cache
+      const { cache } = monitor
       const beforeSize = cache.cache.size
 
       // 清理一半的缓存项（LRU 会保留最近使用的）
