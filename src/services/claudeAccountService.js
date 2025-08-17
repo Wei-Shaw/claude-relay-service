@@ -15,6 +15,7 @@ const {
   logRefreshSkipped
 } = require('../utils/tokenRefreshLogger')
 const tokenRefreshService = require('./tokenRefreshService')
+const LRUCache = require('../utils/lruCache')
 
 class ClaudeAccountService {
   constructor() {
@@ -28,6 +29,18 @@ class ClaudeAccountService {
     // 🚀 性能优化：缓存派生的加密密钥，避免每次重复计算
     // scryptSync 是 CPU 密集型操作，缓存可以减少 95%+ 的 CPU 占用
     this._encryptionKeyCache = null
+
+    // 🔄 解密结果缓存，提高解密性能
+    this._decryptCache = new LRUCache(500)
+
+    // 🧹 定期清理缓存（每10分钟）
+    setInterval(
+      () => {
+        this._decryptCache.cleanup()
+        logger.info('🧹 Claude decrypt cache cleanup completed', this._decryptCache.getStats())
+      },
+      10 * 60 * 1000
+    )
   }
 
   // 🏢 创建Claude账户
@@ -897,7 +910,16 @@ class ClaudeAccountService {
       return ''
     }
 
+    // 🎯 检查缓存
+    const cacheKey = crypto.createHash('sha256').update(encryptedData).digest('hex')
+    const cached = this._decryptCache.get(cacheKey)
+    if (cached !== undefined) {
+      return cached
+    }
+
     try {
+      let decrypted = ''
+
       // 检查是否是新格式（包含IV）
       if (encryptedData.includes(':')) {
         // 新格式：iv:encryptedData
@@ -908,8 +930,17 @@ class ClaudeAccountService {
           const encrypted = parts[1]
 
           const decipher = crypto.createDecipheriv(this.ENCRYPTION_ALGORITHM, key, iv)
-          let decrypted = decipher.update(encrypted, 'hex', 'utf8')
+          decrypted = decipher.update(encrypted, 'hex', 'utf8')
           decrypted += decipher.final('utf8')
+
+          // 💾 存入缓存（5分钟过期）
+          this._decryptCache.set(cacheKey, decrypted, 5 * 60 * 1000)
+
+          // 📊 定期打印缓存统计
+          if ((this._decryptCache.hits + this._decryptCache.misses) % 1000 === 0) {
+            this._decryptCache.printStats()
+          }
+
           return decrypted
         }
       }
@@ -918,8 +949,12 @@ class ClaudeAccountService {
       // 注意：在新版本Node.js中这将失败，但我们会捕获错误
       try {
         const decipher = crypto.createDecipher('aes-256-cbc', config.security.encryptionKey)
-        let decrypted = decipher.update(encryptedData, 'hex', 'utf8')
+        decrypted = decipher.update(encryptedData, 'hex', 'utf8')
         decrypted += decipher.final('utf8')
+
+        // 💾 旧格式也存入缓存
+        this._decryptCache.set(cacheKey, decrypted, 5 * 60 * 1000)
+
         return decrypted
       } catch (oldError) {
         // 如果旧方式也失败，返回原数据

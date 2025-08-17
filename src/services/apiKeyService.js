@@ -466,11 +466,31 @@ class ApiKeyService {
 
       const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
 
-      // 计算费用（支持详细的缓存类型）
-      const pricingService = require('./pricingService')
-      const costInfo = pricingService.calculateCost(usageObject, model)
+      // 计算费用（支持详细的缓存类型）- 添加错误处理
+      let costInfo = { totalCost: 0, ephemeral5mCost: 0, ephemeral1hCost: 0 }
+      try {
+        const pricingService = require('./pricingService')
+        // 确保 pricingService 已初始化
+        if (!pricingService.pricingData) {
+          logger.warn('⚠️ PricingService not initialized, initializing now...')
+          await pricingService.initialize()
+        }
+        costInfo = pricingService.calculateCost(usageObject, model)
+      } catch (pricingError) {
+        logger.error('❌ Failed to calculate cost:', pricingError)
+        // 继续执行，不要因为费用计算失败而跳过统计记录
+      }
 
-      // 记录API Key级别的使用统计
+      // 提取详细的缓存创建数据
+      let ephemeral5mTokens = 0
+      let ephemeral1hTokens = 0
+      
+      if (usageObject.cache_creation && typeof usageObject.cache_creation === 'object') {
+        ephemeral5mTokens = usageObject.cache_creation.ephemeral_5m_input_tokens || 0
+        ephemeral1hTokens = usageObject.cache_creation.ephemeral_1h_input_tokens || 0
+      }
+      
+      // 记录API Key级别的使用统计 - 这个必须执行
       await redis.incrementTokenUsage(
         keyId,
         totalTokens,
@@ -478,7 +498,9 @@ class ApiKeyService {
         outputTokens,
         cacheCreateTokens,
         cacheReadTokens,
-        model
+        model,
+        ephemeral5mTokens,  // 传递5分钟缓存 tokens
+        ephemeral1hTokens   // 传递1小时缓存 tokens
       )
 
       // 记录费用统计
