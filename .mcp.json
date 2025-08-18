@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "spec-workflow": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@pimzino/spec-workflow-mcp@latest",
+        "/Users/weidian/project/claude-relay-service"
+      ],
+      "env": {}
+    }
+  }
+}
