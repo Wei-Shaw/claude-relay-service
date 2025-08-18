@@ -1025,7 +1025,12 @@ async function onboardUser(client, tierId, projectId, clientMetadata) {
     metadata: clientMetadata
   }
 
-  logger.info('📋 开始onboardUser API调用', { tierId, projectId })
+  logger.info('📋 开始onboardUser API调用', {
+    tierId,
+    projectId,
+    hasProjectId: !!projectId,
+    isFreeTier: tierId === 'free-tier' || tierId === 'FREE'
+  })
 
   // 轮询onboardUser直到长运行操作完成
   let lroRes = await axios({
