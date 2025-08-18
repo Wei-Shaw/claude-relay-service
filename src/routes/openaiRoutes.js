@@ -129,6 +129,7 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
         'user',
         'text_formatting',
         'truncation',
+        'text',
         'service_tier'
       ]
       fieldsToRemove.forEach((field) => {
