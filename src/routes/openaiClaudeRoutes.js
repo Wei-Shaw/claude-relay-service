@@ -250,19 +250,13 @@ async function handleChatCompletion(req, res, apiKeyData) {
         (usage) => {
           // 记录使用统计
           if (usage && usage.input_tokens !== undefined && usage.output_tokens !== undefined) {
-            const inputTokens = usage.input_tokens || 0
-            const outputTokens = usage.output_tokens || 0
-            const cacheCreateTokens = usage.cache_creation_input_tokens || 0
-            const cacheReadTokens = usage.cache_read_input_tokens || 0
             const model = usage.model || claudeRequest.model
 
+            // 使用新的 recordUsageWithDetails 方法来支持详细的缓存数据
             apiKeyService
-              .recordUsage(
+              .recordUsageWithDetails(
                 apiKeyData.id,
-                inputTokens,
-                outputTokens,
-                cacheCreateTokens,
-                cacheReadTokens,
+                usage, // 直接传递整个 usage 对象，包含可能的 cache_creation 详细数据
                 model,
                 accountId
               )
@@ -328,13 +322,11 @@ async function handleChatCompletion(req, res, apiKeyData) {
       // 记录使用统计
       if (claudeData.usage) {
         const { usage } = claudeData
+        // 使用新的 recordUsageWithDetails 方法来支持详细的缓存数据
         apiKeyService
-          .recordUsage(
+          .recordUsageWithDetails(
             apiKeyData.id,
-            usage.input_tokens || 0,
-            usage.output_tokens || 0,
-            usage.cache_creation_input_tokens || 0,
-            usage.cache_read_input_tokens || 0,
+            usage, // 直接传递整个 usage 对象，包含可能的 cache_creation 详细数据
             claudeRequest.model,
             accountId
           )

@@ -451,6 +451,23 @@ class ClaudeConsoleRelayService {
                         collectedUsageData.cache_read_input_tokens =
                           data.message.usage.cache_read_input_tokens || 0
                         collectedUsageData.model = data.message.model
+
+                        // 检查是否有详细的 cache_creation 对象
+                        if (
+                          data.message.usage.cache_creation &&
+                          typeof data.message.usage.cache_creation === 'object'
+                        ) {
+                          collectedUsageData.cache_creation = {
+                            ephemeral_5m_input_tokens:
+                              data.message.usage.cache_creation.ephemeral_5m_input_tokens || 0,
+                            ephemeral_1h_input_tokens:
+                              data.message.usage.cache_creation.ephemeral_1h_input_tokens || 0
+                          }
+                          logger.info(
+                            '📊 Collected detailed cache creation data:',
+                            JSON.stringify(collectedUsageData.cache_creation)
+                          )
+                        }
                       }
 
                       if (

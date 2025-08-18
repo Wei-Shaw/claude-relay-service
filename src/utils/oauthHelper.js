@@ -16,7 +16,7 @@ const OAUTH_CONFIG = {
   CLIENT_ID: '9d1c250a-e61b-44d9-88ed-5944d1962f5e',
   REDIRECT_URI: 'https://console.anthropic.com/oauth/code/callback',
   SCOPES: 'org:create_api_key user:profile user:inference',
-  SCOPES_SETUP: 'user:inference'
+  SCOPES_SETUP: 'user:inference' // Setup Token 只需要推理权限
 }
 
 /**
@@ -203,23 +203,55 @@ async function exchangeCodeForTokens(authorizationCode, codeVerifier, state, pro
       timeout: 30000
     })
 
+    // 记录完整的响应数据到专门的认证详细日志
+    logger.authDetail('OAuth token exchange response', response.data)
+
+    // 记录简化版本到主日志
+    logger.info('📊 OAuth token exchange response (analyzing for subscription info):', {
+      status: response.status,
+      hasData: !!response.data,
+      dataKeys: response.data ? Object.keys(response.data) : []
+    })
+
     logger.success('✅ OAuth token exchange successful', {
       status: response.status,
       hasAccessToken: !!response.data?.access_token,
       hasRefreshToken: !!response.data?.refresh_token,
-      scopes: response.data?.scope
+      scopes: response.data?.scope,
+      // 尝试提取可能的套餐信息字段
+      subscription: response.data?.subscription,
+      plan: response.data?.plan,
+      tier: response.data?.tier,
+      accountType: response.data?.account_type,
+      features: response.data?.features,
+      limits: response.data?.limits
     })
 
     const { data } = response
 
-    // 返回Claude格式的token数据
-    return {
+    // 返回Claude格式的token数据，包含可能的套餐信息
+    const result = {
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
       expiresAt: (Math.floor(Date.now() / 1000) + data.expires_in) * 1000,
       scopes: data.scope ? data.scope.split(' ') : ['user:inference', 'user:profile'],
       isMax: true
     }
+
+    // 如果响应中包含套餐信息，添加到返回结果中
+    if (data.subscription || data.plan || data.tier || data.account_type) {
+      result.subscriptionInfo = {
+        subscription: data.subscription,
+        plan: data.plan,
+        tier: data.tier,
+        accountType: data.account_type,
+        features: data.features,
+        limits: data.limits
+      }
+      logger.info('🎯 Found subscription info in OAuth response:', result.subscriptionInfo)
+    }
+
+    return result
   } catch (error) {
     // 处理axios错误响应
     if (error.response) {
@@ -340,7 +372,7 @@ async function exchangeSetupTokenCode(authorizationCode, codeVerifier, state, pr
     redirect_uri: OAUTH_CONFIG.REDIRECT_URI,
     code_verifier: codeVerifier,
     state,
-    expires_in: 31536000
+    expires_in: 31536000 // Setup Token 可以设置较长的过期时间
   }
 
   // 创建代理agent
@@ -368,16 +400,54 @@ async function exchangeSetupTokenCode(authorizationCode, codeVerifier, state, pr
       timeout: 30000
     })
 
+    // 记录完整的响应数据到专门的认证详细日志
+    logger.authDetail('Setup Token exchange response', response.data)
+
+    // 记录简化版本到主日志
+    logger.info('📊 Setup Token exchange response (analyzing for subscription info):', {
+      status: response.status,
+      hasData: !!response.data,
+      dataKeys: response.data ? Object.keys(response.data) : []
+    })
+
+    logger.success('✅ Setup Token exchange successful', {
+      status: response.status,
+      hasAccessToken: !!response.data?.access_token,
+      scopes: response.data?.scope,
+      // 尝试提取可能的套餐信息字段
+      subscription: response.data?.subscription,
+      plan: response.data?.plan,
+      tier: response.data?.tier,
+      accountType: response.data?.account_type,
+      features: response.data?.features,
+      limits: response.data?.limits
+    })
+
     const { data } = response
 
-    // 返回Claude格式的token数据
-    return {
+    // 返回Claude格式的token数据，包含可能的套餐信息
+    const result = {
       accessToken: data.access_token,
       refreshToken: '',
       expiresAt: (Math.floor(Date.now() / 1000) + data.expires_in) * 1000,
       scopes: data.scope ? data.scope.split(' ') : ['user:inference', 'user:profile'],
       isMax: true
     }
+
+    // 如果响应中包含套餐信息，添加到返回结果中
+    if (data.subscription || data.plan || data.tier || data.account_type) {
+      result.subscriptionInfo = {
+        subscription: data.subscription,
+        plan: data.plan,
+        tier: data.tier,
+        accountType: data.account_type,
+        features: data.features,
+        limits: data.limits
+      }
+      logger.info('🎯 Found subscription info in Setup Token response:', result.subscriptionInfo)
+    }
+
+    return result
   } catch (error) {
     // 使用与标准OAuth相同的错误处理逻辑
     if (error.response) {

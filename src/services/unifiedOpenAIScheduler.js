@@ -35,6 +35,28 @@ class UnifiedOpenAIScheduler {
         // 普通专属账户
         const boundAccount = await openaiAccountService.getAccount(apiKeyData.openaiAccountId)
         if (boundAccount && boundAccount.isActive === 'true' && boundAccount.status !== 'error') {
+          // 检查是否被限流
+          const isRateLimited = await this.isAccountRateLimited(boundAccount.id)
+          if (isRateLimited) {
+            const errorMsg = `Dedicated account ${boundAccount.name} is currently rate limited`
+            logger.warn(`⚠️ ${errorMsg}`)
+            throw new Error(errorMsg)
+          }
+
+          // 专属账户：可选的模型检查（只有明确配置了supportedModels且不为空才检查）
+          if (
+            requestedModel &&
+            boundAccount.supportedModels &&
+            boundAccount.supportedModels.length > 0
+          ) {
+            const modelSupported = boundAccount.supportedModels.includes(requestedModel)
+            if (!modelSupported) {
+              const errorMsg = `Dedicated account ${boundAccount.name} does not support model ${requestedModel}`
+              logger.warn(`⚠️ ${errorMsg}`)
+              throw new Error(errorMsg)
+            }
+          }
+
           logger.info(
             `🎯 Using bound dedicated OpenAI account: ${boundAccount.name} (${apiKeyData.openaiAccountId}) for API key ${apiKeyData.name}`
           )
@@ -45,9 +67,12 @@ class UnifiedOpenAIScheduler {
             accountType: 'openai'
           }
         } else {
-          logger.warn(
-            `⚠️ Bound OpenAI account ${apiKeyData.openaiAccountId} is not available, falling back to pool`
-          )
+          // 专属账户不可用时直接报错，不降级到共享池
+          const errorMsg = boundAccount
+            ? `Dedicated account ${boundAccount.name} is not available (inactive or error status)`
+            : `Dedicated account ${apiKeyData.openaiAccountId} not found`
+          logger.warn(`⚠️ ${errorMsg}`)
+          throw new Error(errorMsg)
         }
       }
 
@@ -90,8 +115,12 @@ class UnifiedOpenAIScheduler {
         }
       }
 
-      // 按优先级和最后使用时间排序
-      const sortedAccounts = this._sortAccountsByPriority(availableAccounts)
+      // 按最后使用时间排序（最久未使用的优先，与 Claude 保持一致）
+      const sortedAccounts = availableAccounts.sort((a, b) => {
+        const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
+        const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
+        return aLastUsed - bLastUsed // 最久未使用的优先
+      })
 
       // 选择第一个账户
       const selectedAccount = sortedAccounts[0]
@@ -109,7 +138,7 @@ class UnifiedOpenAIScheduler {
       }
 
       logger.info(
-        `🎯 Selected account: ${selectedAccount.name} (${selectedAccount.accountId}, ${selectedAccount.accountType}) with priority ${selectedAccount.priority} for API key ${apiKeyData.name}`
+        `🎯 Selected account: ${selectedAccount.name} (${selectedAccount.accountId}, ${selectedAccount.accountType}) for API key ${apiKeyData.name}`
       )
 
       // 更新账户的最后使用时间
@@ -125,49 +154,12 @@ class UnifiedOpenAIScheduler {
     }
   }
 
-  // 📋 获取所有可用账户
+  // 📋 获取所有可用账户（仅共享池）
   async _getAllAvailableAccounts(apiKeyData, requestedModel = null) {
     const availableAccounts = []
 
-    // 如果API Key绑定了专属账户，优先返回
-    if (apiKeyData.openaiAccountId) {
-      const boundAccount = await openaiAccountService.getAccount(apiKeyData.openaiAccountId)
-      if (boundAccount && boundAccount.isActive === 'true' && boundAccount.status !== 'error') {
-        const isRateLimited = await this.isAccountRateLimited(boundAccount.id)
-        if (!isRateLimited) {
-          // 检查模型支持（仅在明确设置了supportedModels且不为空时才检查）
-          // 如果没有设置supportedModels或为空数组，则支持所有模型
-          if (
-            requestedModel &&
-            boundAccount.supportedModels &&
-            boundAccount.supportedModels.length > 0
-          ) {
-            const modelSupported = boundAccount.supportedModels.includes(requestedModel)
-            if (!modelSupported) {
-              logger.warn(
-                `⚠️ Bound OpenAI account ${boundAccount.name} does not support model ${requestedModel}`
-              )
-              return availableAccounts
-            }
-          }
-
-          logger.info(
-            `🎯 Using bound dedicated OpenAI account: ${boundAccount.name} (${apiKeyData.openaiAccountId})`
-          )
-          return [
-            {
-              ...boundAccount,
-              accountId: boundAccount.id,
-              accountType: 'openai',
-              priority: parseInt(boundAccount.priority) || 50,
-              lastUsedAt: boundAccount.lastUsedAt || '0'
-            }
-          ]
-        }
-      } else {
-        logger.warn(`⚠️ Bound OpenAI account ${apiKeyData.openaiAccountId} is not available`)
-      }
-    }
+    // 注意：专属账户的处理已经在 selectAccountForApiKey 中完成
+    // 这里只处理共享池账户
 
     // 获取所有OpenAI账户（共享池）
     const openaiAccounts = await openaiAccountService.getAllAccounts()
@@ -221,20 +213,20 @@ class UnifiedOpenAIScheduler {
     return availableAccounts
   }
 
-  // 🔢 按优先级和最后使用时间排序账户
-  _sortAccountsByPriority(accounts) {
-    return accounts.sort((a, b) => {
-      // 首先按优先级排序（数字越小优先级越高）
-      if (a.priority !== b.priority) {
-        return a.priority - b.priority
-      }
+  // 🔢 按优先级和最后使用时间排序账户（已废弃，改为与 Claude 保持一致，只按最后使用时间排序）
+  // _sortAccountsByPriority(accounts) {
+  //   return accounts.sort((a, b) => {
+  //     // 首先按优先级排序（数字越小优先级越高）
+  //     if (a.priority !== b.priority) {
+  //       return a.priority - b.priority
+  //     }
 
-      // 优先级相同时，按最后使用时间排序（最久未使用的优先）
-      const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
-      const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
-      return aLastUsed - bLastUsed
-    })
-  }
+  //     // 优先级相同时，按最后使用时间排序（最久未使用的优先）
+  //     const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
+  //     const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
+  //     return aLastUsed - bLastUsed
+  //   })
+  // }
 
   // 🔍 检查账户是否可用
   async _isAccountAvailable(accountId, accountType) {
@@ -449,8 +441,12 @@ class UnifiedOpenAIScheduler {
         throw new Error(`No available accounts in group ${group.name}`)
       }
 
-      // 按优先级和最后使用时间排序
-      const sortedAccounts = this._sortAccountsByPriority(availableAccounts)
+      // 按最后使用时间排序（最久未使用的优先，与 Claude 保持一致）
+      const sortedAccounts = availableAccounts.sort((a, b) => {
+        const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
+        const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
+        return aLastUsed - bLastUsed // 最久未使用的优先
+      })
 
       // 选择第一个账户
       const selectedAccount = sortedAccounts[0]
@@ -468,7 +464,7 @@ class UnifiedOpenAIScheduler {
       }
 
       logger.info(
-        `🎯 Selected account from group: ${selectedAccount.name} (${selectedAccount.accountId}) with priority ${selectedAccount.priority}`
+        `🎯 Selected account from group: ${selectedAccount.name} (${selectedAccount.accountId})`
       )
 
       // 更新账户的最后使用时间

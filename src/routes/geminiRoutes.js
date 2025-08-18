@@ -318,19 +318,38 @@ async function handleLoadCodeAssist(req, res) {
       sessionHash,
       requestedModel
     )
-    const { accessToken, refreshToken } = await geminiAccountService.getAccount(accountId)
+    const account = await geminiAccountService.getAccount(accountId)
+    const { accessToken, refreshToken, projectId } = account
 
     const { metadata, cloudaicompanionProject } = req.body
 
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
     logger.info(`LoadCodeAssist request (${version})`, {
       metadata: metadata || {},
-      cloudaicompanionProject: cloudaicompanionProject || null,
+      requestedProject: cloudaicompanionProject || null,
+      accountProject: projectId || null,
       apiKeyId: req.apiKey?.id || 'unknown'
     })
 
     const client = await geminiAccountService.getOauthClient(accessToken, refreshToken)
-    const response = await geminiAccountService.loadCodeAssist(client, cloudaicompanionProject)
+
+    // 根据账户配置决定项目ID：
+    // 1. 如果账户有项目ID -> 使用账户的项目ID（强制覆盖）
+    // 2. 如果账户没有项目ID -> 传递 null（移除项目ID）
+    let effectiveProjectId = null
+
+    if (projectId) {
+      // 账户配置了项目ID，强制使用它
+      effectiveProjectId = projectId
+      logger.info('Using account project ID for loadCodeAssist:', effectiveProjectId)
+    } else {
+      // 账户没有配置项目ID，确保不传递项目ID
+      effectiveProjectId = null
+      logger.info('No project ID in account for loadCodeAssist, removing project parameter')
+    }
+
+    const response = await geminiAccountService.loadCodeAssist(client, effectiveProjectId)
+
     res.json(response)
   } catch (error) {
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
@@ -345,6 +364,7 @@ async function handleLoadCodeAssist(req, res) {
 // 共用的 onboardUser 处理函数
 async function handleOnboardUser(req, res) {
   try {
+    // 提取请求参数
     const { tierId, cloudaicompanionProject, metadata } = req.body
     const sessionHash = sessionHelper.generateSessionHash(req.body)
 
@@ -355,34 +375,53 @@ async function handleOnboardUser(req, res) {
       sessionHash,
       requestedModel
     )
-    const { accessToken, refreshToken } = await geminiAccountService.getAccount(accountId)
+    const account = await geminiAccountService.getAccount(accountId)
+    const { accessToken, refreshToken, projectId } = account
 
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
     logger.info(`OnboardUser request (${version})`, {
       tierId: tierId || 'not provided',
-      cloudaicompanionProject: cloudaicompanionProject || null,
+      requestedProject: cloudaicompanionProject || null,
+      accountProject: projectId || null,
       metadata: metadata || {},
       apiKeyId: req.apiKey?.id || 'unknown'
     })
 
     const client = await geminiAccountService.getOauthClient(accessToken, refreshToken)
 
-    // 如果提供了完整参数，直接调用onboardUser
-    if (tierId && metadata) {
+    // 根据账户配置决定项目ID：
+    // 1. 如果账户有项目ID -> 使用账户的项目ID（强制覆盖）
+    // 2. 如果账户没有项目ID -> 传递 null（移除项目ID）
+    let effectiveProjectId = null
+
+    if (projectId) {
+      // 账户配置了项目ID，强制使用它
+      effectiveProjectId = projectId
+      logger.info('Using account project ID:', effectiveProjectId)
+    } else {
+      // 账户没有配置项目ID，确保不传递项目ID（即使客户端传了也要移除）
+      effectiveProjectId = null
+      logger.info('No project ID in account, removing project parameter')
+    }
+
+    // 如果提供了 tierId，直接调用 onboardUser
+    if (tierId) {
       const response = await geminiAccountService.onboardUser(
         client,
         tierId,
-        cloudaicompanionProject,
+        effectiveProjectId, // 使用处理后的项目ID
         metadata
       )
+
       res.json(response)
     } else {
-      // 否则执行完整的setupUser流程
+      // 否则执行完整的 setupUser 流程
       const response = await geminiAccountService.setupUser(
         client,
-        cloudaicompanionProject,
+        effectiveProjectId, // 使用处理后的项目ID
         metadata
       )
+
       res.json(response)
     }
   } catch (error) {
@@ -506,7 +545,7 @@ async function handleGenerateContent(req, res) {
       client,
       { model, request: actualRequestData },
       user_prompt_id,
-      project || account.projectId,
+      account.projectId, // 始终使用账户配置的项目ID，忽略请求中的project
       req.apiKey?.id // 使用 API Key ID 作为 session ID
     )
 
@@ -533,7 +572,6 @@ async function handleGenerateContent(req, res) {
 
     res.json(response)
   } catch (error) {
-    console.log(321, error.response)
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
     logger.error(`Error in generateContent endpoint (${version})`, { error: error.message })
     res.status(500).json({
@@ -620,7 +658,7 @@ async function handleStreamGenerateContent(req, res) {
       client,
       { model, request: actualRequestData },
       user_prompt_id,
-      project || account.projectId,
+      account.projectId, // 始终使用账户配置的项目ID，忽略请求中的project
       req.apiKey?.id, // 使用 API Key ID 作为 session ID
       abortController.signal // 传递中止信号
     )
