@@ -128,7 +128,8 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
         'max_output_tokens',
         'user',
         'text_formatting',
-        'truncation'
+        'truncation',
+        'service_tier'
       ]
       fieldsToRemove.forEach((field) => {
         delete req.body[field]

@@ -20,6 +20,7 @@ class ApiKeyService {
       claudeConsoleAccountId = null,
       geminiAccountId = null,
       openaiAccountId = null,
+      bedrockAccountId = null, // 添加 Bedrock 账号ID支持
       permissions = 'all', // 'claude', 'gemini', 'openai', 'all'
       isActive = true,
       concurrencyLimit = 0,
@@ -52,6 +53,7 @@ class ApiKeyService {
       claudeConsoleAccountId: claudeConsoleAccountId || '',
       geminiAccountId: geminiAccountId || '',
       openaiAccountId: openaiAccountId || '',
+      bedrockAccountId: bedrockAccountId || '', // 添加 Bedrock 账号ID
       permissions: permissions || 'all',
       enableModelRestriction: String(enableModelRestriction),
       restrictedModels: JSON.stringify(restrictedModels || []),
@@ -86,6 +88,7 @@ class ApiKeyService {
       claudeConsoleAccountId: keyData.claudeConsoleAccountId,
       geminiAccountId: keyData.geminiAccountId,
       openaiAccountId: keyData.openaiAccountId,
+      bedrockAccountId: keyData.bedrockAccountId, // 添加 Bedrock 账号ID
       permissions: keyData.permissions,
       enableModelRestriction: keyData.enableModelRestriction === 'true',
       restrictedModels: JSON.parse(keyData.restrictedModels),
@@ -187,6 +190,7 @@ class ApiKeyService {
           claudeConsoleAccountId: keyData.claudeConsoleAccountId,
           geminiAccountId: keyData.geminiAccountId,
           openaiAccountId: keyData.openaiAccountId,
+          bedrockAccountId: keyData.bedrockAccountId, // 添加 Bedrock 账号ID
           permissions: keyData.permissions || 'all',
           tokenLimit: parseInt(keyData.tokenLimit),
           concurrencyLimit: parseInt(keyData.concurrencyLimit || 0),
@@ -333,6 +337,7 @@ class ApiKeyService {
         'claudeConsoleAccountId',
         'geminiAccountId',
         'openaiAccountId',
+        'bedrockAccountId', // 添加 Bedrock 账号ID
         'permissions',
         'expiresAt',
         'enableModelRestriction',
@@ -483,6 +488,126 @@ class ApiKeyService {
       const logParts = [`Model: ${model}`, `Input: ${inputTokens}`, `Output: ${outputTokens}`]
       if (cacheCreateTokens > 0) {
         logParts.push(`Cache Create: ${cacheCreateTokens}`)
+      }
+      if (cacheReadTokens > 0) {
+        logParts.push(`Cache Read: ${cacheReadTokens}`)
+      }
+      logParts.push(`Total: ${totalTokens} tokens`)
+
+      logger.database(`📊 Recorded usage: ${keyId} - ${logParts.join(', ')}`)
+    } catch (error) {
+      logger.error('❌ Failed to record usage:', error)
+    }
+  }
+
+  // 📊 记录使用情况（新版本，支持详细的缓存类型）
+  async recordUsageWithDetails(keyId, usageObject, model = 'unknown', accountId = null) {
+    try {
+      // 提取 token 数量
+      const inputTokens = usageObject.input_tokens || 0
+      const outputTokens = usageObject.output_tokens || 0
+      const cacheCreateTokens = usageObject.cache_creation_input_tokens || 0
+      const cacheReadTokens = usageObject.cache_read_input_tokens || 0
+
+      const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
+
+      // 计算费用（支持详细的缓存类型）- 添加错误处理
+      let costInfo = { totalCost: 0, ephemeral5mCost: 0, ephemeral1hCost: 0 }
+      try {
+        const pricingService = require('./pricingService')
+        // 确保 pricingService 已初始化
+        if (!pricingService.pricingData) {
+          logger.warn('⚠️ PricingService not initialized, initializing now...')
+          await pricingService.initialize()
+        }
+        costInfo = pricingService.calculateCost(usageObject, model)
+      } catch (pricingError) {
+        logger.error('❌ Failed to calculate cost:', pricingError)
+        // 继续执行，不要因为费用计算失败而跳过统计记录
+      }
+
+      // 提取详细的缓存创建数据
+      let ephemeral5mTokens = 0
+      let ephemeral1hTokens = 0
+
+      if (usageObject.cache_creation && typeof usageObject.cache_creation === 'object') {
+        ephemeral5mTokens = usageObject.cache_creation.ephemeral_5m_input_tokens || 0
+        ephemeral1hTokens = usageObject.cache_creation.ephemeral_1h_input_tokens || 0
+      }
+
+      // 记录API Key级别的使用统计 - 这个必须执行
+      await redis.incrementTokenUsage(
+        keyId,
+        totalTokens,
+        inputTokens,
+        outputTokens,
+        cacheCreateTokens,
+        cacheReadTokens,
+        model,
+        ephemeral5mTokens, // 传递5分钟缓存 tokens
+        ephemeral1hTokens // 传递1小时缓存 tokens
+      )
+
+      // 记录费用统计
+      if (costInfo.totalCost > 0) {
+        await redis.incrementDailyCost(keyId, costInfo.totalCost)
+        logger.database(
+          `💰 Recorded cost for ${keyId}: $${costInfo.totalCost.toFixed(6)}, model: ${model}`
+        )
+
+        // 记录详细的缓存费用（如果有）
+        if (costInfo.ephemeral5mCost > 0 || costInfo.ephemeral1hCost > 0) {
+          logger.database(
+            `💰 Cache costs - 5m: $${costInfo.ephemeral5mCost.toFixed(6)}, 1h: $${costInfo.ephemeral1hCost.toFixed(6)}`
+          )
+        }
+      } else {
+        logger.debug(`💰 No cost recorded for ${keyId} - zero cost for model: ${model}`)
+      }
+
+      // 获取API Key数据以确定关联的账户
+      const keyData = await redis.getApiKey(keyId)
+      if (keyData && Object.keys(keyData).length > 0) {
+        // 更新最后使用时间
+        keyData.lastUsedAt = new Date().toISOString()
+        await redis.setApiKey(keyId, keyData)
+
+        // 记录账户级别的使用统计（只统计实际处理请求的账户）
+        if (accountId) {
+          await redis.incrementAccountUsage(
+            accountId,
+            totalTokens,
+            inputTokens,
+            outputTokens,
+            cacheCreateTokens,
+            cacheReadTokens,
+            model
+          )
+          logger.database(
+            `📊 Recorded account usage: ${accountId} - ${totalTokens} tokens (API Key: ${keyId})`
+          )
+        } else {
+          logger.debug(
+            '⚠️ No accountId provided for usage recording, skipping account-level statistics'
+          )
+        }
+      }
+
+      const logParts = [`Model: ${model}`, `Input: ${inputTokens}`, `Output: ${outputTokens}`]
+      if (cacheCreateTokens > 0) {
+        logParts.push(`Cache Create: ${cacheCreateTokens}`)
+
+        // 如果有详细的缓存创建数据，也记录它们
+        if (usageObject.cache_creation) {
+          const { ephemeral_5m_input_tokens, ephemeral_1h_input_tokens } =
+            usageObject.cache_creation
+          if (ephemeral_5m_input_tokens > 0) {
+            logParts.push(`5m: ${ephemeral_5m_input_tokens}`)
+          }
+          if (ephemeral_1h_input_tokens > 0) {
+            logParts.push(`1h: ${ephemeral_1h_input_tokens}`)
+          }
+        }
       }
       if (cacheReadTokens > 0) {
         logParts.push(`Cache Read: ${cacheReadTokens}`)

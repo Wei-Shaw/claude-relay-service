@@ -4,12 +4,28 @@ const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
 const bedrockRelayService = require('./bedrockRelayService')
+const LRUCache = require('../utils/lruCache')
 
 class BedrockAccountService {
   constructor() {
     // 加密相关常量
     this.ENCRYPTION_ALGORITHM = 'aes-256-cbc'
     this.ENCRYPTION_SALT = 'salt'
+
+    // 🚀 性能优化：缓存派生的加密密钥，避免每次重复计算
+    this._encryptionKeyCache = null
+
+    // 🔄 解密结果缓存，提高解密性能
+    this._decryptCache = new LRUCache(500)
+
+    // 🧹 定期清理缓存（每10分钟）
+    setInterval(
+      () => {
+        this._decryptCache.cleanup()
+        logger.info('🧹 Bedrock decrypt cache cleanup completed', this._decryptCache.getStats())
+      },
+      10 * 60 * 1000
+    )
   }
 
   // 🏢 创建Bedrock账户
@@ -336,10 +352,22 @@ class BedrockAccountService {
     }
   }
 
+  // 🔑 生成加密密钥（缓存优化）
+  _generateEncryptionKey() {
+    if (!this._encryptionKeyCache) {
+      this._encryptionKeyCache = crypto
+        .createHash('sha256')
+        .update(config.security.encryptionKey)
+        .digest()
+      logger.info('🔑 Bedrock encryption key derived and cached for performance optimization')
+    }
+    return this._encryptionKeyCache
+  }
+
   // 🔐 加密AWS凭证
   _encryptAwsCredentials(credentials) {
     try {
-      const key = crypto.createHash('sha256').update(config.security.encryptionKey).digest()
+      const key = this._generateEncryptionKey()
       const iv = crypto.randomBytes(16)
       const cipher = crypto.createCipheriv(this.ENCRYPTION_ALGORITHM, key, iv)
 
@@ -368,15 +396,35 @@ class BedrockAccountService {
 
       // 检查是否为加密格式 (有 encrypted 和 iv 字段)
       if (encryptedData.encrypted && encryptedData.iv) {
+        // 🎯 检查缓存
+        const cacheKey = crypto
+          .createHash('sha256')
+          .update(JSON.stringify(encryptedData))
+          .digest('hex')
+        const cached = this._decryptCache.get(cacheKey)
+        if (cached !== undefined) {
+          return cached
+        }
+
         // 加密数据 - 进行解密
-        const key = crypto.createHash('sha256').update(config.security.encryptionKey).digest()
+        const key = this._generateEncryptionKey()
         const iv = Buffer.from(encryptedData.iv, 'hex')
         const decipher = crypto.createDecipheriv(this.ENCRYPTION_ALGORITHM, key, iv)
 
         let decrypted = decipher.update(encryptedData.encrypted, 'hex', 'utf8')
         decrypted += decipher.final('utf8')
 
-        return JSON.parse(decrypted)
+        const result = JSON.parse(decrypted)
+
+        // 💾 存入缓存（5分钟过期）
+        this._decryptCache.set(cacheKey, result, 5 * 60 * 1000)
+
+        // 📊 定期打印缓存统计
+        if ((this._decryptCache.hits + this._decryptCache.misses) % 1000 === 0) {
+          this._decryptCache.printStats()
+        }
+
+        return result
       } else if (encryptedData.accessKeyId) {
         // 纯文本数据 - 直接返回 (向后兼容)
         logger.warn('⚠️ 发现未加密的AWS凭证，建议更新账户以启用加密')

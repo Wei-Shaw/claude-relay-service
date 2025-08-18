@@ -15,6 +15,7 @@ const {
   logRefreshSkipped
 } = require('../utils/tokenRefreshLogger')
 const tokenRefreshService = require('./tokenRefreshService')
+const LRUCache = require('../utils/lruCache')
 
 class ClaudeAccountService {
   constructor() {
@@ -24,6 +25,22 @@ class ClaudeAccountService {
     // 加密相关常量
     this.ENCRYPTION_ALGORITHM = 'aes-256-cbc'
     this.ENCRYPTION_SALT = 'salt'
+
+    // 🚀 性能优化：缓存派生的加密密钥，避免每次重复计算
+    // scryptSync 是 CPU 密集型操作，缓存可以减少 95%+ 的 CPU 占用
+    this._encryptionKeyCache = null
+
+    // 🔄 解密结果缓存，提高解密性能
+    this._decryptCache = new LRUCache(500)
+
+    // 🧹 定期清理缓存（每10分钟）
+    setInterval(
+      () => {
+        this._decryptCache.cleanup()
+        logger.info('🧹 Claude decrypt cache cleanup completed', this._decryptCache.getStats())
+      },
+      10 * 60 * 1000
+    )
   }
 
   // 🏢 创建Claude账户
@@ -39,7 +56,8 @@ class ClaudeAccountService {
       isActive = true,
       accountType = 'shared', // 'dedicated' or 'shared'
       priority = 50, // 调度优先级 (1-100，数字越小优先级越高)
-      schedulable = true // 是否可被调度
+      schedulable = true, // 是否可被调度
+      subscriptionInfo = null // 手动设置的订阅信息
     } = options
 
     const accountId = uuidv4()
@@ -68,7 +86,13 @@ class ClaudeAccountService {
         lastRefreshAt: '',
         status: 'active', // 有OAuth数据的账户直接设为active
         errorMessage: '',
-        schedulable: schedulable.toString() // 是否可被调度
+        schedulable: schedulable.toString(), // 是否可被调度
+        // 优先使用手动设置的订阅信息，否则使用OAuth数据中的，否则默认为空
+        subscriptionInfo: subscriptionInfo
+          ? JSON.stringify(subscriptionInfo)
+          : claudeAiOauth.subscriptionInfo
+            ? JSON.stringify(claudeAiOauth.subscriptionInfo)
+            : ''
       }
     } else {
       // 兼容旧格式
@@ -91,13 +115,33 @@ class ClaudeAccountService {
         lastRefreshAt: '',
         status: 'created', // created, active, expired, error
         errorMessage: '',
-        schedulable: schedulable.toString() // 是否可被调度
+        schedulable: schedulable.toString(), // 是否可被调度
+        // 手动设置的订阅信息
+        subscriptionInfo: subscriptionInfo ? JSON.stringify(subscriptionInfo) : ''
       }
     }
 
     await redis.setClaudeAccount(accountId, accountData)
 
     logger.success(`🏢 Created Claude account: ${name} (${accountId})`)
+
+    // 如果有 OAuth 数据和 accessToken，且包含 user:profile 权限，尝试获取 profile 信息
+    if (claudeAiOauth && claudeAiOauth.accessToken) {
+      // 检查是否有 user:profile 权限（标准 OAuth 有，Setup Token 没有）
+      const hasProfileScope = claudeAiOauth.scopes && claudeAiOauth.scopes.includes('user:profile')
+
+      if (hasProfileScope) {
+        try {
+          const agent = this._createProxyAgent(proxy)
+          await this.fetchAndUpdateAccountProfile(accountId, claudeAiOauth.accessToken, agent)
+          logger.info(`📊 Successfully fetched profile info for new account: ${name}`)
+        } catch (profileError) {
+          logger.warn(`⚠️ Failed to fetch profile info for new account: ${profileError.message}`)
+        }
+      } else {
+        logger.info(`⏩ Skipping profile fetch for account ${name} (no user:profile scope)`)
+      }
+    }
 
     return {
       id: accountId,
@@ -188,7 +232,38 @@ class ClaudeAccountService {
       )
 
       if (response.status === 200) {
+        // 记录完整的响应数据到专门的认证详细日志
+        logger.authDetail('Token refresh response', response.data)
+
+        // 记录简化版本到主日志
+        logger.info('📊 Token refresh response (analyzing for subscription info):', {
+          status: response.status,
+          hasData: !!response.data,
+          dataKeys: response.data ? Object.keys(response.data) : []
+        })
+
         const { access_token, refresh_token, expires_in } = response.data
+
+        // 检查是否有套餐信息
+        if (
+          response.data.subscription ||
+          response.data.plan ||
+          response.data.tier ||
+          response.data.account_type
+        ) {
+          const subscriptionInfo = {
+            subscription: response.data.subscription,
+            plan: response.data.plan,
+            tier: response.data.tier,
+            accountType: response.data.account_type,
+            features: response.data.features,
+            limits: response.data.limits
+          }
+          logger.info('🎯 Found subscription info in refresh response:', subscriptionInfo)
+
+          // 将套餐信息存储在账户数据中
+          accountData.subscriptionInfo = JSON.stringify(subscriptionInfo)
+        }
 
         // 更新账户数据
         accountData.accessToken = this._encryptSensitiveData(access_token)
@@ -199,6 +274,22 @@ class ClaudeAccountService {
         accountData.errorMessage = ''
 
         await redis.setClaudeAccount(accountId, accountData)
+
+        // 刷新成功后，如果有 user:profile 权限，尝试获取账号 profile 信息
+        // 检查账户的 scopes 是否包含 user:profile（标准 OAuth 有，Setup Token 没有）
+        const hasProfileScope = accountData.scopes && accountData.scopes.includes('user:profile')
+
+        if (hasProfileScope) {
+          try {
+            await this.fetchAndUpdateAccountProfile(accountId, access_token, agent)
+          } catch (profileError) {
+            logger.warn(`⚠️ Failed to fetch profile info after refresh: ${profileError.message}`)
+          }
+        } else {
+          logger.debug(
+            `⏩ Skipping profile fetch after refresh for account ${accountId} (no user:profile scope)`
+          )
+        }
 
         // 记录刷新成功
         logRefreshSuccess(accountId, accountData.name, 'claude', {
@@ -228,6 +319,21 @@ class ClaudeAccountService {
         accountData.status = 'error'
         accountData.errorMessage = error.message
         await redis.setClaudeAccount(accountId, accountData)
+
+        // 发送Webhook通知
+        try {
+          const webhookNotifier = require('../utils/webhookNotifier')
+          await webhookNotifier.sendAccountAnomalyNotification({
+            accountId,
+            accountName: accountData.name,
+            platform: 'claude-oauth',
+            status: 'error',
+            errorCode: 'CLAUDE_OAUTH_ERROR',
+            reason: `Token refresh failed: ${error.message}`
+          })
+        } catch (webhookError) {
+          logger.error('Failed to send webhook notification:', webhookError)
+        }
       }
 
       logger.error(`❌ Failed to refresh token for account ${accountId}:`, error)
@@ -343,6 +449,15 @@ class ClaudeAccountService {
             lastUsedAt: account.lastUsedAt,
             lastRefreshAt: account.lastRefreshAt,
             expiresAt: account.expiresAt,
+            // 添加 scopes 字段用于判断认证方式
+            // 处理空字符串的情况，避免返回 ['']
+            scopes: account.scopes && account.scopes.trim() ? account.scopes.split(' ') : [],
+            // 添加 refreshToken 是否存在的标记（不返回实际值）
+            hasRefreshToken: !!account.refreshToken,
+            // 添加套餐信息（如果存在）
+            subscriptionInfo: account.subscriptionInfo
+              ? JSON.parse(account.subscriptionInfo)
+              : null,
             // 添加限流状态信息
             rateLimitStatus: rateLimitInfo
               ? {
@@ -393,7 +508,8 @@ class ClaudeAccountService {
         'claudeAiOauth',
         'accountType',
         'priority',
-        'schedulable'
+        'schedulable',
+        'subscriptionInfo'
       ]
       const updatedData = { ...accountData }
 
@@ -408,6 +524,9 @@ class ClaudeAccountService {
             updatedData[field] = value ? JSON.stringify(value) : ''
           } else if (field === 'priority') {
             updatedData[field] = value.toString()
+          } else if (field === 'subscriptionInfo') {
+            // 处理订阅信息更新
+            updatedData[field] = typeof value === 'string' ? value : JSON.stringify(value)
           } else if (field === 'claudeAiOauth') {
             // 更新 Claude AI OAuth 数据
             if (value) {
@@ -453,6 +572,26 @@ class ClaudeAccountService {
 
       updatedData.updatedAt = new Date().toISOString()
 
+      // 检查是否手动禁用了账号，如果是则发送webhook通知
+      if (updates.isActive === 'false' && accountData.isActive === 'true') {
+        try {
+          const webhookNotifier = require('../utils/webhookNotifier')
+          await webhookNotifier.sendAccountAnomalyNotification({
+            accountId,
+            accountName: updatedData.name || 'Unknown Account',
+            platform: 'claude-oauth',
+            status: 'disabled',
+            errorCode: 'CLAUDE_OAUTH_MANUALLY_DISABLED',
+            reason: 'Account manually disabled by administrator'
+          })
+        } catch (webhookError) {
+          logger.error(
+            'Failed to send webhook notification for manual account disable:',
+            webhookError
+          )
+        }
+      }
+
       await redis.setClaudeAccount(accountId, updatedData)
 
       logger.success(`📝 Updated Claude account: ${accountId}`)
@@ -482,14 +621,42 @@ class ClaudeAccountService {
     }
   }
 
-  // 🎯 智能选择可用账户（支持sticky会话）
-  async selectAvailableAccount(sessionHash = null) {
+  // 🎯 智能选择可用账户（支持sticky会话和模型过滤）
+  async selectAvailableAccount(sessionHash = null, modelName = null) {
     try {
       const accounts = await redis.getAllClaudeAccounts()
 
-      const activeAccounts = accounts.filter(
+      let activeAccounts = accounts.filter(
         (account) => account.isActive === 'true' && account.status !== 'error'
       )
+
+      // 如果请求的是 Opus 模型，过滤掉 Pro 和 Free 账号
+      if (modelName && modelName.toLowerCase().includes('opus')) {
+        activeAccounts = activeAccounts.filter((account) => {
+          // 检查账号的订阅信息
+          if (account.subscriptionInfo) {
+            try {
+              const info = JSON.parse(account.subscriptionInfo)
+              // Pro 和 Free 账号不支持 Opus
+              if (info.hasClaudePro === true && info.hasClaudeMax !== true) {
+                return false // Claude Pro 不支持 Opus
+              }
+              if (info.accountType === 'claude_pro' || info.accountType === 'claude_free') {
+                return false // 明确标记为 Pro 或 Free 的账号不支持
+              }
+            } catch (e) {
+              // 解析失败，假设为旧数据，默认支持（兼容旧数据为 Max）
+              return true
+            }
+          }
+          // 没有订阅信息的账号，默认当作支持（兼容旧数据）
+          return true
+        })
+
+        if (activeAccounts.length === 0) {
+          throw new Error('No Claude accounts available that support Opus model')
+        }
+      }
 
       if (activeAccounts.length === 0) {
         throw new Error('No active Claude accounts available')
@@ -541,8 +708,8 @@ class ClaudeAccountService {
     }
   }
 
-  // 🎯 基于API Key选择账户（支持专属绑定和共享池）
-  async selectAccountForApiKey(apiKeyData, sessionHash = null) {
+  // 🎯 基于API Key选择账户（支持专属绑定、共享池和模型过滤）
+  async selectAccountForApiKey(apiKeyData, sessionHash = null, modelName = null) {
     try {
       // 如果API Key绑定了专属账户，优先使用
       if (apiKeyData.claudeAccountId) {
@@ -562,12 +729,40 @@ class ClaudeAccountService {
       // 如果没有绑定账户或绑定账户不可用，从共享池选择
       const accounts = await redis.getAllClaudeAccounts()
 
-      const sharedAccounts = accounts.filter(
+      let sharedAccounts = accounts.filter(
         (account) =>
           account.isActive === 'true' &&
           account.status !== 'error' &&
           (account.accountType === 'shared' || !account.accountType) // 兼容旧数据
       )
+
+      // 如果请求的是 Opus 模型，过滤掉 Pro 和 Free 账号
+      if (modelName && modelName.toLowerCase().includes('opus')) {
+        sharedAccounts = sharedAccounts.filter((account) => {
+          // 检查账号的订阅信息
+          if (account.subscriptionInfo) {
+            try {
+              const info = JSON.parse(account.subscriptionInfo)
+              // Pro 和 Free 账号不支持 Opus
+              if (info.hasClaudePro === true && info.hasClaudeMax !== true) {
+                return false // Claude Pro 不支持 Opus
+              }
+              if (info.accountType === 'claude_pro' || info.accountType === 'claude_free') {
+                return false // 明确标记为 Pro 或 Free 的账号不支持
+              }
+            } catch (e) {
+              // 解析失败，假设为旧数据，默认支持（兼容旧数据为 Max）
+              return true
+            }
+          }
+          // 没有订阅信息的账号，默认当作支持（兼容旧数据）
+          return true
+        })
+
+        if (sharedAccounts.length === 0) {
+          throw new Error('No shared Claude accounts available that support Opus model')
+        }
+      }
 
       if (sharedAccounts.length === 0) {
         throw new Error('No active shared Claude accounts available')
@@ -715,7 +910,16 @@ class ClaudeAccountService {
       return ''
     }
 
+    // 🎯 检查缓存
+    const cacheKey = crypto.createHash('sha256').update(encryptedData).digest('hex')
+    const cached = this._decryptCache.get(cacheKey)
+    if (cached !== undefined) {
+      return cached
+    }
+
     try {
+      let decrypted = ''
+
       // 检查是否是新格式（包含IV）
       if (encryptedData.includes(':')) {
         // 新格式：iv:encryptedData
@@ -726,8 +930,17 @@ class ClaudeAccountService {
           const encrypted = parts[1]
 
           const decipher = crypto.createDecipheriv(this.ENCRYPTION_ALGORITHM, key, iv)
-          let decrypted = decipher.update(encrypted, 'hex', 'utf8')
+          decrypted = decipher.update(encrypted, 'hex', 'utf8')
           decrypted += decipher.final('utf8')
+
+          // 💾 存入缓存（5分钟过期）
+          this._decryptCache.set(cacheKey, decrypted, 5 * 60 * 1000)
+
+          // 📊 定期打印缓存统计
+          if ((this._decryptCache.hits + this._decryptCache.misses) % 1000 === 0) {
+            this._decryptCache.printStats()
+          }
+
           return decrypted
         }
       }
@@ -736,8 +949,12 @@ class ClaudeAccountService {
       // 注意：在新版本Node.js中这将失败，但我们会捕获错误
       try {
         const decipher = crypto.createDecipher('aes-256-cbc', config.security.encryptionKey)
-        let decrypted = decipher.update(encryptedData, 'hex', 'utf8')
+        decrypted = decipher.update(encryptedData, 'hex', 'utf8')
         decrypted += decipher.final('utf8')
+
+        // 💾 旧格式也存入缓存
+        this._decryptCache.set(cacheKey, decrypted, 5 * 60 * 1000)
+
         return decrypted
       } catch (oldError) {
         // 如果旧方式也失败，返回原数据
@@ -752,7 +969,20 @@ class ClaudeAccountService {
 
   // 🔑 生成加密密钥（辅助方法）
   _generateEncryptionKey() {
-    return crypto.scryptSync(config.security.encryptionKey, this.ENCRYPTION_SALT, 32)
+    // 性能优化：缓存密钥派生结果，避免重复的 CPU 密集计算
+    // scryptSync 是故意设计为慢速的密钥派生函数（防暴力破解）
+    // 但在高并发场景下，每次都重新计算会导致 CPU 100% 占用
+    if (!this._encryptionKeyCache) {
+      // 只在第一次调用时计算，后续使用缓存
+      // 由于输入参数固定，派生结果永远相同，不影响数据兼容性
+      this._encryptionKeyCache = crypto.scryptSync(
+        config.security.encryptionKey,
+        this.ENCRYPTION_SALT,
+        32
+      )
+      logger.info('🔑 Encryption key derived and cached for performance optimization')
+    }
+    return this._encryptionKeyCache
   }
 
   // 🎭 掩码邮箱地址
@@ -1117,6 +1347,199 @@ class ClaudeAccountService {
     }
   }
 
+  // 📊 获取账号 Profile 信息并更新账号类型
+  async fetchAndUpdateAccountProfile(accountId, accessToken = null, agent = null) {
+    try {
+      const accountData = await redis.getClaudeAccount(accountId)
+      if (!accountData || Object.keys(accountData).length === 0) {
+        throw new Error('Account not found')
+      }
+
+      // 检查账户是否有 user:profile 权限
+      const hasProfileScope = accountData.scopes && accountData.scopes.includes('user:profile')
+      if (!hasProfileScope) {
+        logger.warn(
+          `⚠️ Account ${accountId} does not have user:profile scope, cannot fetch profile`
+        )
+        throw new Error('Account does not have user:profile permission')
+      }
+
+      // 如果没有提供 accessToken，使用账号存储的 token
+      if (!accessToken) {
+        accessToken = this._decryptSensitiveData(accountData.accessToken)
+        if (!accessToken) {
+          throw new Error('No access token available')
+        }
+      }
+
+      // 如果没有提供 agent，创建代理
+      if (!agent) {
+        agent = this._createProxyAgent(accountData.proxy)
+      }
+
+      logger.info(`📊 Fetching profile info for account: ${accountData.name} (${accountId})`)
+
+      // 请求 profile 接口
+      const response = await axios.get('https://api.anthropic.com/api/oauth/profile', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'User-Agent': 'claude-cli/1.0.56 (external, cli)',
+          'Accept-Language': 'en-US,en;q=0.9'
+        },
+        httpsAgent: agent,
+        timeout: 15000
+      })
+
+      if (response.status === 200 && response.data) {
+        const profileData = response.data
+
+        logger.info('✅ Successfully fetched profile data:', {
+          email: profileData.account?.email,
+          hasClaudeMax: profileData.account?.has_claude_max,
+          hasClaudePro: profileData.account?.has_claude_pro,
+          organizationType: profileData.organization?.organization_type
+        })
+
+        // 构建订阅信息
+        const subscriptionInfo = {
+          // 账号信息
+          email: profileData.account?.email,
+          fullName: profileData.account?.full_name,
+          displayName: profileData.account?.display_name,
+          hasClaudeMax: profileData.account?.has_claude_max || false,
+          hasClaudePro: profileData.account?.has_claude_pro || false,
+          accountUuid: profileData.account?.uuid,
+
+          // 组织信息
+          organizationName: profileData.organization?.name,
+          organizationUuid: profileData.organization?.uuid,
+          billingType: profileData.organization?.billing_type,
+          rateLimitTier: profileData.organization?.rate_limit_tier,
+          organizationType: profileData.organization?.organization_type,
+
+          // 账号类型（基于 has_claude_max 和 has_claude_pro 判断）
+          accountType:
+            profileData.account?.has_claude_max === true
+              ? 'claude_max'
+              : profileData.account?.has_claude_pro === true
+                ? 'claude_pro'
+                : 'free',
+
+          // 更新时间
+          profileFetchedAt: new Date().toISOString()
+        }
+
+        // 更新账户数据
+        accountData.subscriptionInfo = JSON.stringify(subscriptionInfo)
+        accountData.profileUpdatedAt = new Date().toISOString()
+
+        // 如果提供了邮箱，更新邮箱字段
+        if (profileData.account?.email) {
+          accountData.email = this._encryptSensitiveData(profileData.account.email)
+        }
+
+        await redis.setClaudeAccount(accountId, accountData)
+
+        logger.success(
+          `✅ Updated account profile for ${accountData.name} (${accountId}) - Type: ${subscriptionInfo.accountType}`
+        )
+
+        return subscriptionInfo
+      } else {
+        throw new Error(`Failed to fetch profile with status: ${response.status}`)
+      }
+    } catch (error) {
+      if (error.response?.status === 401) {
+        logger.warn(`⚠️ Profile API returned 401 for account ${accountId} - token may be invalid`)
+      } else if (error.response?.status === 403) {
+        logger.warn(
+          `⚠️ Profile API returned 403 for account ${accountId} - insufficient permissions`
+        )
+      } else {
+        logger.error(`❌ Failed to fetch profile for account ${accountId}:`, error.message)
+      }
+      throw error
+    }
+  }
+
+  // 🔄 手动更新所有账号的 Profile 信息
+  async updateAllAccountProfiles() {
+    try {
+      logger.info('🔄 Starting batch profile update for all accounts...')
+
+      const accounts = await redis.getAllClaudeAccounts()
+      let successCount = 0
+      let failureCount = 0
+      const results = []
+
+      for (const account of accounts) {
+        // 跳过未激活或错误状态的账号
+        if (account.isActive !== 'true' || account.status === 'error') {
+          logger.info(`⏩ Skipping inactive/error account: ${account.name} (${account.id})`)
+          continue
+        }
+
+        // 跳过没有 user:profile 权限的账号（Setup Token 账号）
+        const hasProfileScope = account.scopes && account.scopes.includes('user:profile')
+        if (!hasProfileScope) {
+          logger.info(
+            `⏩ Skipping account without user:profile scope: ${account.name} (${account.id})`
+          )
+          results.push({
+            accountId: account.id,
+            accountName: account.name,
+            success: false,
+            error: 'No user:profile permission (Setup Token account)'
+          })
+          continue
+        }
+
+        try {
+          // 获取有效的 access token
+          const accessToken = await this.getValidAccessToken(account.id)
+          if (accessToken) {
+            const profileInfo = await this.fetchAndUpdateAccountProfile(account.id, accessToken)
+            successCount++
+            results.push({
+              accountId: account.id,
+              accountName: account.name,
+              success: true,
+              accountType: profileInfo.accountType
+            })
+          }
+        } catch (error) {
+          failureCount++
+          results.push({
+            accountId: account.id,
+            accountName: account.name,
+            success: false,
+            error: error.message
+          })
+          logger.warn(
+            `⚠️ Failed to update profile for account ${account.name} (${account.id}): ${error.message}`
+          )
+        }
+
+        // 添加延迟以避免触发限流
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+      }
+
+      logger.success(`✅ Profile update completed: ${successCount} success, ${failureCount} failed`)
+
+      return {
+        totalAccounts: accounts.length,
+        successCount,
+        failureCount,
+        results
+      }
+    } catch (error) {
+      logger.error('❌ Failed to update account profiles:', error)
+      throw error
+    }
+  }
+
   // 🔄 初始化所有账户的会话窗口（从历史数据恢复）
   async initializeSessionWindows(forceRecalculate = false) {
     try {
@@ -1222,6 +1645,21 @@ class ClaudeAccountService {
       logger.warn(
         `⚠️ Account ${accountData.name} (${accountId}) marked as unauthorized and disabled for scheduling`
       )
+
+      // 发送Webhook通知
+      try {
+        const webhookNotifier = require('../utils/webhookNotifier')
+        await webhookNotifier.sendAccountAnomalyNotification({
+          accountId,
+          accountName: accountData.name,
+          platform: 'claude-oauth',
+          status: 'unauthorized',
+          errorCode: 'CLAUDE_OAUTH_UNAUTHORIZED',
+          reason: 'Account unauthorized (401 errors detected)'
+        })
+      } catch (webhookError) {
+        logger.error('Failed to send webhook notification:', webhookError)
+      }
 
       return { success: true }
     } catch (error) {

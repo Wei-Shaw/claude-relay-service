@@ -6,11 +6,13 @@ const fs = require('fs')
 const os = require('os')
 
 // 安全的 JSON 序列化函数，处理循环引用
-const safeStringify = (obj, maxDepth = 3) => {
+const safeStringify = (obj, maxDepth = 3, fullDepth = false) => {
   const seen = new WeakSet()
+  // 如果是fullDepth模式，增加深度限制
+  const actualMaxDepth = fullDepth ? 10 : maxDepth
 
   const replacer = (key, value, depth = 0) => {
-    if (depth > maxDepth) {
+    if (depth > actualMaxDepth) {
       return '[Max Depth Reached]'
     }
 
@@ -149,6 +151,21 @@ const securityLogger = winston.createLogger({
   level: 'warn',
   format: logFormat,
   transports: [createRotateTransport('claude-relay-security-%DATE%.log', 'warn')],
+  silent: false
+})
+
+// 🔐 创建专门的认证详细日志记录器（记录完整的认证响应）
+const authDetailLogger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+    winston.format.printf(({ level, message, timestamp, data }) => {
+      // 使用更深的深度和格式化的JSON输出
+      const jsonData = data ? JSON.stringify(data, null, 2) : '{}'
+      return `[${timestamp}] ${level.toUpperCase()}: ${message}\n${jsonData}\n${'='.repeat(80)}`
+    })
+  ),
+  transports: [createRotateTransport('claude-relay-auth-detail-%DATE%.log', 'info')],
   silent: false
 })
 
@@ -324,6 +341,28 @@ logger.healthCheck = () => {
     return { healthy: true, timestamp: new Date().toISOString() }
   } catch (error) {
     return { healthy: false, error: error.message, timestamp: new Date().toISOString() }
+  }
+}
+
+// 🔐 记录认证详细信息的方法
+logger.authDetail = (message, data = {}) => {
+  try {
+    // 记录到主日志（简化版）
+    logger.info(`🔐 ${message}`, {
+      type: 'auth-detail',
+      summary: {
+        hasAccessToken: !!data.access_token,
+        hasRefreshToken: !!data.refresh_token,
+        scopes: data.scope || data.scopes,
+        organization: data.organization?.name,
+        account: data.account?.email_address
+      }
+    })
+
+    // 记录到专门的认证详细日志文件（完整数据）
+    authDetailLogger.info(message, { data })
+  } catch (error) {
+    logger.error('Failed to log auth detail:', error)
   }
 }
 

@@ -555,14 +555,37 @@
               </div>
             </div>
 
-            <!-- Claude、Claude Console和Bedrock的优先级设置 -->
-            <div
-              v-if="
-                form.platform === 'claude' ||
-                form.platform === 'claude-console' ||
-                form.platform === 'bedrock'
-              "
-            >
+            <!-- Claude 订阅类型选择 -->
+            <div v-if="form.platform === 'claude'">
+              <label class="mb-3 block text-sm font-semibold text-gray-700">订阅类型</label>
+              <div class="flex gap-4">
+                <label class="flex cursor-pointer items-center">
+                  <input
+                    v-model="form.subscriptionType"
+                    class="mr-2"
+                    type="radio"
+                    value="claude_max"
+                  />
+                  <span class="text-sm text-gray-700">Claude Max</span>
+                </label>
+                <label class="flex cursor-pointer items-center">
+                  <input
+                    v-model="form.subscriptionType"
+                    class="mr-2"
+                    type="radio"
+                    value="claude_pro"
+                  />
+                  <span class="text-sm text-gray-700">Claude Pro</span>
+                </label>
+              </div>
+              <p class="mt-2 text-xs text-gray-500">
+                <i class="fas fa-info-circle mr-1" />
+                Pro 账号不支持 Claude Opus 4 模型
+              </p>
+            </div>
+
+            <!-- 所有平台的优先级设置 -->
+            <div>
               <label class="mb-3 block text-sm font-semibold text-gray-700"
                 >调度优先级 (1-100)</label
               >
@@ -961,14 +984,37 @@
             <p class="mt-2 text-xs text-gray-500">Google Cloud/Workspace 账号可能需要提供项目 ID</p>
           </div>
 
-          <!-- Claude、Claude Console和Bedrock的优先级设置（编辑模式） -->
-          <div
-            v-if="
-              form.platform === 'claude' ||
-              form.platform === 'claude-console' ||
-              form.platform === 'bedrock'
-            "
-          >
+          <!-- Claude 订阅类型选择（编辑模式） -->
+          <div v-if="form.platform === 'claude'">
+            <label class="mb-3 block text-sm font-semibold text-gray-700">订阅类型</label>
+            <div class="flex gap-4">
+              <label class="flex cursor-pointer items-center">
+                <input
+                  v-model="form.subscriptionType"
+                  class="mr-2"
+                  type="radio"
+                  value="claude_max"
+                />
+                <span class="text-sm text-gray-700">Claude Max</span>
+              </label>
+              <label class="flex cursor-pointer items-center">
+                <input
+                  v-model="form.subscriptionType"
+                  class="mr-2"
+                  type="radio"
+                  value="claude_pro"
+                />
+                <span class="text-sm text-gray-700">Claude Pro</span>
+              </label>
+            </div>
+            <p class="mt-2 text-xs text-gray-500">
+              <i class="fas fa-info-circle mr-1" />
+              Pro 账号不支持 Claude Opus 4 模型
+            </p>
+          </div>
+
+          <!-- 所有平台的优先级设置（编辑模式） -->
+          <div>
             <label class="mb-3 block text-sm font-semibold text-gray-700">调度优先级 (1-100)</label>
             <input
               v-model.number="form.priority"
@@ -1419,6 +1465,7 @@ const form = ref({
   name: props.account?.name || '',
   description: props.account?.description || '',
   accountType: props.account?.accountType || 'shared',
+  subscriptionType: 'claude_max', // 默认为 Claude Max，兼容旧数据
   groupId: '',
   projectId: props.account?.projectId || '',
   idToken: '',
@@ -1678,12 +1725,21 @@ const handleOAuthSuccess = async (tokenInfo) => {
       // Claude使用claudeAiOauth字段
       data.claudeAiOauth = tokenInfo.claudeAiOauth || tokenInfo
       data.priority = form.value.priority || 50
+      // 添加订阅类型信息
+      data.subscriptionInfo = {
+        accountType: form.value.subscriptionType || 'claude_max',
+        hasClaudeMax: form.value.subscriptionType === 'claude_max',
+        hasClaudePro: form.value.subscriptionType === 'claude_pro',
+        manuallySet: true // 标记为手动设置
+      }
     } else if (form.value.platform === 'gemini') {
       // Gemini使用geminiOauth字段
       data.geminiOauth = tokenInfo.tokens || tokenInfo
       if (form.value.projectId) {
         data.projectId = form.value.projectId
       }
+      // 添加 Gemini 优先级
+      data.priority = form.value.priority || 50
     } else if (form.value.platform === 'openai') {
       data.openaiOauth = tokenInfo.tokens || tokenInfo
       data.accountInfo = tokenInfo.accountInfo
@@ -1803,9 +1859,16 @@ const createAccount = async () => {
         accessToken: form.value.accessToken,
         refreshToken: form.value.refreshToken || '',
         expiresAt: Date.now() + expiresInMs,
-        scopes: ['user:inference']
+        scopes: [] // 手动添加没有 scopes
       }
       data.priority = form.value.priority || 50
+      // 添加订阅类型信息
+      data.subscriptionInfo = {
+        accountType: form.value.subscriptionType || 'claude_max',
+        hasClaudeMax: form.value.subscriptionType === 'claude_max',
+        hasClaudePro: form.value.subscriptionType === 'claude_pro',
+        manuallySet: true // 标记为手动设置
+      }
     } else if (form.value.platform === 'gemini') {
       // Gemini手动模式需要构建geminiOauth对象
       const expiresInMs = form.value.refreshToken
@@ -1823,6 +1886,9 @@ const createAccount = async () => {
       if (form.value.projectId) {
         data.projectId = form.value.projectId
       }
+
+      // 添加 Gemini 优先级
+      data.priority = form.value.priority || 50
     } else if (form.value.platform === 'openai') {
       // OpenAI手动模式需要构建openaiOauth对象
       const expiresInMs = form.value.refreshToken
@@ -1985,7 +2051,7 @@ const updateAccount = async () => {
           accessToken: form.value.accessToken || '',
           refreshToken: form.value.refreshToken || '',
           expiresAt: Date.now() + expiresInMs,
-          scopes: ['user:inference']
+          scopes: props.account.scopes || [] // 保持原有的 scopes，如果没有则为空数组
         }
       } else if (props.account.platform === 'gemini') {
         // Gemini需要构建geminiOauth对象
@@ -2019,13 +2085,25 @@ const updateAccount = async () => {
       data.projectId = form.value.projectId
     }
 
-    // Claude 官方账号优先级更新
+    // Claude 官方账号优先级和订阅类型更新
     if (props.account.platform === 'claude') {
       data.priority = form.value.priority || 50
+      // 更新订阅类型信息
+      data.subscriptionInfo = {
+        accountType: form.value.subscriptionType || 'claude_max',
+        hasClaudeMax: form.value.subscriptionType === 'claude_max',
+        hasClaudePro: form.value.subscriptionType === 'claude_pro',
+        manuallySet: true // 标记为手动设置
+      }
     }
 
     // OpenAI 账号优先级更新
     if (props.account.platform === 'openai') {
+      data.priority = form.value.priority || 50
+    }
+
+    // Gemini 账号优先级更新
+    if (props.account.platform === 'gemini') {
       data.priority = form.value.priority || 50
     }
 
@@ -2319,12 +2397,32 @@ watch(
         groupId = newAccount.groupId || (newAccount.groupInfo && newAccount.groupInfo.id) || ''
       }
 
+      // 初始化订阅类型（从 subscriptionInfo 中提取，兼容旧数据默认为 claude_max）
+      let subscriptionType = 'claude_max'
+      if (newAccount.subscriptionInfo) {
+        const info =
+          typeof newAccount.subscriptionInfo === 'string'
+            ? JSON.parse(newAccount.subscriptionInfo)
+            : newAccount.subscriptionInfo
+
+        if (info.accountType) {
+          subscriptionType = info.accountType
+        } else if (info.hasClaudeMax) {
+          subscriptionType = 'claude_max'
+        } else if (info.hasClaudePro) {
+          subscriptionType = 'claude_pro'
+        } else {
+          subscriptionType = 'claude_free'
+        }
+      }
+
       form.value = {
         platform: newAccount.platform,
         addType: 'oauth',
         name: newAccount.name,
         description: newAccount.description || '',
         accountType: newAccount.accountType || 'shared',
+        subscriptionType: subscriptionType,
         groupId: groupId,
         projectId: newAccount.projectId || '',
         accessToken: '',

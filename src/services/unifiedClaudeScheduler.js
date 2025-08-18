@@ -267,6 +267,35 @@ class UnifiedClaudeScheduler {
       ) {
         // 检查是否可调度
 
+        // 检查模型支持（如果请求的是 Opus 模型）
+        if (requestedModel && requestedModel.toLowerCase().includes('opus')) {
+          // 检查账号的订阅信息
+          if (account.subscriptionInfo) {
+            try {
+              const info =
+                typeof account.subscriptionInfo === 'string'
+                  ? JSON.parse(account.subscriptionInfo)
+                  : account.subscriptionInfo
+
+              // Pro 和 Free 账号不支持 Opus
+              if (info.hasClaudePro === true && info.hasClaudeMax !== true) {
+                logger.info(`🚫 Claude account ${account.name} (Pro) does not support Opus model`)
+                continue // Claude Pro 不支持 Opus
+              }
+              if (info.accountType === 'claude_pro' || info.accountType === 'claude_free') {
+                logger.info(
+                  `🚫 Claude account ${account.name} (${info.accountType}) does not support Opus model`
+                )
+                continue // 明确标记为 Pro 或 Free 的账号不支持
+              }
+            } catch (e) {
+              // 解析失败，假设为旧数据，默认支持（兼容旧数据为 Max）
+              logger.debug(`Account ${account.name} has invalid subscriptionInfo, assuming Max`)
+            }
+          }
+          // 没有订阅信息的账号，默认当作支持（兼容旧数据）
+        }
+
         // 检查是否被限流
         const isRateLimited = await claudeAccountService.isAccountRateLimited(account.id)
         if (!isRateLimited) {

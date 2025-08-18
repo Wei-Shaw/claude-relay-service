@@ -191,7 +191,9 @@ class RedisClient {
     outputTokens = 0,
     cacheCreateTokens = 0,
     cacheReadTokens = 0,
-    model = 'unknown'
+    model = 'unknown',
+    ephemeral5mTokens = 0, // 新增：5分钟缓存 tokens
+    ephemeral1hTokens = 0 // 新增：1小时缓存 tokens
   ) {
     const key = `usage:${keyId}`
     const now = new Date()
@@ -245,6 +247,9 @@ class RedisClient {
     pipeline.hincrby(key, 'totalCacheCreateTokens', finalCacheCreateTokens)
     pipeline.hincrby(key, 'totalCacheReadTokens', finalCacheReadTokens)
     pipeline.hincrby(key, 'totalAllTokens', totalTokens) // 包含所有类型的总token
+    // 详细缓存类型统计（新增）
+    pipeline.hincrby(key, 'totalEphemeral5mTokens', ephemeral5mTokens)
+    pipeline.hincrby(key, 'totalEphemeral1hTokens', ephemeral1hTokens)
     // 请求计数
     pipeline.hincrby(key, 'totalRequests', 1)
 
@@ -256,6 +261,9 @@ class RedisClient {
     pipeline.hincrby(daily, 'cacheReadTokens', finalCacheReadTokens)
     pipeline.hincrby(daily, 'allTokens', totalTokens)
     pipeline.hincrby(daily, 'requests', 1)
+    // 详细缓存类型统计
+    pipeline.hincrby(daily, 'ephemeral5mTokens', ephemeral5mTokens)
+    pipeline.hincrby(daily, 'ephemeral1hTokens', ephemeral1hTokens)
 
     // 每月统计
     pipeline.hincrby(monthly, 'tokens', coreTokens)
@@ -265,6 +273,9 @@ class RedisClient {
     pipeline.hincrby(monthly, 'cacheReadTokens', finalCacheReadTokens)
     pipeline.hincrby(monthly, 'allTokens', totalTokens)
     pipeline.hincrby(monthly, 'requests', 1)
+    // 详细缓存类型统计
+    pipeline.hincrby(monthly, 'ephemeral5mTokens', ephemeral5mTokens)
+    pipeline.hincrby(monthly, 'ephemeral1hTokens', ephemeral1hTokens)
 
     // 按模型统计 - 每日
     pipeline.hincrby(modelDaily, 'inputTokens', finalInputTokens)
@@ -289,6 +300,9 @@ class RedisClient {
     pipeline.hincrby(keyModelDaily, 'cacheReadTokens', finalCacheReadTokens)
     pipeline.hincrby(keyModelDaily, 'allTokens', totalTokens)
     pipeline.hincrby(keyModelDaily, 'requests', 1)
+    // 详细缓存类型统计
+    pipeline.hincrby(keyModelDaily, 'ephemeral5mTokens', ephemeral5mTokens)
+    pipeline.hincrby(keyModelDaily, 'ephemeral1hTokens', ephemeral1hTokens)
 
     // API Key级别的模型统计 - 每月
     pipeline.hincrby(keyModelMonthly, 'inputTokens', finalInputTokens)
@@ -297,6 +311,9 @@ class RedisClient {
     pipeline.hincrby(keyModelMonthly, 'cacheReadTokens', finalCacheReadTokens)
     pipeline.hincrby(keyModelMonthly, 'allTokens', totalTokens)
     pipeline.hincrby(keyModelMonthly, 'requests', 1)
+    // 详细缓存类型统计
+    pipeline.hincrby(keyModelMonthly, 'ephemeral5mTokens', ephemeral5mTokens)
+    pipeline.hincrby(keyModelMonthly, 'ephemeral1hTokens', ephemeral1hTokens)
 
     // 小时级别统计
     pipeline.hincrby(hourly, 'tokens', coreTokens)

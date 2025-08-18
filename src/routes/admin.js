@@ -391,6 +391,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       claudeConsoleAccountId,
       geminiAccountId,
       openaiAccountId,
+      bedrockAccountId,
       permissions,
       concurrencyLimit,
       rateLimitWindow,
@@ -487,6 +488,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       claudeConsoleAccountId,
       geminiAccountId,
       openaiAccountId,
+      bedrockAccountId,
       permissions,
       concurrencyLimit,
       rateLimitWindow,
@@ -633,6 +635,7 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       claudeConsoleAccountId,
       geminiAccountId,
       openaiAccountId,
+      bedrockAccountId,
       permissions,
       enableModelRestriction,
       restrictedModels,
@@ -694,6 +697,11 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
     if (openaiAccountId !== undefined) {
       // 空字符串表示解绑，null或空字符串都设置为空字符串
       updates.openaiAccountId = openaiAccountId || ''
+    }
+
+    if (bedrockAccountId !== undefined) {
+      // 空字符串表示解绑，null或空字符串都设置为空字符串
+      updates.bedrockAccountId = bedrockAccountId || ''
     }
 
     if (permissions !== undefined) {
@@ -1399,6 +1407,46 @@ router.delete('/claude-accounts/:accountId', authenticateAdmin, async (req, res)
     return res
       .status(500)
       .json({ error: 'Failed to delete Claude account', message: error.message })
+  }
+})
+
+// 更新单个Claude账户的Profile信息
+router.post('/claude-accounts/:accountId/update-profile', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+
+    const profileInfo = await claudeAccountService.fetchAndUpdateAccountProfile(accountId)
+
+    logger.success(`✅ Updated profile for Claude account: ${accountId}`)
+    return res.json({
+      success: true,
+      message: 'Account profile updated successfully',
+      data: profileInfo
+    })
+  } catch (error) {
+    logger.error('❌ Failed to update account profile:', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to update account profile', message: error.message })
+  }
+})
+
+// 批量更新所有Claude账户的Profile信息
+router.post('/claude-accounts/update-all-profiles', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await claudeAccountService.updateAllAccountProfiles()
+
+    logger.success('✅ Batch profile update completed')
+    return res.json({
+      success: true,
+      message: 'Batch profile update completed',
+      data: result
+    })
+  } catch (error) {
+    logger.error('❌ Failed to update all account profiles:', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to update all account profiles', message: error.message })
   }
 })
 
