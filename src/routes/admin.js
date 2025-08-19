@@ -799,28 +799,20 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
   }
 })
 
-// 删除API Key
-router.delete('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
-  try {
-    const { keyId } = req.params
-
-    await apiKeyService.deleteApiKey(keyId)
-
-    logger.success(`🗑️ Admin deleted API key: ${keyId}`)
-    return res.json({ success: true, message: 'API key deleted successfully' })
-  } catch (error) {
-    logger.error('❌ Failed to delete API key:', error)
-    return res.status(500).json({ error: 'Failed to delete API key', message: error.message })
-  }
-})
-
-// 批量删除API Keys
+// 批量删除API Keys（必须在 :keyId 路由之前定义）
 router.delete('/api-keys/batch', authenticateAdmin, async (req, res) => {
   try {
     const { keyIds } = req.body
 
+    // 调试信息
+    logger.info(`🐛 Batch delete request body: ${JSON.stringify(req.body)}`)
+    logger.info(`🐛 keyIds type: ${typeof keyIds}, value: ${JSON.stringify(keyIds)}`)
+
     // 参数验证
     if (!keyIds || !Array.isArray(keyIds) || keyIds.length === 0) {
+      logger.warn(
+        `🚨 Invalid keyIds: ${JSON.stringify({ keyIds, type: typeof keyIds, isArray: Array.isArray(keyIds) })}`
+      )
       return res.status(400).json({
         error: 'Invalid request',
         message: 'keyIds 必须是一个非空数组'
@@ -843,7 +835,9 @@ router.delete('/api-keys/batch', authenticateAdmin, async (req, res) => {
       })
     }
 
-    logger.info(`🗑️ Admin attempting batch delete of ${keyIds.length} API keys`)
+    logger.info(
+      `🗑️ Admin attempting batch delete of ${keyIds.length} API keys: ${JSON.stringify(keyIds)}`
+    )
 
     const results = {
       successCount: 0,
@@ -855,8 +849,8 @@ router.delete('/api-keys/batch', authenticateAdmin, async (req, res) => {
     for (const keyId of keyIds) {
       try {
         // 检查API Key是否存在
-        const apiKey = await apiKeyService.getApiKey(keyId)
-        if (!apiKey) {
+        const apiKey = await redis.getApiKey(keyId)
+        if (!apiKey || Object.keys(apiKey).length === 0) {
           results.failedCount++
           results.errors.push({ keyId, error: 'API Key 不存在' })
           continue
@@ -900,6 +894,21 @@ router.delete('/api-keys/batch', authenticateAdmin, async (req, res) => {
       error: 'Batch delete failed',
       message: error.message
     })
+  }
+})
+
+// 删除单个API Key（必须在批量删除路由之后定义）
+router.delete('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyId } = req.params
+
+    await apiKeyService.deleteApiKey(keyId)
+
+    logger.success(`🗑️ Admin deleted API key: ${keyId}`)
+    return res.json({ success: true, message: 'API key deleted successfully' })
+  } catch (error) {
+    logger.error('❌ Failed to delete API key:', error)
+    return res.status(500).json({ error: 'Failed to delete API key', message: error.message })
   }
 })
 

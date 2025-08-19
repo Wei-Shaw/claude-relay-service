@@ -88,6 +88,19 @@
               />
               <span class="relative">刷新</span>
             </button>
+
+            <!-- 批量删除按钮 -->
+            <button
+              v-if="selectedApiKeys.length > 0"
+              class="group relative flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 shadow-sm transition-all duration-200 hover:border-red-300 hover:bg-red-100 hover:shadow-md sm:w-auto"
+              @click="batchDeleteApiKeys()"
+            >
+              <div
+                class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-red-500 to-pink-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+              ></div>
+              <i class="fas fa-trash relative text-red-600" />
+              <span class="relative">删除选中 ({{ selectedApiKeys.length }})</span>
+            </button>
           </div>
           <!-- 创建按钮 -->
           <button
@@ -120,6 +133,17 @@
         <table class="w-full table-fixed">
           <thead class="bg-gray-50/80 backdrop-blur-sm">
             <tr>
+              <th class="w-[50px] px-3 py-4 text-left">
+                <div class="flex items-center">
+                  <input
+                    v-model="selectAllChecked"
+                    class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    :indeterminate="isIndeterminate"
+                    type="checkbox"
+                    @change="handleSelectAll"
+                  />
+                </div>
+              </th>
               <th
                 class="w-[25%] min-w-[200px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100"
                 @click="sortApiKeys('name')"
@@ -216,6 +240,17 @@
             <template v-for="key in paginatedApiKeys" :key="key.id">
               <!-- API Key 主行 -->
               <tr class="table-row">
+                <td class="px-3 py-4">
+                  <div class="flex items-center">
+                    <input
+                      v-model="selectedApiKeys"
+                      class="mr-3 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      type="checkbox"
+                      :value="key.id"
+                      @change="updateSelectAllState"
+                    />
+                  </div>
+                </td>
                 <td class="px-3 py-4">
                   <div class="flex items-center">
                     <div
@@ -505,7 +540,7 @@
 
               <!-- 模型统计展开区域 -->
               <tr v-if="key && key.id && expandedApiKeys[key.id]">
-                <td class="bg-gray-50 px-3 py-4" colspan="7">
+                <td class="bg-gray-50 px-3 py-4" colspan="8">
                   <div v-if="!apiKeyModelStats[key.id]" class="py-4 text-center">
                     <div class="loading-spinner mx-auto" />
                     <p class="mt-2 text-sm text-gray-500">加载模型统计...</p>
@@ -748,6 +783,13 @@
           <!-- 卡片头部 -->
           <div class="mb-3 flex items-start justify-between">
             <div class="flex items-center gap-3">
+              <input
+                v-model="selectedApiKeys"
+                class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                type="checkbox"
+                :value="key.id"
+                @change="updateSelectAllState"
+              />
               <div
                 class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600"
               >
@@ -1152,6 +1194,11 @@ import CustomDropdown from '@/components/common/CustomDropdown.vue'
 // 响应式数据
 const clientsStore = useClientsStore()
 const apiKeys = ref([])
+
+// 多选相关状态
+const selectedApiKeys = ref([])
+const selectAllChecked = ref(false)
+const isIndeterminate = ref(false)
 const apiKeysLoading = ref(false)
 const apiKeyStatsTimeRange = ref('today')
 const apiKeysSortBy = ref('')
@@ -1831,12 +1878,108 @@ const deleteApiKey = async (keyId) => {
     const data = await apiClient.delete(`/admin/api-keys/${keyId}`)
     if (data.success) {
       showToast('API Key 已删除', 'success')
+      // 从选中列表中移除
+      const index = selectedApiKeys.value.indexOf(keyId)
+      if (index > -1) {
+        selectedApiKeys.value.splice(index, 1)
+      }
+      updateSelectAllState()
       loadApiKeys()
     } else {
       showToast(data.message || '删除失败', 'error')
     }
   } catch (error) {
     showToast('删除失败', 'error')
+  }
+}
+
+// 批量删除API Keys
+const batchDeleteApiKeys = async () => {
+  const selectedCount = selectedApiKeys.value.length
+  if (selectedCount === 0) {
+    showToast('请先选择要删除的 API Keys', 'warning')
+    return
+  }
+
+  let confirmed = false
+  const message = `确定要删除选中的 ${selectedCount} 个 API Key 吗？此操作不可恢复。`
+
+  if (window.showConfirm) {
+    confirmed = await window.showConfirm('批量删除 API Keys', message, '确定删除', '取消')
+  } else {
+    confirmed = confirm(message)
+  }
+
+  if (!confirmed) return
+
+  const keyIds = [...selectedApiKeys.value]
+
+  try {
+    const data = await apiClient.delete('/admin/api-keys/batch', {
+      data: { keyIds }
+    })
+
+    if (data.success) {
+      const { successCount, failedCount, errors } = data.data
+
+      if (successCount > 0) {
+        showToast(`成功删除 ${successCount} 个 API Keys`, 'success')
+
+        // 如果有失败的，显示详细信息
+        if (failedCount > 0) {
+          const errorMessages = errors.map((e) => `${e.keyId}: ${e.error}`).join('\n')
+          showToast(`${failedCount} 个删除失败:\n${errorMessages}`, 'warning')
+        }
+      } else {
+        showToast('所有 API Keys 删除失败', 'error')
+      }
+
+      // 清空选中状态
+      selectedApiKeys.value = []
+      updateSelectAllState()
+      loadApiKeys()
+    } else {
+      showToast(data.message || '批量删除失败', 'error')
+    }
+  } catch (error) {
+    showToast('批量删除失败', 'error')
+    console.error('批量删除 API Keys 失败:', error)
+  }
+}
+
+// 处理全选/取消全选
+const handleSelectAll = () => {
+  if (selectAllChecked.value) {
+    // 全选当前页的所有API Keys
+    paginatedApiKeys.value.forEach((key) => {
+      if (!selectedApiKeys.value.includes(key.id)) {
+        selectedApiKeys.value.push(key.id)
+      }
+    })
+  } else {
+    // 取消全选：只移除当前页的选中项，保留其他页面的选中项
+    const currentPageIds = new Set(paginatedApiKeys.value.map((key) => key.id))
+    selectedApiKeys.value = selectedApiKeys.value.filter((id) => !currentPageIds.has(id))
+  }
+  updateSelectAllState()
+}
+
+// 更新全选状态
+const updateSelectAllState = () => {
+  const totalInCurrentPage = paginatedApiKeys.value.length
+  const selectedInCurrentPage = paginatedApiKeys.value.filter((key) =>
+    selectedApiKeys.value.includes(key.id)
+  ).length
+
+  if (selectedInCurrentPage === 0) {
+    selectAllChecked.value = false
+    isIndeterminate.value = false
+  } else if (selectedInCurrentPage === totalInCurrentPage) {
+    selectAllChecked.value = true
+    isIndeterminate.value = false
+  } else {
+    selectAllChecked.value = false
+    isIndeterminate.value = true
   }
 }
 
@@ -1980,14 +2123,43 @@ const clearSearch = () => {
   currentPage.value = 1
 }
 
-// 监听筛选条件变化，重置页码
-watch([selectedTagFilter, apiKeyStatsTimeRange, searchKeyword], () => {
+// 监听筛选条件变化，重置页码和选中状态
+// 监听筛选条件变化（不包括搜索），清空选中状态
+watch([selectedTagFilter, apiKeyStatsTimeRange], () => {
   currentPage.value = 1
+  // 清空选中状态
+  selectedApiKeys.value = []
+  updateSelectAllState()
+})
+
+// 监听搜索关键词变化，只重置分页，保持选中状态
+watch(searchKeyword, () => {
+  currentPage.value = 1
+  // 不清空选中状态，允许跨搜索保持勾选
+  updateSelectAllState()
+})
+
+// 监听分页变化，更新全选状态
+watch([currentPage, pageSize], () => {
+  updateSelectAllState()
+})
+
+// 监听API Keys数据变化，清理无效的选中状态
+watch(apiKeys, () => {
+  const validIds = new Set(apiKeys.value.map((key) => key.id))
+
+  // 过滤出仍然有效的选中项
+  selectedApiKeys.value = selectedApiKeys.value.filter((id) => validIds.has(id))
+
+  updateSelectAllState()
 })
 
 onMounted(async () => {
   // 并行加载所有需要的数据
   await Promise.all([clientsStore.loadSupportedClients(), loadAccounts(), loadApiKeys()])
+
+  // 初始化全选状态
+  updateSelectAllState()
 })
 </script>
 
