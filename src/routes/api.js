@@ -12,10 +12,51 @@ const sessionHelper = require('../utils/sessionHelper')
 
 const router = express.Router()
 
+// 🧹 Unicode 字符清理函数
+function cleanUnicodeString(str) {
+  if (typeof str !== 'string') {
+    return str
+  }
+
+  // 移除无效的 UTF-16 代理对字符
+  // 匹配无效的低代理字符 (0xDC00-0xDFFF) 没有对应的高代理字符
+  // 匹配无效的高代理字符 (0xD800-0xDBFF) 没有对应的低代理字符
+  return str.replace(
+    /[\uDC00-\uDFFF](?![\uD800-\uDBFF])|[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g,
+    '\uFFFD'
+  )
+}
+
+// 🧹 递归清理对象中的 Unicode 字符
+function cleanUnicodeInObject(obj) {
+  if (typeof obj === 'string') {
+    return cleanUnicodeString(obj)
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map((item) => cleanUnicodeInObject(item))
+  }
+
+  if (obj && typeof obj === 'object') {
+    const cleaned = {}
+    for (const [key, value] of Object.entries(obj)) {
+      cleaned[cleanUnicodeString(key)] = cleanUnicodeInObject(value)
+    }
+    return cleaned
+  }
+
+  return obj
+}
+
 // 🔧 共享的消息处理函数
 async function handleMessagesRequest(req, res) {
   try {
     const startTime = Date.now()
+
+    // Unicode 字符清理 - 在输入验证之前清理请求体
+    if (req.body) {
+      req.body = cleanUnicodeInObject(req.body)
+    }
 
     // 严格的输入验证
     if (!req.body || typeof req.body !== 'object') {

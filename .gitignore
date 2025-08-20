@@ -13,6 +13,9 @@ pnpm-debug.log*
 # Claude specific directories
 .claude/
 
+# MCP configuration (local only)
+.mcp.json
+
 # Data directory (contains sensitive information)
 data/
 !data/.gitkeep

@@ -152,9 +152,12 @@ class ApiClient {
   // DELETE 请求
   async delete(url, options = {}) {
     const fullUrl = createApiUrl(url)
+    const { data, ...restOptions } = options
+
     const config = this.buildConfig({
-      ...options,
-      method: 'DELETE'
+      ...restOptions,
+      method: 'DELETE',
+      body: data ? JSON.stringify(data) : undefined
     })
 
     try {
