@@ -164,6 +164,39 @@ class ProxyHelper {
   }
 
   /**
+   * 脱敏代理配置信息用于日志记录
+   * @param {object|string} proxyConfig - 代理配置
+   * @returns {string} 脱敏后的代理信息
+   */
+  static maskProxyInfo(proxyConfig) {
+    if (!proxyConfig) {
+      return 'No proxy'
+    }
+
+    try {
+      const proxy = typeof proxyConfig === 'string' ? JSON.parse(proxyConfig) : proxyConfig
+
+      let proxyDesc = `${proxy.type}://${proxy.host}:${proxy.port}`
+
+      // 如果有认证信息，进行脱敏处理
+      if (proxy.username && proxy.password) {
+        const maskedUsername =
+          proxy.username.length <= 2
+            ? proxy.username
+            : proxy.username[0] +
+              '*'.repeat(Math.max(1, proxy.username.length - 2)) +
+              proxy.username.slice(-1)
+        const maskedPassword = '*'.repeat(Math.min(8, proxy.password.length))
+        proxyDesc += ` (auth: ${maskedUsername}:${maskedPassword})`
+      }
+
+      return proxyDesc
+    } catch (error) {
+      return 'Invalid proxy config'
+    }
+  }
+
+  /**
    * 创建代理 Agent（兼容旧的函数接口）
    * @param {object|string|null} proxyConfig - 代理配置
    * @param {boolean} useIPv4 - 是否使用 IPv4

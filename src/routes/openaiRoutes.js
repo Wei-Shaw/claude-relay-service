@@ -168,7 +168,9 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
     // 如果有代理，添加代理配置
     if (proxyAgent) {
       axiosConfig.httpsAgent = proxyAgent
-      logger.info('Using proxy for OpenAI request')
+      logger.info(`🌐 Using proxy for OpenAI request: ${ProxyHelper.getProxyDescription(proxy)}`)
+    } else {
+      logger.debug('🌐 No proxy configured for OpenAI request')
     }
 
     // 根据 stream 参数决定请求类型

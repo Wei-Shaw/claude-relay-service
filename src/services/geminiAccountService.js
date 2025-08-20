@@ -5,6 +5,7 @@ const config = require('../../config/config')
 const logger = require('../utils/logger')
 const { OAuth2Client } = require('google-auth-library')
 const { maskToken } = require('../utils/tokenMask')
+const ProxyHelper = require('../utils/proxyHelper')
 const {
   logRefreshStart,
   logRefreshSuccess,
@@ -228,7 +229,7 @@ async function exchangeCodeForTokens(code, redirectUri = null, codeVerifier = nu
 }
 
 // 刷新访问令牌
-async function refreshAccessToken(refreshToken) {
+async function refreshAccessToken(refreshToken, proxyConfig = null) {
   const oAuth2Client = createOAuth2Client()
 
   try {
@@ -236,6 +237,20 @@ async function refreshAccessToken(refreshToken) {
     oAuth2Client.setCredentials({
       refresh_token: refreshToken
     })
+
+    // 配置代理（如果提供）
+    const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+    if (proxyAgent) {
+      // Google Auth Library 使用 Axios，可以通过 transportOptions 配置代理
+      oAuth2Client.transportOptions = {
+        httpsAgent: proxyAgent
+      }
+      logger.info(
+        `🔄 Using proxy for Gemini token refresh: ${ProxyHelper.maskProxyInfo(proxyConfig)}`
+      )
+    } else {
+      logger.debug('🔄 No proxy configured for Gemini token refresh')
+    }
 
     // 调用 refreshAccessToken 获取新的 tokens
     const response = await oAuth2Client.refreshAccessToken()
@@ -261,7 +276,9 @@ async function refreshAccessToken(refreshToken) {
     logger.error('Error refreshing access token:', {
       message: error.message,
       code: error.code,
-      response: error.response?.data
+      response: error.response?.data,
+      hasProxy: !!proxyConfig,
+      proxy: proxyConfig ? ProxyHelper.maskProxyInfo(proxyConfig) : 'No proxy'
     })
     throw new Error(`Failed to refresh access token: ${error.message}`)
   }
@@ -786,7 +803,8 @@ async function refreshAccountToken(accountId) {
     logger.info(`🔄 Starting token refresh for Gemini account: ${account.name} (${accountId})`)
 
     // account.refreshToken 已经是解密后的值（从 getAccount 返回）
-    const newTokens = await refreshAccessToken(account.refreshToken)
+    // 传入账户的代理配置
+    const newTokens = await refreshAccessToken(account.refreshToken, account.proxy)
 
     // 更新账户信息
     const updates = {

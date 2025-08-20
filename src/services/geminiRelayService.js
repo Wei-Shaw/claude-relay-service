@@ -280,7 +280,9 @@ async function sendGeminiRequest({
   const proxyAgent = createProxyAgent(proxy)
   if (proxyAgent) {
     axiosConfig.httpsAgent = proxyAgent
-    logger.debug('Using proxy for Gemini request')
+    logger.info(`🌐 Using proxy for Gemini API request: ${ProxyHelper.getProxyDescription(proxy)}`)
+  } else {
+    logger.debug('🌐 No proxy configured for Gemini API request')
   }
 
   // 添加 AbortController 信号支持
@@ -386,6 +388,11 @@ async function getAvailableModels(accessToken, proxy, projectId, location = 'us-
   const proxyAgent = createProxyAgent(proxy)
   if (proxyAgent) {
     axiosConfig.httpsAgent = proxyAgent
+    logger.info(
+      `🌐 Using proxy for Gemini models request: ${ProxyHelper.getProxyDescription(proxy)}`
+    )
+  } else {
+    logger.debug('🌐 No proxy configured for Gemini models request')
   }
 
   try {
@@ -482,7 +489,11 @@ async function countTokens({
   const proxyAgent = createProxyAgent(proxy)
   if (proxyAgent) {
     axiosConfig.httpsAgent = proxyAgent
-    logger.debug('Using proxy for Gemini countTokens request')
+    logger.info(
+      `🌐 Using proxy for Gemini countTokens request: ${ProxyHelper.getProxyDescription(proxy)}`
+    )
+  } else {
+    logger.debug('🌐 No proxy configured for Gemini countTokens request')
   }
 
   try {

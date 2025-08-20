@@ -135,6 +135,11 @@ async function refreshAccessToken(refreshToken, proxy = null) {
     const proxyAgent = ProxyHelper.createProxyAgent(proxy)
     if (proxyAgent) {
       requestOptions.httpsAgent = proxyAgent
+      logger.info(
+        `🌐 Using proxy for OpenAI token refresh: ${ProxyHelper.getProxyDescription(proxy)}`
+      )
+    } else {
+      logger.debug('🌐 No proxy configured for OpenAI token refresh')
     }
 
     // 发送请求

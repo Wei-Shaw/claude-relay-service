@@ -502,10 +502,17 @@ class ClaudeRelayService {
       const account = accountData.find((acc) => acc.id === accountId)
 
       if (!account || !account.proxy) {
+        logger.debug('🌐 No proxy configured for Claude account')
         return null
       }
 
-      return ProxyHelper.createProxyAgent(account.proxy)
+      const proxyAgent = ProxyHelper.createProxyAgent(account.proxy)
+      if (proxyAgent) {
+        logger.info(
+          `🌐 Using proxy for Claude request: ${ProxyHelper.getProxyDescription(account.proxy)}`
+        )
+      }
+      return proxyAgent
     } catch (error) {
       logger.warn('⚠️ Failed to create proxy agent:', error)
       return null

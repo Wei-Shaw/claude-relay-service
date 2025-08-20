@@ -157,6 +157,14 @@ async function exchangeCodeForTokens(authorizationCode, codeVerifier, state, pro
   const agent = createProxyAgent(proxyConfig)
 
   try {
+    if (agent) {
+      logger.info(
+        `🌐 Using proxy for OAuth token exchange: ${ProxyHelper.maskProxyInfo(proxyConfig)}`
+      )
+    } else {
+      logger.debug('🌐 No proxy configured for OAuth token exchange')
+    }
+
     logger.debug('🔄 Attempting OAuth token exchange', {
       url: OAUTH_CONFIG.TOKEN_URL,
       codeLength: cleanedCode.length,
@@ -354,6 +362,14 @@ async function exchangeSetupTokenCode(authorizationCode, codeVerifier, state, pr
   const agent = createProxyAgent(proxyConfig)
 
   try {
+    if (agent) {
+      logger.info(
+        `🌐 Using proxy for Setup Token exchange: ${ProxyHelper.maskProxyInfo(proxyConfig)}`
+      )
+    } else {
+      logger.debug('🌐 No proxy configured for Setup Token exchange')
+    }
+
     logger.debug('🔄 Attempting Setup Token exchange', {
       url: OAUTH_CONFIG.TOKEN_URL,
       codeLength: cleanedCode.length,
