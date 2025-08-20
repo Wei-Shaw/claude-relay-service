@@ -1340,6 +1340,7 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       claudeAiOauth,
       proxy,
       accountType,
+      platform = 'claude',
       priority,
       groupId
     } = req.body
@@ -1377,6 +1378,7 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       claudeAiOauth,
       proxy,
       accountType: accountType || 'shared', // 默认为共享类型
+      platform,
       priority: priority || 50 // 默认优先级为50
     })
 
