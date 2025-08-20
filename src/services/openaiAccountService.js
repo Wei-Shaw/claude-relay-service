@@ -2,8 +2,7 @@ const redisClient = require('../models/redis')
 const { v4: uuidv4 } = require('uuid')
 const crypto = require('crypto')
 const axios = require('axios')
-const { SocksProxyAgent } = require('socks-proxy-agent')
-const { HttpsProxyAgent } = require('https-proxy-agent')
+const ProxyHelper = require('../utils/proxyHelper')
 const config = require('../../config/config')
 const logger = require('../utils/logger')
 // const { maskToken } = require('../utils/tokenMask')
@@ -133,18 +132,9 @@ async function refreshAccessToken(refreshToken, proxy = null) {
     }
 
     // 配置代理（如果有）
-    if (proxy && proxy.host && proxy.port) {
-      if (proxy.type === 'socks5') {
-        const proxyAuth =
-          proxy.username && proxy.password ? `${proxy.username}:${proxy.password}@` : ''
-        const socksProxy = `socks5://${proxyAuth}${proxy.host}:${proxy.port}`
-        requestOptions.httpsAgent = new SocksProxyAgent(socksProxy)
-      } else if (proxy.type === 'http' || proxy.type === 'https') {
-        const proxyAuth =
-          proxy.username && proxy.password ? `${proxy.username}:${proxy.password}@` : ''
-        const httpProxy = `http://${proxyAuth}${proxy.host}:${proxy.port}`
-        requestOptions.httpsAgent = new HttpsProxyAgent(httpProxy)
-      }
+    const proxyAgent = ProxyHelper.createProxyAgent(proxy)
+    if (proxyAgent) {
+      requestOptions.httpsAgent = proxyAgent
     }
 
     // 发送请求

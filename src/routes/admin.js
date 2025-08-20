@@ -18,8 +18,7 @@ const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
 const config = require('../../config/config')
-const { SocksProxyAgent } = require('socks-proxy-agent')
-const { HttpsProxyAgent } = require('https-proxy-agent')
+const ProxyHelper = require('../utils/proxyHelper')
 
 const router = express.Router()
 
@@ -4649,19 +4648,10 @@ router.post('/openai-accounts/exchange-code', authenticateAdmin, async (req, res
       }
     }
 
-    if (sessionData.proxy) {
-      const { type, host, port, username, password } = sessionData.proxy
-      if (type === 'socks5') {
-        // SOCKS5 代理
-        const auth = username && password ? `${username}:${password}@` : ''
-        const socksUrl = `socks5://${auth}${host}:${port}`
-        axiosConfig.httpsAgent = new SocksProxyAgent(socksUrl)
-      } else if (type === 'http' || type === 'https') {
-        // HTTP/HTTPS 代理
-        const auth = username && password ? `${username}:${password}@` : ''
-        const proxyUrl = `${type}://${auth}${host}:${port}`
-        axiosConfig.httpsAgent = new HttpsProxyAgent(proxyUrl)
-      }
+    // 配置代理（如果有）
+    const proxyAgent = ProxyHelper.createProxyAgent(sessionData.proxy)
+    if (proxyAgent) {
+      axiosConfig.httpsAgent = proxyAgent
     }
 
     // 交换 authorization code 获取 tokens
