@@ -60,8 +60,8 @@ const safeStringify = (obj, maxDepth = 3, fullDepth = false) => {
 const createLogFormat = (colorize = false) => {
   const formats = [
     winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-    winston.format.errors({ stack: true }),
-    winston.format.metadata({ fillExcept: ['message', 'level', 'timestamp', 'stack'] })
+    winston.format.errors({ stack: true })
+    // 移除 winston.format.metadata() 来避免自动包装
   ]
 
   if (colorize) {
@@ -69,7 +69,7 @@ const createLogFormat = (colorize = false) => {
   }
 
   formats.push(
-    winston.format.printf(({ level, message, timestamp, stack, metadata, ...rest }) => {
+    winston.format.printf(({ level, message, timestamp, stack, ...rest }) => {
       const emoji = {
         error: '❌',
         warn: '⚠️ ',
@@ -80,12 +80,7 @@ const createLogFormat = (colorize = false) => {
 
       let logMessage = `${emoji[level] || '📝'} [${timestamp}] ${level.toUpperCase()}: ${message}`
 
-      // 添加元数据
-      if (metadata && Object.keys(metadata).length > 0) {
-        logMessage += ` | ${safeStringify(metadata)}`
-      }
-
-      // 添加其他属性
+      // 直接处理额外数据，不需要metadata包装
       const additionalData = { ...rest }
       delete additionalData.level
       delete additionalData.message

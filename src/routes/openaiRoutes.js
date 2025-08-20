@@ -82,7 +82,8 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
       accessToken,
       accountId: result.accountId,
       accountName: account.name,
-      proxy
+      proxy,
+      account
     }
   } catch (error) {
     logger.error('Failed to get OpenAI auth token:', error)
@@ -148,7 +149,7 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
     }
 
     // 使用调度器选择账户
-    const { accessToken, accountId, proxy } = await getOpenAIAuthToken(
+    const { accessToken, accountId, accountName, proxy, account } = await getOpenAIAuthToken(
       apiKeyData,
       sessionId,
       requestedModel
@@ -167,7 +168,7 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
 
     // 覆盖或新增必要头部
     headers['authorization'] = `Bearer ${accessToken}`
-    headers['chatgpt-account-id'] = accountId
+    headers['chatgpt-account-id'] = account.chatgptUserId || account.accountId || accountId
     headers['host'] = 'chatgpt.com'
     headers['accept'] = isStream ? 'text/event-stream' : 'application/json'
     headers['content-type'] = 'application/json'

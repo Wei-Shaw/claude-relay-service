@@ -573,7 +573,16 @@ async function handleGenerateContent(req, res) {
     res.json(response)
   } catch (error) {
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
-    logger.error(`Error in generateContent endpoint (${version})`, { error: error.message })
+    // 打印详细的错误信息
+    logger.error(`Error in generateContent endpoint (${version})`, {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      responseData: error.response?.data,
+      requestUrl: error.config?.url,
+      requestMethod: error.config?.method,
+      stack: error.stack
+    })
     res.status(500).json({
       error: {
         message: error.message || 'Internal server error',
@@ -756,7 +765,16 @@ async function handleStreamGenerateContent(req, res) {
     })
   } catch (error) {
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
-    logger.error(`Error in streamGenerateContent endpoint (${version})`, { error: error.message })
+    // 打印详细的错误信息
+    logger.error(`Error in streamGenerateContent endpoint (${version})`, {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      responseData: error.response?.data,
+      requestUrl: error.config?.url,
+      requestMethod: error.config?.method,
+      stack: error.stack
+    })
 
     if (!res.headersSent) {
       res.status(500).json({
