@@ -21,7 +21,9 @@ function createProxyAgent(proxy) {
     if (proxy.type === 'socks5') {
       const auth = proxy.username && proxy.password ? `${proxy.username}:${proxy.password}@` : ''
       const socksUrl = `socks5://${auth}${proxy.host}:${proxy.port}`
-      return new SocksProxyAgent(socksUrl)
+      return new SocksProxyAgent(socksUrl, {
+        family: 4,
+      })
     } else if (proxy.type === 'http' || proxy.type === 'https') {
       const auth = proxy.username && proxy.password ? `${proxy.username}:${proxy.password}@` : ''
       const proxyUrl = `${proxy.type}://${auth}${proxy.host}:${proxy.port}`
