@@ -141,40 +141,10 @@ class Application {
             if (buf && buf.length && !buf.toString(encoding || 'utf8').trim()) {
               throw new Error('Invalid JSON: empty body')
             }
-            // 注意：不在这里修改buffer，避免导致JSON解析错误
           }
         })
       )
       this.app.use(express.urlencoded({ extended: true, limit: '10mb' }))
-
-      // 🧹 JSON 解析错误处理中间件
-      this.app.use((err, req, res, next) => {
-        if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
-          // JSON 解析错误统一处理
-          logger.warn('🚨 JSON parsing error detected:', err.message)
-          
-          // 检查是否是常见的JSON解析错误
-          if (
-            err.message.includes('Unexpected end of JSON input') ||
-            err.message.includes('Unexpected token') ||
-            err.message.includes('Expected property name') ||
-            err.message.includes('in JSON at position') ||
-            err.message.includes('surrogate') ||
-            err.message.includes('UTF-16') ||
-            err.message.includes('invalid character')
-          ) {
-            return res.status(400).json({
-              type: 'error',
-              error: {
-                type: 'invalid_request_error',
-                message: 'Invalid JSON format in request body. Please ensure the request contains valid JSON data.'
-              }
-            })
-          }
-        }
-        next(err)
-      })
-
       this.app.use(securityMiddleware)
 
       // 🎯 信任代理
