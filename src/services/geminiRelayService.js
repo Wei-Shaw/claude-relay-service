@@ -1,6 +1,5 @@
 const axios = require('axios')
-const { HttpsProxyAgent } = require('https-proxy-agent')
-const { SocksProxyAgent } = require('socks-proxy-agent')
+const ProxyHelper = require('../utils/proxyHelper')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
 const apiKeyService = require('./apiKeyService')
@@ -9,34 +8,9 @@ const apiKeyService = require('./apiKeyService')
 const GEMINI_API_BASE = 'https://cloudcode.googleapis.com/v1'
 const DEFAULT_MODEL = 'models/gemini-2.0-flash-exp'
 
-// 创建代理 agent
+// 创建代理 agent（使用统一的代理工具）
 function createProxyAgent(proxyConfig) {
-  if (!proxyConfig) {
-    return null
-  }
-
-  try {
-    const proxy = typeof proxyConfig === 'string' ? JSON.parse(proxyConfig) : proxyConfig
-
-    if (!proxy.type || !proxy.host || !proxy.port) {
-      return null
-    }
-
-    const proxyUrl =
-      proxy.username && proxy.password
-        ? `${proxy.type}://${proxy.username}:${proxy.password}@${proxy.host}:${proxy.port}`
-        : `${proxy.type}://${proxy.host}:${proxy.port}`
-
-    if (proxy.type === 'socks5') {
-      return new SocksProxyAgent(proxyUrl)
-    } else if (proxy.type === 'http' || proxy.type === 'https') {
-      return new HttpsProxyAgent(proxyUrl)
-    }
-  } catch (error) {
-    logger.error('Error creating proxy agent:', error)
-  }
-
-  return null
+  return ProxyHelper.createProxyAgent(proxyConfig)
 }
 
 // 转换 OpenAI 消息格式到 Gemini 格式
@@ -306,7 +280,9 @@ async function sendGeminiRequest({
   const proxyAgent = createProxyAgent(proxy)
   if (proxyAgent) {
     axiosConfig.httpsAgent = proxyAgent
-    logger.debug('Using proxy for Gemini request')
+    logger.info(`🌐 Using proxy for Gemini API request: ${ProxyHelper.getProxyDescription(proxy)}`)
+  } else {
+    logger.debug('🌐 No proxy configured for Gemini API request')
   }
 
   // 添加 AbortController 信号支持
@@ -412,6 +388,11 @@ async function getAvailableModels(accessToken, proxy, projectId, location = 'us-
   const proxyAgent = createProxyAgent(proxy)
   if (proxyAgent) {
     axiosConfig.httpsAgent = proxyAgent
+    logger.info(
+      `🌐 Using proxy for Gemini models request: ${ProxyHelper.getProxyDescription(proxy)}`
+    )
+  } else {
+    logger.debug('🌐 No proxy configured for Gemini models request')
   }
 
   try {
@@ -508,7 +489,11 @@ async function countTokens({
   const proxyAgent = createProxyAgent(proxy)
   if (proxyAgent) {
     axiosConfig.httpsAgent = proxyAgent
-    logger.debug('Using proxy for Gemini countTokens request')
+    logger.info(
+      `🌐 Using proxy for Gemini countTokens request: ${ProxyHelper.getProxyDescription(proxy)}`
+    )
+  } else {
+    logger.debug('🌐 No proxy configured for Gemini countTokens request')
   }
 
   try {

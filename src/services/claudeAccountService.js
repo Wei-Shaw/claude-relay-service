@@ -1,7 +1,6 @@
 const { v4: uuidv4 } = require('uuid')
 const crypto = require('crypto')
-const { SocksProxyAgent } = require('socks-proxy-agent')
-const { HttpsProxyAgent } = require('https-proxy-agent')
+const ProxyHelper = require('../utils/proxyHelper')
 const axios = require('axios')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
@@ -55,6 +54,7 @@ class ClaudeAccountService {
       proxy = null, // { type: 'socks5', host: 'localhost', port: 1080, username: '', password: '' }
       isActive = true,
       accountType = 'shared', // 'dedicated' or 'shared'
+      platform = 'claude',
       priority = 50, // 调度优先级 (1-100，数字越小优先级越高)
       schedulable = true, // 是否可被调度
       subscriptionInfo = null // 手动设置的订阅信息
@@ -79,7 +79,8 @@ class ClaudeAccountService {
         scopes: claudeAiOauth.scopes.join(' '),
         proxy: proxy ? JSON.stringify(proxy) : '',
         isActive: isActive.toString(),
-        accountType, // 账号类型：'dedicated' 或 'shared'
+        accountType, // 账号类型：'dedicated' 或 'shared' 或 'group'
+        platform,
         priority: priority.toString(), // 调度优先级
         createdAt: new Date().toISOString(),
         lastUsedAt: '',
@@ -108,7 +109,8 @@ class ClaudeAccountService {
         scopes: '',
         proxy: proxy ? JSON.stringify(proxy) : '',
         isActive: isActive.toString(),
-        accountType, // 账号类型：'dedicated' 或 'shared'
+        accountType, // 账号类型：'dedicated' 或 'shared' 或 'group'
+        platform,
         priority: priority.toString(), // 调度优先级
         createdAt: new Date().toISOString(),
         lastUsedAt: '',
@@ -151,6 +153,7 @@ class ClaudeAccountService {
       isActive,
       proxy,
       accountType,
+      platform,
       priority,
       status: accountData.status,
       createdAt: accountData.createdAt,
@@ -444,7 +447,7 @@ class ClaudeAccountService {
             errorMessage: account.errorMessage,
             accountType: account.accountType || 'shared', // 兼容旧数据，默认为共享
             priority: parseInt(account.priority) || 50, // 兼容旧数据，默认优先级50
-            platform: 'claude-oauth', // 添加平台标识，用于前端区分
+            platform: account.platform || 'claude', // 添加平台标识，用于前端区分
             createdAt: account.createdAt,
             lastUsedAt: account.lastUsedAt,
             lastRefreshAt: account.lastRefreshAt,
@@ -857,29 +860,19 @@ class ClaudeAccountService {
     }
   }
 
-  // 🌐 创建代理agent
+  // 🌐 创建代理agent（使用统一的代理工具）
   _createProxyAgent(proxyConfig) {
-    if (!proxyConfig) {
-      return null
+    const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+    if (proxyAgent) {
+      logger.info(
+        `🌐 Using proxy for Claude request: ${ProxyHelper.getProxyDescription(proxyConfig)}`
+      )
+    } else if (proxyConfig) {
+      logger.debug('🌐 Failed to create proxy agent for Claude')
+    } else {
+      logger.debug('🌐 No proxy configured for Claude request')
     }
-
-    try {
-      const proxy = JSON.parse(proxyConfig)
-
-      if (proxy.type === 'socks5') {
-        const auth = proxy.username && proxy.password ? `${proxy.username}:${proxy.password}@` : ''
-        const socksUrl = `socks5://${auth}${proxy.host}:${proxy.port}`
-        return new SocksProxyAgent(socksUrl)
-      } else if (proxy.type === 'http' || proxy.type === 'https') {
-        const auth = proxy.username && proxy.password ? `${proxy.username}:${proxy.password}@` : ''
-        const httpUrl = `${proxy.type}://${auth}${proxy.host}:${proxy.port}`
-        return new HttpsProxyAgent(httpUrl)
-      }
-    } catch (error) {
-      logger.warn('⚠️ Invalid proxy configuration:', error)
-    }
-
-    return null
+    return proxyAgent
   }
 
   // 🔐 加密敏感数据

@@ -141,62 +141,10 @@ class Application {
             if (buf && buf.length && !buf.toString(encoding || 'utf8').trim()) {
               throw new Error('Invalid JSON: empty body')
             }
-
-            // Unicode 字符清理 - 清理无效的 UTF-16 代理对
-            if (buf && buf.length) {
-              try {
-                const str = buf.toString(encoding || 'utf8')
-                // 移除无效的 UTF-16 代理对字符
-                const cleanedStr = str.replace(
-                  /[\uDC00-\uDFFF](?![\uD800-\uDBFF])|[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g,
-                  '\uFFFD'
-                )
-
-                // 如果字符串被清理过，重新写入buffer
-                if (cleanedStr !== str) {
-                  logger.warn('🧹 Cleaned invalid Unicode characters from request body')
-                  const cleanedBuf = Buffer.from(cleanedStr, encoding || 'utf8')
-                  // 将清理后的内容复制回原buffer
-                  cleanedBuf.copy(buf, 0)
-                  // 调整buffer长度
-                  buf._charsWritten = cleanedBuf.length
-                }
-              } catch (error) {
-                logger.warn(
-                  '⚠️ Unicode cleaning failed, proceeding with original buffer:',
-                  error.message
-                )
-              }
-            }
           }
         })
       )
       this.app.use(express.urlencoded({ extended: true, limit: '10mb' }))
-
-      // 🧹 Unicode 错误处理中间件
-      this.app.use((err, req, res, next) => {
-        if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
-          // 检查是否是Unicode相关的JSON解析错误
-          if (
-            err.message.includes('surrogate') ||
-            err.message.includes('UTF-16') ||
-            err.message.includes('invalid character')
-          ) {
-            logger.warn('🧹 Detected Unicode JSON parsing error, attempting recovery:', err.message)
-
-            return res.status(400).json({
-              type: 'error',
-              error: {
-                type: 'invalid_request_error',
-                message:
-                  'The request body contains invalid Unicode characters. Please ensure your text uses valid UTF-8 encoding and does not contain malformed surrogate pairs.'
-              }
-            })
-          }
-        }
-        next(err)
-      })
-
       this.app.use(securityMiddleware)
 
       // 🎯 信任代理

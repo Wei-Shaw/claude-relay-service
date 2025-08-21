@@ -541,12 +541,24 @@ async function handleGenerateContent(req, res) {
     })
 
     const client = await geminiAccountService.getOauthClient(accessToken, refreshToken)
+
+    // 解析账户的代理配置
+    let proxyConfig = null
+    if (account.proxy) {
+      try {
+        proxyConfig = typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
+      } catch (e) {
+        logger.warn('Failed to parse proxy configuration:', e)
+      }
+    }
+
     const response = await geminiAccountService.generateContent(
       client,
       { model, request: actualRequestData },
       user_prompt_id,
       account.projectId, // 始终使用账户配置的项目ID，忽略请求中的project
-      req.apiKey?.id // 使用 API Key ID 作为 session ID
+      req.apiKey?.id, // 使用 API Key ID 作为 session ID
+      proxyConfig // 传递代理配置
     )
 
     // 记录使用统计
@@ -573,7 +585,16 @@ async function handleGenerateContent(req, res) {
     res.json(response)
   } catch (error) {
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
-    logger.error(`Error in generateContent endpoint (${version})`, { error: error.message })
+    // 打印详细的错误信息
+    logger.error(`Error in generateContent endpoint (${version})`, {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      responseData: error.response?.data,
+      requestUrl: error.config?.url,
+      requestMethod: error.config?.method,
+      stack: error.stack
+    })
     res.status(500).json({
       error: {
         message: error.message || 'Internal server error',
@@ -654,13 +675,25 @@ async function handleStreamGenerateContent(req, res) {
     })
 
     const client = await geminiAccountService.getOauthClient(accessToken, refreshToken)
+
+    // 解析账户的代理配置
+    let proxyConfig = null
+    if (account.proxy) {
+      try {
+        proxyConfig = typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
+      } catch (e) {
+        logger.warn('Failed to parse proxy configuration:', e)
+      }
+    }
+
     const streamResponse = await geminiAccountService.generateContentStream(
       client,
       { model, request: actualRequestData },
       user_prompt_id,
       account.projectId, // 始终使用账户配置的项目ID，忽略请求中的project
       req.apiKey?.id, // 使用 API Key ID 作为 session ID
-      abortController.signal // 传递中止信号
+      abortController.signal, // 传递中止信号
+      proxyConfig // 传递代理配置
     )
 
     // 设置 SSE 响应头
@@ -756,7 +789,16 @@ async function handleStreamGenerateContent(req, res) {
     })
   } catch (error) {
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
-    logger.error(`Error in streamGenerateContent endpoint (${version})`, { error: error.message })
+    // 打印详细的错误信息
+    logger.error(`Error in streamGenerateContent endpoint (${version})`, {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      responseData: error.response?.data,
+      requestUrl: error.config?.url,
+      requestMethod: error.config?.method,
+      stack: error.stack
+    })
 
     if (!res.headersSent) {
       res.status(500).json({

@@ -2081,8 +2081,8 @@ const updateAccount = async () => {
       }
     }
 
-    if (props.account.platform === 'gemini' && form.value.projectId) {
-      data.projectId = form.value.projectId
+    if (props.account.platform === 'gemini') {
+      data.projectId = form.value.projectId || ''
     }
 
     // Claude 官方账号优先级和订阅类型更新

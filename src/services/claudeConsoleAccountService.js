@@ -1,7 +1,6 @@
 const { v4: uuidv4 } = require('uuid')
 const crypto = require('crypto')
-const { SocksProxyAgent } = require('socks-proxy-agent')
-const { HttpsProxyAgent } = require('https-proxy-agent')
+const ProxyHelper = require('../utils/proxyHelper')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
@@ -480,29 +479,19 @@ class ClaudeConsoleAccountService {
     }
   }
 
-  // 🌐 创建代理agent
+  // 🌐 创建代理agent（使用统一的代理工具）
   _createProxyAgent(proxyConfig) {
-    if (!proxyConfig) {
-      return null
+    const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+    if (proxyAgent) {
+      logger.info(
+        `🌐 Using proxy for Claude Console request: ${ProxyHelper.getProxyDescription(proxyConfig)}`
+      )
+    } else if (proxyConfig) {
+      logger.debug('🌐 Failed to create proxy agent for Claude Console')
+    } else {
+      logger.debug('🌐 No proxy configured for Claude Console request')
     }
-
-    try {
-      const proxy = typeof proxyConfig === 'string' ? JSON.parse(proxyConfig) : proxyConfig
-
-      if (proxy.type === 'socks5') {
-        const auth = proxy.username && proxy.password ? `${proxy.username}:${proxy.password}@` : ''
-        const socksUrl = `socks5://${auth}${proxy.host}:${proxy.port}`
-        return new SocksProxyAgent(socksUrl)
-      } else if (proxy.type === 'http' || proxy.type === 'https') {
-        const auth = proxy.username && proxy.password ? `${proxy.username}:${proxy.password}@` : ''
-        const httpUrl = `${proxy.type}://${auth}${proxy.host}:${proxy.port}`
-        return new HttpsProxyAgent(httpUrl)
-      }
-    } catch (error) {
-      logger.warn('⚠️ Invalid proxy configuration:', error)
-    }
-
-    return null
+    return proxyAgent
   }
 
   // 🔐 加密敏感数据

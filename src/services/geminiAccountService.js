@@ -5,6 +5,7 @@ const config = require('../../config/config')
 const logger = require('../utils/logger')
 const { OAuth2Client } = require('google-auth-library')
 const { maskToken } = require('../utils/tokenMask')
+const ProxyHelper = require('../utils/proxyHelper')
 const {
   logRefreshStart,
   logRefreshSuccess,
@@ -109,11 +110,32 @@ setInterval(
   10 * 60 * 1000
 )
 
-// 创建 OAuth2 客户端
-function createOAuth2Client(redirectUri = null) {
+// 创建 OAuth2 客户端（支持代理配置）
+function createOAuth2Client(redirectUri = null, proxyConfig = null) {
   // 如果没有提供 redirectUri，使用默认值
   const uri = redirectUri || 'http://localhost:45462'
-  return new OAuth2Client(OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, uri)
+
+  // 准备客户端选项
+  const clientOptions = {
+    clientId: OAUTH_CLIENT_ID,
+    clientSecret: OAUTH_CLIENT_SECRET,
+    redirectUri: uri
+  }
+
+  // 如果有代理配置，设置 transporterOptions
+  if (proxyConfig) {
+    const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+    if (proxyAgent) {
+      // 通过 transporterOptions 传递代理配置给底层的 Gaxios
+      clientOptions.transporterOptions = {
+        agent: proxyAgent,
+        httpsAgent: proxyAgent
+      }
+      logger.debug('Created OAuth2Client with proxy configuration')
+    }
+  }
+
+  return new OAuth2Client(clientOptions)
 }
 
 // 生成授权 URL (支持 PKCE)
@@ -196,11 +218,25 @@ async function pollAuthorizationStatus(sessionId, maxAttempts = 60, interval = 2
   }
 }
 
-// 交换授权码获取 tokens (支持 PKCE)
-async function exchangeCodeForTokens(code, redirectUri = null, codeVerifier = null) {
-  const oAuth2Client = createOAuth2Client(redirectUri)
-
+// 交换授权码获取 tokens (支持 PKCE 和代理)
+async function exchangeCodeForTokens(
+  code,
+  redirectUri = null,
+  codeVerifier = null,
+  proxyConfig = null
+) {
   try {
+    // 创建带代理配置的 OAuth2Client
+    const oAuth2Client = createOAuth2Client(redirectUri, proxyConfig)
+
+    if (proxyConfig) {
+      logger.info(
+        `🌐 Using proxy for Gemini token exchange: ${ProxyHelper.getProxyDescription(proxyConfig)}`
+      )
+    } else {
+      logger.debug('🌐 No proxy configured for Gemini token exchange')
+    }
+
     const tokenParams = {
       code,
       redirect_uri: redirectUri
@@ -228,14 +264,23 @@ async function exchangeCodeForTokens(code, redirectUri = null, codeVerifier = nu
 }
 
 // 刷新访问令牌
-async function refreshAccessToken(refreshToken) {
-  const oAuth2Client = createOAuth2Client()
+async function refreshAccessToken(refreshToken, proxyConfig = null) {
+  // 创建带代理配置的 OAuth2Client
+  const oAuth2Client = createOAuth2Client(null, proxyConfig)
 
   try {
     // 设置 refresh_token
     oAuth2Client.setCredentials({
       refresh_token: refreshToken
     })
+
+    if (proxyConfig) {
+      logger.info(
+        `🔄 Using proxy for Gemini token refresh: ${ProxyHelper.maskProxyInfo(proxyConfig)}`
+      )
+    } else {
+      logger.debug('🔄 No proxy configured for Gemini token refresh')
+    }
 
     // 调用 refreshAccessToken 获取新的 tokens
     const response = await oAuth2Client.refreshAccessToken()
@@ -261,7 +306,9 @@ async function refreshAccessToken(refreshToken) {
     logger.error('Error refreshing access token:', {
       message: error.message,
       code: error.code,
-      response: error.response?.data
+      response: error.response?.data,
+      hasProxy: !!proxyConfig,
+      proxy: proxyConfig ? ProxyHelper.maskProxyInfo(proxyConfig) : 'No proxy'
     })
     throw new Error(`Failed to refresh access token: ${error.message}`)
   }
@@ -786,7 +833,8 @@ async function refreshAccountToken(accountId) {
     logger.info(`🔄 Starting token refresh for Gemini account: ${account.name} (${accountId})`)
 
     // account.refreshToken 已经是解密后的值（从 getAccount 返回）
-    const newTokens = await refreshAccessToken(account.refreshToken)
+    // 传入账户的代理配置
+    const newTokens = await refreshAccessToken(account.refreshToken, account.proxy)
 
     // 更新账户信息
     const updates = {
@@ -1169,7 +1217,8 @@ async function generateContent(
   requestData,
   userPromptId,
   projectId = null,
-  sessionId = null
+  sessionId = null,
+  proxyConfig = null
 ) {
   const axios = require('axios')
   const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com'
@@ -1206,6 +1255,17 @@ async function generateContent(
     timeout: 60000 // 生成内容可能需要更长时间
   }
 
+  // 添加代理配置
+  const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+  if (proxyAgent) {
+    axiosConfig.httpsAgent = proxyAgent
+    logger.info(
+      `🌐 Using proxy for Gemini generateContent: ${ProxyHelper.getProxyDescription(proxyConfig)}`
+    )
+  } else {
+    logger.debug('🌐 No proxy configured for Gemini generateContent')
+  }
+
   const response = await axios(axiosConfig)
 
   logger.info('✅ generateContent API调用成功')
@@ -1219,7 +1279,8 @@ async function generateContentStream(
   userPromptId,
   projectId = null,
   sessionId = null,
-  signal = null
+  signal = null,
+  proxyConfig = null
 ) {
   const axios = require('axios')
   const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com'
@@ -1258,6 +1319,17 @@ async function generateContentStream(
     data: request,
     responseType: 'stream',
     timeout: 60000
+  }
+
+  // 添加代理配置
+  const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+  if (proxyAgent) {
+    axiosConfig.httpsAgent = proxyAgent
+    logger.info(
+      `🌐 Using proxy for Gemini streamGenerateContent: ${ProxyHelper.getProxyDescription(proxyConfig)}`
+    )
+  } else {
+    logger.debug('🌐 No proxy configured for Gemini streamGenerateContent')
   }
 
   // 如果提供了中止信号，添加到配置中
