@@ -2152,7 +2152,7 @@ router.post('/bedrock-accounts/:accountId/test', authenticateAdmin, async (req, 
 // 生成 Gemini OAuth 授权 URL
 router.post('/gemini-accounts/generate-auth-url', authenticateAdmin, async (req, res) => {
   try {
-    const { state } = req.body
+    const { state, proxy } = req.body // 接收代理配置
 
     // 使用新的 codeassist.google.com 回调地址
     const redirectUri = 'https://codeassist.google.com/authcode'
@@ -2166,13 +2166,14 @@ router.post('/gemini-accounts/generate-auth-url', authenticateAdmin, async (req,
       redirectUri: finalRedirectUri
     } = await geminiAccountService.generateAuthUrl(state, redirectUri)
 
-    // 创建 OAuth 会话，包含 codeVerifier
+    // 创建 OAuth 会话，包含 codeVerifier 和代理配置
     const sessionId = authState
     await redis.setOAuthSession(sessionId, {
       state: authState,
       type: 'gemini',
       redirectUri: finalRedirectUri,
       codeVerifier, // 保存 PKCE code verifier
+      proxy: proxy || null, // 保存代理配置
       createdAt: new Date().toISOString()
     })
 
@@ -2216,7 +2217,7 @@ router.post('/gemini-accounts/poll-auth-status', authenticateAdmin, async (req, 
 // 交换 Gemini 授权码
 router.post('/gemini-accounts/exchange-code', authenticateAdmin, async (req, res) => {
   try {
-    const { code, sessionId } = req.body
+    const { code, sessionId, proxy: requestProxy } = req.body
 
     if (!code) {
       return res.status(400).json({ error: 'Authorization code is required' })
@@ -2224,21 +2225,40 @@ router.post('/gemini-accounts/exchange-code', authenticateAdmin, async (req, res
 
     let redirectUri = 'https://codeassist.google.com/authcode'
     let codeVerifier = null
+    let proxyConfig = null
 
     // 如果提供了 sessionId，从 OAuth 会话中获取信息
     if (sessionId) {
       const sessionData = await redis.getOAuthSession(sessionId)
       if (sessionData) {
-        const { redirectUri: sessionRedirectUri, codeVerifier: sessionCodeVerifier } = sessionData
+        const {
+          redirectUri: sessionRedirectUri,
+          codeVerifier: sessionCodeVerifier,
+          proxy
+        } = sessionData
         redirectUri = sessionRedirectUri || redirectUri
         codeVerifier = sessionCodeVerifier
+        proxyConfig = proxy // 获取代理配置
         logger.info(
-          `Using session redirect_uri: ${redirectUri}, has codeVerifier: ${!!codeVerifier}`
+          `Using session redirect_uri: ${redirectUri}, has codeVerifier: ${!!codeVerifier}, has proxy from session: ${!!proxyConfig}`
         )
       }
     }
 
-    const tokens = await geminiAccountService.exchangeCodeForTokens(code, redirectUri, codeVerifier)
+    // 如果请求体中直接提供了代理配置，优先使用它
+    if (requestProxy) {
+      proxyConfig = requestProxy
+      logger.info(
+        `Using proxy from request body: ${proxyConfig ? JSON.stringify(proxyConfig) : 'none'}`
+      )
+    }
+
+    const tokens = await geminiAccountService.exchangeCodeForTokens(
+      code,
+      redirectUri,
+      codeVerifier,
+      proxyConfig // 传递代理配置
+    )
 
     // 清理 OAuth 会话
     if (sessionId) {

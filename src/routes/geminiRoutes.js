@@ -541,12 +541,24 @@ async function handleGenerateContent(req, res) {
     })
 
     const client = await geminiAccountService.getOauthClient(accessToken, refreshToken)
+
+    // 解析账户的代理配置
+    let proxyConfig = null
+    if (account.proxy) {
+      try {
+        proxyConfig = typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
+      } catch (e) {
+        logger.warn('Failed to parse proxy configuration:', e)
+      }
+    }
+
     const response = await geminiAccountService.generateContent(
       client,
       { model, request: actualRequestData },
       user_prompt_id,
       account.projectId, // 始终使用账户配置的项目ID，忽略请求中的project
-      req.apiKey?.id // 使用 API Key ID 作为 session ID
+      req.apiKey?.id, // 使用 API Key ID 作为 session ID
+      proxyConfig // 传递代理配置
     )
 
     // 记录使用统计
@@ -663,13 +675,25 @@ async function handleStreamGenerateContent(req, res) {
     })
 
     const client = await geminiAccountService.getOauthClient(accessToken, refreshToken)
+
+    // 解析账户的代理配置
+    let proxyConfig = null
+    if (account.proxy) {
+      try {
+        proxyConfig = typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
+      } catch (e) {
+        logger.warn('Failed to parse proxy configuration:', e)
+      }
+    }
+
     const streamResponse = await geminiAccountService.generateContentStream(
       client,
       { model, request: actualRequestData },
       user_prompt_id,
       account.projectId, // 始终使用账户配置的项目ID，忽略请求中的project
       req.apiKey?.id, // 使用 API Key ID 作为 session ID
-      abortController.signal // 传递中止信号
+      abortController.signal, // 传递中止信号
+      proxyConfig // 传递代理配置
     )
 
     // 设置 SSE 响应头
