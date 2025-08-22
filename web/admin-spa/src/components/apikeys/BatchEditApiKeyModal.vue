@@ -659,15 +659,8 @@ const batchUpdateApiKeys = async () => {
 
     // 标签处理
     if (tagOperation.value !== 'none') {
-      // 这里需要在后端实现标签操作逻辑，目前简化为直接替换
-      if (tagOperation.value === 'replace') {
-        updates.tags = form.tags
-      }
-      // TODO: 实现添加和移除标签的逻辑
-      else if (tagOperation.value === 'add' || tagOperation.value === 'remove') {
-        updates.tags = form.tags
-        updates.tagOperation = tagOperation.value
-      }
+      updates.tags = form.tags
+      updates.tagOperation = tagOperation.value
     }
 
     const result = await apiClient.put('/admin/api-keys/batch', {

@@ -620,6 +620,170 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
   }
 })
 
+// 批量编辑API Keys
+router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyIds, updates } = req.body
+
+    if (!keyIds || !Array.isArray(keyIds) || keyIds.length === 0) {
+      return res.status(400).json({
+        error: 'Invalid input',
+        message: 'keyIds must be a non-empty array'
+      })
+    }
+
+    if (!updates || typeof updates !== 'object') {
+      return res.status(400).json({
+        error: 'Invalid input',
+        message: 'updates must be an object'
+      })
+    }
+
+    logger.info(
+      `🔄 Admin batch editing ${keyIds.length} API keys with updates: ${JSON.stringify(updates)}`
+    )
+    logger.info(`🔍 Debug: keyIds received: ${JSON.stringify(keyIds)}`)
+
+    const results = {
+      successCount: 0,
+      failedCount: 0,
+      errors: []
+    }
+
+    // 处理每个API Key
+    for (const keyId of keyIds) {
+      try {
+        // 获取当前API Key信息
+        const currentKey = await redis.getApiKey(keyId)
+        if (!currentKey || Object.keys(currentKey).length === 0) {
+          results.failedCount++
+          results.errors.push(`API key ${keyId} not found`)
+          continue
+        }
+
+        // 构建最终更新数据
+        const finalUpdates = {}
+
+        // 处理普通字段
+        if (updates.name) {
+          finalUpdates.name = updates.name
+        }
+        if (updates.tokenLimit !== undefined) {
+          finalUpdates.tokenLimit = updates.tokenLimit
+        }
+        if (updates.concurrencyLimit !== undefined) {
+          finalUpdates.concurrencyLimit = updates.concurrencyLimit
+        }
+        if (updates.rateLimitWindow !== undefined) {
+          finalUpdates.rateLimitWindow = updates.rateLimitWindow
+        }
+        if (updates.rateLimitRequests !== undefined) {
+          finalUpdates.rateLimitRequests = updates.rateLimitRequests
+        }
+        if (updates.dailyCostLimit !== undefined) {
+          finalUpdates.dailyCostLimit = updates.dailyCostLimit
+        }
+        if (updates.permissions !== undefined) {
+          finalUpdates.permissions = updates.permissions
+        }
+        if (updates.isActive !== undefined) {
+          finalUpdates.isActive = updates.isActive
+        }
+        if (updates.monthlyLimit !== undefined) {
+          finalUpdates.monthlyLimit = updates.monthlyLimit
+        }
+        if (updates.priority !== undefined) {
+          finalUpdates.priority = updates.priority
+        }
+        if (updates.enabled !== undefined) {
+          finalUpdates.enabled = updates.enabled
+        }
+
+        // 处理账户绑定
+        if (updates.claudeAccountId !== undefined) {
+          finalUpdates.claudeAccountId = updates.claudeAccountId
+        }
+        if (updates.claudeConsoleAccountId !== undefined) {
+          finalUpdates.claudeConsoleAccountId = updates.claudeConsoleAccountId
+        }
+        if (updates.geminiAccountId !== undefined) {
+          finalUpdates.geminiAccountId = updates.geminiAccountId
+        }
+        if (updates.openaiAccountId !== undefined) {
+          finalUpdates.openaiAccountId = updates.openaiAccountId
+        }
+        if (updates.bedrockAccountId !== undefined) {
+          finalUpdates.bedrockAccountId = updates.bedrockAccountId
+        }
+
+        // 处理标签操作
+        if (updates.tags !== undefined) {
+          if (updates.tagOperation) {
+            const currentTags = currentKey.tags ? JSON.parse(currentKey.tags) : []
+            const operationTags = updates.tags
+
+            switch (updates.tagOperation) {
+              case 'replace': {
+                finalUpdates.tags = operationTags
+                break
+              }
+              case 'add': {
+                const newTags = [...currentTags]
+                operationTags.forEach((tag) => {
+                  if (!newTags.includes(tag)) {
+                    newTags.push(tag)
+                  }
+                })
+                finalUpdates.tags = newTags
+                break
+              }
+              case 'remove': {
+                finalUpdates.tags = currentTags.filter((tag) => !operationTags.includes(tag))
+                break
+              }
+            }
+          } else {
+            // 如果没有指定操作类型，默认为替换
+            finalUpdates.tags = updates.tags
+          }
+        }
+
+        // 执行更新
+        await apiKeyService.updateApiKey(keyId, finalUpdates)
+        results.successCount++
+        logger.success(`✅ Batch edit: API key ${keyId} updated successfully`)
+      } catch (error) {
+        results.failedCount++
+        results.errors.push(`Failed to update key ${keyId}: ${error.message}`)
+        logger.error(`❌ Batch edit failed for key ${keyId}:`, error)
+      }
+    }
+
+    // 记录批量编辑结果
+    if (results.successCount > 0) {
+      logger.success(
+        `🎉 Batch edit completed: ${results.successCount} successful, ${results.failedCount} failed`
+      )
+    } else {
+      logger.warn(
+        `⚠️ Batch edit completed with no successful updates: ${results.failedCount} failed`
+      )
+    }
+
+    return res.json({
+      success: true,
+      message: `批量编辑完成`,
+      data: results
+    })
+  } catch (error) {
+    logger.error('❌ Failed to batch edit API keys:', error)
+    return res.status(500).json({
+      error: 'Batch edit failed',
+      message: error.message
+    })
+  }
+})
+
 // 更新API Key
 router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
   try {
