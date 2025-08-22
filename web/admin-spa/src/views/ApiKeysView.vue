@@ -89,6 +89,19 @@
               <span class="relative">刷新</span>
             </button>
 
+            <!-- 批量编辑按钮 -->
+            <button
+              v-if="selectedApiKeys.length > 0"
+              class="group relative flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 shadow-sm transition-all duration-200 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md sm:w-auto"
+              @click="openBatchEditModal()"
+            >
+              <div
+                class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+              ></div>
+              <i class="fas fa-edit relative text-blue-600" />
+              <span class="relative">编辑选中 ({{ selectedApiKeys.length }})</span>
+            </button>
+
             <!-- 批量删除按钮 -->
             <button
               v-if="selectedApiKeys.length > 0"
@@ -306,13 +319,26 @@
                             {{ getOpenAIBindingInfo(key) }}
                           </span>
                         </div>
+                        <!-- Bedrock 绑定 -->
+                        <div v-if="key.bedrockAccountId" class="flex items-center gap-1 text-xs">
+                          <span
+                            class="inline-flex items-center rounded bg-orange-100 px-1.5 py-0.5 text-orange-700"
+                          >
+                            <i class="fas fa-cloud mr-1 text-[10px]" />
+                            Bedrock
+                          </span>
+                          <span class="truncate text-gray-600">
+                            {{ getBedrockBindingInfo(key) }}
+                          </span>
+                        </div>
                         <!-- 无绑定时显示共享池 -->
                         <div
                           v-if="
                             !key.claudeAccountId &&
                             !key.claudeConsoleAccountId &&
                             !key.geminiAccountId &&
-                            !key.openaiAccountId
+                            !key.openaiAccountId &&
+                            !key.bedrockAccountId
                           "
                           class="text-xs text-gray-500"
                         >
@@ -859,13 +885,26 @@
                 {{ getOpenAIBindingInfo(key) }}
               </span>
             </div>
+            <!-- Bedrock 绑定 -->
+            <div v-if="key.bedrockAccountId" class="flex flex-wrap items-center gap-1 text-xs">
+              <span
+                class="inline-flex items-center rounded bg-orange-100 px-2 py-0.5 text-orange-700"
+              >
+                <i class="fas fa-cloud mr-1" />
+                Bedrock
+              </span>
+              <span class="text-gray-600">
+                {{ getBedrockBindingInfo(key) }}
+              </span>
+            </div>
             <!-- 无绑定时显示共享池 -->
             <div
               v-if="
                 !key.claudeAccountId &&
                 !key.claudeConsoleAccountId &&
                 !key.geminiAccountId &&
-                !key.openaiAccountId
+                !key.openaiAccountId &&
+                !key.bedrockAccountId
               "
               class="text-xs text-gray-500"
             >
@@ -1158,6 +1197,14 @@
       @close="showBatchApiKeyModal = false"
     />
 
+    <BatchEditApiKeyModal
+      v-if="showBatchEditModal"
+      :accounts="accounts"
+      :selected-keys="selectedApiKeys"
+      @close="showBatchEditModal = false"
+      @success="handleBatchEditSuccess"
+    />
+
     <!-- 过期时间编辑弹窗 -->
     <ExpiryEditModal
       ref="expiryEditModalRef"
@@ -1186,6 +1233,7 @@ import EditApiKeyModal from '@/components/apikeys/EditApiKeyModal.vue'
 import RenewApiKeyModal from '@/components/apikeys/RenewApiKeyModal.vue'
 import NewApiKeyModal from '@/components/apikeys/NewApiKeyModal.vue'
 import BatchApiKeyModal from '@/components/apikeys/BatchApiKeyModal.vue'
+import BatchEditApiKeyModal from '@/components/apikeys/BatchEditApiKeyModal.vue'
 import ExpiryEditModal from '@/components/apikeys/ExpiryEditModal.vue'
 import UsageDetailModal from '@/components/apikeys/UsageDetailModal.vue'
 import WindowCountdown from '@/components/apikeys/WindowCountdown.vue'
@@ -1211,6 +1259,7 @@ const accounts = ref({
   claude: [],
   gemini: [],
   openai: [],
+  bedrock: [],
   claudeGroups: [],
   geminiGroups: [],
   openaiGroups: []
@@ -1260,6 +1309,7 @@ const showEditApiKeyModal = ref(false)
 const showRenewApiKeyModal = ref(false)
 const showNewApiKeyModal = ref(false)
 const showBatchApiKeyModal = ref(false)
+const showBatchEditModal = ref(false)
 const editingApiKey = ref(null)
 const renewingApiKey = ref(null)
 const newApiKeyData = ref(null)
@@ -1358,33 +1408,60 @@ const paginatedApiKeys = computed(() => {
 // 加载账户列表
 const loadAccounts = async () => {
   try {
-    const [claudeData, claudeConsoleData, geminiData, openaiData, groupsData] = await Promise.all([
-      apiClient.get('/admin/claude-accounts'),
-      apiClient.get('/admin/claude-console-accounts'),
-      apiClient.get('/admin/gemini-accounts'),
-      apiClient.get('/admin/openai-accounts'),
-      apiClient.get('/admin/account-groups')
-    ])
+    const [claudeData, claudeConsoleData, geminiData, openaiData, bedrockData, groupsData] =
+      await Promise.all([
+        apiClient.get('/admin/claude-accounts'),
+        apiClient.get('/admin/claude-console-accounts'),
+        apiClient.get('/admin/gemini-accounts'),
+        apiClient.get('/admin/openai-accounts'),
+        apiClient.get('/admin/bedrock-accounts'),
+        apiClient.get('/admin/account-groups')
+      ])
+
+    // 合并Claude OAuth账户和Claude Console账户
+    const claudeAccounts = []
 
     if (claudeData.success) {
-      accounts.value.claude = claudeData.data || []
+      claudeData.data?.forEach((account) => {
+        claudeAccounts.push({
+          ...account,
+          platform: 'claude-oauth',
+          isDedicated: account.accountType === 'dedicated'
+        })
+      })
     }
 
     if (claudeConsoleData.success) {
-      // 将 Claude Console 账号合并到 claude 数组中
-      const consoleAccounts = (claudeConsoleData.data || []).map((acc) => ({
-        ...acc,
-        platform: 'claude-console'
-      }))
-      accounts.value.claude = [...accounts.value.claude, ...consoleAccounts]
+      claudeConsoleData.data?.forEach((account) => {
+        claudeAccounts.push({
+          ...account,
+          platform: 'claude-console',
+          isDedicated: account.accountType === 'dedicated'
+        })
+      })
     }
 
+    accounts.value.claude = claudeAccounts
+
     if (geminiData.success) {
-      accounts.value.gemini = geminiData.data || []
+      accounts.value.gemini = (geminiData.data || []).map((account) => ({
+        ...account,
+        isDedicated: account.accountType === 'dedicated'
+      }))
     }
 
     if (openaiData.success) {
-      accounts.value.openai = openaiData.data || []
+      accounts.value.openai = (openaiData.data || []).map((account) => ({
+        ...account,
+        isDedicated: account.accountType === 'dedicated'
+      }))
+    }
+
+    if (bedrockData.success) {
+      accounts.value.bedrock = (bedrockData.data || []).map((account) => ({
+        ...account,
+        isDedicated: account.accountType === 'dedicated'
+      }))
     }
 
     if (groupsData.success) {
@@ -1494,6 +1571,12 @@ const getBoundAccountName = (accountId) => {
     return `${openaiAccount.name}`
   }
 
+  // 从Bedrock账户列表中查找
+  const bedrockAccount = accounts.value.bedrock.find((acc) => acc.id === accountId)
+  if (bedrockAccount) {
+    return `${bedrockAccount.name}`
+  }
+
   // 如果找不到，返回账户ID的前8位
   return `${accountId.substring(0, 8)}`
 }
@@ -1556,6 +1639,26 @@ const getOpenAIBindingInfo = (key) => {
     }
     // 检查账户是否存在
     const account = accounts.value.openai.find((acc) => acc.id === key.openaiAccountId)
+    if (!account) {
+      return `⚠️ ${info} (账户不存在)`
+    }
+    if (account.accountType === 'dedicated') {
+      return `🔒 专属-${info}`
+    }
+    return info
+  }
+  return ''
+}
+
+// 获取Bedrock绑定信息
+const getBedrockBindingInfo = (key) => {
+  if (key.bedrockAccountId) {
+    const info = getBoundAccountName(key.bedrockAccountId)
+    if (key.bedrockAccountId.startsWith('group:')) {
+      return info
+    }
+    // 检查账户是否存在
+    const account = accounts.value.bedrock.find((acc) => acc.id === key.bedrockAccountId)
     if (!account) {
       return `⚠️ ${info} (账户不存在)`
     }
@@ -1796,6 +1899,27 @@ const handleBatchCreateSuccess = (data) => {
   showCreateApiKeyModal.value = false
   batchApiKeyData.value = data
   showBatchApiKeyModal.value = true
+  loadApiKeys()
+}
+
+// 打开批量编辑模态框
+const openBatchEditModal = async () => {
+  if (selectedApiKeys.value.length === 0) {
+    showToast('请先选择要编辑的 API Keys', 'warning')
+    return
+  }
+
+  // 重新加载账号数据，确保显示最新的专属账号
+  await loadAccounts()
+  showBatchEditModal.value = true
+}
+
+// 处理批量编辑成功
+const handleBatchEditSuccess = () => {
+  showBatchEditModal.value = false
+  // 清空选中状态
+  selectedApiKeys.value = []
+  updateSelectAllState()
   loadApiKeys()
 }
 
