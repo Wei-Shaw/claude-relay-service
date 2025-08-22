@@ -11,12 +11,12 @@
             >
               <i class="fas fa-edit text-sm text-white sm:text-base" />
             </div>
-            <h3 class="text-lg font-bold text-gray-900 sm:text-xl">
+            <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">
               批量编辑 API Keys ({{ selectedCount }} 个)
             </h3>
           </div>
           <button
-            class="p-1 text-gray-400 transition-colors hover:text-gray-600"
+            class="p-1 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
             @click="$emit('close')"
           >
             <i class="fas fa-times text-lg sm:text-xl" />
@@ -28,12 +28,12 @@
           @submit.prevent="batchUpdateApiKeys"
         >
           <!-- 说明文本 -->
-          <div class="rounded-lg bg-blue-50 p-4">
+          <div class="rounded-lg bg-blue-50 p-4 dark:bg-blue-900/20">
             <div class="flex items-start gap-3">
               <i class="fas fa-info-circle mt-1 text-blue-500" />
               <div>
-                <p class="text-sm font-medium text-blue-800">批量编辑说明</p>
-                <p class="mt-1 text-sm text-blue-700">
+                <p class="text-sm font-medium text-blue-800 dark:text-blue-300">批量编辑说明</p>
+                <p class="mt-1 text-sm text-blue-700 dark:text-blue-400">
                   以下设置将应用到所选的 {{ selectedCount }} 个 API
                   Key。只有填写或修改的字段才会被更新，空白字段将保持原值不变。
                 </p>
@@ -43,7 +43,7 @@
 
           <!-- 标签编辑 -->
           <div>
-            <label class="mb-1.5 block text-xs font-semibold text-gray-700 sm:mb-3 sm:text-sm">
+            <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-3 sm:text-sm">
               标签 (批量操作)
             </label>
             <div class="space-y-4">
@@ -51,19 +51,19 @@
               <div class="flex flex-wrap gap-4">
                 <label class="flex cursor-pointer items-center">
                   <input v-model="tagOperation" class="mr-2" type="radio" value="replace" />
-                  <span class="text-sm text-gray-700">替换标签</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">替换标签</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input v-model="tagOperation" class="mr-2" type="radio" value="add" />
-                  <span class="text-sm text-gray-700">添加标签</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">添加标签</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input v-model="tagOperation" class="mr-2" type="radio" value="remove" />
-                  <span class="text-sm text-gray-700">移除标签</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">移除标签</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input v-model="tagOperation" class="mr-2" type="radio" value="none" />
-                  <span class="text-sm text-gray-700">不修改标签</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">不修改标签</span>
                 </label>
               </div>
 
@@ -71,7 +71,7 @@
               <div v-if="tagOperation !== 'none'" class="space-y-3">
                 <!-- 已选择的标签 -->
                 <div v-if="form.tags.length > 0">
-                  <div class="mb-2 text-xs font-medium text-gray-600">
+                  <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">
                     {{
                       tagOperation === 'replace'
                         ? '新标签列表:'
@@ -84,7 +84,7 @@
                     <span
                       v-for="(tag, index) in form.tags"
                       :key="'selected-' + index"
-                      class="inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-800"
+                      class="inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
                     >
                       {{ tag }}
                       <button
@@ -100,16 +100,16 @@
 
                 <!-- 可选择的已有标签 -->
                 <div v-if="unselectedTags.length > 0">
-                  <div class="mb-2 text-xs font-medium text-gray-600">点击选择已有标签:</div>
+                  <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">点击选择已有标签:</div>
                   <div class="flex flex-wrap gap-2">
                     <button
                       v-for="tag in unselectedTags"
                       :key="'available-' + tag"
-                      class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700 transition-colors hover:bg-blue-100 hover:text-blue-700"
+                      class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700 transition-colors hover:bg-blue-100 hover:text-blue-700 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-blue-900/30 dark:hover:text-blue-300"
                       type="button"
                       @click="selectTag(tag)"
                     >
-                      <i class="fas fa-tag text-xs text-gray-500" />
+                      <i class="fas fa-tag text-xs text-gray-500 dark:text-gray-400" />
                       {{ tag }}
                     </button>
                   </div>
@@ -117,17 +117,17 @@
 
                 <!-- 创建新标签 -->
                 <div>
-                  <div class="mb-2 text-xs font-medium text-gray-600">创建新标签:</div>
+                  <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">创建新标签:</div>
                   <div class="flex gap-2">
                     <input
                       v-model="newTag"
-                      class="form-input flex-1"
+                      class="form-input flex-1 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                       placeholder="输入新标签名称"
                       type="text"
                       @keypress.enter.prevent="addTag"
                     />
                     <button
-                      class="rounded-lg bg-green-500 px-4 py-2 text-white transition-colors hover:bg-green-600"
+                      class="rounded-lg bg-green-500 px-4 py-2 text-white transition-colors hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700"
                       type="button"
                       @click="addTag"
                     >
@@ -140,25 +140,25 @@
           </div>
 
           <!-- 速率限制设置 -->
-          <div class="rounded-lg border border-blue-200 bg-blue-50 p-3">
+          <div class="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-700 dark:bg-blue-900/20">
             <div class="mb-2 flex items-center gap-2">
               <div
                 class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-blue-500"
               >
                 <i class="fas fa-tachometer-alt text-xs text-white" />
               </div>
-              <h4 class="text-sm font-semibold text-gray-800">速率限制设置</h4>
+              <h4 class="text-sm font-semibold text-gray-800 dark:text-gray-200">速率限制设置</h4>
             </div>
 
             <div class="space-y-2">
               <div class="grid grid-cols-1 gap-2 lg:grid-cols-3">
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-gray-700">
+                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
                     时间窗口 (分钟)
                   </label>
                   <input
                     v-model="form.rateLimitWindow"
-                    class="form-input w-full text-sm"
+                    class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                     min="1"
                     placeholder="不修改"
                     type="number"
@@ -166,10 +166,10 @@
                 </div>
 
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-gray-700">请求次数限制</label>
+                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">请求次数限制</label>
                   <input
                     v-model="form.rateLimitRequests"
-                    class="form-input w-full text-sm"
+                    class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                     min="1"
                     placeholder="不修改"
                     type="number"
@@ -177,10 +177,10 @@
                 </div>
 
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-gray-700">Token 限制</label>
+                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Token 限制</label>
                   <input
                     v-model="form.tokenLimit"
-                    class="form-input w-full text-sm"
+                    class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                     placeholder="不修改"
                     type="number"
                   />
@@ -191,12 +191,12 @@
 
           <!-- 每日费用限制 -->
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700">
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
               每日费用限制 (美元)
             </label>
             <input
               v-model="form.dailyCostLimit"
-              class="form-input w-full"
+              class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
               min="0"
               placeholder="不修改 (0 表示无限制)"
               step="0.01"
@@ -206,10 +206,10 @@
 
           <!-- 并发限制 -->
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700">并发限制</label>
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">并发限制</label>
             <input
               v-model="form.concurrencyLimit"
-              class="form-input w-full"
+              class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
               min="0"
               placeholder="不修改 (0 表示无限制)"
               type="number"
@@ -219,19 +219,19 @@
           <!-- 激活状态 -->
           <div>
             <div class="mb-3 flex items-center gap-4">
-              <label class="text-sm font-semibold text-gray-700">激活状态</label>
+              <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">激活状态</label>
               <div class="flex gap-4">
                 <label class="flex cursor-pointer items-center">
                   <input v-model="form.isActive" class="mr-2" type="radio" :value="true" />
-                  <span class="text-sm text-gray-700">激活</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">激活</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input v-model="form.isActive" class="mr-2" type="radio" :value="false" />
-                  <span class="text-sm text-gray-700">禁用</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">禁用</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input v-model="form.isActive" class="mr-2" type="radio" :value="null" />
-                  <span class="text-sm text-gray-700">不修改</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">不修改</span>
                 </label>
               </div>
             </div>
@@ -239,7 +239,7 @@
 
           <!-- 服务权限 -->
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700">服务权限</label>
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">服务权限</label>
             <div class="flex flex-wrap gap-4">
               <label class="flex cursor-pointer items-center">
                 <input v-model="form.permissions" class="mr-2" type="radio" value="" />
@@ -267,9 +267,9 @@
           <!-- 专属账号绑定 -->
           <div>
             <div class="mb-3 flex items-center justify-between">
-              <label class="text-sm font-semibold text-gray-700">专属账号绑定</label>
+              <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">专属账号绑定</label>
               <button
-                class="flex items-center gap-1 text-sm text-blue-600 transition-colors hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+                class="flex items-center gap-1 text-sm text-blue-600 transition-colors hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
                 :disabled="accountsLoading"
                 title="刷新账号列表"
                 type="button"
@@ -287,10 +287,10 @@
             </div>
             <div class="grid grid-cols-1 gap-3">
               <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600">Claude 专属账号</label>
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400">Claude 专属账号</label>
                 <select
                   v-model="form.claudeAccountId"
-                  class="form-input w-full"
+                  class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                   :disabled="form.permissions === 'gemini' || form.permissions === 'openai'"
                 >
                   <option value="">不修改</option>
@@ -320,10 +320,10 @@
                 </select>
               </div>
               <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600">Gemini 专属账号</label>
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400">Gemini 专属账号</label>
                 <select
                   v-model="form.geminiAccountId"
-                  class="form-input w-full"
+                  class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                   :disabled="form.permissions === 'claude' || form.permissions === 'openai'"
                 >
                   <option value="">不修改</option>
@@ -349,10 +349,10 @@
                 </select>
               </div>
               <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600">OpenAI 专属账号</label>
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400">OpenAI 专属账号</label>
                 <select
                   v-model="form.openaiAccountId"
-                  class="form-input w-full"
+                  class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                   :disabled="form.permissions === 'claude' || form.permissions === 'gemini'"
                 >
                   <option value="">不修改</option>
@@ -378,10 +378,10 @@
                 </select>
               </div>
               <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600">Bedrock 专属账号</label>
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400">Bedrock 专属账号</label>
                 <select
                   v-model="form.bedrockAccountId"
-                  class="form-input w-full"
+                  class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                   :disabled="form.permissions === 'gemini' || form.permissions === 'openai'"
                 >
                   <option value="">不修改</option>
@@ -402,7 +402,7 @@
 
           <div class="flex gap-3 pt-4">
             <button
-              class="flex-1 rounded-xl bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200"
+              class="flex-1 rounded-xl bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
               type="button"
               @click="$emit('close')"
             >
