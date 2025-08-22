@@ -43,7 +43,9 @@
 
           <!-- 标签编辑 -->
           <div>
-            <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-3 sm:text-sm">
+            <label
+              class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-3 sm:text-sm"
+            >
               标签 (批量操作)
             </label>
             <div class="space-y-4">
@@ -100,7 +102,9 @@
 
                 <!-- 可选择的已有标签 -->
                 <div v-if="unselectedTags.length > 0">
-                  <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">点击选择已有标签:</div>
+                  <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">
+                    点击选择已有标签:
+                  </div>
                   <div class="flex flex-wrap gap-2">
                     <button
                       v-for="tag in unselectedTags"
@@ -117,7 +121,9 @@
 
                 <!-- 创建新标签 -->
                 <div>
-                  <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">创建新标签:</div>
+                  <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">
+                    创建新标签:
+                  </div>
                   <div class="flex gap-2">
                     <input
                       v-model="newTag"
@@ -140,7 +146,9 @@
           </div>
 
           <!-- 速率限制设置 -->
-          <div class="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-700 dark:bg-blue-900/20">
+          <div
+            class="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-700 dark:bg-blue-900/20"
+          >
             <div class="mb-2 flex items-center gap-2">
               <div
                 class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-blue-500"
@@ -166,7 +174,9 @@
                 </div>
 
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">请求次数限制</label>
+                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300"
+                    >请求次数限制</label
+                  >
                   <input
                     v-model="form.rateLimitRequests"
                     class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
@@ -177,7 +187,9 @@
                 </div>
 
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Token 限制</label>
+                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300"
+                    >Token 限制</label
+                  >
                   <input
                     v-model="form.tokenLimit"
                     class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
@@ -206,7 +218,9 @@
 
           <!-- 并发限制 -->
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">并发限制</label>
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >并发限制</label
+            >
             <input
               v-model="form.concurrencyLimit"
               class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
@@ -239,7 +253,9 @@
 
           <!-- 服务权限 -->
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">服务权限</label>
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >服务权限</label
+            >
             <div class="flex flex-wrap gap-4">
               <label class="flex cursor-pointer items-center">
                 <input v-model="form.permissions" class="mr-2" type="radio" value="" />
@@ -267,7 +283,9 @@
           <!-- 专属账号绑定 -->
           <div>
             <div class="mb-3 flex items-center justify-between">
-              <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">专属账号绑定</label>
+              <label class="text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >专属账号绑定</label
+              >
               <button
                 class="flex items-center gap-1 text-sm text-blue-600 transition-colors hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
                 :disabled="accountsLoading"
@@ -287,7 +305,9 @@
             </div>
             <div class="grid grid-cols-1 gap-3">
               <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400">Claude 专属账号</label>
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
+                  >Claude 专属账号</label
+                >
                 <select
                   v-model="form.claudeAccountId"
                   class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
@@ -320,7 +340,9 @@
                 </select>
               </div>
               <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400">Gemini 专属账号</label>
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
+                  >Gemini 专属账号</label
+                >
                 <select
                   v-model="form.geminiAccountId"
                   class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
@@ -349,7 +371,9 @@
                 </select>
               </div>
               <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400">OpenAI 专属账号</label>
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
+                  >OpenAI 专属账号</label
+                >
                 <select
                   v-model="form.openaiAccountId"
                   class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
@@ -378,7 +402,9 @@
                 </select>
               </div>
               <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400">Bedrock 专属账号</label>
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
+                  >Bedrock 专属账号</label
+                >
                 <select
                   v-model="form.bedrockAccountId"
                   class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
