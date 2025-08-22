@@ -162,6 +162,12 @@ defineExpose({
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+:global(.dark) .toast {
+  background: #1f2937;
+  border: 1px solid #374151;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
 .toast-show {
   transform: translateX(0);
   opacity: 1;
@@ -227,6 +233,11 @@ defineExpose({
   color: #6b7280;
 }
 
+:global(.dark) .toast-close:hover {
+  background: #374151;
+  color: #9ca3af;
+}
+
 .toast-progress {
   position: absolute;
   bottom: 0;
@@ -256,12 +267,24 @@ defineExpose({
   background: #d1fae5;
 }
 
+:global(.dark) .toast-success .toast-icon {
+  background: #064e3b;
+}
+
 .toast-success .toast-title {
   color: #065f46;
 }
 
+:global(.dark) .toast-success .toast-title {
+  color: #10b981;
+}
+
 .toast-success .toast-message {
   color: #047857;
+}
+
+:global(.dark) .toast-success .toast-message {
+  color: #34d399;
 }
 
 .toast-success .toast-progress {
@@ -278,12 +301,24 @@ defineExpose({
   background: #fee2e2;
 }
 
+:global(.dark) .toast-error .toast-icon {
+  background: #7f1d1d;
+}
+
 .toast-error .toast-title {
   color: #991b1b;
 }
 
+:global(.dark) .toast-error .toast-title {
+  color: #ef4444;
+}
+
 .toast-error .toast-message {
   color: #dc2626;
+}
+
+:global(.dark) .toast-error .toast-message {
+  color: #f87171;
 }
 
 .toast-error .toast-progress {
@@ -300,12 +335,24 @@ defineExpose({
   background: #fef3c7;
 }
 
+:global(.dark) .toast-warning .toast-icon {
+  background: #78350f;
+}
+
 .toast-warning .toast-title {
   color: #92400e;
 }
 
+:global(.dark) .toast-warning .toast-title {
+  color: #f59e0b;
+}
+
 .toast-warning .toast-message {
   color: #d97706;
+}
+
+:global(.dark) .toast-warning .toast-message {
+  color: #fbbf24;
 }
 
 .toast-warning .toast-progress {
@@ -322,12 +369,24 @@ defineExpose({
   background: #dbeafe;
 }
 
+:global(.dark) .toast-info .toast-icon {
+  background: #1e3a8a;
+}
+
 .toast-info .toast-title {
   color: #1e40af;
 }
 
+:global(.dark) .toast-info .toast-title {
+  color: #3b82f6;
+}
+
 .toast-info .toast-message {
   color: #2563eb;
+}
+
+:global(.dark) .toast-info .toast-message {
+  color: #60a5fa;
 }
 
 .toast-info .toast-progress {

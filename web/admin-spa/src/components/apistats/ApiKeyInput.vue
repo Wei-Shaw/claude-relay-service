@@ -1,12 +1,12 @@
 <template>
-  <div class="api-input-wide-card glass-strong mb-8 rounded-3xl p-6 shadow-xl">
+  <div class="api-input-wide-card mb-8 rounded-3xl p-6 shadow-xl">
     <!-- 标题区域 -->
     <div class="wide-card-title mb-6 text-center">
-      <h2 class="mb-2 text-2xl font-bold">
+      <h2 class="mb-2 text-2xl font-bold text-gray-900 dark:text-white">
         <i class="fas fa-chart-line mr-3" />
         使用统计查询
       </h2>
-      <p class="text-base text-gray-600">查询您的 API Key 使用情况和统计数据</p>
+      <p class="text-base text-gray-600 dark:text-gray-300">查询您的 API Key 使用情况和统计数据</p>
     </div>
 
     <!-- 输入区域 -->
@@ -14,7 +14,7 @@
       <div class="api-input-grid grid grid-cols-1 lg:grid-cols-4">
         <!-- API Key 输入 -->
         <div class="lg:col-span-3">
-          <label class="mb-2 block text-sm font-medium text-gray-700">
+          <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">
             <i class="fas fa-key mr-2" />
             输入您的 API Key
           </label>
@@ -30,7 +30,9 @@
 
         <!-- 查询按钮 -->
         <div class="lg:col-span-1">
-          <label class="mb-2 hidden text-sm font-medium text-gray-700 lg:block"> &nbsp; </label>
+          <label class="mb-2 hidden text-sm font-medium text-gray-700 dark:text-gray-200 lg:block">
+            &nbsp;
+          </label>
           <button
             class="btn btn-primary btn-query flex h-full w-full items-center justify-center gap-2"
             :disabled="loading || !apiKey.trim()"
@@ -62,16 +64,24 @@ const { queryStats } = apiStatsStore
 </script>
 
 <style scoped>
-/* 宽卡片样式 */
+/* 宽卡片样式 - 使用CSS变量 */
 .api-input-wide-card {
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--surface-color);
   backdrop-filter: blur(25px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid var(--border-color);
   box-shadow:
     0 25px 50px -12px rgba(0, 0, 0, 0.25),
     0 0 0 1px rgba(255, 255, 255, 0.05),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 暗夜模式宽卡片样式 */
+:global(.dark) .api-input-wide-card {
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(75, 85, 99, 0.2),
+    inset 0 1px 0 rgba(107, 114, 128, 0.15);
 }
 
 .api-input-wide-card:hover {
@@ -82,6 +92,13 @@ const { queryStats } = apiStatsStore
   transform: translateY(-1px);
 }
 
+:global(.dark) .api-input-wide-card:hover {
+  box-shadow:
+    0 32px 64px -12px rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(75, 85, 99, 0.25),
+    inset 0 1px 0 rgba(107, 114, 128, 0.3) !important;
+}
+
 /* 标题样式 */
 .wide-card-title h2 {
   color: #1f2937;
@@ -89,9 +106,19 @@ const { queryStats } = apiStatsStore
   font-weight: 700;
 }
 
+:global(.dark) .wide-card-title h2 {
+  color: #f9fafb;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
 .wide-card-title p {
   color: #4b5563;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+}
+
+:global(.dark) .wide-card-title p {
+  color: #d1d5db;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
 }
 
 .wide-card-title .fas.fa-chart-line {
@@ -105,21 +132,30 @@ const { queryStats } = apiStatsStore
   gap: 1rem;
 }
 
-/* 输入框样式 */
+/* 输入框样式 - 使用CSS变量 */
 .wide-card-input {
-  background: rgba(255, 255, 255, 0.95);
-  border: 2px solid rgba(255, 255, 255, 0.4);
+  background: var(--input-bg);
+  border: 2px solid var(--input-border);
   border-radius: 12px;
   padding: 14px 16px;
   font-size: 16px;
   transition: all 0.3s ease;
   backdrop-filter: blur(10px);
-  color: #1f2937;
+  color: var(--text-primary);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+:global(.dark) .wide-card-input {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+  color: #e5e7eb;
 }
 
 .wide-card-input::placeholder {
   color: #9ca3af;
+}
+
+:global(.dark) .wide-card-input::placeholder {
+  color: #64748b;
 }
 
 .wide-card-input:focus {
@@ -129,6 +165,16 @@ const { queryStats } = apiStatsStore
     0 0 0 3px rgba(96, 165, 250, 0.2),
     0 10px 15px -3px rgba(0, 0, 0, 0.1);
   background: white;
+  color: #1f2937;
+}
+
+:global(.dark) .wide-card-input:focus {
+  border-color: #60a5fa;
+  box-shadow:
+    0 0 0 3px rgba(96, 165, 250, 0.15),
+    0 10px 15px -3px rgba(0, 0, 0, 0.4);
+  background: rgba(31, 41, 55, 0.95);
+  color: #f3f4f6;
 }
 
 /* 按钮样式 */
@@ -172,8 +218,8 @@ const { queryStats } = apiStatsStore
 
 /* 安全提示样式 */
 .security-notice {
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   backdrop-filter: blur(10px);
   border-radius: 8px;
   padding: 12px 16px;
@@ -182,9 +228,22 @@ const { queryStats } = apiStatsStore
   transition: all 0.3s ease;
 }
 
+:global(.dark) .security-notice {
+  background: rgba(31, 41, 55, 0.8) !important;
+  border: 1px solid rgba(75, 85, 99, 0.5) !important;
+  color: #d1d5db !important;
+}
+
 .security-notice:hover {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.6);
+  border-color: rgba(255, 255, 255, 0.5);
+  color: #1f2937;
+}
+
+:global(.dark) .security-notice:hover {
+  background: rgba(31, 41, 55, 0.9) !important;
+  border-color: rgba(75, 85, 99, 0.6) !important;
+  color: #e5e7eb !important;
 }
 
 .security-notice .fas.fa-shield-alt {

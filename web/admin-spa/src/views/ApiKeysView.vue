@@ -3,8 +3,12 @@
     <div class="card p-4 sm:p-6">
       <div class="mb-4 flex flex-col gap-4 sm:mb-6">
         <div>
-          <h3 class="mb-1 text-lg font-bold text-gray-900 sm:mb-2 sm:text-xl">API Keys 管理</h3>
-          <p class="text-sm text-gray-600 sm:text-base">管理和监控您的 API 密钥</p>
+          <h3 class="mb-1 text-lg font-bold text-gray-900 dark:text-gray-100 sm:mb-2 sm:text-xl">
+            API Keys 管理
+          </h3>
+          <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-base">
+            管理和监控您的 API 密钥
+          </p>
         </div>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <!-- 筛选器组 -->
@@ -55,7 +59,7 @@
               <div class="relative flex items-center">
                 <input
                   v-model="searchKeyword"
-                  class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 pl-9 text-sm text-gray-700 placeholder-gray-400 shadow-sm transition-all duration-200 hover:border-gray-300 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+                  class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 pl-9 text-sm text-gray-700 placeholder-gray-400 shadow-sm transition-all duration-200 hover:border-gray-300 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 dark:hover:border-gray-500"
                   placeholder="搜索名称..."
                   type="text"
                   @input="currentPage = 1"
@@ -63,7 +67,7 @@
                 <i class="fas fa-search absolute left-3 text-sm text-cyan-500" />
                 <button
                   v-if="searchKeyword"
-                  class="absolute right-2 flex h-5 w-5 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  class="absolute right-2 flex h-5 w-5 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
                   @click="clearSearch"
                 >
                   <i class="fas fa-times text-xs" />
@@ -73,7 +77,7 @@
 
             <!-- 刷新按钮 -->
             <button
-              class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+              class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-500 sm:w-auto"
               :disabled="apiKeysLoading"
               @click="loadApiKeys()"
             >
@@ -131,7 +135,7 @@
       <!-- 桌面端表格视图 -->
       <div v-else class="table-container hidden md:block">
         <table class="w-full table-fixed">
-          <thead class="bg-gray-50/80 backdrop-blur-sm">
+          <thead class="bg-gray-50/80 backdrop-blur-sm dark:bg-gray-700/80">
             <tr>
               <th class="w-[50px] px-3 py-4 text-left">
                 <div class="flex items-center">
@@ -145,7 +149,7 @@
                 </div>
               </th>
               <th
-                class="w-[25%] min-w-[200px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100"
+                class="w-[25%] min-w-[200px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                 @click="sortApiKeys('name')"
               >
                 名称
@@ -160,12 +164,12 @@
                 <i v-else class="fas fa-sort ml-1 text-gray-400" />
               </th>
               <th
-                class="w-[10%] min-w-[80px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700"
+                class="w-[10%] min-w-[80px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
               >
                 标签
               </th>
               <th
-                class="w-[8%] min-w-[70px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100"
+                class="w-[8%] min-w-[70px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                 @click="sortApiKeys('status')"
               >
                 状态
@@ -180,11 +184,11 @@
                 <i v-else class="fas fa-sort ml-1 text-gray-400" />
               </th>
               <th
-                class="w-[17%] min-w-[140px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700"
+                class="w-[17%] min-w-[140px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
               >
                 使用统计
                 <span
-                  class="cursor-pointer rounded px-2 py-1 hover:bg-gray-100"
+                  class="cursor-pointer rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600"
                   @click="sortApiKeys('cost')"
                 >
                   (费用
@@ -200,7 +204,7 @@
                 </span>
               </th>
               <th
-                class="w-[10%] min-w-[90px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100"
+                class="w-[10%] min-w-[90px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                 @click="sortApiKeys('createdAt')"
               >
                 创建时间
@@ -215,7 +219,7 @@
                 <i v-else class="fas fa-sort ml-1 text-gray-400" />
               </th>
               <th
-                class="w-[10%] min-w-[90px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100"
+                class="w-[10%] min-w-[90px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                 @click="sortApiKeys('expiresAt')"
               >
                 过期时间
@@ -230,13 +234,13 @@
                 <i v-else class="fas fa-sort ml-1 text-gray-400" />
               </th>
               <th
-                class="w-[20%] min-w-[180px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700"
+                class="w-[20%] min-w-[180px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
               >
                 操作
               </th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-200/50">
+          <tbody class="divide-y divide-gray-200/50 dark:divide-gray-600/50">
             <template v-for="key in paginatedApiKeys" :key="key.id">
               <!-- API Key 主行 -->
               <tr class="table-row">
@@ -259,10 +263,16 @@
                       <i class="fas fa-key text-xs text-white" />
                     </div>
                     <div class="min-w-0">
-                      <div class="truncate text-sm font-semibold text-gray-900" :title="key.name">
+                      <div
+                        class="truncate text-sm font-semibold text-gray-900 dark:text-gray-100"
+                        :title="key.name"
+                      >
                         {{ key.name }}
                       </div>
-                      <div class="truncate text-xs text-gray-500" :title="key.id">
+                      <div
+                        class="truncate text-xs text-gray-500 dark:text-gray-400"
+                        :title="key.id"
+                      >
                         {{ key.id }}
                       </div>
                       <!-- 账户绑定信息 -->
@@ -278,7 +288,7 @@
                             <i class="fas fa-brain mr-1 text-[10px]" />
                             Claude
                           </span>
-                          <span class="truncate text-gray-600">
+                          <span class="truncate text-gray-600 dark:text-gray-400">
                             {{ getClaudeBindingInfo(key) }}
                           </span>
                         </div>
@@ -290,7 +300,7 @@
                             <i class="fas fa-robot mr-1 text-[10px]" />
                             Gemini
                           </span>
-                          <span class="truncate text-gray-600">
+                          <span class="truncate text-gray-600 dark:text-gray-400">
                             {{ getGeminiBindingInfo(key) }}
                           </span>
                         </div>
@@ -302,7 +312,7 @@
                             <i class="fa-openai mr-1 text-[10px]" />
                             OpenAI
                           </span>
-                          <span class="truncate text-gray-600">
+                          <span class="truncate text-gray-600 dark:text-gray-400">
                             {{ getOpenAIBindingInfo(key) }}
                           </span>
                         </div>
@@ -358,20 +368,20 @@
                     <!-- 今日使用统计 -->
                     <div class="mb-2">
                       <div class="mb-1 flex items-center justify-between text-sm">
-                        <span class="text-gray-600">今日请求</span>
-                        <span class="font-semibold text-gray-900"
+                        <span class="text-gray-600 dark:text-gray-400">今日请求</span>
+                        <span class="font-semibold text-gray-900 dark:text-gray-100"
                           >{{ formatNumber(key.usage?.daily?.requests || 0) }}次</span
                         >
                       </div>
                       <div class="flex items-center justify-between text-sm">
-                        <span class="text-gray-600">今日费用</span>
+                        <span class="text-gray-600 dark:text-gray-400">今日费用</span>
                         <span class="font-semibold text-green-600"
                           >${{ (key.dailyCost || 0).toFixed(4) }}</span
                         >
                       </div>
                       <div class="flex items-center justify-between text-sm">
-                        <span class="text-gray-600">最后使用</span>
-                        <span class="font-medium text-gray-700">{{
+                        <span class="text-gray-600 dark:text-gray-400">最后使用</span>
+                        <span class="font-medium text-gray-700 dark:text-gray-300">{{
                           formatLastUsed(key.lastUsedAt)
                         }}</span>
                       </div>
@@ -380,8 +390,8 @@
                     <!-- 每日费用限制进度条 -->
                     <div v-if="key.dailyCostLimit > 0" class="space-y-1">
                       <div class="flex items-center justify-between text-xs">
-                        <span class="text-gray-500">费用限额</span>
-                        <span class="text-gray-700">
+                        <span class="text-gray-500 dark:text-gray-400">费用限额</span>
+                        <span class="text-gray-700 dark:text-gray-300">
                           ${{ (key.dailyCost || 0).toFixed(2) }} / ${{
                             key.dailyCostLimit.toFixed(2)
                           }}
@@ -414,7 +424,7 @@
                     <!-- 查看详情按钮 -->
                     <div class="pt-1">
                       <button
-                        class="flex w-full items-center justify-center gap-1 rounded py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-800"
+                        class="flex w-full items-center justify-center gap-1 rounded py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-800 dark:hover:bg-blue-900/20 dark:hover:text-blue-400"
                         @click="showUsageDetails(key)"
                       >
                         <i class="fas fa-chart-line" />
@@ -540,7 +550,7 @@
 
               <!-- 模型统计展开区域 -->
               <tr v-if="key && key.id && expandedApiKeys[key.id]">
-                <td class="bg-gray-50 px-3 py-4" colspan="8">
+                <td class="bg-gray-50 px-3 py-4 dark:bg-gray-700" colspan="8">
                   <div v-if="!apiKeyModelStats[key.id]" class="py-4 text-center">
                     <div class="loading-spinner mx-auto" />
                     <p class="mt-2 text-sm text-gray-500">加载模型统计...</p>
@@ -548,14 +558,16 @@
                   <div class="space-y-4">
                     <!-- 通用的标题和时间筛选器，无论是否有数据都显示 -->
                     <div class="mb-4 flex items-center justify-between">
-                      <h5 class="flex items-center text-sm font-semibold text-gray-700">
+                      <h5
+                        class="flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300"
+                      >
                         <i class="fas fa-chart-pie mr-2 text-indigo-500" />
                         模型使用分布
                       </h5>
                       <div class="flex items-center gap-2">
                         <span
                           v-if="apiKeyModelStats[key.id] && apiKeyModelStats[key.id].length > 0"
-                          class="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-500"
+                          class="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-500 dark:bg-gray-700 dark:text-gray-400"
                         >
                           {{ apiKeyModelStats[key.id].length }} 个模型
                         </span>
@@ -563,7 +575,7 @@
                         <!-- API Keys日期筛选器 -->
                         <div class="flex items-center gap-1">
                           <!-- 快捷日期选择 -->
-                          <div class="flex gap-1 rounded bg-gray-100 p-1">
+                          <div class="flex gap-1 rounded bg-gray-100 p-1 dark:bg-gray-700">
                             <button
                               v-for="option in getApiKeyDateFilter(key.id).presetOptions"
                               :key="option.value"
@@ -571,8 +583,8 @@
                                 'rounded px-2 py-1 text-xs font-medium transition-colors',
                                 getApiKeyDateFilter(key.id).preset === option.value &&
                                 getApiKeyDateFilter(key.id).type === 'preset'
-                                  ? 'bg-white text-blue-600 shadow-sm'
-                                  : 'text-gray-600 hover:text-gray-900'
+                                  ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
+                                  : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
                               ]"
                               @click="setApiKeyDateFilterPreset(option.value, key.id)"
                             >
@@ -630,14 +642,16 @@
                       <div
                         v-for="stat in apiKeyModelStats[key.id]"
                         :key="stat.model"
-                        class="rounded-xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-4 transition-all duration-200 hover:border-indigo-300 hover:shadow-lg"
+                        class="rounded-xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-4 transition-all duration-200 hover:border-indigo-300 hover:shadow-lg dark:border-gray-600 dark:from-gray-800 dark:to-gray-700 dark:hover:border-indigo-500"
                       >
                         <div class="mb-3 flex items-start justify-between">
                           <div class="flex-1">
-                            <span class="mb-1 block text-sm font-semibold text-gray-800">{{
-                              stat.model
-                            }}</span>
-                            <span class="rounded-full bg-blue-50 px-2 py-1 text-xs text-gray-500"
+                            <span
+                              class="mb-1 block text-sm font-semibold text-gray-800 dark:text-gray-200"
+                              >{{ stat.model }}</span
+                            >
+                            <span
+                              class="rounded-full bg-blue-50 px-2 py-1 text-xs text-gray-500 dark:bg-blue-900/30 dark:text-gray-400"
                               >{{ stat.requests }} 次请求</span
                             >
                           </div>
@@ -645,16 +659,16 @@
 
                         <div class="mb-3 space-y-2">
                           <div class="flex items-center justify-between text-sm">
-                            <span class="flex items-center text-gray-600">
+                            <span class="flex items-center text-gray-600 dark:text-gray-400">
                               <i class="fas fa-coins mr-1 text-xs text-yellow-500" />
                               总Token:
                             </span>
-                            <span class="font-semibold text-gray-900">{{
+                            <span class="font-semibold text-gray-900 dark:text-gray-100">{{
                               formatTokenCount(stat.allTokens)
                             }}</span>
                           </div>
                           <div class="flex items-center justify-between text-sm">
-                            <span class="flex items-center text-gray-600">
+                            <span class="flex items-center text-gray-600 dark:text-gray-400">
                               <i class="fas fa-dollar-sign mr-1 text-xs text-green-500" />
                               费用:
                             </span>
@@ -662,8 +676,10 @@
                               calculateModelCost(stat)
                             }}</span>
                           </div>
-                          <div class="mt-2 border-t border-gray-100 pt-2">
-                            <div class="flex items-center justify-between text-xs text-gray-500">
+                          <div class="mt-2 border-t border-gray-100 pt-2 dark:border-gray-600">
+                            <div
+                              class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
+                            >
                               <span class="flex items-center">
                                 <i class="fas fa-arrow-down mr-1 text-green-500" />
                                 输入:
@@ -672,7 +688,9 @@
                                 formatTokenCount(stat.inputTokens)
                               }}</span>
                             </div>
-                            <div class="flex items-center justify-between text-xs text-gray-500">
+                            <div
+                              class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
+                            >
                               <span class="flex items-center">
                                 <i class="fas fa-arrow-up mr-1 text-blue-500" />
                                 输出:
@@ -737,23 +755,25 @@
                     <!-- 总计统计，仅在有数据时显示 -->
                     <div
                       v-if="apiKeyModelStats[key.id] && apiKeyModelStats[key.id].length > 0"
-                      class="mt-4 rounded-lg border border-indigo-100 bg-gradient-to-r from-indigo-50 to-purple-50 p-3"
+                      class="mt-4 rounded-lg border border-indigo-100 bg-gradient-to-r from-indigo-50 to-purple-50 p-3 dark:border-indigo-700 dark:from-indigo-900/20 dark:to-purple-900/20"
                     >
                       <div class="flex items-center justify-between text-sm">
-                        <span class="flex items-center font-semibold text-gray-700">
+                        <span
+                          class="flex items-center font-semibold text-gray-700 dark:text-gray-300"
+                        >
                           <i class="fas fa-calculator mr-2 text-indigo-500" />
                           总计统计
                         </span>
                         <div class="flex gap-4 text-xs">
-                          <span class="text-gray-600">
+                          <span class="text-gray-600 dark:text-gray-400">
                             总请求:
-                            <span class="font-semibold text-gray-800">{{
+                            <span class="font-semibold text-gray-800 dark:text-gray-200">{{
                               apiKeyModelStats[key.id].reduce((sum, stat) => sum + stat.requests, 0)
                             }}</span>
                           </span>
-                          <span class="text-gray-600">
+                          <span class="text-gray-600 dark:text-gray-400">
                             总Token:
-                            <span class="font-semibold text-gray-800">{{
+                            <span class="font-semibold text-gray-800 dark:text-gray-200">{{
                               formatTokenCount(
                                 apiKeyModelStats[key.id].reduce(
                                   (sum, stat) => sum + stat.allTokens,
@@ -796,10 +816,10 @@
                 <i class="fas fa-key text-sm text-white" />
               </div>
               <div>
-                <h4 class="text-sm font-semibold text-gray-900">
+                <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">
                   {{ key.name }}
                 </h4>
-                <p class="mt-0.5 text-xs text-gray-500">
+                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                   {{ key.id }}
                 </p>
               </div>
@@ -889,21 +909,21 @@
               </div>
               <div class="grid grid-cols-2 gap-3">
                 <div>
-                  <p class="text-sm font-semibold text-gray-900">
+                  <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
                     {{ formatNumber(key.usage?.daily?.requests || 0) }} 次
                   </p>
-                  <p class="text-xs text-gray-500">请求</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">请求</p>
                 </div>
                 <div>
                   <p class="text-sm font-semibold text-green-600">
                     ${{ (key.dailyCost || 0).toFixed(4) }}
                   </p>
-                  <p class="text-xs text-gray-500">费用</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">费用</p>
                 </div>
               </div>
               <div class="mt-2 flex items-center justify-between">
-                <span class="text-xs text-gray-600">最后使用</span>
-                <span class="text-xs font-medium text-gray-700">{{
+                <span class="text-xs text-gray-600 dark:text-gray-400">最后使用</span>
+                <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{
                   formatLastUsed(key.lastUsedAt)
                 }}</span>
               </div>
@@ -1042,28 +1062,28 @@
         class="mt-4 flex flex-col items-center justify-between gap-4 sm:mt-6 sm:flex-row"
       >
         <div class="flex w-full flex-col items-center gap-3 sm:w-auto sm:flex-row">
-          <span class="text-xs text-gray-600 sm:text-sm">
+          <span class="text-xs text-gray-600 dark:text-gray-400 sm:text-sm">
             共 {{ sortedApiKeys.length }} 条记录
           </span>
           <div class="flex items-center gap-2">
-            <span class="text-xs text-gray-600 sm:text-sm">每页显示</span>
+            <span class="text-xs text-gray-600 dark:text-gray-400 sm:text-sm">每页显示</span>
             <select
               v-model="pageSize"
-              class="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 transition-colors hover:border-gray-300 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
+              class="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 transition-colors hover:border-gray-300 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 sm:text-sm"
               @change="currentPage = 1"
             >
               <option v-for="size in pageSizeOptions" :key="size" :value="size">
                 {{ size }}
               </option>
             </select>
-            <span class="text-xs text-gray-600 sm:text-sm">条</span>
+            <span class="text-xs text-gray-600 dark:text-gray-400 sm:text-sm">条</span>
           </div>
         </div>
 
         <div class="flex items-center gap-2">
           <!-- 上一页 -->
           <button
-            class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 sm:py-1 sm:text-sm"
+            class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:py-1 sm:text-sm"
             :disabled="currentPage === 1"
             @click="currentPage--"
           >
@@ -1075,12 +1095,16 @@
             <!-- 第一页 -->
             <button
               v-if="currentPage > 3"
-              class="hidden rounded-md border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:block"
+              class="hidden rounded-md border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:block"
               @click="currentPage = 1"
             >
               1
             </button>
-            <span v-if="currentPage > 4" class="hidden px-2 text-gray-500 sm:inline">...</span>
+            <span
+              v-if="currentPage > 4"
+              class="hidden px-2 text-gray-500 dark:text-gray-400 sm:inline"
+              >...</span
+            >
 
             <!-- 中间页码 -->
             <button
@@ -1090,7 +1114,7 @@
                 'rounded-md px-2 py-1 text-xs font-medium sm:px-3 sm:text-sm',
                 page === currentPage
                   ? 'bg-blue-600 text-white'
-                  : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                  : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
               ]"
               @click="currentPage = page"
             >
@@ -1098,12 +1122,14 @@
             </button>
 
             <!-- 最后一页 -->
-            <span v-if="currentPage < totalPages - 3" class="hidden px-2 text-gray-500 sm:inline"
+            <span
+              v-if="currentPage < totalPages - 3"
+              class="hidden px-2 text-gray-500 dark:text-gray-400 sm:inline"
               >...</span
             >
             <button
               v-if="totalPages > 1 && currentPage < totalPages - 2"
-              class="hidden rounded-md border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:block"
+              class="hidden rounded-md border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:block"
               @click="currentPage = totalPages"
             >
               {{ totalPages }}
@@ -1112,7 +1138,7 @@
 
           <!-- 下一页 -->
           <button
-            class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 sm:py-1 sm:text-sm"
+            class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:py-1 sm:text-sm"
             :disabled="currentPage === totalPages || totalPages === 0"
             @click="currentPage++"
           >

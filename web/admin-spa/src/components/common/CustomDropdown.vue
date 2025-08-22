@@ -3,17 +3,19 @@
     <!-- 触发器 -->
     <div
       ref="triggerRef"
-      class="relative flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm transition-all duration-200 hover:shadow-md"
+      class="relative flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm transition-all duration-200 hover:shadow-md dark:border-gray-600 dark:bg-gray-800"
       :class="[isOpen && 'border-blue-400 shadow-md']"
       @click="toggleDropdown"
     >
       <i v-if="icon" :class="['fas', icon, 'text-sm', iconColor]"></i>
-      <span class="select-none whitespace-nowrap text-sm font-medium text-gray-700">
+      <span
+        class="select-none whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200"
+      >
         {{ selectedLabel || placeholder }}
       </span>
       <i
         :class="[
-          'fas fa-chevron-down ml-auto text-xs text-gray-400 transition-transform duration-200',
+          'fas fa-chevron-down ml-auto text-xs text-gray-400 transition-transform duration-200 dark:text-gray-500',
           isOpen && 'rotate-180'
         ]"
       ></i>
@@ -32,7 +34,7 @@
         <div
           v-if="isOpen"
           ref="dropdownRef"
-          class="fixed z-[9999] min-w-max overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
+          class="fixed z-[9999] min-w-max overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-800"
           :style="dropdownStyle"
         >
           <div class="max-h-60 overflow-y-auto py-1">
@@ -42,8 +44,8 @@
               class="flex cursor-pointer items-center gap-2 whitespace-nowrap px-3 py-2 text-sm transition-colors duration-150"
               :class="[
                 option.value === modelValue
-                  ? 'bg-blue-50 font-medium text-blue-700'
-                  : 'text-gray-700 hover:bg-gray-50'
+                  ? 'bg-blue-50 font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                  : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
               ]"
               @click="selectOption(option)"
             >

@@ -2,19 +2,21 @@
   <div class="settings-container">
     <div class="card p-4 sm:p-6">
       <div class="mb-4 sm:mb-6">
-        <h3 class="mb-1 text-lg font-bold text-gray-900 sm:mb-2 sm:text-xl">其他设置</h3>
-        <p class="text-sm text-gray-600 sm:text-base">自定义网站名称和图标</p>
+        <h3 class="mb-1 text-lg font-bold text-gray-900 dark:text-gray-100 sm:mb-2 sm:text-xl">
+          其他设置
+        </h3>
+        <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-base">自定义网站名称和图标</p>
       </div>
 
       <div v-if="loading" class="py-12 text-center">
         <div class="loading-spinner mx-auto mb-4" />
-        <p class="text-gray-500">正在加载设置...</p>
+        <p class="text-gray-500 dark:text-gray-400">正在加载设置...</p>
       </div>
 
       <!-- 桌面端表格视图 -->
       <div v-else class="table-container hidden sm:block">
         <table class="min-w-full">
-          <tbody class="divide-y divide-gray-200/50">
+          <tbody class="divide-y divide-gray-200/50 dark:divide-gray-600/50">
             <!-- 网站名称 -->
             <tr class="table-row">
               <td class="w-48 whitespace-nowrap px-6 py-4">
@@ -25,20 +27,24 @@
                     <i class="fas fa-font text-xs text-white" />
                   </div>
                   <div>
-                    <div class="text-sm font-semibold text-gray-900">网站名称</div>
-                    <div class="text-xs text-gray-500">品牌标识</div>
+                    <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      网站名称
+                    </div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">品牌标识</div>
                   </div>
                 </div>
               </td>
               <td class="px-6 py-4">
                 <input
                   v-model="oemSettings.siteName"
-                  class="form-input w-full max-w-md"
+                  class="form-input w-full max-w-md dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                   maxlength="100"
                   placeholder="Claude Relay Service"
                   type="text"
                 />
-                <p class="mt-1 text-xs text-gray-500">将显示在浏览器标题和页面头部</p>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  将显示在浏览器标题和页面头部
+                </p>
               </td>
             </tr>
 
@@ -52,8 +58,10 @@
                     <i class="fas fa-image text-xs text-white" />
                   </div>
                   <div>
-                    <div class="text-sm font-semibold text-gray-900">网站图标</div>
-                    <div class="text-xs text-gray-500">Favicon</div>
+                    <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      网站图标
+                    </div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">Favicon</div>
                   </div>
                 </div>
               </td>
@@ -62,7 +70,7 @@
                   <!-- 图标预览 -->
                   <div
                     v-if="oemSettings.siteIconData || oemSettings.siteIcon"
-                    class="inline-flex items-center gap-3 rounded-lg bg-gray-50 p-3"
+                    class="inline-flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-700"
                   >
                     <img
                       alt="图标预览"
@@ -70,7 +78,7 @@
                       :src="oemSettings.siteIconData || oemSettings.siteIcon"
                       @error="handleIconError"
                     />
-                    <span class="text-sm text-gray-600">当前图标</span>
+                    <span class="text-sm text-gray-600 dark:text-gray-400">当前图标</span>
                     <button
                       class="rounded-lg px-3 py-1 font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-900"
                       @click="removeIcon"
@@ -92,7 +100,7 @@
                       <i class="fas fa-upload mr-2" />
                       上传图标
                     </button>
-                    <span class="ml-3 text-xs text-gray-500"
+                    <span class="ml-3 text-xs text-gray-500 dark:text-gray-400"
                       >支持 .ico, .png, .jpg, .svg 格式，最大 350KB</span
                     >
                   </div>
@@ -117,7 +125,7 @@
                     </button>
 
                     <button
-                      class="btn bg-gray-100 px-6 py-3 text-gray-700 hover:bg-gray-200"
+                      class="btn bg-gray-100 px-6 py-3 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                       :disabled="saving"
                       @click="resetOemSettings"
                     >
@@ -126,7 +134,10 @@
                     </button>
                   </div>
 
-                  <div v-if="oemSettings.updatedAt" class="text-sm text-gray-500">
+                  <div
+                    v-if="oemSettings.updatedAt"
+                    class="text-sm text-gray-500 dark:text-gray-400"
+                  >
                     <i class="fas fa-clock mr-1" />
                     最后更新：{{ formatDateTime(oemSettings.updatedAt) }}
                   </div>
@@ -140,7 +151,7 @@
       <!-- 移动端卡片视图 -->
       <div v-if="!loading" class="space-y-4 sm:hidden">
         <!-- 网站名称设置卡片 -->
-        <div class="rounded-lg bg-gray-50 p-4">
+        <div class="rounded-lg bg-gray-50 p-4 dark:bg-gray-700">
           <div class="mb-3 flex items-center gap-3">
             <div
               class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600"
@@ -148,24 +159,24 @@
               <i class="fas fa-font text-sm text-white" />
             </div>
             <div>
-              <h4 class="text-sm font-semibold text-gray-900">网站名称</h4>
+              <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">网站名称</h4>
               <p class="text-xs text-gray-500">品牌标识</p>
             </div>
           </div>
           <div class="space-y-2">
             <input
               v-model="oemSettings.siteName"
-              class="form-input w-full text-sm"
+              class="form-input w-full text-sm dark:border-gray-500 dark:bg-gray-600 dark:text-gray-200"
               maxlength="100"
               placeholder="Claude Relay Service"
               type="text"
             />
-            <p class="text-xs text-gray-500">将显示在浏览器标题和页面头部</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">将显示在浏览器标题和页面头部</p>
           </div>
         </div>
 
         <!-- 网站图标设置卡片 -->
-        <div class="rounded-lg bg-gray-50 p-4">
+        <div class="rounded-lg bg-gray-50 p-4 dark:bg-gray-700">
           <div class="mb-3 flex items-center gap-3">
             <div
               class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 to-purple-600"
@@ -173,15 +184,15 @@
               <i class="fas fa-image text-sm text-white" />
             </div>
             <div>
-              <h4 class="text-sm font-semibold text-gray-900">网站图标</h4>
-              <p class="text-xs text-gray-500">Favicon</p>
+              <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">网站图标</h4>
+              <p class="text-xs text-gray-500 dark:text-gray-400">Favicon</p>
             </div>
           </div>
           <div class="space-y-3">
             <!-- 图标预览 -->
             <div
               v-if="oemSettings.siteIconData || oemSettings.siteIcon"
-              class="inline-flex w-full items-center gap-3 rounded-lg border border-gray-200 bg-white p-3"
+              class="inline-flex w-full items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-600 dark:bg-gray-800"
             >
               <img
                 alt="图标预览"
@@ -189,7 +200,7 @@
                 :src="oemSettings.siteIconData || oemSettings.siteIcon"
                 @error="handleIconError"
               />
-              <span class="flex-1 text-sm text-gray-600">当前图标</span>
+              <span class="flex-1 text-sm text-gray-600 dark:text-gray-400">当前图标</span>
               <button
                 class="rounded-lg px-3 py-1 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-900"
                 @click="removeIcon"
@@ -208,21 +219,23 @@
             />
             <div class="flex flex-col gap-2">
               <button
-                class="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50"
+                class="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                 @click="$refs.iconFileInput.click()"
               >
                 <i class="fas fa-upload" />
                 上传图标
               </button>
-              <div class="text-xs text-gray-500">或者输入图标URL：</div>
+              <div class="text-xs text-gray-500 dark:text-gray-400">或者输入图标URL：</div>
               <input
                 v-model="oemSettings.siteIcon"
-                class="form-input w-full text-sm"
+                class="form-input w-full text-sm dark:border-gray-500 dark:bg-gray-600 dark:text-gray-200"
                 placeholder="https://example.com/icon.png"
                 type="url"
               />
             </div>
-            <p class="text-xs text-gray-500">支持 PNG、JPEG、GIF 格式，建议使用正方形图片</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              支持 PNG、JPEG、GIF 格式，建议使用正方形图片
+            </p>
           </div>
         </div>
 
@@ -239,7 +252,7 @@
           </button>
 
           <button
-            class="btn w-full bg-gray-100 py-3 text-sm text-gray-700 hover:bg-gray-200"
+            class="btn w-full bg-gray-100 py-3 text-sm text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
             :disabled="saving"
             @click="resetOemSettings"
           >
@@ -247,7 +260,10 @@
             重置为默认
           </button>
 
-          <div v-if="oemSettings.updatedAt" class="text-center text-xs text-gray-500">
+          <div
+            v-if="oemSettings.updatedAt"
+            class="text-center text-xs text-gray-500 dark:text-gray-400"
+          >
             <i class="fas fa-clock mr-1" />
             最后更新：{{ formatDateTime(oemSettings.updatedAt) }}
           </div>
@@ -365,10 +381,20 @@ const formatDateTime = settingsStore.formatDateTime
   border: 1px solid #e5e7eb;
 }
 
+:root.dark .card {
+  background: #1f2937;
+  border: 1px solid #374151;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
 .table-container {
   overflow: hidden;
   border-radius: 8px;
   border: 1px solid #f3f4f6;
+}
+
+:root.dark .table-container {
+  border: 1px solid #4b5563;
 }
 
 .table-row {
@@ -377,6 +403,10 @@ const formatDateTime = settingsStore.formatDateTime
 
 .table-row:hover {
   background-color: #f9fafb;
+}
+
+:root.dark .table-row:hover {
+  background-color: #374151;
 }
 
 .form-input {
