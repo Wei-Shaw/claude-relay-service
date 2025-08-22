@@ -32,16 +32,6 @@
 
 📖 **免责声明**: 本项目仅供技术学习和研究使用，作者不对因使用本项目导致的账户封禁、服务中断或其他损失承担任何责任。
 
----
-
-> 💡 **感谢 [@vista8](https://x.com/vista8) 的推荐！**
->
-> 如果你对Vibe coding感兴趣，推荐关注：
->
-> - 🐦 **X**: [@vista8](https://x.com/vista8) - 分享前沿技术动态
-> - 📱 **公众号**: 向阳乔木推荐看
-
----
 
 ## 🤔 这个项目适合你吗？
 
@@ -321,20 +311,7 @@ npm run service:status
 # 拉取镜像（支持 amd64 和 arm64）
 docker pull weishaw/claude-relay-service:latest
 
-# 使用 docker run 运行（注意设置必需的环境变量）
-docker run -d \
-  --name claude-relay \
-  -p 3000:3000 \
-  -v $(pwd)/data:/app/data \
-  -v $(pwd)/logs:/app/logs \
-  -e JWT_SECRET=your-random-secret-key-at-least-32-chars \
-  -e ENCRYPTION_KEY=your-32-character-encryption-key \
-  -e REDIS_HOST=redis \
-  -e ADMIN_USERNAME=my_admin \
-  -e ADMIN_PASSWORD=my_secure_password \
-  weishaw/claude-relay-service:latest
-
-# 或使用 docker-compose
+# 使用 docker-compose
 # 创建 .env 文件用于 docker-compose 的环境变量：
 cat > .env << 'EOF'
 # 必填：安全密钥（请修改为随机值）

@@ -12,6 +12,9 @@ services:
     ports:
       # 绑定地址：生产环境建议使用反向代理，设置 BIND_HOST=127.0.0.1
       - "${BIND_HOST:-0.0.0.0}:${PORT:-3000}:3000"
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
     environment:
       # 🌐 服务器配置
       - NODE_ENV=production
@@ -56,7 +59,6 @@ services:
       - CLEANUP_INTERVAL=${CLEANUP_INTERVAL:-3600000}
       - TOKEN_USAGE_RETENTION=${TOKEN_USAGE_RETENTION:-2592000000}
       - HEALTH_CHECK_INTERVAL=${HEALTH_CHECK_INTERVAL:-60000}
-      - SYSTEM_TIMEZONE=${SYSTEM_TIMEZONE:-Asia/Shanghai}
       - TIMEZONE_OFFSET=${TIMEZONE_OFFSET:-8}
       
       # 🎨 Web 界面配置
@@ -68,9 +70,6 @@ services:
       - DEBUG=${DEBUG:-false}
       - ENABLE_CORS=${ENABLE_CORS:-true}
       - TRUST_PROXY=${TRUST_PROXY:-true}
-    volumes:
-      - ./logs:/app/logs
-      - ./data:/app/data
     depends_on:
       - redis
     networks:
