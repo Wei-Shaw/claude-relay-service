@@ -982,7 +982,7 @@ function createApiKeysUsageTrendChart() {
   }
 
   const data = apiKeysTrendData.value.data || []
-  const metric = apiKeysTrendMetric
+  const metric = apiKeysTrendMetric.value
 
   // 颜色数组
   const colors = [
@@ -1104,7 +1104,7 @@ function createApiKeysUsageTrendChart() {
               else if (rank === 2) rankIcon = '🥈 '
               else if (rank === 3) rankIcon = '🥉 '
 
-              if (apiKeysTrendMetric === 'tokens') {
+              if (apiKeysTrendMetric.value === 'tokens') {
                 // 格式化token显示
                 let formattedValue = ''
                 if (value >= 1000000) {
@@ -1148,7 +1148,7 @@ function createApiKeysUsageTrendChart() {
           beginAtZero: true,
           title: {
             display: true,
-            text: apiKeysTrendMetric === 'tokens' ? 'Token 数量' : '请求次数',
+            text: apiKeysTrendMetric.value === 'tokens' ? 'Token 数量' : '请求次数',
             color: chartColors.value.text
           },
           ticks: {
@@ -1168,7 +1168,7 @@ function createApiKeysUsageTrendChart() {
 
 // 更新API Keys使用趋势图
 async function updateApiKeysUsageTrendChart() {
-  await loadApiKeysTrend(apiKeysTrendMetric)
+  await loadApiKeysTrend(apiKeysTrendMetric.value)
   await nextTick()
   createApiKeysUsageTrendChart()
 }
