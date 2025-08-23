@@ -13,20 +13,14 @@
 
       <!-- 内容区域 -->
       <div class="tab-content">
-        <router-view v-slot="{ Component }">
-          <transition mode="out-in" name="slide-up">
-            <keep-alive :include="['DashboardView', 'ApiKeysView']">
-              <component :is="Component" />
-            </keep-alive>
-          </transition>
-        </router-view>
+        <router-view />
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppHeader from './AppHeader.vue'
 import TabBar from './TabBar.vue'
@@ -45,6 +39,35 @@ const tabRouteMap = {
   settings: '/settings'
 }
 
+// 初始化当前激活的标签
+const initActiveTab = () => {
+  const currentPath = route.path
+  const tabKey = Object.keys(tabRouteMap).find((key) => tabRouteMap[key] === currentPath)
+
+  if (tabKey) {
+    activeTab.value = tabKey
+  } else {
+    // 如果路径不匹配任何标签，尝试从路由名称获取
+    const routeName = route.name
+    const nameToTabMap = {
+      Dashboard: 'dashboard',
+      ApiKeys: 'apiKeys',
+      Accounts: 'accounts',
+      Tutorial: 'tutorial',
+      Settings: 'settings'
+    }
+    if (routeName && nameToTabMap[routeName]) {
+      activeTab.value = nameToTabMap[routeName]
+    } else {
+      // 默认选中仪表板
+      activeTab.value = 'dashboard'
+    }
+  }
+}
+
+// 初始化
+initActiveTab()
+
 // 监听路由变化，更新激活的标签
 watch(
   () => route.path,
@@ -52,15 +75,46 @@ watch(
     const tabKey = Object.keys(tabRouteMap).find((key) => tabRouteMap[key] === newPath)
     if (tabKey) {
       activeTab.value = tabKey
+    } else {
+      // 如果路径不匹配任何标签，尝试从路由名称获取
+      const routeName = route.name
+      const nameToTabMap = {
+        Dashboard: 'dashboard',
+        ApiKeys: 'apiKeys',
+        Accounts: 'accounts',
+        Tutorial: 'tutorial',
+        Settings: 'settings'
+      }
+      if (routeName && nameToTabMap[routeName]) {
+        activeTab.value = nameToTabMap[routeName]
+      }
     }
-  },
-  { immediate: true }
+  }
 )
 
 // 处理标签切换
-const handleTabChange = (tabKey) => {
+const handleTabChange = async (tabKey) => {
+  // 如果已经在目标路由，不需要做任何事
+  if (tabRouteMap[tabKey] === route.path) {
+    return
+  }
+
+  // 先更新activeTab状态
   activeTab.value = tabKey
-  router.push(tabRouteMap[tabKey])
+
+  // 使用 await 确保路由切换完成
+  try {
+    await router.push(tabRouteMap[tabKey])
+    // 等待下一个DOM更新周期，确保组件正确渲染
+    await nextTick()
+  } catch (err) {
+    // 如果路由切换失败，恢复activeTab状态
+    if (err.name !== 'NavigationDuplicated') {
+      console.error('路由切换失败:', err)
+      // 恢复到当前路由对应的tab
+      initActiveTab()
+    }
+  }
 }
 
 // OEM设置已在App.vue中加载，无需重复加载

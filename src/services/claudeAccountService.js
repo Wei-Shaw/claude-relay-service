@@ -1087,6 +1087,22 @@ class ClaudeAccountService {
         logger.info(`🗑️ Deleted sticky session mapping for rate limited account: ${accountId}`)
       }
 
+      // 发送Webhook通知
+      try {
+        const webhookNotifier = require('../utils/webhookNotifier')
+        await webhookNotifier.sendAccountAnomalyNotification({
+          accountId,
+          accountName: accountData.name || 'Claude Account',
+          platform: 'claude-oauth',
+          status: 'error',
+          errorCode: 'CLAUDE_OAUTH_RATE_LIMITED',
+          reason: `Account rate limited (429 error). ${rateLimitResetTimestamp ? `Reset at: ${new Date(rateLimitResetTimestamp * 1000).toISOString()}` : 'Estimated reset in 1-5 hours'}`,
+          timestamp: new Date().toISOString()
+        })
+      } catch (webhookError) {
+        logger.error('Failed to send rate limit webhook notification:', webhookError)
+      }
+
       return { success: true }
     } catch (error) {
       logger.error(`❌ Failed to mark account as rate limited: ${accountId}`, error)

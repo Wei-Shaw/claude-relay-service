@@ -14,6 +14,7 @@ const oauthHelper = require('../utils/oauthHelper')
 const CostCalculator = require('../utils/costCalculator')
 const pricingService = require('../services/pricingService')
 const claudeCodeHeadersService = require('../services/claudeCodeHeadersService')
+const webhookNotifier = require('../utils/webhookNotifier')
 const axios = require('axios')
 const crypto = require('crypto')
 const fs = require('fs')
@@ -1736,6 +1737,19 @@ router.put(
       const newSchedulable = !account.schedulable
       await claudeAccountService.updateAccount(accountId, { schedulable: newSchedulable })
 
+      // 如果账号被禁用，发送webhook通知
+      if (!newSchedulable) {
+        await webhookNotifier.sendAccountAnomalyNotification({
+          accountId: account.id,
+          accountName: account.name || account.claudeAiOauth?.email || 'Claude Account',
+          platform: 'claude-oauth',
+          status: 'disabled',
+          errorCode: 'CLAUDE_OAUTH_MANUALLY_DISABLED',
+          reason: '账号已被管理员手动禁用调度',
+          timestamp: new Date().toISOString()
+        })
+      }
+
       logger.success(
         `🔄 Admin toggled Claude account schedulable status: ${accountId} -> ${newSchedulable ? 'schedulable' : 'not schedulable'}`
       )
@@ -2005,6 +2019,19 @@ router.put(
 
       const newSchedulable = !account.schedulable
       await claudeConsoleAccountService.updateAccount(accountId, { schedulable: newSchedulable })
+
+      // 如果账号被禁用，发送webhook通知
+      if (!newSchedulable) {
+        await webhookNotifier.sendAccountAnomalyNotification({
+          accountId: account.id,
+          accountName: account.name || 'Claude Console Account',
+          platform: 'claude-console',
+          status: 'disabled',
+          errorCode: 'CLAUDE_CONSOLE_MANUALLY_DISABLED',
+          reason: '账号已被管理员手动禁用调度',
+          timestamp: new Date().toISOString()
+        })
+      }
 
       logger.success(
         `🔄 Admin toggled Claude Console account schedulable status: ${accountId} -> ${newSchedulable ? 'schedulable' : 'not schedulable'}`
@@ -2278,6 +2305,19 @@ router.put(
         return res
           .status(500)
           .json({ error: 'Failed to toggle schedulable status', message: updateResult.error })
+      }
+
+      // 如果账号被禁用，发送webhook通知
+      if (!newSchedulable) {
+        await webhookNotifier.sendAccountAnomalyNotification({
+          accountId: accountResult.data.id,
+          accountName: accountResult.data.name || 'Bedrock Account',
+          platform: 'bedrock',
+          status: 'disabled',
+          errorCode: 'BEDROCK_MANUALLY_DISABLED',
+          reason: '账号已被管理员手动禁用调度',
+          timestamp: new Date().toISOString()
+        })
       }
 
       logger.success(
@@ -2650,6 +2690,19 @@ router.put(
       // 验证更新是否成功，重新获取账户信息
       const updatedAccount = await geminiAccountService.getAccount(accountId)
       const actualSchedulable = updatedAccount ? updatedAccount.schedulable : newSchedulable
+
+      // 如果账号被禁用，发送webhook通知
+      if (!actualSchedulable) {
+        await webhookNotifier.sendAccountAnomalyNotification({
+          accountId: account.id,
+          accountName: account.accountName || 'Gemini Account',
+          platform: 'gemini',
+          status: 'disabled',
+          errorCode: 'GEMINI_MANUALLY_DISABLED',
+          reason: '账号已被管理员手动禁用调度',
+          timestamp: new Date().toISOString()
+        })
+      }
 
       logger.success(
         `🔄 Admin toggled Gemini account schedulable status: ${accountId} -> ${actualSchedulable ? 'schedulable' : 'not schedulable'}`
@@ -5212,6 +5265,23 @@ router.put(
 
       const result = await openaiAccountService.toggleSchedulable(accountId)
 
+      // 如果账号被禁用，发送webhook通知
+      if (!result.schedulable) {
+        // 获取账号信息
+        const account = await redis.getOpenAiAccount(accountId)
+        if (account) {
+          await webhookNotifier.sendAccountAnomalyNotification({
+            accountId: account.id,
+            accountName: account.name || 'OpenAI Account',
+            platform: 'openai',
+            status: 'disabled',
+            errorCode: 'OPENAI_MANUALLY_DISABLED',
+            reason: '账号已被管理员手动禁用调度',
+            timestamp: new Date().toISOString()
+          })
+        }
+      }
+
       return res.json({
         success: result.success,
         schedulable: result.schedulable,
@@ -5440,6 +5510,23 @@ router.put(
       const { accountId } = req.params
 
       const result = await azureOpenaiAccountService.toggleSchedulable(accountId)
+
+      // 如果账号被禁用，发送webhook通知
+      if (!result.schedulable) {
+        // 获取账号信息
+        const account = await azureOpenaiAccountService.getAccount(accountId)
+        if (account) {
+          await webhookNotifier.sendAccountAnomalyNotification({
+            accountId: account.id,
+            accountName: account.name || 'Azure OpenAI Account',
+            platform: 'azure-openai',
+            status: 'disabled',
+            errorCode: 'AZURE_OPENAI_MANUALLY_DISABLED',
+            reason: '账号已被管理员手动禁用调度',
+            timestamp: new Date().toISOString()
+          })
+        }
+      }
 
       return res.json({
         success: true,

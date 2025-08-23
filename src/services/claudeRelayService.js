@@ -591,10 +591,18 @@ class ClaudeRelayService {
     }
 
     return new Promise((resolve, reject) => {
+      // 支持自定义路径（如 count_tokens）
+      let requestPath = url.pathname
+      if (requestOptions.customPath) {
+        const baseUrl = new URL('https://api.anthropic.com')
+        const customUrl = new URL(requestOptions.customPath, baseUrl)
+        requestPath = customUrl.pathname
+      }
+
       const options = {
         hostname: url.hostname,
         port: url.port || 443,
-        path: url.pathname,
+        path: requestPath,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

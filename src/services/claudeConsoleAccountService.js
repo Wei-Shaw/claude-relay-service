@@ -366,6 +366,22 @@ class ClaudeConsoleAccountService {
 
       await client.hset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, updates)
 
+      // 发送Webhook通知
+      try {
+        const webhookNotifier = require('../utils/webhookNotifier')
+        await webhookNotifier.sendAccountAnomalyNotification({
+          accountId,
+          accountName: account.name || 'Claude Console Account',
+          platform: 'claude-console',
+          status: 'error',
+          errorCode: 'CLAUDE_CONSOLE_RATE_LIMITED',
+          reason: `Account rate limited (429 error). ${account.rateLimitDuration ? `Will be blocked for ${account.rateLimitDuration} hours` : 'Temporary rate limit'}`,
+          timestamp: new Date().toISOString()
+        })
+      } catch (webhookError) {
+        logger.error('Failed to send rate limit webhook notification:', webhookError)
+      }
+
       logger.warn(
         `🚫 Claude Console account marked as rate limited: ${account.name} (${accountId})`
       )

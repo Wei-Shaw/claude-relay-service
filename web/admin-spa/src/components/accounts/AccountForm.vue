@@ -962,7 +962,8 @@
                 v-if="
                   (form.addType === 'oauth' || form.addType === 'setup-token') &&
                   form.platform !== 'claude-console' &&
-                  form.platform !== 'bedrock'
+                  form.platform !== 'bedrock' &&
+                  form.platform !== 'azure_openai'
                 "
                 class="btn btn-primary flex-1 px-6 py-3 font-semibold"
                 :disabled="loading"
