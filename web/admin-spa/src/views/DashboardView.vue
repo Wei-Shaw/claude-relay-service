@@ -105,6 +105,20 @@
                     dashboardData.accountsByPlatform.openai.total
                   }}</span>
                 </div>
+                <!-- Azure OpenAI账户 -->
+                <div
+                  v-if="
+                    dashboardData.accountsByPlatform.azure_openai &&
+                    dashboardData.accountsByPlatform.azure_openai.total > 0
+                  "
+                  class="inline-flex items-center gap-0.5"
+                  :title="`Azure OpenAI: ${dashboardData.accountsByPlatform.azure_openai.total} 个 (正常: ${dashboardData.accountsByPlatform.azure_openai.normal})`"
+                >
+                  <i class="fab fa-microsoft text-xs text-blue-600" />
+                  <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{
+                    dashboardData.accountsByPlatform.azure_openai.total
+                  }}</span>
+                </div>
               </div>
             </div>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -982,7 +996,7 @@ function createApiKeysUsageTrendChart() {
   }
 
   const data = apiKeysTrendData.value.data || []
-  const metric = apiKeysTrendMetric
+  const metric = apiKeysTrendMetric.value
 
   // 颜色数组
   const colors = [
@@ -1104,7 +1118,7 @@ function createApiKeysUsageTrendChart() {
               else if (rank === 2) rankIcon = '🥈 '
               else if (rank === 3) rankIcon = '🥉 '
 
-              if (apiKeysTrendMetric === 'tokens') {
+              if (apiKeysTrendMetric.value === 'tokens') {
                 // 格式化token显示
                 let formattedValue = ''
                 if (value >= 1000000) {
@@ -1148,7 +1162,7 @@ function createApiKeysUsageTrendChart() {
           beginAtZero: true,
           title: {
             display: true,
-            text: apiKeysTrendMetric === 'tokens' ? 'Token 数量' : '请求次数',
+            text: apiKeysTrendMetric.value === 'tokens' ? 'Token 数量' : '请求次数',
             color: chartColors.value.text
           },
           ticks: {
@@ -1168,7 +1182,7 @@ function createApiKeysUsageTrendChart() {
 
 // 更新API Keys使用趋势图
 async function updateApiKeysUsageTrendChart() {
-  await loadApiKeysTrend(apiKeysTrendMetric)
+  await loadApiKeysTrend(apiKeysTrendMetric.value)
   await nextTick()
   createApiKeysUsageTrendChart()
 }

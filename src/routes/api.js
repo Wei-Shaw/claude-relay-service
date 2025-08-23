@@ -671,4 +671,103 @@ router.get('/v1/organizations/:org_id/usage', authenticateApiKey, async (req, re
   }
 })
 
+// 🔢 Token计数端点 - count_tokens beta API
+router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) => {
+  try {
+    // 检查权限
+    if (
+      req.apiKey.permissions &&
+      req.apiKey.permissions !== 'all' &&
+      req.apiKey.permissions !== 'claude'
+    ) {
+      return res.status(403).json({
+        error: {
+          type: 'permission_error',
+          message: 'This API key does not have permission to access Claude'
+        }
+      })
+    }
+
+    logger.info(`🔢 Processing token count request for key: ${req.apiKey.name}`)
+
+    // 生成会话哈希用于sticky会话
+    const sessionHash = sessionHelper.generateSessionHash(req.body)
+
+    // 选择可用的Claude账户
+    const requestedModel = req.body.model
+    const { accountId, accountType } = await unifiedClaudeScheduler.selectAccountForApiKey(
+      req.apiKey,
+      sessionHash,
+      requestedModel
+    )
+
+    let response
+    if (accountType === 'claude-official') {
+      // 使用官方Claude账号转发count_tokens请求
+      response = await claudeRelayService.relayRequest(
+        req.body,
+        req.apiKey,
+        req,
+        res,
+        req.headers,
+        {
+          skipUsageRecord: true, // 跳过usage记录，这只是计数请求
+          customPath: '/v1/messages/count_tokens' // 指定count_tokens路径
+        }
+      )
+    } else if (accountType === 'claude-console') {
+      // 使用Console Claude账号转发count_tokens请求
+      response = await claudeConsoleRelayService.relayRequest(
+        req.body,
+        req.apiKey,
+        req,
+        res,
+        req.headers,
+        accountId,
+        {
+          skipUsageRecord: true, // 跳过usage记录，这只是计数请求
+          customPath: '/v1/messages/count_tokens' // 指定count_tokens路径
+        }
+      )
+    } else {
+      // Bedrock不支持count_tokens
+      return res.status(501).json({
+        error: {
+          type: 'not_supported',
+          message: 'Token counting is not supported for Bedrock accounts'
+        }
+      })
+    }
+
+    // 直接返回响应，不记录token使用量
+    res.status(response.statusCode)
+
+    // 设置响应头
+    const skipHeaders = ['content-encoding', 'transfer-encoding', 'content-length']
+    Object.keys(response.headers).forEach((key) => {
+      if (!skipHeaders.includes(key.toLowerCase())) {
+        res.setHeader(key, response.headers[key])
+      }
+    })
+
+    // 尝试解析并返回JSON响应
+    try {
+      const jsonData = JSON.parse(response.body)
+      res.json(jsonData)
+    } catch (parseError) {
+      res.send(response.body)
+    }
+
+    logger.info(`✅ Token count request completed for key: ${req.apiKey.name}`)
+  } catch (error) {
+    logger.error('❌ Token count error:', error)
+    res.status(500).json({
+      error: {
+        type: 'server_error',
+        message: 'Failed to count tokens'
+      }
+    })
+  }
+})
+
 module.exports = router
