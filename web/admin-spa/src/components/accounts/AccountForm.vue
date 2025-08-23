@@ -110,6 +110,15 @@
                     v-model="form.platform"
                     class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
                     type="radio"
+                    value="azure_openai"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">Azure OpenAI</span>
+                </label>
+                <label class="flex cursor-pointer items-center">
+                  <input
+                    v-model="form.platform"
+                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="radio"
                     value="bedrock"
                   />
                   <span class="text-sm text-gray-700 dark:text-gray-300">Bedrock</span>
@@ -118,7 +127,12 @@
             </div>
 
             <div
-              v-if="!isEdit && form.platform !== 'claude-console' && form.platform !== 'bedrock'"
+              v-if="
+                !isEdit &&
+                form.platform !== 'claude-console' &&
+                form.platform !== 'bedrock' &&
+                form.platform !== 'azure_openai'
+              "
             >
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >添加方式</label
@@ -429,7 +443,111 @@
                   用于快速响应的轻量级模型，留空将使用系统默认
                 </p>
               </div>
+            </div>
 
+            <!-- Azure OpenAI 特定字段 -->
+            <div v-if="form.platform === 'azure_openai' && !isEdit" class="space-y-4">
+              <div>
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  >Azure Endpoint *</label
+                >
+                <input
+                  v-model="form.azureEndpoint"
+                  class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  :class="{ 'border-red-500': errors.azureEndpoint }"
+                  placeholder="https://your-resource.openai.azure.com"
+                  required
+                  type="url"
+                />
+                <p v-if="errors.azureEndpoint" class="mt-1 text-xs text-red-500">
+                  {{ errors.azureEndpoint }}
+                </p>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Azure OpenAI 资源的终结点 URL，格式：https://your-resource.openai.azure.com
+                </p>
+              </div>
+
+              <div>
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  >API 版本</label
+                >
+                <input
+                  v-model="form.apiVersion"
+                  class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  placeholder="2024-02-01"
+                  type="text"
+                />
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Azure OpenAI API 版本，默认使用最新稳定版本 2024-02-01
+                </p>
+              </div>
+
+              <div>
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  >部署名称 *</label
+                >
+                <input
+                  v-model="form.deploymentName"
+                  class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  :class="{ 'border-red-500': errors.deploymentName }"
+                  placeholder="gpt-4"
+                  required
+                  type="text"
+                />
+                <p v-if="errors.deploymentName" class="mt-1 text-xs text-red-500">
+                  {{ errors.deploymentName }}
+                </p>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  在 Azure OpenAI Studio 中创建的部署名称
+                </p>
+              </div>
+
+              <div>
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  >API Key *</label
+                >
+                <input
+                  v-model="form.apiKey"
+                  class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  :class="{ 'border-red-500': errors.apiKey }"
+                  placeholder="请输入 Azure OpenAI API Key"
+                  required
+                  type="password"
+                />
+                <p v-if="errors.apiKey" class="mt-1 text-xs text-red-500">
+                  {{ errors.apiKey }}
+                </p>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  从 Azure 门户获取的 API 密钥
+                </p>
+              </div>
+
+              <div>
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  >支持的模型</label
+                >
+                <div class="flex flex-wrap gap-2">
+                  <label
+                    v-for="model in ['gpt-4', 'gpt-4-turbo', 'gpt-35-turbo', 'gpt-35-turbo-16k']"
+                    :key="model"
+                    class="flex cursor-pointer items-center"
+                  >
+                    <input
+                      v-model="form.supportedModels"
+                      class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                      type="checkbox"
+                      :value="model"
+                    />
+                    <span class="text-sm text-gray-700 dark:text-gray-300">{{ model }}</span>
+                  </label>
+                </div>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  选择此部署支持的模型类型
+                </p>
+              </div>
+            </div>
+
+            <div v-if="form.platform === 'bedrock' && !isEdit">
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >限流机制</label

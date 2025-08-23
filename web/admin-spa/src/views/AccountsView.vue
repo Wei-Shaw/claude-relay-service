@@ -7,7 +7,7 @@
             账户管理
           </h3>
           <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-base">
-            管理您的 Claude 和 Gemini 账户及代理配置
+            管理您的 Claude、Gemini、OpenAI 和 Azure OpenAI 账户及代理配置
           </p>
         </div>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -299,6 +299,19 @@
                     <span class="text-xs font-medium text-gray-950">{{ getOpenAIAuthType() }}</span>
                   </div>
                   <div
+                    v-else-if="account.platform === 'azure_openai'"
+                    class="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-gradient-to-r from-blue-100 to-cyan-100 px-2.5 py-1 dark:border-blue-700 dark:from-blue-900/20 dark:to-cyan-900/20"
+                  >
+                    <i class="fab fa-microsoft text-xs text-blue-700 dark:text-blue-400" />
+                    <span class="text-xs font-semibold text-blue-800 dark:text-blue-300"
+                      >Azure OpenAI</span
+                    >
+                    <span class="mx-1 h-4 w-px bg-blue-300 dark:bg-blue-600" />
+                    <span class="text-xs font-medium text-blue-700 dark:text-blue-400"
+                      >API Key</span
+                    >
+                  </div>
+                  <div
                     v-else-if="account.platform === 'claude' || account.platform === 'claude-oauth'"
                     class="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-gradient-to-r from-indigo-100 to-blue-100 px-2.5 py-1"
                   >
@@ -581,7 +594,11 @@
                     ? 'bg-gradient-to-br from-purple-500 to-purple-600'
                     : account.platform === 'bedrock'
                       ? 'bg-gradient-to-br from-orange-500 to-red-600'
-                      : 'bg-gradient-to-br from-blue-500 to-blue-600'
+                      : account.platform === 'azure_openai'
+                        ? 'bg-gradient-to-br from-blue-500 to-cyan-600'
+                        : account.platform === 'openai'
+                          ? 'bg-gradient-to-br from-gray-600 to-gray-700'
+                          : 'bg-gradient-to-br from-blue-500 to-blue-600'
                 ]"
               >
                 <i
@@ -591,7 +608,11 @@
                       ? 'fas fa-brain'
                       : account.platform === 'bedrock'
                         ? 'fab fa-aws'
-                        : 'fas fa-robot'
+                        : account.platform === 'azure_openai'
+                          ? 'fab fa-microsoft'
+                          : account.platform === 'openai'
+                            ? 'fas fa-openai'
+                            : 'fas fa-robot'
                   ]"
                 />
               </div>
@@ -820,6 +841,7 @@ const platformOptions = ref([
   { value: 'claude-console', label: 'Claude Console', icon: 'fa-terminal' },
   { value: 'gemini', label: 'Gemini', icon: 'fa-google' },
   { value: 'openai', label: 'OpenAi', icon: 'fa-openai' },
+  { value: 'azure_openai', label: 'Azure OpenAI', icon: 'fab fa-microsoft' },
   { value: 'bedrock', label: 'Bedrock', icon: 'fab fa-aws' }
 ])
 
@@ -912,7 +934,8 @@ const loadAccounts = async (forceReload = false) => {
         apiClient.get('/admin/claude-console-accounts', { params }),
         apiClient.get('/admin/bedrock-accounts', { params }),
         apiClient.get('/admin/gemini-accounts', { params }),
-        apiClient.get('/admin/openai-accounts', { params })
+        apiClient.get('/admin/openai-accounts', { params }),
+        apiClient.get('/admin/azure-openai-accounts', { params })
       )
     } else {
       // 只请求指定平台，其他平台设为null占位
@@ -958,7 +981,7 @@ const loadAccounts = async (forceReload = false) => {
     // 加载分组成员关系（需要在分组数据加载完成后）
     await loadGroupMembers(forceReload)
 
-    const [claudeData, claudeConsoleData, bedrockData, geminiData, openaiData] =
+    const [claudeData, claudeConsoleData, bedrockData, geminiData, openaiData, azureOpenaiData] =
       await Promise.all(requests)
 
     const allAccounts = []
@@ -1015,6 +1038,17 @@ const loadAccounts = async (forceReload = false) => {
         return { ...acc, platform: 'openai', boundApiKeysCount, groupInfo }
       })
       allAccounts.push(...openaiAccounts)
+    }
+    if (azureOpenaiData && azureOpenaiData.success) {
+      const azureOpenaiAccounts = (azureOpenaiData.data || []).map((acc) => {
+        // 计算每个Azure OpenAI账户绑定的API Key数量
+        const boundApiKeysCount = apiKeys.value.filter(
+          (key) => key.azureOpenaiAccountId === acc.id
+        ).length
+        const groupInfo = accountGroupMap.value.get(acc.id) || null
+        return { ...acc, platform: 'azure_openai', boundApiKeysCount, groupInfo }
+      })
+      allAccounts.push(...azureOpenaiAccounts)
     }
 
     accounts.value = allAccounts
@@ -1244,6 +1278,8 @@ const deleteAccount = async (account) => {
       endpoint = `/admin/bedrock-accounts/${account.id}`
     } else if (account.platform === 'openai') {
       endpoint = `/admin/openai-accounts/${account.id}`
+    } else if (account.platform === 'azure_openai') {
+      endpoint = `/admin/azure-openai-accounts/${account.id}`
     } else {
       endpoint = `/admin/gemini-accounts/${account.id}`
     }
@@ -1316,6 +1352,8 @@ const toggleSchedulable = async (account) => {
       endpoint = `/admin/gemini-accounts/${account.id}/toggle-schedulable`
     } else if (account.platform === 'openai') {
       endpoint = `/admin/openai-accounts/${account.id}/toggle-schedulable`
+    } else if (account.platform === 'azure_openai') {
+      endpoint = `/admin/azure-openai-accounts/${account.id}/toggle-schedulable`
     } else {
       showToast('该账户类型暂不支持调度控制', 'warning')
       return

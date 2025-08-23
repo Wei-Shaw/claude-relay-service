@@ -105,6 +105,20 @@
                     dashboardData.accountsByPlatform.openai.total
                   }}</span>
                 </div>
+                <!-- Azure OpenAI账户 -->
+                <div
+                  v-if="
+                    dashboardData.accountsByPlatform.azure_openai &&
+                    dashboardData.accountsByPlatform.azure_openai.total > 0
+                  "
+                  class="inline-flex items-center gap-0.5"
+                  :title="`Azure OpenAI: ${dashboardData.accountsByPlatform.azure_openai.total} 个 (正常: ${dashboardData.accountsByPlatform.azure_openai.normal})`"
+                >
+                  <i class="fab fa-microsoft text-xs text-blue-600" />
+                  <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{
+                    dashboardData.accountsByPlatform.azure_openai.total
+                  }}</span>
+                </div>
               </div>
             </div>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
