@@ -149,7 +149,7 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
 
     // 覆盖或新增必要头部
     headers['authorization'] = `Bearer ${accessToken}`
-    headers['chatgpt-account-id'] = account.chatgptUserId || account.accountId || accountId
+    headers['chatgpt-account-id'] = account.accountId || account.chatgptUserId || accountId
     headers['host'] = 'chatgpt.com'
     headers['accept'] = isStream ? 'text/event-stream' : 'application/json'
     headers['content-type'] = 'application/json'
