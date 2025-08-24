@@ -1760,7 +1760,12 @@ const initProxyConfig = () => {
 // 表单数据
 const form = ref({
   platform: props.account?.platform || 'claude',
-  addType: props.account?.platform === 'gemini' ? 'oauth' : 'setup-token',
+  addType: (() => {
+    const platform = props.account?.platform || 'claude'
+    if (platform === 'gemini' || platform === 'openai') return 'oauth'
+    if (platform === 'claude') return 'setup-token'
+    return 'manual'
+  })(),
   name: props.account?.name || '',
   description: props.account?.description || '',
   accountType: props.account?.accountType || 'shared',
@@ -2553,6 +2558,9 @@ watch(
       form.value.addType = 'setup-token'
     } else if (newPlatform === 'gemini') {
       // 切换到 Gemini 时，使用 OAuth 作为默认方式
+      form.value.addType = 'oauth'
+    } else if (newPlatform === 'openai') {
+      // 切换到 OpenAI 时，使用 OAuth 作为默认方式
       form.value.addType = 'oauth'
     }
 
