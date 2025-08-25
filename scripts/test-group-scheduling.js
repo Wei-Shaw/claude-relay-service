@@ -436,8 +436,9 @@ async function test8_groupMemberManagement() {
     const account = testData.accounts.find((a) => a.type === 'claude')
 
     // 获取账户所属分组
-    const accountGroup = await accountGroupService.getAccountGroup(account.id)
-    if (accountGroup && accountGroup.id === claudeGroup.id) {
+    const accountGroups = await accountGroupService.getAccountGroup(account.id)
+    const hasTargetGroup = accountGroups.some((group) => group.id === claudeGroup.id)
+    if (hasTargetGroup) {
       log('✅ 账户分组查询验证通过', 'success')
     } else {
       throw new Error('账户分组查询结果不正确')
