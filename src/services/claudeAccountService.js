@@ -609,6 +609,13 @@ class ClaudeAccountService {
   // 🗑️ 删除Claude账户
   async deleteAccount(accountId) {
     try {
+      // 首先从所有分组中移除此账户
+      const accountGroupService = require('./accountGroupService')
+      const groups = await accountGroupService.getAccountGroup(accountId)
+      for (const group of groups) {
+        await accountGroupService.removeAccountFromGroup(accountId, group.id)
+      }
+
       const result = await redis.deleteClaudeAccount(accountId)
 
       if (result === 0) {
@@ -1025,6 +1032,7 @@ class ClaudeAccountService {
       return 0
     }
   }
+
 
   // 🚫 标记账号为限流状态
   async markAccountRateLimited(accountId, sessionHash = null, rateLimitResetTimestamp = null) {
@@ -1734,6 +1742,7 @@ class ClaudeAccountService {
       throw error
     }
   }
+
 }
 
 module.exports = new ClaudeAccountService()
