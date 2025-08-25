@@ -240,12 +240,14 @@
                       >
                         <i class="fas fa-share-alt mr-1" />共享
                       </span>
+                      <!-- 显示所有分组 -->
                       <span
-                        v-if="account.groupInfo"
+                        v-for="group in account.groupInfos"
+                        :key="group.id"
                         class="ml-1 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-400"
-                        :title="`所属分组: ${account.groupInfo.name}`"
+                        :title="`所属分组: ${group.name}`"
                       >
-                        <i class="fas fa-folder mr-1" />{{ account.groupInfo.name }}
+                        <i class="fas fa-folder mr-1" />{{ group.name }}
                       </span>
                     </div>
                     <div
@@ -824,7 +826,7 @@ const platformFilter = ref('all')
 const apiKeysLoaded = ref(false)
 const groupsLoaded = ref(false)
 const groupMembersLoaded = ref(false)
-const accountGroupMap = ref(new Map())
+const accountGroupMap = ref(new Map()) // Map<accountId, Array<groupInfo>>
 
 // 下拉选项数据
 const sortOptions = ref([
@@ -978,8 +980,8 @@ const loadAccounts = async (forceReload = false) => {
     // 使用缓存机制加载 API Keys 和分组数据
     await Promise.all([loadApiKeys(forceReload), loadAccountGroups(forceReload)])
 
-    // 加载分组成员关系（需要在分组数据加载完成后）
-    await loadGroupMembers(forceReload)
+    // 后端账户API已经包含分组信息，不需要单独加载分组成员关系
+    // await loadGroupMembers(forceReload)
 
     const [claudeData, claudeConsoleData, bedrockData, geminiData, openaiData, azureOpenaiData] =
       await Promise.all(requests)
@@ -992,9 +994,8 @@ const loadAccounts = async (forceReload = false) => {
         const boundApiKeysCount = apiKeys.value.filter(
           (key) => key.claudeAccountId === acc.id
         ).length
-        // 检查是否属于某个分组
-        const groupInfo = accountGroupMap.value.get(acc.id) || null
-        return { ...acc, platform: 'claude', boundApiKeysCount, groupInfo }
+        // 后端已经包含了groupInfos，直接使用
+        return { ...acc, platform: 'claude', boundApiKeysCount }
       })
       allAccounts.push(...claudeAccounts)
     }
@@ -1002,8 +1003,8 @@ const loadAccounts = async (forceReload = false) => {
     if (claudeConsoleData.success) {
       const claudeConsoleAccounts = (claudeConsoleData.data || []).map((acc) => {
         // Claude Console账户暂时不支持直接绑定
-        const groupInfo = accountGroupMap.value.get(acc.id) || null
-        return { ...acc, platform: 'claude-console', boundApiKeysCount: 0, groupInfo }
+        // 后端已经包含了groupInfos，直接使用
+        return { ...acc, platform: 'claude-console', boundApiKeysCount: 0 }
       })
       allAccounts.push(...claudeConsoleAccounts)
     }
@@ -1011,8 +1012,8 @@ const loadAccounts = async (forceReload = false) => {
     if (bedrockData.success) {
       const bedrockAccounts = (bedrockData.data || []).map((acc) => {
         // Bedrock账户暂时不支持直接绑定
-        const groupInfo = accountGroupMap.value.get(acc.id) || null
-        return { ...acc, platform: 'bedrock', boundApiKeysCount: 0, groupInfo }
+        // 后端已经包含了groupInfos，直接使用
+        return { ...acc, platform: 'bedrock', boundApiKeysCount: 0 }
       })
       allAccounts.push(...bedrockAccounts)
     }
@@ -1023,8 +1024,8 @@ const loadAccounts = async (forceReload = false) => {
         const boundApiKeysCount = apiKeys.value.filter(
           (key) => key.geminiAccountId === acc.id
         ).length
-        const groupInfo = accountGroupMap.value.get(acc.id) || null
-        return { ...acc, platform: 'gemini', boundApiKeysCount, groupInfo }
+        // 后端已经包含了groupInfos，直接使用
+        return { ...acc, platform: 'gemini', boundApiKeysCount }
       })
       allAccounts.push(...geminiAccounts)
     }
@@ -1034,8 +1035,8 @@ const loadAccounts = async (forceReload = false) => {
         const boundApiKeysCount = apiKeys.value.filter(
           (key) => key.openaiAccountId === acc.id
         ).length
-        const groupInfo = accountGroupMap.value.get(acc.id) || null
-        return { ...acc, platform: 'openai', boundApiKeysCount, groupInfo }
+        // 后端已经包含了groupInfos，直接使用
+        return { ...acc, platform: 'openai', boundApiKeysCount }
       })
       allAccounts.push(...openaiAccounts)
     }
@@ -1128,36 +1129,6 @@ const loadAccountGroups = async (forceReload = false) => {
     }
   } catch (error) {
     console.error('Failed to load account groups:', error)
-  }
-}
-
-// 加载分组成员关系（缓存版本）
-const loadGroupMembers = async (forceReload = false) => {
-  if (!forceReload && groupMembersLoaded.value) {
-    return // 使用缓存数据
-  }
-
-  try {
-    // 重置映射
-    accountGroupMap.value.clear()
-
-    // 获取所有分组的成员信息
-    for (const group of accountGroups.value) {
-      try {
-        const membersResponse = await apiClient.get(`/admin/account-groups/${group.id}/members`)
-        if (membersResponse.success) {
-          const members = membersResponse.data || []
-          members.forEach((member) => {
-            accountGroupMap.value.set(member.id, group)
-          })
-        }
-      } catch (error) {
-        console.error(`Failed to load members for group ${group.id}:`, error)
-      }
-    }
-    groupMembersLoaded.value = true
-  } catch (error) {
-    console.error('Failed to load group members:', error)
   }
 }
 
