@@ -4,8 +4,7 @@
  */
 
 const crypto = require('crypto')
-const { SocksProxyAgent } = require('socks-proxy-agent')
-const { HttpsProxyAgent } = require('https-proxy-agent')
+const ProxyHelper = require('./proxyHelper')
 const axios = require('axios')
 const logger = require('./logger')
 
@@ -125,36 +124,12 @@ function generateSetupTokenParams() {
 }
 
 /**
- * 创建代理agent
+ * 创建代理agent（使用统一的代理工具）
  * @param {object|null} proxyConfig - 代理配置对象
  * @returns {object|null} 代理agent或null
  */
 function createProxyAgent(proxyConfig) {
-  if (!proxyConfig) {
-    return null
-  }
-
-  try {
-    if (proxyConfig.type === 'socks5') {
-      const auth =
-        proxyConfig.username && proxyConfig.password
-          ? `${proxyConfig.username}:${proxyConfig.password}@`
-          : ''
-      const socksUrl = `socks5://${auth}${proxyConfig.host}:${proxyConfig.port}`
-      return new SocksProxyAgent(socksUrl)
-    } else if (proxyConfig.type === 'http' || proxyConfig.type === 'https') {
-      const auth =
-        proxyConfig.username && proxyConfig.password
-          ? `${proxyConfig.username}:${proxyConfig.password}@`
-          : ''
-      const httpUrl = `${proxyConfig.type}://${auth}${proxyConfig.host}:${proxyConfig.port}`
-      return new HttpsProxyAgent(httpUrl)
-    }
-  } catch (error) {
-    console.warn('⚠️ Invalid proxy configuration:', error)
-  }
-
-  return null
+  return ProxyHelper.createProxyAgent(proxyConfig)
 }
 
 /**
@@ -182,6 +157,14 @@ async function exchangeCodeForTokens(authorizationCode, codeVerifier, state, pro
   const agent = createProxyAgent(proxyConfig)
 
   try {
+    if (agent) {
+      logger.info(
+        `🌐 Using proxy for OAuth token exchange: ${ProxyHelper.maskProxyInfo(proxyConfig)}`
+      )
+    } else {
+      logger.debug('🌐 No proxy configured for OAuth token exchange')
+    }
+
     logger.debug('🔄 Attempting OAuth token exchange', {
       url: OAUTH_CONFIG.TOKEN_URL,
       codeLength: cleanedCode.length,
@@ -379,6 +362,14 @@ async function exchangeSetupTokenCode(authorizationCode, codeVerifier, state, pr
   const agent = createProxyAgent(proxyConfig)
 
   try {
+    if (agent) {
+      logger.info(
+        `🌐 Using proxy for Setup Token exchange: ${ProxyHelper.maskProxyInfo(proxyConfig)}`
+      )
+    } else {
+      logger.debug('🌐 No proxy configured for Setup Token exchange')
+    }
+
     logger.debug('🔄 Attempting Setup Token exchange', {
       url: OAUTH_CONFIG.TOKEN_URL,
       codeLength: cleanedCode.length,

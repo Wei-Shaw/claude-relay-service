@@ -1,26 +1,28 @@
 <template>
   <div class="card p-3 sm:p-6">
     <div class="mb-4 sm:mb-8">
-      <h3 class="mb-3 flex items-center text-xl font-bold text-gray-900 sm:mb-4 sm:text-2xl">
+      <h3
+        class="mb-3 flex items-center text-xl font-bold text-gray-900 dark:text-gray-100 sm:mb-4 sm:text-2xl"
+      >
         <i class="fas fa-graduation-cap mr-2 text-blue-600 sm:mr-3" />
         Claude Code 使用教程
       </h3>
-      <p class="text-sm text-gray-600 sm:text-lg">
+      <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-lg">
         跟着这个教程，你可以轻松在自己的电脑上安装并使用 Claude Code。
       </p>
     </div>
 
     <!-- 系统选择标签 -->
     <div class="mb-4 sm:mb-8">
-      <div class="flex flex-wrap gap-1 rounded-xl bg-gray-100 p-1 sm:gap-2 sm:p-2">
+      <div class="flex flex-wrap gap-1 rounded-xl bg-gray-100 p-1 dark:bg-gray-700 sm:gap-2 sm:p-2">
         <button
           v-for="system in tutorialSystems"
           :key="system.key"
           :class="[
             'flex flex-1 items-center justify-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold transition-all duration-300 sm:gap-2 sm:px-6 sm:py-3 sm:text-sm',
             activeTutorialSystem === system.key
-              ? 'bg-white text-blue-600 shadow-sm'
-              : 'text-gray-600 hover:bg-white/50 hover:text-gray-900'
+              ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
+              : 'text-gray-600 hover:bg-white/50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
           ]"
           @click="activeTutorialSystem = system.key"
         >
@@ -34,14 +36,16 @@
     <div v-if="activeTutorialSystem === 'windows'" class="tutorial-content">
       <!-- 第一步：安装 Node.js -->
       <div class="mb-4 sm:mb-10 sm:mb-6">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+        <h4
+          class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
+        >
           <span
             class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
             >1</span
           >
           安装 Node.js 环境
         </h4>
-        <p class="mb-4 text-sm text-gray-600 sm:mb-4 sm:mb-6 sm:text-base">
+        <p class="mb-4 text-sm text-gray-600 dark:text-gray-400 sm:mb-4 sm:mb-6 sm:text-base">
           Claude Code 需要 Node.js 环境才能运行。
         </p>
 
@@ -49,34 +53,42 @@
           class="mb-4 rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 sm:mb-4 sm:mb-6 sm:p-6"
         >
           <h5
-            class="mb-2 flex items-center text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg"
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-600 sm:mb-3 sm:text-lg"
           >
             <i class="fab fa-windows mr-2 text-blue-600" />
             Windows 安装方法
           </h5>
           <div class="mb-3 sm:mb-4">
-            <p class="mb-2 text-sm text-gray-700 sm:mb-3 sm:text-base">方法一：官网下载（推荐）</p>
+            <p class="mb-2 text-sm text-gray-700 dark:text-gray-600 sm:mb-3 sm:text-base">
+              方法一：官网下载（推荐）
+            </p>
             <ol
-              class="ml-2 list-inside list-decimal space-y-1 text-xs text-gray-600 sm:ml-4 sm:space-y-2 sm:text-sm"
+              class="ml-2 list-inside list-decimal space-y-1 text-xs text-gray-600 dark:text-gray-600 sm:ml-4 sm:space-y-2 sm:text-sm"
             >
               <li>
                 打开浏览器访问
-                <code class="rounded bg-gray-100 px-1 py-1 text-xs sm:px-2 sm:text-sm"
+                <code
+                  class="rounded bg-gray-100 px-1 py-1 text-xs dark:bg-gray-700 sm:px-2 sm:text-sm"
                   >https://nodejs.org/</code
                 >
               </li>
               <li>点击 "LTS" 版本进行下载（推荐长期支持版本）</li>
               <li>
                 下载完成后双击
-                <code class="rounded bg-gray-100 px-1 py-1 text-xs sm:px-2 sm:text-sm">.msi</code>
+                <code
+                  class="rounded bg-gray-100 px-1 py-1 text-xs dark:bg-gray-700 sm:px-2 sm:text-sm"
+                  >.msi</code
+                >
                 文件
               </li>
               <li>按照安装向导完成安装，保持默认设置即可</li>
             </ol>
           </div>
           <div class="mb-3 sm:mb-4">
-            <p class="mb-2 text-sm text-gray-700 sm:mb-3 sm:text-base">方法二：使用包管理器</p>
-            <p class="mb-2 text-xs text-gray-600 sm:text-sm">
+            <p class="mb-2 text-sm text-gray-700 dark:text-gray-600 sm:mb-3 sm:text-base">
+              方法二：使用包管理器
+            </p>
+            <p class="mb-2 text-xs text-gray-600 dark:text-gray-400 sm:text-sm">
               如果你安装了 Chocolatey 或 Scoop，可以使用命令行安装：
             </p>
             <div
@@ -116,7 +128,9 @@
 
       <!-- 第二步：安装 Claude Code -->
       <div class="mb-4 sm:mb-10 sm:mb-6">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+        <h4
+          class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
+        >
           <span
             class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
             >2</span
@@ -128,12 +142,12 @@
           class="mb-4 rounded-xl border border-green-100 bg-gradient-to-r from-green-50 to-emerald-50 p-4 sm:mb-6 sm:p-6"
         >
           <h5
-            class="mb-2 flex items-center text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg"
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-600 sm:mb-3 sm:text-lg"
           >
             <i class="fas fa-download mr-2 text-green-600" />
             安装 Claude Code
           </h5>
-          <p class="mb-3 text-sm text-gray-700 sm:mb-4 sm:text-base">
+          <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
             打开 PowerShell 或 CMD，运行以下命令：
           </p>
           <div
@@ -144,7 +158,7 @@
               npm install -g @anthropic-ai/claude-code
             </div>
           </div>
-          <p class="text-sm text-gray-600">
+          <p class="text-sm text-gray-600 dark:text-gray-400">
             这个命令会从 npm 官方仓库下载并安装最新版本的 Claude Code。
           </p>
 
@@ -159,7 +173,7 @@
 
         <!-- 验证安装 -->
         <div class="rounded-lg border border-green-200 bg-green-50 p-3 sm:p-4">
-          <h6 class="mb-2 font-medium text-green-800">验证 Claude Code 安装</h6>
+          <h6 class="mb-2 font-medium text-green-800 dark:text-green-300">验证 Claude Code 安装</h6>
           <p class="mb-3 text-sm text-green-700">安装完成后，输入以下命令检查是否安装成功：</p>
           <div
             class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
@@ -174,7 +188,9 @@
 
       <!-- 第三步：设置环境变量 -->
       <div class="mb-6 sm:mb-10">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+        <h4
+          class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
+        >
           <span
             class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-purple-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
             >3</span
@@ -186,18 +202,20 @@
           class="mb-4 rounded-xl border border-purple-100 bg-gradient-to-r from-purple-50 to-pink-50 p-4 sm:mb-6 sm:p-6"
         >
           <h5
-            class="mb-2 flex items-center text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg"
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-600 sm:mb-3 sm:text-lg"
           >
             <i class="fas fa-cog mr-2 text-purple-600" />
             配置 Claude Code 环境变量
           </h5>
-          <p class="mb-3 text-sm text-gray-700 sm:mb-4 sm:text-base">
+          <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
             为了让 Claude Code 连接到你的中转服务，需要设置两个环境变量：
           </p>
 
           <div class="space-y-4">
-            <div class="rounded-lg border border-purple-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">
+            <div
+              class="rounded-lg border border-purple-200 bg-white p-3 dark:border-purple-700 dark:bg-gray-800 sm:p-4"
+            >
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
                 方法一：PowerShell 临时设置（当前会话）
               </h6>
               <p class="mb-3 text-sm text-gray-600">在 PowerShell 中运行以下命令：</p>
@@ -216,8 +234,10 @@
               </p>
             </div>
 
-            <div class="rounded-lg border border-purple-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">
+            <div
+              class="rounded-lg border border-purple-200 bg-white p-3 dark:border-purple-700 dark:bg-gray-800 sm:p-4"
+            >
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
                 方法二：PowerShell 永久设置（用户级）
               </h6>
               <p class="mb-3 text-sm text-gray-600">
@@ -260,14 +280,14 @@
 
         <!-- 验证环境变量设置 -->
         <div class="mt-6 rounded-lg border border-blue-200 bg-blue-50 p-3 sm:p-4">
-          <h6 class="mb-2 font-medium text-blue-800">验证环境变量设置</h6>
+          <h6 class="mb-2 font-medium text-blue-800 dark:text-blue-300">验证环境变量设置</h6>
           <p class="mb-3 text-sm text-blue-700">
             设置完环境变量后，可以通过以下命令验证是否设置成功：
           </p>
 
           <div class="space-y-4">
             <div>
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
                 在 PowerShell 中验证：
               </h6>
               <div
@@ -279,7 +299,9 @@
             </div>
 
             <div>
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">在 CMD 中验证：</h6>
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
+                在 CMD 中验证：
+              </h6>
               <div
                 class="space-y-1 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
               >
@@ -293,7 +315,7 @@
             <p class="text-sm text-blue-700">
               <strong>预期输出示例：</strong>
             </p>
-            <div class="rounded bg-gray-100 p-2 font-mono text-sm">
+            <div class="rounded bg-gray-100 p-2 font-mono text-sm dark:bg-gray-700">
               <div>{{ currentBaseUrl }}</div>
               <div>cr_xxxxxxxxxxxxxxxxxx</div>
             </div>
@@ -306,18 +328,18 @@
         <!-- Gemini CLI 环境变量设置 -->
         <div class="mt-8">
           <h5
-            class="mb-2 flex items-center text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg"
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-600 sm:mb-3 sm:text-lg"
           >
             <i class="fas fa-robot mr-2 text-green-600" />
             配置 Gemini CLI 环境变量
           </h5>
-          <p class="mb-3 text-sm text-gray-700 sm:mb-4 sm:text-base">
+          <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
             如果你使用 Gemini CLI，需要设置以下环境变量：
           </p>
 
           <div class="space-y-4">
             <div class="rounded-lg border border-green-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
                 PowerShell 设置方法
               </h6>
               <p class="mb-3 text-sm text-gray-600">在 PowerShell 中运行以下命令：</p>
@@ -340,7 +362,7 @@
             </div>
 
             <div class="rounded-lg border border-green-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
                 PowerShell 永久设置（用户级）
               </h6>
               <p class="mb-3 text-sm text-gray-600">在 PowerShell 中运行以下命令：</p>
@@ -368,7 +390,9 @@
             </div>
 
             <div class="rounded-lg border border-green-200 bg-green-50 p-3 sm:p-4">
-              <h6 class="mb-2 font-medium text-green-800">验证 Gemini CLI 环境变量</h6>
+              <h6 class="mb-2 font-medium text-green-800 dark:text-green-300">
+                验证 Gemini CLI 环境变量
+              </h6>
               <p class="mb-3 text-sm text-green-700">在 PowerShell 中验证：</p>
               <div
                 class="space-y-1 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
@@ -386,18 +410,18 @@
         <!-- Codex 环境变量设置 -->
         <div class="mt-8">
           <h5
-            class="mb-2 flex items-center text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg"
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-600 sm:mb-3 sm:text-lg"
           >
             <i class="fas fa-code mr-2 text-indigo-600" />
             配置 Codex 环境变量
           </h5>
-          <p class="mb-3 text-sm text-gray-700 sm:mb-4 sm:text-base">
+          <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
             如果你使用支持 OpenAI API 的工具（如 Codex），需要设置以下环境变量：
           </p>
 
           <div class="space-y-4">
             <div class="rounded-lg border border-indigo-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
                 PowerShell 设置方法
               </h6>
               <p class="mb-3 text-sm text-gray-600">在 PowerShell 中运行以下命令：</p>
@@ -417,7 +441,7 @@
             </div>
 
             <div class="rounded-lg border border-indigo-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
                 PowerShell 永久设置（用户级）
               </h6>
               <p class="mb-3 text-sm text-gray-600">在 PowerShell 中运行以下命令：</p>
@@ -456,7 +480,9 @@
 
       <!-- 第四步：开始使用 -->
       <div class="mb-6 sm:mb-8">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+        <h4
+          class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
+        >
           <span
             class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-orange-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
             >4</span
@@ -466,13 +492,15 @@
         <div
           class="rounded-xl border border-orange-100 bg-gradient-to-r from-orange-50 to-yellow-50 p-4 sm:p-6"
         >
-          <p class="mb-3 text-sm text-gray-700 sm:mb-4 sm:text-base">
+          <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
             现在你可以开始使用 Claude Code 了！
           </p>
 
           <div class="space-y-4">
             <div>
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">启动 Claude Code</h6>
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
+                启动 Claude Code
+              </h6>
               <div
                 class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
               >
@@ -481,7 +509,9 @@
             </div>
 
             <div>
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">在特定项目中使用</h6>
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
+                在特定项目中使用
+              </h6>
               <div
                 class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
               >
@@ -497,7 +527,9 @@
 
       <!-- Windows 故障排除 -->
       <div class="mb-8">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+        <h4
+          class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
+        >
           <i class="fas fa-wrench mr-2 text-red-600 sm:mr-3" />
           Windows 常见问题解决
         </h4>
@@ -567,7 +599,9 @@
     <div v-else-if="activeTutorialSystem === 'macos'" class="tutorial-content">
       <!-- 第一步：安装 Node.js -->
       <div class="mb-6 sm:mb-10">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+        <h4
+          class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
+        >
           <span
             class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
             >1</span
@@ -580,14 +614,14 @@
           class="mb-4 rounded-xl border border-gray-200 bg-gradient-to-r from-gray-50 to-slate-50 p-4 sm:mb-6 sm:p-6"
         >
           <h5
-            class="mb-2 flex items-center text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg"
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-600 sm:mb-3 sm:text-lg"
           >
             <i class="fab fa-apple mr-2 text-gray-700" />
             macOS 安装方法
           </h5>
           <div class="mb-4">
             <p class="mb-3 text-gray-700">方法一：使用 Homebrew（推荐）</p>
-            <p class="mb-2 text-xs text-gray-600 sm:text-sm">
+            <p class="mb-2 text-xs text-gray-600 dark:text-gray-400 sm:text-sm">
               如果你已经安装了 Homebrew，使用它安装 Node.js 会更方便：
             </p>
             <div
@@ -602,18 +636,22 @@
           <div class="mb-4">
             <p class="mb-3 text-gray-700">方法二：官网下载</p>
             <ol
-              class="ml-2 list-inside list-decimal space-y-1 text-xs text-gray-600 sm:ml-4 sm:space-y-2 sm:text-sm"
+              class="ml-2 list-inside list-decimal space-y-1 text-xs text-gray-600 dark:text-gray-400 sm:ml-4 sm:space-y-2 sm:text-sm"
             >
               <li>
                 访问
-                <code class="rounded bg-gray-100 px-1 py-1 text-xs sm:px-2 sm:text-sm"
+                <code
+                  class="rounded bg-gray-100 px-1 py-1 text-xs dark:bg-gray-700 sm:px-2 sm:text-sm"
                   >https://nodejs.org/</code
                 >
               </li>
               <li>下载适合 macOS 的 LTS 版本</li>
               <li>
                 打开下载的
-                <code class="rounded bg-gray-100 px-1 py-1 text-xs sm:px-2 sm:text-sm">.pkg</code>
+                <code
+                  class="rounded bg-gray-100 px-1 py-1 text-xs dark:bg-gray-700 sm:px-2 sm:text-sm"
+                  >.pkg</code
+                >
                 文件
               </li>
               <li>按照安装程序指引完成安装</li>
@@ -634,7 +672,7 @@
 
         <!-- 验证安装 -->
         <div class="rounded-lg border border-green-200 bg-green-50 p-3 sm:p-4">
-          <h6 class="mb-2 font-medium text-green-800">验证安装是否成功</h6>
+          <h6 class="mb-2 font-medium text-green-800 dark:text-green-300">验证安装是否成功</h6>
           <p class="mb-3 text-sm text-green-700">安装完成后，打开 Terminal，输入以下命令：</p>
           <div
             class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
@@ -648,7 +686,9 @@
 
       <!-- 第二步：安装 Claude Code -->
       <div class="mb-6 sm:mb-10">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+        <h4
+          class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
+        >
           <span
             class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
             >2</span
@@ -660,12 +700,12 @@
           class="mb-4 rounded-xl border border-purple-100 bg-gradient-to-r from-purple-50 to-pink-50 p-4 sm:mb-6 sm:p-6"
         >
           <h5
-            class="mb-2 flex items-center text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg"
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-600 sm:mb-3 sm:text-lg"
           >
             <i class="fas fa-download mr-2 text-purple-600" />
             安装 Claude Code
           </h5>
-          <p class="mb-3 text-sm text-gray-700 sm:mb-4 sm:text-base">
+          <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
             打开 Terminal，运行以下命令：
           </p>
           <div
@@ -688,7 +728,7 @@
 
         <!-- 验证安装 -->
         <div class="rounded-lg border border-green-200 bg-green-50 p-3 sm:p-4">
-          <h6 class="mb-2 font-medium text-green-800">验证 Claude Code 安装</h6>
+          <h6 class="mb-2 font-medium text-green-800 dark:text-green-300">验证 Claude Code 安装</h6>
           <p class="mb-3 text-sm text-green-700">安装完成后，输入以下命令检查是否安装成功：</p>
           <div
             class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
@@ -703,7 +743,9 @@
 
       <!-- 第三步：设置环境变量 -->
       <div class="mb-6 sm:mb-10">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+        <h4
+          class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
+        >
           <span
             class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-orange-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
             >3</span
@@ -715,18 +757,18 @@
           class="mb-4 rounded-xl border border-orange-100 bg-gradient-to-r from-orange-50 to-yellow-50 p-4 sm:mb-6 sm:p-6"
         >
           <h5
-            class="mb-2 flex items-center text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg"
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-600 sm:mb-3 sm:text-lg"
           >
             <i class="fas fa-cog mr-2 text-orange-600" />
             配置 Claude Code 环境变量
           </h5>
-          <p class="mb-3 text-sm text-gray-700 sm:mb-4 sm:text-base">
+          <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
             为了让 Claude Code 连接到你的中转服务，需要设置两个环境变量：
           </p>
 
           <div class="space-y-4">
             <div class="rounded-lg border border-orange-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
                 方法一：临时设置（当前会话）
               </h6>
               <p class="mb-3 text-sm text-gray-600">在 Terminal 中运行以下命令：</p>
@@ -746,7 +788,9 @@
             </div>
 
             <div class="rounded-lg border border-orange-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">方法二：永久设置</h6>
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
+                方法二：永久设置
+              </h6>
               <p class="mb-3 text-sm text-gray-600">
                 编辑你的 shell 配置文件（根据你使用的 shell）：
               </p>
@@ -781,18 +825,20 @@
         <!-- Gemini CLI 环境变量设置 -->
         <div class="mt-8">
           <h5
-            class="mb-2 flex items-center text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg"
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-600 sm:mb-3 sm:text-lg"
           >
             <i class="fas fa-robot mr-2 text-green-600" />
             配置 Gemini CLI 环境变量
           </h5>
-          <p class="mb-3 text-sm text-gray-700 sm:mb-4 sm:text-base">
+          <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
             如果你使用 Gemini CLI，需要设置以下环境变量：
           </p>
 
           <div class="space-y-4">
             <div class="rounded-lg border border-green-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">Terminal 设置方法</h6>
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
+                Terminal 设置方法
+              </h6>
               <p class="mb-3 text-sm text-gray-600">在 Terminal 中运行以下命令：</p>
               <div
                 class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
@@ -813,7 +859,9 @@
             </div>
 
             <div class="rounded-lg border border-green-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">永久设置方法</h6>
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
+                永久设置方法
+              </h6>
               <p class="mb-3 text-sm text-gray-600">添加到你的 shell 配置文件：</p>
               <div
                 class="mb-3 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
@@ -848,7 +896,9 @@
             </div>
 
             <div class="rounded-lg border border-green-200 bg-green-50 p-3 sm:p-4">
-              <h6 class="mb-2 font-medium text-green-800">验证 Gemini CLI 环境变量</h6>
+              <h6 class="mb-2 font-medium text-green-800 dark:text-green-300">
+                验证 Gemini CLI 环境变量
+              </h6>
               <p class="mb-3 text-sm text-green-700">在 Terminal 中验证：</p>
               <div
                 class="space-y-1 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
@@ -864,18 +914,20 @@
         <!-- Codex 环境变量设置 -->
         <div class="mt-8">
           <h5
-            class="mb-2 flex items-center text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg"
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-600 sm:mb-3 sm:text-lg"
           >
             <i class="fas fa-code mr-2 text-indigo-600" />
             配置 Codex 环境变量
           </h5>
-          <p class="mb-3 text-sm text-gray-700 sm:mb-4 sm:text-base">
+          <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
             如果你使用支持 OpenAI API 的工具（如 Codex），需要设置以下环境变量：
           </p>
 
           <div class="space-y-4">
             <div class="rounded-lg border border-indigo-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">Terminal 设置方法</h6>
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
+                Terminal 设置方法
+              </h6>
               <p class="mb-3 text-sm text-gray-600">在 Terminal 中运行以下命令：</p>
               <div
                 class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
@@ -893,7 +945,9 @@
             </div>
 
             <div class="rounded-lg border border-indigo-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">永久设置方法</h6>
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
+                永久设置方法
+              </h6>
               <p class="mb-3 text-sm text-gray-600">添加到你的 shell 配置文件：</p>
               <div
                 class="mb-3 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
@@ -937,7 +991,9 @@
 
       <!-- 第四步：开始使用 -->
       <div class="mb-8">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+        <h4
+          class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
+        >
           <span
             class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-yellow-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
             >4</span
@@ -947,13 +1003,15 @@
         <div
           class="rounded-xl border border-yellow-100 bg-gradient-to-r from-yellow-50 to-amber-50 p-4 sm:p-6"
         >
-          <p class="mb-3 text-sm text-gray-700 sm:mb-4 sm:text-base">
+          <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
             现在你可以开始使用 Claude Code 了！
           </p>
 
           <div class="space-y-4">
             <div>
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">启动 Claude Code</h6>
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
+                启动 Claude Code
+              </h6>
               <div
                 class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
               >
@@ -962,7 +1020,9 @@
             </div>
 
             <div>
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">在特定项目中使用</h6>
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
+                在特定项目中使用
+              </h6>
               <div
                 class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
               >
@@ -978,7 +1038,9 @@
 
       <!-- macOS 故障排除 -->
       <div class="mb-8">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+        <h4
+          class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
+        >
           <i class="fas fa-wrench mr-2 text-red-600 sm:mr-3" />
           macOS 常见问题解决
         </h4>
@@ -1054,7 +1116,9 @@
     <div v-else-if="activeTutorialSystem === 'linux'" class="tutorial-content">
       <!-- 第一步：安装 Node.js -->
       <div class="mb-6 sm:mb-10">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+        <h4
+          class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
+        >
           <span
             class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
             >1</span
@@ -1067,7 +1131,7 @@
           class="mb-4 rounded-xl border border-orange-100 bg-gradient-to-r from-orange-50 to-red-50 p-4 sm:mb-6 sm:p-6"
         >
           <h5
-            class="mb-2 flex items-center text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg"
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-600 sm:mb-3 sm:text-lg"
           >
             <i class="fab fa-ubuntu mr-2 text-orange-600" />
             Linux 安装方法
@@ -1087,7 +1151,7 @@
           </div>
           <div class="mb-4">
             <p class="mb-3 text-gray-700">方法二：使用系统包管理器</p>
-            <p class="mb-2 text-xs text-gray-600 sm:text-sm">
+            <p class="mb-2 text-xs text-gray-600 dark:text-gray-400 sm:text-sm">
               虽然版本可能不是最新的，但对于基本使用已经足够：
             </p>
             <div
@@ -1112,7 +1176,7 @@
 
         <!-- 验证安装 -->
         <div class="rounded-lg border border-green-200 bg-green-50 p-3 sm:p-4">
-          <h6 class="mb-2 font-medium text-green-800">验证安装是否成功</h6>
+          <h6 class="mb-2 font-medium text-green-800 dark:text-green-300">验证安装是否成功</h6>
           <p class="mb-3 text-sm text-green-700">安装完成后，打开终端，输入以下命令：</p>
           <div
             class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
@@ -1126,7 +1190,9 @@
 
       <!-- 第二步：安装 Claude Code -->
       <div class="mb-6 sm:mb-10">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+        <h4
+          class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
+        >
           <span
             class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
             >2</span
@@ -1138,12 +1204,14 @@
           class="mb-4 rounded-xl border border-purple-100 bg-gradient-to-r from-purple-50 to-pink-50 p-4 sm:mb-6 sm:p-6"
         >
           <h5
-            class="mb-2 flex items-center text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg"
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-600 sm:mb-3 sm:text-lg"
           >
             <i class="fas fa-download mr-2 text-purple-600" />
             安装 Claude Code
           </h5>
-          <p class="mb-3 text-sm text-gray-700 sm:mb-4 sm:text-base">打开终端，运行以下命令：</p>
+          <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
+            打开终端，运行以下命令：
+          </p>
           <div
             class="mb-4 overflow-x-auto rounded-lg bg-gray-900 p-3 font-mono text-xs text-green-400 sm:p-4 sm:text-sm"
           >
@@ -1164,7 +1232,7 @@
 
         <!-- 验证安装 -->
         <div class="rounded-lg border border-green-200 bg-green-50 p-3 sm:p-4">
-          <h6 class="mb-2 font-medium text-green-800">验证 Claude Code 安装</h6>
+          <h6 class="mb-2 font-medium text-green-800 dark:text-green-300">验证 Claude Code 安装</h6>
           <p class="mb-3 text-sm text-green-700">安装完成后，输入以下命令检查是否安装成功：</p>
           <div
             class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
@@ -1179,7 +1247,9 @@
 
       <!-- 第三步：设置环境变量 -->
       <div class="mb-6 sm:mb-10">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+        <h4
+          class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
+        >
           <span
             class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-orange-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
             >3</span
@@ -1191,18 +1261,18 @@
           class="mb-4 rounded-xl border border-orange-100 bg-gradient-to-r from-orange-50 to-yellow-50 p-4 sm:mb-6 sm:p-6"
         >
           <h5
-            class="mb-2 flex items-center text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg"
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-600 sm:mb-3 sm:text-lg"
           >
             <i class="fas fa-cog mr-2 text-orange-600" />
             配置 Claude Code 环境变量
           </h5>
-          <p class="mb-3 text-sm text-gray-700 sm:mb-4 sm:text-base">
+          <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
             为了让 Claude Code 连接到你的中转服务，需要设置两个环境变量：
           </p>
 
           <div class="space-y-4">
             <div class="rounded-lg border border-orange-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
                 方法一：临时设置（当前会话）
               </h6>
               <p class="mb-3 text-sm text-gray-600">在终端中运行以下命令：</p>
@@ -1222,7 +1292,9 @@
             </div>
 
             <div class="rounded-lg border border-orange-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">方法二：永久设置</h6>
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
+                方法二：永久设置
+              </h6>
               <p class="mb-3 text-sm text-gray-600">编辑你的 shell 配置文件：</p>
               <div
                 class="mb-3 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
@@ -1255,18 +1327,20 @@
         <!-- Gemini CLI 环境变量设置 -->
         <div class="mt-8">
           <h5
-            class="mb-2 flex items-center text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg"
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-600 sm:mb-3 sm:text-lg"
           >
             <i class="fas fa-robot mr-2 text-green-600" />
             配置 Gemini CLI 环境变量
           </h5>
-          <p class="mb-3 text-sm text-gray-700 sm:mb-4 sm:text-base">
+          <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
             如果你使用 Gemini CLI，需要设置以下环境变量：
           </p>
 
           <div class="space-y-4">
             <div class="rounded-lg border border-green-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">终端设置方法</h6>
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
+                终端设置方法
+              </h6>
               <p class="mb-3 text-sm text-gray-600">在终端中运行以下命令：</p>
               <div
                 class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
@@ -1287,7 +1361,9 @@
             </div>
 
             <div class="rounded-lg border border-green-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">永久设置方法</h6>
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
+                永久设置方法
+              </h6>
               <p class="mb-3 text-sm text-gray-600">添加到你的 shell 配置文件：</p>
               <div
                 class="mb-3 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
@@ -1322,7 +1398,9 @@
             </div>
 
             <div class="rounded-lg border border-green-200 bg-green-50 p-3 sm:p-4">
-              <h6 class="mb-2 font-medium text-green-800">验证 Gemini CLI 环境变量</h6>
+              <h6 class="mb-2 font-medium text-green-800 dark:text-green-300">
+                验证 Gemini CLI 环境变量
+              </h6>
               <p class="mb-3 text-sm text-green-700">在终端中验证：</p>
               <div
                 class="space-y-1 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
@@ -1338,18 +1416,20 @@
         <!-- Codex 环境变量设置 -->
         <div class="mt-8">
           <h5
-            class="mb-2 flex items-center text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg"
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-600 sm:mb-3 sm:text-lg"
           >
             <i class="fas fa-code mr-2 text-indigo-600" />
             配置 Codex 环境变量
           </h5>
-          <p class="mb-3 text-sm text-gray-700 sm:mb-4 sm:text-base">
+          <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
             如果你使用支持 OpenAI API 的工具（如 Codex），需要设置以下环境变量：
           </p>
 
           <div class="space-y-4">
             <div class="rounded-lg border border-indigo-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">终端设置方法</h6>
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
+                终端设置方法
+              </h6>
               <p class="mb-3 text-sm text-gray-600">在终端中运行以下命令：</p>
               <div
                 class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
@@ -1367,7 +1447,9 @@
             </div>
 
             <div class="rounded-lg border border-indigo-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">永久设置方法</h6>
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
+                永久设置方法
+              </h6>
               <p class="mb-3 text-sm text-gray-600">添加到你的 shell 配置文件：</p>
               <div
                 class="mb-3 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
@@ -1411,7 +1493,9 @@
 
       <!-- 第四步：开始使用 -->
       <div class="mb-8">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+        <h4
+          class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
+        >
           <span
             class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-yellow-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
             >4</span
@@ -1421,13 +1505,15 @@
         <div
           class="rounded-xl border border-yellow-100 bg-gradient-to-r from-yellow-50 to-amber-50 p-4 sm:p-6"
         >
-          <p class="mb-3 text-sm text-gray-700 sm:mb-4 sm:text-base">
+          <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
             现在你可以开始使用 Claude Code 了！
           </p>
 
           <div class="space-y-4">
             <div>
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">启动 Claude Code</h6>
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
+                启动 Claude Code
+              </h6>
               <div
                 class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
               >
@@ -1436,7 +1522,9 @@
             </div>
 
             <div>
-              <h6 class="mb-2 text-sm font-medium text-gray-800 sm:text-base">在特定项目中使用</h6>
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
+                在特定项目中使用
+              </h6>
               <div
                 class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
               >
@@ -1452,7 +1540,9 @@
 
       <!-- Linux 故障排除 -->
       <div class="mb-8">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+        <h4
+          class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
+        >
           <i class="fas fa-wrench mr-2 text-red-600 sm:mr-3" />
           Linux 常见问题解决
         </h4>

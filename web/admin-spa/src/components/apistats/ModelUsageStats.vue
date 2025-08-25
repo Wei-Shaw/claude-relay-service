@@ -2,13 +2,13 @@
   <div class="card p-4 md:p-6">
     <div class="mb-4 md:mb-6">
       <h3
-        class="flex flex-col text-lg font-bold text-gray-900 sm:flex-row sm:items-center md:text-xl"
+        class="flex flex-col text-lg font-bold text-gray-900 dark:text-gray-100 sm:flex-row sm:items-center md:text-xl"
       >
         <span class="flex items-center">
           <i class="fas fa-robot mr-2 text-sm text-indigo-500 md:mr-3 md:text-base" />
           模型使用统计
         </span>
-        <span class="text-xs font-normal text-gray-600 sm:ml-2 md:text-sm"
+        <span class="text-xs font-normal text-gray-600 dark:text-gray-400 sm:ml-2 md:text-sm"
           >({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span
         >
       </h3>
@@ -16,8 +16,10 @@
 
     <!-- 模型统计加载状态 -->
     <div v-if="modelStatsLoading" class="py-6 text-center md:py-8">
-      <i class="fas fa-spinner loading-spinner mb-2 text-xl text-gray-600 md:text-2xl" />
-      <p class="text-sm text-gray-600 md:text-base">加载模型统计数据中...</p>
+      <i
+        class="fas fa-spinner loading-spinner mb-2 text-xl text-gray-600 dark:text-gray-400 md:text-2xl"
+      />
+      <p class="text-sm text-gray-600 dark:text-gray-400 md:text-base">加载模型统计数据中...</p>
     </div>
 
     <!-- 模型统计数据 -->
@@ -25,41 +27,43 @@
       <div v-for="(model, index) in modelStats" :key="index" class="model-usage-item">
         <div class="mb-2 flex items-start justify-between md:mb-3">
           <div class="min-w-0 flex-1">
-            <h4 class="break-all text-base font-bold text-gray-900 md:text-lg">
+            <h4 class="break-all text-base font-bold text-gray-900 dark:text-gray-100 md:text-lg">
               {{ model.model }}
             </h4>
-            <p class="text-xs text-gray-600 md:text-sm">{{ model.requests }} 次请求</p>
+            <p class="text-xs text-gray-600 dark:text-gray-400 md:text-sm">
+              {{ model.requests }} 次请求
+            </p>
           </div>
           <div class="ml-3 flex-shrink-0 text-right">
             <div class="text-base font-bold text-green-600 md:text-lg">
               {{ model.formatted?.total || '$0.000000' }}
             </div>
-            <div class="text-xs text-gray-600 md:text-sm">总费用</div>
+            <div class="text-xs text-gray-600 dark:text-gray-400 md:text-sm">总费用</div>
           </div>
         </div>
 
         <div class="grid grid-cols-2 gap-2 text-xs md:grid-cols-4 md:gap-3 md:text-sm">
-          <div class="rounded bg-gray-50 p-2">
-            <div class="text-gray-600">输入 Token</div>
-            <div class="font-medium text-gray-900">
+          <div class="rounded bg-gray-50 p-2 dark:bg-gray-700">
+            <div class="text-gray-600 dark:text-gray-400">输入 Token</div>
+            <div class="font-medium text-gray-900 dark:text-gray-100">
               {{ formatNumber(model.inputTokens) }}
             </div>
           </div>
-          <div class="rounded bg-gray-50 p-2">
-            <div class="text-gray-600">输出 Token</div>
-            <div class="font-medium text-gray-900">
+          <div class="rounded bg-gray-50 p-2 dark:bg-gray-700">
+            <div class="text-gray-600 dark:text-gray-400">输出 Token</div>
+            <div class="font-medium text-gray-900 dark:text-gray-100">
               {{ formatNumber(model.outputTokens) }}
             </div>
           </div>
-          <div class="rounded bg-gray-50 p-2">
-            <div class="text-gray-600">缓存创建</div>
-            <div class="font-medium text-gray-900">
+          <div class="rounded bg-gray-50 p-2 dark:bg-gray-700">
+            <div class="text-gray-600 dark:text-gray-400">缓存创建</div>
+            <div class="font-medium text-gray-900 dark:text-gray-100">
               {{ formatNumber(model.cacheCreateTokens) }}
             </div>
           </div>
-          <div class="rounded bg-gray-50 p-2">
-            <div class="text-gray-600">缓存读取</div>
-            <div class="font-medium text-gray-900">
+          <div class="rounded bg-gray-50 p-2 dark:bg-gray-700">
+            <div class="text-gray-600 dark:text-gray-400">缓存读取</div>
+            <div class="font-medium text-gray-900 dark:text-gray-100">
               {{ formatNumber(model.cacheReadTokens) }}
             </div>
           </div>
@@ -68,7 +72,7 @@
     </div>
 
     <!-- 无模型数据 -->
-    <div v-else class="py-6 text-center text-gray-500 md:py-8">
+    <div v-else class="py-6 text-center text-gray-500 dark:text-gray-400 md:py-8">
       <i class="fas fa-chart-pie mb-3 text-2xl md:text-3xl" />
       <p class="text-sm md:text-base">
         暂无{{ statsPeriod === 'daily' ? '今日' : '本月' }}模型使用数据
@@ -104,11 +108,11 @@ const formatNumber = (num) => {
 </script>
 
 <style scoped>
-/* 卡片样式 */
+/* 卡片样式 - 使用CSS变量 */
 .card {
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--surface-color);
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--border-color);
   box-shadow:
     0 10px 15px -3px rgba(0, 0, 0, 0.1),
     0 4px 6px -2px rgba(0, 0, 0, 0.05);
@@ -134,10 +138,16 @@ const formatNumber = (num) => {
     0 10px 10px -5px rgba(0, 0, 0, 0.08);
 }
 
-/* 模型使用项样式 */
+:global(.dark) .card:hover {
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.5),
+    0 10px 10px -5px rgba(0, 0, 0, 0.35);
+}
+
+/* 模型使用项样式 - 使用CSS变量 */
 .model-usage-item {
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 12px;
   transition: all 0.3s ease;
@@ -167,6 +177,13 @@ const formatNumber = (num) => {
     0 10px 15px -3px rgba(0, 0, 0, 0.1),
     0 4px 6px -2px rgba(0, 0, 0, 0.05);
   border-color: rgba(255, 255, 255, 0.3);
+}
+
+:global(.dark) .model-usage-item:hover {
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.4),
+    0 4px 6px -2px rgba(0, 0, 0, 0.25);
+  border-color: rgba(75, 85, 99, 0.6);
 }
 
 /* 加载动画 */

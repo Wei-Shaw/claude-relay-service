@@ -7,11 +7,15 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div>
-            <p class="mb-1 text-xs font-semibold text-gray-600 sm:text-sm">总API Keys</p>
-            <p class="text-2xl font-bold text-gray-900 sm:text-3xl">
+            <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
+              总API Keys
+            </p>
+            <p class="text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">
               {{ dashboardData.totalApiKeys }}
             </p>
-            <p class="mt-1 text-xs text-gray-500">活跃: {{ dashboardData.activeApiKeys || 0 }}</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              活跃: {{ dashboardData.activeApiKeys || 0 }}
+            </p>
           </div>
           <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-blue-500 to-blue-600">
             <i class="fas fa-key" />
@@ -22,9 +26,11 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div class="flex-1">
-            <p class="mb-1 text-xs font-semibold text-gray-600 sm:text-sm">服务账户</p>
+            <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
+              服务账户
+            </p>
             <div class="flex flex-wrap items-baseline gap-x-2">
-              <p class="text-2xl font-bold text-gray-900 sm:text-3xl">
+              <p class="text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">
                 {{ dashboardData.totalAccounts }}
               </p>
               <!-- 各平台账户数量展示 -->
@@ -39,7 +45,7 @@
                   :title="`Claude: ${dashboardData.accountsByPlatform.claude.total} 个 (正常: ${dashboardData.accountsByPlatform.claude.normal})`"
                 >
                   <i class="fas fa-brain text-xs text-indigo-600" />
-                  <span class="text-xs font-medium text-gray-700">{{
+                  <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{
                     dashboardData.accountsByPlatform.claude.total
                   }}</span>
                 </div>
@@ -53,7 +59,7 @@
                   :title="`Console: ${dashboardData.accountsByPlatform['claude-console'].total} 个 (正常: ${dashboardData.accountsByPlatform['claude-console'].normal})`"
                 >
                   <i class="fas fa-terminal text-xs text-purple-600" />
-                  <span class="text-xs font-medium text-gray-700">{{
+                  <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{
                     dashboardData.accountsByPlatform['claude-console'].total
                   }}</span>
                 </div>
@@ -67,7 +73,7 @@
                   :title="`Gemini: ${dashboardData.accountsByPlatform.gemini.total} 个 (正常: ${dashboardData.accountsByPlatform.gemini.normal})`"
                 >
                   <i class="fas fa-robot text-xs text-yellow-600" />
-                  <span class="text-xs font-medium text-gray-700">{{
+                  <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{
                     dashboardData.accountsByPlatform.gemini.total
                   }}</span>
                 </div>
@@ -81,7 +87,7 @@
                   :title="`Bedrock: ${dashboardData.accountsByPlatform.bedrock.total} 个 (正常: ${dashboardData.accountsByPlatform.bedrock.normal})`"
                 >
                   <i class="fab fa-aws text-xs text-orange-600" />
-                  <span class="text-xs font-medium text-gray-700">{{
+                  <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{
                     dashboardData.accountsByPlatform.bedrock.total
                   }}</span>
                 </div>
@@ -95,18 +101,35 @@
                   :title="`OpenAI: ${dashboardData.accountsByPlatform.openai.total} 个 (正常: ${dashboardData.accountsByPlatform.openai.normal})`"
                 >
                   <i class="fas fa-openai text-xs text-gray-100" />
-                  <span class="text-xs font-medium text-gray-700">{{
+                  <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{
                     dashboardData.accountsByPlatform.openai.total
+                  }}</span>
+                </div>
+                <!-- Azure OpenAI账户 -->
+                <div
+                  v-if="
+                    dashboardData.accountsByPlatform.azure_openai &&
+                    dashboardData.accountsByPlatform.azure_openai.total > 0
+                  "
+                  class="inline-flex items-center gap-0.5"
+                  :title="`Azure OpenAI: ${dashboardData.accountsByPlatform.azure_openai.total} 个 (正常: ${dashboardData.accountsByPlatform.azure_openai.normal})`"
+                >
+                  <i class="fab fa-microsoft text-xs text-blue-600" />
+                  <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{
+                    dashboardData.accountsByPlatform.azure_openai.total
                   }}</span>
                 </div>
               </div>
             </div>
-            <p class="mt-1 text-xs text-gray-500">
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
               正常: {{ dashboardData.normalAccounts || 0 }}
               <span v-if="dashboardData.abnormalAccounts > 0" class="text-red-600">
                 | 异常: {{ dashboardData.abnormalAccounts }}
               </span>
-              <span v-if="dashboardData.pausedAccounts > 0" class="text-gray-600">
+              <span
+                v-if="dashboardData.pausedAccounts > 0"
+                class="text-gray-600 dark:text-gray-400"
+              >
                 | 停止调度: {{ dashboardData.pausedAccounts }}
               </span>
               <span v-if="dashboardData.rateLimitedAccounts > 0" class="text-yellow-600">
@@ -123,11 +146,13 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div>
-            <p class="mb-1 text-xs font-semibold text-gray-600 sm:text-sm">今日请求</p>
-            <p class="text-2xl font-bold text-gray-900 sm:text-3xl">
+            <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
+              今日请求
+            </p>
+            <p class="text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">
               {{ dashboardData.todayRequests }}
             </p>
-            <p class="mt-1 text-xs text-gray-500">
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
               总请求: {{ formatNumber(dashboardData.totalRequests || 0) }}
             </p>
           </div>
@@ -140,11 +165,15 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div>
-            <p class="mb-1 text-xs font-semibold text-gray-600 sm:text-sm">系统状态</p>
+            <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
+              系统状态
+            </p>
             <p class="text-2xl font-bold text-green-600 sm:text-3xl">
               {{ dashboardData.systemStatus }}
             </p>
-            <p class="mt-1 text-xs text-gray-500">运行时间: {{ formattedUptime }}</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              运行时间: {{ formattedUptime }}
+            </p>
           </div>
           <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-yellow-500 to-orange-500">
             <i class="fas fa-heartbeat" />
@@ -160,7 +189,9 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div class="mr-8 flex-1">
-            <p class="mb-1 text-xs font-semibold text-gray-600 sm:text-sm">今日Token</p>
+            <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
+              今日Token
+            </p>
             <div class="mb-2 flex flex-wrap items-baseline gap-2">
               <p class="text-xl font-bold text-blue-600 sm:text-2xl md:text-3xl">
                 {{
@@ -176,7 +207,7 @@
                 >/ {{ costsData.todayCosts.formatted.totalCost }}</span
               >
             </div>
-            <div class="text-xs text-gray-500">
+            <div class="text-xs text-gray-500 dark:text-gray-400">
               <div class="flex flex-wrap items-center justify-between gap-x-4">
                 <span
                   >输入:
@@ -214,7 +245,9 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div class="mr-8 flex-1">
-            <p class="mb-1 text-xs font-semibold text-gray-600 sm:text-sm">总Token消耗</p>
+            <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
+              总Token消耗
+            </p>
             <div class="mb-2 flex flex-wrap items-baseline gap-2">
               <p class="text-xl font-bold text-emerald-600 sm:text-2xl md:text-3xl">
                 {{
@@ -230,7 +263,7 @@
                 >/ {{ costsData.totalCosts.formatted.totalCost }}</span
               >
             </div>
-            <div class="text-xs text-gray-500">
+            <div class="text-xs text-gray-500 dark:text-gray-400">
               <div class="flex flex-wrap items-center justify-between gap-x-4">
                 <span
                   >输入:
@@ -268,14 +301,14 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div>
-            <p class="mb-1 text-xs font-semibold text-gray-600 sm:text-sm">
+            <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
               实时RPM
               <span class="text-xs text-gray-400">({{ dashboardData.metricsWindow }}分钟)</span>
             </p>
             <p class="text-2xl font-bold text-orange-600 sm:text-3xl">
               {{ dashboardData.realtimeRPM || 0 }}
             </p>
-            <p class="mt-1 text-xs text-gray-500">
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
               每分钟请求数
               <span v-if="dashboardData.isHistoricalMetrics" class="text-yellow-600">
                 <i class="fas fa-exclamation-circle" /> 历史数据
@@ -291,14 +324,14 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div>
-            <p class="mb-1 text-xs font-semibold text-gray-600 sm:text-sm">
+            <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
               实时TPM
               <span class="text-xs text-gray-400">({{ dashboardData.metricsWindow }}分钟)</span>
             </p>
             <p class="text-2xl font-bold text-rose-600 sm:text-3xl">
               {{ formatNumber(dashboardData.realtimeTPM || 0) }}
             </p>
-            <p class="mt-1 text-xs text-gray-500">
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
               每分钟Token数
               <span v-if="dashboardData.isHistoricalMetrics" class="text-yellow-600">
                 <i class="fas fa-exclamation-circle" /> 历史数据
@@ -315,18 +348,22 @@
     <!-- 模型消费统计 -->
     <div class="mb-8">
       <div class="mb-4 flex flex-col gap-4 sm:mb-6">
-        <h3 class="text-lg font-bold text-gray-900 sm:text-xl">模型使用分布与Token使用趋势</h3>
+        <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">
+          模型使用分布与Token使用趋势
+        </h3>
         <div class="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-end">
           <!-- 快捷日期选择 -->
-          <div class="flex flex-shrink-0 gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1">
+          <div
+            class="flex flex-shrink-0 gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1 dark:bg-gray-700"
+          >
             <button
               v-for="option in dateFilter.presetOptions"
               :key="option.value"
               :class="[
                 'rounded-md px-3 py-1 text-sm font-medium transition-colors',
                 dateFilter.preset === option.value && dateFilter.type === 'preset'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
+                  : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
               ]"
               @click="setDateFilterPreset(option.value)"
             >
@@ -335,13 +372,13 @@
           </div>
 
           <!-- 粒度切换按钮 -->
-          <div class="flex gap-1 rounded-lg bg-gray-100 p-1">
+          <div class="flex gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-700">
             <button
               :class="[
                 'rounded-md px-3 py-1 text-sm font-medium transition-colors',
                 trendGranularity === 'day'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
+                  : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
               ]"
               @click="setTrendGranularity('day')"
             >
@@ -351,8 +388,8 @@
               :class="[
                 'rounded-md px-3 py-1 text-sm font-medium transition-colors',
                 trendGranularity === 'hour'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
+                  : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
               ]"
               @click="setTrendGranularity('hour')"
             >
@@ -385,17 +422,17 @@
           <!-- 刷新控制 -->
           <div class="flex items-center gap-2">
             <!-- 自动刷新控制 -->
-            <div class="flex items-center rounded-lg bg-gray-100 px-3 py-1">
+            <div class="flex items-center rounded-lg bg-gray-100 px-3 py-1 dark:bg-gray-700">
               <label class="relative inline-flex cursor-pointer items-center">
                 <input v-model="autoRefreshEnabled" class="peer sr-only" type="checkbox" />
                 <!-- 更小的开关 -->
                 <div
-                  class="peer relative h-5 w-9 rounded-full bg-gray-300 transition-all duration-200 after:absolute after:left-[2px] after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:duration-200 after:content-[''] peer-checked:bg-blue-500 peer-checked:after:translate-x-4 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300"
+                  class="peer relative h-5 w-9 rounded-full bg-gray-300 transition-all duration-200 after:absolute after:left-[2px] after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:duration-200 after:content-[''] peer-checked:bg-blue-500 peer-checked:after:translate-x-4 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:bg-gray-600 dark:after:bg-gray-300 dark:peer-focus:ring-blue-600"
                 />
                 <span
-                  class="ml-2.5 flex select-none items-center gap-1 text-sm font-medium text-gray-600"
+                  class="ml-2.5 flex select-none items-center gap-1 text-sm font-medium text-gray-600 dark:text-gray-300"
                 >
-                  <i class="fas fa-redo-alt text-xs text-gray-500" />
+                  <i class="fas fa-redo-alt text-xs text-gray-500 dark:text-gray-400" />
                   <span>自动刷新</span>
                   <span
                     v-if="autoRefreshEnabled"
@@ -410,7 +447,7 @@
 
             <!-- 刷新按钮 -->
             <button
-              class="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-blue-600 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 sm:gap-2"
+              class="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-blue-600 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-700 sm:gap-2"
               :disabled="isRefreshing"
               title="立即刷新数据"
               @click="refreshAllData()"
@@ -425,7 +462,9 @@
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <!-- 饼图 -->
         <div class="card p-4 sm:p-6">
-          <h4 class="mb-4 text-base font-semibold text-gray-800 sm:text-lg">Token使用分布</h4>
+          <h4 class="mb-4 text-base font-semibold text-gray-800 dark:text-gray-200 sm:text-lg">
+            Token使用分布
+          </h4>
           <div class="relative" style="height: 250px">
             <canvas ref="modelUsageChart" />
           </div>
@@ -433,48 +472,62 @@
 
         <!-- 详细数据表格 -->
         <div class="card p-4 sm:p-6">
-          <h4 class="mb-4 text-base font-semibold text-gray-800 sm:text-lg">详细统计数据</h4>
+          <h4 class="mb-4 text-base font-semibold text-gray-800 dark:text-gray-200 sm:text-lg">
+            详细统计数据
+          </h4>
           <div v-if="dashboardModelStats.length === 0" class="py-8 text-center">
             <p class="text-sm text-gray-500 sm:text-base">暂无模型使用数据</p>
           </div>
           <div v-else class="max-h-[250px] overflow-auto sm:max-h-[300px]">
             <table class="min-w-full">
-              <thead class="sticky top-0 bg-gray-50">
+              <thead class="sticky top-0 bg-gray-50 dark:bg-gray-700">
                 <tr>
-                  <th class="px-2 py-2 text-left text-xs font-medium text-gray-700 sm:px-4">
+                  <th
+                    class="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 sm:px-4"
+                  >
                     模型
                   </th>
                   <th
-                    class="hidden px-2 py-2 text-right text-xs font-medium text-gray-700 sm:table-cell sm:px-4"
+                    class="hidden px-2 py-2 text-right text-xs font-medium text-gray-700 dark:text-gray-300 sm:table-cell sm:px-4"
                   >
                     请求数
                   </th>
-                  <th class="px-2 py-2 text-right text-xs font-medium text-gray-700 sm:px-4">
+                  <th
+                    class="px-2 py-2 text-right text-xs font-medium text-gray-700 dark:text-gray-300 sm:px-4"
+                  >
                     总Token
                   </th>
-                  <th class="px-2 py-2 text-right text-xs font-medium text-gray-700 sm:px-4">
+                  <th
+                    class="px-2 py-2 text-right text-xs font-medium text-gray-700 dark:text-gray-300 sm:px-4"
+                  >
                     费用
                   </th>
                   <th
-                    class="hidden px-2 py-2 text-right text-xs font-medium text-gray-700 sm:table-cell sm:px-4"
+                    class="hidden px-2 py-2 text-right text-xs font-medium text-gray-700 dark:text-gray-300 sm:table-cell sm:px-4"
                   >
                     占比
                   </th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-gray-200">
-                <tr v-for="stat in dashboardModelStats" :key="stat.model" class="hover:bg-gray-50">
-                  <td class="px-2 py-2 text-xs text-gray-900 sm:px-4 sm:text-sm">
+              <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
+                <tr
+                  v-for="stat in dashboardModelStats"
+                  :key="stat.model"
+                  class="hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  <td class="px-2 py-2 text-xs text-gray-900 dark:text-gray-100 sm:px-4 sm:text-sm">
                     <span class="block max-w-[100px] truncate sm:max-w-none" :title="stat.model">
                       {{ stat.model }}
                     </span>
                   </td>
                   <td
-                    class="hidden px-2 py-2 text-right text-xs text-gray-600 sm:table-cell sm:px-4 sm:text-sm"
+                    class="hidden px-2 py-2 text-right text-xs text-gray-600 dark:text-gray-400 sm:table-cell sm:px-4 sm:text-sm"
                   >
                     {{ formatNumber(stat.requests) }}
                   </td>
-                  <td class="px-2 py-2 text-right text-xs text-gray-600 sm:px-4 sm:text-sm">
+                  <td
+                    class="px-2 py-2 text-right text-xs text-gray-600 dark:text-gray-400 sm:px-4 sm:text-sm"
+                  >
                     {{ formatNumber(stat.allTokens) }}
                   </td>
                   <td
@@ -486,7 +539,7 @@
                     class="hidden px-2 py-2 text-right text-xs font-medium sm:table-cell sm:px-4 sm:text-sm"
                   >
                     <span
-                      class="inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800"
+                      class="inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
                     >
                       {{ calculatePercentage(stat.allTokens, dashboardModelStats) }}%
                     </span>
@@ -512,15 +565,17 @@
     <div class="mb-4 sm:mb-6 md:mb-8">
       <div class="card p-4 sm:p-6">
         <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h3 class="text-base font-semibold text-gray-900 sm:text-lg">API Keys 使用趋势</h3>
+          <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 sm:text-lg">
+            API Keys 使用趋势
+          </h3>
           <!-- 维度切换按钮 -->
-          <div class="flex gap-1 rounded-lg bg-gray-100 p-1">
+          <div class="flex gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-700">
             <button
               :class="[
                 'rounded-md px-2 py-1 text-xs font-medium transition-colors sm:px-3 sm:text-sm',
                 apiKeysTrendMetric === 'requests'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
+                  : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
               ]"
               @click="((apiKeysTrendMetric = 'requests'), updateApiKeysUsageTrendChart())"
             >
@@ -531,8 +586,8 @@
               :class="[
                 'rounded-md px-2 py-1 text-xs font-medium transition-colors sm:px-3 sm:text-sm',
                 apiKeysTrendMetric === 'tokens'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
+                  : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
               ]"
               @click="((apiKeysTrendMetric = 'tokens'), updateApiKeysUsageTrendChart())"
             >
@@ -541,7 +596,7 @@
             </button>
           </div>
         </div>
-        <div class="mb-4 text-xs text-gray-600 sm:text-sm">
+        <div class="mb-4 text-xs text-gray-600 dark:text-gray-400 sm:text-sm">
           <span v-if="apiKeysTrendData.totalApiKeys > 10">
             共 {{ apiKeysTrendData.totalApiKeys }} 个 API Key，显示使用量前 10 个
           </span>
@@ -556,12 +611,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useDashboardStore } from '@/stores/dashboard'
+import { useThemeStore } from '@/stores/theme'
 import Chart from 'chart.js/auto'
 
 const dashboardStore = useDashboardStore()
+const themeStore = useThemeStore()
+const { isDarkMode } = storeToRefs(themeStore)
+
 const {
   dashboardData,
   costsData,
@@ -606,6 +665,13 @@ const isRefreshing = ref(false)
 //   if (!autoRefreshEnabled.value || refreshCountdown.value <= 0) return ''
 //   return `${refreshCountdown.value}秒后刷新`
 // })
+
+// 图表颜色配置（根据主题动态调整）
+const chartColors = computed(() => ({
+  text: isDarkMode.value ? '#e5e7eb' : '#374151',
+  grid: isDarkMode.value ? 'rgba(75, 85, 99, 0.3)' : 'rgba(0, 0, 0, 0.1)',
+  legend: isDarkMode.value ? '#e5e7eb' : '#374151'
+}))
 
 // 格式化数字
 function formatNumber(num) {
@@ -670,7 +736,8 @@ function createModelUsageChart() {
             usePointStyle: true,
             font: {
               size: 12
-            }
+            },
+            color: chartColors.value.legend
           }
         },
         tooltip: {
@@ -800,10 +867,14 @@ function createUsageTrendChart() {
           font: {
             size: 16,
             weight: 'bold'
-          }
+          },
+          color: chartColors.value.text
         },
         legend: {
-          position: 'top'
+          position: 'top',
+          labels: {
+            color: chartColors.value.legend
+          }
         },
         tooltip: {
           mode: 'index',
@@ -858,7 +929,14 @@ function createUsageTrendChart() {
           display: true,
           title: {
             display: true,
-            text: trendGranularity.value === 'hour' ? '时间' : '日期'
+            text: trendGranularity === 'hour' ? '时间' : '日期',
+            color: chartColors.value.text
+          },
+          ticks: {
+            color: chartColors.value.text
+          },
+          grid: {
+            color: chartColors.value.grid
           }
         },
         y: {
@@ -867,12 +945,17 @@ function createUsageTrendChart() {
           position: 'left',
           title: {
             display: true,
-            text: 'Token数量'
+            text: 'Token数量',
+            color: chartColors.value.text
           },
           ticks: {
             callback: function (value) {
               return formatNumber(value)
-            }
+            },
+            color: chartColors.value.text
+          },
+          grid: {
+            color: chartColors.value.grid
           }
         },
         y1: {
@@ -881,7 +964,8 @@ function createUsageTrendChart() {
           position: 'right',
           title: {
             display: true,
-            text: '请求数'
+            text: '请求数',
+            color: chartColors.value.text
           },
           grid: {
             drawOnChartArea: false
@@ -889,7 +973,8 @@ function createUsageTrendChart() {
           ticks: {
             callback: function (value) {
               return value.toLocaleString()
-            }
+            },
+            color: chartColors.value.text
           }
         },
         y2: {
@@ -998,7 +1083,8 @@ function createApiKeysUsageTrendChart() {
             usePointStyle: true,
             font: {
               size: 12
-            }
+            },
+            color: chartColors.value.legend
           }
         },
         tooltip: {
@@ -1062,19 +1148,31 @@ function createApiKeysUsageTrendChart() {
           display: true,
           title: {
             display: true,
-            text: trendGranularity.value === 'hour' ? '时间' : '日期'
+            text: trendGranularity === 'hour' ? '时间' : '日期',
+            color: chartColors.value.text
+          },
+          ticks: {
+            color: chartColors.value.text
+          },
+          grid: {
+            color: chartColors.value.grid
           }
         },
         y: {
           beginAtZero: true,
           title: {
             display: true,
-            text: apiKeysTrendMetric.value === 'tokens' ? 'Token 数量' : '请求次数'
+            text: apiKeysTrendMetric.value === 'tokens' ? 'Token 数量' : '请求次数',
+            color: chartColors.value.text
           },
           ticks: {
             callback: function (value) {
               return formatNumber(value)
-            }
+            },
+            color: chartColors.value.text
+          },
+          grid: {
+            color: chartColors.value.grid
           }
         }
       }
@@ -1179,6 +1277,15 @@ watch(autoRefreshEnabled, (newVal) => {
   }
 })
 
+// 监听主题变化，重新创建图表
+watch(isDarkMode, () => {
+  nextTick(() => {
+    createModelUsageChart()
+    createUsageTrendChart()
+    createApiKeysUsageTrendChart()
+  })
+})
+
 // 初始化
 onMounted(async () => {
   // 加载所有数据
@@ -1208,19 +1315,8 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* 自定义日期选择器样式 */
-.custom-date-picker :deep(.el-input__inner) {
-  @apply border-gray-300 bg-white focus:border-blue-500 focus:ring-blue-500;
-  font-size: 13px;
-  padding: 0 10px;
-}
-
-.custom-date-picker :deep(.el-range-separator) {
-  @apply text-gray-500;
-  padding: 0 2px;
-}
-
-.custom-date-picker :deep(.el-range-input) {
+/* 日期选择器基本样式调整 - 让Element Plus官方暗黑模式生效 */
+.custom-date-picker {
   font-size: 13px;
 }
 

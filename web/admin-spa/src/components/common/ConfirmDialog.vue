@@ -14,10 +14,10 @@
               <i class="fas fa-exclamation-triangle text-lg text-white" />
             </div>
             <div class="flex-1">
-              <h3 class="mb-2 text-lg font-semibold text-gray-900">
+              <h3 class="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
                 {{ title }}
               </h3>
-              <div class="whitespace-pre-line leading-relaxed text-gray-600">
+              <div class="whitespace-pre-line leading-relaxed text-gray-700 dark:text-gray-400">
                 {{ message }}
               </div>
             </div>
@@ -25,7 +25,7 @@
 
           <div class="flex items-center justify-end gap-3">
             <button
-              class="btn bg-gray-100 px-6 py-3 text-gray-700 hover:bg-gray-200"
+              class="btn bg-gray-100 px-6 py-3 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
               :disabled="isProcessing"
               @click="handleCancel"
             >
@@ -141,6 +141,10 @@ defineExpose({
   backdrop-filter: blur(8px);
 }
 
+:global(.dark) .modal {
+  background: rgba(0, 0, 0, 0.7);
+}
+
 .modal-content {
   background: white;
   border-radius: 16px;
@@ -148,6 +152,12 @@ defineExpose({
   border: 1px solid #e5e7eb;
   max-height: 90vh;
   overflow-y: auto;
+}
+
+:global(.dark) .modal-content {
+  background: #1f2937;
+  border: 1px solid #374151;
+  box-shadow: 0 20px 64px rgba(0, 0, 0, 0.8);
 }
 
 .btn {
@@ -197,12 +207,24 @@ defineExpose({
   border-radius: 3px;
 }
 
+:global(.dark) .modal-content::-webkit-scrollbar-track {
+  background: #374151;
+}
+
 .modal-content::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 3px;
 }
 
+:global(.dark) .modal-content::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
 .modal-content::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+:global(.dark) .modal-content::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
 }
 </style>

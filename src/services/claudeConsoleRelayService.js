@@ -84,7 +84,16 @@ class ClaudeConsoleRelayService {
 
       // 构建完整的API URL
       const cleanUrl = account.apiUrl.replace(/\/$/, '') // 移除末尾斜杠
-      const apiEndpoint = cleanUrl.endsWith('/v1/messages') ? cleanUrl : `${cleanUrl}/v1/messages`
+      let apiEndpoint
+
+      if (options.customPath) {
+        // 如果指定了自定义路径（如 count_tokens），使用它
+        const baseUrl = cleanUrl.replace(/\/v1\/messages$/, '') // 移除已有的 /v1/messages
+        apiEndpoint = `${baseUrl}${options.customPath}`
+      } else {
+        // 默认使用 messages 端点
+        apiEndpoint = cleanUrl.endsWith('/v1/messages') ? cleanUrl : `${cleanUrl}/v1/messages`
+      }
 
       logger.debug(`🎯 Final API endpoint: ${apiEndpoint}`)
       logger.debug(`[DEBUG] Options passed to relayRequest: ${JSON.stringify(options)}`)

@@ -2,7 +2,9 @@
   <div>
     <!-- 限制配置 -->
     <div class="card p-4 md:p-6">
-      <h3 class="mb-3 flex items-center text-lg font-bold text-gray-900 md:mb-4 md:text-xl">
+      <h3
+        class="mb-3 flex items-center text-lg font-bold text-gray-900 dark:text-gray-100 md:mb-4 md:text-xl"
+      >
         <i class="fas fa-shield-alt mr-2 text-sm text-red-500 md:mr-3 md:text-base" />
         限制配置
       </h3>
@@ -10,8 +12,10 @@
         <!-- 每日费用限制 -->
         <div>
           <div class="mb-2 flex items-center justify-between">
-            <span class="text-sm font-medium text-gray-600 md:text-base">每日费用限制</span>
-            <span class="text-xs text-gray-500 md:text-sm">
+            <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base"
+              >每日费用限制</span
+            >
+            <span class="text-xs text-gray-500 dark:text-gray-400 md:text-sm">
               <span v-if="statsData.limits.dailyCostLimit > 0">
                 ${{ statsData.limits.currentDailyCost.toFixed(4) }} / ${{
                   statsData.limits.dailyCostLimit.toFixed(2)
@@ -24,7 +28,7 @@
           </div>
           <div
             v-if="statsData.limits.dailyCostLimit > 0"
-            class="h-2 w-full rounded-full bg-gray-200"
+            class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700"
           >
             <div
               class="h-2 rounded-full transition-all duration-300"
@@ -58,16 +62,16 @@
             :window-start-time="statsData.limits.windowStartTime"
           />
 
-          <div class="mt-2 text-xs text-gray-500">
+          <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
             <i class="fas fa-info-circle mr-1" />
             请求次数和Token使用量为"或"的关系，任一达到限制即触发限流
           </div>
         </div>
 
         <!-- 其他限制信息 -->
-        <div class="space-y-2 border-t border-gray-100 pt-2">
+        <div class="space-y-2 border-t border-gray-100 pt-2 dark:border-gray-700">
           <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-600 md:text-base">并发限制</span>
+            <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">并发限制</span>
             <span class="text-sm font-medium text-gray-900 md:text-base">
               <span v-if="statsData.limits.concurrencyLimit > 0">
                 {{ statsData.limits.concurrencyLimit }}
@@ -78,7 +82,7 @@
             </span>
           </div>
           <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-600 md:text-base">模型限制</span>
+            <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">模型限制</span>
             <span class="text-sm font-medium text-gray-900 md:text-base">
               <span
                 v-if="
@@ -97,7 +101,7 @@
             </span>
           </div>
           <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-600 md:text-base">客户端限制</span>
+            <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">客户端限制</span>
             <span class="text-sm font-medium text-gray-900 md:text-base">
               <span
                 v-if="
@@ -129,7 +133,9 @@
       "
       class="card mt-4 p-4 md:mt-6 md:p-6"
     >
-      <h3 class="mb-3 flex items-center text-lg font-bold text-gray-900 md:mb-4 md:text-xl">
+      <h3
+        class="mb-3 flex items-center text-lg font-bold text-gray-900 dark:text-gray-100 md:mb-4 md:text-xl"
+      >
         <i class="fas fa-list-alt mr-2 text-sm text-amber-500 md:mr-3 md:text-base" />
         详细限制信息
       </h3>
@@ -141,9 +147,11 @@
             statsData.restrictions.enableModelRestriction &&
             statsData.restrictions.restrictedModels.length > 0
           "
-          class="rounded-lg border border-amber-200 bg-amber-50 p-3 md:p-4"
+          class="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20 md:p-4"
         >
-          <h4 class="mb-2 flex items-center text-sm font-bold text-amber-800 md:mb-3 md:text-base">
+          <h4
+            class="mb-2 flex items-center text-sm font-bold text-amber-800 dark:text-amber-300 md:mb-3 md:text-base"
+          >
             <i class="fas fa-robot mr-1 text-xs md:mr-2 md:text-sm" />
             受限模型列表
           </h4>
@@ -151,13 +159,13 @@
             <div
               v-for="model in statsData.restrictions.restrictedModels"
               :key="model"
-              class="rounded border border-amber-200 bg-white px-2 py-1 text-xs md:px-3 md:py-2 md:text-sm"
+              class="rounded border border-amber-200 bg-white px-2 py-1 text-xs dark:border-amber-700 dark:bg-gray-800 md:px-3 md:py-2 md:text-sm"
             >
               <i class="fas fa-ban mr-1 text-xs text-red-500 md:mr-2" />
-              <span class="break-all text-gray-800">{{ model }}</span>
+              <span class="break-all text-gray-800 dark:text-gray-200">{{ model }}</span>
             </div>
           </div>
-          <p class="mt-2 text-xs text-amber-700 md:mt-3">
+          <p class="mt-2 text-xs text-amber-700 dark:text-amber-400 md:mt-3">
             <i class="fas fa-info-circle mr-1" />
             此 API Key 不能访问以上列出的模型
           </p>
@@ -169,9 +177,11 @@
             statsData.restrictions.enableClientRestriction &&
             statsData.restrictions.allowedClients.length > 0
           "
-          class="rounded-lg border border-blue-200 bg-blue-50 p-3 md:p-4"
+          class="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20 md:p-4"
         >
-          <h4 class="mb-2 flex items-center text-sm font-bold text-blue-800 md:mb-3 md:text-base">
+          <h4
+            class="mb-2 flex items-center text-sm font-bold text-blue-800 dark:text-blue-300 md:mb-3 md:text-base"
+          >
             <i class="fas fa-desktop mr-1 text-xs md:mr-2 md:text-sm" />
             允许的客户端
           </h4>
@@ -179,13 +189,13 @@
             <div
               v-for="client in statsData.restrictions.allowedClients"
               :key="client"
-              class="rounded border border-blue-200 bg-white px-2 py-1 text-xs md:px-3 md:py-2 md:text-sm"
+              class="rounded border border-blue-200 bg-white px-2 py-1 text-xs dark:border-blue-700 dark:bg-gray-800 md:px-3 md:py-2 md:text-sm"
             >
               <i class="fas fa-check mr-1 text-xs text-green-500 md:mr-2" />
-              <span class="break-all text-gray-800">{{ client }}</span>
+              <span class="break-all text-gray-800 dark:text-gray-200">{{ client }}</span>
             </div>
           </div>
-          <p class="mt-2 text-xs text-blue-700 md:mt-3">
+          <p class="mt-2 text-xs text-blue-700 dark:text-blue-400 md:mt-3">
             <i class="fas fa-info-circle mr-1" />
             此 API Key 只能被以上列出的客户端使用
           </p>
@@ -222,11 +232,11 @@ const getDailyCostProgressColor = () => {
 </script>
 
 <style scoped>
-/* 卡片样式 */
+/* 卡片样式 - 使用CSS变量 */
 .card {
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--surface-color);
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--border-color);
   box-shadow:
     0 10px 15px -3px rgba(0, 0, 0, 0.1),
     0 4px 6px -2px rgba(0, 0, 0, 0.05);
@@ -250,5 +260,11 @@ const getDailyCostProgressColor = () => {
   box-shadow:
     0 20px 25px -5px rgba(0, 0, 0, 0.15),
     0 10px 10px -5px rgba(0, 0, 0, 0.08);
+}
+
+:global(.dark) .card:hover {
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.5),
+    0 10px 10px -5px rgba(0, 0, 0, 0.35);
 }
 </style>

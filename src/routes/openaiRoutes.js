@@ -8,30 +8,11 @@ const unifiedOpenAIScheduler = require('../services/unifiedOpenAIScheduler')
 const openaiAccountService = require('../services/openaiAccountService')
 const apiKeyService = require('../services/apiKeyService')
 const crypto = require('crypto')
-const { SocksProxyAgent } = require('socks-proxy-agent')
-const { HttpsProxyAgent } = require('https-proxy-agent')
+const ProxyHelper = require('../utils/proxyHelper')
 
-// 创建代理 Agent
+// 创建代理 Agent（使用统一的代理工具）
 function createProxyAgent(proxy) {
-  if (!proxy) {
-    return null
-  }
-
-  try {
-    if (proxy.type === 'socks5') {
-      const auth = proxy.username && proxy.password ? `${proxy.username}:${proxy.password}@` : ''
-      const socksUrl = `socks5://${auth}${proxy.host}:${proxy.port}`
-      return new SocksProxyAgent(socksUrl)
-    } else if (proxy.type === 'http' || proxy.type === 'https') {
-      const auth = proxy.username && proxy.password ? `${proxy.username}:${proxy.password}@` : ''
-      const proxyUrl = `${proxy.type}://${auth}${proxy.host}:${proxy.port}`
-      return new HttpsProxyAgent(proxyUrl)
-    }
-  } catch (error) {
-    logger.warn('Failed to create proxy agent:', error)
-  }
-
-  return null
+  return ProxyHelper.createProxyAgent(proxy)
 }
 
 // 使用统一调度器选择 OpenAI 账户
@@ -80,7 +61,8 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
       accessToken,
       accountId: result.accountId,
       accountName: account.name,
-      proxy
+      proxy,
+      account
     }
   } catch (error) {
     logger.error('Failed to get OpenAI auth token:', error)
@@ -146,11 +128,13 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
     }
 
     // 使用调度器选择账户
-    const { accessToken, accountId, proxy } = await getOpenAIAuthToken(
-      apiKeyData,
-      sessionId,
-      requestedModel
-    )
+    const {
+      accessToken,
+      accountId,
+      accountName: _accountName,
+      proxy,
+      account
+    } = await getOpenAIAuthToken(apiKeyData, sessionId, requestedModel)
     // 基于白名单构造上游所需的请求头，确保键为小写且值受控
     const incoming = req.headers || {}
 
@@ -165,7 +149,7 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
 
     // 覆盖或新增必要头部
     headers['authorization'] = `Bearer ${accessToken}`
-    headers['chatgpt-account-id'] = accountId
+    headers['chatgpt-account-id'] = account.accountId || account.chatgptUserId || accountId
     headers['host'] = 'chatgpt.com'
     headers['accept'] = isStream ? 'text/event-stream' : 'application/json'
     headers['content-type'] = 'application/json'
@@ -184,7 +168,9 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
     // 如果有代理，添加代理配置
     if (proxyAgent) {
       axiosConfig.httpsAgent = proxyAgent
-      logger.info('Using proxy for OpenAI request')
+      logger.info(`🌐 Using proxy for OpenAI request: ${ProxyHelper.getProxyDescription(proxy)}`)
+    } else {
+      logger.debug('🌐 No proxy configured for OpenAI request')
     }
 
     // 根据 stream 参数决定请求类型

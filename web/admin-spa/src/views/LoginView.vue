@@ -1,5 +1,10 @@
 <template>
   <div class="flex min-h-screen items-center justify-center p-4 sm:p-6">
+    <!-- 主题切换按钮 - 固定在右上角 -->
+    <div class="fixed right-4 top-4 z-50">
+      <ThemeToggle mode="dropdown" />
+    </div>
+
     <div
       class="glass-strong w-full max-w-md rounded-xl p-6 shadow-2xl sm:rounded-2xl sm:p-8 md:rounded-3xl md:p-10"
     >
@@ -29,12 +34,14 @@
           v-else-if="oemLoading"
           class="mx-auto mb-2 h-8 w-48 animate-pulse rounded bg-gray-300/50 sm:h-9 sm:w-64"
         />
-        <p class="text-base text-gray-600 sm:text-lg">管理后台</p>
+        <p class="text-base text-gray-600 dark:text-gray-400 sm:text-lg">管理后台</p>
       </div>
 
       <form class="space-y-4 sm:space-y-6" @submit.prevent="handleLogin">
         <div>
-          <label class="mb-2 block text-sm font-semibold text-gray-900 sm:mb-3">用户名</label>
+          <label class="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100 sm:mb-3"
+            >用户名</label
+          >
           <input
             v-model="loginForm.username"
             class="form-input w-full"
@@ -45,7 +52,9 @@
         </div>
 
         <div>
-          <label class="mb-2 block text-sm font-semibold text-gray-900 sm:mb-3">密码</label>
+          <label class="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100 sm:mb-3"
+            >密码</label
+          >
           <input
             v-model="loginForm.password"
             class="form-input w-full"
@@ -68,7 +77,7 @@
 
       <div
         v-if="authStore.loginError"
-        class="mt-4 rounded-lg border border-red-500/30 bg-red-500/20 p-3 text-center text-xs text-red-800 backdrop-blur-sm sm:mt-6 sm:rounded-xl sm:p-4 sm:text-sm"
+        class="mt-4 rounded-lg border border-red-500/30 bg-red-500/20 p-3 text-center text-xs text-red-800 backdrop-blur-sm dark:text-red-400 sm:mt-6 sm:rounded-xl sm:p-4 sm:text-sm"
       >
         <i class="fas fa-exclamation-triangle mr-2" />{{ authStore.loginError }}
       </div>
@@ -79,8 +88,11 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useThemeStore } from '@/stores/theme'
+import ThemeToggle from '@/components/common/ThemeToggle.vue'
 
 const authStore = useAuthStore()
+const themeStore = useThemeStore()
 const oemLoading = computed(() => authStore.oemLoading)
 
 const loginForm = ref({
@@ -89,6 +101,8 @@ const loginForm = ref({
 })
 
 onMounted(() => {
+  // 初始化主题
+  themeStore.initTheme()
   // 加载OEM设置
   authStore.loadOemSettings()
 })

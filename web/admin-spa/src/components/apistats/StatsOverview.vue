@@ -2,19 +2,22 @@
   <div class="mb-6 grid grid-cols-1 gap-4 md:mb-8 md:gap-6 lg:grid-cols-2">
     <!-- API Key 基本信息 -->
     <div class="card p-4 md:p-6">
-      <h3 class="mb-3 flex items-center text-lg font-bold text-gray-900 md:mb-4 md:text-xl">
+      <h3
+        class="mb-3 flex items-center text-lg font-bold text-gray-900 dark:text-gray-100 md:mb-4 md:text-xl"
+      >
         <i class="fas fa-info-circle mr-2 text-sm text-blue-500 md:mr-3 md:text-base" />
         API Key 信息
       </h3>
       <div class="space-y-2 md:space-y-3">
         <div class="flex items-center justify-between">
-          <span class="text-sm text-gray-600 md:text-base">名称</span>
-          <span class="break-all text-sm font-medium text-gray-900 md:text-base">{{
-            statsData.name
-          }}</span>
+          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">名称</span>
+          <span
+            class="break-all text-sm font-medium text-gray-900 dark:text-gray-100 md:text-base"
+            >{{ statsData.name }}</span
+          >
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-sm text-gray-600 md:text-base">状态</span>
+          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">状态</span>
           <span
             class="text-sm font-medium md:text-base"
             :class="statsData.isActive ? 'text-green-600' : 'text-red-600'"
@@ -27,19 +30,22 @@
           </span>
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-sm text-gray-600 md:text-base">权限</span>
-          <span class="text-sm font-medium text-gray-900 md:text-base">{{
+          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">权限</span>
+          <span class="text-sm font-medium text-gray-900 dark:text-gray-100 md:text-base">{{
             formatPermissions(statsData.permissions)
           }}</span>
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-sm text-gray-600 md:text-base">创建时间</span>
-          <span class="break-all text-xs font-medium text-gray-900 md:text-base">{{
-            formatDate(statsData.createdAt)
-          }}</span>
+          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">创建时间</span>
+          <span
+            class="break-all text-xs font-medium text-gray-900 dark:text-gray-100 md:text-base"
+            >{{ formatDate(statsData.createdAt) }}</span
+          >
         </div>
         <div class="flex items-start justify-between">
-          <span class="mt-1 flex-shrink-0 text-sm text-gray-600 md:text-base">过期时间</span>
+          <span class="mt-1 flex-shrink-0 text-sm text-gray-600 dark:text-gray-400 md:text-base"
+            >过期时间</span
+          >
           <div v-if="statsData.expiresAt" class="text-right">
             <div
               v-if="isApiKeyExpired(statsData.expiresAt)"
@@ -55,11 +61,14 @@
               <i class="fas fa-clock mr-1 text-xs md:text-sm" />
               {{ formatExpireDate(statsData.expiresAt) }}
             </div>
-            <div v-else class="break-all text-xs font-medium text-gray-900 md:text-base">
+            <div
+              v-else
+              class="break-all text-xs font-medium text-gray-900 dark:text-gray-100 md:text-base"
+            >
               {{ formatExpireDate(statsData.expiresAt) }}
             </div>
           </div>
-          <div v-else class="text-sm font-medium text-gray-400 md:text-base">
+          <div v-else class="text-sm font-medium text-gray-400 dark:text-gray-500 md:text-base">
             <i class="fas fa-infinity mr-1 text-xs md:text-sm" />
             永不过期
           </div>
@@ -70,13 +79,13 @@
     <!-- 使用统计概览 -->
     <div class="card p-4 md:p-6">
       <h3
-        class="mb-3 flex flex-col text-lg font-bold text-gray-900 sm:flex-row sm:items-center md:mb-4 md:text-xl"
+        class="mb-3 flex flex-col text-lg font-bold text-gray-900 dark:text-gray-100 sm:flex-row sm:items-center md:mb-4 md:text-xl"
       >
         <span class="flex items-center">
           <i class="fas fa-chart-bar mr-2 text-sm text-green-500 md:mr-3 md:text-base" />
           使用统计概览
         </span>
-        <span class="text-xs font-normal text-gray-600 sm:ml-2 md:text-sm"
+        <span class="text-xs font-normal text-gray-600 dark:text-gray-400 sm:ml-2 md:text-sm"
           >({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span
         >
       </h3>
@@ -85,7 +94,7 @@
           <div class="text-lg font-bold text-green-600 md:text-3xl">
             {{ formatNumber(currentPeriodData.requests) }}
           </div>
-          <div class="text-xs text-gray-600 md:text-sm">
+          <div class="text-xs text-gray-600 dark:text-gray-400 md:text-sm">
             {{ statsPeriod === 'daily' ? '今日' : '本月' }}请求数
           </div>
         </div>
@@ -93,7 +102,7 @@
           <div class="text-lg font-bold text-blue-600 md:text-3xl">
             {{ formatNumber(currentPeriodData.allTokens) }}
           </div>
-          <div class="text-xs text-gray-600 md:text-sm">
+          <div class="text-xs text-gray-600 dark:text-gray-400 md:text-sm">
             {{ statsPeriod === 'daily' ? '今日' : '本月' }}Token数
           </div>
         </div>
@@ -101,7 +110,7 @@
           <div class="text-lg font-bold text-purple-600 md:text-3xl">
             {{ currentPeriodData.formattedCost || '$0.000000' }}
           </div>
-          <div class="text-xs text-gray-600 md:text-sm">
+          <div class="text-xs text-gray-600 dark:text-gray-400 md:text-sm">
             {{ statsPeriod === 'daily' ? '今日' : '本月' }}费用
           </div>
         </div>
@@ -109,7 +118,7 @@
           <div class="text-lg font-bold text-yellow-600 md:text-3xl">
             {{ formatNumber(currentPeriodData.inputTokens) }}
           </div>
-          <div class="text-xs text-gray-600 md:text-sm">
+          <div class="text-xs text-gray-600 dark:text-gray-400 md:text-sm">
             {{ statsPeriod === 'daily' ? '今日' : '本月' }}输入Token
           </div>
         </div>
@@ -197,11 +206,11 @@ const formatPermissions = (permissions) => {
 </script>
 
 <style scoped>
-/* 卡片样式 */
+/* 卡片样式 - 使用CSS变量 */
 .card {
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--surface-color);
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--border-color);
   box-shadow:
     0 10px 15px -3px rgba(0, 0, 0, 0.1),
     0 4px 6px -2px rgba(0, 0, 0, 0.05);
@@ -227,11 +236,17 @@ const formatPermissions = (permissions) => {
     0 10px 10px -5px rgba(0, 0, 0, 0.08);
 }
 
-/* 统计卡片样式 */
+:global(.dark) .card:hover {
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.5),
+    0 10px 10px -5px rgba(0, 0, 0, 0.35);
+}
+
+/* 统计卡片样式 - 使用CSS变量 */
 .stat-card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.8) 100%);
+  background: linear-gradient(135deg, var(--surface-color) 0%, var(--glass-strong-color) 100%);
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid var(--border-color);
   padding: 16px;
   position: relative;
   overflow: hidden;
@@ -262,6 +277,12 @@ const formatPermissions = (permissions) => {
   box-shadow:
     0 20px 25px -5px rgba(0, 0, 0, 0.1),
     0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+:global(.dark) .stat-card:hover {
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.4),
+    0 10px 10px -5px rgba(0, 0, 0, 0.25);
 }
 
 .stat-card:hover::before {

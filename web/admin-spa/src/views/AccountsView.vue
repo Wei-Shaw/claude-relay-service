@@ -3,8 +3,12 @@
     <div class="card p-4 sm:p-6">
       <div class="mb-4 flex flex-col gap-4 sm:mb-6">
         <div>
-          <h3 class="mb-1 text-lg font-bold text-gray-900 sm:mb-2 sm:text-xl">账户管理</h3>
-          <p class="text-sm text-gray-600 sm:text-base">管理您的 Claude 和 Gemini 账户及代理配置</p>
+          <h3 class="mb-1 text-lg font-bold text-gray-900 dark:text-gray-100 sm:mb-2 sm:text-xl">
+            账户管理
+          </h3>
+          <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-base">
+            管理您的 Claude、Gemini、OpenAI 和 Azure OpenAI 账户及代理配置
+          </p>
         </div>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <!-- 筛选器组 -->
@@ -62,7 +66,7 @@
                 placement="bottom"
               >
                 <button
-                  class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                  class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 sm:w-auto"
                   :disabled="accountsLoading"
                   @click.ctrl.exact="loadAccounts(true)"
                   @click.exact="loadAccounts(false)"
@@ -96,26 +100,26 @@
 
       <div v-if="accountsLoading" class="py-12 text-center">
         <div class="loading-spinner mx-auto mb-4" />
-        <p class="text-gray-500">正在加载账户...</p>
+        <p class="text-gray-500 dark:text-gray-400">正在加载账户...</p>
       </div>
 
       <div v-else-if="sortedAccounts.length === 0" class="py-12 text-center">
         <div
-          class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100"
+          class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700"
         >
           <i class="fas fa-user-circle text-xl text-gray-400" />
         </div>
-        <p class="text-lg text-gray-500">暂无账户</p>
-        <p class="mt-2 text-sm text-gray-400">点击上方按钮添加您的第一个账户</p>
+        <p class="text-lg text-gray-500 dark:text-gray-400">暂无账户</p>
+        <p class="mt-2 text-sm text-gray-400 dark:text-gray-500">点击上方按钮添加您的第一个账户</p>
       </div>
 
       <!-- 桌面端表格视图 -->
       <div v-else class="table-container hidden md:block">
         <table class="w-full table-fixed">
-          <thead class="bg-gray-50/80 backdrop-blur-sm">
+          <thead class="bg-gray-50/80 backdrop-blur-sm dark:bg-gray-700/80">
             <tr>
               <th
-                class="w-[22%] min-w-[180px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100"
+                class="w-[22%] min-w-[180px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                 @click="sortAccounts('name')"
               >
                 名称
@@ -130,7 +134,7 @@
                 <i v-else class="fas fa-sort ml-1 text-gray-400" />
               </th>
               <th
-                class="w-[15%] min-w-[120px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100"
+                class="w-[15%] min-w-[120px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                 @click="sortAccounts('platform')"
               >
                 平台/类型
@@ -145,7 +149,7 @@
                 <i v-else class="fas fa-sort ml-1 text-gray-400" />
               </th>
               <th
-                class="w-[12%] min-w-[100px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100"
+                class="w-[12%] min-w-[100px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                 @click="sortAccounts('status')"
               >
                 状态
@@ -160,7 +164,7 @@
                 <i v-else class="fas fa-sort ml-1 text-gray-400" />
               </th>
               <th
-                class="w-[8%] min-w-[80px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100"
+                class="w-[8%] min-w-[80px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                 @click="sortAccounts('priority')"
               >
                 优先级
@@ -175,33 +179,33 @@
                 <i v-else class="fas fa-sort ml-1 text-gray-400" />
               </th>
               <th
-                class="w-[10%] min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700"
+                class="w-[10%] min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
               >
                 代理
               </th>
               <th
-                class="w-[10%] min-w-[90px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700"
+                class="w-[10%] min-w-[90px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
               >
                 今日使用
               </th>
               <th
-                class="w-[10%] min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700"
+                class="w-[10%] min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
               >
                 会话窗口
               </th>
               <th
-                class="w-[8%] min-w-[80px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700"
+                class="w-[8%] min-w-[80px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
               >
                 最后使用
               </th>
               <th
-                class="w-[15%] min-w-[180px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700"
+                class="w-[15%] min-w-[180px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
               >
                 操作
               </th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-200/50">
+          <tbody class="divide-y divide-gray-200/50 dark:divide-gray-600/50">
             <tr v-for="account in sortedAccounts" :key="account.id" class="table-row">
               <td class="px-3 py-4">
                 <div class="flex items-center">
@@ -213,7 +217,7 @@
                   <div class="min-w-0">
                     <div class="flex items-center gap-2">
                       <div
-                        class="truncate text-sm font-semibold text-gray-900"
+                        class="truncate text-sm font-semibold text-gray-900 dark:text-gray-100"
                         :title="account.name"
                       >
                         {{ account.name }}
@@ -238,13 +242,16 @@
                       </span>
                       <span
                         v-if="account.groupInfo"
-                        class="ml-1 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600"
+                        class="ml-1 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-400"
                         :title="`所属分组: ${account.groupInfo.name}`"
                       >
                         <i class="fas fa-folder mr-1" />{{ account.groupInfo.name }}
                       </span>
                     </div>
-                    <div class="truncate text-xs text-gray-500" :title="account.id">
+                    <div
+                      class="truncate text-xs text-gray-500 dark:text-gray-400"
+                      :title="account.id"
+                    >
                       {{ account.id }}
                     </div>
                   </div>
@@ -290,6 +297,19 @@
                     <span class="text-xs font-semibold text-gray-950">OpenAi</span>
                     <span class="mx-1 h-4 w-px bg-gray-400" />
                     <span class="text-xs font-medium text-gray-950">{{ getOpenAIAuthType() }}</span>
+                  </div>
+                  <div
+                    v-else-if="account.platform === 'azure_openai'"
+                    class="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-gradient-to-r from-blue-100 to-cyan-100 px-2.5 py-1 dark:border-blue-700 dark:from-blue-900/20 dark:to-cyan-900/20"
+                  >
+                    <i class="fab fa-microsoft text-xs text-blue-700 dark:text-blue-400" />
+                    <span class="text-xs font-semibold text-blue-800 dark:text-blue-300"
+                      >Azure OpenAI</span
+                    >
+                    <span class="mx-1 h-4 w-px bg-blue-300 dark:bg-blue-600" />
+                    <span class="text-xs font-medium text-blue-700 dark:text-blue-400"
+                      >API Key</span
+                    >
                   </div>
                   <div
                     v-else-if="account.platform === 'claude' || account.platform === 'claude-oauth'"
@@ -376,12 +396,15 @@
                   </span>
                   <span
                     v-if="account.status === 'blocked' && account.errorMessage"
-                    class="mt-1 max-w-xs truncate text-xs text-gray-500"
+                    class="mt-1 max-w-xs truncate text-xs text-gray-500 dark:text-gray-400"
                     :title="account.errorMessage"
                   >
                     {{ account.errorMessage }}
                   </span>
-                  <span v-if="account.accountType === 'dedicated'" class="text-xs text-gray-500">
+                  <span
+                    v-if="account.accountType === 'dedicated'"
+                    class="text-xs text-gray-500 dark:text-gray-400"
+                  >
                     绑定: {{ account.boundApiKeysCount || 0 }} 个API Key
                   </span>
                 </div>
@@ -403,7 +426,7 @@
                       :style="{ width: 101 - (account.priority || 50) + '%' }"
                     />
                   </div>
-                  <span class="min-w-[20px] text-xs font-medium text-gray-700">
+                  <span class="min-w-[20px] text-xs font-medium text-gray-700 dark:text-gray-200">
                     {{ account.priority || 50 }}
                   </span>
                 </div>
@@ -425,19 +448,19 @@
                 <div v-if="account.usage && account.usage.daily" class="space-y-1">
                   <div class="flex items-center gap-2">
                     <div class="h-2 w-2 rounded-full bg-green-500" />
-                    <span class="text-sm font-medium text-gray-900"
+                    <span class="text-sm font-medium text-gray-900 dark:text-gray-100"
                       >{{ account.usage.daily.requests || 0 }} 次</span
                     >
                   </div>
                   <div class="flex items-center gap-2">
                     <div class="h-2 w-2 rounded-full bg-blue-500" />
-                    <span class="text-xs text-gray-600"
+                    <span class="text-xs text-gray-600 dark:text-gray-300"
                       >{{ formatNumber(account.usage.daily.allTokens || 0) }} tokens</span
                     >
                   </div>
                   <div
                     v-if="account.usage.averages && account.usage.averages.rpm > 0"
-                    class="text-xs text-gray-500"
+                    class="text-xs text-gray-500 dark:text-gray-400"
                   >
                     平均 {{ account.usage.averages.rpm.toFixed(2) }} RPM
                   </div>
@@ -460,11 +483,11 @@
                         :style="{ width: account.sessionWindow.progress + '%' }"
                       />
                     </div>
-                    <span class="min-w-[32px] text-xs font-medium text-gray-700">
+                    <span class="min-w-[32px] text-xs font-medium text-gray-700 dark:text-gray-200">
                       {{ account.sessionWindow.progress }}%
                     </span>
                   </div>
-                  <div class="text-xs text-gray-600">
+                  <div class="text-xs text-gray-600 dark:text-gray-300">
                     <div>
                       {{
                         formatSessionWindow(
@@ -488,7 +511,7 @@
                   <span class="text-xs">N/A</span>
                 </div>
               </td>
-              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600">
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 dark:text-gray-300">
                 {{ formatLastUsed(account.lastUsedAt) }}
               </td>
               <td class="whitespace-nowrap px-3 py-4 text-sm font-medium">
@@ -571,7 +594,11 @@
                     ? 'bg-gradient-to-br from-purple-500 to-purple-600'
                     : account.platform === 'bedrock'
                       ? 'bg-gradient-to-br from-orange-500 to-red-600'
-                      : 'bg-gradient-to-br from-blue-500 to-blue-600'
+                      : account.platform === 'azure_openai'
+                        ? 'bg-gradient-to-br from-blue-500 to-cyan-600'
+                        : account.platform === 'openai'
+                          ? 'bg-gradient-to-br from-gray-600 to-gray-700'
+                          : 'bg-gradient-to-br from-blue-500 to-blue-600'
                 ]"
               >
                 <i
@@ -581,7 +608,11 @@
                       ? 'fas fa-brain'
                       : account.platform === 'bedrock'
                         ? 'fab fa-aws'
-                        : 'fas fa-robot'
+                        : account.platform === 'azure_openai'
+                          ? 'fab fa-microsoft'
+                          : account.platform === 'openai'
+                            ? 'fas fa-openai'
+                            : 'fas fa-robot'
                   ]"
                 />
               </div>
@@ -590,9 +621,11 @@
                   {{ account.name || account.email }}
                 </h4>
                 <div class="mt-0.5 flex items-center gap-2">
-                  <span class="text-xs text-gray-500">{{ account.platform }}</span>
+                  <span class="text-xs text-gray-500 dark:text-gray-400">{{
+                    account.platform
+                  }}</span>
                   <span class="text-xs text-gray-400">|</span>
-                  <span class="text-xs text-gray-500">{{ account.type }}</span>
+                  <span class="text-xs text-gray-500 dark:text-gray-400">{{ account.type }}</span>
                 </div>
               </div>
             </div>
@@ -612,20 +645,20 @@
           <!-- 使用统计 -->
           <div class="mb-3 grid grid-cols-2 gap-3">
             <div>
-              <p class="text-xs text-gray-500">今日使用</p>
-              <p class="text-sm font-semibold text-gray-900">
+              <p class="text-xs text-gray-500 dark:text-gray-400">今日使用</p>
+              <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
                 {{ formatNumber(account.usage?.daily?.requests || 0) }} 次
               </p>
-              <p class="mt-0.5 text-xs text-gray-500">
+              <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                 {{ formatNumber(account.usage?.daily?.allTokens || 0) }} tokens
               </p>
             </div>
             <div>
-              <p class="text-xs text-gray-500">总使用量</p>
-              <p class="text-sm font-semibold text-gray-900">
+              <p class="text-xs text-gray-500 dark:text-gray-400">总使用量</p>
+              <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
                 {{ formatNumber(account.usage?.total?.requests || 0) }} 次
               </p>
-              <p class="mt-0.5 text-xs text-gray-500">
+              <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                 {{ formatNumber(account.usage?.total?.allTokens || 0) }} tokens
               </p>
             </div>
@@ -640,22 +673,22 @@
                 account.sessionWindow &&
                 account.sessionWindow.hasActiveWindow
               "
-              class="space-y-1.5 rounded-lg bg-gray-50 p-2"
+              class="space-y-1.5 rounded-lg bg-gray-50 p-2 dark:bg-gray-700"
             >
               <div class="flex items-center justify-between text-xs">
-                <span class="font-medium text-gray-600">会话窗口</span>
-                <span class="font-medium text-gray-700">
+                <span class="font-medium text-gray-600 dark:text-gray-300">会话窗口</span>
+                <span class="font-medium text-gray-700 dark:text-gray-200">
                   {{ account.sessionWindow.progress }}%
                 </span>
               </div>
-              <div class="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+              <div class="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-600">
                 <div
                   class="h-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-300"
                   :style="{ width: account.sessionWindow.progress + '%' }"
                 />
               </div>
               <div class="flex items-center justify-between text-xs">
-                <span class="text-gray-500">
+                <span class="text-gray-500 dark:text-gray-400">
                   {{
                     formatSessionWindow(
                       account.sessionWindow.windowStart,
@@ -675,8 +708,8 @@
 
             <!-- 最后使用时间 -->
             <div class="flex items-center justify-between text-xs">
-              <span class="text-gray-500">最后使用</span>
-              <span class="text-gray-700">
+              <span class="text-gray-500 dark:text-gray-400">最后使用</span>
+              <span class="text-gray-700 dark:text-gray-200">
                 {{ account.lastUsedAt ? formatRelativeTime(account.lastUsedAt) : '从未使用' }}
               </span>
             </div>
@@ -686,16 +719,16 @@
               v-if="account.proxyConfig && account.proxyConfig.type !== 'none'"
               class="flex items-center justify-between text-xs"
             >
-              <span class="text-gray-500">代理</span>
-              <span class="text-gray-700">
+              <span class="text-gray-500 dark:text-gray-400">代理</span>
+              <span class="text-gray-700 dark:text-gray-200">
                 {{ account.proxyConfig.type.toUpperCase() }}
               </span>
             </div>
 
             <!-- 调度优先级 -->
             <div class="flex items-center justify-between text-xs">
-              <span class="text-gray-500">优先级</span>
-              <span class="font-medium text-gray-700">
+              <span class="text-gray-500 dark:text-gray-400">优先级</span>
+              <span class="font-medium text-gray-700 dark:text-gray-200">
                 {{ account.priority || 50 }}
               </span>
             </div>
@@ -808,6 +841,7 @@ const platformOptions = ref([
   { value: 'claude-console', label: 'Claude Console', icon: 'fa-terminal' },
   { value: 'gemini', label: 'Gemini', icon: 'fa-google' },
   { value: 'openai', label: 'OpenAi', icon: 'fa-openai' },
+  { value: 'azure_openai', label: 'Azure OpenAI', icon: 'fab fa-microsoft' },
   { value: 'bedrock', label: 'Bedrock', icon: 'fab fa-aws' }
 ])
 
@@ -900,7 +934,8 @@ const loadAccounts = async (forceReload = false) => {
         apiClient.get('/admin/claude-console-accounts', { params }),
         apiClient.get('/admin/bedrock-accounts', { params }),
         apiClient.get('/admin/gemini-accounts', { params }),
-        apiClient.get('/admin/openai-accounts', { params })
+        apiClient.get('/admin/openai-accounts', { params }),
+        apiClient.get('/admin/azure-openai-accounts', { params })
       )
     } else {
       // 只请求指定平台，其他平台设为null占位
@@ -946,7 +981,7 @@ const loadAccounts = async (forceReload = false) => {
     // 加载分组成员关系（需要在分组数据加载完成后）
     await loadGroupMembers(forceReload)
 
-    const [claudeData, claudeConsoleData, bedrockData, geminiData, openaiData] =
+    const [claudeData, claudeConsoleData, bedrockData, geminiData, openaiData, azureOpenaiData] =
       await Promise.all(requests)
 
     const allAccounts = []
@@ -1003,6 +1038,17 @@ const loadAccounts = async (forceReload = false) => {
         return { ...acc, platform: 'openai', boundApiKeysCount, groupInfo }
       })
       allAccounts.push(...openaiAccounts)
+    }
+    if (azureOpenaiData && azureOpenaiData.success) {
+      const azureOpenaiAccounts = (azureOpenaiData.data || []).map((acc) => {
+        // 计算每个Azure OpenAI账户绑定的API Key数量
+        const boundApiKeysCount = apiKeys.value.filter(
+          (key) => key.azureOpenaiAccountId === acc.id
+        ).length
+        const groupInfo = accountGroupMap.value.get(acc.id) || null
+        return { ...acc, platform: 'azure_openai', boundApiKeysCount, groupInfo }
+      })
+      allAccounts.push(...azureOpenaiAccounts)
     }
 
     accounts.value = allAccounts
@@ -1232,6 +1278,8 @@ const deleteAccount = async (account) => {
       endpoint = `/admin/bedrock-accounts/${account.id}`
     } else if (account.platform === 'openai') {
       endpoint = `/admin/openai-accounts/${account.id}`
+    } else if (account.platform === 'azure_openai') {
+      endpoint = `/admin/azure-openai-accounts/${account.id}`
     } else {
       endpoint = `/admin/gemini-accounts/${account.id}`
     }
@@ -1304,6 +1352,8 @@ const toggleSchedulable = async (account) => {
       endpoint = `/admin/gemini-accounts/${account.id}/toggle-schedulable`
     } else if (account.platform === 'openai') {
       endpoint = `/admin/openai-accounts/${account.id}/toggle-schedulable`
+    } else if (account.platform === 'azure_openai') {
+      endpoint = `/admin/azure-openai-accounts/${account.id}/toggle-schedulable`
     } else {
       showToast('该账户类型暂不支持调度控制', 'warning')
       return

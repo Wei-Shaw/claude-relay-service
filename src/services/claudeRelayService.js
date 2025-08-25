@@ -2,8 +2,7 @@ const https = require('https')
 const zlib = require('zlib')
 const fs = require('fs')
 const path = require('path')
-const { SocksProxyAgent } = require('socks-proxy-agent')
-const { HttpsProxyAgent } = require('https-proxy-agent')
+const ProxyHelper = require('../utils/proxyHelper')
 const claudeAccountService = require('./claudeAccountService')
 const unifiedClaudeScheduler = require('./unifiedClaudeScheduler')
 const sessionHelper = require('../utils/sessionHelper')
@@ -496,32 +495,28 @@ class ClaudeRelayService {
     }
   }
 
-  // 🌐 获取代理Agent
+  // 🌐 获取代理Agent（使用统一的代理工具）
   async _getProxyAgent(accountId) {
     try {
       const accountData = await claudeAccountService.getAllAccounts()
       const account = accountData.find((acc) => acc.id === accountId)
 
       if (!account || !account.proxy) {
+        logger.debug('🌐 No proxy configured for Claude account')
         return null
       }
 
-      const { proxy } = account
-
-      if (proxy.type === 'socks5') {
-        const auth = proxy.username && proxy.password ? `${proxy.username}:${proxy.password}@` : ''
-        const socksUrl = `socks5://${auth}${proxy.host}:${proxy.port}`
-        return new SocksProxyAgent(socksUrl)
-      } else if (proxy.type === 'http' || proxy.type === 'https') {
-        const auth = proxy.username && proxy.password ? `${proxy.username}:${proxy.password}@` : ''
-        const httpUrl = `${proxy.type}://${auth}${proxy.host}:${proxy.port}`
-        return new HttpsProxyAgent(httpUrl)
+      const proxyAgent = ProxyHelper.createProxyAgent(account.proxy)
+      if (proxyAgent) {
+        logger.info(
+          `🌐 Using proxy for Claude request: ${ProxyHelper.getProxyDescription(account.proxy)}`
+        )
       }
+      return proxyAgent
     } catch (error) {
       logger.warn('⚠️ Failed to create proxy agent:', error)
+      return null
     }
-
-    return null
   }
 
   // 🔧 过滤客户端请求头
@@ -596,10 +591,18 @@ class ClaudeRelayService {
     }
 
     return new Promise((resolve, reject) => {
+      // 支持自定义路径（如 count_tokens）
+      let requestPath = url.pathname
+      if (requestOptions.customPath) {
+        const baseUrl = new URL('https://api.anthropic.com')
+        const customUrl = new URL(requestOptions.customPath, baseUrl)
+        requestPath = customUrl.pathname
+      }
+
       const options = {
         hostname: url.hostname,
         port: url.port || 443,
-        path: url.pathname,
+        path: requestPath,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

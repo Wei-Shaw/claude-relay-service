@@ -1,5 +1,6 @@
 /* 从原始 style.css 复制的全局样式 */
 :root {
+  /* 亮色模式 */
   --primary-color: #667eea;
   --secondary-color: #764ba2;
   --accent-color: #f093fb;
@@ -8,31 +9,62 @@
   --error-color: #ef4444;
   --surface-color: rgba(255, 255, 255, 0.95);
   --glass-color: rgba(255, 255, 255, 0.1);
+  --glass-strong-color: rgba(255, 255, 255, 0.95);
   --text-primary: #1f2937;
   --text-secondary: #6b7280;
   --border-color: rgba(255, 255, 255, 0.2);
+  --bg-gradient-start: #667eea;
+  --bg-gradient-mid: #764ba2;
+  --bg-gradient-end: #f093fb;
+  --input-bg: rgba(255, 255, 255, 0.9);
+  --input-border: rgba(255, 255, 255, 0.3);
+  --modal-bg: rgba(0, 0, 0, 0.4);
+  --table-bg: rgba(255, 255, 255, 0.95);
+  --table-hover: rgba(102, 126, 234, 0.05);
 }
 
-/* 通用transition - 仅应用于特定元素 */
-body,
-div,
+.dark {
+  /* 暗黑模式 */
+  --primary-color: #818cf8;
+  --secondary-color: #a78bfa;
+  --accent-color: #c084fc;
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  --error-color: #ef4444;
+  --surface-color: rgba(31, 41, 55, 0.95);
+  --glass-color: rgba(0, 0, 0, 0.2);
+  --glass-strong-color: rgba(31, 41, 55, 0.95);
+  --text-primary: #f3f4f6;
+  --text-secondary: #9ca3af;
+  --border-color: rgba(75, 85, 99, 0.3);
+  --bg-gradient-start: #1f2937;
+  --bg-gradient-mid: #374151;
+  --bg-gradient-end: #4b5563;
+  --input-bg: rgba(31, 41, 55, 0.9);
+  --input-border: rgba(75, 85, 99, 0.5);
+  --modal-bg: rgba(0, 0, 0, 0.6);
+  --table-bg: rgba(31, 41, 55, 0.95);
+  --table-hover: rgba(129, 140, 248, 0.1);
+}
+
+/* 优化后的transition - 避免布局跳动 */
 button,
 input,
 select,
-textarea,
-table,
-tr,
-td,
-th,
-span,
-p,
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+textarea {
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease,
+    transform 0.2s ease;
+}
+
+/* 颜色和背景过渡 */
+.transition-colors {
+  transition:
+    color 0.3s ease,
+    background-color 0.3s ease,
+    border-color 0.3s ease;
 }
 
 body {
@@ -45,14 +77,18 @@ body {
     sans-serif;
   background: linear-gradient(
     135deg,
-    var(--primary-color) 0%,
-    var(--secondary-color) 50%,
-    var(--accent-color) 100%
+    var(--bg-gradient-start) 0%,
+    var(--bg-gradient-mid) 50%,
+    var(--bg-gradient-end) 100%
   );
   background-attachment: fixed;
   min-height: 100vh;
   margin: 0;
   overflow-x: hidden;
+  color: var(--text-primary);
+  transition:
+    background 0.3s ease,
+    color 0.3s ease;
 }
 
 body::before {
@@ -73,21 +109,43 @@ body::before {
 .glass {
   background: var(--glass-color);
   backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border-color);
   box-shadow:
     0 20px 25px -5px rgba(0, 0, 0, 0.1),
     0 10px 10px -5px rgba(0, 0, 0, 0.04),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.dark .glass {
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.25),
+    0 10px 10px -5px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .glass-strong {
-  background: var(--surface-color);
+  background: var(--glass-strong-color);
   backdrop-filter: blur(25px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  -webkit-backdrop-filter: blur(25px);
+  border: 1px solid var(--border-color);
   box-shadow:
     0 25px 50px -12px rgba(0, 0, 0, 0.25),
     0 0 0 1px rgba(255, 255, 255, 0.05),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.dark .glass-strong {
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.02),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .tab-btn {
@@ -201,13 +259,18 @@ body::before {
 
 /* 表单输入框样式 */
 .form-input {
-  background: rgba(255, 255, 255, 0.9);
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: var(--input-bg);
+  border: 2px solid var(--input-border);
   border-radius: 12px;
   padding: 16px;
   font-size: 16px;
-  transition: all 0.3s ease;
+  color: var(--text-primary);
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
   backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .form-input:focus {
@@ -217,17 +280,35 @@ body::before {
     0 0 0 3px rgba(102, 126, 234, 0.1),
     0 10px 15px -3px rgba(0, 0, 0, 0.1);
   background: rgba(255, 255, 255, 0.95);
+  color: #1f2937;
+}
+
+.dark .form-input:focus {
+  box-shadow:
+    0 0 0 3px rgba(129, 140, 248, 0.2),
+    0 10px 15px -3px rgba(0, 0, 0, 0.2);
+  background: rgba(17, 24, 39, 0.95);
+  color: #f3f4f6;
 }
 
 .card {
   background: var(--surface-color);
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--border-color);
   box-shadow:
     0 10px 15px -3px rgba(0, 0, 0, 0.1),
     0 4px 6px -2px rgba(0, 0, 0, 0.05);
   overflow: hidden;
   position: relative;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.dark .card {
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.25),
+    0 4px 6px -2px rgba(0, 0, 0, 0.1);
 }
 
 .card::before {
@@ -241,13 +322,19 @@ body::before {
 }
 
 .stat-card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.8) 100%);
+  background: linear-gradient(135deg, var(--surface-color) 0%, var(--glass-strong-color) 100%);
   border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid var(--border-color);
   padding: 24px;
   position: relative;
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.dark .stat-card {
+  background: linear-gradient(135deg, rgba(31, 41, 55, 0.95) 0%, rgba(17, 24, 39, 0.8) 100%);
 }
 
 .stat-card::before {
@@ -364,13 +451,18 @@ body::before {
 }
 
 .form-input {
-  background: rgba(255, 255, 255, 0.9);
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: var(--input-bg);
+  border: 2px solid var(--input-border);
   border-radius: 12px;
   padding: 16px;
   font-size: 16px;
-  transition: all 0.3s ease;
+  color: var(--text-primary);
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
   backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .form-input:focus {
@@ -380,39 +472,71 @@ body::before {
     0 0 0 3px rgba(102, 126, 234, 0.1),
     0 10px 15px -3px rgba(0, 0, 0, 0.1);
   background: rgba(255, 255, 255, 0.95);
+  color: #1f2937;
+}
+
+.dark .form-input:focus {
+  box-shadow:
+    0 0 0 3px rgba(129, 140, 248, 0.2),
+    0 10px 15px -3px rgba(0, 0, 0, 0.2);
+  background: rgba(17, 24, 39, 0.95);
+  color: #f3f4f6;
 }
 
 .table-container {
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--table-bg);
   border-radius: 16px;
   overflow: hidden;
   box-shadow:
     0 10px 15px -3px rgba(0, 0, 0, 0.1),
     0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  transition: background-color 0.3s ease;
+}
+
+.dark .table-container {
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.25),
+    0 4px 6px -2px rgba(0, 0, 0, 0.1);
 }
 
 .table-row {
-  transition: all 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease;
 }
 
 .table-row:hover {
-  background: rgba(102, 126, 234, 0.05);
+  background: var(--table-hover);
   transform: scale(1.005);
 }
 
 .modal {
   backdrop-filter: blur(8px);
-  background: rgba(0, 0, 0, 0.4);
+  -webkit-backdrop-filter: blur(8px);
+  background: var(--modal-bg);
+  transition: background-color 0.3s ease;
 }
 
 .modal-content {
-  background: rgba(255, 255, 255, 0.95);
+  background: white;
   border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(229, 231, 235, 0.8);
   box-shadow:
     0 25px 50px -12px rgba(0, 0, 0, 0.25),
     0 0 0 1px rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.dark .modal-content {
+  background: #1f2937;
+  border: 1px solid rgba(75, 85, 99, 0.5);
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.02);
 }
 
 .header-title {
@@ -517,6 +641,10 @@ body::before {
   scrollbar-color: rgba(102, 126, 234, 0.3) rgba(102, 126, 234, 0.05);
 }
 
+.dark .custom-scrollbar {
+  scrollbar-color: rgba(129, 140, 248, 0.3) rgba(129, 140, 248, 0.05);
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -527,18 +655,34 @@ body::before {
   border-radius: 10px;
 }
 
+.dark .custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(129, 140, 248, 0.05);
+}
+
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: linear-gradient(135deg, rgba(102, 126, 234, 0.4) 0%, rgba(118, 75, 162, 0.4) 100%);
   border-radius: 10px;
   transition: background 0.3s ease;
 }
 
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, rgba(129, 140, 248, 0.4) 0%, rgba(167, 139, 250, 0.4) 100%);
+}
+
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(135deg, rgba(102, 126, 234, 0.6) 0%, rgba(118, 75, 162, 0.6) 100%);
 }
 
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, rgba(129, 140, 248, 0.6) 0%, rgba(167, 139, 250, 0.6) 100%);
+}
+
 .custom-scrollbar::-webkit-scrollbar-thumb:active {
   background: linear-gradient(135deg, rgba(102, 126, 234, 0.8) 0%, rgba(118, 75, 162, 0.8) 100%);
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(135deg, rgba(129, 140, 248, 0.8) 0%, rgba(167, 139, 250, 0.8) 100%);
 }
 
 /* 弹窗滚动内容样式 */

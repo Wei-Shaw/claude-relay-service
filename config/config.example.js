@@ -57,7 +57,9 @@ const config = {
   // 🌐 代理配置
   proxy: {
     timeout: parseInt(process.env.DEFAULT_PROXY_TIMEOUT) || 30000,
-    maxRetries: parseInt(process.env.MAX_PROXY_RETRIES) || 3
+    maxRetries: parseInt(process.env.MAX_PROXY_RETRIES) || 3,
+    // IP协议族配置：true=IPv4, false=IPv6, 默认IPv4（兼容性更好）
+    useIPv4: process.env.PROXY_USE_IPV4 !== 'false' // 默认 true，只有明确设置为 'false' 才使用 IPv6
   },
 
   // 📈 使用限制

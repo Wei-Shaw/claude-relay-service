@@ -5,6 +5,7 @@ const claudeConsoleAccountService = require('../services/claudeConsoleAccountSer
 const bedrockAccountService = require('../services/bedrockAccountService')
 const geminiAccountService = require('../services/geminiAccountService')
 const openaiAccountService = require('../services/openaiAccountService')
+const azureOpenaiAccountService = require('../services/azureOpenaiAccountService')
 const accountGroupService = require('../services/accountGroupService')
 const redis = require('../models/redis')
 const { authenticateAdmin } = require('../middleware/auth')
@@ -13,13 +14,13 @@ const oauthHelper = require('../utils/oauthHelper')
 const CostCalculator = require('../utils/costCalculator')
 const pricingService = require('../services/pricingService')
 const claudeCodeHeadersService = require('../services/claudeCodeHeadersService')
+const webhookNotifier = require('../utils/webhookNotifier')
 const axios = require('axios')
 const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
 const config = require('../../config/config')
-const { SocksProxyAgent } = require('socks-proxy-agent')
-const { HttpsProxyAgent } = require('https-proxy-agent')
+const ProxyHelper = require('../utils/proxyHelper')
 
 const router = express.Router()
 
@@ -621,6 +622,170 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
   }
 })
 
+// 批量编辑API Keys
+router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyIds, updates } = req.body
+
+    if (!keyIds || !Array.isArray(keyIds) || keyIds.length === 0) {
+      return res.status(400).json({
+        error: 'Invalid input',
+        message: 'keyIds must be a non-empty array'
+      })
+    }
+
+    if (!updates || typeof updates !== 'object') {
+      return res.status(400).json({
+        error: 'Invalid input',
+        message: 'updates must be an object'
+      })
+    }
+
+    logger.info(
+      `🔄 Admin batch editing ${keyIds.length} API keys with updates: ${JSON.stringify(updates)}`
+    )
+    logger.info(`🔍 Debug: keyIds received: ${JSON.stringify(keyIds)}`)
+
+    const results = {
+      successCount: 0,
+      failedCount: 0,
+      errors: []
+    }
+
+    // 处理每个API Key
+    for (const keyId of keyIds) {
+      try {
+        // 获取当前API Key信息
+        const currentKey = await redis.getApiKey(keyId)
+        if (!currentKey || Object.keys(currentKey).length === 0) {
+          results.failedCount++
+          results.errors.push(`API key ${keyId} not found`)
+          continue
+        }
+
+        // 构建最终更新数据
+        const finalUpdates = {}
+
+        // 处理普通字段
+        if (updates.name) {
+          finalUpdates.name = updates.name
+        }
+        if (updates.tokenLimit !== undefined) {
+          finalUpdates.tokenLimit = updates.tokenLimit
+        }
+        if (updates.concurrencyLimit !== undefined) {
+          finalUpdates.concurrencyLimit = updates.concurrencyLimit
+        }
+        if (updates.rateLimitWindow !== undefined) {
+          finalUpdates.rateLimitWindow = updates.rateLimitWindow
+        }
+        if (updates.rateLimitRequests !== undefined) {
+          finalUpdates.rateLimitRequests = updates.rateLimitRequests
+        }
+        if (updates.dailyCostLimit !== undefined) {
+          finalUpdates.dailyCostLimit = updates.dailyCostLimit
+        }
+        if (updates.permissions !== undefined) {
+          finalUpdates.permissions = updates.permissions
+        }
+        if (updates.isActive !== undefined) {
+          finalUpdates.isActive = updates.isActive
+        }
+        if (updates.monthlyLimit !== undefined) {
+          finalUpdates.monthlyLimit = updates.monthlyLimit
+        }
+        if (updates.priority !== undefined) {
+          finalUpdates.priority = updates.priority
+        }
+        if (updates.enabled !== undefined) {
+          finalUpdates.enabled = updates.enabled
+        }
+
+        // 处理账户绑定
+        if (updates.claudeAccountId !== undefined) {
+          finalUpdates.claudeAccountId = updates.claudeAccountId
+        }
+        if (updates.claudeConsoleAccountId !== undefined) {
+          finalUpdates.claudeConsoleAccountId = updates.claudeConsoleAccountId
+        }
+        if (updates.geminiAccountId !== undefined) {
+          finalUpdates.geminiAccountId = updates.geminiAccountId
+        }
+        if (updates.openaiAccountId !== undefined) {
+          finalUpdates.openaiAccountId = updates.openaiAccountId
+        }
+        if (updates.bedrockAccountId !== undefined) {
+          finalUpdates.bedrockAccountId = updates.bedrockAccountId
+        }
+
+        // 处理标签操作
+        if (updates.tags !== undefined) {
+          if (updates.tagOperation) {
+            const currentTags = currentKey.tags ? JSON.parse(currentKey.tags) : []
+            const operationTags = updates.tags
+
+            switch (updates.tagOperation) {
+              case 'replace': {
+                finalUpdates.tags = operationTags
+                break
+              }
+              case 'add': {
+                const newTags = [...currentTags]
+                operationTags.forEach((tag) => {
+                  if (!newTags.includes(tag)) {
+                    newTags.push(tag)
+                  }
+                })
+                finalUpdates.tags = newTags
+                break
+              }
+              case 'remove': {
+                finalUpdates.tags = currentTags.filter((tag) => !operationTags.includes(tag))
+                break
+              }
+            }
+          } else {
+            // 如果没有指定操作类型，默认为替换
+            finalUpdates.tags = updates.tags
+          }
+        }
+
+        // 执行更新
+        await apiKeyService.updateApiKey(keyId, finalUpdates)
+        results.successCount++
+        logger.success(`✅ Batch edit: API key ${keyId} updated successfully`)
+      } catch (error) {
+        results.failedCount++
+        results.errors.push(`Failed to update key ${keyId}: ${error.message}`)
+        logger.error(`❌ Batch edit failed for key ${keyId}:`, error)
+      }
+    }
+
+    // 记录批量编辑结果
+    if (results.successCount > 0) {
+      logger.success(
+        `🎉 Batch edit completed: ${results.successCount} successful, ${results.failedCount} failed`
+      )
+    } else {
+      logger.warn(
+        `⚠️ Batch edit completed with no successful updates: ${results.failedCount} failed`
+      )
+    }
+
+    return res.json({
+      success: true,
+      message: `批量编辑完成`,
+      data: results
+    })
+  } catch (error) {
+    logger.error('❌ Failed to batch edit API keys:', error)
+    return res.status(500).json({
+      error: 'Batch edit failed',
+      message: error.message
+    })
+  }
+})
+
 // 更新API Key
 router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
   try {
@@ -799,7 +964,105 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
   }
 })
 
-// 删除API Key
+// 批量删除API Keys（必须在 :keyId 路由之前定义）
+router.delete('/api-keys/batch', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyIds } = req.body
+
+    // 调试信息
+    logger.info(`🐛 Batch delete request body: ${JSON.stringify(req.body)}`)
+    logger.info(`🐛 keyIds type: ${typeof keyIds}, value: ${JSON.stringify(keyIds)}`)
+
+    // 参数验证
+    if (!keyIds || !Array.isArray(keyIds) || keyIds.length === 0) {
+      logger.warn(
+        `🚨 Invalid keyIds: ${JSON.stringify({ keyIds, type: typeof keyIds, isArray: Array.isArray(keyIds) })}`
+      )
+      return res.status(400).json({
+        error: 'Invalid request',
+        message: 'keyIds 必须是一个非空数组'
+      })
+    }
+
+    if (keyIds.length > 100) {
+      return res.status(400).json({
+        error: 'Too many keys',
+        message: '每次最多只能删除100个API Keys'
+      })
+    }
+
+    // 验证keyIds格式
+    const invalidKeys = keyIds.filter((id) => !id || typeof id !== 'string')
+    if (invalidKeys.length > 0) {
+      return res.status(400).json({
+        error: 'Invalid key IDs',
+        message: '包含无效的API Key ID'
+      })
+    }
+
+    logger.info(
+      `🗑️ Admin attempting batch delete of ${keyIds.length} API keys: ${JSON.stringify(keyIds)}`
+    )
+
+    const results = {
+      successCount: 0,
+      failedCount: 0,
+      errors: []
+    }
+
+    // 逐个删除，记录成功和失败情况
+    for (const keyId of keyIds) {
+      try {
+        // 检查API Key是否存在
+        const apiKey = await redis.getApiKey(keyId)
+        if (!apiKey || Object.keys(apiKey).length === 0) {
+          results.failedCount++
+          results.errors.push({ keyId, error: 'API Key 不存在' })
+          continue
+        }
+
+        // 执行删除
+        await apiKeyService.deleteApiKey(keyId)
+        results.successCount++
+
+        logger.success(`✅ Batch delete: API key ${keyId} deleted successfully`)
+      } catch (error) {
+        results.failedCount++
+        results.errors.push({
+          keyId,
+          error: error.message || '删除失败'
+        })
+
+        logger.error(`❌ Batch delete failed for key ${keyId}:`, error)
+      }
+    }
+
+    // 记录批量删除结果
+    if (results.successCount > 0) {
+      logger.success(
+        `🎉 Batch delete completed: ${results.successCount} successful, ${results.failedCount} failed`
+      )
+    } else {
+      logger.warn(
+        `⚠️ Batch delete completed with no successful deletions: ${results.failedCount} failed`
+      )
+    }
+
+    return res.json({
+      success: true,
+      message: `批量删除完成`,
+      data: results
+    })
+  } catch (error) {
+    logger.error('❌ Failed to batch delete API keys:', error)
+    return res.status(500).json({
+      error: 'Batch delete failed',
+      message: error.message
+    })
+  }
+})
+
+// 删除单个API Key（必须在批量删除路由之后定义）
 router.delete('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
   try {
     const { keyId } = req.params
@@ -1268,6 +1531,7 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       claudeAiOauth,
       proxy,
       accountType,
+      platform = 'claude',
       priority,
       groupId
     } = req.body
@@ -1305,6 +1569,7 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       claudeAiOauth,
       proxy,
       accountType: accountType || 'shared', // 默认为共享类型
+      platform,
       priority: priority || 50 // 默认优先级为50
     })
 
@@ -1497,6 +1762,19 @@ router.put(
 
       const newSchedulable = !account.schedulable
       await claudeAccountService.updateAccount(accountId, { schedulable: newSchedulable })
+
+      // 如果账号被禁用，发送webhook通知
+      if (!newSchedulable) {
+        await webhookNotifier.sendAccountAnomalyNotification({
+          accountId: account.id,
+          accountName: account.name || account.claudeAiOauth?.email || 'Claude Account',
+          platform: 'claude-oauth',
+          status: 'disabled',
+          errorCode: 'CLAUDE_OAUTH_MANUALLY_DISABLED',
+          reason: '账号已被管理员手动禁用调度',
+          timestamp: new Date().toISOString()
+        })
+      }
 
       logger.success(
         `🔄 Admin toggled Claude account schedulable status: ${accountId} -> ${newSchedulable ? 'schedulable' : 'not schedulable'}`
@@ -1767,6 +2045,19 @@ router.put(
 
       const newSchedulable = !account.schedulable
       await claudeConsoleAccountService.updateAccount(accountId, { schedulable: newSchedulable })
+
+      // 如果账号被禁用，发送webhook通知
+      if (!newSchedulable) {
+        await webhookNotifier.sendAccountAnomalyNotification({
+          accountId: account.id,
+          accountName: account.name || 'Claude Console Account',
+          platform: 'claude-console',
+          status: 'disabled',
+          errorCode: 'CLAUDE_CONSOLE_MANUALLY_DISABLED',
+          reason: '账号已被管理员手动禁用调度',
+          timestamp: new Date().toISOString()
+        })
+      }
 
       logger.success(
         `🔄 Admin toggled Claude Console account schedulable status: ${accountId} -> ${newSchedulable ? 'schedulable' : 'not schedulable'}`
@@ -2042,6 +2333,19 @@ router.put(
           .json({ error: 'Failed to toggle schedulable status', message: updateResult.error })
       }
 
+      // 如果账号被禁用，发送webhook通知
+      if (!newSchedulable) {
+        await webhookNotifier.sendAccountAnomalyNotification({
+          accountId: accountResult.data.id,
+          accountName: accountResult.data.name || 'Bedrock Account',
+          platform: 'bedrock',
+          status: 'disabled',
+          errorCode: 'BEDROCK_MANUALLY_DISABLED',
+          reason: '账号已被管理员手动禁用调度',
+          timestamp: new Date().toISOString()
+        })
+      }
+
       logger.success(
         `🔄 Admin toggled Bedrock account schedulable status: ${accountId} -> ${newSchedulable ? 'schedulable' : 'not schedulable'}`
       )
@@ -2079,7 +2383,7 @@ router.post('/bedrock-accounts/:accountId/test', authenticateAdmin, async (req, 
 // 生成 Gemini OAuth 授权 URL
 router.post('/gemini-accounts/generate-auth-url', authenticateAdmin, async (req, res) => {
   try {
-    const { state } = req.body
+    const { state, proxy } = req.body // 接收代理配置
 
     // 使用新的 codeassist.google.com 回调地址
     const redirectUri = 'https://codeassist.google.com/authcode'
@@ -2093,13 +2397,14 @@ router.post('/gemini-accounts/generate-auth-url', authenticateAdmin, async (req,
       redirectUri: finalRedirectUri
     } = await geminiAccountService.generateAuthUrl(state, redirectUri)
 
-    // 创建 OAuth 会话，包含 codeVerifier
+    // 创建 OAuth 会话，包含 codeVerifier 和代理配置
     const sessionId = authState
     await redis.setOAuthSession(sessionId, {
       state: authState,
       type: 'gemini',
       redirectUri: finalRedirectUri,
       codeVerifier, // 保存 PKCE code verifier
+      proxy: proxy || null, // 保存代理配置
       createdAt: new Date().toISOString()
     })
 
@@ -2143,7 +2448,7 @@ router.post('/gemini-accounts/poll-auth-status', authenticateAdmin, async (req, 
 // 交换 Gemini 授权码
 router.post('/gemini-accounts/exchange-code', authenticateAdmin, async (req, res) => {
   try {
-    const { code, sessionId } = req.body
+    const { code, sessionId, proxy: requestProxy } = req.body
 
     if (!code) {
       return res.status(400).json({ error: 'Authorization code is required' })
@@ -2151,21 +2456,40 @@ router.post('/gemini-accounts/exchange-code', authenticateAdmin, async (req, res
 
     let redirectUri = 'https://codeassist.google.com/authcode'
     let codeVerifier = null
+    let proxyConfig = null
 
     // 如果提供了 sessionId，从 OAuth 会话中获取信息
     if (sessionId) {
       const sessionData = await redis.getOAuthSession(sessionId)
       if (sessionData) {
-        const { redirectUri: sessionRedirectUri, codeVerifier: sessionCodeVerifier } = sessionData
+        const {
+          redirectUri: sessionRedirectUri,
+          codeVerifier: sessionCodeVerifier,
+          proxy
+        } = sessionData
         redirectUri = sessionRedirectUri || redirectUri
         codeVerifier = sessionCodeVerifier
+        proxyConfig = proxy // 获取代理配置
         logger.info(
-          `Using session redirect_uri: ${redirectUri}, has codeVerifier: ${!!codeVerifier}`
+          `Using session redirect_uri: ${redirectUri}, has codeVerifier: ${!!codeVerifier}, has proxy from session: ${!!proxyConfig}`
         )
       }
     }
 
-    const tokens = await geminiAccountService.exchangeCodeForTokens(code, redirectUri, codeVerifier)
+    // 如果请求体中直接提供了代理配置，优先使用它
+    if (requestProxy) {
+      proxyConfig = requestProxy
+      logger.info(
+        `Using proxy from request body: ${proxyConfig ? JSON.stringify(proxyConfig) : 'none'}`
+      )
+    }
+
+    const tokens = await geminiAccountService.exchangeCodeForTokens(
+      code,
+      redirectUri,
+      codeVerifier,
+      proxyConfig // 传递代理配置
+    )
 
     // 清理 OAuth 会话
     if (sessionId) {
@@ -2392,6 +2716,19 @@ router.put(
       // 验证更新是否成功，重新获取账户信息
       const updatedAccount = await geminiAccountService.getAccount(accountId)
       const actualSchedulable = updatedAccount ? updatedAccount.schedulable : newSchedulable
+
+      // 如果账号被禁用，发送webhook通知
+      if (!actualSchedulable) {
+        await webhookNotifier.sendAccountAnomalyNotification({
+          accountId: account.id,
+          accountName: account.accountName || 'Gemini Account',
+          platform: 'gemini',
+          status: 'disabled',
+          errorCode: 'GEMINI_MANUALLY_DISABLED',
+          reason: '账号已被管理员手动禁用调度',
+          timestamp: new Date().toISOString()
+        })
+      }
 
       logger.success(
         `🔄 Admin toggled Gemini account schedulable status: ${accountId} -> ${actualSchedulable ? 'schedulable' : 'not schedulable'}`
@@ -4575,19 +4912,10 @@ router.post('/openai-accounts/exchange-code', authenticateAdmin, async (req, res
       }
     }
 
-    if (sessionData.proxy) {
-      const { type, host, port, username, password } = sessionData.proxy
-      if (type === 'socks5') {
-        // SOCKS5 代理
-        const auth = username && password ? `${username}:${password}@` : ''
-        const socksUrl = `socks5://${auth}${host}:${port}`
-        axiosConfig.httpsAgent = new SocksProxyAgent(socksUrl)
-      } else if (type === 'http' || type === 'https') {
-        // HTTP/HTTPS 代理
-        const auth = username && password ? `${username}:${password}@` : ''
-        const proxyUrl = `${type}://${auth}${host}:${port}`
-        axiosConfig.httpsAgent = new HttpsProxyAgent(proxyUrl)
-      }
+    // 配置代理（如果有）
+    const proxyAgent = ProxyHelper.createProxyAgent(sessionData.proxy)
+    if (proxyAgent) {
+      axiosConfig.httpsAgent = proxyAgent
     }
 
     // 交换 authorization code 获取 tokens
@@ -4963,6 +5291,23 @@ router.put(
 
       const result = await openaiAccountService.toggleSchedulable(accountId)
 
+      // 如果账号被禁用，发送webhook通知
+      if (!result.schedulable) {
+        // 获取账号信息
+        const account = await redis.getOpenAiAccount(accountId)
+        if (account) {
+          await webhookNotifier.sendAccountAnomalyNotification({
+            accountId: account.id,
+            accountName: account.name || 'OpenAI Account',
+            platform: 'openai',
+            status: 'disabled',
+            errorCode: 'OPENAI_MANUALLY_DISABLED',
+            reason: '账号已被管理员手动禁用调度',
+            timestamp: new Date().toISOString()
+          })
+        }
+      }
+
       return res.json({
         success: result.success,
         schedulable: result.schedulable,
@@ -4978,5 +5323,309 @@ router.put(
     }
   }
 )
+
+// 🌐 Azure OpenAI 账户管理
+
+// 获取所有 Azure OpenAI 账户
+router.get('/azure-openai-accounts', authenticateAdmin, async (req, res) => {
+  try {
+    const accounts = await azureOpenaiAccountService.getAllAccounts()
+    res.json({
+      success: true,
+      data: accounts
+    })
+  } catch (error) {
+    logger.error('Failed to fetch Azure OpenAI accounts:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch accounts',
+      error: error.message
+    })
+  }
+})
+
+// 创建 Azure OpenAI 账户
+router.post('/azure-openai-accounts', authenticateAdmin, async (req, res) => {
+  try {
+    const {
+      name,
+      description,
+      accountType,
+      azureEndpoint,
+      apiVersion,
+      deploymentName,
+      apiKey,
+      supportedModels,
+      proxy,
+      groupId,
+      priority,
+      isActive,
+      schedulable
+    } = req.body
+
+    // 验证必填字段
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        message: 'Account name is required'
+      })
+    }
+
+    if (!azureEndpoint) {
+      return res.status(400).json({
+        success: false,
+        message: 'Azure endpoint is required'
+      })
+    }
+
+    if (!apiKey) {
+      return res.status(400).json({
+        success: false,
+        message: 'API key is required'
+      })
+    }
+
+    if (!deploymentName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Deployment name is required'
+      })
+    }
+
+    // 验证 Azure endpoint 格式
+    if (!azureEndpoint.match(/^https:\/\/[\w-]+\.openai\.azure\.com$/)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Invalid Azure OpenAI endpoint format. Expected: https://your-resource.openai.azure.com'
+      })
+    }
+
+    // 测试连接
+    try {
+      const testUrl = `${azureEndpoint}/openai/deployments/${deploymentName}?api-version=${apiVersion || '2024-02-01'}`
+      await axios.get(testUrl, {
+        headers: {
+          'api-key': apiKey
+        },
+        timeout: 5000
+      })
+    } catch (testError) {
+      if (testError.response?.status === 404) {
+        logger.warn('Azure OpenAI deployment not found, but continuing with account creation')
+      } else if (testError.response?.status === 401) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid API key or unauthorized access'
+        })
+      }
+    }
+
+    const account = await azureOpenaiAccountService.createAccount({
+      name,
+      description,
+      accountType: accountType || 'shared',
+      azureEndpoint,
+      apiVersion: apiVersion || '2024-02-01',
+      deploymentName,
+      apiKey,
+      supportedModels,
+      proxy,
+      groupId,
+      priority: priority || 50,
+      isActive: isActive !== false,
+      schedulable: schedulable !== false
+    })
+
+    res.json({
+      success: true,
+      data: account,
+      message: 'Azure OpenAI account created successfully'
+    })
+  } catch (error) {
+    logger.error('Failed to create Azure OpenAI account:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create account',
+      error: error.message
+    })
+  }
+})
+
+// 更新 Azure OpenAI 账户
+router.put('/azure-openai-accounts/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+    const updates = req.body
+
+    const account = await azureOpenaiAccountService.updateAccount(id, updates)
+
+    res.json({
+      success: true,
+      data: account,
+      message: 'Azure OpenAI account updated successfully'
+    })
+  } catch (error) {
+    logger.error('Failed to update Azure OpenAI account:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update account',
+      error: error.message
+    })
+  }
+})
+
+// 删除 Azure OpenAI 账户
+router.delete('/azure-openai-accounts/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    await azureOpenaiAccountService.deleteAccount(id)
+
+    res.json({
+      success: true,
+      message: 'Azure OpenAI account deleted successfully'
+    })
+  } catch (error) {
+    logger.error('Failed to delete Azure OpenAI account:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete account',
+      error: error.message
+    })
+  }
+})
+
+// 切换 Azure OpenAI 账户状态
+router.put('/azure-openai-accounts/:id/toggle', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const account = await azureOpenaiAccountService.getAccount(id)
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        message: 'Account not found'
+      })
+    }
+
+    const newStatus = account.isActive === 'true' ? 'false' : 'true'
+    await azureOpenaiAccountService.updateAccount(id, { isActive: newStatus })
+
+    res.json({
+      success: true,
+      message: `Account ${newStatus === 'true' ? 'activated' : 'deactivated'} successfully`,
+      isActive: newStatus === 'true'
+    })
+  } catch (error) {
+    logger.error('Failed to toggle Azure OpenAI account status:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to toggle account status',
+      error: error.message
+    })
+  }
+})
+
+// 切换 Azure OpenAI 账户调度状态
+router.put(
+  '/azure-openai-accounts/:accountId/toggle-schedulable',
+  authenticateAdmin,
+  async (req, res) => {
+    try {
+      const { accountId } = req.params
+
+      const result = await azureOpenaiAccountService.toggleSchedulable(accountId)
+
+      // 如果账号被禁用，发送webhook通知
+      if (!result.schedulable) {
+        // 获取账号信息
+        const account = await azureOpenaiAccountService.getAccount(accountId)
+        if (account) {
+          await webhookNotifier.sendAccountAnomalyNotification({
+            accountId: account.id,
+            accountName: account.name || 'Azure OpenAI Account',
+            platform: 'azure-openai',
+            status: 'disabled',
+            errorCode: 'AZURE_OPENAI_MANUALLY_DISABLED',
+            reason: '账号已被管理员手动禁用调度',
+            timestamp: new Date().toISOString()
+          })
+        }
+      }
+
+      return res.json({
+        success: true,
+        schedulable: result.schedulable,
+        message: result.schedulable ? '已启用调度' : '已禁用调度'
+      })
+    } catch (error) {
+      logger.error('切换 Azure OpenAI 账户调度状态失败:', error)
+      return res.status(500).json({
+        success: false,
+        message: '切换调度状态失败',
+        error: error.message
+      })
+    }
+  }
+)
+
+// 健康检查单个 Azure OpenAI 账户
+router.post('/azure-openai-accounts/:id/health-check', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+    const healthResult = await azureOpenaiAccountService.healthCheckAccount(id)
+
+    res.json({
+      success: true,
+      data: healthResult
+    })
+  } catch (error) {
+    logger.error('Failed to perform health check:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to perform health check',
+      error: error.message
+    })
+  }
+})
+
+// 批量健康检查所有 Azure OpenAI 账户
+router.post('/azure-openai-accounts/health-check-all', authenticateAdmin, async (req, res) => {
+  try {
+    const healthResults = await azureOpenaiAccountService.performHealthChecks()
+
+    res.json({
+      success: true,
+      data: healthResults
+    })
+  } catch (error) {
+    logger.error('Failed to perform batch health check:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to perform batch health check',
+      error: error.message
+    })
+  }
+})
+
+// 迁移 API Keys 以支持 Azure OpenAI
+router.post('/migrate-api-keys-azure', authenticateAdmin, async (req, res) => {
+  try {
+    const migratedCount = await azureOpenaiAccountService.migrateApiKeysForAzureSupport()
+
+    res.json({
+      success: true,
+      message: `Successfully migrated ${migratedCount} API keys for Azure OpenAI support`
+    })
+  } catch (error) {
+    logger.error('Failed to migrate API keys:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to migrate API keys',
+      error: error.message
+    })
+  }
+})
 
 module.exports = router
