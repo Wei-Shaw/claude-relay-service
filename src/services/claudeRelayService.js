@@ -197,6 +197,23 @@ class ClaudeRelayService {
             )
           }
         }
+        // 检查是否为5xx状态码
+        else if (response.statusCode >= 500 && response.statusCode < 600) {
+          logger.warn(`🔥 Server error (${response.statusCode}) detected for account ${accountId}`)
+          // 记录5xx错误
+          await claudeAccountService.recordServerError(accountId, response.statusCode)
+          // 检查是否需要标记为临时错误状态（连续3次500）
+          const errorCount = await claudeAccountService.getServerErrorCount(accountId)
+          logger.info(
+            `🔥 Account ${accountId} has ${errorCount} consecutive 5xx errors in the last 5 minutes`
+          )
+          if (errorCount >= 3) {
+            logger.error(
+              `❌ Account ${accountId} exceeded 5xx error threshold (${errorCount} errors), marking as temp_error`
+            )
+            await claudeAccountService.markAccountTempError(accountId, sessionHash)
+          }
+        }
         // 检查是否为429状态码
         else if (response.statusCode === 429) {
           isRateLimited = true
@@ -247,8 +264,9 @@ class ClaudeRelayService {
           )
         }
       } else if (response.statusCode === 200 || response.statusCode === 201) {
-        // 请求成功，清除401错误计数
+        // 请求成功，清除401和500错误计数
         await this.clearUnauthorizedErrors(accountId)
+        await claudeAccountService.clearInternalErrors(accountId)
         // 如果请求成功，检查并移除限流状态
         const isRateLimited = await unifiedClaudeScheduler.isAccountRateLimited(
           accountId,
@@ -883,6 +901,34 @@ class ClaudeRelayService {
 
         // 错误响应处理
         if (res.statusCode !== 200) {
+          // 将错误处理逻辑封装在一个异步函数中
+          const handleErrorResponse = async () => {
+            // 增加对5xx错误的处理
+            if (res.statusCode >= 500 && res.statusCode < 600) {
+              logger.warn(
+                `🔥 [Stream] Server error (${res.statusCode}) detected for account ${accountId}`
+              )
+              // 记录5xx错误
+              await claudeAccountService.recordServerError(accountId, res.statusCode)
+              // 检查是否需要标记为临时错误状态（连续3次500）
+              const errorCount = await claudeAccountService.getServerErrorCount(accountId)
+              logger.info(
+                `🔥 [Stream] Account ${accountId} has ${errorCount} consecutive 5xx errors in the last 5 minutes`
+              )
+              if (errorCount >= 3) {
+                logger.error(
+                  `❌ [Stream] Account ${accountId} exceeded 5xx error threshold (${errorCount} errors), marking as temp_error`
+                )
+                await claudeAccountService.markAccountTempError(accountId, sessionHash)
+              }
+            }
+          }
+
+          // 调用异步错误处理函数
+          handleErrorResponse().catch((err) => {
+            logger.error('❌ Error in stream error handler:', err)
+          })
+
           logger.error(`❌ Claude API returned error status: ${res.statusCode}`)
           let errorData = ''
 
@@ -1162,6 +1208,9 @@ class ClaudeRelayService {
               rateLimitResetTimestamp
             )
           } else if (res.statusCode === 200) {
+            // 请求成功，清除401和500错误计数
+            await this.clearUnauthorizedErrors(accountId)
+            await claudeAccountService.clearInternalErrors(accountId)
             // 如果请求成功，检查并移除限流状态
             const isRateLimited = await unifiedClaudeScheduler.isAccountRateLimited(
               accountId,

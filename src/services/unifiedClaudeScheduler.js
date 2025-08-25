@@ -176,7 +176,8 @@ class UnifiedClaudeScheduler {
         boundAccount &&
         boundAccount.isActive === 'true' &&
         boundAccount.status !== 'error' &&
-        boundAccount.status !== 'blocked'
+        boundAccount.status !== 'blocked' &&
+        boundAccount.status !== 'temp_error'
       ) {
         const isRateLimited = await claudeAccountService.isAccountRateLimited(boundAccount.id)
         if (!isRateLimited) {
@@ -262,6 +263,7 @@ class UnifiedClaudeScheduler {
         account.isActive === 'true' &&
         account.status !== 'error' &&
         account.status !== 'blocked' &&
+        account.status !== 'temp_error' &&
         (account.accountType === 'shared' || !account.accountType) && // 兼容旧数据
         this._isSchedulable(account.schedulable)
       ) {
@@ -441,7 +443,12 @@ class UnifiedClaudeScheduler {
     try {
       if (accountType === 'claude-official') {
         const account = await redis.getClaudeAccount(accountId)
-        if (!account || account.isActive !== 'true' || account.status === 'error') {
+        if (
+          !account ||
+          account.isActive !== 'true' ||
+          account.status === 'error' ||
+          account.status === 'temp_error'
+        ) {
           return false
         }
         // 检查是否可调度

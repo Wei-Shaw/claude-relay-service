@@ -1743,6 +1743,145 @@ class ClaudeAccountService {
       throw error
     }
   }
+
+  // 🧹 清理临时错误账户
+  async cleanupTempErrorAccounts() {
+    try {
+      const accounts = await redis.getAllClaudeAccounts()
+      let cleanedCount = 0
+      const TEMP_ERROR_RECOVERY_MINUTES = 60 // 临时错误状态恢复时间（分钟）
+
+      for (const account of accounts) {
+        if (account.status === 'temp_error' && account.tempErrorAt) {
+          const tempErrorAt = new Date(account.tempErrorAt)
+          const now = new Date()
+          const minutesSinceTempError = (now - tempErrorAt) / (1000 * 60)
+
+          // 如果临时错误状态超过指定时间，尝试重新激活
+          if (minutesSinceTempError > TEMP_ERROR_RECOVERY_MINUTES) {
+            account.status = 'active' // 恢复为 active 状态
+            account.schedulable = 'true' // 恢复为可调度
+            delete account.errorMessage
+            delete account.tempErrorAt
+            await redis.setClaudeAccount(account.id, account)
+            // 同时清除500错误计数
+            await this.clearInternalErrors(account.id)
+            cleanedCount++
+            logger.success(`🧹 Reset temp_error status for account ${account.name} (${account.id})`)
+          }
+        }
+      }
+
+      if (cleanedCount > 0) {
+        logger.success(`🧹 Reset ${cleanedCount} temp_error accounts`)
+      }
+
+      return cleanedCount
+    } catch (error) {
+      logger.error('❌ Failed to cleanup temp_error accounts:', error)
+      return 0
+    }
+  }
+
+  // 记录5xx服务器错误
+  async recordServerError(accountId, statusCode) {
+    try {
+      const key = `claude_account:${accountId}:5xx_errors`
+
+      // 增加错误计数，设置5分钟过期时间
+      await redis.client.incr(key)
+      await redis.client.expire(key, 300) // 5分钟
+
+      logger.info(`📝 Recorded ${statusCode} error for account ${accountId}`)
+    } catch (error) {
+      logger.error(`❌ Failed to record ${statusCode} error for account ${accountId}:`, error)
+    }
+  }
+
+  // 记录500内部错误(保留以便向后兼容)
+  async recordInternalError(accountId) {
+    return this.recordServerError(accountId, 500)
+  }
+
+  // 获取5xx错误计数
+  async getServerErrorCount(accountId) {
+    try {
+      const key = `claude_account:${accountId}:5xx_errors`
+
+      const count = await redis.client.get(key)
+      return parseInt(count) || 0
+    } catch (error) {
+      logger.error(`❌ Failed to get 5xx error count for account ${accountId}:`, error)
+      return 0
+    }
+  }
+
+  // 获取500错误计数(保留以便向后兼容)
+  async getInternalErrorCount(accountId) {
+    return this.getServerErrorCount(accountId)
+  }
+
+  // 清除500错误计数
+  async clearInternalErrors(accountId) {
+    try {
+      const key = `claude_account:${accountId}:5xx_errors`
+
+      await redis.client.del(key)
+      logger.info(`✅ Cleared 5xx error count for account ${accountId}`)
+    } catch (error) {
+      logger.error(`❌ Failed to clear 5xx errors for account ${accountId}:`, error)
+    }
+  }
+
+  // 标记账号为临时错误状态
+  async markAccountTempError(accountId, sessionHash = null) {
+    try {
+      const accountData = await redis.getClaudeAccount(accountId)
+      if (!accountData || Object.keys(accountData).length === 0) {
+        throw new Error('Account not found')
+      }
+
+      // 更新账户状态
+      const updatedAccountData = { ...accountData }
+      updatedAccountData.status = 'temp_error' // 新增的临时错误状态
+      updatedAccountData.schedulable = 'false' // 设置为不可调度
+      updatedAccountData.errorMessage = 'Account temporarily disabled due to consecutive 500 errors'
+      updatedAccountData.tempErrorAt = new Date().toISOString()
+
+      // 保存更新后的账户数据
+      await redis.setClaudeAccount(accountId, updatedAccountData)
+
+      // 如果有sessionHash，删除粘性会话映射
+      if (sessionHash) {
+        await redis.client.del(`sticky_session:${sessionHash}`)
+        logger.info(`🗑️ Deleted sticky session mapping for hash: ${sessionHash}`)
+      }
+
+      logger.warn(
+        `⚠️ Account ${accountData.name} (${accountId}) marked as temp_error and disabled for scheduling`
+      )
+
+      // 发送Webhook通知
+      try {
+        const webhookNotifier = require('../utils/webhookNotifier')
+        await webhookNotifier.sendAccountAnomalyNotification({
+          accountId,
+          accountName: accountData.name,
+          platform: 'claude-oauth',
+          status: 'temp_error',
+          errorCode: 'CLAUDE_OAUTH_TEMP_ERROR',
+          reason: 'Account temporarily disabled due to consecutive 500 errors'
+        })
+      } catch (webhookError) {
+        logger.error('Failed to send webhook notification:', webhookError)
+      }
+
+      return { success: true }
+    } catch (error) {
+      logger.error(`❌ Failed to mark account ${accountId} as temp_error:`, error)
+      throw error
+    }
+  }
 }
 
 module.exports = new ClaudeAccountService()
