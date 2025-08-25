@@ -328,25 +328,32 @@ class AccountGroupService {
   }
 
   /**
-   * 根据账户ID获取其所属的分组
+   * 根据账户ID获取其所属的所有分组
    * @param {string} accountId - 账户ID
-   * @returns {Object|null} 分组信息
+   * @returns {Array} 分组信息数组
    */
   async getAccountGroup(accountId) {
     try {
       const client = redis.getClientSafe()
       const allGroupIds = await client.smembers(this.GROUPS_KEY)
+      const memberGroups = []
 
       for (const groupId of allGroupIds) {
         const isMember = await client.sismember(`${this.GROUP_MEMBERS_PREFIX}${groupId}`, accountId)
         if (isMember) {
-          return await this.getGroup(groupId)
+          const group = await this.getGroup(groupId)
+          if (group) {
+            memberGroups.push(group)
+          }
         }
       }
 
-      return null
+      // 按创建时间倒序排序
+      memberGroups.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+
+      return memberGroups
     } catch (error) {
-      logger.error('❌ 获取账户所属分组失败:', error)
+      logger.error('❌ 获取账户所属分组列表失败:', error)
       throw error
     }
   }
