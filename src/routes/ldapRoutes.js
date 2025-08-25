@@ -384,24 +384,41 @@ const authenticateUser = (req, res, next) => {
 
 /**
  * 获取用户的API Keys
+ *
+ * 自动关联逻辑说明:
+ * 系统迁移过程中存在历史API Key，这些Key是在AD集成前手动创建的
+ * 创建时使用的name字段恰好与AD用户的displayName一致
+ * 例如: AD用户displayName为"测试用户"，对应的API Key name也是"测试用户"
+ * 为了避免用户重复创建Key，系统会自动关联这些历史Key
+ * 关联规则:
+ * 1. 优先匹配owner字段(新建的Key)
+ * 2. 如果没有owner匹配，则尝试匹配name字段与displayName
+ * 3. 找到匹配的历史Key后，自动将owner设置为当前用户，完成关联
  */
 router.get('/user/api-keys', authenticateUser, async (req, res) => {
   try {
     const redis = require('../models/redis')
-    const { username } = req.user
+    const { username, displayName } = req.user
 
-    logger.info(`获取用户API Keys: ${username}`)
+    logger.info(`获取用户API Keys: ${username}, displayName: ${displayName}`)
+    logger.info(`用户完整信息: ${JSON.stringify(req.user)}`)
 
     // 获取所有API Keys
     const allKeysPattern = 'api_key:*'
     const keys = await redis.getClient().keys(allKeysPattern)
 
     const userKeys = []
+    let foundHistoricalKey = false
 
     // 筛选属于该用户的API Keys
     for (const key of keys) {
       const apiKeyData = await redis.getClient().hgetall(key)
-      if (apiKeyData && apiKeyData.owner === username) {
+      if (!apiKeyData) {
+        continue
+      }
+
+      // 规则1: 直接owner匹配(已关联的Key)
+      if (apiKeyData.owner === username) {
         userKeys.push({
           id: apiKeyData.id,
           name: apiKeyData.name || '未命名',
@@ -412,6 +429,30 @@ router.get('/user/api-keys', authenticateUser, async (req, res) => {
           status: apiKeyData.status || 'active'
         })
       }
+      // 规则2: 历史Key自动关联(name字段匹配displayName且无owner)
+      else if (displayName && apiKeyData.name === displayName && !apiKeyData.owner) {
+        logger.info(`发现历史API Key需要关联: name=${apiKeyData.name}, displayName=${displayName}`)
+
+        // 自动关联: 设置owner为当前用户
+        await redis.getClient().hset(key, 'owner', username)
+        foundHistoricalKey = true
+
+        userKeys.push({
+          id: apiKeyData.id,
+          name: apiKeyData.name || '未命名',
+          key: apiKeyData.key,
+          limit: parseInt(apiKeyData.limit) || 1000000,
+          used: parseInt(apiKeyData.used) || 0,
+          createdAt: apiKeyData.createdAt,
+          status: apiKeyData.status || 'active'
+        })
+
+        logger.info(`历史API Key关联成功: ${apiKeyData.id} -> ${username}`)
+      }
+    }
+
+    if (foundHistoricalKey) {
+      logger.info(`用户 ${username} 自动关联了历史API Key`)
     }
 
     res.json({
