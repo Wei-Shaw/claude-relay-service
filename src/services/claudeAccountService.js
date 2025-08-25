@@ -630,7 +630,10 @@ class ClaudeAccountService {
       const accounts = await redis.getAllClaudeAccounts()
 
       let activeAccounts = accounts.filter(
-        (account) => account.isActive === 'true' && account.status !== 'error'
+        (account) =>
+          account.isActive === 'true' &&
+          account.status !== 'error' &&
+          account.schedulable !== 'false'
       )
 
       // 如果请求的是 Opus 模型，过滤掉 Pro 和 Free 账号
@@ -717,7 +720,12 @@ class ClaudeAccountService {
       // 如果API Key绑定了专属账户，优先使用
       if (apiKeyData.claudeAccountId) {
         const boundAccount = await redis.getClaudeAccount(apiKeyData.claudeAccountId)
-        if (boundAccount && boundAccount.isActive === 'true' && boundAccount.status !== 'error') {
+        if (
+          boundAccount &&
+          boundAccount.isActive === 'true' &&
+          boundAccount.status !== 'error' &&
+          boundAccount.schedulable !== 'false'
+        ) {
           logger.info(
             `🎯 Using bound dedicated account: ${boundAccount.name} (${apiKeyData.claudeAccountId}) for API key ${apiKeyData.name}`
           )
@@ -736,6 +744,7 @@ class ClaudeAccountService {
         (account) =>
           account.isActive === 'true' &&
           account.status !== 'error' &&
+          account.schedulable !== 'false' &&
           (account.accountType === 'shared' || !account.accountType) // 兼容旧数据
       )
 
