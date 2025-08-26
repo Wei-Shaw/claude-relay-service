@@ -4,11 +4,22 @@ const logger = require('../utils/logger')
 class LDAPService {
   constructor() {
     this.client = null
+
+    // 检查必需的LDAP配置
+    if (
+      !process.env.LDAP_URL ||
+      !process.env.LDAP_BIND_DN ||
+      !process.env.LDAP_BIND_PASSWORD ||
+      !process.env.LDAP_BASE_DN
+    ) {
+      logger.warn('⚠️ LDAP配置不完整，请检查.env文件中的LDAP配置项')
+    }
+
     this.config = {
-      url: process.env.LDAP_URL || 'ldap://172.25.3.100:389',
-      bindDN: process.env.LDAP_BIND_DN || 'LDAP-Proxy-Read',
-      bindPassword: process.env.LDAP_BIND_PASSWORD || 'Y%77JsVK8W',
-      baseDN: process.env.LDAP_BASE_DN || 'OU=微店,DC=corp,DC=weidian-inc,DC=com',
+      url: process.env.LDAP_URL || '',
+      bindDN: process.env.LDAP_BIND_DN || '',
+      bindPassword: process.env.LDAP_BIND_PASSWORD || '',
+      baseDN: process.env.LDAP_BASE_DN || '',
       searchFilter: process.env.LDAP_SEARCH_FILTER || '(&(objectClass=user)(cn={username}))',
       timeout: parseInt(process.env.LDAP_TIMEOUT) || 10000,
       connectTimeout: parseInt(process.env.LDAP_CONNECT_TIMEOUT) || 10000

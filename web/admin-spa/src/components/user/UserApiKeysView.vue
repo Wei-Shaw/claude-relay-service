@@ -25,18 +25,13 @@
           <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
             API Key 将用于访问 Claude Relay Service
           </p>
-          <form class="mx-auto max-w-md space-y-3" @submit.prevent="createApiKey">
-            <p class="text-center text-sm text-gray-600 dark:text-gray-400">
-              API Key 名称将自动设置为您的用户名
-            </p>
-            <input
-              v-model.number="newKeyForm.limit"
-              class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-800 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-400"
-              max="1000000"
-              min="0"
-              placeholder="使用额度（0表示无限制）"
-              type="number"
-            />
+          <form class="mx-auto max-w-md space-y-4" @submit.prevent="createApiKey">
+            <div class="text-center">
+              <p class="mb-2 text-sm text-gray-600 dark:text-gray-400">
+                API Key 名称将自动设置为您的用户名
+              </p>
+              <p class="text-sm text-gray-500 dark:text-gray-500">使用额度：无限制</p>
+            </div>
             <button
               class="w-full rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 px-6 py-3 font-medium text-white transition-all hover:from-blue-600 hover:to-purple-700 disabled:opacity-50"
               :disabled="createLoading"
@@ -95,12 +90,6 @@
                 <!-- 操作按钮 -->
                 <div class="flex items-center gap-2">
                   <button
-                    class="rounded-lg px-3 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
-                    @click="editApiKey(apiKey)"
-                  >
-                    <i class="fas fa-edit mr-1" />编辑
-                  </button>
-                  <button
                     :class="[
                       apiKey.isActive
                         ? 'text-orange-600 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-900/20'
@@ -136,7 +125,7 @@
               <i class="fas fa-info-circle" />
               <span class="text-sm">
                 已关联的历史API
-                Key无法显示原始内容，仅在创建时可见。如需查看完整Key，请联系管理员或创建新Key。
+                Key无法显示原始内容，仅在创建时可见。如需查看完整Key，请删除原key创建新Key。
               </span>
             </div>
             <div class="mt-2 text-xs text-amber-600 dark:text-amber-400">
@@ -303,9 +292,7 @@ const selectedApiKeyForDetail = ref(null)
 const showNewApiKeyModal = ref(false)
 const newApiKeyData = ref(null)
 
-const newKeyForm = ref({
-  limit: 0
-})
+const newKeyForm = ref({})
 
 // 获取用户的 API Keys
 const fetchApiKeys = async () => {
@@ -349,8 +336,9 @@ const createApiKey = async () => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        limit: newKeyForm.value.limit || 0
-        // name字段由后端根据用户displayName自动生成
+        // name和limit字段都由后端自动生成/设置
+        // name: 用户displayName
+        // limit: 0 (无限制)
       })
     })
 
@@ -362,7 +350,7 @@ const createApiKey = async () => {
 
       // 更新API Keys列表
       apiKeys.value = [result.apiKey]
-      newKeyForm.value = { limit: 0 }
+      newKeyForm.value = {}
 
       // 清除错误信息
       error.value = ''
@@ -387,14 +375,6 @@ const calculateTokenUsagePercentage = (used, limit) => {
 const calculateCostUsagePercentage = (used, limit) => {
   if (!limit || limit === 0) return 0
   return Math.round((used / limit) * 100)
-}
-
-// 编辑API Key（简化版，只允许修改名称和描述）
-const editApiKey = (apiKey) => {
-  const newName = prompt('请输入新的API Key名称：', apiKey.name)
-  if (newName !== null && newName.trim() !== '') {
-    updateApiKey(apiKey.id, { name: newName.trim() })
-  }
 }
 
 // 切换API Key状态

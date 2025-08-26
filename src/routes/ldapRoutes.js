@@ -196,8 +196,14 @@ router.get('/list-ous', async (req, res) => {
  */
 router.get('/verify-ou', async (req, res) => {
   try {
-    const { ou = '微店' } = req.query
-    const testDN = `OU=${ou},DC=corp,DC=weidian-inc,DC=com`
+    const defaultOU = process.env.LDAP_DEFAULT_OU || 'YourOU'
+    const { ou = defaultOU } = req.query
+    // 使用配置的baseDN来构建测试DN，而不是硬编码域名
+    const config = ldapService.getConfig()
+    // 从baseDN中提取域部分，替换OU部分
+    const baseDNParts = config.baseDN.split(',')
+    const domainParts = baseDNParts.filter((part) => part.trim().startsWith('DC='))
+    const testDN = `OU=${ou},${domainParts.join(',')}`
 
     logger.info(`Verifying OU exists: ${testDN}`)
 
@@ -461,7 +467,8 @@ router.get('/user/api-keys', authenticateUser, async (req, res) => {
 router.post('/user/api-keys', authenticateUser, async (req, res) => {
   try {
     const { username } = req.user
-    const { limit } = req.body
+    // 用户创建的API Key不需要任何输入参数，都使用默认值
+    // const { limit } = req.body // 不再从请求体获取limit
 
     // 检查用户是否已有API Key
     const redis = require('../models/redis')
@@ -492,8 +499,8 @@ router.post('/user/api-keys', authenticateUser, async (req, res) => {
     const defaultName = displayName || username
 
     const keyParams = {
-      name: defaultName, // 忽略用户输入的name，强制使用displayName
-      tokenLimit: limit || 0,
+      name: defaultName, // 使用displayName作为API Key名称
+      tokenLimit: 0, // 固定为无限制
       description: `AD用户${username}创建的API Key`,
       // AD用户创建的Key添加owner信息以区分用户归属
       owner: username,
@@ -521,7 +528,7 @@ router.post('/user/api-keys', authenticateUser, async (req, res) => {
         id: newKey.id,
         key: newKey.apiKey, // 返回完整的API Key
         name: newKey.name,
-        tokenLimit: newKey.tokenLimit || limit || 0,
+        tokenLimit: newKey.tokenLimit || 0,
         used: 0,
         createdAt: newKey.createdAt,
         isActive: true,
@@ -616,8 +623,8 @@ router.put('/user/api-keys/:keyId', authenticateUser, async (req, res) => {
       })
     }
 
-    // 限制用户只能修改特定字段
-    const allowedFields = ['name', 'description', 'isActive']
+    // 限制用户只能修改特定字段（不允许修改name）
+    const allowedFields = ['description', 'isActive']
     const filteredUpdates = {}
     for (const [key, value] of Object.entries(updates)) {
       if (allowedFields.includes(key)) {

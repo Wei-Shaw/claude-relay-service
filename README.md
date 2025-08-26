@@ -250,6 +250,15 @@ REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=
 
+# AD域控配置（可选，用于企业内部用户登录）
+LDAP_ENABLED=true
+LDAP_URL=ldap://your-domain-controller-ip:389
+LDAP_BIND_DN=your-bind-user
+LDAP_BIND_PASSWORD=your-bind-password
+LDAP_BASE_DN=DC=your-domain,DC=com
+LDAP_SEARCH_FILTER=(&(objectClass=user)(|(cn={username})(sAMAccountName={username})))
+LDAP_TIMEOUT=10000
+
 # Webhook通知配置（可选）
 WEBHOOK_ENABLED=true
 WEBHOOK_URLS=https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=your-key
