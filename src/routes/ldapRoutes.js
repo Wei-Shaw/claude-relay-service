@@ -397,57 +397,44 @@ const authenticateUser = (req, res, next) => {
  */
 router.get('/user/api-keys', authenticateUser, async (req, res) => {
   try {
+    const apiKeyService = require('../services/apiKeyService')
     const redis = require('../models/redis')
     const { username, displayName } = req.user
 
     logger.info(`获取用户API Keys: ${username}, displayName: ${displayName}`)
-    logger.info(`用户完整信息: ${JSON.stringify(req.user)}`)
 
-    // 获取所有API Keys
-    const allKeysPattern = 'api_key:*'
-    const keys = await redis.getClient().keys(allKeysPattern)
+    // 使用与admin相同的API Key服务，获取所有API Keys的完整信息
+    const allApiKeys = await apiKeyService.getAllApiKeys()
 
     const userKeys = []
     let foundHistoricalKey = false
 
-    // 筛选属于该用户的API Keys
-    for (const key of keys) {
-      const apiKeyData = await redis.getClient().hgetall(key)
-      if (!apiKeyData) {
-        continue
-      }
+    // 筛选属于该用户的API Keys，并处理自动关联
+    for (const apiKey of allApiKeys) {
+      logger.debug(
+        `检查API Key: ${apiKey.id}, name: "${apiKey.name}", owner: "${apiKey.owner || '无'}", displayName: "${displayName}"`
+      )
 
       // 规则1: 直接owner匹配(已关联的Key)
-      if (apiKeyData.owner === username) {
-        userKeys.push({
-          id: apiKeyData.id,
-          name: apiKeyData.name || '未命名',
-          key: apiKeyData.key,
-          limit: parseInt(apiKeyData.limit) || 1000000,
-          used: parseInt(apiKeyData.used) || 0,
-          createdAt: apiKeyData.createdAt,
-          status: apiKeyData.status || 'active'
-        })
+      if (apiKey.owner === username) {
+        logger.info(`找到已关联的API Key: ${apiKey.id}`)
+        userKeys.push(apiKey)
       }
       // 规则2: 历史Key自动关联(name字段匹配displayName且无owner)
-      else if (displayName && apiKeyData.name === displayName && !apiKeyData.owner) {
-        logger.info(`发现历史API Key需要关联: name=${apiKeyData.name}, displayName=${displayName}`)
+      else if (displayName && apiKey.name === displayName && !apiKey.owner) {
+        logger.info(
+          `🔗 发现历史API Key需要关联: id=${apiKey.id}, name="${apiKey.name}", displayName="${displayName}"`
+        )
 
         // 自动关联: 设置owner为当前用户
-        await redis.getClient().hset(key, 'owner', username)
+        await redis.getClient().hset(`apikey:${apiKey.id}`, 'owner', username)
         foundHistoricalKey = true
 
-        userKeys.push({
-          id: apiKeyData.id,
-          name: apiKeyData.name || '未命名',
-          key: apiKeyData.key,
-          limit: parseInt(apiKeyData.limit) || 1000000,
-          used: parseInt(apiKeyData.used) || 0,
-          createdAt: apiKeyData.createdAt,
-          status: apiKeyData.status || 'active'
-        })
+        // 更新本地数据并添加到用户Key列表
+        apiKey.owner = username
+        userKeys.push(apiKey)
 
-        logger.info(`历史API Key关联成功: ${apiKeyData.id} -> ${username}`)
+        logger.info(`✅ 历史API Key关联成功: ${apiKey.id} -> ${username}`)
       }
     }
 
@@ -474,11 +461,11 @@ router.get('/user/api-keys', authenticateUser, async (req, res) => {
 router.post('/user/api-keys', authenticateUser, async (req, res) => {
   try {
     const { username } = req.user
-    const { name, limit } = req.body
+    const { limit } = req.body
 
     // 检查用户是否已有API Key
     const redis = require('../models/redis')
-    const allKeysPattern = 'api_key:*'
+    const allKeysPattern = 'apikey:*'
     const keys = await redis.getClient().keys(allKeysPattern)
 
     let userKeyCount = 0
@@ -496,45 +483,53 @@ router.post('/user/api-keys', authenticateUser, async (req, res) => {
       })
     }
 
-    // 生成API Key
-    const crypto = require('crypto')
-    const uuid = require('uuid')
+    // 使用与admin相同的API Key生成服务，确保数据结构一致性
+    const apiKeyService = require('../services/apiKeyService')
 
-    const keyId = uuid.v4()
-    const apiKey = `cr_${crypto.randomBytes(32).toString('hex')}`
+    // 获取用户的显示名称
+    const { displayName } = req.user
+    // 用户创建的API Key名称固定为displayName，不允许自定义
+    const defaultName = displayName || username
 
-    const keyData = {
-      id: keyId,
-      key: apiKey,
-      name: name || 'AD用户密钥',
-      limit: limit || 100000,
-      used: 0,
+    const keyParams = {
+      name: defaultName, // 忽略用户输入的name，强制使用displayName
+      tokenLimit: limit || 0,
+      description: `AD用户${username}创建的API Key`,
+      // AD用户创建的Key添加owner信息以区分用户归属
       owner: username,
       ownerType: 'ad_user',
-      createdAt: new Date().toISOString(),
-      status: 'active'
+      // 确保用户创建的Key默认激活
+      isActive: true,
+      // 设置基本权限（与admin创建保持一致）
+      permissions: 'all',
+      // 设置合理的并发和速率限制（与admin创建保持一致）
+      concurrencyLimit: 0,
+      rateLimitWindow: 0,
+      rateLimitRequests: 0,
+      // 添加标签标识AD用户创建
+      tags: ['ad-user', 'user-created']
     }
 
-    // 存储到Redis
-    await redis.getClient().hset(`api_key:${keyId}`, keyData)
+    const newKey = await apiKeyService.generateApiKey(keyParams)
 
-    // 创建哈希映射以快速查找
-    const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex')
-    await redis.getClient().set(`api_key_hash:${keyHash}`, keyId)
-
-    logger.info(`用户${username}创建API Key成功: ${keyId}`)
+    logger.info(`用户${username}创建API Key成功: ${newKey.id}`)
 
     res.json({
       success: true,
       message: 'API Key创建成功',
       apiKey: {
-        id: keyId,
-        key: apiKey,
-        name: keyData.name,
-        limit: keyData.limit,
+        id: newKey.id,
+        key: newKey.apiKey, // 返回完整的API Key
+        name: newKey.name,
+        tokenLimit: newKey.tokenLimit || limit || 0,
         used: 0,
-        createdAt: keyData.createdAt,
-        status: keyData.status
+        createdAt: newKey.createdAt,
+        isActive: true,
+        usage: {
+          daily: { requests: 0, tokens: 0 },
+          total: { requests: 0, tokens: 0 }
+        },
+        dailyCost: 0
       }
     })
   } catch (error) {
@@ -555,7 +550,7 @@ router.get('/user/usage-stats', authenticateUser, async (req, res) => {
     const redis = require('../models/redis')
 
     // 获取用户的API Keys
-    const allKeysPattern = 'api_key:*'
+    const allKeysPattern = 'apikey:*'
     const keys = await redis.getClient().keys(allKeysPattern)
 
     let totalUsage = 0
@@ -596,6 +591,90 @@ router.get('/user/usage-stats', authenticateUser, async (req, res) => {
     res.status(500).json({
       success: false,
       message: '获取使用统计失败'
+    })
+  }
+})
+
+/**
+ * 更新用户API Key
+ */
+router.put('/user/api-keys/:keyId', authenticateUser, async (req, res) => {
+  try {
+    const { username } = req.user
+    const { keyId } = req.params
+    const updates = req.body
+
+    // 验证用户只能编辑自己的API Key
+    const apiKeyService = require('../services/apiKeyService')
+    const allApiKeys = await apiKeyService.getAllApiKeys()
+    const apiKey = allApiKeys.find((key) => key.id === keyId && key.owner === username)
+
+    if (!apiKey) {
+      return res.status(404).json({
+        success: false,
+        message: 'API Key 不存在或无权限'
+      })
+    }
+
+    // 限制用户只能修改特定字段
+    const allowedFields = ['name', 'description', 'isActive']
+    const filteredUpdates = {}
+    for (const [key, value] of Object.entries(updates)) {
+      if (allowedFields.includes(key)) {
+        filteredUpdates[key] = value
+      }
+    }
+
+    await apiKeyService.updateApiKey(keyId, filteredUpdates)
+
+    logger.info(`用户 ${username} 更新了 API Key: ${keyId}`)
+
+    res.json({
+      success: true,
+      message: 'API Key 更新成功'
+    })
+  } catch (error) {
+    logger.error('更新用户API Key失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '更新 API Key 失败'
+    })
+  }
+})
+
+/**
+ * 删除用户API Key
+ */
+router.delete('/user/api-keys/:keyId', authenticateUser, async (req, res) => {
+  try {
+    const { username } = req.user
+    const { keyId } = req.params
+
+    // 验证用户只能删除自己的API Key
+    const apiKeyService = require('../services/apiKeyService')
+    const allApiKeys = await apiKeyService.getAllApiKeys()
+    const apiKey = allApiKeys.find((key) => key.id === keyId && key.owner === username)
+
+    if (!apiKey) {
+      return res.status(404).json({
+        success: false,
+        message: 'API Key 不存在或无权限'
+      })
+    }
+
+    await apiKeyService.deleteApiKey(keyId)
+
+    logger.info(`用户 ${username} 删除了 API Key: ${keyId}`)
+
+    res.json({
+      success: true,
+      message: 'API Key 删除成功'
+    })
+  } catch (error) {
+    logger.error('删除用户API Key失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '删除 API Key 失败'
     })
   }
 })

@@ -51,14 +51,7 @@
             @click="currentTab = 'api-keys'"
           >
             <i class="fas fa-key mr-1 md:mr-2" />
-            <span class="text-sm md:text-base">API Keys</span>
-          </button>
-          <button
-            :class="['tab-pill-button', currentTab === 'dashboard' ? 'active' : '']"
-            @click="currentTab = 'dashboard'"
-          >
-            <i class="fas fa-chart-line mr-1 md:mr-2" />
-            <span class="text-sm md:text-base">使用统计</span>
+            <span class="text-sm md:text-base">API Keys 管理</span>
           </button>
           <button
             :class="['tab-pill-button', currentTab === 'tutorial' ? 'active' : '']"
@@ -74,11 +67,6 @@
     <!-- API Keys 管理 -->
     <div v-if="currentTab === 'api-keys'" class="tab-content">
       <UserApiKeysView :user-info="userInfo" />
-    </div>
-
-    <!-- 使用统计 -->
-    <div v-if="currentTab === 'dashboard'" class="tab-content">
-      <UserStatsView :user-info="userInfo" />
     </div>
 
     <!-- 使用教程 -->
@@ -97,7 +85,6 @@ import LogoTitle from '@/components/common/LogoTitle.vue'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import TutorialView from './TutorialView.vue'
 import UserApiKeysView from '@/components/user/UserApiKeysView.vue'
-import UserStatsView from '@/components/user/UserStatsView.vue'
 const themeStore = useThemeStore()
 
 // 当前标签页

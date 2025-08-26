@@ -33,12 +33,31 @@
               >名称</label
             >
             <input
-              class="form-input w-full cursor-not-allowed bg-gray-100 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400"
-              disabled
+              v-model="form.name"
+              class="form-input w-full text-sm"
+              maxlength="100"
+              placeholder="请输入API Key名称"
+              required
               type="text"
-              :value="form.name"
             />
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 sm:mt-2">名称不可修改</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 sm:mt-2">最多100个字符</p>
+          </div>
+
+          <div>
+            <label
+              class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-3 sm:text-sm"
+              >描述</label
+            >
+            <textarea
+              v-model="form.description"
+              class="form-input w-full text-sm"
+              maxlength="500"
+              placeholder="请输入API Key描述（可选）"
+              rows="3"
+            ></textarea>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 sm:mt-2">
+              最多500个字符（可选）
+            </p>
           </div>
 
           <!-- 标签 -->
@@ -632,6 +651,7 @@ const unselectedTags = computed(() => {
 // 表单数据
 const form = reactive({
   name: '',
+  description: '',
   tokenLimit: '',
   rateLimitWindow: '',
   rateLimitRequests: '',
@@ -707,6 +727,8 @@ const updateApiKey = async () => {
   try {
     // 准备提交的数据
     const data = {
+      name: form.name,
+      description: form.description,
       tokenLimit:
         form.tokenLimit !== '' && form.tokenLimit !== null ? parseInt(form.tokenLimit) : 0,
       rateLimitWindow:
@@ -893,6 +915,7 @@ onMounted(async () => {
   }
 
   form.name = props.apiKey.name
+  form.description = props.apiKey.description || ''
   form.tokenLimit = props.apiKey.tokenLimit || ''
   form.rateLimitWindow = props.apiKey.rateLimitWindow || ''
   form.rateLimitRequests = props.apiKey.rateLimitRequests || ''

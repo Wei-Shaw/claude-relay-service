@@ -26,18 +26,15 @@
             API Key 将用于访问 Claude Relay Service
           </p>
           <form class="mx-auto max-w-md space-y-3" @submit.prevent="createApiKey">
-            <input
-              v-model="newKeyForm.name"
-              class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-800 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-400"
-              placeholder="API Key 名称（可选）"
-              type="text"
-            />
+            <p class="text-center text-sm text-gray-600 dark:text-gray-400">
+              API Key 名称将自动设置为您的用户名
+            </p>
             <input
               v-model.number="newKeyForm.limit"
               class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-800 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-400"
               max="1000000"
-              min="1000"
-              placeholder="使用额度（默认 100,000）"
+              min="0"
+              placeholder="使用额度（0表示无限制）"
               type="number"
             />
             <button
@@ -82,51 +79,69 @@
               <p class="text-sm text-gray-600 dark:text-gray-400">
                 创建时间：{{ formatDate(apiKey.createdAt) }}
               </p>
-              <div class="mt-2 flex items-center gap-2">
+              <div class="mt-2 flex items-center justify-between">
                 <span
                   class="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium"
                   :class="
-                    apiKey.status === 'active'
+                    apiKey.isActive
                       ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
                       : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
                   "
                 >
-                  <i
-                    :class="
-                      apiKey.status === 'active' ? 'fas fa-check-circle' : 'fas fa-times-circle'
-                    "
-                  />
-                  {{ apiKey.status === 'active' ? '活跃' : '已禁用' }}
+                  <i :class="apiKey.isActive ? 'fas fa-check-circle' : 'fas fa-times-circle'" />
+                  {{ apiKey.isActive ? '活跃' : '已禁用' }}
                 </span>
+
+                <!-- 操作按钮 -->
+                <div class="flex items-center gap-2">
+                  <button
+                    class="rounded-lg px-3 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                    @click="editApiKey(apiKey)"
+                  >
+                    <i class="fas fa-edit mr-1" />编辑
+                  </button>
+                  <button
+                    :class="[
+                      apiKey.isActive
+                        ? 'text-orange-600 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-900/20'
+                        : 'text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20',
+                      'rounded-lg px-3 py-1 text-xs font-medium transition-colors'
+                    ]"
+                    @click="toggleApiKeyStatus(apiKey)"
+                  >
+                    <i :class="['fas mr-1', apiKey.isActive ? 'fa-ban' : 'fa-check-circle']" />
+                    {{ apiKey.isActive ? '禁用' : '激活' }}
+                  </button>
+                  <button
+                    class="rounded-lg px-3 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                    @click="deleteApiKey(apiKey)"
+                  >
+                    <i class="fas fa-trash mr-1" />删除
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- API Key 显示 -->
+        <!-- API Key 显示 - 历史Key无法显示原始内容 -->
         <div class="mb-4 space-y-3">
           <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
             API Key
           </label>
-          <div class="flex gap-2">
-            <input
-              class="flex-1 rounded-xl border border-gray-300 bg-gray-50 px-4 py-3 font-mono text-sm text-gray-600 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400"
-              readonly
-              type="text"
-              :value="showApiKey[apiKey.id] ? apiKey.key : maskApiKey(apiKey.key)"
-            />
-            <button
-              class="rounded-xl border border-gray-300 px-4 py-3 text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
-              @click="toggleApiKeyVisibility(apiKey.id)"
-            >
-              <i :class="showApiKey[apiKey.id] ? 'fas fa-eye-slash' : 'fas fa-eye'" />
-            </button>
-            <button
-              class="rounded-xl border border-gray-300 px-4 py-3 text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
-              @click="copyApiKey(apiKey.key)"
-            >
-              <i class="fas fa-copy" />
-            </button>
+          <div
+            class="rounded-xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-600 dark:bg-amber-900/20"
+          >
+            <div class="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+              <i class="fas fa-info-circle" />
+              <span class="text-sm">
+                已关联的历史API
+                Key无法显示原始内容，仅在创建时可见。如需查看完整Key，请联系管理员或创建新Key。
+              </span>
+            </div>
+            <div class="mt-2 text-xs text-amber-600 dark:text-amber-400">
+              Key ID: {{ apiKey.id }}
+            </div>
           </div>
         </div>
 
@@ -136,51 +151,85 @@
             <div class="flex items-center gap-3">
               <i class="fas fa-chart-bar text-blue-500" />
               <div>
-                <p class="text-sm font-medium text-blue-800 dark:text-blue-300">已使用</p>
+                <p class="text-sm font-medium text-blue-800 dark:text-blue-300">今日请求</p>
                 <p class="text-xl font-bold text-blue-900 dark:text-blue-100">
-                  {{ apiKey.used?.toLocaleString() || 0 }}
+                  {{ apiKey.usage?.daily?.requests?.toLocaleString() || 0 }}
                 </p>
               </div>
             </div>
           </div>
           <div class="rounded-xl bg-green-50 p-4 dark:bg-green-900/20">
             <div class="flex items-center gap-3">
-              <i class="fas fa-battery-three-quarters text-green-500" />
+              <i class="fas fa-coins text-green-500" />
               <div>
-                <p class="text-sm font-medium text-green-800 dark:text-green-300">总额度</p>
+                <p class="text-sm font-medium text-green-800 dark:text-green-300">今日Token</p>
                 <p class="text-xl font-bold text-green-900 dark:text-green-100">
-                  {{ apiKey.limit?.toLocaleString() || 0 }}
+                  {{ apiKey.usage?.daily?.tokens?.toLocaleString() || 0 }}
                 </p>
               </div>
             </div>
           </div>
           <div class="rounded-xl bg-purple-50 p-4 dark:bg-purple-900/20">
             <div class="flex items-center gap-3">
-              <i class="fas fa-percentage text-purple-500" />
+              <i class="fas fa-dollar-sign text-purple-500" />
               <div>
-                <p class="text-sm font-medium text-purple-800 dark:text-purple-300">使用率</p>
+                <p class="text-sm font-medium text-purple-800 dark:text-purple-300">今日费用</p>
                 <p class="text-xl font-bold text-purple-900 dark:text-purple-100">
-                  {{ calculateUsagePercentage(apiKey.used, apiKey.limit) }}%
+                  ${{ (apiKey.dailyCost || 0).toFixed(4) }}
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- 使用进度条 -->
-        <div class="mt-4">
+        <!-- Token 额度进度条 -->
+        <div v-if="apiKey.tokenLimit > 0" class="mt-4">
           <div class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-            <span>使用进度</span>
-            <span>{{ calculateUsagePercentage(apiKey.used, apiKey.limit) }}%</span>
+            <span>Token 使用进度</span>
+            <span>
+              {{ apiKey.usage?.total?.tokens?.toLocaleString() || 0 }} /
+              {{ apiKey.tokenLimit?.toLocaleString() || 0 }}
+            </span>
           </div>
           <div class="mt-2 h-3 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
             <div
               class="h-full rounded-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-500"
               :style="{
-                width: `${Math.min(calculateUsagePercentage(apiKey.used, apiKey.limit), 100)}%`
+                width: `${Math.min(calculateTokenUsagePercentage(apiKey.usage?.total?.tokens || 0, apiKey.tokenLimit || 0), 100)}%`
               }"
             ></div>
           </div>
+        </div>
+
+        <!-- 费用限制进度条 -->
+        <div v-if="apiKey.dailyCostLimit > 0" class="mt-4">
+          <div class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+            <span>每日费用限制</span>
+            <span>
+              ${{ (apiKey.dailyCost || 0).toFixed(4) }} / ${{
+                (apiKey.dailyCostLimit || 0).toFixed(2)
+              }}
+            </span>
+          </div>
+          <div class="mt-2 h-3 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+            <div
+              class="h-full rounded-full bg-gradient-to-r from-green-500 to-red-500 transition-all duration-500"
+              :style="{
+                width: `${Math.min(calculateCostUsagePercentage(apiKey.dailyCost || 0, apiKey.dailyCostLimit || 0), 100)}%`
+              }"
+            ></div>
+          </div>
+        </div>
+
+        <!-- 查看详细统计按钮 -->
+        <div class="mt-4">
+          <button
+            class="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:from-indigo-600 hover:to-purple-700 hover:shadow-lg"
+            @click="showUsageDetails(apiKey)"
+          >
+            <i class="fas fa-chart-line" />
+            查看详细统计
+          </button>
         </div>
       </div>
     </div>
@@ -210,11 +259,27 @@
     >
       <i class="fas fa-check-circle mr-2" />{{ successMessage }}
     </div>
+
+    <!-- 使用详情模态框 -->
+    <UsageDetailModal
+      :api-key="selectedApiKeyForDetail || {}"
+      :show="showUsageDetailModal"
+      @close="showUsageDetailModal = false"
+    />
+
+    <!-- 新API Key模态框 -->
+    <NewApiKeyModal
+      v-if="showNewApiKeyModal"
+      :api-key="newApiKeyData"
+      @close="showNewApiKeyModal = false"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, reactive } from 'vue'
+import { ref, onMounted } from 'vue'
+import UsageDetailModal from '@/components/apikeys/UsageDetailModal.vue'
+import NewApiKeyModal from '@/components/apikeys/NewApiKeyModal.vue'
 
 defineProps({
   userInfo: {
@@ -229,11 +294,17 @@ const createLoading = ref(false)
 const error = ref('')
 const successMessage = ref('')
 const apiKeys = ref([])
-const showApiKey = reactive({})
+
+// 使用详情模态框相关
+const showUsageDetailModal = ref(false)
+const selectedApiKeyForDetail = ref(null)
+
+// 新API Key模态框相关
+const showNewApiKeyModal = ref(false)
+const newApiKeyData = ref(null)
 
 const newKeyForm = ref({
-  name: '',
-  limit: 100000
+  limit: 0
 })
 
 // 获取用户的 API Keys
@@ -278,21 +349,23 @@ const createApiKey = async () => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        name: newKeyForm.value.name || 'AD用户密钥',
-        limit: newKeyForm.value.limit || 100000
+        limit: newKeyForm.value.limit || 0
+        // name字段由后端根据用户displayName自动生成
       })
     })
 
     const result = await response.json()
     if (result.success) {
-      successMessage.value = 'API Key 创建成功'
-      apiKeys.value = [result.apiKey]
-      newKeyForm.value = { name: '', limit: 100000 }
+      // 显示新API Key模态框
+      newApiKeyData.value = result.apiKey
+      showNewApiKeyModal.value = true
 
-      // 3秒后清除成功消息
-      setTimeout(() => {
-        successMessage.value = ''
-      }, 3000)
+      // 更新API Keys列表
+      apiKeys.value = [result.apiKey]
+      newKeyForm.value = { limit: 0 }
+
+      // 清除错误信息
+      error.value = ''
     } else {
       error.value = result.message || 'API Key 创建失败'
     }
@@ -304,37 +377,98 @@ const createApiKey = async () => {
   }
 }
 
-// 切换 API Key 显示/隐藏
-const toggleApiKeyVisibility = (keyId) => {
-  showApiKey[keyId] = !showApiKey[keyId]
+// 计算Token使用百分比
+const calculateTokenUsagePercentage = (used, limit) => {
+  if (!limit || limit === 0) return 0
+  return Math.round((used / limit) * 100)
 }
 
-// 复制 API Key
-const copyApiKey = async (apiKey) => {
-  try {
-    await navigator.clipboard.writeText(apiKey)
-    successMessage.value = 'API Key 已复制到剪贴板'
-    setTimeout(() => {
-      successMessage.value = ''
-    }, 2000)
-  } catch (err) {
-    console.error('复制失败:', err)
-    error.value = '复制失败，请手动选择复制'
+// 计算费用使用百分比
+const calculateCostUsagePercentage = (used, limit) => {
+  if (!limit || limit === 0) return 0
+  return Math.round((used / limit) * 100)
+}
+
+// 编辑API Key（简化版，只允许修改名称和描述）
+const editApiKey = (apiKey) => {
+  const newName = prompt('请输入新的API Key名称：', apiKey.name)
+  if (newName !== null && newName.trim() !== '') {
+    updateApiKey(apiKey.id, { name: newName.trim() })
   }
 }
 
-// 遮盖 API Key
-const maskApiKey = (key) => {
-  if (!key) return ''
-  const start = key.substring(0, 8)
-  const end = key.substring(key.length - 8)
-  return `${start}${'*'.repeat(20)}${end}`
+// 切换API Key状态
+const toggleApiKeyStatus = async (apiKey) => {
+  const action = apiKey.isActive ? '禁用' : '激活'
+  if (confirm(`确定要${action}这个API Key吗？`)) {
+    await updateApiKey(apiKey.id, { isActive: !apiKey.isActive })
+  }
 }
 
-// 计算使用百分比
-const calculateUsagePercentage = (used, limit) => {
-  if (!limit || limit === 0) return 0
-  return Math.round((used / limit) * 100)
+// 删除API Key
+const deleteApiKey = async (apiKey) => {
+  if (confirm(`确定要删除API Key "${apiKey.name}" 吗？删除后将无法恢复！`)) {
+    try {
+      const token = localStorage.getItem('user_token')
+      const response = await fetch(`/admin/ldap/user/api-keys/${apiKey.id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
+
+      const result = await response.json()
+      if (result.success) {
+        successMessage.value = 'API Key 删除成功'
+        // 从本地数组中移除
+        const index = apiKeys.value.findIndex((k) => k.id === apiKey.id)
+        if (index > -1) {
+          apiKeys.value.splice(index, 1)
+        }
+        setTimeout(() => {
+          successMessage.value = ''
+        }, 3000)
+      } else {
+        error.value = result.message || 'API Key 删除失败'
+      }
+    } catch (err) {
+      console.error('删除 API Key 错误:', err)
+      error.value = '网络错误，请重试'
+    }
+  }
+}
+
+// 更新API Key
+const updateApiKey = async (keyId, updates) => {
+  try {
+    const token = localStorage.getItem('user_token')
+    const response = await fetch(`/admin/ldap/user/api-keys/${keyId}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(updates)
+    })
+
+    const result = await response.json()
+    if (result.success) {
+      successMessage.value = 'API Key 更新成功'
+      // 更新本地数据
+      const apiKey = apiKeys.value.find((k) => k.id === keyId)
+      if (apiKey) {
+        Object.assign(apiKey, updates)
+      }
+      setTimeout(() => {
+        successMessage.value = ''
+      }, 3000)
+    } else {
+      error.value = result.message || 'API Key 更新失败'
+    }
+  } catch (err) {
+    console.error('更新 API Key 错误:', err)
+    error.value = '网络错误，请重试'
+  }
 }
 
 // 格式化日期
@@ -348,6 +482,12 @@ const formatDate = (dateString) => {
     hour: '2-digit',
     minute: '2-digit'
   })
+}
+
+// 显示使用详情
+const showUsageDetails = (apiKey) => {
+  selectedApiKeyForDetail.value = apiKey
+  showUsageDetailModal.value = true
 }
 
 // 初始化
