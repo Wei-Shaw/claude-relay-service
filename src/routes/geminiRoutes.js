@@ -50,7 +50,7 @@ router.post('/messages', authenticateApiKey, async (req, res) => {
     // 提取请求参数
     const {
       messages,
-      model = 'gemini-2.0-flash-exp',
+      model = 'gemini-2.5-flash',
       temperature = 0.7,
       max_tokens = 4096,
       stream = false
@@ -217,7 +217,7 @@ router.get('/models', authenticateApiKey, async (req, res) => {
         object: 'list',
         data: [
           {
-            id: 'gemini-2.0-flash-exp',
+            id: 'gemini-2.5-flash',
             object: 'model',
             created: Date.now() / 1000,
             owned_by: 'google'
@@ -311,8 +311,8 @@ async function handleLoadCodeAssist(req, res) {
   try {
     const sessionHash = sessionHelper.generateSessionHash(req.body)
 
-    // 使用统一调度选择账号（传递请求的模型）
-    const requestedModel = req.body.model
+    // 从路径参数或请求体中获取模型名
+    const requestedModel = req.body.model || req.params.modelName || 'gemini-2.5-flash'
     const { accountId } = await unifiedGeminiScheduler.selectAccountForApiKey(
       req.apiKey,
       sessionHash,
@@ -368,8 +368,8 @@ async function handleOnboardUser(req, res) {
     const { tierId, cloudaicompanionProject, metadata } = req.body
     const sessionHash = sessionHelper.generateSessionHash(req.body)
 
-    // 使用统一调度选择账号（传递请求的模型）
-    const requestedModel = req.body.model
+    // 从路径参数或请求体中获取模型名
+    const requestedModel = req.body.model || req.params.modelName || 'gemini-2.5-flash'
     const { accountId } = await unifiedGeminiScheduler.selectAccountForApiKey(
       req.apiKey,
       sessionHash,
@@ -439,7 +439,9 @@ async function handleCountTokens(req, res) {
   try {
     // 处理请求体结构，支持直接 contents 或 request.contents
     const requestData = req.body.request || req.body
-    const { contents, model = 'gemini-2.0-flash-exp' } = requestData
+    const { contents } = requestData
+    // 从路径参数或请求体中获取模型名
+    const model = requestData.model || req.params.modelName || 'gemini-2.5-flash'
     const sessionHash = sessionHelper.generateSessionHash(req.body)
 
     // 验证必需参数
@@ -487,7 +489,9 @@ async function handleCountTokens(req, res) {
 // 共用的 generateContent 处理函数
 async function handleGenerateContent(req, res) {
   try {
-    const { model, project, user_prompt_id, request: requestData } = req.body
+    const { project, user_prompt_id, request: requestData } = req.body
+    // 从路径参数或请求体中获取模型名
+    const model = req.body.model || req.params.modelName || 'gemini-2.5-flash'
     const sessionHash = sessionHelper.generateSessionHash(req.body)
 
     // 处理不同格式的请求
@@ -610,7 +614,9 @@ async function handleStreamGenerateContent(req, res) {
   let abortController = null
 
   try {
-    const { model, project, user_prompt_id, request: requestData } = req.body
+    const { project, user_prompt_id, request: requestData } = req.body
+    // 从路径参数或请求体中获取模型名
+    const model = req.body.model || req.params.modelName || 'gemini-2.5-flash'
     const sessionHash = sessionHelper.generateSessionHash(req.body)
 
     // 处理不同格式的请求
