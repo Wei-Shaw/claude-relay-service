@@ -586,7 +586,7 @@ async function handleGenerateContent(req, res) {
       }
     }
 
-    res.json(response)
+    res.json(version === 'v1beta' ? response.response : response)
   } catch (error) {
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
     // 打印详细的错误信息
