@@ -11,7 +11,8 @@ class WebhookService {
       feishu: this.sendToFeishu.bind(this),
       slack: this.sendToSlack.bind(this),
       discord: this.sendToDiscord.bind(this),
-      custom: this.sendToCustom.bind(this)
+      custom: this.sendToCustom.bind(this),
+      bark: this.sendToBark.bind(this)
     }
   }
 
@@ -213,6 +214,33 @@ class WebhookService {
   }
 
   /**
+   * Bark webhook
+   */
+  async sendToBark(platform, type, data) {
+    const payload = {
+      device_key: platform.deviceKey,
+      title: this.getNotificationTitle(type),
+      body: this.formatMessageForBark(type, data),
+      level: platform.level || this.getBarkLevel(type),
+      sound: platform.sound || this.getBarkSound(type),
+      group: platform.group || 'claude-relay',
+      badge: 1
+    }
+
+    // 添加可选参数
+    if (platform.icon) {
+      payload.icon = platform.icon
+    }
+
+    if (platform.clickUrl) {
+      payload.url = platform.clickUrl
+    }
+
+    const url = platform.serverUrl || 'https://api.day.app/push'
+    await this.sendHttpRequest(url, payload, platform.timeout || 10000)
+  }
+
+  /**
    * 发送HTTP请求
    */
   async sendHttpRequest(url, payload, timeout) {
@@ -349,6 +377,81 @@ class WebhookService {
     }
 
     return titles[type] || '📢 系统通知'
+  }
+
+  /**
+   * 获取Bark通知级别
+   */
+  getBarkLevel(type) {
+    const levels = {
+      accountAnomaly: 'timeSensitive',
+      quotaWarning: 'active',
+      systemError: 'critical',
+      securityAlert: 'critical',
+      test: 'passive'
+    }
+
+    return levels[type] || 'active'
+  }
+
+  /**
+   * 获取Bark声音
+   */
+  getBarkSound(type) {
+    const sounds = {
+      accountAnomaly: 'alarm',
+      quotaWarning: 'bell',
+      systemError: 'alert',
+      securityAlert: 'alarm',
+      test: 'default'
+    }
+
+    return sounds[type] || 'default'
+  }
+
+  /**
+   * 格式化Bark消息
+   */
+  formatMessageForBark(type, data) {
+    const lines = []
+
+    if (data.accountName) {
+      lines.push(`账号: ${data.accountName}`)
+    }
+
+    if (data.platform) {
+      lines.push(`平台: ${data.platform}`)
+    }
+
+    if (data.status) {
+      lines.push(`状态: ${data.status}`)
+    }
+
+    if (data.errorCode) {
+      lines.push(`错误: ${data.errorCode}`)
+    }
+
+    if (data.reason) {
+      lines.push(`原因: ${data.reason}`)
+    }
+
+    if (data.message) {
+      lines.push(`消息: ${data.message}`)
+    }
+
+    if (data.quota) {
+      lines.push(`剩余配额: ${data.quota.remaining}/${data.quota.total}`)
+    }
+
+    if (data.usage) {
+      lines.push(`使用率: ${data.usage}%`)
+    }
+
+    // 添加服务标识和时间戳
+    lines.push(`\n服务: Claude Relay Service`)
+    lines.push(`时间: ${new Date().toLocaleString('zh-CN')}`)
+
+    return lines.join('\n')
   }
 
   /**
