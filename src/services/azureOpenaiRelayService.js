@@ -52,22 +52,24 @@ async function handleAzureOpenAIRequest({
     // 处理请求体
     const processedBody = { ...requestBody }
 
-    // Detailed logging for all endpoints - INCLUDING SENSITIVE DATA
-    logger.debug(`🔍 Azure OpenAI ${endpoint.toUpperCase()} Complete Request Details`, {
-      targetUrl: requestUrl,
-      completeHeaders: requestHeaders,
-      fullProcessedRequestBody: processedBody,
-      account: {
-        id: account.id,
-        name: account.name,
-        azureEndpoint: account.azureEndpoint,
-        deploymentName: account.deploymentName,
-        apiVersion: apiVersion,
-        apiKeyPreview: account.apiKey ? account.apiKey.substring(0, 10) + '...' : 'not set'
-      },
-      endpoint: endpoint,
-      originalRequestBody: requestBody
-    })
+    // Detailed logging for responses endpoint
+    if (endpoint === 'responses') {
+      logger.debug(`🔍 Azure OpenAI Responses Endpoint Details`, {
+        targetUrl: requestUrl,
+        headers: {
+          'Content-Type': requestHeaders['Content-Type'],
+          'api-key': '[REDACTED]',
+          'User-Agent': requestHeaders['User-Agent'] || 'not set'
+        },
+        processedRequestBody: processedBody,
+        account: {
+          name: account.name,
+          azureEndpoint: account.azureEndpoint,
+          deploymentName: account.deploymentName,
+          apiVersion: apiVersion
+        }
+      })
+    }
 
     // 标准化模型名称
     if (processedBody.model) {
@@ -127,13 +129,18 @@ async function handleAzureOpenAIRequest({
       requestBodySize: JSON.stringify(processedBody).length
     })
 
-    logger.debug('Azure OpenAI Complete Request Headers - INCLUDING SENSITIVE DATA', {
-      allHeaders: requestHeaders
+    logger.debug('Azure OpenAI request headers', {
+      'content-type': requestHeaders['Content-Type'],
+      'user-agent': requestHeaders['user-agent'] || 'not-set',
+      customHeaders: Object.keys(requestHeaders).filter(
+        (key) => !['Content-Type', 'user-agent'].includes(key)
+      )
     })
 
-    logger.debug('Azure OpenAI Complete Request Body - INCLUDING SENSITIVE DATA', {
-      fullRequestBody: processedBody,
-      requestBodySize: JSON.stringify(processedBody).length
+    logger.debug('Azure OpenAI request body', {
+      model: processedBody.model,
+      messages: processedBody.messages?.length || 0,
+      otherParams: Object.keys(processedBody).filter((key) => !['model', 'messages'].includes(key))
     })
 
     const requestStartTime = Date.now()
@@ -154,17 +161,24 @@ async function handleAzureOpenAIRequest({
       contentType: response.headers?.['content-type'] || 'unknown'
     })
 
-    // Enhanced logging for all endpoints - INCLUDING SENSITIVE DATA
-    logger.debug(`🔍 Azure OpenAI ${endpoint.toUpperCase()} Complete Response`, {
-      status: response.status,
-      statusText: response.statusText,
-      completeResponseHeaders: response.headers,
-      fullResponseBody: isStream ? '[STREAM - Cannot capture stream data]' : response.data,
-      responseDataType: typeof response.data,
-      responseSize: response.headers['content-length'] || 'unknown',
-      endpoint: endpoint,
-      duration: `${requestDuration}ms`
-    })
+    // Enhanced logging for responses endpoint
+    if (endpoint === 'responses') {
+      logger.debug(`🔍 Azure OpenAI Responses Endpoint Response`, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: {
+          'content-type': response.headers['content-type'],
+          'x-request-id': response.headers['x-request-id'] || response.headers['x-ms-request-id'],
+          'x-ratelimit-remaining': response.headers['x-ratelimit-remaining-requests'],
+          'x-ratelimit-reset': response.headers['x-ratelimit-reset-requests']
+        },
+        responseBodyPreview: isStream ? '[STREAM]' : (
+          response.data ? JSON.stringify(response.data).substring(0, 500) + (JSON.stringify(response.data).length > 500 ? '...' : '') : 'no data'
+        ),
+        endpoint: 'responses',
+        duration: `${requestDuration}ms`
+      })
+    }
 
     return response
   } catch (error) {
@@ -231,25 +245,16 @@ async function handleAzureOpenAIRequest({
       logger.error('Azure OpenAI Request Failed', errorDetails)
     }
 
-    // Enhanced error logging for all endpoints - INCLUDING SENSITIVE DATA
-    logger.error(`❌ Azure OpenAI ${endpoint.toUpperCase()} Complete Error Details`, {
-      ...errorDetails,
-      endpoint: endpoint,
-      targetUrl: requestUrl,
-      errorType: error.response ? 'HTTP_ERROR' : 'NETWORK_ERROR',
-      completeRequestHeaders: requestHeaders,
-      fullRequestBody: processedBody,
-      completeResponseHeaders: error.response?.headers,
-      fullResponseBody: error.response?.data,
-      account: {
-        id: account.id,
-        name: account.name,
-        azureEndpoint: account.azureEndpoint,
-        deploymentName: account.deploymentName,
-        apiVersion: account.apiVersion,
-        fullApiKey: account.apiKey
-      }
-    })
+    // Enhanced error logging for responses endpoint
+    if (endpoint === 'responses') {
+      logger.error(`❌ Azure OpenAI Responses Endpoint Error`, {
+        ...errorDetails,
+        endpoint: 'responses',
+        targetUrl: requestUrl,
+        errorType: error.response ? 'HTTP_ERROR' : 'NETWORK_ERROR',
+        responseBody: error.response?.data ? JSON.stringify(error.response.data) : 'no response body'
+      })
+    }
 
     throw error
   }

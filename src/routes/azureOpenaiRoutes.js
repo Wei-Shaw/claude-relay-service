@@ -157,16 +157,6 @@ router.post('/chat/completions', authenticateApiKey, async (req, res) => {
     messages: req.body.messages?.length || 0
   })
 
-  // Detailed logging for debugging - INCLUDING SENSITIVE DATA
-  logger.debug(`📋 Azure OpenAI Chat Request Details ${requestId}`, {
-    completeHeaders: req.headers,
-    fullRequestBody: req.body,
-    clientIP: req.ip || req.connection?.remoteAddress,
-    method: req.method,
-    originalUrl: req.originalUrl,
-    query: req.query
-  })
-
   try {
     // 获取绑定的 Azure OpenAI 账户
     let account = null
@@ -260,14 +250,26 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
     messages: req.body.messages?.length || 0
   })
 
-  // Detailed logging for debugging - INCLUDING SENSITIVE DATA
+  // Detailed logging for debugging
   logger.debug(`📋 Azure OpenAI Responses Request Details ${requestId}`, {
-    completeHeaders: req.headers,
-    fullRequestBody: req.body,
-    clientIP: req.ip || req.connection?.remoteAddress,
-    method: req.method,
-    originalUrl: req.originalUrl,
-    query: req.query
+    headers: {
+      'content-type': req.headers['content-type'],
+      'user-agent': req.headers['user-agent'],
+      'x-forwarded-for': req.headers['x-forwarded-for'],
+      'authorization': req.headers.authorization ? '[REDACTED]' : 'not present'
+    },
+    requestBody: {
+      model: req.body.model,
+      messages: req.body.messages,
+      stream: req.body.stream,
+      temperature: req.body.temperature,
+      max_tokens: req.body.max_tokens,
+      top_p: req.body.top_p,
+      frequency_penalty: req.body.frequency_penalty,
+      presence_penalty: req.body.presence_penalty,
+      stop: req.body.stop,
+      logit_bias: req.body.logit_bias
+    }
   })
 
   try {
@@ -374,16 +376,6 @@ router.post('/embeddings', authenticateApiKey, async (req, res) => {
     sessionId,
     model: req.body.model,
     input: Array.isArray(req.body.input) ? req.body.input.length : 1
-  })
-
-  // Detailed logging for debugging - INCLUDING SENSITIVE DATA
-  logger.debug(`📋 Azure OpenAI Embeddings Request Details ${requestId}`, {
-    completeHeaders: req.headers,
-    fullRequestBody: req.body,
-    clientIP: req.ip || req.connection?.remoteAddress,
-    method: req.method,
-    originalUrl: req.originalUrl,
-    query: req.query
   })
 
   try {
