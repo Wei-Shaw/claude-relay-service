@@ -29,7 +29,7 @@ async function handleAzureOpenAIRequest({
     deploymentName = account.deploymentName || 'default'
     // Azure Responses API requires preview versions; fall back appropriately
     const apiVersion =
-      account.apiVersion || (endpoint === 'responses' ? '2025-04-01-preview' : '2024-02-01')
+      account.apiVersion || (endpoint === 'responses' ? '2024-10-01-preview' : '2024-02-01')
     if (endpoint === 'chat/completions') {
       requestUrl = `${baseUrl}/openai/deployments/${deploymentName}/chat/completions?api-version=${apiVersion}`
     } else if (endpoint === 'responses') {

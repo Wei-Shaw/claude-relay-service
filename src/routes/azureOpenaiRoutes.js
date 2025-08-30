@@ -296,7 +296,7 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
         deploymentName: account.deploymentName,
         apiVersion: account.apiVersion
       },
-      targetUrl: `${account.azureEndpoint}/openai/responses?api-version=${account.apiVersion || '2025-04-01-preview'}`,
+      targetUrl: `${account.azureEndpoint}/openai/deployments/${account.deploymentName}/responses?api-version=${account.apiVersion || '2024-10-01-preview'}`,
       endpoint: 'responses',
       isStream: req.body.stream || false
     })
