@@ -528,7 +528,17 @@
                 >
                 <div class="flex flex-wrap gap-2">
                   <label
-                    v-for="model in ['gpt-4', 'gpt-4-turbo', 'gpt-35-turbo', 'gpt-35-turbo-16k']"
+                    v-for="model in [
+                      'gpt-4',
+                      'gpt-4-turbo',
+                      'gpt-4o',
+                      'gpt-4o-mini',
+                      'gpt-5',
+                      'gpt-5-mini',
+                      'gpt-35-turbo',
+                      'gpt-35-turbo-16k',
+                      'codex-mini'
+                    ]"
                     :key="model"
                     class="flex cursor-pointer items-center"
                   >
