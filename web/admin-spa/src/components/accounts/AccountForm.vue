@@ -1614,9 +1614,112 @@
             </div>
           </div>
 
+          <!-- Azure OpenAI 特定字段（编辑模式）-->
+          <div v-if="form.platform === 'azure_openai'" class="space-y-4">
+            <div>
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >Azure Endpoint</label
+              >
+              <input
+                v-model="form.azureEndpoint"
+                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                :class="{ 'border-red-500': errors.azureEndpoint }"
+                placeholder="https://your-resource.openai.azure.com"
+                type="url"
+              />
+              <p v-if="errors.azureEndpoint" class="mt-1 text-xs text-red-500">
+                {{ errors.azureEndpoint }}
+              </p>
+            </div>
+
+            <div>
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >API 版本</label
+              >
+              <input
+                v-model="form.apiVersion"
+                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                placeholder="2024-02-01"
+                type="text"
+              />
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Azure OpenAI API 版本，默认使用最新稳定版本 2024-02-01
+              </p>
+            </div>
+
+            <div>
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >部署名称</label
+              >
+              <input
+                v-model="form.deploymentName"
+                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                :class="{ 'border-red-500': errors.deploymentName }"
+                placeholder="gpt-4"
+                type="text"
+              />
+              <p v-if="errors.deploymentName" class="mt-1 text-xs text-red-500">
+                {{ errors.deploymentName }}
+              </p>
+            </div>
+
+            <div>
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >API Key</label
+              >
+              <input
+                v-model="form.apiKey"
+                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                :class="{ 'border-red-500': errors.apiKey }"
+                placeholder="留空表示不更新"
+                type="password"
+              />
+              <p v-if="errors.apiKey" class="mt-1 text-xs text-red-500">
+                {{ errors.apiKey }}
+              </p>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">留空表示不更新 API Key</p>
+            </div>
+
+            <div>
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >支持的模型</label
+              >
+              <div class="flex flex-wrap gap-2">
+                <label
+                  v-for="model in [
+                    'gpt-4',
+                    'gpt-4-turbo',
+                    'gpt-4o',
+                    'gpt-4o-mini',
+                    'gpt-5',
+                    'gpt-5-mini',
+                    'gpt-35-turbo',
+                    'gpt-35-turbo-16k',
+                    'codex-mini'
+                  ]"
+                  :key="model"
+                  class="flex cursor-pointer items-center"
+                >
+                  <input
+                    v-model="form.supportedModels"
+                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="checkbox"
+                    :value="model"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ model }}</span>
+                </label>
+              </div>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">选择此部署支持的模型类型</p>
+            </div>
+          </div>
+
           <!-- Token 更新 -->
           <div
-            v-if="form.platform !== 'claude-console' && form.platform !== 'bedrock'"
+            v-if="
+              form.platform !== 'claude-console' &&
+              form.platform !== 'bedrock' &&
+              form.platform !== 'azure_openai'
+            "
             class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-900/30"
           >
             <div class="mb-4 flex items-start gap-3">
@@ -2492,6 +2595,21 @@ const updateAccount = async () => {
       data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
     }
 
+    // Azure OpenAI 特定更新
+    if (props.account.platform === 'azure_openai') {
+      data.azureEndpoint = form.value.azureEndpoint
+      data.apiVersion = form.value.apiVersion || '2024-02-01'
+      data.deploymentName = form.value.deploymentName
+      data.supportedModels = Array.isArray(form.value.supportedModels)
+        ? form.value.supportedModels
+        : []
+      data.priority = form.value.priority || 50
+      // 只有当有新的 API Key 时才更新
+      if (form.value.apiKey && form.value.apiKey.trim()) {
+        data.apiKey = form.value.apiKey
+      }
+    }
+
     if (props.account.platform === 'claude') {
       await accountsStore.updateClaudeAccount(props.account.id, data)
     } else if (props.account.platform === 'claude-console') {
@@ -2500,6 +2618,8 @@ const updateAccount = async () => {
       await accountsStore.updateBedrockAccount(props.account.id, data)
     } else if (props.account.platform === 'openai') {
       await accountsStore.updateOpenAIAccount(props.account.id, data)
+    } else if (props.account.platform === 'azure_openai') {
+      await accountsStore.updateAzureOpenAIAccount(props.account.id, data)
     } else {
       await accountsStore.updateGeminiAccount(props.account.id, data)
     }
