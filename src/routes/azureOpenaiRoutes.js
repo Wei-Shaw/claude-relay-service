@@ -197,13 +197,6 @@ router.post('/chat/completions', authenticateApiKey, async (req, res) => {
         onEnd: async ({ usageData, actualModel }) => {
           if (usageData) {
             const modelToRecord = actualModel || req.body.model || 'unknown'
-            logger.info(`✅ Usage capture SUCCESS for stream chat request ${requestId}`, {
-              usageData,
-              modelToRecord,
-              inputTokens: usageData.prompt_tokens || usageData.input_tokens || 0,
-              outputTokens: usageData.completion_tokens || usageData.output_tokens || 0
-            })
-            
             await usageReporter.reportOnce(
               requestId,
               usageData,
@@ -211,14 +204,6 @@ router.post('/chat/completions', authenticateApiKey, async (req, res) => {
               modelToRecord,
               account.id
             )
-          } else {
-            logger.error(`❌ Usage capture FAILED for stream chat request ${requestId}`, {
-              apiKeyId: req.apiKey.id,
-              model: req.body.model,
-              account: account.name,
-              endpoint: 'chat/completions',
-              isStream: true
-            })
           }
         },
         onError: (error) => {
@@ -234,13 +219,6 @@ router.post('/chat/completions', authenticateApiKey, async (req, res) => {
 
       if (usageData) {
         const modelToRecord = actualModel || req.body.model || 'unknown'
-        logger.info(`✅ Usage capture SUCCESS for non-stream chat request ${requestId}`, {
-          usageData,
-          modelToRecord,
-          inputTokens: usageData.prompt_tokens || usageData.input_tokens || 0,
-          outputTokens: usageData.completion_tokens || usageData.output_tokens || 0
-        })
-        
         await usageReporter.reportOnce(
           requestId,
           usageData,
@@ -248,15 +226,6 @@ router.post('/chat/completions', authenticateApiKey, async (req, res) => {
           modelToRecord,
           account.id
         )
-      } else {
-        logger.error(`❌ Usage capture FAILED for non-stream chat request ${requestId}`, {
-          apiKeyId: req.apiKey.id,
-          model: req.body.model,
-          account: account.name,
-          endpoint: 'chat/completions',
-          isStream: false,
-          responseStatus: response.status
-        })
       }
     }
   } catch (error) {
@@ -345,13 +314,6 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
         onEnd: async ({ usageData, actualModel }) => {
           if (usageData) {
             const modelToRecord = actualModel || req.body.model || 'unknown'
-            logger.info(`✅ Usage capture SUCCESS for stream responses request ${requestId}`, {
-              usageData,
-              modelToRecord,
-              inputTokens: usageData.prompt_tokens || usageData.input_tokens || 0,
-              outputTokens: usageData.completion_tokens || usageData.output_tokens || 0
-            })
-            
             await usageReporter.reportOnce(
               requestId,
               usageData,
@@ -359,14 +321,6 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
               modelToRecord,
               account.id
             )
-          } else {
-            logger.error(`❌ Usage capture FAILED for stream responses request ${requestId}`, {
-              apiKeyId: req.apiKey.id,
-              model: req.body.model,
-              account: account.name,
-              endpoint: 'responses',
-              isStream: true
-            })
           }
         },
         onError: (error) => {
@@ -382,13 +336,6 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
 
       if (usageData) {
         const modelToRecord = actualModel || req.body.model || 'unknown'
-        logger.info(`✅ Usage capture SUCCESS for non-stream responses request ${requestId}`, {
-          usageData,
-          modelToRecord,
-          inputTokens: usageData.prompt_tokens || usageData.input_tokens || 0,
-          outputTokens: usageData.completion_tokens || usageData.output_tokens || 0
-        })
-        
         await usageReporter.reportOnce(
           requestId,
           usageData,
@@ -396,15 +343,6 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
           modelToRecord,
           account.id
         )
-      } else {
-        logger.error(`❌ Usage capture FAILED for non-stream responses request ${requestId}`, {
-          apiKeyId: req.apiKey.id,
-          model: req.body.model,
-          account: account.name,
-          endpoint: 'responses',
-          isStream: false,
-          responseStatus: response.status
-        })
       }
     }
   } catch (error) {
@@ -480,23 +418,7 @@ router.post('/embeddings', authenticateApiKey, async (req, res) => {
 
     if (usageData) {
       const modelToRecord = actualModel || req.body.model || 'unknown'
-      logger.info(`✅ Usage capture SUCCESS for embeddings request ${requestId}`, {
-        usageData,
-        modelToRecord,
-        inputTokens: usageData.prompt_tokens || usageData.input_tokens || 0,
-        outputTokens: usageData.completion_tokens || usageData.output_tokens || 0
-      })
-      
       await usageReporter.reportOnce(requestId, usageData, req.apiKey.id, modelToRecord, account.id)
-    } else {
-      logger.error(`❌ Usage capture FAILED for embeddings request ${requestId}`, {
-        apiKeyId: req.apiKey.id,
-        model: req.body.model,
-        account: account.name,
-        endpoint: 'embeddings',
-        isStream: false,
-        responseStatus: response.status
-      })
     }
   } catch (error) {
     logger.error(`Azure OpenAI embeddings request failed ${requestId}:`, error)
