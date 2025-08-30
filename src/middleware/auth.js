@@ -297,6 +297,30 @@ const authenticateApiKey = async (req, res, next) => {
       )
     }
 
+    // 检查美元总限额
+    const dollarLimit = validation.keyData.dollarLimit || 0
+    if (dollarLimit > 0) {
+      const totalCost = validation.keyData.totalCost || 0
+
+      if (totalCost >= dollarLimit) {
+        logger.security(
+          `💵 Total dollar limit exceeded for key: ${validation.keyData.id} (${validation.keyData.name}), total cost: $${totalCost.toFixed(2)}/$${dollarLimit}`
+        )
+
+        return res.status(429).json({
+          error: 'Total dollar limit exceeded',
+          message: `已达到总费用限制 ($${dollarLimit})，API Key已失效`,
+          totalCost: totalCost,
+          dollarLimit: dollarLimit
+        })
+      }
+
+      // 记录当前总费用使用情况
+      logger.api(
+        `💵 Total cost usage for key: ${validation.keyData.id} (${validation.keyData.name}), current: $${totalCost.toFixed(2)}/$${dollarLimit}`
+      )
+    }
+
     // 将验证信息添加到请求对象（只包含必要信息）
     req.apiKey = {
       id: validation.keyData.id,
@@ -317,6 +341,8 @@ const authenticateApiKey = async (req, res, next) => {
       allowedClients: validation.keyData.allowedClients,
       dailyCostLimit: validation.keyData.dailyCostLimit,
       dailyCost: validation.keyData.dailyCost,
+      dollarLimit: validation.keyData.dollarLimit, // 新增：美元总限额
+      totalCost: validation.keyData.totalCost, // 新增：已使用的总费用
       usage: validation.keyData.usage
     }
     req.usage = validation.keyData.usage

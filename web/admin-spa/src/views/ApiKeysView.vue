@@ -406,6 +406,12 @@
                         >
                       </div>
                       <div class="flex items-center justify-between text-sm">
+                        <span class="text-gray-600 dark:text-gray-400">总费用</span>
+                        <span class="font-semibold text-blue-600"
+                          >${{ (key.totalCost || 0).toFixed(4) }}</span
+                        >
+                      </div>
+                      <div class="flex items-center justify-between text-sm">
                         <span class="text-gray-600 dark:text-gray-400">最后使用</span>
                         <span class="font-medium text-gray-700 dark:text-gray-300">{{
                           formatLastUsed(key.lastUsedAt)
@@ -416,7 +422,7 @@
                     <!-- 每日费用限制进度条 -->
                     <div v-if="key.dailyCostLimit > 0" class="space-y-1">
                       <div class="flex items-center justify-between text-xs">
-                        <span class="text-gray-500 dark:text-gray-400">费用限额</span>
+                        <span class="text-gray-500 dark:text-gray-400">每日限额</span>
                         <span class="text-gray-700 dark:text-gray-300">
                           ${{ (key.dailyCost || 0).toFixed(2) }} / ${{
                             key.dailyCostLimit.toFixed(2)
@@ -428,6 +434,25 @@
                           class="h-1.5 rounded-full transition-all duration-300"
                           :class="getDailyCostProgressColor(key)"
                           :style="{ width: getDailyCostProgress(key) + '%' }"
+                        />
+                      </div>
+                    </div>
+
+                    <!-- 总费用限额进度条 -->
+                    <div v-if="key.dollarLimit > 0" class="space-y-1">
+                      <div class="flex items-center justify-between text-xs">
+                        <span class="text-gray-500 dark:text-gray-400">总限额</span>
+                        <span class="text-gray-700 dark:text-gray-300">
+                          ${{ (key.totalCost || 0).toFixed(2) }} / ${{
+                            key.dollarLimit.toFixed(2)
+                          }}
+                        </span>
+                      </div>
+                      <div class="h-1.5 w-full rounded-full bg-gray-200">
+                        <div
+                          class="h-1.5 rounded-full transition-all duration-300"
+                          :class="getTotalCostProgressColor(key)"
+                          :style="{ width: getTotalCostProgress(key) + '%' }"
                         />
                       </div>
                     </div>
@@ -2233,6 +2258,21 @@ const getDailyCostProgress = (key) => {
 // 获取每日费用进度条颜色
 const getDailyCostProgressColor = (key) => {
   const progress = getDailyCostProgress(key)
+  if (progress >= 100) return 'bg-red-500'
+  if (progress >= 80) return 'bg-yellow-500'
+  return 'bg-green-500'
+}
+
+// 获取总费用进度
+const getTotalCostProgress = (key) => {
+  if (!key.dollarLimit || key.dollarLimit === 0) return 0
+  const percentage = ((key.totalCost || 0) / key.dollarLimit) * 100
+  return Math.min(percentage, 100)
+}
+
+// 获取总费用进度条颜色
+const getTotalCostProgressColor = (key) => {
+  const progress = getTotalCostProgress(key)
   if (progress >= 100) return 'bg-red-500'
   if (progress >= 80) return 'bg-yellow-500'
   return 'bg-green-500'

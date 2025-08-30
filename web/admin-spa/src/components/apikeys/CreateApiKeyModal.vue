@@ -338,6 +338,76 @@
 
           <div>
             <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >总费用限额 (美元)</label
+            >
+            <div class="space-y-2">
+              <div class="flex flex-wrap gap-2">
+                <button
+                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  type="button"
+                  @click="form.dollarLimit = '10'"
+                >
+                  $10
+                </button>
+                <button
+                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  type="button"
+                  @click="form.dollarLimit = '30'"
+                >
+                  $30
+                </button>
+                <button
+                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  type="button"
+                  @click="form.dollarLimit = '50'"
+                >
+                  $50
+                </button>
+                <button
+                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  type="button"
+                  @click="form.dollarLimit = '100'"
+                >
+                  $100
+                </button>
+                <button
+                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  type="button"
+                  @click="form.dollarLimit = '500'"
+                >
+                  $500
+                </button>
+                <button
+                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  type="button"
+                  @click="form.dollarLimit = '1000'"
+                >
+                  $1000
+                </button>
+                <button
+                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  type="button"
+                  @click="form.dollarLimit = ''"
+                >
+                  自定义
+                </button>
+              </div>
+              <input
+                v-model="form.dollarLimit"
+                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                min="0"
+                placeholder="0 表示无限制"
+                step="0.01"
+                type="number"
+              />
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                设置此 API Key 的总费用限额，达到限额后 API Key 将失效，0 或留空表示无限制
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
               >并发限制 (可选)</label
             >
             <input
@@ -744,6 +814,7 @@ const form = reactive({
   rateLimitRequests: '',
   concurrencyLimit: '',
   dailyCostLimit: '',
+  dollarLimit: '', // 新增：总费用限额
   expireDuration: '',
   customExpireDate: '',
   expiresAt: null,
@@ -1008,6 +1079,10 @@ const createApiKey = async () => {
       dailyCostLimit:
         form.dailyCostLimit !== '' && form.dailyCostLimit !== null
           ? parseFloat(form.dailyCostLimit)
+          : 0,
+      dollarLimit:
+        form.dollarLimit !== '' && form.dollarLimit !== null
+          ? parseFloat(form.dollarLimit)
           : 0,
       expiresAt: form.expiresAt || undefined,
       permissions: form.permissions,

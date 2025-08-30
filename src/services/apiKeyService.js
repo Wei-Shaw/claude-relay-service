@@ -32,6 +32,7 @@ class ApiKeyService {
       enableClientRestriction = false,
       allowedClients = [],
       dailyCostLimit = 0,
+      dollarLimit = 0, // 新增：美元总限额
       tags = []
     } = options
 
@@ -62,6 +63,8 @@ class ApiKeyService {
       enableClientRestriction: String(enableClientRestriction || false),
       allowedClients: JSON.stringify(allowedClients || []),
       dailyCostLimit: String(dailyCostLimit || 0),
+      dollarLimit: String(dollarLimit || 0), // 新增：美元总限额
+      totalCost: '0', // 新增：已使用的总费用
       tags: JSON.stringify(tags || []),
       createdAt: new Date().toISOString(),
       lastUsedAt: '',
@@ -96,6 +99,8 @@ class ApiKeyService {
       enableClientRestriction: keyData.enableClientRestriction === 'true',
       allowedClients: JSON.parse(keyData.allowedClients || '[]'),
       dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
+      dollarLimit: parseFloat(keyData.dollarLimit || 0), // 新增：美元总限额
+      totalCost: parseFloat(keyData.totalCost || 0), // 新增：已使用的总费用
       tags: JSON.parse(keyData.tags || '[]'),
       createdAt: keyData.createdAt,
       expiresAt: keyData.expiresAt,
@@ -135,6 +140,9 @@ class ApiKeyService {
 
       // 获取当日费用统计
       const dailyCost = await redis.getDailyCost(keyData.id)
+
+      // 获取总费用（从Redis或keyData中）
+      const totalCost = parseFloat(keyData.totalCost || 0)
 
       // 更新最后使用时间（优化：只在实际API调用时更新，而不是验证时）
       // 注意：lastUsedAt的更新已移至recordUsage方法中
@@ -190,6 +198,8 @@ class ApiKeyService {
           allowedClients,
           dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
           dailyCost: dailyCost || 0,
+          dollarLimit: parseFloat(keyData.dollarLimit || 0), // 新增：美元总限额
+          totalCost: totalCost, // 新增：已使用的总费用
           tags,
           usage
         }
@@ -220,6 +230,8 @@ class ApiKeyService {
         key.permissions = key.permissions || 'all' // 兼容旧数据
         key.dailyCostLimit = parseFloat(key.dailyCostLimit || 0)
         key.dailyCost = (await redis.getDailyCost(key.id)) || 0
+        key.dollarLimit = parseFloat(key.dollarLimit || 0) // 新增：美元总限额
+        key.totalCost = parseFloat(key.totalCost || 0) // 新增：已使用的总费用
 
         // 获取当前时间窗口的请求次数和Token使用量
         if (key.rateLimitWindow > 0) {
@@ -321,6 +333,7 @@ class ApiKeyService {
         'enableClientRestriction',
         'allowedClients',
         'dailyCostLimit',
+        'dollarLimit', // 新增：美元总限额
         'tags'
       ]
       const updatedData = { ...keyData }
@@ -407,19 +420,23 @@ class ApiKeyService {
         model
       )
 
-      // 记录费用统计
-      if (costInfo.costs.total > 0) {
-        await redis.incrementDailyCost(keyId, costInfo.costs.total)
-        logger.database(
-          `💰 Recorded cost for ${keyId}: $${costInfo.costs.total.toFixed(6)}, model: ${model}`
-        )
-      } else {
-        logger.debug(`💰 No cost recorded for ${keyId} - zero cost for model: ${model}`)
-      }
-
-      // 获取API Key数据以确定关联的账户
+      // 获取API Key数据以更新费用和关联账户
       const keyData = await redis.getApiKey(keyId)
       if (keyData && Object.keys(keyData).length > 0) {
+        // 记录费用统计
+        if (costInfo.costs.total > 0) {
+          await redis.incrementDailyCost(keyId, costInfo.costs.total)
+          logger.database(
+            `💰 Recorded cost for ${keyId}: $${costInfo.costs.total.toFixed(6)}, model: ${model}`
+          )
+          
+          // 更新总费用
+          const currentTotalCost = parseFloat(keyData.totalCost || 0)
+          keyData.totalCost = String(currentTotalCost + costInfo.costs.total)
+        } else {
+          logger.debug(`💰 No cost recorded for ${keyId} - zero cost for model: ${model}`)
+        }
+        
         // 更新最后使用时间
         keyData.lastUsedAt = new Date().toISOString()
         await redis.setApiKey(keyId, keyData)
@@ -508,26 +525,30 @@ class ApiKeyService {
         ephemeral1hTokens // 传递1小时缓存 tokens
       )
 
-      // 记录费用统计
-      if (costInfo.totalCost > 0) {
-        await redis.incrementDailyCost(keyId, costInfo.totalCost)
-        logger.database(
-          `💰 Recorded cost for ${keyId}: $${costInfo.totalCost.toFixed(6)}, model: ${model}`
-        )
-
-        // 记录详细的缓存费用（如果有）
-        if (costInfo.ephemeral5mCost > 0 || costInfo.ephemeral1hCost > 0) {
-          logger.database(
-            `💰 Cache costs - 5m: $${costInfo.ephemeral5mCost.toFixed(6)}, 1h: $${costInfo.ephemeral1hCost.toFixed(6)}`
-          )
-        }
-      } else {
-        logger.debug(`💰 No cost recorded for ${keyId} - zero cost for model: ${model}`)
-      }
-
-      // 获取API Key数据以确定关联的账户
+      // 获取API Key数据以更新费用和关联账户
       const keyData = await redis.getApiKey(keyId)
       if (keyData && Object.keys(keyData).length > 0) {
+        // 记录费用统计
+        if (costInfo.totalCost > 0) {
+          await redis.incrementDailyCost(keyId, costInfo.totalCost)
+          logger.database(
+            `💰 Recorded cost for ${keyId}: $${costInfo.totalCost.toFixed(6)}, model: ${model}`
+          )
+          
+          // 更新总费用
+          const currentTotalCost = parseFloat(keyData.totalCost || 0)
+          keyData.totalCost = String(currentTotalCost + costInfo.totalCost)
+
+          // 记录详细的缓存费用（如果有）
+          if (costInfo.ephemeral5mCost > 0 || costInfo.ephemeral1hCost > 0) {
+            logger.database(
+              `💰 Cache costs - 5m: $${costInfo.ephemeral5mCost.toFixed(6)}, 1h: $${costInfo.ephemeral1hCost.toFixed(6)}`
+            )
+          }
+        } else {
+          logger.debug(`💰 No cost recorded for ${keyId} - zero cost for model: ${model}`)
+        }
+        
         // 更新最后使用时间
         keyData.lastUsedAt = new Date().toISOString()
         await redis.setApiKey(keyId, keyData)
