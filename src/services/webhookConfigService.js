@@ -56,15 +56,26 @@ class WebhookConfigService {
 
     // 验证平台配置
     if (config.platforms) {
-      const validPlatforms = ['wechat_work', 'dingtalk', 'feishu', 'slack', 'discord', 'custom']
+      const validPlatforms = [
+        'wechat_work',
+        'dingtalk',
+        'feishu',
+        'slack',
+        'discord',
+        'custom',
+        'bark'
+      ]
 
       for (const platform of config.platforms) {
         if (!validPlatforms.includes(platform.type)) {
           throw new Error(`不支持的平台类型: ${platform.type}`)
         }
 
-        if (!platform.url || !this.isValidUrl(platform.url)) {
-          throw new Error(`无效的webhook URL: ${platform.url}`)
+        // Bark平台使用deviceKey而不是url
+        if (platform.type !== 'bark') {
+          if (!platform.url || !this.isValidUrl(platform.url)) {
+            throw new Error(`无效的webhook URL: ${platform.url}`)
+          }
         }
 
         // 验证平台特定的配置
@@ -107,6 +118,88 @@ class WebhookConfigService {
         break
       case 'custom':
         // 自定义webhook，用户自行负责格式
+        break
+      case 'bark':
+        // 验证设备密钥
+        if (!platform.deviceKey) {
+          throw new Error('Bark平台必须提供设备密钥')
+        }
+
+        // 验证设备密钥格式（通常是22-24位字符）
+        if (platform.deviceKey.length < 20 || platform.deviceKey.length > 30) {
+          logger.warn('⚠️ Bark设备密钥长度可能不正确，请检查是否完整复制')
+        }
+
+        // 验证服务器URL（如果提供）
+        if (platform.serverUrl) {
+          if (!this.isValidUrl(platform.serverUrl)) {
+            throw new Error('Bark服务器URL格式无效')
+          }
+          if (!platform.serverUrl.includes('/push')) {
+            logger.warn('⚠️ Bark服务器URL应该以/push结尾')
+          }
+        }
+
+        // 验证声音参数（如果提供）
+        if (platform.sound) {
+          const validSounds = [
+            'default',
+            'alarm',
+            'anticipate',
+            'bell',
+            'birdsong',
+            'bloom',
+            'calypso',
+            'chime',
+            'choo',
+            'descent',
+            'electronic',
+            'fanfare',
+            'glass',
+            'gotosleep',
+            'healthnotification',
+            'horn',
+            'ladder',
+            'mailsent',
+            'minuet',
+            'multiwayinvitation',
+            'newmail',
+            'newsflash',
+            'noir',
+            'paymentsuccess',
+            'shake',
+            'sherwoodforest',
+            'silence',
+            'spell',
+            'suspense',
+            'telegraph',
+            'tiptoes',
+            'typewriters',
+            'update',
+            'alert'
+          ]
+          if (!validSounds.includes(platform.sound)) {
+            logger.warn(`⚠️ 未知的Bark声音: ${platform.sound}`)
+          }
+        }
+
+        // 验证级别参数
+        if (platform.level) {
+          const validLevels = ['active', 'timeSensitive', 'passive', 'critical']
+          if (!validLevels.includes(platform.level)) {
+            throw new Error(`无效的Bark通知级别: ${platform.level}`)
+          }
+        }
+
+        // 验证图标URL（如果提供）
+        if (platform.icon && !this.isValidUrl(platform.icon)) {
+          logger.warn('⚠️ Bark图标URL格式可能不正确')
+        }
+
+        // 验证点击跳转URL（如果提供）
+        if (platform.clickUrl && !this.isValidUrl(platform.clickUrl)) {
+          logger.warn('⚠️ Bark点击跳转URL格式可能不正确')
+        }
         break
     }
   }
