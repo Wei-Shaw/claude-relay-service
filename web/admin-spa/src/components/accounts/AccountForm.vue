@@ -1792,16 +1792,16 @@ const form = ref({
   priority: props.account?.priority || 50,
   supportedModels: (() => {
     const models = props.account?.supportedModels
-    if (!models) return ''
+    if (!models) return []
     // 处理对象格式（Claude Console 的新格式）
     if (typeof models === 'object' && !Array.isArray(models)) {
-      return Object.keys(models).join('\n')
+      return Object.keys(models)
     }
     // 处理数组格式（向后兼容）
     if (Array.isArray(models)) {
-      return models.join('\n')
+      return models
     }
-    return ''
+    return []
   })(),
   userAgent: props.account?.userAgent || '',
   enableRateLimit: props.account ? props.account.rateLimitDuration > 0 : true,
@@ -1812,7 +1812,11 @@ const form = ref({
   region: props.account?.region || '',
   sessionToken: props.account?.sessionToken || '',
   defaultModel: props.account?.defaultModel || '',
-  smallFastModel: props.account?.smallFastModel || ''
+  smallFastModel: props.account?.smallFastModel || '',
+  // Azure OpenAI 特定字段
+  azureEndpoint: props.account?.azureEndpoint || '',
+  apiVersion: props.account?.apiVersion || '',
+  deploymentName: props.account?.deploymentName || ''
 })
 
 // 模型映射表数据
@@ -1849,7 +1853,9 @@ const errors = ref({
   apiKey: '',
   accessKeyId: '',
   secretAccessKey: '',
-  region: ''
+  region: '',
+  azureEndpoint: '',
+  deploymentName: ''
 })
 
 // 计算是否可以进入下一步
@@ -2116,6 +2122,20 @@ const createAccount = async () => {
       errors.value.region = '请选择 AWS 区域'
       hasError = true
     }
+  } else if (form.value.platform === 'azure_openai') {
+    // Azure OpenAI 验证
+    if (!form.value.azureEndpoint || form.value.azureEndpoint.trim() === '') {
+      errors.value.azureEndpoint = '请填写 Azure Endpoint'
+      hasError = true
+    }
+    if (!form.value.deploymentName || form.value.deploymentName.trim() === '') {
+      errors.value.deploymentName = '请填写部署名称'
+      hasError = true
+    }
+    if (!form.value.apiKey || form.value.apiKey.trim() === '') {
+      errors.value.apiKey = '请填写 API Key'
+      hasError = true
+    }
   } else if (form.value.addType === 'manual') {
     // 手动模式验证
     if (!form.value.accessToken || form.value.accessToken.trim() === '') {
@@ -2276,6 +2296,16 @@ const createAccount = async () => {
       data.priority = form.value.priority || 50
       // 如果不启用限流，传递 0 表示不限流
       data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
+    } else if (form.value.platform === 'azure_openai') {
+      // Azure OpenAI 账户特定数据
+      data.azureEndpoint = form.value.azureEndpoint
+      data.apiKey = form.value.apiKey
+      data.apiVersion = form.value.apiVersion || '2024-02-01'
+      data.deploymentName = form.value.deploymentName
+      data.supportedModels = Array.isArray(form.value.supportedModels)
+        ? form.value.supportedModels
+        : []
+      data.priority = form.value.priority || 50
     }
 
     let result
@@ -2287,6 +2317,8 @@ const createAccount = async () => {
       result = await accountsStore.createBedrockAccount(data)
     } else if (form.value.platform === 'openai') {
       result = await accountsStore.createOpenAIAccount(data)
+    } else if (form.value.platform === 'azure_openai') {
+      result = await accountsStore.createAzureOpenAIAccount(data)
     } else {
       result = await accountsStore.createGeminiAccount(data)
     }
@@ -2516,6 +2548,26 @@ watch(
   () => {
     if (errors.value.apiKey && form.value.apiKey?.trim()) {
       errors.value.apiKey = ''
+    }
+  }
+)
+
+// 监听Azure Endpoint变化，清除错误
+watch(
+  () => form.value.azureEndpoint,
+  () => {
+    if (errors.value.azureEndpoint && form.value.azureEndpoint?.trim()) {
+      errors.value.azureEndpoint = ''
+    }
+  }
+)
+
+// 监听Deployment Name变化，清除错误
+watch(
+  () => form.value.deploymentName,
+  () => {
+    if (errors.value.deploymentName && form.value.deploymentName?.trim()) {
+      errors.value.deploymentName = ''
     }
   }
 )
@@ -2751,16 +2803,16 @@ watch(
         priority: newAccount.priority || 50,
         supportedModels: (() => {
           const models = newAccount.supportedModels
-          if (!models) return ''
+          if (!models) return []
           // 处理对象格式（Claude Console 的新格式）
           if (typeof models === 'object' && !Array.isArray(models)) {
-            return Object.keys(models).join('\n')
+            return Object.keys(models)
           }
           // 处理数组格式（向后兼容）
           if (Array.isArray(models)) {
-            return models.join('\n')
+            return models
           }
-          return ''
+          return []
         })(),
         userAgent: newAccount.userAgent || '',
         enableRateLimit:
