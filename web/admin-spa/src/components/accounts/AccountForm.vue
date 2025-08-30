@@ -2944,7 +2944,11 @@ watch(
         region: newAccount.region || '',
         sessionToken: '', // 编辑模式不显示现有的会话令牌
         defaultModel: newAccount.defaultModel || '',
-        smallFastModel: newAccount.smallFastModel || ''
+        smallFastModel: newAccount.smallFastModel || '',
+        // Azure OpenAI 特定字段
+        azureEndpoint: newAccount.azureEndpoint || '',
+        apiVersion: newAccount.apiVersion || '',
+        deploymentName: newAccount.deploymentName || ''
       }
 
       // 如果是分组类型，加载分组ID
