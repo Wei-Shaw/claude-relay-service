@@ -11,7 +11,6 @@ const AccountsView = () => import('@/views/AccountsView.vue')
 const TutorialView = () => import('@/views/TutorialView.vue')
 const SettingsView = () => import('@/views/SettingsView.vue')
 const ApiStatsView = () => import('@/views/ApiStatsView.vue')
-const UserDashboardView = () => import('@/views/UserDashboardView.vue')
 
 const routes = [
   {
@@ -41,12 +40,6 @@ const routes = [
     name: 'ApiStats',
     component: ApiStatsView,
     meta: { requiresAuth: false }
-  },
-  {
-    path: '/user-dashboard',
-    name: 'UserDashboard',
-    component: UserDashboardView,
-    meta: { requiresAuth: false, userAuth: true }
   },
   {
     path: '/dashboard',
@@ -140,18 +133,7 @@ router.beforeEach((to, from, next) => {
   // API Stats 页面不需要认证，直接放行
   if (to.path === '/api-stats' || to.path.startsWith('/api-stats')) {
     next()
-  }
-  // 用户仪表盘需要用户token验证
-  else if (to.meta.userAuth) {
-    const userToken = localStorage.getItem('user_token')
-    if (!userToken) {
-      next('/api-stats')
-    } else {
-      next()
-    }
-  }
-  // 管理员页面需要管理员认证
-  else if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+  } else if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next('/login')
   } else if (to.path === '/login' && authStore.isAuthenticated) {
     next('/dashboard')

@@ -23,7 +23,6 @@ const openaiClaudeRoutes = require('./routes/openaiClaudeRoutes')
 const openaiRoutes = require('./routes/openaiRoutes')
 const azureOpenaiRoutes = require('./routes/azureOpenaiRoutes')
 const webhookRoutes = require('./routes/webhook')
-const ldapRoutes = require('./routes/ldapRoutes')
 
 // Import middleware
 const {
@@ -245,7 +244,6 @@ class Application {
       this.app.use('/openai', openaiRoutes)
       this.app.use('/azure', azureOpenaiRoutes)
       this.app.use('/admin/webhook', webhookRoutes)
-      this.app.use('/admin/ldap', ldapRoutes)
 
       // 🏠 根路径重定向到新版管理界面
       this.app.get('/', (req, res) => {

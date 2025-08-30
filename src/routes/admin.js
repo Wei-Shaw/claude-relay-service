@@ -791,8 +791,6 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
   try {
     const { keyId } = req.params
     const {
-      name,
-      description,
       tokenLimit,
       concurrencyLimit,
       rateLimitWindow,
@@ -815,30 +813,6 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
 
     // 只允许更新指定字段
     const updates = {}
-
-    // 处理name字段
-    if (name !== undefined) {
-      if (name === null || name === '') {
-        return res.status(400).json({ error: 'Name cannot be empty' })
-      }
-      if (typeof name !== 'string' || name.trim().length === 0) {
-        return res.status(400).json({ error: 'Name must be a non-empty string' })
-      }
-      if (name.length > 100) {
-        return res.status(400).json({ error: 'Name must be less than 100 characters' })
-      }
-      updates.name = name.trim()
-    }
-
-    // 处理description字段
-    if (description !== undefined) {
-      if (description && (typeof description !== 'string' || description.length > 500)) {
-        return res
-          .status(400)
-          .json({ error: 'Description must be a string with less than 500 characters' })
-      }
-      updates.description = description || ''
-    }
 
     if (tokenLimit !== undefined && tokenLimit !== null && tokenLimit !== '') {
       if (!Number.isInteger(Number(tokenLimit)) || Number(tokenLimit) < 0) {
@@ -980,20 +954,12 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       updates.isActive = isActive
     }
 
-    logger.info(`🔧 Admin updating API key: ${keyId}`, {
-      updates: Object.keys(updates),
-      updatesData: updates
-    })
-
     await apiKeyService.updateApiKey(keyId, updates)
 
     logger.success(`📝 Admin updated API key: ${keyId}`)
     return res.json({ success: true, message: 'API key updated successfully' })
   } catch (error) {
-    logger.error(`❌ Failed to update API key ${req.params.keyId}:`, {
-      error: error.message,
-      stack: error.stack
-    })
+    logger.error('❌ Failed to update API key:', error)
     return res.status(500).json({ error: 'Failed to update API key', message: error.message })
   }
 })

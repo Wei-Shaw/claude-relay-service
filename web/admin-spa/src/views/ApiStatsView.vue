@@ -20,15 +20,6 @@
             class="h-8 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent opacity-50 dark:via-gray-600"
           />
 
-          <!-- 用户登录按钮 -->
-          <button
-            class="user-login-button flex items-center gap-2 rounded-2xl px-4 py-2 transition-all duration-300 md:px-5 md:py-2.5"
-            @click="showUserLogin"
-          >
-            <i class="fas fa-user-circle text-sm md:text-base" />
-            <span class="text-xs font-semibold tracking-wide md:text-sm">用户登录</span>
-          </button>
-
           <!-- 管理后台按钮 -->
           <router-link
             class="admin-button-refined flex items-center gap-2 rounded-2xl px-4 py-2 transition-all duration-300 md:px-5 md:py-2.5"
@@ -138,74 +129,6 @@
         <TutorialView />
       </div>
     </div>
-
-    <!-- 用户登录模态框 -->
-    <div v-if="showLoginModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="hideUserLogin"></div>
-      <div class="glass-strong relative w-full max-w-md rounded-2xl p-6 shadow-2xl">
-        <div class="mb-6 text-center">
-          <h2 class="mb-2 text-2xl font-bold text-gray-800 dark:text-gray-100">AD域控登录</h2>
-          <p class="text-sm text-gray-600 dark:text-gray-400">使用您的域账号登录</p>
-        </div>
-
-        <form class="space-y-4" @submit.prevent="handleUserLogin">
-          <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100">
-              用户名
-            </label>
-            <input
-              v-model="userLoginForm.username"
-              class="w-full rounded-xl border border-gray-300 bg-white/70 px-4 py-3 text-gray-800 placeholder-gray-500 backdrop-blur-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800/70 dark:text-gray-200 dark:placeholder-gray-400"
-              placeholder="请输入域用户名"
-              required
-              type="text"
-            />
-          </div>
-
-          <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100">
-              密码
-            </label>
-            <input
-              v-model="userLoginForm.password"
-              class="w-full rounded-xl border border-gray-300 bg-white/70 px-4 py-3 text-gray-800 placeholder-gray-500 backdrop-blur-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800/70 dark:text-gray-200 dark:placeholder-gray-400"
-              placeholder="请输入域密码"
-              required
-              type="password"
-            />
-          </div>
-
-          <div class="flex gap-3 pt-4">
-            <button
-              class="flex-1 rounded-xl border border-gray-300 bg-white/70 px-4 py-3 text-sm font-medium text-gray-700 backdrop-blur-sm transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800/70 dark:text-gray-300 dark:hover:bg-gray-700"
-              type="button"
-              @click="hideUserLogin"
-            >
-              取消
-            </button>
-            <button
-              class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 px-4 py-3 text-sm font-medium text-white backdrop-blur-sm transition-all hover:from-blue-600 hover:to-purple-700 disabled:opacity-50"
-              :disabled="userLoginLoading"
-              type="submit"
-            >
-              <div
-                v-if="userLoginLoading"
-                class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
-              ></div>
-              <i v-else class="fas fa-sign-in-alt"></i>
-              {{ userLoginLoading ? '登录中...' : '登录' }}
-            </button>
-          </div>
-        </form>
-
-        <div
-          v-if="userLoginError"
-          class="mt-4 rounded-xl border border-red-500/30 bg-red-500/20 p-3 text-center text-sm text-red-800 dark:text-red-400"
-        >
-          <i class="fas fa-exclamation-triangle mr-2"></i>{{ userLoginError }}
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -234,15 +157,6 @@ const currentTab = ref('stats')
 // 主题相关
 const isDarkMode = computed(() => themeStore.isDarkMode)
 
-// 用户登录相关
-const showLoginModal = ref(false)
-const userLoginLoading = ref(false)
-const userLoginError = ref('')
-const userLoginForm = ref({
-  username: '',
-  password: ''
-})
-
 const {
   apiKey,
   apiId,
@@ -256,63 +170,6 @@ const {
 } = storeToRefs(apiStatsStore)
 
 const { queryStats, switchPeriod, loadStatsWithApiId, loadOemSettings, reset } = apiStatsStore
-
-// 用户登录相关方法
-const showUserLogin = () => {
-  showLoginModal.value = true
-  userLoginError.value = ''
-  userLoginForm.value = {
-    username: '',
-    password: ''
-  }
-}
-
-const hideUserLogin = () => {
-  showLoginModal.value = false
-  userLoginError.value = ''
-  userLoginForm.value = {
-    username: '',
-    password: ''
-  }
-}
-
-const handleUserLogin = async () => {
-  if (!userLoginForm.value.username || !userLoginForm.value.password) {
-    userLoginError.value = '请输入用户名和密码'
-    return
-  }
-
-  userLoginLoading.value = true
-  userLoginError.value = ''
-
-  try {
-    const response = await fetch('/admin/ldap/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(userLoginForm.value)
-    })
-
-    const result = await response.json()
-
-    if (result.success) {
-      // 保存token到localStorage
-      localStorage.setItem('user_token', result.token)
-      localStorage.setItem('user_info', JSON.stringify(result.user))
-
-      // 跳转到用户专用页面
-      window.location.href = '/admin-next/user-dashboard'
-    } else {
-      userLoginError.value = result.message || '登录失败'
-    }
-  } catch (error) {
-    console.error('用户登录错误:', error)
-    userLoginError.value = '网络错误，请重试'
-  } finally {
-    userLoginLoading.value = false
-  }
-}
 
 // 处理键盘快捷键
 const handleKeyDown = (event) => {
@@ -450,55 +307,6 @@ watch(apiKey, (newValue) => {
   background-clip: text;
   font-weight: 700;
   letter-spacing: -0.025em;
-}
-
-/* 用户登录按钮 */
-.user-login-button {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: white;
-  text-decoration: none;
-  box-shadow:
-    0 4px 12px rgba(16, 185, 129, 0.25),
-    inset 0 1px 1px rgba(255, 255, 255, 0.2);
-  position: relative;
-  overflow: hidden;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-/* 暗色模式下的用户登录按钮 */
-:global(.dark) .user-login-button {
-  background: rgba(34, 197, 94, 0.8);
-  border: 1px solid rgba(107, 114, 128, 0.4);
-  color: #f3f4f6;
-  box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.3),
-    inset 0 1px 1px rgba(255, 255, 255, 0.05);
-}
-
-.user-login-button:hover {
-  transform: translateY(-2px) scale(1.02);
-  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
-  box-shadow:
-    0 8px 20px rgba(5, 150, 105, 0.35),
-    inset 0 1px 1px rgba(255, 255, 255, 0.3);
-  border-color: rgba(255, 255, 255, 0.4);
-  color: white;
-}
-
-:global(.dark) .user-login-button:hover {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  border-color: rgba(34, 197, 94, 0.4);
-  box-shadow:
-    0 8px 20px rgba(16, 185, 129, 0.3),
-    inset 0 1px 1px rgba(255, 255, 255, 0.1);
-  color: white;
-}
-
-.user-login-button:active {
-  transform: translateY(-1px) scale(1);
 }
 
 /* 管理后台按钮 - 精致版本 */

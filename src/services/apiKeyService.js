@@ -32,9 +32,7 @@ class ApiKeyService {
       enableClientRestriction = false,
       allowedClients = [],
       dailyCostLimit = 0,
-      tags = [],
-      owner = null,
-      ownerType = null
+      tags = []
     } = options
 
     // 生成简单的API Key (64字符十六进制)
@@ -68,9 +66,7 @@ class ApiKeyService {
       createdAt: new Date().toISOString(),
       lastUsedAt: '',
       expiresAt: expiresAt || '',
-      createdBy: 'admin', // 可以根据需要扩展用户系统
-      owner: owner || '',
-      ownerType: ownerType || ''
+      createdBy: 'admin' // 可以根据需要扩展用户系统
     }
 
     // 保存API Key数据并建立哈希映射
@@ -103,9 +99,7 @@ class ApiKeyService {
       tags: JSON.parse(keyData.tags || '[]'),
       createdAt: keyData.createdAt,
       expiresAt: keyData.expiresAt,
-      createdBy: keyData.createdBy,
-      owner: keyData.owner,
-      ownerType: keyData.ownerType
+      createdBy: keyData.createdBy
     }
   }
 
@@ -300,20 +294,10 @@ class ApiKeyService {
   // 📝 更新API Key
   async updateApiKey(keyId, updates) {
     try {
-      logger.debug(`🔧 Updating API key ${keyId} with:`, updates)
-
       const keyData = await redis.getApiKey(keyId)
       if (!keyData || Object.keys(keyData).length === 0) {
-        logger.error(`❌ API key not found: ${keyId}`)
         throw new Error('API key not found')
       }
-
-      logger.debug(`📋 Current API key data:`, {
-        id: keyData.id,
-        name: keyData.name,
-        owner: keyData.owner,
-        ownerType: keyData.ownerType
-      })
 
       // 允许更新的字段
       const allowedUpdates = [
@@ -360,10 +344,7 @@ class ApiKeyService {
       // 更新时不需要重新建立哈希映射，因为API Key本身没有变化
       await redis.setApiKey(keyId, updatedData)
 
-      logger.success(`📝 Updated API key: ${keyId}`, {
-        updatedFields: Object.keys(updates),
-        newName: updatedData.name
-      })
+      logger.success(`📝 Updated API key: ${keyId}`)
 
       return { success: true }
     } catch (error) {
