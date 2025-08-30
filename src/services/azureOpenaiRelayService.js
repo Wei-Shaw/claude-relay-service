@@ -52,25 +52,6 @@ async function handleAzureOpenAIRequest({
     // 处理请求体
     const processedBody = { ...requestBody }
 
-    // Detailed logging for responses endpoint
-    if (endpoint === 'responses') {
-      logger.debug(`🔍 Azure OpenAI Responses Endpoint Details`, {
-        targetUrl: requestUrl,
-        headers: {
-          'Content-Type': requestHeaders['Content-Type'],
-          'api-key': '[REDACTED]',
-          'User-Agent': requestHeaders['User-Agent'] || 'not set'
-        },
-        processedRequestBody: processedBody,
-        account: {
-          name: account.name,
-          azureEndpoint: account.azureEndpoint,
-          deploymentName: account.deploymentName,
-          apiVersion: apiVersion
-        }
-      })
-    }
-
     // 标准化模型名称
     if (processedBody.model) {
       processedBody.model = normalizeModelName(processedBody.model)
@@ -161,25 +142,6 @@ async function handleAzureOpenAIRequest({
       contentType: response.headers?.['content-type'] || 'unknown'
     })
 
-    // Enhanced logging for responses endpoint
-    if (endpoint === 'responses') {
-      logger.debug(`🔍 Azure OpenAI Responses Endpoint Response`, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: {
-          'content-type': response.headers['content-type'],
-          'x-request-id': response.headers['x-request-id'] || response.headers['x-ms-request-id'],
-          'x-ratelimit-remaining': response.headers['x-ratelimit-remaining-requests'],
-          'x-ratelimit-reset': response.headers['x-ratelimit-reset-requests']
-        },
-        responseBodyPreview: isStream ? '[STREAM]' : (
-          response.data ? JSON.stringify(response.data).substring(0, 500) + (JSON.stringify(response.data).length > 500 ? '...' : '') : 'no data'
-        ),
-        endpoint: 'responses',
-        duration: `${requestDuration}ms`
-      })
-    }
-
     return response
   } catch (error) {
     const errorDetails = {
@@ -243,17 +205,6 @@ async function handleAzureOpenAIRequest({
       })
     } else {
       logger.error('Azure OpenAI Request Failed', errorDetails)
-    }
-
-    // Enhanced error logging for responses endpoint
-    if (endpoint === 'responses') {
-      logger.error(`❌ Azure OpenAI Responses Endpoint Error`, {
-        ...errorDetails,
-        endpoint: 'responses',
-        targetUrl: requestUrl,
-        errorType: error.response ? 'HTTP_ERROR' : 'NETWORK_ERROR',
-        responseBody: error.response?.data ? JSON.stringify(error.response.data) : 'no response body'
-      })
     }
 
     throw error

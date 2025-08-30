@@ -250,28 +250,6 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
     messages: req.body.messages?.length || 0
   })
 
-  // Detailed logging for debugging
-  logger.debug(`📋 Azure OpenAI Responses Request Details ${requestId}`, {
-    headers: {
-      'content-type': req.headers['content-type'],
-      'user-agent': req.headers['user-agent'],
-      'x-forwarded-for': req.headers['x-forwarded-for'],
-      'authorization': req.headers.authorization ? '[REDACTED]' : 'not present'
-    },
-    requestBody: {
-      model: req.body.model,
-      messages: req.body.messages,
-      stream: req.body.stream,
-      temperature: req.body.temperature,
-      max_tokens: req.body.max_tokens,
-      top_p: req.body.top_p,
-      frequency_penalty: req.body.frequency_penalty,
-      presence_penalty: req.body.presence_penalty,
-      stop: req.body.stop,
-      logit_bias: req.body.logit_bias
-    }
-  })
-
   try {
     // 获取绑定的 Azure OpenAI 账户
     let account = null
@@ -286,20 +264,6 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
     if (!account || account.isActive !== 'true') {
       account = await azureOpenaiAccountService.selectAvailableAccount(sessionId)
     }
-
-    // Log Azure OpenAI request details
-    logger.debug(`🔗 Sending to Azure OpenAI ${requestId}`, {
-      account: {
-        id: account.id,
-        name: account.name,
-        azureEndpoint: account.azureEndpoint,
-        deploymentName: account.deploymentName,
-        apiVersion: account.apiVersion
-      },
-      targetUrl: `${account.azureEndpoint}/openai/deployments/${account.deploymentName}/responses?api-version=${account.apiVersion || '2024-10-01-preview'}`,
-      endpoint: 'responses',
-      isStream: req.body.stream || false
-    })
 
     // 发送请求到 Azure OpenAI
     const response = await azureOpenaiRelayService.handleAzureOpenAIRequest({
