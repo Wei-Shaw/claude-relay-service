@@ -311,6 +311,16 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
     // 标记账户被使用
     await geminiAccountService.markAccountUsed(account.id)
 
+    // 解析账户的代理配置
+    let proxyConfig = null
+    if (account.proxy) {
+      try {
+        proxyConfig = typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
+      } catch (e) {
+        logger.warn('Failed to parse proxy configuration:', e)
+      }
+    }
+
     // 创建中止控制器
     abortController = new AbortController()
 
@@ -325,7 +335,8 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
     // 获取OAuth客户端
     const client = await geminiAccountService.getOauthClient(
       account.accessToken,
-      account.refreshToken
+      account.refreshToken,
+      proxyConfig
     )
     if (actualStream) {
       // 流式响应
@@ -341,7 +352,8 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
         null, // user_prompt_id
         account.projectId, // 使用有权限的项目ID
         apiKeyData.id, // 使用 API Key ID 作为 session ID
-        abortController.signal // 传递中止信号
+        abortController.signal, // 传递中止信号
+        proxyConfig // 传递代理配置
       )
 
       // 设置流式响应头
@@ -541,7 +553,8 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
         { model, request: geminiRequestBody },
         null, // user_prompt_id
         account.projectId, // 使用有权限的项目ID
-        apiKeyData.id // 使用 API Key ID 作为 session ID
+        apiKeyData.id, // 使用 API Key ID 作为 session ID
+        proxyConfig // 传递代理配置
       )
 
       // 转换为 OpenAI 格式并返回

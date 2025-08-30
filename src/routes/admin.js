@@ -2395,7 +2395,7 @@ router.post('/gemini-accounts/generate-auth-url', authenticateAdmin, async (req,
       state: authState,
       codeVerifier,
       redirectUri: finalRedirectUri
-    } = await geminiAccountService.generateAuthUrl(state, redirectUri)
+    } = await geminiAccountService.generateAuthUrl(state, redirectUri, proxy)
 
     // 创建 OAuth 会话，包含 codeVerifier 和代理配置
     const sessionId = authState
