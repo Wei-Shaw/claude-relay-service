@@ -8,7 +8,7 @@ WORKDIR /app/web/admin-spa
 COPY web/admin-spa/package*.json ./
 
 # 🔽 安装前端依赖
-RUN npm i 
+RUN npm ci
 
 # 📋 复制前端源代码
 COPY web/admin-spa/ ./
@@ -38,7 +38,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # 🔽 安装依赖 (生产环境)
-RUN npm i --only=production && \
+RUN npm ci --only=production && \
     npm cache clean --force
 
 # 📋 复制应用代码
