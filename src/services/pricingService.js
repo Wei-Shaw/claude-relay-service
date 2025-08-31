@@ -308,7 +308,9 @@ class PricingService {
 
   // 确保价格对象包含缓存价格
   ensureCachePricing(pricing) {
-    if (!pricing) return pricing
+    if (!pricing) {
+      return pricing
+    }
 
     // 如果缺少缓存价格，根据输入价格计算（缓存创建价格通常是输入价格的1.25倍，缓存读取是0.1倍）
     if (!pricing.cache_creation_input_token_cost && pricing.input_cost_per_token) {
