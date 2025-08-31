@@ -1431,7 +1431,13 @@ class RedisClient {
       const startDate = new Date(windowStart)
       const endDate = new Date(windowEnd)
 
+      // 添加日志以调试时间窗口
+      logger.debug(`📊 Getting session window usage for account ${accountId}`)
+      logger.debug(`   Window: ${windowStart} to ${windowEnd}`)
+      logger.debug(`   Start UTC: ${startDate.toISOString()}, End UTC: ${endDate.toISOString()}`)
+
       // 获取窗口内所有可能的小时键
+      // 重要：需要使用配置的时区来构建键名，因为数据存储时使用的是配置时区
       const hourlyKeys = []
       const currentHour = new Date(startDate)
       currentHour.setMinutes(0)
@@ -1439,9 +1445,12 @@ class RedisClient {
       currentHour.setMilliseconds(0)
 
       while (currentHour <= endDate) {
-        const dateStr = `${currentHour.getUTCFullYear()}-${String(currentHour.getUTCMonth() + 1).padStart(2, '0')}-${String(currentHour.getUTCDate()).padStart(2, '0')}`
-        const hourStr = String(currentHour.getUTCHours()).padStart(2, '0')
-        const key = `account_usage:hourly:${accountId}:${dateStr}:${hourStr}`
+        // 使用时区转换函数来获取正确的日期和小时
+        const tzDateStr = getDateStringInTimezone(currentHour)
+        const tzHour = String(getHourInTimezone(currentHour)).padStart(2, '0')
+        const key = `account_usage:hourly:${accountId}:${tzDateStr}:${tzHour}`
+
+        logger.debug(`   Adding hourly key: ${key}`)
         hourlyKeys.push(key)
         currentHour.setHours(currentHour.getHours() + 1)
       }
@@ -1462,18 +1471,31 @@ class RedisClient {
       let totalRequests = 0
       const modelUsage = {}
 
+      logger.debug(`   Processing ${results.length} hourly results`)
+
       for (const [error, data] of results) {
         if (error || !data || Object.keys(data).length === 0) {
           continue
         }
 
         // 处理总计数据
-        totalInputTokens += parseInt(data.inputTokens || 0)
-        totalOutputTokens += parseInt(data.outputTokens || 0)
-        totalCacheCreateTokens += parseInt(data.cacheCreateTokens || 0)
-        totalCacheReadTokens += parseInt(data.cacheReadTokens || 0)
-        totalAllTokens += parseInt(data.allTokens || 0)
-        totalRequests += parseInt(data.requests || 0)
+        const hourInputTokens = parseInt(data.inputTokens || 0)
+        const hourOutputTokens = parseInt(data.outputTokens || 0)
+        const hourCacheCreateTokens = parseInt(data.cacheCreateTokens || 0)
+        const hourCacheReadTokens = parseInt(data.cacheReadTokens || 0)
+        const hourAllTokens = parseInt(data.allTokens || 0)
+        const hourRequests = parseInt(data.requests || 0)
+
+        totalInputTokens += hourInputTokens
+        totalOutputTokens += hourOutputTokens
+        totalCacheCreateTokens += hourCacheCreateTokens
+        totalCacheReadTokens += hourCacheReadTokens
+        totalAllTokens += hourAllTokens
+        totalRequests += hourRequests
+
+        if (hourAllTokens > 0) {
+          logger.debug(`   Hour data: allTokens=${hourAllTokens}, requests=${hourRequests}`)
+        }
 
         // 处理每个模型的数据
         for (const [key, value] of Object.entries(data)) {
@@ -1512,6 +1534,14 @@ class RedisClient {
           }
         }
       }
+
+      logger.debug(`📊 Session window usage summary:`)
+      logger.debug(`   Total allTokens: ${totalAllTokens}`)
+      logger.debug(`   Total requests: ${totalRequests}`)
+      logger.debug(`   Input: ${totalInputTokens}, Output: ${totalOutputTokens}`)
+      logger.debug(
+        `   Cache Create: ${totalCacheCreateTokens}, Cache Read: ${totalCacheReadTokens}`
+      )
 
       return {
         totalInputTokens,

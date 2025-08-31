@@ -1524,7 +1524,10 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
                 cache_read_input_tokens: usage.cacheReadTokens
               }
 
+              logger.debug(`💰 Calculating cost for model ${modelName}:`, JSON.stringify(usageData))
               const costResult = CostCalculator.calculateCost(usageData, modelName)
+              logger.debug(`💰 Cost result for ${modelName}: total=${costResult.costs.total}`)
+
               modelCosts[modelName] = {
                 ...usage,
                 cost: costResult.costs.total
