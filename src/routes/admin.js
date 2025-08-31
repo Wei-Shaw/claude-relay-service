@@ -397,11 +397,13 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       concurrencyLimit,
       rateLimitWindow,
       rateLimitRequests,
+      rateLimitCost,
       enableModelRestriction,
       restrictedModels,
       enableClientRestriction,
       allowedClients,
       dailyCostLimit,
+      weeklyOpusCostLimit,
       tags
     } = req.body
 
@@ -494,11 +496,13 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       concurrencyLimit,
       rateLimitWindow,
       rateLimitRequests,
+      rateLimitCost,
       enableModelRestriction,
       restrictedModels,
       enableClientRestriction,
       allowedClients,
       dailyCostLimit,
+      weeklyOpusCostLimit,
       tags
     })
 
@@ -532,6 +536,7 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       enableClientRestriction,
       allowedClients,
       dailyCostLimit,
+      weeklyOpusCostLimit,
       tags
     } = req.body
 
@@ -575,6 +580,7 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
           enableClientRestriction,
           allowedClients,
           dailyCostLimit,
+          weeklyOpusCostLimit,
           tags
         })
 
@@ -684,6 +690,9 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
         }
         if (updates.dailyCostLimit !== undefined) {
           finalUpdates.dailyCostLimit = updates.dailyCostLimit
+        }
+        if (updates.weeklyOpusCostLimit !== undefined) {
+          finalUpdates.weeklyOpusCostLimit = updates.weeklyOpusCostLimit
         }
         if (updates.permissions !== undefined) {
           finalUpdates.permissions = updates.permissions
@@ -795,6 +804,7 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       concurrencyLimit,
       rateLimitWindow,
       rateLimitRequests,
+      rateLimitCost,
       isActive,
       claudeAccountId,
       claudeConsoleAccountId,
@@ -808,6 +818,7 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       allowedClients,
       expiresAt,
       dailyCostLimit,
+      weeklyOpusCostLimit,
       tags
     } = req.body
 
@@ -842,6 +853,14 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
         return res.status(400).json({ error: 'Rate limit requests must be a non-negative integer' })
       }
       updates.rateLimitRequests = Number(rateLimitRequests)
+    }
+
+    if (rateLimitCost !== undefined && rateLimitCost !== null && rateLimitCost !== '') {
+      const cost = Number(rateLimitCost)
+      if (isNaN(cost) || cost < 0) {
+        return res.status(400).json({ error: 'Rate limit cost must be a non-negative number' })
+      }
+      updates.rateLimitCost = cost
     }
 
     if (claudeAccountId !== undefined) {
@@ -933,6 +952,22 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
         return res.status(400).json({ error: 'Daily cost limit must be a non-negative number' })
       }
       updates.dailyCostLimit = costLimit
+    }
+
+    // 处理 Opus 周费用限制
+    if (
+      weeklyOpusCostLimit !== undefined &&
+      weeklyOpusCostLimit !== null &&
+      weeklyOpusCostLimit !== ''
+    ) {
+      const costLimit = Number(weeklyOpusCostLimit)
+      // 明确验证非负数（0 表示禁用，负数无意义）
+      if (isNaN(costLimit) || costLimit < 0) {
+        return res
+          .status(400)
+          .json({ error: 'Weekly Opus cost limit must be a non-negative number' })
+      }
+      updates.weeklyOpusCostLimit = costLimit
     }
 
     // 处理标签
@@ -1475,11 +1510,14 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
     if (groupId && groupId !== 'all') {
       if (groupId === 'ungrouped') {
         // 筛选未分组账户
-        accounts = accounts.filter((account) => !account.groupInfo)
+        accounts = accounts.filter(
+          (account) => !account.groupInfos || account.groupInfos.length === 0
+        )
       } else {
         // 筛选特定分组的账户
         accounts = accounts.filter(
-          (account) => account.groupInfo && account.groupInfo.id === groupId
+          (account) =>
+            account.groupInfos && account.groupInfos.some((group) => group.id === groupId)
         )
       }
     }
@@ -1489,23 +1527,89 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
       accounts.map(async (account) => {
         try {
           const usageStats = await redis.getAccountUsageStats(account.id)
+          const groupInfos = await accountGroupService.getAccountGroup(account.id)
+
+          // 获取会话窗口使用统计（仅对有活跃窗口的账户）
+          let sessionWindowUsage = null
+          if (account.sessionWindow && account.sessionWindow.hasActiveWindow) {
+            const windowUsage = await redis.getAccountSessionWindowUsage(
+              account.id,
+              account.sessionWindow.windowStart,
+              account.sessionWindow.windowEnd
+            )
+
+            // 计算会话窗口的总费用
+            let totalCost = 0
+            const modelCosts = {}
+
+            for (const [modelName, usage] of Object.entries(windowUsage.modelUsage)) {
+              const usageData = {
+                input_tokens: usage.inputTokens,
+                output_tokens: usage.outputTokens,
+                cache_creation_input_tokens: usage.cacheCreateTokens,
+                cache_read_input_tokens: usage.cacheReadTokens
+              }
+
+              logger.debug(`💰 Calculating cost for model ${modelName}:`, JSON.stringify(usageData))
+              const costResult = CostCalculator.calculateCost(usageData, modelName)
+              logger.debug(`💰 Cost result for ${modelName}: total=${costResult.costs.total}`)
+
+              modelCosts[modelName] = {
+                ...usage,
+                cost: costResult.costs.total
+              }
+              totalCost += costResult.costs.total
+            }
+
+            sessionWindowUsage = {
+              totalTokens: windowUsage.totalAllTokens,
+              totalRequests: windowUsage.totalRequests,
+              totalCost,
+              modelUsage: modelCosts
+            }
+          }
+
           return {
             ...account,
+            // 转换schedulable为布尔值
+            schedulable: account.schedulable === 'true' || account.schedulable === true,
+            groupInfos,
             usage: {
               daily: usageStats.daily,
               total: usageStats.total,
-              averages: usageStats.averages
+              averages: usageStats.averages,
+              sessionWindow: sessionWindowUsage
             }
           }
         } catch (statsError) {
           logger.warn(`⚠️ Failed to get usage stats for account ${account.id}:`, statsError.message)
           // 如果获取统计失败，返回空统计
-          return {
-            ...account,
-            usage: {
-              daily: { tokens: 0, requests: 0, allTokens: 0 },
-              total: { tokens: 0, requests: 0, allTokens: 0 },
-              averages: { rpm: 0, tpm: 0 }
+          try {
+            const groupInfos = await accountGroupService.getAccountGroup(account.id)
+            return {
+              ...account,
+              groupInfos,
+              usage: {
+                daily: { tokens: 0, requests: 0, allTokens: 0 },
+                total: { tokens: 0, requests: 0, allTokens: 0 },
+                averages: { rpm: 0, tpm: 0 },
+                sessionWindow: null
+              }
+            }
+          } catch (groupError) {
+            logger.warn(
+              `⚠️ Failed to get group info for account ${account.id}:`,
+              groupError.message
+            )
+            return {
+              ...account,
+              groupInfos: [],
+              usage: {
+                daily: { tokens: 0, requests: 0, allTokens: 0 },
+                total: { tokens: 0, requests: 0, allTokens: 0 },
+                averages: { rpm: 0, tpm: 0 },
+                sessionWindow: null
+              }
             }
           }
         }
@@ -1533,7 +1637,8 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       accountType,
       platform = 'claude',
       priority,
-      groupId
+      groupId,
+      autoStopOnWarning
     } = req.body
 
     if (!name) {
@@ -1570,7 +1675,8 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       proxy,
       accountType: accountType || 'shared', // 默认为共享类型
       platform,
-      priority: priority || 50 // 默认优先级为50
+      priority: priority || 50, // 默认优先级为50
+      autoStopOnWarning: autoStopOnWarning === true // 默认为false
     })
 
     // 如果是分组类型，将账户添加到分组
@@ -1622,10 +1728,10 @@ router.put('/claude-accounts/:accountId', authenticateAdmin, async (req, res) =>
 
     // 处理分组的变更
     if (updates.accountType !== undefined) {
-      // 如果之前是分组类型，需要从原分组中移除
+      // 如果之前是分组类型，需要从所有分组中移除
       if (currentAccount.accountType === 'group') {
-        const oldGroup = await accountGroupService.getAccountGroup(accountId)
-        if (oldGroup) {
+        const oldGroups = await accountGroupService.getAccountGroup(accountId)
+        for (const oldGroup of oldGroups) {
           await accountGroupService.removeAccountFromGroup(accountId, oldGroup.id)
         }
       }
@@ -1657,8 +1763,8 @@ router.delete('/claude-accounts/:accountId', authenticateAdmin, async (req, res)
     // 获取账户信息以检查是否在分组中
     const account = await claudeAccountService.getAccount(accountId)
     if (account && account.accountType === 'group') {
-      const group = await accountGroupService.getAccountGroup(accountId)
-      if (group) {
+      const groups = await accountGroupService.getAccountGroup(accountId)
+      for (const group of groups) {
         await accountGroupService.removeAccountFromGroup(accountId, group.id)
       }
     }
@@ -1807,11 +1913,14 @@ router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
     if (groupId && groupId !== 'all') {
       if (groupId === 'ungrouped') {
         // 筛选未分组账户
-        accounts = accounts.filter((account) => !account.groupInfo)
+        accounts = accounts.filter(
+          (account) => !account.groupInfos || account.groupInfos.length === 0
+        )
       } else {
         // 筛选特定分组的账户
         accounts = accounts.filter(
-          (account) => account.groupInfo && account.groupInfo.id === groupId
+          (account) =>
+            account.groupInfos && account.groupInfos.some((group) => group.id === groupId)
         )
       }
     }
@@ -1821,8 +1930,13 @@ router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
       accounts.map(async (account) => {
         try {
           const usageStats = await redis.getAccountUsageStats(account.id)
+          const groupInfos = await accountGroupService.getAccountGroup(account.id)
+
           return {
             ...account,
+            // 转换schedulable为布尔值
+            schedulable: account.schedulable === 'true' || account.schedulable === true,
+            groupInfos,
             usage: {
               daily: usageStats.daily,
               total: usageStats.total,
@@ -1834,12 +1948,32 @@ router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
             `⚠️ Failed to get usage stats for Claude Console account ${account.id}:`,
             statsError.message
           )
-          return {
-            ...account,
-            usage: {
-              daily: { tokens: 0, requests: 0, allTokens: 0 },
-              total: { tokens: 0, requests: 0, allTokens: 0 },
-              averages: { rpm: 0, tpm: 0 }
+          try {
+            const groupInfos = await accountGroupService.getAccountGroup(account.id)
+            return {
+              ...account,
+              // 转换schedulable为布尔值
+              schedulable: account.schedulable === 'true' || account.schedulable === true,
+              groupInfos,
+              usage: {
+                daily: { tokens: 0, requests: 0, allTokens: 0 },
+                total: { tokens: 0, requests: 0, allTokens: 0 },
+                averages: { rpm: 0, tpm: 0 }
+              }
+            }
+          } catch (groupError) {
+            logger.warn(
+              `⚠️ Failed to get group info for Claude Console account ${account.id}:`,
+              groupError.message
+            )
+            return {
+              ...account,
+              groupInfos: [],
+              usage: {
+                daily: { tokens: 0, requests: 0, allTokens: 0 },
+                total: { tokens: 0, requests: 0, allTokens: 0 },
+                averages: { rpm: 0, tpm: 0 }
+              }
             }
           }
         }
@@ -1953,10 +2087,10 @@ router.put('/claude-console-accounts/:accountId', authenticateAdmin, async (req,
 
     // 处理分组的变更
     if (updates.accountType !== undefined) {
-      // 如果之前是分组类型，需要从原分组中移除
+      // 如果之前是分组类型，需要从所有分组中移除
       if (currentAccount.accountType === 'group') {
-        const oldGroup = await accountGroupService.getAccountGroup(accountId)
-        if (oldGroup) {
+        const oldGroups = await accountGroupService.getAccountGroup(accountId)
+        for (const oldGroup of oldGroups) {
           await accountGroupService.removeAccountFromGroup(accountId, oldGroup.id)
         }
       }
@@ -1987,8 +2121,8 @@ router.delete('/claude-console-accounts/:accountId', authenticateAdmin, async (r
     // 获取账户信息以检查是否在分组中
     const account = await claudeConsoleAccountService.getAccount(accountId)
     if (account && account.accountType === 'group') {
-      const group = await accountGroupService.getAccountGroup(accountId)
-      if (group) {
+      const groups = await accountGroupService.getAccountGroup(accountId)
+      for (const group of groups) {
         await accountGroupService.removeAccountFromGroup(accountId, group.id)
       }
     }
@@ -2097,11 +2231,14 @@ router.get('/bedrock-accounts', authenticateAdmin, async (req, res) => {
     if (groupId && groupId !== 'all') {
       if (groupId === 'ungrouped') {
         // 筛选未分组账户
-        accounts = accounts.filter((account) => !account.groupInfo)
+        accounts = accounts.filter(
+          (account) => !account.groupInfos || account.groupInfos.length === 0
+        )
       } else {
         // 筛选特定分组的账户
         accounts = accounts.filter(
-          (account) => account.groupInfo && account.groupInfo.id === groupId
+          (account) =>
+            account.groupInfos && account.groupInfos.some((group) => group.id === groupId)
         )
       }
     }
@@ -2111,8 +2248,11 @@ router.get('/bedrock-accounts', authenticateAdmin, async (req, res) => {
       accounts.map(async (account) => {
         try {
           const usageStats = await redis.getAccountUsageStats(account.id)
+          const groupInfos = await accountGroupService.getAccountGroup(account.id)
+
           return {
             ...account,
+            groupInfos,
             usage: {
               daily: usageStats.daily,
               total: usageStats.total,
@@ -2124,12 +2264,30 @@ router.get('/bedrock-accounts', authenticateAdmin, async (req, res) => {
             `⚠️ Failed to get usage stats for Bedrock account ${account.id}:`,
             statsError.message
           )
-          return {
-            ...account,
-            usage: {
-              daily: { tokens: 0, requests: 0, allTokens: 0 },
-              total: { tokens: 0, requests: 0, allTokens: 0 },
-              averages: { rpm: 0, tpm: 0 }
+          try {
+            const groupInfos = await accountGroupService.getAccountGroup(account.id)
+            return {
+              ...account,
+              groupInfos,
+              usage: {
+                daily: { tokens: 0, requests: 0, allTokens: 0 },
+                total: { tokens: 0, requests: 0, allTokens: 0 },
+                averages: { rpm: 0, tpm: 0 }
+              }
+            }
+          } catch (groupError) {
+            logger.warn(
+              `⚠️ Failed to get group info for account ${account.id}:`,
+              groupError.message
+            )
+            return {
+              ...account,
+              groupInfos: [],
+              usage: {
+                daily: { tokens: 0, requests: 0, allTokens: 0 },
+                total: { tokens: 0, requests: 0, allTokens: 0 },
+                averages: { rpm: 0, tpm: 0 }
+              }
             }
           }
         }
@@ -2520,11 +2678,14 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
     if (groupId && groupId !== 'all') {
       if (groupId === 'ungrouped') {
         // 筛选未分组账户
-        accounts = accounts.filter((account) => !account.groupInfo)
+        accounts = accounts.filter(
+          (account) => !account.groupInfos || account.groupInfos.length === 0
+        )
       } else {
         // 筛选特定分组的账户
         accounts = accounts.filter(
-          (account) => account.groupInfo && account.groupInfo.id === groupId
+          (account) =>
+            account.groupInfos && account.groupInfos.some((group) => group.id === groupId)
         )
       }
     }
@@ -2534,8 +2695,11 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
       accounts.map(async (account) => {
         try {
           const usageStats = await redis.getAccountUsageStats(account.id)
+          const groupInfos = await accountGroupService.getAccountGroup(account.id)
+
           return {
             ...account,
+            groupInfos,
             usage: {
               daily: usageStats.daily,
               total: usageStats.total,
@@ -2548,12 +2712,30 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
             statsError.message
           )
           // 如果获取统计失败，返回空统计
-          return {
-            ...account,
-            usage: {
-              daily: { tokens: 0, requests: 0, allTokens: 0 },
-              total: { tokens: 0, requests: 0, allTokens: 0 },
-              averages: { rpm: 0, tpm: 0 }
+          try {
+            const groupInfos = await accountGroupService.getAccountGroup(account.id)
+            return {
+              ...account,
+              groupInfos,
+              usage: {
+                daily: { tokens: 0, requests: 0, allTokens: 0 },
+                total: { tokens: 0, requests: 0, allTokens: 0 },
+                averages: { rpm: 0, tpm: 0 }
+              }
+            }
+          } catch (groupError) {
+            logger.warn(
+              `⚠️ Failed to get group info for account ${account.id}:`,
+              groupError.message
+            )
+            return {
+              ...account,
+              groupInfos: [],
+              usage: {
+                daily: { tokens: 0, requests: 0, allTokens: 0 },
+                total: { tokens: 0, requests: 0, allTokens: 0 },
+                averages: { rpm: 0, tpm: 0 }
+              }
             }
           }
         }
@@ -2633,10 +2815,10 @@ router.put('/gemini-accounts/:accountId', authenticateAdmin, async (req, res) =>
 
     // 处理分组的变更
     if (updates.accountType !== undefined) {
-      // 如果之前是分组类型，需要从原分组中移除
+      // 如果之前是分组类型，需要从所有分组中移除
       if (currentAccount.accountType === 'group') {
-        const oldGroup = await accountGroupService.getAccountGroup(accountId)
-        if (oldGroup) {
+        const oldGroups = await accountGroupService.getAccountGroup(accountId)
+        for (const oldGroup of oldGroups) {
           await accountGroupService.removeAccountFromGroup(accountId, oldGroup.id)
         }
       }
@@ -2664,8 +2846,8 @@ router.delete('/gemini-accounts/:accountId', authenticateAdmin, async (req, res)
     // 获取账户信息以检查是否在分组中
     const account = await geminiAccountService.getAccount(accountId)
     if (account && account.accountType === 'group') {
-      const group = await accountGroupService.getAccountGroup(accountId)
-      if (group) {
+      const groups = await accountGroupService.getAccountGroup(accountId)
+      for (const group of groups) {
         await accountGroupService.removeAccountFromGroup(accountId, group.id)
       }
     }
@@ -5003,11 +5185,14 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
     if (groupId && groupId !== 'all') {
       if (groupId === 'ungrouped') {
         // 筛选未分组账户
-        accounts = accounts.filter((account) => !account.groupInfo)
+        accounts = accounts.filter(
+          (account) => !account.groupInfos || account.groupInfos.length === 0
+        )
       } else {
         // 筛选特定分组的账户
         accounts = accounts.filter(
-          (account) => account.groupInfo && account.groupInfo.id === groupId
+          (account) =>
+            account.groupInfos && account.groupInfos.some((group) => group.id === groupId)
         )
       }
     }

@@ -175,15 +175,25 @@ class ClaudeConsoleRelayService {
         `[DEBUG] Response data preview: ${typeof response.data === 'string' ? response.data.substring(0, 200) : JSON.stringify(response.data).substring(0, 200)}`
       )
 
-      // 检查是否为限流错误
-      if (response.status === 429) {
+      // 检查错误状态并相应处理
+      if (response.status === 401) {
+        logger.warn(`🚫 Unauthorized error detected for Claude Console account ${accountId}`)
+        await claudeConsoleAccountService.markAccountUnauthorized(accountId)
+      } else if (response.status === 429) {
         logger.warn(`🚫 Rate limit detected for Claude Console account ${accountId}`)
         await claudeConsoleAccountService.markAccountRateLimited(accountId)
+      } else if (response.status === 529) {
+        logger.warn(`🚫 Overload error detected for Claude Console account ${accountId}`)
+        await claudeConsoleAccountService.markAccountOverloaded(accountId)
       } else if (response.status === 200 || response.status === 201) {
-        // 如果请求成功，检查并移除限流状态
+        // 如果请求成功，检查并移除错误状态
         const isRateLimited = await claudeConsoleAccountService.isAccountRateLimited(accountId)
         if (isRateLimited) {
           await claudeConsoleAccountService.removeAccountRateLimit(accountId)
+        }
+        const isOverloaded = await claudeConsoleAccountService.isAccountOverloaded(accountId)
+        if (isOverloaded) {
+          await claudeConsoleAccountService.removeAccountOverload(accountId)
         }
       }
 
@@ -363,8 +373,12 @@ class ClaudeConsoleRelayService {
           if (response.status !== 200) {
             logger.error(`❌ Claude Console API returned error status: ${response.status}`)
 
-            if (response.status === 429) {
+            if (response.status === 401) {
+              claudeConsoleAccountService.markAccountUnauthorized(accountId)
+            } else if (response.status === 429) {
               claudeConsoleAccountService.markAccountRateLimited(accountId)
+            } else if (response.status === 529) {
+              claudeConsoleAccountService.markAccountOverloaded(accountId)
             }
 
             // 设置错误响应的状态码和响应头
@@ -396,10 +410,15 @@ class ClaudeConsoleRelayService {
             return
           }
 
-          // 成功响应，检查并移除限流状态
+          // 成功响应，检查并移除错误状态
           claudeConsoleAccountService.isAccountRateLimited(accountId).then((isRateLimited) => {
             if (isRateLimited) {
               claudeConsoleAccountService.removeAccountRateLimit(accountId)
+            }
+          })
+          claudeConsoleAccountService.isAccountOverloaded(accountId).then((isOverloaded) => {
+            if (isOverloaded) {
+              claudeConsoleAccountService.removeAccountOverload(accountId)
             }
           })
 
@@ -564,9 +583,15 @@ class ClaudeConsoleRelayService {
 
           logger.error('❌ Claude Console Claude stream request error:', error.message)
 
-          // 检查是否是429错误
-          if (error.response && error.response.status === 429) {
-            claudeConsoleAccountService.markAccountRateLimited(accountId)
+          // 检查错误状态
+          if (error.response) {
+            if (error.response.status === 401) {
+              claudeConsoleAccountService.markAccountUnauthorized(accountId)
+            } else if (error.response.status === 429) {
+              claudeConsoleAccountService.markAccountRateLimited(accountId)
+            } else if (error.response.status === 529) {
+              claudeConsoleAccountService.markAccountOverloaded(accountId)
+            }
           }
 
           // 发送错误响应

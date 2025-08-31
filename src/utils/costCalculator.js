@@ -31,6 +31,14 @@ const MODEL_PRICING = {
     cacheWrite: 18.75,
     cacheRead: 1.5
   },
+  
+  // Claude Opus 4.1 (新模型)
+  'claude-opus-4-1-20250805': {
+    input: 15.0,
+    output: 75.0,
+    cacheWrite: 18.75,
+    cacheRead: 1.5
+  },
 
   // Claude 3 Sonnet
   'claude-3-sonnet-20240229': {
@@ -69,9 +77,57 @@ class CostCalculator {
    * @returns {Object} 费用详情
    */
   static calculateCost(usage, model = 'unknown') {
-    // 如果 usage 包含详细的 cache_creation 对象，使用 pricingService 来处理
-    if (usage.cache_creation && typeof usage.cache_creation === 'object') {
-      return pricingService.calculateCost(usage, model)
+    // 如果 usage 包含详细的 cache_creation 对象或是 1M 模型，使用 pricingService 来处理
+    if (
+      (usage.cache_creation && typeof usage.cache_creation === 'object') ||
+      (model && model.includes('[1m]'))
+    ) {
+      const result = pricingService.calculateCost(usage, model)
+      // 转换 pricingService 返回的格式到 costCalculator 的格式
+      return {
+        model,
+        pricing: {
+          input: result.pricing.input * 1000000, // 转换为 per 1M tokens
+          output: result.pricing.output * 1000000,
+          cacheWrite: result.pricing.cacheCreate * 1000000,
+          cacheRead: result.pricing.cacheRead * 1000000
+        },
+        usingDynamicPricing: true,
+        isLongContextRequest: result.isLongContextRequest || false,
+        usage: {
+          inputTokens: usage.input_tokens || 0,
+          outputTokens: usage.output_tokens || 0,
+          cacheCreateTokens: usage.cache_creation_input_tokens || 0,
+          cacheReadTokens: usage.cache_read_input_tokens || 0,
+          totalTokens:
+            (usage.input_tokens || 0) +
+            (usage.output_tokens || 0) +
+            (usage.cache_creation_input_tokens || 0) +
+            (usage.cache_read_input_tokens || 0)
+        },
+        costs: {
+          input: result.inputCost,
+          output: result.outputCost,
+          cacheWrite: result.cacheCreateCost,
+          cacheRead: result.cacheReadCost,
+          total: result.totalCost
+        },
+        formatted: {
+          input: this.formatCost(result.inputCost),
+          output: this.formatCost(result.outputCost),
+          cacheWrite: this.formatCost(result.cacheCreateCost),
+          cacheRead: this.formatCost(result.cacheReadCost),
+          total: this.formatCost(result.totalCost)
+        },
+        debug: {
+          isOpenAIModel: model.includes('gpt') || model.includes('o1'),
+          hasCacheCreatePrice: !!result.pricing.cacheCreate,
+          cacheCreateTokens: usage.cache_creation_input_tokens || 0,
+          cacheWritePriceUsed: result.pricing.cacheCreate * 1000000,
+          isLongContextModel: model && model.includes('[1m]'),
+          isLongContextRequest: result.isLongContextRequest || false
+        }
+      }
     }
 
     // 否则使用旧的逻辑（向后兼容）

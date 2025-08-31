@@ -5,6 +5,7 @@ const bedrockRelayService = require('../services/bedrockRelayService')
 const bedrockAccountService = require('../services/bedrockAccountService')
 const unifiedClaudeScheduler = require('../services/unifiedClaudeScheduler')
 const apiKeyService = require('../services/apiKeyService')
+const pricingService = require('../services/pricingService')
 const { authenticateApiKey } = require('../middleware/auth')
 const logger = require('../utils/logger')
 const redis = require('../models/redis')
@@ -131,14 +132,16 @@ async function handleMessagesRequest(req, res) {
               }
 
               apiKeyService
-                .recordUsageWithDetails(req.apiKey.id, usageObject, model, usageAccountId)
+                .recordUsageWithDetails(req.apiKey.id, usageObject, model, usageAccountId, 'claude')
                 .catch((error) => {
                   logger.error('❌ Failed to record stream usage:', error)
                 })
 
-              // 更新时间窗口内的token计数
+              // 更新时间窗口内的token计数和费用
               if (req.rateLimitInfo) {
                 const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
+
+                // 更新Token计数（向后兼容）
                 redis
                   .getClient()
                   .incrby(req.rateLimitInfo.tokenCountKey, totalTokens)
@@ -146,6 +149,22 @@ async function handleMessagesRequest(req, res) {
                     logger.error('❌ Failed to update rate limit token count:', error)
                   })
                 logger.api(`📊 Updated rate limit token count: +${totalTokens} tokens`)
+
+                // 计算并更新费用计数（新功能）
+                if (req.rateLimitInfo.costCountKey) {
+                  const costInfo = pricingService.calculateCost(usageData, model)
+                  if (costInfo.totalCost > 0) {
+                    redis
+                      .getClient()
+                      .incrbyfloat(req.rateLimitInfo.costCountKey, costInfo.totalCost)
+                      .catch((error) => {
+                        logger.error('❌ Failed to update rate limit cost count:', error)
+                      })
+                    logger.api(
+                      `💰 Updated rate limit cost count: +$${costInfo.totalCost.toFixed(6)}`
+                    )
+                  }
+                }
               }
 
               usageDataCaptured = true
@@ -216,14 +235,22 @@ async function handleMessagesRequest(req, res) {
               }
 
               apiKeyService
-                .recordUsageWithDetails(req.apiKey.id, usageObject, model, usageAccountId)
+                .recordUsageWithDetails(
+                  req.apiKey.id,
+                  usageObject,
+                  model,
+                  usageAccountId,
+                  'claude-console'
+                )
                 .catch((error) => {
                   logger.error('❌ Failed to record stream usage:', error)
                 })
 
-              // 更新时间窗口内的token计数
+              // 更新时间窗口内的token计数和费用
               if (req.rateLimitInfo) {
                 const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
+
+                // 更新Token计数（向后兼容）
                 redis
                   .getClient()
                   .incrby(req.rateLimitInfo.tokenCountKey, totalTokens)
@@ -231,6 +258,22 @@ async function handleMessagesRequest(req, res) {
                     logger.error('❌ Failed to update rate limit token count:', error)
                   })
                 logger.api(`📊 Updated rate limit token count: +${totalTokens} tokens`)
+
+                // 计算并更新费用计数（新功能）
+                if (req.rateLimitInfo.costCountKey) {
+                  const costInfo = pricingService.calculateCost(usageData, model)
+                  if (costInfo.totalCost > 0) {
+                    redis
+                      .getClient()
+                      .incrbyfloat(req.rateLimitInfo.costCountKey, costInfo.totalCost)
+                      .catch((error) => {
+                        logger.error('❌ Failed to update rate limit cost count:', error)
+                      })
+                    logger.api(
+                      `💰 Updated rate limit cost count: +$${costInfo.totalCost.toFixed(6)}`
+                    )
+                  }
+                }
               }
 
               usageDataCaptured = true
@@ -271,9 +314,11 @@ async function handleMessagesRequest(req, res) {
                 logger.error('❌ Failed to record Bedrock stream usage:', error)
               })
 
-            // 更新时间窗口内的token计数
+            // 更新时间窗口内的token计数和费用
             if (req.rateLimitInfo) {
               const totalTokens = inputTokens + outputTokens
+
+              // 更新Token计数（向后兼容）
               redis
                 .getClient()
                 .incrby(req.rateLimitInfo.tokenCountKey, totalTokens)
@@ -281,6 +326,20 @@ async function handleMessagesRequest(req, res) {
                   logger.error('❌ Failed to update rate limit token count:', error)
                 })
               logger.api(`📊 Updated rate limit token count: +${totalTokens} tokens`)
+
+              // 计算并更新费用计数（新功能）
+              if (req.rateLimitInfo.costCountKey) {
+                const costInfo = pricingService.calculateCost(result.usage, result.model)
+                if (costInfo.totalCost > 0) {
+                  redis
+                    .getClient()
+                    .incrbyfloat(req.rateLimitInfo.costCountKey, costInfo.totalCost)
+                    .catch((error) => {
+                      logger.error('❌ Failed to update rate limit cost count:', error)
+                    })
+                  logger.api(`💰 Updated rate limit cost count: +$${costInfo.totalCost.toFixed(6)}`)
+                }
+              }
             }
 
             usageDataCaptured = true
@@ -438,11 +497,24 @@ async function handleMessagesRequest(req, res) {
             responseAccountId
           )
 
-          // 更新时间窗口内的token计数
+          // 更新时间窗口内的token计数和费用
           if (req.rateLimitInfo) {
             const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
+
+            // 更新Token计数（向后兼容）
             await redis.getClient().incrby(req.rateLimitInfo.tokenCountKey, totalTokens)
             logger.api(`📊 Updated rate limit token count: +${totalTokens} tokens`)
+
+            // 计算并更新费用计数（新功能）
+            if (req.rateLimitInfo.costCountKey) {
+              const costInfo = pricingService.calculateCost(jsonData.usage, model)
+              if (costInfo.totalCost > 0) {
+                await redis
+                  .getClient()
+                  .incrbyfloat(req.rateLimitInfo.costCountKey, costInfo.totalCost)
+                logger.api(`💰 Updated rate limit cost count: +$${costInfo.totalCost.toFixed(6)}`)
+              }
+            }
           }
 
           usageRecorded = true

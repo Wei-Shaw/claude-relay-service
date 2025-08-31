@@ -14,7 +14,7 @@ class ApiKeyService {
     const {
       name = 'Unnamed Key',
       description = '',
-      tokenLimit = config.limits.defaultTokenLimit,
+      tokenLimit = 0, // 默认为0，不再使用token限制
       expiresAt = null,
       claudeAccountId = null,
       claudeConsoleAccountId = null,
@@ -27,11 +27,13 @@ class ApiKeyService {
       concurrencyLimit = 0,
       rateLimitWindow = null,
       rateLimitRequests = null,
+      rateLimitCost = null, // 新增：速率限制费用字段
       enableModelRestriction = false,
       restrictedModels = [],
       enableClientRestriction = false,
       allowedClients = [],
       dailyCostLimit = 0,
+      weeklyOpusCostLimit = 0,
       tags = []
     } = options
 
@@ -49,6 +51,7 @@ class ApiKeyService {
       concurrencyLimit: String(concurrencyLimit ?? 0),
       rateLimitWindow: String(rateLimitWindow ?? 0),
       rateLimitRequests: String(rateLimitRequests ?? 0),
+      rateLimitCost: String(rateLimitCost ?? 0), // 新增：速率限制费用字段
       isActive: String(isActive),
       claudeAccountId: claudeAccountId || '',
       claudeConsoleAccountId: claudeConsoleAccountId || '',
@@ -62,6 +65,7 @@ class ApiKeyService {
       enableClientRestriction: String(enableClientRestriction || false),
       allowedClients: JSON.stringify(allowedClients || []),
       dailyCostLimit: String(dailyCostLimit || 0),
+      weeklyOpusCostLimit: String(weeklyOpusCostLimit || 0),
       tags: JSON.stringify(tags || []),
       createdAt: new Date().toISOString(),
       lastUsedAt: '',
@@ -85,6 +89,7 @@ class ApiKeyService {
       concurrencyLimit: parseInt(keyData.concurrencyLimit),
       rateLimitWindow: parseInt(keyData.rateLimitWindow || 0),
       rateLimitRequests: parseInt(keyData.rateLimitRequests || 0),
+      rateLimitCost: parseFloat(keyData.rateLimitCost || 0), // 新增：速率限制费用字段
       isActive: keyData.isActive === 'true',
       claudeAccountId: keyData.claudeAccountId,
       claudeConsoleAccountId: keyData.claudeConsoleAccountId,
@@ -98,6 +103,7 @@ class ApiKeyService {
       enableClientRestriction: keyData.enableClientRestriction === 'true',
       allowedClients: JSON.parse(keyData.allowedClients || '[]'),
       dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
+      weeklyOpusCostLimit: parseFloat(keyData.weeklyOpusCostLimit || 0),
       tags: JSON.parse(keyData.tags || '[]'),
       createdAt: keyData.createdAt,
       expiresAt: keyData.expiresAt,
@@ -200,12 +206,15 @@ class ApiKeyService {
           concurrencyLimit: parseInt(keyData.concurrencyLimit || 0),
           rateLimitWindow: parseInt(keyData.rateLimitWindow || 0),
           rateLimitRequests: parseInt(keyData.rateLimitRequests || 0),
+          rateLimitCost: parseFloat(keyData.rateLimitCost || 0), // 新增：速率限制费用字段
           enableModelRestriction: keyData.enableModelRestriction === 'true',
           restrictedModels,
           enableClientRestriction: keyData.enableClientRestriction === 'true',
           allowedClients,
           dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
+          weeklyOpusCostLimit: parseFloat(keyData.weeklyOpusCostLimit || 0),
           dailyCost: dailyCost || 0,
+          weeklyOpusCost: (await redis.getWeeklyOpusCost(keyData.id)) || 0,
           tags,
           usage
         }
@@ -242,22 +251,27 @@ class ApiKeyService {
         key.concurrencyLimit = parseInt(key.concurrencyLimit || 0)
         key.rateLimitWindow = parseInt(key.rateLimitWindow || 0)
         key.rateLimitRequests = parseInt(key.rateLimitRequests || 0)
+        key.rateLimitCost = parseFloat(key.rateLimitCost || 0) // 新增：速率限制费用字段
         key.currentConcurrency = await redis.getConcurrency(key.id)
         key.isActive = key.isActive === 'true'
         key.enableModelRestriction = key.enableModelRestriction === 'true'
         key.enableClientRestriction = key.enableClientRestriction === 'true'
         key.permissions = key.permissions || 'all' // 兼容旧数据
         key.dailyCostLimit = parseFloat(key.dailyCostLimit || 0)
+        key.weeklyOpusCostLimit = parseFloat(key.weeklyOpusCostLimit || 0)
         key.dailyCost = (await redis.getDailyCost(key.id)) || 0
+        key.weeklyOpusCost = (await redis.getWeeklyOpusCost(key.id)) || 0
 
-        // 获取当前时间窗口的请求次数和Token使用量
+        // 获取当前时间窗口的请求次数、Token使用量和费用
         if (key.rateLimitWindow > 0) {
           const requestCountKey = `rate_limit:requests:${key.id}`
           const tokenCountKey = `rate_limit:tokens:${key.id}`
+          const costCountKey = `rate_limit:cost:${key.id}` // 新增：费用计数器
           const windowStartKey = `rate_limit:window_start:${key.id}`
 
           key.currentWindowRequests = parseInt((await client.get(requestCountKey)) || '0')
           key.currentWindowTokens = parseInt((await client.get(tokenCountKey)) || '0')
+          key.currentWindowCost = parseFloat((await client.get(costCountKey)) || '0') // 新增：当前窗口费用
 
           // 获取窗口开始时间和计算剩余时间
           const windowStart = await client.get(windowStartKey)
@@ -280,6 +294,7 @@ class ApiKeyService {
               // 重置计数为0，因为窗口已过期
               key.currentWindowRequests = 0
               key.currentWindowTokens = 0
+              key.currentWindowCost = 0 // 新增：重置费用
             }
           } else {
             // 窗口还未开始（没有任何请求）
@@ -290,6 +305,7 @@ class ApiKeyService {
         } else {
           key.currentWindowRequests = 0
           key.currentWindowTokens = 0
+          key.currentWindowCost = 0 // 新增：重置费用
           key.windowStartTime = null
           key.windowEndTime = null
           key.windowRemainingSeconds = null
@@ -336,6 +352,7 @@ class ApiKeyService {
         'concurrencyLimit',
         'rateLimitWindow',
         'rateLimitRequests',
+        'rateLimitCost', // 新增：速率限制费用字段
         'isActive',
         'claudeAccountId',
         'claudeConsoleAccountId',
@@ -350,6 +367,7 @@ class ApiKeyService {
         'enableClientRestriction',
         'allowedClients',
         'dailyCostLimit',
+        'weeklyOpusCostLimit',
         'tags'
       ]
       const updatedData = { ...keyData }
@@ -441,6 +459,13 @@ class ApiKeyService {
         model
       )
 
+      // 检查是否为 1M 上下文请求
+      let isLongContextRequest = false
+      if (model && model.includes('[1m]')) {
+        const totalInputTokens = inputTokens + cacheCreateTokens + cacheReadTokens
+        isLongContextRequest = totalInputTokens > 200000
+      }
+
       // 记录API Key级别的使用统计
       await redis.incrementTokenUsage(
         keyId,
@@ -449,7 +474,10 @@ class ApiKeyService {
         outputTokens,
         cacheCreateTokens,
         cacheReadTokens,
-        model
+        model,
+        0, // ephemeral5mTokens - 暂时为0，后续处理
+        0, // ephemeral1hTokens - 暂时为0，后续处理
+        isLongContextRequest
       )
 
       // 记录费用统计
@@ -478,7 +506,8 @@ class ApiKeyService {
             outputTokens,
             cacheCreateTokens,
             cacheReadTokens,
-            model
+            model,
+            isLongContextRequest
           )
           logger.database(
             `📊 Recorded account usage: ${accountId} - ${totalTokens} tokens (API Key: ${keyId})`
@@ -505,8 +534,38 @@ class ApiKeyService {
     }
   }
 
+  // 📊 记录 Opus 模型费用（仅限 claude 和 claude-console 账户）
+  async recordOpusCost(keyId, cost, model, accountType) {
+    try {
+      // 判断是否为 Opus 模型
+      if (!model || !model.toLowerCase().includes('claude-opus')) {
+        return // 不是 Opus 模型，直接返回
+      }
+
+      // 判断是否为 claude 或 claude-console 账户
+      if (!accountType || (accountType !== 'claude' && accountType !== 'claude-console')) {
+        logger.debug(`⚠️ Skipping Opus cost recording for non-Claude account type: ${accountType}`)
+        return // 不是 claude 账户，直接返回
+      }
+
+      // 记录 Opus 周费用
+      await redis.incrementWeeklyOpusCost(keyId, cost)
+      logger.database(
+        `💰 Recorded Opus weekly cost for ${keyId}: $${cost.toFixed(6)}, model: ${model}, account type: ${accountType}`
+      )
+    } catch (error) {
+      logger.error('❌ Failed to record Opus cost:', error)
+    }
+  }
+
   // 📊 记录使用情况（新版本，支持详细的缓存类型）
-  async recordUsageWithDetails(keyId, usageObject, model = 'unknown', accountId = null) {
+  async recordUsageWithDetails(
+    keyId,
+    usageObject,
+    model = 'unknown',
+    accountId = null,
+    accountType = null
+  ) {
     try {
       // 提取 token 数量
       const inputTokens = usageObject.input_tokens || 0
@@ -550,7 +609,8 @@ class ApiKeyService {
         cacheReadTokens,
         model,
         ephemeral5mTokens, // 传递5分钟缓存 tokens
-        ephemeral1hTokens // 传递1小时缓存 tokens
+        ephemeral1hTokens, // 传递1小时缓存 tokens
+        costInfo.isLongContextRequest || false // 传递 1M 上下文请求标记
       )
 
       // 记录费用统计
@@ -559,6 +619,9 @@ class ApiKeyService {
         logger.database(
           `💰 Recorded cost for ${keyId}: $${costInfo.totalCost.toFixed(6)}, model: ${model}`
         )
+
+        // 记录 Opus 周费用（如果适用）
+        await this.recordOpusCost(keyId, costInfo.totalCost, model, accountType)
 
         // 记录详细的缓存费用（如果有）
         if (costInfo.ephemeral5mCost > 0 || costInfo.ephemeral1hCost > 0) {
@@ -586,7 +649,8 @@ class ApiKeyService {
             outputTokens,
             cacheCreateTokens,
             cacheReadTokens,
-            model
+            model,
+            costInfo.isLongContextRequest || false
           )
           logger.database(
             `📊 Recorded account usage: ${accountId} - ${totalTokens} tokens (API Key: ${keyId})`

@@ -509,7 +509,8 @@ class Application {
 
         const [expiredKeys, errorAccounts] = await Promise.all([
           apiKeyService.cleanupExpiredKeys(),
-          claudeAccountService.cleanupErrorAccounts()
+          claudeAccountService.cleanupErrorAccounts(),
+          claudeAccountService.cleanupTempErrorAccounts() // 新增：清理临时错误账户
         ])
 
         await redis.cleanup()
