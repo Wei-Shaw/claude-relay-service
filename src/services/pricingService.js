@@ -45,6 +45,7 @@ class PricingService {
       'claude-sonnet-3-5': 0.000006,
       'claude-sonnet-3-7': 0.000006,
       'claude-sonnet-4': 0.000006,
+      'claude-sonnet-4-20250514': 0.000006,
 
       // Haiku 系列: $1.6/MTok
       'claude-3-5-haiku': 0.0000016,
@@ -54,6 +55,17 @@ class PricingService {
       'claude-3-haiku-20240307': 0.0000016,
       'claude-haiku-3': 0.0000016,
       'claude-haiku-3-5': 0.0000016
+    }
+
+    // 硬编码的 1M 上下文模型价格（美元/token）
+    // 当总输入 tokens 超过 200k 时使用这些价格
+    this.longContextPricing = {
+      // claude-sonnet-4-20250514[1m] 模型的 1M 上下文价格
+      'claude-sonnet-4-20250514[1m]': {
+        input: 0.000006, // $6/MTok
+        output: 0.0000225 // $22.50/MTok
+      }
+      // 未来可以添加更多 1M 模型的价格
     }
   }
 
@@ -249,6 +261,7 @@ class PricingService {
 
     // 尝试直接匹配
     if (this.pricingData[modelName]) {
+      logger.debug(`💰 Found exact pricing match for ${modelName}`)
       return this.pricingData[modelName]
     }
 
@@ -293,6 +306,20 @@ class PricingService {
     return null
   }
 
+  // 确保价格对象包含缓存价格
+  ensureCachePricing(pricing) {
+    if (!pricing) return pricing
+
+    // 如果缺少缓存价格，根据输入价格计算（缓存创建价格通常是输入价格的1.25倍，缓存读取是0.1倍）
+    if (!pricing.cache_creation_input_token_cost && pricing.input_cost_per_token) {
+      pricing.cache_creation_input_token_cost = pricing.input_cost_per_token * 1.25
+    }
+    if (!pricing.cache_read_input_token_cost && pricing.input_cost_per_token) {
+      pricing.cache_read_input_token_cost = pricing.input_cost_per_token * 0.1
+    }
+    return pricing
+  }
+
   // 获取 1 小时缓存价格
   getEphemeral1hPricing(modelName) {
     if (!modelName) {
@@ -329,9 +356,40 @@ class PricingService {
 
   // 计算使用费用
   calculateCost(usage, modelName) {
+    // 检查是否为 1M 上下文模型
+    const isLongContextModel = modelName && modelName.includes('[1m]')
+    let isLongContextRequest = false
+    let useLongContextPricing = false
+
+    if (isLongContextModel) {
+      // 计算总输入 tokens
+      const inputTokens = usage.input_tokens || 0
+      const cacheCreationTokens = usage.cache_creation_input_tokens || 0
+      const cacheReadTokens = usage.cache_read_input_tokens || 0
+      const totalInputTokens = inputTokens + cacheCreationTokens + cacheReadTokens
+
+      // 如果总输入超过 200k，使用 1M 上下文价格
+      if (totalInputTokens > 200000) {
+        isLongContextRequest = true
+        // 检查是否有硬编码的 1M 价格
+        if (this.longContextPricing[modelName]) {
+          useLongContextPricing = true
+        } else {
+          // 如果没有找到硬编码价格，使用第一个 1M 模型的价格作为默认
+          const defaultLongContextModel = Object.keys(this.longContextPricing)[0]
+          if (defaultLongContextModel) {
+            useLongContextPricing = true
+            logger.warn(
+              `⚠️ No specific 1M pricing for ${modelName}, using default from ${defaultLongContextModel}`
+            )
+          }
+        }
+      }
+    }
+
     const pricing = this.getModelPricing(modelName)
 
-    if (!pricing) {
+    if (!pricing && !useLongContextPricing) {
       return {
         inputCost: 0,
         outputCost: 0,
@@ -340,14 +398,35 @@ class PricingService {
         ephemeral5mCost: 0,
         ephemeral1hCost: 0,
         totalCost: 0,
-        hasPricing: false
+        hasPricing: false,
+        isLongContextRequest: false
       }
     }
 
-    const inputCost = (usage.input_tokens || 0) * (pricing.input_cost_per_token || 0)
-    const outputCost = (usage.output_tokens || 0) * (pricing.output_cost_per_token || 0)
+    let inputCost = 0
+    let outputCost = 0
+
+    if (useLongContextPricing) {
+      // 使用 1M 上下文特殊价格（仅输入和输出价格改变）
+      const longContextPrices =
+        this.longContextPricing[modelName] ||
+        this.longContextPricing[Object.keys(this.longContextPricing)[0]]
+
+      inputCost = (usage.input_tokens || 0) * longContextPrices.input
+      outputCost = (usage.output_tokens || 0) * longContextPrices.output
+
+      logger.info(
+        `💰 Using 1M context pricing for ${modelName}: input=$${longContextPrices.input}/token, output=$${longContextPrices.output}/token`
+      )
+    } else {
+      // 使用正常价格
+      inputCost = (usage.input_tokens || 0) * (pricing?.input_cost_per_token || 0)
+      outputCost = (usage.output_tokens || 0) * (pricing?.output_cost_per_token || 0)
+    }
+
+    // 缓存价格保持不变（即使对于 1M 模型）
     const cacheReadCost =
-      (usage.cache_read_input_tokens || 0) * (pricing.cache_read_input_token_cost || 0)
+      (usage.cache_read_input_tokens || 0) * (pricing?.cache_read_input_token_cost || 0)
 
     // 处理缓存创建费用：
     // 1. 如果有详细的 cache_creation 对象，使用它
@@ -362,7 +441,7 @@ class PricingService {
       const ephemeral1hTokens = usage.cache_creation.ephemeral_1h_input_tokens || 0
 
       // 5分钟缓存使用标准的 cache_creation_input_token_cost
-      ephemeral5mCost = ephemeral5mTokens * (pricing.cache_creation_input_token_cost || 0)
+      ephemeral5mCost = ephemeral5mTokens * (pricing?.cache_creation_input_token_cost || 0)
 
       // 1小时缓存使用硬编码的价格
       const ephemeral1hPrice = this.getEphemeral1hPricing(modelName)
@@ -373,7 +452,7 @@ class PricingService {
     } else if (usage.cache_creation_input_tokens) {
       // 旧格式，所有缓存创建 tokens 都按 5 分钟价格计算（向后兼容）
       cacheCreateCost =
-        (usage.cache_creation_input_tokens || 0) * (pricing.cache_creation_input_token_cost || 0)
+        (usage.cache_creation_input_tokens || 0) * (pricing?.cache_creation_input_token_cost || 0)
       ephemeral5mCost = cacheCreateCost
     }
 
@@ -386,11 +465,22 @@ class PricingService {
       ephemeral1hCost,
       totalCost: inputCost + outputCost + cacheCreateCost + cacheReadCost,
       hasPricing: true,
+      isLongContextRequest,
       pricing: {
-        input: pricing.input_cost_per_token || 0,
-        output: pricing.output_cost_per_token || 0,
-        cacheCreate: pricing.cache_creation_input_token_cost || 0,
-        cacheRead: pricing.cache_read_input_token_cost || 0,
+        input: useLongContextPricing
+          ? (
+              this.longContextPricing[modelName] ||
+              this.longContextPricing[Object.keys(this.longContextPricing)[0]]
+            )?.input || 0
+          : pricing?.input_cost_per_token || 0,
+        output: useLongContextPricing
+          ? (
+              this.longContextPricing[modelName] ||
+              this.longContextPricing[Object.keys(this.longContextPricing)[0]]
+            )?.output || 0
+          : pricing?.output_cost_per_token || 0,
+        cacheCreate: pricing?.cache_creation_input_token_cost || 0,
+        cacheRead: pricing?.cache_read_input_token_cost || 0,
         ephemeral1h: this.getEphemeral1hPricing(modelName)
       }
     }

@@ -29,6 +29,25 @@ function getHourInTimezone(date = new Date()) {
   return tzDate.getUTCHours()
 }
 
+// 获取配置时区的 ISO 周（YYYY-Wxx 格式，周一到周日）
+function getWeekStringInTimezone(date = new Date()) {
+  const tzDate = getDateInTimezone(date)
+
+  // 获取年份
+  const year = tzDate.getUTCFullYear()
+
+  // 计算 ISO 周数（周一为第一天）
+  const dateObj = new Date(tzDate)
+  const dayOfWeek = dateObj.getUTCDay() || 7 // 将周日(0)转换为7
+  const firstThursday = new Date(dateObj)
+  firstThursday.setUTCDate(dateObj.getUTCDate() + 4 - dayOfWeek) // 找到这周的周四
+
+  const yearStart = new Date(firstThursday.getUTCFullYear(), 0, 1)
+  const weekNumber = Math.ceil(((firstThursday - yearStart) / 86400000 + 1) / 7)
+
+  return `${year}-W${String(weekNumber).padStart(2, '0')}`
+}
+
 class RedisClient {
   constructor() {
     this.client = null
@@ -193,7 +212,8 @@ class RedisClient {
     cacheReadTokens = 0,
     model = 'unknown',
     ephemeral5mTokens = 0, // 新增：5分钟缓存 tokens
-    ephemeral1hTokens = 0 // 新增：1小时缓存 tokens
+    ephemeral1hTokens = 0, // 新增：1小时缓存 tokens
+    isLongContextRequest = false // 新增：是否为 1M 上下文请求（超过200k）
   ) {
     const key = `usage:${keyId}`
     const now = new Date()
@@ -250,6 +270,12 @@ class RedisClient {
     // 详细缓存类型统计（新增）
     pipeline.hincrby(key, 'totalEphemeral5mTokens', ephemeral5mTokens)
     pipeline.hincrby(key, 'totalEphemeral1hTokens', ephemeral1hTokens)
+    // 1M 上下文请求统计（新增）
+    if (isLongContextRequest) {
+      pipeline.hincrby(key, 'totalLongContextInputTokens', finalInputTokens)
+      pipeline.hincrby(key, 'totalLongContextOutputTokens', finalOutputTokens)
+      pipeline.hincrby(key, 'totalLongContextRequests', 1)
+    }
     // 请求计数
     pipeline.hincrby(key, 'totalRequests', 1)
 
@@ -264,6 +290,12 @@ class RedisClient {
     // 详细缓存类型统计
     pipeline.hincrby(daily, 'ephemeral5mTokens', ephemeral5mTokens)
     pipeline.hincrby(daily, 'ephemeral1hTokens', ephemeral1hTokens)
+    // 1M 上下文请求统计
+    if (isLongContextRequest) {
+      pipeline.hincrby(daily, 'longContextInputTokens', finalInputTokens)
+      pipeline.hincrby(daily, 'longContextOutputTokens', finalOutputTokens)
+      pipeline.hincrby(daily, 'longContextRequests', 1)
+    }
 
     // 每月统计
     pipeline.hincrby(monthly, 'tokens', coreTokens)
@@ -376,7 +408,8 @@ class RedisClient {
     outputTokens = 0,
     cacheCreateTokens = 0,
     cacheReadTokens = 0,
-    model = 'unknown'
+    model = 'unknown',
+    isLongContextRequest = false
   ) {
     const now = new Date()
     const today = getDateStringInTimezone(now)
@@ -407,7 +440,8 @@ class RedisClient {
       finalInputTokens + finalOutputTokens + finalCacheCreateTokens + finalCacheReadTokens
     const coreTokens = finalInputTokens + finalOutputTokens
 
-    await Promise.all([
+    // 构建统计操作数组
+    const operations = [
       // 账户总体统计
       this.client.hincrby(accountKey, 'totalTokens', coreTokens),
       this.client.hincrby(accountKey, 'totalInputTokens', finalInputTokens),
@@ -444,6 +478,26 @@ class RedisClient {
       this.client.hincrby(accountHourly, 'allTokens', actualTotalTokens),
       this.client.hincrby(accountHourly, 'requests', 1),
 
+      // 添加模型级别的数据到hourly键中，以支持会话窗口的统计
+      this.client.hincrby(accountHourly, `model:${normalizedModel}:inputTokens`, finalInputTokens),
+      this.client.hincrby(
+        accountHourly,
+        `model:${normalizedModel}:outputTokens`,
+        finalOutputTokens
+      ),
+      this.client.hincrby(
+        accountHourly,
+        `model:${normalizedModel}:cacheCreateTokens`,
+        finalCacheCreateTokens
+      ),
+      this.client.hincrby(
+        accountHourly,
+        `model:${normalizedModel}:cacheReadTokens`,
+        finalCacheReadTokens
+      ),
+      this.client.hincrby(accountHourly, `model:${normalizedModel}:allTokens`, actualTotalTokens),
+      this.client.hincrby(accountHourly, `model:${normalizedModel}:requests`, 1),
+
       // 账户按模型统计 - 每日
       this.client.hincrby(accountModelDaily, 'inputTokens', finalInputTokens),
       this.client.hincrby(accountModelDaily, 'outputTokens', finalOutputTokens),
@@ -475,7 +529,21 @@ class RedisClient {
       this.client.expire(accountModelDaily, 86400 * 32), // 32天过期
       this.client.expire(accountModelMonthly, 86400 * 365), // 1年过期
       this.client.expire(accountModelHourly, 86400 * 7) // 7天过期
-    ])
+    ]
+
+    // 如果是 1M 上下文请求，添加额外的统计
+    if (isLongContextRequest) {
+      operations.push(
+        this.client.hincrby(accountKey, 'totalLongContextInputTokens', finalInputTokens),
+        this.client.hincrby(accountKey, 'totalLongContextOutputTokens', finalOutputTokens),
+        this.client.hincrby(accountKey, 'totalLongContextRequests', 1),
+        this.client.hincrby(accountDaily, 'longContextInputTokens', finalInputTokens),
+        this.client.hincrby(accountDaily, 'longContextOutputTokens', finalOutputTokens),
+        this.client.hincrby(accountDaily, 'longContextRequests', 1)
+      )
+    }
+
+    await Promise.all(operations)
   }
 
   async getUsageStats(keyId) {
@@ -630,6 +698,39 @@ class RedisClient {
       hourly: parseFloat(hourly || 0),
       total: parseFloat(total || 0)
     }
+  }
+
+  // 💰 获取本周 Opus 费用
+  async getWeeklyOpusCost(keyId) {
+    const currentWeek = getWeekStringInTimezone()
+    const costKey = `usage:opus:weekly:${keyId}:${currentWeek}`
+    const cost = await this.client.get(costKey)
+    const result = parseFloat(cost || 0)
+    logger.debug(
+      `💰 Getting weekly Opus cost for ${keyId}, week: ${currentWeek}, key: ${costKey}, value: ${cost}, result: ${result}`
+    )
+    return result
+  }
+
+  // 💰 增加本周 Opus 费用
+  async incrementWeeklyOpusCost(keyId, amount) {
+    const currentWeek = getWeekStringInTimezone()
+    const weeklyKey = `usage:opus:weekly:${keyId}:${currentWeek}`
+    const totalKey = `usage:opus:total:${keyId}`
+
+    logger.debug(
+      `💰 Incrementing weekly Opus cost for ${keyId}, week: ${currentWeek}, amount: $${amount}`
+    )
+
+    // 使用 pipeline 批量执行，提高性能
+    const pipeline = this.client.pipeline()
+    pipeline.incrbyfloat(weeklyKey, amount)
+    pipeline.incrbyfloat(totalKey, amount)
+    // 设置周费用键的过期时间为 2 周
+    pipeline.expire(weeklyKey, 14 * 24 * 3600)
+
+    const results = await pipeline.exec()
+    logger.debug(`💰 Opus cost incremented successfully, new weekly total: $${results[0][1]}`)
   }
 
   // 📊 获取账户使用统计
@@ -1311,6 +1412,159 @@ class RedisClient {
       return 0
     }
   }
+
+  // 📊 获取账户会话窗口内的使用统计（包含模型细分）
+  async getAccountSessionWindowUsage(accountId, windowStart, windowEnd) {
+    try {
+      if (!windowStart || !windowEnd) {
+        return {
+          totalInputTokens: 0,
+          totalOutputTokens: 0,
+          totalCacheCreateTokens: 0,
+          totalCacheReadTokens: 0,
+          totalAllTokens: 0,
+          totalRequests: 0,
+          modelUsage: {}
+        }
+      }
+
+      const startDate = new Date(windowStart)
+      const endDate = new Date(windowEnd)
+
+      // 添加日志以调试时间窗口
+      logger.debug(`📊 Getting session window usage for account ${accountId}`)
+      logger.debug(`   Window: ${windowStart} to ${windowEnd}`)
+      logger.debug(`   Start UTC: ${startDate.toISOString()}, End UTC: ${endDate.toISOString()}`)
+
+      // 获取窗口内所有可能的小时键
+      // 重要：需要使用配置的时区来构建键名，因为数据存储时使用的是配置时区
+      const hourlyKeys = []
+      const currentHour = new Date(startDate)
+      currentHour.setMinutes(0)
+      currentHour.setSeconds(0)
+      currentHour.setMilliseconds(0)
+
+      while (currentHour <= endDate) {
+        // 使用时区转换函数来获取正确的日期和小时
+        const tzDateStr = getDateStringInTimezone(currentHour)
+        const tzHour = String(getHourInTimezone(currentHour)).padStart(2, '0')
+        const key = `account_usage:hourly:${accountId}:${tzDateStr}:${tzHour}`
+
+        logger.debug(`   Adding hourly key: ${key}`)
+        hourlyKeys.push(key)
+        currentHour.setHours(currentHour.getHours() + 1)
+      }
+
+      // 批量获取所有小时的数据
+      const pipeline = this.client.pipeline()
+      for (const key of hourlyKeys) {
+        pipeline.hgetall(key)
+      }
+      const results = await pipeline.exec()
+
+      // 聚合所有数据
+      let totalInputTokens = 0
+      let totalOutputTokens = 0
+      let totalCacheCreateTokens = 0
+      let totalCacheReadTokens = 0
+      let totalAllTokens = 0
+      let totalRequests = 0
+      const modelUsage = {}
+
+      logger.debug(`   Processing ${results.length} hourly results`)
+
+      for (const [error, data] of results) {
+        if (error || !data || Object.keys(data).length === 0) {
+          continue
+        }
+
+        // 处理总计数据
+        const hourInputTokens = parseInt(data.inputTokens || 0)
+        const hourOutputTokens = parseInt(data.outputTokens || 0)
+        const hourCacheCreateTokens = parseInt(data.cacheCreateTokens || 0)
+        const hourCacheReadTokens = parseInt(data.cacheReadTokens || 0)
+        const hourAllTokens = parseInt(data.allTokens || 0)
+        const hourRequests = parseInt(data.requests || 0)
+
+        totalInputTokens += hourInputTokens
+        totalOutputTokens += hourOutputTokens
+        totalCacheCreateTokens += hourCacheCreateTokens
+        totalCacheReadTokens += hourCacheReadTokens
+        totalAllTokens += hourAllTokens
+        totalRequests += hourRequests
+
+        if (hourAllTokens > 0) {
+          logger.debug(`   Hour data: allTokens=${hourAllTokens}, requests=${hourRequests}`)
+        }
+
+        // 处理每个模型的数据
+        for (const [key, value] of Object.entries(data)) {
+          // 查找模型相关的键（格式: model:{modelName}:{metric}）
+          if (key.startsWith('model:')) {
+            const parts = key.split(':')
+            if (parts.length >= 3) {
+              const modelName = parts[1]
+              const metric = parts.slice(2).join(':')
+
+              if (!modelUsage[modelName]) {
+                modelUsage[modelName] = {
+                  inputTokens: 0,
+                  outputTokens: 0,
+                  cacheCreateTokens: 0,
+                  cacheReadTokens: 0,
+                  allTokens: 0,
+                  requests: 0
+                }
+              }
+
+              if (metric === 'inputTokens') {
+                modelUsage[modelName].inputTokens += parseInt(value || 0)
+              } else if (metric === 'outputTokens') {
+                modelUsage[modelName].outputTokens += parseInt(value || 0)
+              } else if (metric === 'cacheCreateTokens') {
+                modelUsage[modelName].cacheCreateTokens += parseInt(value || 0)
+              } else if (metric === 'cacheReadTokens') {
+                modelUsage[modelName].cacheReadTokens += parseInt(value || 0)
+              } else if (metric === 'allTokens') {
+                modelUsage[modelName].allTokens += parseInt(value || 0)
+              } else if (metric === 'requests') {
+                modelUsage[modelName].requests += parseInt(value || 0)
+              }
+            }
+          }
+        }
+      }
+
+      logger.debug(`📊 Session window usage summary:`)
+      logger.debug(`   Total allTokens: ${totalAllTokens}`)
+      logger.debug(`   Total requests: ${totalRequests}`)
+      logger.debug(`   Input: ${totalInputTokens}, Output: ${totalOutputTokens}`)
+      logger.debug(
+        `   Cache Create: ${totalCacheCreateTokens}, Cache Read: ${totalCacheReadTokens}`
+      )
+
+      return {
+        totalInputTokens,
+        totalOutputTokens,
+        totalCacheCreateTokens,
+        totalCacheReadTokens,
+        totalAllTokens,
+        totalRequests,
+        modelUsage
+      }
+    } catch (error) {
+      logger.error(`❌ Failed to get session window usage for account ${accountId}:`, error)
+      return {
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        totalCacheCreateTokens: 0,
+        totalCacheReadTokens: 0,
+        totalAllTokens: 0,
+        totalRequests: 0,
+        modelUsage: {}
+      }
+    }
+  }
 }
 
 const redisClient = new RedisClient()
@@ -1319,5 +1573,6 @@ const redisClient = new RedisClient()
 redisClient.getDateInTimezone = getDateInTimezone
 redisClient.getDateStringInTimezone = getDateStringInTimezone
 redisClient.getHourInTimezone = getHourInTimezone
+redisClient.getWeekStringInTimezone = getWeekStringInTimezone
 
 module.exports = redisClient
