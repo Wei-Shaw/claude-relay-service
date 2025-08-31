@@ -478,6 +478,26 @@ class RedisClient {
       this.client.hincrby(accountHourly, 'allTokens', actualTotalTokens),
       this.client.hincrby(accountHourly, 'requests', 1),
 
+      // 添加模型级别的数据到hourly键中，以支持会话窗口的统计
+      this.client.hincrby(accountHourly, `model:${normalizedModel}:inputTokens`, finalInputTokens),
+      this.client.hincrby(
+        accountHourly,
+        `model:${normalizedModel}:outputTokens`,
+        finalOutputTokens
+      ),
+      this.client.hincrby(
+        accountHourly,
+        `model:${normalizedModel}:cacheCreateTokens`,
+        finalCacheCreateTokens
+      ),
+      this.client.hincrby(
+        accountHourly,
+        `model:${normalizedModel}:cacheReadTokens`,
+        finalCacheReadTokens
+      ),
+      this.client.hincrby(accountHourly, `model:${normalizedModel}:allTokens`, actualTotalTokens),
+      this.client.hincrby(accountHourly, `model:${normalizedModel}:requests`, 1),
+
       // 账户按模型统计 - 每日
       this.client.hincrby(accountModelDaily, 'inputTokens', finalInputTokens),
       this.client.hincrby(accountModelDaily, 'outputTokens', finalOutputTokens),
