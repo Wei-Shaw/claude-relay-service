@@ -57,7 +57,8 @@ class ClaudeAccountService {
       platform = 'claude',
       priority = 50, // 调度优先级 (1-100，数字越小优先级越高)
       schedulable = true, // 是否可被调度
-      subscriptionInfo = null // 手动设置的订阅信息
+      subscriptionInfo = null, // 手动设置的订阅信息
+      autoStopOnWarning = false // 5小时使用量接近限制时自动停止调度
     } = options
 
     const accountId = uuidv4()
@@ -88,6 +89,7 @@ class ClaudeAccountService {
         status: 'active', // 有OAuth数据的账户直接设为active
         errorMessage: '',
         schedulable: schedulable.toString(), // 是否可被调度
+        autoStopOnWarning: autoStopOnWarning.toString(), // 5小时使用量接近限制时自动停止调度
         // 优先使用手动设置的订阅信息，否则使用OAuth数据中的，否则默认为空
         subscriptionInfo: subscriptionInfo
           ? JSON.stringify(subscriptionInfo)
@@ -118,6 +120,7 @@ class ClaudeAccountService {
         status: 'created', // created, active, expired, error
         errorMessage: '',
         schedulable: schedulable.toString(), // 是否可被调度
+        autoStopOnWarning: autoStopOnWarning.toString(), // 5小时使用量接近限制时自动停止调度
         // 手动设置的订阅信息
         subscriptionInfo: subscriptionInfo ? JSON.stringify(subscriptionInfo) : ''
       }
@@ -158,7 +161,8 @@ class ClaudeAccountService {
       status: accountData.status,
       createdAt: accountData.createdAt,
       expiresAt: accountData.expiresAt,
-      scopes: claudeAiOauth ? claudeAiOauth.scopes : []
+      scopes: claudeAiOauth ? claudeAiOauth.scopes : [],
+      autoStopOnWarning
     }
   }
 
@@ -479,7 +483,11 @@ class ClaudeAccountService {
               lastRequestTime: null
             },
             // 添加调度状态
-            schedulable: account.schedulable !== 'false' // 默认为true，兼容历史数据
+            schedulable: account.schedulable !== 'false', // 默认为true，兼容历史数据
+            // 添加自动停止调度设置
+            autoStopOnWarning: account.autoStopOnWarning === 'true', // 默认为false
+            // 添加停止原因
+            stoppedReason: account.stoppedReason || null
           }
         })
       )
@@ -1284,6 +1292,42 @@ class ClaudeAccountService {
       accountData.sessionWindowEnd = windowEnd.toISOString()
       accountData.lastRequestTime = now.toISOString()
 
+      // 清除会话窗口状态，因为进入了新窗口
+      if (accountData.sessionWindowStatus) {
+        delete accountData.sessionWindowStatus
+        delete accountData.sessionWindowStatusUpdatedAt
+      }
+
+      // 如果账户因为5小时限制被自动停止，现在恢复调度
+      if (
+        accountData.autoStoppedAt &&
+        accountData.schedulable === 'false' &&
+        accountData.stoppedReason === '5小时使用量接近限制，自动停止调度'
+      ) {
+        logger.info(
+          `✅ Auto-resuming scheduling for account ${accountData.name} (${accountId}) - new session window started`
+        )
+        accountData.schedulable = 'true'
+        delete accountData.stoppedReason
+        delete accountData.autoStoppedAt
+
+        // 发送Webhook通知
+        try {
+          const webhookNotifier = require('../utils/webhookNotifier')
+          await webhookNotifier.sendAccountAnomalyNotification({
+            accountId,
+            accountName: accountData.name || 'Claude Account',
+            platform: 'claude',
+            status: 'resumed',
+            errorCode: 'CLAUDE_5H_LIMIT_RESUMED',
+            reason: '进入新的5小时窗口，已自动恢复调度',
+            timestamp: new Date().toISOString()
+          })
+        } catch (webhookError) {
+          logger.error('Failed to send webhook notification:', webhookError)
+        }
+      }
+
       logger.info(
         `🕐 Created new session window for account ${accountData.name} (${accountId}): ${windowStart.toISOString()} - ${windowEnd.toISOString()} (from current time)`
       )
@@ -1329,7 +1373,8 @@ class ClaudeAccountService {
           windowEnd: null,
           progress: 0,
           remainingTime: null,
-          lastRequestTime: accountData.lastRequestTime || null
+          lastRequestTime: accountData.lastRequestTime || null,
+          sessionWindowStatus: accountData.sessionWindowStatus || null
         }
       }
 
@@ -1346,7 +1391,8 @@ class ClaudeAccountService {
           windowEnd: accountData.sessionWindowEnd,
           progress: 100,
           remainingTime: 0,
-          lastRequestTime: accountData.lastRequestTime || null
+          lastRequestTime: accountData.lastRequestTime || null,
+          sessionWindowStatus: accountData.sessionWindowStatus || null
         }
       }
 
@@ -1364,7 +1410,8 @@ class ClaudeAccountService {
         windowEnd: accountData.sessionWindowEnd,
         progress,
         remainingTime,
-        lastRequestTime: accountData.lastRequestTime || null
+        lastRequestTime: accountData.lastRequestTime || null,
+        sessionWindowStatus: accountData.sessionWindowStatus || null
       }
     } catch (error) {
       logger.error(`❌ Failed to get session window info for account ${accountId}:`, error)
@@ -1887,6 +1934,70 @@ class ClaudeAccountService {
     } catch (error) {
       logger.error(`❌ Failed to mark account ${accountId} as temp_error:`, error)
       throw error
+    }
+  }
+
+  // 更新会话窗口状态（allowed, allowed_warning, rejected）
+  async updateSessionWindowStatus(accountId, status) {
+    try {
+      // 参数验证
+      if (!accountId || !status) {
+        logger.warn(
+          `Invalid parameters for updateSessionWindowStatus: accountId=${accountId}, status=${status}`
+        )
+        return
+      }
+
+      const accountData = await redis.getClaudeAccount(accountId)
+      if (!accountData || Object.keys(accountData).length === 0) {
+        logger.warn(`Account not found: ${accountId}`)
+        return
+      }
+
+      // 验证状态值是否有效
+      const validStatuses = ['allowed', 'allowed_warning', 'rejected']
+      if (!validStatuses.includes(status)) {
+        logger.warn(`Invalid session window status: ${status} for account ${accountId}`)
+        return
+      }
+
+      // 更新会话窗口状态
+      accountData.sessionWindowStatus = status
+      accountData.sessionWindowStatusUpdatedAt = new Date().toISOString()
+
+      // 如果状态是 allowed_warning 且账户设置了自动停止调度
+      if (status === 'allowed_warning' && accountData.autoStopOnWarning === 'true') {
+        logger.warn(
+          `⚠️ Account ${accountData.name} (${accountId}) approaching 5h limit, auto-stopping scheduling`
+        )
+        accountData.schedulable = 'false'
+        accountData.stoppedReason = '5小时使用量接近限制，自动停止调度'
+        accountData.autoStoppedAt = new Date().toISOString()
+
+        // 发送Webhook通知
+        try {
+          const webhookNotifier = require('../utils/webhookNotifier')
+          await webhookNotifier.sendAccountAnomalyNotification({
+            accountId,
+            accountName: accountData.name || 'Claude Account',
+            platform: 'claude',
+            status: 'warning',
+            errorCode: 'CLAUDE_5H_LIMIT_WARNING',
+            reason: '5小时使用量接近限制，已自动停止调度',
+            timestamp: new Date().toISOString()
+          })
+        } catch (webhookError) {
+          logger.error('Failed to send webhook notification:', webhookError)
+        }
+      }
+
+      await redis.setClaudeAccount(accountId, accountData)
+
+      logger.info(
+        `📊 Updated session window status for account ${accountData.name} (${accountId}): ${status}`
+      )
+    } catch (error) {
+      logger.error(`❌ Failed to update session window status for account ${accountId}:`, error)
     }
   }
 }

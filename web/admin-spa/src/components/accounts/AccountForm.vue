@@ -797,6 +797,25 @@
               </p>
             </div>
 
+            <!-- Claude 5小时限制自动停止调度选项 -->
+            <div v-if="form.platform === 'claude'" class="mt-4">
+              <label class="flex items-start">
+                <input
+                  v-model="form.autoStopOnWarning"
+                  class="mt-1 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  type="checkbox"
+                />
+                <div class="ml-3">
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    5小时使用量接近限制时自动停止调度
+                  </span>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    当系统检测到账户接近5小时使用限制时，自动暂停调度该账户。进入新的时间窗口后会自动恢复调度。
+                  </p>
+                </div>
+              </label>
+            </div>
+
             <!-- 所有平台的优先级设置 -->
             <div>
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -1308,6 +1327,25 @@
             </p>
           </div>
 
+          <!-- Claude 5小时限制自动停止调度选项（编辑模式） -->
+          <div v-if="form.platform === 'claude'" class="mt-4">
+            <label class="flex items-start">
+              <input
+                v-model="form.autoStopOnWarning"
+                class="mt-1 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                type="checkbox"
+              />
+              <div class="ml-3">
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  5小时使用量接近限制时自动停止调度
+                </span>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  当系统检测到账户接近5小时使用限制时，自动暂停调度该账户。进入新的时间窗口后会自动恢复调度。
+                </p>
+              </div>
+            </label>
+          </div>
+
           <!-- 所有平台的优先级设置（编辑模式） -->
           <div>
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -1770,6 +1808,7 @@ const form = ref({
   description: props.account?.description || '',
   accountType: props.account?.accountType || 'shared',
   subscriptionType: 'claude_max', // 默认为 Claude Max，兼容旧数据
+  autoStopOnWarning: props.account?.autoStopOnWarning || false, // 5小时限制自动停止调度
   groupId: '',
   projectId: props.account?.projectId || '',
   idToken: '',
@@ -2029,6 +2068,7 @@ const handleOAuthSuccess = async (tokenInfo) => {
       // Claude使用claudeAiOauth字段
       data.claudeAiOauth = tokenInfo.claudeAiOauth || tokenInfo
       data.priority = form.value.priority || 50
+      data.autoStopOnWarning = form.value.autoStopOnWarning || false
       // 添加订阅类型信息
       data.subscriptionInfo = {
         accountType: form.value.subscriptionType || 'claude_max',
@@ -2166,6 +2206,7 @@ const createAccount = async () => {
         scopes: [] // 手动添加没有 scopes
       }
       data.priority = form.value.priority || 50
+      data.autoStopOnWarning = form.value.autoStopOnWarning || false
       // 添加订阅类型信息
       data.subscriptionInfo = {
         accountType: form.value.subscriptionType || 'claude_max',
@@ -2392,6 +2433,7 @@ const updateAccount = async () => {
     // Claude 官方账号优先级和订阅类型更新
     if (props.account.platform === 'claude') {
       data.priority = form.value.priority || 50
+      data.autoStopOnWarning = form.value.autoStopOnWarning || false
       // 更新订阅类型信息
       data.subscriptionInfo = {
         accountType: form.value.subscriptionType || 'claude_max',
@@ -2730,6 +2772,7 @@ watch(
         description: newAccount.description || '',
         accountType: newAccount.accountType || 'shared',
         subscriptionType: subscriptionType,
+        autoStopOnWarning: newAccount.autoStopOnWarning || false,
         groupId: groupId,
         projectId: newAccount.projectId || '',
         accessToken: '',

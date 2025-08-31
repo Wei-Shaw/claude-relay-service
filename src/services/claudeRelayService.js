@@ -180,15 +180,15 @@ class ClaudeRelayService {
           // 记录401错误
           await this.recordUnauthorizedError(accountId)
 
-          // 检查是否需要标记为异常（连续3次401）
+          // 检查是否需要标记为异常（遇到1次401就停止调度）
           const errorCount = await this.getUnauthorizedErrorCount(accountId)
           logger.info(
             `🔐 Account ${accountId} has ${errorCount} consecutive 401 errors in the last 5 minutes`
           )
 
-          if (errorCount >= 3) {
+          if (errorCount >= 1) {
             logger.error(
-              `❌ Account ${accountId} exceeded 401 error threshold (${errorCount} errors), marking as unauthorized`
+              `❌ Account ${accountId} encountered 401 error (${errorCount} errors), marking as unauthorized`
             )
             await unifiedClaudeScheduler.markAccountUnauthorized(
               accountId,
@@ -264,6 +264,27 @@ class ClaudeRelayService {
           )
         }
       } else if (response.statusCode === 200 || response.statusCode === 201) {
+        // 提取5小时会话窗口状态
+        // 使用大小写不敏感的方式获取响应头
+        const get5hStatus = (headers) => {
+          if (!headers) {
+            return null
+          }
+          // HTTP头部名称不区分大小写，需要处理不同情况
+          return (
+            headers['anthropic-ratelimit-unified-5h-status'] ||
+            headers['Anthropic-Ratelimit-Unified-5h-Status'] ||
+            headers['ANTHROPIC-RATELIMIT-UNIFIED-5H-STATUS']
+          )
+        }
+
+        const sessionWindowStatus = get5hStatus(response.headers)
+        if (sessionWindowStatus) {
+          logger.info(`📊 Session window status for account ${accountId}: ${sessionWindowStatus}`)
+          // 保存会话窗口状态到账户数据
+          await claudeAccountService.updateSessionWindowStatus(accountId, sessionWindowStatus)
+        }
+
         // 请求成功，清除401和500错误计数
         await this.clearUnauthorizedErrors(accountId)
         await claudeAccountService.clearInternalErrors(accountId)
@@ -454,7 +475,10 @@ class ClaudeRelayService {
       const modelConfig = pricingData[model]
 
       if (!modelConfig) {
-        logger.debug(`🔍 Model ${model} not found in pricing file, skipping max_tokens validation`)
+        // 如果找不到模型配置，直接透传客户端参数，不进行任何干预
+        logger.info(
+          `📝 Model ${model} not found in pricing file, passing through client parameters without modification`
+        )
         return
       }
 
@@ -1187,6 +1211,27 @@ class ClaudeRelayService {
 
             // 调用一次usageCallback记录合并后的数据
             usageCallback(finalUsage)
+          }
+
+          // 提取5小时会话窗口状态
+          // 使用大小写不敏感的方式获取响应头
+          const get5hStatus = (headers) => {
+            if (!headers) {
+              return null
+            }
+            // HTTP头部名称不区分大小写，需要处理不同情况
+            return (
+              headers['anthropic-ratelimit-unified-5h-status'] ||
+              headers['Anthropic-Ratelimit-Unified-5h-Status'] ||
+              headers['ANTHROPIC-RATELIMIT-UNIFIED-5H-STATUS']
+            )
+          }
+
+          const sessionWindowStatus = get5hStatus(res.headers)
+          if (sessionWindowStatus) {
+            logger.info(`📊 Session window status for account ${accountId}: ${sessionWindowStatus}`)
+            // 保存会话窗口状态到账户数据
+            await claudeAccountService.updateSessionWindowStatus(accountId, sessionWindowStatus)
           }
 
           // 处理限流状态

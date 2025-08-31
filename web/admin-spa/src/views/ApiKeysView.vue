@@ -416,7 +416,7 @@
                     <!-- 每日费用限制进度条 -->
                     <div v-if="key.dailyCostLimit > 0" class="space-y-1">
                       <div class="flex items-center justify-between text-xs">
-                        <span class="text-gray-500 dark:text-gray-400">费用限额</span>
+                        <span class="text-gray-500 dark:text-gray-400">每日费用</span>
                         <span class="text-gray-700 dark:text-gray-300">
                           ${{ (key.dailyCost || 0).toFixed(2) }} / ${{
                             key.dailyCostLimit.toFixed(2)
@@ -432,9 +432,30 @@
                       </div>
                     </div>
 
+                    <!-- Opus 周费用限制进度条 -->
+                    <div v-if="key.weeklyOpusCostLimit > 0" class="space-y-1">
+                      <div class="flex items-center justify-between text-xs">
+                        <span class="text-gray-500 dark:text-gray-400">Opus周费用</span>
+                        <span class="text-gray-700 dark:text-gray-300">
+                          ${{ (key.weeklyOpusCost || 0).toFixed(2) }} / ${{
+                            key.weeklyOpusCostLimit.toFixed(2)
+                          }}
+                        </span>
+                      </div>
+                      <div class="h-1.5 w-full rounded-full bg-gray-200">
+                        <div
+                          class="h-1.5 rounded-full transition-all duration-300"
+                          :class="getWeeklyOpusCostProgressColor(key)"
+                          :style="{ width: getWeeklyOpusCostProgress(key) + '%' }"
+                        />
+                      </div>
+                    </div>
+
                     <!-- 时间窗口限制进度条 -->
                     <WindowCountdown
                       v-if="key.rateLimitWindow > 0"
+                      :cost-limit="key.rateLimitCost"
+                      :current-cost="key.currentWindowCost"
                       :current-requests="key.currentWindowRequests"
                       :current-tokens="key.currentWindowTokens"
                       :rate-limit-window="key.rateLimitWindow"
@@ -987,7 +1008,12 @@
 
             <!-- 移动端时间窗口限制 -->
             <WindowCountdown
-              v-if="key.rateLimitWindow > 0 && (key.rateLimitRequests > 0 || key.tokenLimit > 0)"
+              v-if="
+                key.rateLimitWindow > 0 &&
+                (key.rateLimitRequests > 0 || key.tokenLimit > 0 || key.rateLimitCost > 0)
+              "
+              :cost-limit="key.rateLimitCost"
+              :current-cost="key.currentWindowCost"
               :current-requests="key.currentWindowRequests"
               :current-tokens="key.currentWindowTokens"
               :rate-limit-window="key.rateLimitWindow"
@@ -2233,6 +2259,21 @@ const getDailyCostProgress = (key) => {
 // 获取每日费用进度条颜色
 const getDailyCostProgressColor = (key) => {
   const progress = getDailyCostProgress(key)
+  if (progress >= 100) return 'bg-red-500'
+  if (progress >= 80) return 'bg-yellow-500'
+  return 'bg-green-500'
+}
+
+// 获取 Opus 周费用进度
+const getWeeklyOpusCostProgress = (key) => {
+  if (!key.weeklyOpusCostLimit || key.weeklyOpusCostLimit === 0) return 0
+  const percentage = ((key.weeklyOpusCost || 0) / key.weeklyOpusCostLimit) * 100
+  return Math.min(percentage, 100)
+}
+
+// 获取 Opus 周费用进度条颜色
+const getWeeklyOpusCostProgressColor = (key) => {
+  const progress = getWeeklyOpusCostProgress(key)
   if (progress >= 100) return 'bg-red-500'
   if (progress >= 80) return 'bg-yellow-500'
   return 'bg-green-500'

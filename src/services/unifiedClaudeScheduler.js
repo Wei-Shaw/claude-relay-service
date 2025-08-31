@@ -459,7 +459,15 @@ class UnifiedClaudeScheduler {
         return !(await claudeAccountService.isAccountRateLimited(accountId))
       } else if (accountType === 'claude-console') {
         const account = await claudeConsoleAccountService.getAccount(accountId)
-        if (!account || !account.isActive || account.status !== 'active') {
+        if (!account || !account.isActive) {
+          return false
+        }
+        // 检查账户状态
+        if (
+          account.status !== 'active' &&
+          account.status !== 'unauthorized' &&
+          account.status !== 'overloaded'
+        ) {
           return false
         }
         // 检查是否可调度
@@ -467,7 +475,19 @@ class UnifiedClaudeScheduler {
           logger.info(`🚫 Claude Console account ${accountId} is not schedulable`)
           return false
         }
-        return !(await claudeConsoleAccountService.isAccountRateLimited(accountId))
+        // 检查是否被限流
+        if (await claudeConsoleAccountService.isAccountRateLimited(accountId)) {
+          return false
+        }
+        // 检查是否未授权（401错误）
+        if (account.status === 'unauthorized') {
+          return false
+        }
+        // 检查是否过载（529错误）
+        if (await claudeConsoleAccountService.isAccountOverloaded(accountId)) {
+          return false
+        }
+        return true
       } else if (accountType === 'bedrock') {
         const accountResult = await bedrockAccountService.getAccount(accountId)
         if (!accountResult.success || !accountResult.data.isActive) {
