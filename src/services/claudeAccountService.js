@@ -520,7 +520,8 @@ class ClaudeAccountService {
         'accountType',
         'priority',
         'schedulable',
-        'subscriptionInfo'
+        'subscriptionInfo',
+        'autoStopOnWarning'
       ]
       const updatedData = { ...accountData }
 
