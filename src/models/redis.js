@@ -1468,12 +1468,12 @@ class RedisClient {
         }
 
         // 处理总计数据
-        totalInputTokens += parseInt(data.totalInputTokens || 0)
-        totalOutputTokens += parseInt(data.totalOutputTokens || 0)
-        totalCacheCreateTokens += parseInt(data.totalCacheCreateTokens || 0)
-        totalCacheReadTokens += parseInt(data.totalCacheReadTokens || 0)
-        totalAllTokens += parseInt(data.totalAllTokens || 0)
-        totalRequests += parseInt(data.totalRequests || 0)
+        totalInputTokens += parseInt(data.inputTokens || 0)
+        totalOutputTokens += parseInt(data.outputTokens || 0)
+        totalCacheCreateTokens += parseInt(data.cacheCreateTokens || 0)
+        totalCacheReadTokens += parseInt(data.cacheReadTokens || 0)
+        totalAllTokens += parseInt(data.allTokens || 0)
+        totalRequests += parseInt(data.requests || 0)
 
         // 处理每个模型的数据
         for (const [key, value] of Object.entries(data)) {
