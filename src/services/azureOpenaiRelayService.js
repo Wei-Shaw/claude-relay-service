@@ -272,11 +272,11 @@ function handleStreamResponse(upstreamResponse, clientResponse, options = {}) {
     let hasEnded = false
     let eventCount = 0
     const maxEvents = 10000 // 最大事件数量限制
-    
+
     // 专门用于保存最后几个chunks以提取usage数据
     let finalChunksBuffer = ''
     const FINAL_CHUNKS_SIZE = 32 * 1024 // 32KB保留最终chunks
-    let allParsedEvents = [] // 存储所有解析的事件用于最终usage提取
+    const allParsedEvents = [] // 存储所有解析的事件用于最终usage提取
 
     // 设置响应头
     clientResponse.setHeader('Content-Type', 'text/event-stream')
@@ -314,7 +314,7 @@ function handleStreamResponse(upstreamResponse, clientResponse, options = {}) {
               continue
             }
             const eventData = JSON.parse(jsonStr)
-            
+
             // 保存所有成功解析的事件
             allParsedEvents.push(eventData)
 
@@ -324,14 +324,17 @@ function handleStreamResponse(upstreamResponse, clientResponse, options = {}) {
             }
 
             // 使用强化的usage提取函数
-            const { usageData: extractedUsage, actualModel: extractedModel } = extractUsageDataRobust(
-              eventData, 
-              `stream-event-${isFromFinalBuffer ? 'final' : 'normal'}`
-            )
-            
+            const { usageData: extractedUsage, actualModel: extractedModel } =
+              extractUsageDataRobust(
+                eventData,
+                `stream-event-${isFromFinalBuffer ? 'final' : 'normal'}`
+              )
+
             if (extractedUsage && !usageData) {
               usageData = extractedUsage
-              if (extractedModel) actualModel = extractedModel
+              if (extractedModel) {
+                actualModel = extractedModel
+              }
               logger.debug(`🎯 Stream usage captured via robust extraction`, {
                 isFromFinalBuffer,
                 usageData,
@@ -358,7 +361,6 @@ function handleStreamResponse(upstreamResponse, clientResponse, options = {}) {
                 logger.debug('🎯 Stream usage (backup method - top-level):', usageData)
               }
             }
-
           } catch (e) {
             logger.debug('SSE parsing error (expected for incomplete chunks):', e.message)
           }
@@ -418,7 +420,9 @@ function handleStreamResponse(upstreamResponse, clientResponse, options = {}) {
 
         // 防止主缓冲区过大 - 但保持最后部分用于usage解析
         if (buffer.length > MAX_BUFFER_SIZE) {
-          logger.warn(`Stream ${streamId} buffer exceeded limit, truncating main buffer but preserving final chunks`)
+          logger.warn(
+            `Stream ${streamId} buffer exceeded limit, truncating main buffer but preserving final chunks`
+          )
           // 保留最后1/4而不是1/2，为usage数据留更多空间
           buffer = buffer.slice(-MAX_BUFFER_SIZE / 4)
         }
@@ -481,16 +485,18 @@ function handleStreamResponse(upstreamResponse, clientResponse, options = {}) {
           // 方法3: 从所有解析的事件中重新搜索usage
           if (!usageData && allParsedEvents.length > 0) {
             logger.debug('🔍 Searching through all parsed events for usage...')
-            
+
             // 倒序查找，因为usage通常在最后
             for (let i = allParsedEvents.length - 1; i >= 0; i--) {
               const { usageData: foundUsage, actualModel: foundModel } = extractUsageDataRobust(
-                allParsedEvents[i], 
+                allParsedEvents[i],
                 `final-event-scan-${i}`
               )
               if (foundUsage) {
                 usageData = foundUsage
-                if (foundModel) actualModel = foundModel
+                if (foundModel) {
+                  actualModel = foundModel
+                }
                 logger.debug(`🎯 Usage found in event ${i} during final scan!`)
                 break
               }
@@ -505,8 +511,11 @@ function handleStreamResponse(upstreamResponse, clientResponse, options = {}) {
               lastEvent: allParsedEvents[allParsedEvents.length - 1],
               eventCount: allParsedEvents.length
             }
-            
-            const { usageData: combinedUsage } = extractUsageDataRobust(combinedData, 'combined-events')
+
+            const { usageData: combinedUsage } = extractUsageDataRobust(
+              combinedData,
+              'combined-events'
+            )
             if (combinedUsage) {
               usageData = combinedUsage
               logger.debug('🎯 Usage found via combined events analysis!')
@@ -529,7 +538,7 @@ function handleStreamResponse(upstreamResponse, clientResponse, options = {}) {
             totalEvents: allParsedEvents.length,
             finalBufferSize: finalChunksBuffer.length,
             mainBufferSize: buffer.length,
-            lastFewEvents: allParsedEvents.slice(-3).map(e => ({
+            lastFewEvents: allParsedEvents.slice(-3).map((e) => ({
               type: e.type,
               hasUsage: !!e.usage,
               hasResponse: !!e.response,
@@ -610,35 +619,39 @@ function extractUsageDataRobust(responseData, context = 'unknown') {
       actualModel = responseData.model
       logger.debug('✅ Usage extracted via Strategy 1 (top-level)', { usageData, actualModel })
     }
-    
+
     // 策略 2: response.usage (Responses API)
     else if (responseData?.response?.usage) {
       usageData = responseData.response.usage
       actualModel = responseData.response.model || responseData.model
       logger.debug('✅ Usage extracted via Strategy 2 (response.usage)', { usageData, actualModel })
     }
-    
+
     // 策略 3: 嵌套搜索 - 深度查找 usage 字段
     else {
       const findUsageRecursive = (obj, path = '') => {
-        if (!obj || typeof obj !== 'object') return null
-        
+        if (!obj || typeof obj !== 'object') {
+          return null
+        }
+
         for (const [key, value] of Object.entries(obj)) {
           const currentPath = path ? `${path}.${key}` : key
-          
+
           if (key === 'usage' && value && typeof value === 'object') {
             logger.debug(`✅ Usage found at path: ${currentPath}`, value)
             return { usage: value, path: currentPath }
           }
-          
+
           if (typeof value === 'object' && value !== null) {
             const nested = findUsageRecursive(value, currentPath)
-            if (nested) return nested
+            if (nested) {
+              return nested
+            }
           }
         }
         return null
       }
-      
+
       const found = findUsageRecursive(responseData)
       if (found) {
         usageData = found.usage
@@ -650,14 +663,14 @@ function extractUsageDataRobust(responseData, context = 'unknown') {
           modelParent = modelParent?.[part]
         }
         actualModel = modelParent?.model || responseData?.model
-        logger.debug('✅ Usage extracted via Strategy 3 (recursive)', { 
-          usageData, 
-          actualModel, 
-          foundPath: found.path 
+        logger.debug('✅ Usage extracted via Strategy 3 (recursive)', {
+          usageData,
+          actualModel,
+          foundPath: found.path
         })
       }
     }
-    
+
     // 策略 4: 特殊响应格式处理
     if (!usageData) {
       // 检查是否有 choices 数组，usage 可能在最后一个 choice 中
@@ -684,12 +697,11 @@ function extractUsageDataRobust(responseData, context = 'unknown') {
     } else {
       logger.warn('❌ Failed to extract usage data', {
         context,
-        responseDataStructure: JSON.stringify(responseData, null, 2).substring(0, 1000) + '...',
+        responseDataStructure: `${JSON.stringify(responseData, null, 2).substring(0, 1000)}...`,
         availableKeys: Object.keys(responseData || {}),
         responseSize: JSON.stringify(responseData || {}).length
       })
     }
-
   } catch (extractionError) {
     logger.error('🚨 Error during usage extraction', {
       context,
