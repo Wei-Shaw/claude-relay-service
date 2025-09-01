@@ -733,6 +733,52 @@ class RedisClient {
     logger.debug(`💰 Opus cost incremented successfully, new weekly total: $${results[0][1]}`)
   }
 
+  // 💰 计算账户的每日费用（基于模型使用）
+  async getAccountDailyCost(accountId) {
+    const CostCalculator = require('../utils/costCalculator')
+    const today = getDateStringInTimezone()
+
+    // 获取账户今日所有模型的使用数据
+    const pattern = `account_usage:model:daily:${accountId}:*:${today}`
+    const modelKeys = await this.client.keys(pattern)
+
+    if (!modelKeys || modelKeys.length === 0) {
+      return 0
+    }
+
+    let totalCost = 0
+
+    for (const key of modelKeys) {
+      // 从key中解析模型名称
+      // 格式：account_usage:model:daily:{accountId}:{model}:{date}
+      const parts = key.split(':')
+      const model = parts[4] // 模型名在第5个位置（索引4）
+
+      // 获取该模型的使用数据
+      const modelUsage = await this.client.hgetall(key)
+
+      if (modelUsage && (modelUsage.inputTokens || modelUsage.outputTokens)) {
+        const usage = {
+          input_tokens: parseInt(modelUsage.inputTokens || 0),
+          output_tokens: parseInt(modelUsage.outputTokens || 0),
+          cache_creation_input_tokens: parseInt(modelUsage.cacheCreateTokens || 0),
+          cache_read_input_tokens: parseInt(modelUsage.cacheReadTokens || 0)
+        }
+
+        // 使用CostCalculator计算费用
+        const costResult = CostCalculator.calculateCost(usage, model)
+        totalCost += costResult.costs.total
+
+        logger.debug(
+          `💰 Account ${accountId} daily cost for model ${model}: $${costResult.costs.total}`
+        )
+      }
+    }
+
+    logger.debug(`💰 Account ${accountId} total daily cost: $${totalCost}`)
+    return totalCost
+  }
+
   // 📊 获取账户使用统计
   async getAccountUsageStats(accountId) {
     const accountKey = `account_usage:${accountId}`
@@ -792,10 +838,16 @@ class RedisClient {
     const dailyData = handleAccountData(daily)
     const monthlyData = handleAccountData(monthly)
 
+    // 获取每日费用（基于模型使用）
+    const dailyCost = await this.getAccountDailyCost(accountId)
+
     return {
       accountId,
       total: totalData,
-      daily: dailyData,
+      daily: {
+        ...dailyData,
+        cost: dailyCost
+      },
       monthly: monthlyData,
       averages: {
         rpm: Math.round(avgRPM * 100) / 100,

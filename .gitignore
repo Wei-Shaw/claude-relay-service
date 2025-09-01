@@ -216,6 +216,10 @@ local/
 debug.log
 error.log
 access.log
+http-debug*.log
+logs/http-debug-*.log
+
+src/middleware/debugInterceptor.js
 
 # Session files
 sessions/

@@ -4,6 +4,7 @@ const logger = require('../utils/logger')
 const webhookService = require('../services/webhookService')
 const webhookConfigService = require('../services/webhookConfigService')
 const { authenticateAdmin } = require('../middleware/auth')
+const { getISOStringWithTimezone } = require('../utils/dateHelper')
 
 // 获取webhook配置
 router.get('/config', authenticateAdmin, async (req, res) => {
@@ -114,26 +115,61 @@ router.post('/platforms/:id/toggle', authenticateAdmin, async (req, res) => {
 // 测试Webhook连通性
 router.post('/test', authenticateAdmin, async (req, res) => {
   try {
-    const { url, type = 'custom', secret, enableSign } = req.body
+    const {
+      url,
+      type = 'custom',
+      secret,
+      enableSign,
+      deviceKey,
+      serverUrl,
+      level,
+      sound,
+      group
+    } = req.body
 
-    if (!url) {
-      return res.status(400).json({
-        error: 'Missing webhook URL',
-        message: '请提供webhook URL'
-      })
+    // Bark平台特殊处理
+    if (type === 'bark') {
+      if (!deviceKey) {
+        return res.status(400).json({
+          error: 'Missing device key',
+          message: '请提供Bark设备密钥'
+        })
+      }
+
+      // 验证服务器URL（如果提供）
+      if (serverUrl) {
+        try {
+          new URL(serverUrl)
+        } catch (urlError) {
+          return res.status(400).json({
+            error: 'Invalid server URL format',
+            message: '请提供有效的Bark服务器URL'
+          })
+        }
+      }
+
+      logger.info(`🧪 测试webhook: ${type} - Device Key: ${deviceKey.substring(0, 8)}...`)
+    } else {
+      // 其他平台验证URL
+      if (!url) {
+        return res.status(400).json({
+          error: 'Missing webhook URL',
+          message: '请提供webhook URL'
+        })
+      }
+
+      // 验证URL格式
+      try {
+        new URL(url)
+      } catch (urlError) {
+        return res.status(400).json({
+          error: 'Invalid URL format',
+          message: '请提供有效的webhook URL'
+        })
+      }
+
+      logger.info(`🧪 测试webhook: ${type} - ${url}`)
     }
-
-    // 验证URL格式
-    try {
-      new URL(url)
-    } catch (urlError) {
-      return res.status(400).json({
-        error: 'Invalid URL format',
-        message: '请提供有效的webhook URL'
-      })
-    }
-
-    logger.info(`🧪 测试webhook: ${type} - ${url}`)
 
     // 创建临时平台配置
     const platform = {
@@ -145,21 +181,34 @@ router.post('/test', authenticateAdmin, async (req, res) => {
       timeout: 10000
     }
 
+    // 添加Bark特有字段
+    if (type === 'bark') {
+      platform.deviceKey = deviceKey
+      platform.serverUrl = serverUrl
+      platform.level = level
+      platform.sound = sound
+      platform.group = group
+    }
+
     const result = await webhookService.testWebhook(platform)
 
     if (result.success) {
-      logger.info(`✅ Webhook测试成功: ${url}`)
+      const identifier = type === 'bark' ? `Device: ${deviceKey.substring(0, 8)}...` : url
+      logger.info(`✅ Webhook测试成功: ${identifier}`)
       res.json({
         success: true,
         message: 'Webhook测试成功',
-        url
+        url: type === 'bark' ? undefined : url,
+        deviceKey: type === 'bark' ? `${deviceKey.substring(0, 8)}...` : undefined
       })
     } else {
-      logger.warn(`❌ Webhook测试失败: ${url} - ${result.error}`)
+      const identifier = type === 'bark' ? `Device: ${deviceKey.substring(0, 8)}...` : url
+      logger.warn(`❌ Webhook测试失败: ${identifier} - ${result.error}`)
       res.status(400).json({
         success: false,
         message: 'Webhook测试失败',
-        url,
+        url: type === 'bark' ? undefined : url,
+        deviceKey: type === 'bark' ? `${deviceKey.substring(0, 8)}...` : undefined,
         error: result.error
       })
     }
@@ -218,7 +267,7 @@ router.post('/test-notification', authenticateAdmin, async (req, res) => {
       errorCode,
       reason,
       message,
-      timestamp: new Date().toISOString()
+      timestamp: getISOStringWithTimezone(new Date())
     }
 
     const result = await webhookService.sendNotification(type, testData)

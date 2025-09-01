@@ -250,11 +250,6 @@ REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=
 
-# Webhook通知配置（可选）
-WEBHOOK_ENABLED=true
-WEBHOOK_URLS=https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=your-key
-WEBHOOK_TIMEOUT=10000
-WEBHOOK_RETRIES=3
 ```
 
 **编辑 `config/config.js` 文件：**
@@ -515,67 +510,6 @@ http://你的服务器:3000/openai/claude/v1/
 - `/api/v1/messages` = `/claude/v1/messages` = `/openai/claude/v1/messages`
 - 选择适合你使用工具的格式即可
 - 支持所有Claude API端点（messages、models等）
-
----
-
-## 📢 Webhook 通知功能
-
-### 功能说明
-
-当系统检测到账号异常时，会自动发送 webhook 通知，支持企业微信、钉钉、Slack 等平台。
-
-### 通知触发场景
-
-- **Claude OAuth 账户**: token 过期或未授权时
-- **Claude Console 账户**: 系统检测到账户被封锁时
-- **Gemini 账户**: token 刷新失败时
-- **手动禁用账户**: 管理员手动禁用账户时
-
-### 配置方法
-
-**1. 环境变量配置**
-
-```bash
-# 启用 webhook 通知
-WEBHOOK_ENABLED=true
-
-# 企业微信 webhook 地址（替换为你的实际地址）
-WEBHOOK_URLS=https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=your-key
-
-# 多个地址用逗号分隔
-WEBHOOK_URLS=https://webhook1.com,https://webhook2.com
-
-# 请求超时时间（毫秒，默认10秒）
-WEBHOOK_TIMEOUT=10000
-
-# 重试次数（默认3次）
-WEBHOOK_RETRIES=3
-```
-
-**2. 企业微信设置**
-
-1. 在企业微信群中添加「群机器人」
-2. 获取 webhook 地址：`https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx`
-3. 将地址配置到 `WEBHOOK_URLS` 环境变量
-
-### 通知内容格式
-
-系统会发送结构化的通知消息：
-
-```
-账户名称 账号异常，异常代码 ERROR_CODE
-平台：claude-oauth
-时间：2025-08-14 17:30:00
-原因：Token expired
-```
-
-### 测试 Webhook
-
-可以通过管理后台测试 webhook 连通性：
-
-1. 登录管理后台：`http://你的服务器:3000/web`
-2. 访问：`/admin/webhook/test`
-3. 发送测试通知确认配置正确
 
 ---
 

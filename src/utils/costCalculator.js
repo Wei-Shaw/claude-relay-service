@@ -31,7 +31,7 @@ const MODEL_PRICING = {
     cacheWrite: 18.75,
     cacheRead: 1.5
   },
-  
+
   // Claude Opus 4.1 (新模型)
   'claude-opus-4-1-20250805': {
     input: 15.0,
