@@ -1726,20 +1726,17 @@ const formatCost = (cost) => {
   return cost.toFixed(2)
 }
 
-// 计算每日费用（估算，基于平均模型价格）
+// 计算每日费用（使用后端返回的精确费用数据）
 const calculateDailyCost = (account) => {
   if (!account.usage || !account.usage.daily) return '0.0000'
 
-  const dailyTokens = account.usage.daily.allTokens || 0
-  if (dailyTokens === 0) return '0.0000'
+  // 如果后端已经返回了计算好的费用，直接使用
+  if (account.usage.daily.cost !== undefined) {
+    return formatCost(account.usage.daily.cost)
+  }
 
-  // 使用平均价格估算（基于Claude 3.5 Sonnet的价格）
-  // 输入: $3/1M tokens, 输出: $15/1M tokens
-  // 假设平均比例为 输入:输出 = 3:1
-  const avgPricePerMillion = 3 * 0.75 + 15 * 0.25 // 加权平均价格
-  const cost = (dailyTokens / 1000000) * avgPricePerMillion
-
-  return formatCost(cost)
+  // 如果后端没有返回费用（旧版本），返回0
+  return '0.0000'
 }
 
 // 切换调度状态

@@ -2,6 +2,7 @@ const axios = require('axios')
 const crypto = require('crypto')
 const logger = require('../utils/logger')
 const webhookConfigService = require('./webhookConfigService')
+const { getISOStringWithTimezone } = require('../utils/dateHelper')
 
 class WebhookService {
   constructor() {
@@ -206,7 +207,7 @@ class WebhookService {
     const payload = {
       type,
       service: 'claude-relay-service',
-      timestamp: new Date().toISOString(),
+      timestamp: getISOStringWithTimezone(new Date()),
       data
     }
 
@@ -357,7 +358,7 @@ class WebhookService {
       title,
       color,
       fields,
-      timestamp: new Date().toISOString(),
+      timestamp: getISOStringWithTimezone(new Date()),
       footer: {
         text: 'Claude Relay Service'
       }
@@ -580,7 +581,7 @@ class WebhookService {
     try {
       const testData = {
         message: 'Claude Relay Service webhook测试',
-        timestamp: new Date().toISOString()
+        timestamp: getISOStringWithTimezone(new Date())
       }
 
       await this.sendToPlatform(platform, 'test', testData, { maxRetries: 1, retryDelay: 1000 })

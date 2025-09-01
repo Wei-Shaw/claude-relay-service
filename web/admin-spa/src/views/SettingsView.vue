@@ -479,6 +479,7 @@
                 <option value="feishu">🟦 飞书</option>
                 <option value="slack">🟣 Slack</option>
                 <option value="discord">🟪 Discord</option>
+                <option value="bark">🔔 Bark</option>
                 <option value="custom">⚙️ 自定义</option>
               </select>
               <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
@@ -508,8 +509,8 @@
             />
           </div>
 
-          <!-- Webhook URL -->
-          <div>
+          <!-- Webhook URL (非Bark平台) -->
+          <div v-if="platformForm.type !== 'bark'">
             <label
               class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
             >
@@ -545,6 +546,118 @@
               <p class="text-sm text-blue-700 dark:text-blue-300">
                 {{ getWebhookHint(platformForm.type) }}
               </p>
+            </div>
+          </div>
+
+          <!-- Bark 平台特有字段 -->
+          <div v-if="platformForm.type === 'bark'" class="space-y-5">
+            <!-- 设备密钥 -->
+            <div>
+              <label
+                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                <i class="fas fa-key mr-2 text-gray-400"></i>
+                设备密钥 (Device Key)
+                <span class="ml-1 text-xs text-red-500">*</span>
+              </label>
+              <input
+                v-model="platformForm.deviceKey"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                placeholder="例如：aBcDeFgHiJkLmNoPqRsTuVwX"
+                required
+                type="text"
+              />
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                在Bark App中查看您的推送密钥
+              </p>
+            </div>
+
+            <!-- 服务器URL（可选） -->
+            <div>
+              <label
+                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                <i class="fas fa-server mr-2 text-gray-400"></i>
+                服务器地址
+                <span class="ml-2 text-xs text-gray-500">(可选)</span>
+              </label>
+              <input
+                v-model="platformForm.serverUrl"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                placeholder="默认: https://api.day.app/push"
+                type="url"
+              />
+            </div>
+
+            <!-- 通知级别 -->
+            <div>
+              <label
+                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                <i class="fas fa-flag mr-2 text-gray-400"></i>
+                通知级别
+              </label>
+              <select
+                v-model="platformForm.level"
+                class="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 text-gray-900 shadow-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">自动（根据通知类型）</option>
+                <option value="passive">被动</option>
+                <option value="active">默认</option>
+                <option value="timeSensitive">时效性</option>
+                <option value="critical">紧急</option>
+              </select>
+            </div>
+
+            <!-- 通知声音 -->
+            <div>
+              <label
+                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                <i class="fas fa-volume-up mr-2 text-gray-400"></i>
+                通知声音
+              </label>
+              <select
+                v-model="platformForm.sound"
+                class="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 text-gray-900 shadow-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">自动（根据通知类型）</option>
+                <option value="default">默认</option>
+                <option value="alarm">警报</option>
+                <option value="bell">铃声</option>
+                <option value="birdsong">鸟鸣</option>
+                <option value="electronic">电子音</option>
+                <option value="glass">玻璃</option>
+                <option value="horn">喇叭</option>
+                <option value="silence">静音</option>
+              </select>
+            </div>
+
+            <!-- 分组 -->
+            <div>
+              <label
+                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                <i class="fas fa-folder mr-2 text-gray-400"></i>
+                通知分组
+                <span class="ml-2 text-xs text-gray-500">(可选)</span>
+              </label>
+              <input
+                v-model="platformForm.group"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                placeholder="默认: claude-relay"
+                type="text"
+              />
+            </div>
+
+            <!-- 提示信息 -->
+            <div class="mt-2 flex items-start rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
+              <i class="fas fa-info-circle mr-2 mt-0.5 text-blue-600 dark:text-blue-400"></i>
+              <div class="text-sm text-blue-700 dark:text-blue-300">
+                <p>1. 在iPhone上安装Bark App</p>
+                <p>2. 打开App获取您的设备密钥</p>
+                <p>3. 将密钥粘贴到上方输入框</p>
+              </div>
             </div>
           </div>
 
@@ -633,7 +746,7 @@
             </button>
             <button
               class="group flex items-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2.5 text-sm font-medium text-white shadow-md transition-all hover:from-blue-700 hover:to-indigo-700 hover:shadow-lg disabled:cursor-not-allowed disabled:from-gray-400 disabled:to-gray-500"
-              :disabled="!platformForm.url || savingPlatform"
+              :disabled="!isPlatformFormValid || savingPlatform"
               @click="savePlatform"
             >
               <i
@@ -652,7 +765,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { showToast } from '@/utils/toast'
 import { useSettingsStore } from '@/stores/settings'
@@ -721,6 +834,44 @@ const sectionWatcher = watch(activeSection, async (newSection) => {
   }
 })
 
+// 监听平台类型变化，重置验证状态
+const platformTypeWatcher = watch(
+  () => platformForm.value.type,
+  (newType) => {
+    // 切换平台类型时重置验证状态
+    urlError.value = false
+    urlValid.value = false
+
+    // 如果不是编辑模式，清空相关字段
+    if (!editingPlatform.value) {
+      if (newType === 'bark') {
+        // 切换到Bark时，清空URL相关字段
+        platformForm.value.url = ''
+        platformForm.value.enableSign = false
+        platformForm.value.secret = ''
+      } else {
+        // 切换到其他平台时，清空Bark相关字段
+        platformForm.value.deviceKey = ''
+        platformForm.value.serverUrl = ''
+        platformForm.value.level = ''
+        platformForm.value.sound = ''
+        platformForm.value.group = ''
+      }
+    }
+  }
+)
+
+// 计算属性：判断平台表单是否有效
+const isPlatformFormValid = computed(() => {
+  if (platformForm.value.type === 'bark') {
+    // Bark平台需要deviceKey
+    return !!platformForm.value.deviceKey
+  } else {
+    // 其他平台需要URL且URL格式正确
+    return !!platformForm.value.url && !urlError.value
+  }
+})
+
 // 页面加载时获取设置
 onMounted(async () => {
   try {
@@ -746,6 +897,9 @@ onBeforeUnmount(() => {
   // 停止watch监听器
   if (sectionWatcher) {
     sectionWatcher()
+  }
+  if (platformTypeWatcher) {
+    platformTypeWatcher()
   }
 
   // 安全关闭模态框
@@ -795,6 +949,13 @@ const saveWebhookConfig = async () => {
 
 // 验证 URL
 const validateUrl = () => {
+  // Bark平台不需要验证URL
+  if (platformForm.value.type === 'bark') {
+    urlError.value = false
+    urlValid.value = false
+    return
+  }
+
   const url = platformForm.value.url
   if (!url) {
     urlError.value = false
@@ -925,18 +1086,26 @@ const testPlatform = async (platform) => {
   if (!isMounted.value) return
 
   try {
-    const response = await apiClient.post(
-      '/admin/webhook/test',
-      {
-        url: platform.url,
-        type: platform.type,
-        secret: platform.secret,
-        enableSign: platform.enableSign
-      },
-      {
-        signal: abortController.value.signal
-      }
-    )
+    const testData = {
+      type: platform.type,
+      secret: platform.secret,
+      enableSign: platform.enableSign
+    }
+
+    // 根据平台类型添加不同字段
+    if (platform.type === 'bark') {
+      testData.deviceKey = platform.deviceKey
+      testData.serverUrl = platform.serverUrl
+      testData.level = platform.level
+      testData.sound = platform.sound
+      testData.group = platform.group
+    } else {
+      testData.url = platform.url
+    }
+
+    const response = await apiClient.post('/admin/webhook/test', testData, {
+      signal: abortController.value.signal
+    })
     if (response.success && isMounted.value) {
       showToast('测试成功，webhook连接正常', 'success')
     }
@@ -952,14 +1121,23 @@ const testPlatform = async (platform) => {
 const testPlatformForm = async () => {
   if (!isMounted.value) return
 
-  if (!platformForm.value.url) {
-    showToast('请先输入Webhook URL', 'error')
-    return
-  }
+  // Bark平台验证
+  if (platformForm.value.type === 'bark') {
+    if (!platformForm.value.deviceKey) {
+      showToast('请先输入Bark设备密钥', 'error')
+      return
+    }
+  } else {
+    // 其他平台验证URL
+    if (!platformForm.value.url) {
+      showToast('请先输入Webhook URL', 'error')
+      return
+    }
 
-  if (urlError.value) {
-    showToast('请输入有效的Webhook URL', 'error')
-    return
+    if (urlError.value) {
+      showToast('请输入有效的Webhook URL', 'error')
+      return
+    }
   }
 
   testingConnection.value = true
@@ -1020,7 +1198,13 @@ const closePlatformModal = () => {
       name: '',
       url: '',
       enableSign: false,
-      secret: ''
+      secret: '',
+      // Bark特有字段
+      deviceKey: '',
+      serverUrl: '',
+      level: '',
+      sound: '',
+      group: ''
     }
     urlError.value = false
     urlValid.value = false
@@ -1037,6 +1221,7 @@ const getPlatformName = (type) => {
     feishu: '飞书',
     slack: 'Slack',
     discord: 'Discord',
+    bark: 'Bark',
     custom: '自定义'
   }
   return names[type] || type
@@ -1049,6 +1234,7 @@ const getPlatformIcon = (type) => {
     feishu: 'fas fa-dove text-blue-600',
     slack: 'fab fa-slack text-purple-600',
     discord: 'fab fa-discord text-indigo-600',
+    bark: 'fas fa-bell text-orange-500',
     custom: 'fas fa-webhook text-gray-600'
   }
   return icons[type] || 'fas fa-bell'
@@ -1061,6 +1247,7 @@ const getWebhookHint = (type) => {
     feishu: '请在飞书群机器人设置中获取Webhook地址',
     slack: '请在Slack应用的Incoming Webhooks中获取地址',
     discord: '请在Discord服务器的集成设置中创建Webhook',
+    bark: '请在Bark App中查看您的设备密钥',
     custom: '请输入完整的Webhook接收地址'
   }
   return hints[type] || ''

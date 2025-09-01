@@ -15,6 +15,7 @@ const {
 } = require('../utils/tokenRefreshLogger')
 const tokenRefreshService = require('./tokenRefreshService')
 const LRUCache = require('../utils/lruCache')
+const { formatDateWithTimezone, getISOStringWithTimezone } = require('../utils/dateHelper')
 
 class ClaudeAccountService {
   constructor() {
@@ -1121,8 +1122,8 @@ class ClaudeAccountService {
           platform: 'claude-oauth',
           status: 'error',
           errorCode: 'CLAUDE_OAUTH_RATE_LIMITED',
-          reason: `Account rate limited (429 error). ${rateLimitResetTimestamp ? `Reset at: ${new Date(rateLimitResetTimestamp * 1000).toISOString()}` : 'Estimated reset in 1-5 hours'}`,
-          timestamp: new Date().toISOString()
+          reason: `Account rate limited (429 error). ${rateLimitResetTimestamp ? `Reset at: ${formatDateWithTimezone(rateLimitResetTimestamp)}` : 'Estimated reset in 1-5 hours'}`,
+          timestamp: getISOStringWithTimezone(new Date())
         })
       } catch (webhookError) {
         logger.error('Failed to send rate limit webhook notification:', webhookError)
@@ -1322,7 +1323,7 @@ class ClaudeAccountService {
             status: 'resumed',
             errorCode: 'CLAUDE_5H_LIMIT_RESUMED',
             reason: '进入新的5小时窗口，已自动恢复调度',
-            timestamp: new Date().toISOString()
+            timestamp: getISOStringWithTimezone(new Date())
           })
         } catch (webhookError) {
           logger.error('Failed to send webhook notification:', webhookError)
@@ -1985,7 +1986,7 @@ class ClaudeAccountService {
             status: 'warning',
             errorCode: 'CLAUDE_5H_LIMIT_WARNING',
             reason: '5小时使用量接近限制，已自动停止调度',
-            timestamp: new Date().toISOString()
+            timestamp: getISOStringWithTimezone(new Date())
           })
         } catch (webhookError) {
           logger.error('Failed to send webhook notification:', webhookError)

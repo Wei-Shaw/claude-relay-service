@@ -369,6 +369,7 @@ class ClaudeConsoleAccountService {
       // 发送Webhook通知
       try {
         const webhookNotifier = require('../utils/webhookNotifier')
+        const { getISOStringWithTimezone } = require('../utils/dateHelper')
         await webhookNotifier.sendAccountAnomalyNotification({
           accountId,
           accountName: account.name || 'Claude Console Account',
@@ -376,7 +377,7 @@ class ClaudeConsoleAccountService {
           status: 'error',
           errorCode: 'CLAUDE_CONSOLE_RATE_LIMITED',
           reason: `Account rate limited (429 error). ${account.rateLimitDuration ? `Will be blocked for ${account.rateLimitDuration} hours` : 'Temporary rate limit'}`,
-          timestamp: new Date().toISOString()
+          timestamp: getISOStringWithTimezone(new Date())
         })
       } catch (webhookError) {
         logger.error('Failed to send rate limit webhook notification:', webhookError)

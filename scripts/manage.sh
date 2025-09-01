@@ -937,15 +937,61 @@ stop_service() {
     # 强制停止所有相关进程
     pkill -f "node.*src/app.js" 2>/dev/null || true
     
+    # 等待进程完全退出（最多等待10秒）
+    local wait_count=0
+    while pgrep -f "node.*src/app.js" > /dev/null; do
+        if [ $wait_count -ge 10 ]; then
+            print_warning "进程停止超时，尝试强制终止..."
+            pkill -9 -f "node.*src/app.js" 2>/dev/null || true
+            sleep 1
+            break
+        fi
+        sleep 1
+        wait_count=$((wait_count + 1))
+    done
+    
+    # 最终确认进程已停止
+    if pgrep -f "node.*src/app.js" > /dev/null; then
+        print_error "无法完全停止服务进程"
+        return 1
+    fi
+    
     print_success "服务已停止"
 }
 
 # 重启服务
 restart_service() {
     print_info "重启服务..."
-    stop_service
-    sleep 2
-    start_service
+    
+    # 停止服务并检查结果
+    if ! stop_service; then
+        print_error "停止服务失败"
+        return 1
+    fi
+    
+    # 短暂等待，确保端口释放
+    sleep 1
+    
+    # 启动服务，如果失败则重试
+    local retry_count=0
+    while [ $retry_count -lt 3 ]; do
+        # 清除可能的僵尸进程检测
+        if ! pgrep -f "node.*src/app.js" > /dev/null; then
+            # 进程确实已停止，可以启动
+            if start_service; then
+                return 0
+            fi
+        fi
+        
+        retry_count=$((retry_count + 1))
+        if [ $retry_count -lt 3 ]; then
+            print_warning "启动失败，等待2秒后重试（第 $retry_count 次）..."
+            sleep 2
+        fi
+    done
+    
+    print_error "重启服务失败"
+    return 1
 }
 
 # 更新模型价格
