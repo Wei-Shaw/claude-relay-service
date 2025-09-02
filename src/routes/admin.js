@@ -63,6 +63,9 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
     const { timeRange = 'all' } = req.query // all, 7days, monthly
     const apiKeys = await apiKeyService.getAllApiKeys()
 
+    // 获取用户服务来补充owner信息
+    const userService = require('../services/userService')
+
     // 根据时间范围计算查询模式
     const now = new Date()
     const searchPatterns = []
@@ -310,6 +313,28 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
 
         // 为了保持兼容性，也更新total字段
         apiKey.usage.total = apiKey.usage[timeRange]
+      }
+    }
+
+    // 为每个API Key添加owner的displayName
+    for (const apiKey of apiKeys) {
+      // 如果API Key有关联的用户ID，获取用户信息
+      if (apiKey.userId) {
+        try {
+          const user = await userService.getUserById(apiKey.userId, false)
+          if (user) {
+            apiKey.ownerDisplayName = user.displayName || user.username || 'Unknown User'
+          } else {
+            apiKey.ownerDisplayName = 'Unknown User'
+          }
+        } catch (error) {
+          logger.debug(`无法获取用户 ${apiKey.userId} 的信息:`, error)
+          apiKey.ownerDisplayName = 'Unknown User'
+        }
+      } else {
+        // 如果没有userId，使用createdBy字段或默认为Admin
+        apiKey.ownerDisplayName =
+          apiKey.createdBy === 'admin' ? 'Admin' : apiKey.createdBy || 'Admin'
       }
     }
 

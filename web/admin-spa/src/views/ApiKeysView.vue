@@ -402,6 +402,11 @@
                               使用共享池
                             </div>
                           </div>
+                          <!-- 显示所有者信息 -->
+                          <div v-if="key.ownerDisplayName" class="mt-1 text-xs text-red-600">
+                            <i class="fas fa-user mr-1" />
+                            {{ key.ownerDisplayName }}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -1022,6 +1027,11 @@
                 >
                   <i class="fas fa-share-alt mr-1" />
                   使用共享池
+                </div>
+                <!-- 显示所有者信息 -->
+                <div v-if="key.ownerDisplayName" class="text-xs text-red-600">
+                  <i class="fas fa-user mr-1" />
+                  {{ key.ownerDisplayName }}
                 </div>
               </div>
 
