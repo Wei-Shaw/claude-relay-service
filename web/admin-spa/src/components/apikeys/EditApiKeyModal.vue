@@ -41,6 +41,26 @@
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 sm:mt-2">名称不可修改</p>
           </div>
 
+          <!-- 所有者选择 -->
+          <div>
+            <label
+              class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-3 sm:text-sm"
+              >所有者</label
+            >
+            <select
+              v-model="form.ownerId"
+              class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+            >
+              <option v-for="user in availableUsers" :key="user.id" :value="user.id">
+                {{ user.displayName }} ({{ user.username }})
+                <span v-if="user.role === 'admin'" class="text-gray-500">- 管理员</span>
+              </option>
+            </select>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 sm:mt-2">
+              分配此 API Key 给指定用户或管理员，管理员分配时不受用户 API Key 数量限制
+            </p>
+          </div>
+
           <!-- 标签 -->
           <div>
             <label
@@ -666,6 +686,9 @@ const localAccounts = ref({
 // 支持的客户端列表
 const supportedClients = ref([])
 
+// 可用用户列表
+const availableUsers = ref([])
+
 // 标签相关
 const newTag = ref('')
 const availableTags = ref([])
@@ -696,7 +719,8 @@ const form = reactive({
   enableClientRestriction: false,
   allowedClients: [],
   tags: [],
-  isActive: true
+  isActive: true,
+  ownerId: '' // 新增：所有者ID
 })
 
 // 添加限制的模型
@@ -856,6 +880,11 @@ const updateApiKey = async () => {
     // 活跃状态
     data.isActive = form.isActive
 
+    // 所有者
+    if (form.ownerId !== undefined) {
+      data.ownerId = form.ownerId
+    }
+
     const result = await apiClient.put(`/admin/api-keys/${props.apiKey.id}`, data)
 
     if (result.success) {
@@ -947,11 +976,34 @@ const refreshAccounts = async () => {
   }
 }
 
+// 加载用户列表
+const loadUsers = async () => {
+  try {
+    const response = await apiClient.get('/admin/users')
+    if (response.success) {
+      availableUsers.value = response.data || []
+    }
+  } catch (error) {
+    console.error('Failed to load users:', error)
+    availableUsers.value = [
+      {
+        id: 'admin',
+        username: 'admin',
+        displayName: 'Admin',
+        email: '',
+        role: 'admin'
+      }
+    ]
+  }
+}
+
 // 初始化表单数据
 onMounted(async () => {
-  // 加载支持的客户端和已存在的标签
-  supportedClients.value = await clientsStore.loadSupportedClients()
-  availableTags.value = await apiKeysStore.fetchTags()
+  // 并行加载所有需要的数据
+  await Promise.all([clientsStore.loadSupportedClients(), apiKeysStore.fetchTags(), loadUsers()])
+
+  supportedClients.value = clientsStore.supportedClients
+  availableTags.value = apiKeysStore.availableTags
 
   // 初始化账号数据
   if (props.accounts) {
@@ -1001,6 +1053,9 @@ onMounted(async () => {
   form.enableClientRestriction = props.apiKey.enableClientRestriction || false
   // 初始化活跃状态，默认为 true
   form.isActive = props.apiKey.isActive !== undefined ? props.apiKey.isActive : true
+
+  // 初始化所有者
+  form.ownerId = props.apiKey.userId || 'admin'
 })
 </script>
 
