@@ -30,18 +30,19 @@ const router = express.Router()
 router.get('/users', authenticateAdmin, async (req, res) => {
   try {
     const userService = require('../services/userService')
-    const allUsers = await userService.getAllUsers()
+    const result = await userService.getAllUsers({ isActive: true, limit: 1000 }) // Get all active users
 
-    // 只返回活跃用户，并包含管理员选项
-    const activeUsers = allUsers
-      .filter((user) => user.isActive)
-      .map((user) => ({
-        id: user.id,
-        username: user.username,
-        displayName: user.displayName || user.username,
-        email: user.email,
-        role: user.role
-      }))
+    // Extract users array from the paginated result
+    const allUsers = result.users || []
+
+    // Map to the format needed for the dropdown
+    const activeUsers = allUsers.map((user) => ({
+      id: user.id,
+      username: user.username,
+      displayName: user.displayName || user.username,
+      email: user.email,
+      role: user.role
+    }))
 
     // 添加Admin选项作为第一个
     const usersWithAdmin = [

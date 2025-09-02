@@ -999,11 +999,22 @@ const loadUsers = async () => {
 
 // 初始化表单数据
 onMounted(async () => {
-  // 并行加载所有需要的数据
-  await Promise.all([clientsStore.loadSupportedClients(), apiKeysStore.fetchTags(), loadUsers()])
+  try {
+    // 并行加载所有需要的数据
+    const [clients, tags] = await Promise.all([
+      clientsStore.loadSupportedClients(),
+      apiKeysStore.fetchTags(),
+      loadUsers()
+    ])
 
-  supportedClients.value = clientsStore.supportedClients
-  availableTags.value = apiKeysStore.availableTags
+    supportedClients.value = clients || []
+    availableTags.value = tags || []
+  } catch (error) {
+    console.error('Error loading initial data:', error)
+    // Fallback to empty arrays if loading fails
+    supportedClients.value = []
+    availableTags.value = []
+  }
 
   // 初始化账号数据
   if (props.accounts) {
