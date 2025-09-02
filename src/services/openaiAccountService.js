@@ -502,6 +502,8 @@ async function getAllAccounts() {
       // 不解密敏感字段，只返回基本信息
       accounts.push({
         ...accountData,
+        isActive: accountData.isActive === 'true',
+        schedulable: accountData.schedulable !== 'false',
         openaiOauth: accountData.openaiOauth ? '[ENCRYPTED]' : '',
         accessToken: accountData.accessToken ? '[ENCRYPTED]' : '',
         refreshToken: accountData.refreshToken ? '[ENCRYPTED]' : '',
