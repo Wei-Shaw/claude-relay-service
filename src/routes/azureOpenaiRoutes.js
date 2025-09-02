@@ -14,8 +14,11 @@ const ALLOWED_MODELS = {
     'gpt-4-turbo',
     'gpt-4o',
     'gpt-4o-mini',
+    'gpt-5',
+    'gpt-5-mini',
     'gpt-35-turbo',
-    'gpt-35-turbo-16k'
+    'gpt-35-turbo-16k',
+    'codex-mini'
   ],
   EMBEDDING_MODELS: ['text-embedding-ada-002', 'text-embedding-3-small', 'text-embedding-3-large']
 }
@@ -217,6 +220,99 @@ router.post('/chat/completions', authenticateApiKey, async (req, res) => {
     }
   } catch (error) {
     logger.error(`Azure OpenAI request failed ${requestId}:`, error)
+
+    if (!res.headersSent) {
+      const statusCode = error.response?.status || 500
+      const errorMessage =
+        error.response?.data?.error?.message || error.message || 'Internal server error'
+
+      res.status(statusCode).json({
+        error: {
+          message: errorMessage,
+          type: 'azure_openai_error',
+          code: error.code || 'unknown'
+        }
+      })
+    }
+  }
+})
+
+// 处理响应请求 (gpt-5, gpt-5-mini, codex-mini models)
+router.post('/responses', authenticateApiKey, async (req, res) => {
+  const requestId = `azure_resp_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`
+  const sessionId = req.sessionId || req.headers['x-session-id'] || null
+
+  logger.info(`🚀 Azure OpenAI Responses Request ${requestId}`, {
+    apiKeyId: req.apiKey?.id,
+    sessionId,
+    model: req.body.model,
+    stream: req.body.stream || false,
+    messages: req.body.messages?.length || 0
+  })
+
+  try {
+    // 获取绑定的 Azure OpenAI 账户
+    let account = null
+    if (req.apiKey?.azureOpenaiAccountId) {
+      account = await azureOpenaiAccountService.getAccount(req.apiKey.azureOpenaiAccountId)
+      if (!account) {
+        logger.warn(`Bound Azure OpenAI account not found: ${req.apiKey.azureOpenaiAccountId}`)
+      }
+    }
+
+    // 如果没有绑定账户或账户不可用，选择一个可用账户
+    if (!account || account.isActive !== 'true') {
+      account = await azureOpenaiAccountService.selectAvailableAccount(sessionId)
+    }
+
+    // 发送请求到 Azure OpenAI
+    const response = await azureOpenaiRelayService.handleAzureOpenAIRequest({
+      account,
+      requestBody: req.body,
+      headers: req.headers,
+      isStream: req.body.stream || false,
+      endpoint: 'responses'
+    })
+
+    // 处理流式响应
+    if (req.body.stream) {
+      await azureOpenaiRelayService.handleStreamResponse(response, res, {
+        onEnd: async ({ usageData, actualModel }) => {
+          if (usageData) {
+            const modelToRecord = actualModel || req.body.model || 'unknown'
+            await usageReporter.reportOnce(
+              requestId,
+              usageData,
+              req.apiKey.id,
+              modelToRecord,
+              account.id
+            )
+          }
+        },
+        onError: (error) => {
+          logger.error(`Stream error for request ${requestId}:`, error)
+        }
+      })
+    } else {
+      // 处理非流式响应
+      const { usageData, actualModel } = azureOpenaiRelayService.handleNonStreamResponse(
+        response,
+        res
+      )
+
+      if (usageData) {
+        const modelToRecord = actualModel || req.body.model || 'unknown'
+        await usageReporter.reportOnce(
+          requestId,
+          usageData,
+          req.apiKey.id,
+          modelToRecord,
+          account.id
+        )
+      }
+    }
+  } catch (error) {
+    logger.error(`Azure OpenAI responses request failed ${requestId}:`, error)
 
     if (!res.headersSent) {
       const statusCode = error.response?.status || 500

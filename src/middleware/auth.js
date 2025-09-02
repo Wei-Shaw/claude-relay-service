@@ -1,4 +1,5 @@
 const apiKeyService = require('../services/apiKeyService')
+const userService = require('../services/userService')
 const logger = require('../utils/logger')
 const redis = require('../models/redis')
 // const { RateLimiterRedis } = require('rate-limiter-flexible') // 暂时未使用
@@ -525,6 +526,234 @@ const authenticateAdmin = async (req, res, next) => {
   }
 }
 
+// 👤 用户验证中间件
+const authenticateUser = async (req, res, next) => {
+  const startTime = Date.now()
+
+  try {
+    // 安全提取用户session token，支持多种方式
+    const sessionToken =
+      req.headers['authorization']?.replace(/^Bearer\s+/i, '') ||
+      req.cookies?.userToken ||
+      req.headers['x-user-token']
+
+    if (!sessionToken) {
+      logger.security(`🔒 Missing user session token attempt from ${req.ip || 'unknown'}`)
+      return res.status(401).json({
+        error: 'Missing user session token',
+        message: 'Please login to access this resource'
+      })
+    }
+
+    // 基本token格式验证
+    if (typeof sessionToken !== 'string' || sessionToken.length < 32 || sessionToken.length > 128) {
+      logger.security(`🔒 Invalid user session token format from ${req.ip || 'unknown'}`)
+      return res.status(401).json({
+        error: 'Invalid session token format',
+        message: 'Session token format is invalid'
+      })
+    }
+
+    // 验证用户会话
+    const sessionValidation = await userService.validateUserSession(sessionToken)
+
+    if (!sessionValidation) {
+      logger.security(`🔒 Invalid user session token attempt from ${req.ip || 'unknown'}`)
+      return res.status(401).json({
+        error: 'Invalid session token',
+        message: 'Invalid or expired user session'
+      })
+    }
+
+    const { session, user } = sessionValidation
+
+    // 检查用户是否被禁用
+    if (!user.isActive) {
+      logger.security(
+        `🔒 Disabled user login attempt: ${user.username} from ${req.ip || 'unknown'}`
+      )
+      return res.status(403).json({
+        error: 'Account disabled',
+        message: 'Your account has been disabled. Please contact administrator.'
+      })
+    }
+
+    // 设置用户信息（只包含必要信息）
+    req.user = {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      displayName: user.displayName,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      sessionToken,
+      sessionCreatedAt: session.createdAt
+    }
+
+    const authDuration = Date.now() - startTime
+    logger.info(`👤 User authenticated: ${user.username} (${user.id}) in ${authDuration}ms`)
+
+    return next()
+  } catch (error) {
+    const authDuration = Date.now() - startTime
+    logger.error(`❌ User authentication error (${authDuration}ms):`, {
+      error: error.message,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      url: req.originalUrl
+    })
+
+    return res.status(500).json({
+      error: 'Authentication error',
+      message: 'Internal server error during user authentication'
+    })
+  }
+}
+
+// 👤 用户或管理员验证中间件（支持两种身份）
+const authenticateUserOrAdmin = async (req, res, next) => {
+  const startTime = Date.now()
+
+  try {
+    // 检查是否有管理员token
+    const adminToken =
+      req.headers['authorization']?.replace(/^Bearer\s+/i, '') ||
+      req.cookies?.adminToken ||
+      req.headers['x-admin-token']
+
+    // 检查是否有用户session token
+    const userToken =
+      req.headers['x-user-token'] ||
+      req.cookies?.userToken ||
+      (!adminToken ? req.headers['authorization']?.replace(/^Bearer\s+/i, '') : null)
+
+    // 优先尝试管理员认证
+    if (adminToken) {
+      try {
+        const adminSession = await redis.getSession(adminToken)
+        if (adminSession && Object.keys(adminSession).length > 0) {
+          req.admin = {
+            id: adminSession.adminId || 'admin',
+            username: adminSession.username,
+            sessionId: adminToken,
+            loginTime: adminSession.loginTime
+          }
+          req.userType = 'admin'
+
+          const authDuration = Date.now() - startTime
+          logger.security(`🔐 Admin authenticated: ${adminSession.username} in ${authDuration}ms`)
+          return next()
+        }
+      } catch (error) {
+        logger.debug('Admin authentication failed, trying user authentication:', error.message)
+      }
+    }
+
+    // 尝试用户认证
+    if (userToken) {
+      try {
+        const sessionValidation = await userService.validateUserSession(userToken)
+        if (sessionValidation) {
+          const { session, user } = sessionValidation
+
+          if (user.isActive) {
+            req.user = {
+              id: user.id,
+              username: user.username,
+              email: user.email,
+              displayName: user.displayName,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              role: user.role,
+              sessionToken: userToken,
+              sessionCreatedAt: session.createdAt
+            }
+            req.userType = 'user'
+
+            const authDuration = Date.now() - startTime
+            logger.info(`👤 User authenticated: ${user.username} (${user.id}) in ${authDuration}ms`)
+            return next()
+          }
+        }
+      } catch (error) {
+        logger.debug('User authentication failed:', error.message)
+      }
+    }
+
+    // 如果都失败了，返回未授权
+    logger.security(`🔒 Authentication failed from ${req.ip || 'unknown'}`)
+    return res.status(401).json({
+      error: 'Authentication required',
+      message: 'Please login as user or admin to access this resource'
+    })
+  } catch (error) {
+    const authDuration = Date.now() - startTime
+    logger.error(`❌ User/Admin authentication error (${authDuration}ms):`, {
+      error: error.message,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      url: req.originalUrl
+    })
+
+    return res.status(500).json({
+      error: 'Authentication error',
+      message: 'Internal server error during authentication'
+    })
+  }
+}
+
+// 🛡️ 权限检查中间件
+const requireRole = (allowedRoles) => (req, res, next) => {
+  // 管理员始终有权限
+  if (req.admin) {
+    return next()
+  }
+
+  // 检查用户角色
+  if (req.user) {
+    const userRole = req.user.role
+    const allowed = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles]
+
+    if (allowed.includes(userRole)) {
+      return next()
+    } else {
+      logger.security(
+        `🚫 Access denied for user ${req.user.username} (role: ${userRole}) to ${req.originalUrl}`
+      )
+      return res.status(403).json({
+        error: 'Insufficient permissions',
+        message: `This resource requires one of the following roles: ${allowed.join(', ')}`
+      })
+    }
+  }
+
+  return res.status(401).json({
+    error: 'Authentication required',
+    message: 'Please login to access this resource'
+  })
+}
+
+// 🔒 管理员权限检查中间件
+const requireAdmin = (req, res, next) => {
+  if (req.admin) {
+    return next()
+  }
+
+  // 检查是否是admin角色的用户
+  if (req.user && req.user.role === 'admin') {
+    return next()
+  }
+
+  logger.security(
+    `🚫 Admin access denied for ${req.user?.username || 'unknown'} from ${req.ip || 'unknown'}`
+  )
+  return res.status(403).json({
+    error: 'Admin access required',
+    message: 'This resource requires administrator privileges'
+  })
+}
+
 // 注意：使用统计现在直接在/api/v1/messages路由中处理，
 // 以便从Claude API响应中提取真实的usage数据
 
@@ -881,6 +1110,10 @@ const requestSizeLimit = (req, res, next) => {
 module.exports = {
   authenticateApiKey,
   authenticateAdmin,
+  authenticateUser,
+  authenticateUserOrAdmin,
+  requireRole,
+  requireAdmin,
   corsMiddleware,
   requestLogger,
   securityMiddleware,

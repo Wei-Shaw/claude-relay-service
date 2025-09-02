@@ -296,7 +296,11 @@ async function getAllAccounts() {
         }
       }
 
-      accounts.push(accountData)
+      accounts.push({
+        ...accountData,
+        isActive: accountData.isActive === 'true',
+        schedulable: accountData.schedulable !== 'false'
+      })
     }
   }
 

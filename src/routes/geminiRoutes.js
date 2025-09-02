@@ -331,7 +331,17 @@ async function handleLoadCodeAssist(req, res) {
       apiKeyId: req.apiKey?.id || 'unknown'
     })
 
-    const client = await geminiAccountService.getOauthClient(accessToken, refreshToken)
+    // 解析账户的代理配置
+    let proxyConfig = null
+    if (account.proxy) {
+      try {
+        proxyConfig = typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
+      } catch (e) {
+        logger.warn('Failed to parse proxy configuration:', e)
+      }
+    }
+
+    const client = await geminiAccountService.getOauthClient(accessToken, refreshToken, proxyConfig)
 
     // 根据账户配置决定项目ID：
     // 1. 如果账户有项目ID -> 使用账户的项目ID（强制覆盖）
@@ -348,7 +358,11 @@ async function handleLoadCodeAssist(req, res) {
       logger.info('No project ID in account for loadCodeAssist, removing project parameter')
     }
 
-    const response = await geminiAccountService.loadCodeAssist(client, effectiveProjectId)
+    const response = await geminiAccountService.loadCodeAssist(
+      client,
+      effectiveProjectId,
+      proxyConfig
+    )
 
     res.json(response)
   } catch (error) {
@@ -387,7 +401,17 @@ async function handleOnboardUser(req, res) {
       apiKeyId: req.apiKey?.id || 'unknown'
     })
 
-    const client = await geminiAccountService.getOauthClient(accessToken, refreshToken)
+    // 解析账户的代理配置
+    let proxyConfig = null
+    if (account.proxy) {
+      try {
+        proxyConfig = typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
+      } catch (e) {
+        logger.warn('Failed to parse proxy configuration:', e)
+      }
+    }
+
+    const client = await geminiAccountService.getOauthClient(accessToken, refreshToken, proxyConfig)
 
     // 根据账户配置决定项目ID：
     // 1. 如果账户有项目ID -> 使用账户的项目ID（强制覆盖）
@@ -410,7 +434,8 @@ async function handleOnboardUser(req, res) {
         client,
         tierId,
         effectiveProjectId, // 使用处理后的项目ID
-        metadata
+        metadata,
+        proxyConfig
       )
 
       res.json(response)
@@ -419,7 +444,8 @@ async function handleOnboardUser(req, res) {
       const response = await geminiAccountService.setupUser(
         client,
         effectiveProjectId, // 使用处理后的项目ID
-        metadata
+        metadata,
+        proxyConfig
       )
 
       res.json(response)
@@ -460,7 +486,8 @@ async function handleCountTokens(req, res) {
       sessionHash,
       model
     )
-    const { accessToken, refreshToken } = await geminiAccountService.getAccount(accountId)
+    const account = await geminiAccountService.getAccount(accountId)
+    const { accessToken, refreshToken } = account
 
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
     logger.info(`CountTokens request (${version})`, {
@@ -469,8 +496,18 @@ async function handleCountTokens(req, res) {
       apiKeyId: req.apiKey?.id || 'unknown'
     })
 
-    const client = await geminiAccountService.getOauthClient(accessToken, refreshToken)
-    const response = await geminiAccountService.countTokens(client, contents, model)
+    // 解析账户的代理配置
+    let proxyConfig = null
+    if (account.proxy) {
+      try {
+        proxyConfig = typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
+      } catch (e) {
+        logger.warn('Failed to parse proxy configuration:', e)
+      }
+    }
+
+    const client = await geminiAccountService.getOauthClient(accessToken, refreshToken, proxyConfig)
+    const response = await geminiAccountService.countTokens(client, contents, model, proxyConfig)
 
     res.json(response)
   } catch (error) {
@@ -544,8 +581,6 @@ async function handleGenerateContent(req, res) {
       apiKeyId: req.apiKey?.id || 'unknown'
     })
 
-    const client = await geminiAccountService.getOauthClient(accessToken, refreshToken)
-
     // 解析账户的代理配置
     let proxyConfig = null
     if (account.proxy) {
@@ -555,6 +590,8 @@ async function handleGenerateContent(req, res) {
         logger.warn('Failed to parse proxy configuration:', e)
       }
     }
+
+    const client = await geminiAccountService.getOauthClient(accessToken, refreshToken, proxyConfig)
 
     const response = await geminiAccountService.generateContent(
       client,
@@ -680,8 +717,6 @@ async function handleStreamGenerateContent(req, res) {
       }
     })
 
-    const client = await geminiAccountService.getOauthClient(accessToken, refreshToken)
-
     // 解析账户的代理配置
     let proxyConfig = null
     if (account.proxy) {
@@ -691,6 +726,8 @@ async function handleStreamGenerateContent(req, res) {
         logger.warn('Failed to parse proxy configuration:', e)
       }
     }
+
+    const client = await geminiAccountService.getOauthClient(accessToken, refreshToken, proxyConfig)
 
     const streamResponse = await geminiAccountService.generateContentStream(
       client,
