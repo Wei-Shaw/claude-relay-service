@@ -1429,7 +1429,7 @@ class RedisClient {
       const luaScript = `
         local key = KEYS[1]
         local current = tonumber(redis.call('get', key) or "0")
-        
+
         if current <= 0 then
           redis.call('del', key)
           return 0
@@ -1463,6 +1463,32 @@ class RedisClient {
       logger.error('❌ Failed to get concurrency:', error)
       return 0
     }
+  }
+
+  // 🔧 Basic Redis operations wrapper methods for convenience
+  async get(key) {
+    const client = this.getClientSafe()
+    return await client.get(key)
+  }
+
+  async set(key, value, ...args) {
+    const client = this.getClientSafe()
+    return await client.set(key, value, ...args)
+  }
+
+  async setex(key, ttl, value) {
+    const client = this.getClientSafe()
+    return await client.setex(key, ttl, value)
+  }
+
+  async del(...keys) {
+    const client = this.getClientSafe()
+    return await client.del(...keys)
+  }
+
+  async keys(pattern) {
+    const client = this.getClientSafe()
+    return await client.keys(pattern)
   }
 
   // 📊 获取账户会话窗口内的使用统计（包含模型细分）
