@@ -679,6 +679,9 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
         if (updates.tokenLimit !== undefined) {
           finalUpdates.tokenLimit = updates.tokenLimit
         }
+        if (updates.rateLimitCost !== undefined) {
+          finalUpdates.rateLimitCost = updates.rateLimitCost
+        }
         if (updates.concurrencyLimit !== undefined) {
           finalUpdates.concurrencyLimit = updates.concurrencyLimit
         }
@@ -1125,7 +1128,7 @@ router.get('/api-keys/deleted', authenticateAdmin, async (req, res) => {
       deletedAt: key.deletedAt,
       deletedBy: key.deletedBy,
       deletedByType: key.deletedByType,
-      canRestore: false // Deleted keys cannot be restored per requirement
+      canRestore: true // 已删除的API Key可以恢复
     }))
 
     logger.success(`📋 Admin retrieved ${enrichedKeys.length} deleted API keys`)
@@ -1135,6 +1138,123 @@ router.get('/api-keys/deleted', authenticateAdmin, async (req, res) => {
     return res
       .status(500)
       .json({ error: 'Failed to retrieve deleted API keys', message: error.message })
+  }
+})
+
+// 🔄 恢复已删除的API Key
+router.post('/api-keys/:keyId/restore', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyId } = req.params
+    const adminUsername = req.session?.admin?.username || 'unknown'
+
+    // 调用服务层的恢复方法
+    const result = await apiKeyService.restoreApiKey(keyId, adminUsername, 'admin')
+
+    if (result.success) {
+      logger.success(`✅ Admin ${adminUsername} restored API key: ${keyId}`)
+      return res.json({
+        success: true,
+        message: 'API Key 已成功恢复',
+        apiKey: result.apiKey
+      })
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'Failed to restore API key'
+      })
+    }
+  } catch (error) {
+    logger.error('❌ Failed to restore API key:', error)
+
+    // 根据错误类型返回适当的响应
+    if (error.message === 'API key not found') {
+      return res.status(404).json({
+        success: false,
+        error: 'API Key 不存在'
+      })
+    } else if (error.message === 'API key is not deleted') {
+      return res.status(400).json({
+        success: false,
+        error: '该 API Key 未被删除，无需恢复'
+      })
+    }
+
+    return res.status(500).json({
+      success: false,
+      error: '恢复 API Key 失败',
+      message: error.message
+    })
+  }
+})
+
+// 🗑️ 彻底删除API Key（物理删除）
+router.delete('/api-keys/:keyId/permanent', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyId } = req.params
+    const adminUsername = req.session?.admin?.username || 'unknown'
+
+    // 调用服务层的彻底删除方法
+    const result = await apiKeyService.permanentDeleteApiKey(keyId)
+
+    if (result.success) {
+      logger.success(`🗑️ Admin ${adminUsername} permanently deleted API key: ${keyId}`)
+      return res.json({
+        success: true,
+        message: 'API Key 已彻底删除'
+      })
+    }
+  } catch (error) {
+    logger.error('❌ Failed to permanently delete API key:', error)
+
+    if (error.message === 'API key not found') {
+      return res.status(404).json({
+        success: false,
+        error: 'API Key 不存在'
+      })
+    } else if (error.message === '只能彻底删除已经删除的API Key') {
+      return res.status(400).json({
+        success: false,
+        error: '只能彻底删除已经删除的API Key'
+      })
+    }
+
+    return res.status(500).json({
+      success: false,
+      error: '彻底删除 API Key 失败',
+      message: error.message
+    })
+  }
+})
+
+// 🧹 清空所有已删除的API Keys
+router.delete('/api-keys/deleted/clear-all', authenticateAdmin, async (req, res) => {
+  try {
+    const adminUsername = req.session?.admin?.username || 'unknown'
+
+    // 调用服务层的清空方法
+    const result = await apiKeyService.clearAllDeletedApiKeys()
+
+    logger.success(
+      `🧹 Admin ${adminUsername} cleared deleted API keys: ${result.successCount}/${result.total}`
+    )
+
+    return res.json({
+      success: true,
+      message: `成功清空 ${result.successCount} 个已删除的 API Keys`,
+      details: {
+        total: result.total,
+        successCount: result.successCount,
+        failedCount: result.failedCount,
+        errors: result.errors
+      }
+    })
+  } catch (error) {
+    logger.error('❌ Failed to clear all deleted API keys:', error)
+    return res.status(500).json({
+      success: false,
+      error: '清空已删除的 API Keys 失败',
+      message: error.message
+    })
   }
 })
 
