@@ -1,14 +1,28 @@
 <template>
   <div>
-    <!-- 限制配置 -->
+    <!-- 限制配置 / 聚合模式提示 -->
     <div class="card p-4 md:p-6">
       <h3
         class="mb-3 flex items-center text-lg font-bold text-gray-900 dark:text-gray-100 md:mb-4 md:text-xl"
       >
         <i class="fas fa-shield-alt mr-2 text-sm text-red-500 md:mr-3 md:text-base" />
-        限制配置
+        {{ multiKeyMode ? '限制配置（聚合查询模式）' : '限制配置' }}
       </h3>
-      <div class="space-y-4 md:space-y-5">
+
+      <!-- 多 Key 模式下的提示信息 -->
+      <div
+        v-if="multiKeyMode"
+        class="mb-4 rounded-lg bg-yellow-50 p-3 text-sm dark:bg-yellow-900/20"
+      >
+        <i class="fas fa-info-circle mr-2 text-yellow-600 dark:text-yellow-400" />
+        <span class="text-yellow-700 dark:text-yellow-300">
+          聚合查询模式下，限制配置信息不适用于多个 API Key 的组合，因此不显示详细的限制配置。 每个
+          API Key 有独立的限制设置。
+        </span>
+      </div>
+
+      <!-- 仅在单 Key 模式下显示限制配置 -->
+      <div v-if="!multiKeyMode" class="space-y-4 md:space-y-5">
         <!-- 每日费用限制 -->
         <div>
           <div class="mb-2 flex items-center justify-between">
@@ -221,7 +235,7 @@ import { useApiStatsStore } from '@/stores/apistats'
 import WindowCountdown from '@/components/apikeys/WindowCountdown.vue'
 
 const apiStatsStore = useApiStatsStore()
-const { statsData } = storeToRefs(apiStatsStore)
+const { statsData, multiKeyMode } = storeToRefs(apiStatsStore)
 
 // 获取每日费用进度
 const getDailyCostProgress = () => {
