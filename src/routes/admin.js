@@ -1183,34 +1183,7 @@ router.get('/account-groups/:groupId/members', authenticateAdmin, async (req, re
       }
 
       if (account) {
-        try {
-          // 添加使用统计信息
-          const usageStats = await redis.getAccountUsageStats(account.id)
-          const groupInfos = await accountGroupService.getAccountGroups(account.id)
-
-          members.push({
-            ...account,
-            groupInfos,
-            usage: {
-              daily: usageStats.daily,
-              total: usageStats.total,
-              averages: usageStats.averages
-            }
-          })
-        } catch (statsError) {
-          logger.warn(`⚠️ Failed to get usage stats for account ${account.id}:`, statsError.message)
-          // 如果获取统计失败，返回空统计
-          const groupInfos = await accountGroupService.getAccountGroups(account.id).catch(() => [])
-          members.push({
-            ...account,
-            groupInfos,
-            usage: {
-              daily: { tokens: 0, requests: 0 },
-              total: { tokens: 0, requests: 0 },
-              averages: { tokensPerRequest: 0 }
-            }
-          })
-        }
+        members.push(account)
       }
     }
 
@@ -5173,15 +5146,13 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
       }
     }
 
-    // 为每个账户添加使用统计信息和分组信息
+    // 为每个账户添加使用统计信息
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
         try {
           const usageStats = await redis.getAccountUsageStats(account.id)
-          const groupInfos = await accountGroupService.getAccountGroups(account.id)
           return {
             ...account,
-            groupInfos,
             usage: {
               daily: usageStats.daily,
               total: usageStats.total,
@@ -5190,27 +5161,12 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
           }
         } catch (error) {
           logger.debug(`Failed to get usage stats for OpenAI account ${account.id}:`, error)
-          try {
-            const groupInfos = await accountGroupService.getAccountGroups(account.id)
-            return {
-              ...account,
-              groupInfos,
-              usage: {
-                daily: { requests: 0, tokens: 0, allTokens: 0 },
-                total: { requests: 0, tokens: 0, allTokens: 0 },
-                averages: { rpm: 0, tpm: 0 }
-              }
-            }
-          } catch (groupError) {
-            logger.debug(`Failed to get group info for account ${account.id}:`, groupError)
-            return {
-              ...account,
-              groupInfos: [],
-              usage: {
-                daily: { requests: 0, tokens: 0, allTokens: 0 },
-                total: { requests: 0, tokens: 0, allTokens: 0 },
-                averages: { rpm: 0, tpm: 0 }
-              }
+          return {
+            ...account,
+            usage: {
+              daily: { requests: 0, tokens: 0, allTokens: 0 },
+              total: { requests: 0, tokens: 0, allTokens: 0 },
+              monthly: { requests: 0, tokens: 0, allTokens: 0 }
             }
           }
         }

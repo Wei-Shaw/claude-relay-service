@@ -585,10 +585,6 @@ async function deleteAccount(accountId) {
     throw new Error('Account not found')
   }
 
-  // 首先从所有分组中移除此账户
-  const accountGroupService = require('./accountGroupService')
-  await accountGroupService.removeAccountFromAllGroups(accountId)
-
   // 从 Redis 删除
   const client = redisClient.getClientSafe()
   await client.del(`${GEMINI_ACCOUNT_KEY_PREFIX}${accountId}`)
