@@ -1431,7 +1431,8 @@ const resetAccountStatus = async (account) => {
 
     if (data.success) {
       showToast('账户状态已重置', 'success')
-      loadAccounts()
+      // 强制刷新，绕过前端缓存，确保最终一致性
+      loadAccounts(true)
     } else {
       showToast(data.message || '状态重置失败', 'error')
     }

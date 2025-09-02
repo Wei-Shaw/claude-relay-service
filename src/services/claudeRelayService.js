@@ -207,7 +207,7 @@ class ClaudeRelayService {
           logger.info(
             `🔥 Account ${accountId} has ${errorCount} consecutive 5xx errors in the last 5 minutes`
           )
-          if (errorCount >= 3) {
+          if (errorCount > 10) {
             logger.error(
               `❌ Account ${accountId} exceeded 5xx error threshold (${errorCount} errors), marking as temp_error`
             )
@@ -939,7 +939,7 @@ class ClaudeRelayService {
               logger.info(
                 `🔥 [Stream] Account ${accountId} has ${errorCount} consecutive 5xx errors in the last 5 minutes`
               )
-              if (errorCount >= 3) {
+              if (errorCount > 10) {
                 logger.error(
                   `❌ [Stream] Account ${accountId} exceeded 5xx error threshold (${errorCount} errors), marking as temp_error`
                 )
