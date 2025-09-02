@@ -3,8 +3,8 @@
     <!-- Header -->
     <div class="sm:flex sm:items-center">
       <div class="sm:flex-auto">
-        <h1 class="text-2xl font-semibold text-gray-900">User Management</h1>
-        <p class="mt-2 text-sm text-gray-700">
+        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">User Management</h1>
+        <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">
           Manage users, their API keys, and view usage statistics
         </p>
       </div>
@@ -29,7 +29,7 @@
 
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-      <div class="overflow-hidden rounded-lg bg-white shadow">
+      <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
         <div class="p-5">
           <div class="flex items-center">
             <div class="flex-shrink-0">
@@ -49,15 +49,19 @@
             </div>
             <div class="ml-5 w-0 flex-1">
               <dl>
-                <dt class="truncate text-sm font-medium text-gray-500">Total Users</dt>
-                <dd class="text-lg font-medium text-gray-900">{{ userStats?.totalUsers || 0 }}</dd>
+                <dt class="truncate text-sm font-medium text-gray-500 dark:text-gray-400">
+                  Total Users
+                </dt>
+                <dd class="text-lg font-medium text-gray-900 dark:text-white">
+                  {{ userStats?.totalUsers || 0 }}
+                </dd>
               </dl>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="overflow-hidden rounded-lg bg-white shadow">
+      <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
         <div class="p-5">
           <div class="flex items-center">
             <div class="flex-shrink-0">
@@ -77,15 +81,19 @@
             </div>
             <div class="ml-5 w-0 flex-1">
               <dl>
-                <dt class="truncate text-sm font-medium text-gray-500">Active Users</dt>
-                <dd class="text-lg font-medium text-gray-900">{{ userStats?.activeUsers || 0 }}</dd>
+                <dt class="truncate text-sm font-medium text-gray-500 dark:text-gray-400">
+                  Active Users
+                </dt>
+                <dd class="text-lg font-medium text-gray-900 dark:text-white">
+                  {{ userStats?.activeUsers || 0 }}
+                </dd>
               </dl>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="overflow-hidden rounded-lg bg-white shadow">
+      <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
         <div class="p-5">
           <div class="flex items-center">
             <div class="flex-shrink-0">
@@ -105,8 +113,10 @@
             </div>
             <div class="ml-5 w-0 flex-1">
               <dl>
-                <dt class="truncate text-sm font-medium text-gray-500">Total API Keys</dt>
-                <dd class="text-lg font-medium text-gray-900">
+                <dt class="truncate text-sm font-medium text-gray-500 dark:text-gray-400">
+                  Total API Keys
+                </dt>
+                <dd class="text-lg font-medium text-gray-900 dark:text-white">
                   {{ userStats?.totalApiKeys || 0 }}
                 </dd>
               </dl>
@@ -115,7 +125,7 @@
         </div>
       </div>
 
-      <div class="overflow-hidden rounded-lg bg-white shadow">
+      <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
         <div class="p-5">
           <div class="flex items-center">
             <div class="flex-shrink-0">
@@ -135,8 +145,10 @@
             </div>
             <div class="ml-5 w-0 flex-1">
               <dl>
-                <dt class="truncate text-sm font-medium text-gray-500">Total Cost</dt>
-                <dd class="text-lg font-medium text-gray-900">
+                <dt class="truncate text-sm font-medium text-gray-500 dark:text-gray-400">
+                  Total Cost
+                </dt>
+                <dd class="text-lg font-medium text-gray-900 dark:text-white">
                   ${{ (userStats?.totalUsage?.totalCost || 0).toFixed(4) }}
                 </dd>
               </dl>
@@ -147,7 +159,7 @@
     </div>
 
     <!-- Search and Filters -->
-    <div class="rounded-lg bg-white shadow">
+    <div class="rounded-lg bg-white shadow dark:bg-gray-800">
       <div class="px-4 py-5 sm:p-6">
         <div class="sm:flex sm:items-center sm:justify-between">
           <div class="space-y-4 sm:flex sm:items-center sm:space-x-4 sm:space-y-0">
@@ -171,7 +183,7 @@
                 </div>
                 <input
                   v-model="searchQuery"
-                  class="block w-full rounded-md border-gray-300 pl-10 focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                  class="block w-full rounded-md border-gray-300 pl-10 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
                   placeholder="Search users..."
                   type="search"
                   @input="debouncedSearch"
@@ -183,7 +195,7 @@
             <div>
               <select
                 v-model="selectedRole"
-                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
                 @change="loadUsers"
               >
                 <option value="">All Roles</option>
@@ -196,7 +208,7 @@
             <div>
               <select
                 v-model="selectedStatus"
-                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
                 @change="loadUsers"
               >
                 <option value="">All Status</option>
@@ -210,11 +222,11 @@
     </div>
 
     <!-- Users Table -->
-    <div class="overflow-hidden bg-white shadow sm:rounded-md">
-      <div class="border-b border-gray-200 px-4 py-5 sm:px-6">
-        <h3 class="text-lg font-medium leading-6 text-gray-900">
+    <div class="overflow-hidden bg-white shadow dark:bg-gray-800 sm:rounded-md">
+      <div class="border-b border-gray-200 px-4 py-5 dark:border-gray-700 sm:px-6">
+        <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
           Users
-          <span v-if="!loading" class="text-sm text-gray-500"
+          <span v-if="!loading" class="text-sm text-gray-500 dark:text-gray-400"
             >({{ filteredUsers.length }} of {{ users.length }})</span
           >
         </h3>
@@ -242,18 +254,24 @@
             fill="currentColor"
           ></path>
         </svg>
-        <p class="mt-2 text-sm text-gray-500">Loading users...</p>
+        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading users...</p>
       </div>
 
       <!-- Users List -->
-      <ul v-else-if="filteredUsers.length > 0" class="divide-y divide-gray-200" role="list">
+      <ul
+        v-else-if="filteredUsers.length > 0"
+        class="divide-y divide-gray-200 dark:divide-gray-700"
+        role="list"
+      >
         <li v-for="user in filteredUsers" :key="user.id" class="px-6 py-4">
           <div class="flex items-center justify-between">
             <div class="flex min-w-0 flex-1 items-center">
               <div class="flex-shrink-0">
-                <div class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-300">
+                <div
+                  class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-300 dark:bg-gray-600"
+                >
                   <svg
-                    class="h-6 w-6 text-gray-600"
+                    class="h-6 w-6 text-gray-600 dark:text-gray-400"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -269,14 +287,16 @@
               </div>
               <div class="ml-4 min-w-0 flex-1">
                 <div class="flex items-center">
-                  <p class="truncate text-sm font-medium text-gray-900">
+                  <p class="truncate text-sm font-medium text-gray-900 dark:text-white">
                     {{ user.displayName || user.username }}
                   </p>
                   <div class="ml-2 flex items-center space-x-2">
                     <span
                       :class="[
                         'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
-                        user.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        user.isActive
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                       ]"
                     >
                       {{ user.isActive ? 'Active' : 'Disabled' }}
@@ -285,15 +305,17 @@
                       :class="[
                         'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
                         user.role === 'admin'
-                          ? 'bg-purple-100 text-purple-800'
-                          : 'bg-blue-100 text-blue-800'
+                          ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                          : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
                       ]"
                     >
                       {{ user.role }}
                     </span>
                   </div>
                 </div>
-                <div class="mt-1 flex items-center space-x-4 text-sm text-gray-500">
+                <div
+                  class="mt-1 flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400"
+                >
                   <span>@{{ user.username }}</span>
                   <span v-if="user.email">{{ user.email }}</span>
                   <span>{{ user.apiKeyCount || 0 }} API keys</span>
@@ -304,7 +326,7 @@
                 </div>
                 <div
                   v-if="user.totalUsage"
-                  class="mt-1 flex items-center space-x-4 text-xs text-gray-400"
+                  class="mt-1 flex items-center space-x-4 text-xs text-gray-400 dark:text-gray-500"
                 >
                   <span>{{ formatNumber(user.totalUsage.requests || 0) }} requests</span>
                   <span>${{ (user.totalUsage.totalCost || 0).toFixed(4) }} total cost</span>
@@ -415,8 +437,8 @@
             stroke-width="2"
           />
         </svg>
-        <h3 class="mt-2 text-sm font-medium text-gray-900">No users found</h3>
-        <p class="mt-1 text-sm text-gray-500">
+        <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No users found</h3>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
           {{
             searchQuery ? 'No users match your search criteria.' : 'No users have been created yet.'
           }}

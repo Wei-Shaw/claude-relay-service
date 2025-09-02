@@ -1,9 +1,21 @@
 <template>
-  <div class="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+  <div
+    class="relative flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 dark:bg-gray-900 sm:px-6 lg:px-8"
+  >
+    <!-- 主题切换按钮 -->
+    <div class="fixed right-4 top-4 z-10">
+      <ThemeToggle mode="dropdown" />
+    </div>
+
     <div class="w-full max-w-md space-y-8">
       <div>
         <div class="mx-auto flex h-12 w-auto items-center justify-center">
-          <svg class="h-8 w-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg
+            class="h-8 w-8 text-blue-600 dark:text-blue-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
             <path
               d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
               stroke-linecap="round"
@@ -11,23 +23,30 @@
               stroke-width="2"
             />
           </svg>
-          <span class="ml-2 text-xl font-bold text-gray-900">Claude Relay</span>
+          <span class="ml-2 text-xl font-bold text-gray-900 dark:text-white">Claude Relay</span>
         </div>
-        <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">User Sign In</h2>
-        <p class="mt-2 text-center text-sm text-gray-600">
+        <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
+          User Sign In
+        </h2>
+        <p class="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
           Sign in to your account to manage your API keys
         </p>
       </div>
 
-      <div class="rounded-lg bg-white px-6 py-8 shadow">
+      <div class="rounded-lg bg-white px-6 py-8 shadow dark:bg-gray-800 dark:shadow-xl">
         <form class="space-y-6" @submit.prevent="handleLogin">
           <div>
-            <label class="block text-sm font-medium text-gray-700" for="username"> Username </label>
+            <label
+              class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+              for="username"
+            >
+              Username
+            </label>
             <div class="mt-1">
               <input
                 id="username"
                 v-model="form.username"
-                class="relative block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                class="relative block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-400 dark:focus:ring-blue-400 sm:text-sm"
                 :disabled="loading"
                 name="username"
                 placeholder="Enter your username"
@@ -38,12 +57,17 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700" for="password"> Password </label>
+            <label
+              class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+              for="password"
+            >
+              Password
+            </label>
             <div class="mt-1">
               <input
                 id="password"
                 v-model="form.password"
-                class="relative block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                class="relative block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-400 dark:focus:ring-blue-400 sm:text-sm"
                 :disabled="loading"
                 name="password"
                 placeholder="Enter your password"
@@ -53,7 +77,10 @@
             </div>
           </div>
 
-          <div v-if="error" class="rounded-md border border-red-200 bg-red-50 p-4">
+          <div
+            v-if="error"
+            class="rounded-md border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20"
+          >
             <div class="flex">
               <div class="flex-shrink-0">
                 <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
@@ -65,14 +92,14 @@
                 </svg>
               </div>
               <div class="ml-3">
-                <p class="text-sm text-red-700">{{ error }}</p>
+                <p class="text-sm text-red-700 dark:text-red-400">{{ error }}</p>
               </div>
             </div>
           </div>
 
           <div>
             <button
-              class="group relative flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              class="group relative flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-blue-400 dark:focus:ring-offset-gray-800"
               :disabled="loading || !form.username || !form.password"
               type="submit"
             >
@@ -103,7 +130,10 @@
           </div>
 
           <div class="text-center">
-            <router-link class="text-sm text-blue-600 hover:text-blue-500" to="/admin-login">
+            <router-link
+              class="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+              to="/admin-login"
+            >
               Admin Login
             </router-link>
           </div>
@@ -114,13 +144,16 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useThemeStore } from '@/stores/theme'
 import { showToast } from '@/utils/toast'
+import ThemeToggle from '@/components/common/ThemeToggle.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
+const themeStore = useThemeStore()
 
 const loading = ref(false)
 const error = ref('')
@@ -154,6 +187,11 @@ const handleLogin = async () => {
     loading.value = false
   }
 }
+
+onMounted(() => {
+  // 初始化主题（因为该页面不在 MainLayout 内）
+  themeStore.initTheme()
+})
 </script>
 
 <style scoped>

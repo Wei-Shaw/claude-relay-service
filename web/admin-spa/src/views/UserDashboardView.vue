@@ -1,13 +1,13 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
     <!-- 导航栏 -->
-    <nav class="bg-white shadow">
+    <nav class="bg-white shadow dark:bg-gray-800">
       <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div class="flex h-16 justify-between">
           <div class="flex items-center">
             <div class="flex flex-shrink-0 items-center">
               <svg
-                class="h-8 w-8 text-blue-600"
+                class="h-8 w-8 text-blue-600 dark:text-blue-400"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -19,7 +19,7 @@
                   stroke-width="2"
                 />
               </svg>
-              <span class="ml-2 text-xl font-bold text-gray-900">Claude Relay</span>
+              <span class="ml-2 text-xl font-bold text-gray-900 dark:text-white">Claude Relay</span>
             </div>
             <div class="ml-10">
               <div class="flex items-baseline space-x-4">
@@ -27,8 +27,8 @@
                   :class="[
                     'rounded-md px-3 py-2 text-sm font-medium',
                     activeTab === 'overview'
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'text-gray-500 hover:text-gray-700'
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                   ]"
                   @click="handleTabChange('overview')"
                 >
@@ -38,8 +38,8 @@
                   :class="[
                     'rounded-md px-3 py-2 text-sm font-medium',
                     activeTab === 'api-keys'
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'text-gray-500 hover:text-gray-700'
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                   ]"
                   @click="handleTabChange('api-keys')"
                 >
@@ -49,8 +49,8 @@
                   :class="[
                     'rounded-md px-3 py-2 text-sm font-medium',
                     activeTab === 'usage'
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'text-gray-500 hover:text-gray-700'
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                   ]"
                   @click="handleTabChange('usage')"
                 >
@@ -60,11 +60,15 @@
             </div>
           </div>
           <div class="flex items-center space-x-4">
-            <div class="text-sm text-gray-700">
+            <div class="text-sm text-gray-700 dark:text-gray-300">
               Welcome, <span class="font-medium">{{ userStore.userName }}</span>
             </div>
+
+            <!-- 主题切换按钮 -->
+            <ThemeToggle mode="icon" />
+
             <button
-              class="rounded-md px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-700"
+              class="rounded-md px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
               @click="handleLogout"
             >
               Logout
@@ -79,13 +83,15 @@
       <!-- Overview Tab -->
       <div v-if="activeTab === 'overview'" class="space-y-6">
         <div>
-          <h1 class="text-2xl font-semibold text-gray-900">Dashboard Overview</h1>
-          <p class="mt-2 text-sm text-gray-600">Welcome to your Claude Relay dashboard</p>
+          <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">Dashboard Overview</h1>
+          <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Welcome to your Claude Relay dashboard
+          </p>
         </div>
 
         <!-- Stats Cards -->
         <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-5">
-          <div class="overflow-hidden rounded-lg bg-white shadow">
+          <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
             <div class="p-5">
               <div class="flex items-center">
                 <div class="flex-shrink-0">
@@ -105,8 +111,10 @@
                 </div>
                 <div class="ml-5 w-0 flex-1">
                   <dl>
-                    <dt class="truncate text-sm font-medium text-gray-500">Active API Keys</dt>
-                    <dd class="text-lg font-medium text-gray-900">
+                    <dt class="truncate text-sm font-medium text-gray-500 dark:text-gray-400">
+                      Active API Keys
+                    </dt>
+                    <dd class="text-lg font-medium text-gray-900 dark:text-white">
                       {{ apiKeysStats.active }}
                     </dd>
                   </dl>
@@ -115,7 +123,7 @@
             </div>
           </div>
 
-          <div class="overflow-hidden rounded-lg bg-white shadow">
+          <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
             <div class="p-5">
               <div class="flex items-center">
                 <div class="flex-shrink-0">
@@ -135,8 +143,10 @@
                 </div>
                 <div class="ml-5 w-0 flex-1">
                   <dl>
-                    <dt class="truncate text-sm font-medium text-gray-500">Deleted API Keys</dt>
-                    <dd class="text-lg font-medium text-gray-900">
+                    <dt class="truncate text-sm font-medium text-gray-500 dark:text-gray-400">
+                      Deleted API Keys
+                    </dt>
+                    <dd class="text-lg font-medium text-gray-900 dark:text-white">
                       {{ apiKeysStats.deleted }}
                     </dd>
                   </dl>
@@ -145,12 +155,12 @@
             </div>
           </div>
 
-          <div class="overflow-hidden rounded-lg bg-white shadow">
+          <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
             <div class="p-5">
               <div class="flex items-center">
                 <div class="flex-shrink-0">
                   <svg
-                    class="h-6 w-6 text-gray-400"
+                    class="h-6 w-6 text-blue-400"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -165,8 +175,10 @@
                 </div>
                 <div class="ml-5 w-0 flex-1">
                   <dl>
-                    <dt class="truncate text-sm font-medium text-gray-500">Total Requests</dt>
-                    <dd class="text-lg font-medium text-gray-900">
+                    <dt class="truncate text-sm font-medium text-gray-500 dark:text-gray-400">
+                      Total Requests
+                    </dt>
+                    <dd class="text-lg font-medium text-gray-900 dark:text-white">
                       {{ formatNumber(userProfile?.totalUsage?.requests || 0) }}
                     </dd>
                   </dl>
@@ -175,12 +187,12 @@
             </div>
           </div>
 
-          <div class="overflow-hidden rounded-lg bg-white shadow">
+          <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
             <div class="p-5">
               <div class="flex items-center">
                 <div class="flex-shrink-0">
                   <svg
-                    class="h-6 w-6 text-gray-400"
+                    class="h-6 w-6 text-purple-400"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -195,8 +207,10 @@
                 </div>
                 <div class="ml-5 w-0 flex-1">
                   <dl>
-                    <dt class="truncate text-sm font-medium text-gray-500">Input Tokens</dt>
-                    <dd class="text-lg font-medium text-gray-900">
+                    <dt class="truncate text-sm font-medium text-gray-500 dark:text-gray-400">
+                      Input Tokens
+                    </dt>
+                    <dd class="text-lg font-medium text-gray-900 dark:text-white">
                       {{ formatNumber(userProfile?.totalUsage?.inputTokens || 0) }}
                     </dd>
                   </dl>
@@ -205,12 +219,12 @@
             </div>
           </div>
 
-          <div class="overflow-hidden rounded-lg bg-white shadow">
+          <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
             <div class="p-5">
               <div class="flex items-center">
                 <div class="flex-shrink-0">
                   <svg
-                    class="h-6 w-6 text-gray-400"
+                    class="h-6 w-6 text-yellow-400"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -225,8 +239,10 @@
                 </div>
                 <div class="ml-5 w-0 flex-1">
                   <dl>
-                    <dt class="truncate text-sm font-medium text-gray-500">Total Cost</dt>
-                    <dd class="text-lg font-medium text-gray-900">
+                    <dt class="truncate text-sm font-medium text-gray-500 dark:text-gray-400">
+                      Total Cost
+                    </dt>
+                    <dd class="text-lg font-medium text-gray-900 dark:text-white">
                       ${{ (userProfile?.totalUsage?.totalCost || 0).toFixed(4) }}
                     </dd>
                   </dl>
@@ -237,48 +253,50 @@
         </div>
 
         <!-- User Info -->
-        <div class="rounded-lg bg-white shadow">
+        <div class="rounded-lg bg-white shadow dark:bg-gray-800">
           <div class="px-4 py-5 sm:p-6">
-            <h3 class="text-lg font-medium leading-6 text-gray-900">Account Information</h3>
-            <div class="mt-5 border-t border-gray-200">
-              <dl class="divide-y divide-gray-200">
+            <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
+              Account Information
+            </h3>
+            <div class="mt-5 border-t border-gray-200 dark:border-gray-700">
+              <dl class="divide-y divide-gray-200 dark:divide-gray-700">
                 <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-                  <dt class="text-sm font-medium text-gray-500">Username</dt>
-                  <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
+                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Username</dt>
+                  <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
                     {{ userProfile?.username }}
                   </dd>
                 </div>
                 <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-                  <dt class="text-sm font-medium text-gray-500">Display Name</dt>
-                  <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
+                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Display Name</dt>
+                  <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
                     {{ userProfile?.displayName || 'N/A' }}
                   </dd>
                 </div>
                 <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-                  <dt class="text-sm font-medium text-gray-500">Email</dt>
-                  <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
+                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Email</dt>
+                  <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
                     {{ userProfile?.email || 'N/A' }}
                   </dd>
                 </div>
                 <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-                  <dt class="text-sm font-medium text-gray-500">Role</dt>
-                  <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
+                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Role</dt>
+                  <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
                     <span
-                      class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800"
+                      class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200"
                     >
                       {{ userProfile?.role || 'user' }}
                     </span>
                   </dd>
                 </div>
                 <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-                  <dt class="text-sm font-medium text-gray-500">Member Since</dt>
-                  <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
+                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Member Since</dt>
+                  <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
                     {{ formatDate(userProfile?.createdAt) }}
                   </dd>
                 </div>
                 <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-                  <dt class="text-sm font-medium text-gray-500">Last Login</dt>
-                  <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
+                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Last Login</dt>
+                  <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
                     {{ formatDate(userProfile?.lastLoginAt) || 'N/A' }}
                   </dd>
                 </div>
@@ -305,12 +323,15 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useThemeStore } from '@/stores/theme'
 import { showToast } from '@/utils/toast'
+import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import UserApiKeysManager from '@/components/user/UserApiKeysManager.vue'
 import UserUsageStats from '@/components/user/UserUsageStats.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
+const themeStore = useThemeStore()
 
 const activeTab = ref('overview')
 const userProfile = ref(null)
@@ -387,6 +408,8 @@ const loadApiKeysStats = async () => {
 }
 
 onMounted(() => {
+  // 初始化主题
+  themeStore.initTheme()
   loadUserProfile()
   loadApiKeysStats()
 })
