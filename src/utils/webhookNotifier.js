@@ -1,5 +1,6 @@
 const logger = require('./logger')
 const webhookService = require('../services/webhookService')
+const { getISOStringWithTimezone } = require('./dateHelper')
 
 class WebhookNotifier {
   constructor() {
@@ -28,7 +29,7 @@ class WebhookNotifier {
         errorCode:
           notification.errorCode || this._getErrorCode(notification.platform, notification.status),
         reason: notification.reason,
-        timestamp: notification.timestamp || new Date().toISOString()
+        timestamp: notification.timestamp || getISOStringWithTimezone(new Date())
       })
     } catch (error) {
       logger.error('Failed to send account anomaly notification:', error)

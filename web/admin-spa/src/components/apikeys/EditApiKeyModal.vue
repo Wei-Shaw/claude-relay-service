@@ -166,17 +166,17 @@
 
                 <div>
                   <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300"
-                    >Token 限制</label
+                    >费用限制 (美元)</label
                   >
                   <input
-                    v-model="form.tokenLimit"
+                    v-model="form.rateLimitCost"
                     class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                    min="0"
                     placeholder="无限制"
+                    step="0.01"
                     type="number"
                   />
-                  <p class="ml-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                    窗口内最大Token
-                  </p>
+                  <p class="ml-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">窗口内最大费用</p>
                 </div>
               </div>
 
@@ -189,12 +189,9 @@
                   <div>
                     <strong>示例1:</strong> 时间窗口=60，请求次数=1000 → 每60分钟最多1000次请求
                   </div>
+                  <div><strong>示例2:</strong> 时间窗口=1，费用=0.1 → 每分钟最多$0.1费用</div>
                   <div>
-                    <strong>示例2:</strong> 时间窗口=1，Token=10000 → 每分钟最多10,000个Token
-                  </div>
-                  <div>
-                    <strong>示例3:</strong> 窗口=30，请求=50，Token=100000 →
-                    每30分钟50次请求且不超10万Token
+                    <strong>示例3:</strong> 窗口=30，请求=50，费用=5 → 每30分钟50次请求且不超$5费用
                   </div>
                 </div>
               </div>
@@ -246,6 +243,55 @@
               />
               <p class="text-xs text-gray-500 dark:text-gray-400">
                 设置此 API Key 每日的费用限制，超过限制将拒绝请求，0 或留空表示无限制
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >Opus 模型周费用限制 (美元)</label
+            >
+            <div class="space-y-3">
+              <div class="flex gap-2">
+                <button
+                  class="rounded-lg bg-gray-100 px-3 py-1 text-sm font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  type="button"
+                  @click="form.weeklyOpusCostLimit = '100'"
+                >
+                  $100
+                </button>
+                <button
+                  class="rounded-lg bg-gray-100 px-3 py-1 text-sm font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  type="button"
+                  @click="form.weeklyOpusCostLimit = '500'"
+                >
+                  $500
+                </button>
+                <button
+                  class="rounded-lg bg-gray-100 px-3 py-1 text-sm font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  type="button"
+                  @click="form.weeklyOpusCostLimit = '1000'"
+                >
+                  $1000
+                </button>
+                <button
+                  class="rounded-lg bg-gray-100 px-3 py-1 text-sm font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  type="button"
+                  @click="form.weeklyOpusCostLimit = ''"
+                >
+                  自定义
+                </button>
+              </div>
+              <input
+                v-model="form.weeklyOpusCostLimit"
+                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                min="0"
+                placeholder="0 表示无限制"
+                step="0.01"
+                type="number"
+              />
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                设置 Opus 模型的周费用限制（周一到周日），仅限 Claude 官方账户，0 或留空表示无限制
               </p>
             </div>
           </div>
@@ -632,11 +678,13 @@ const unselectedTags = computed(() => {
 // 表单数据
 const form = reactive({
   name: '',
-  tokenLimit: '',
+  tokenLimit: '', // 保留用于检测历史数据
   rateLimitWindow: '',
   rateLimitRequests: '',
+  rateLimitCost: '', // 新增：费用限制
   concurrencyLimit: '',
   dailyCostLimit: '',
+  weeklyOpusCostLimit: '',
   permissions: 'all',
   claudeAccountId: '',
   geminiAccountId: '',
@@ -702,13 +750,31 @@ const removeTag = (index) => {
 
 // 更新 API Key
 const updateApiKey = async () => {
+  // 检查是否设置了时间窗口但费用限制为0
+  if (form.rateLimitWindow && (!form.rateLimitCost || parseFloat(form.rateLimitCost) === 0)) {
+    let confirmed = false
+    if (window.showConfirm) {
+      confirmed = await window.showConfirm(
+        '费用限制提醒',
+        '您设置了时间窗口但费用限制为0，这意味着不会有费用限制。\n\n是否继续？',
+        '继续保存',
+        '返回修改'
+      )
+    } else {
+      // 降级方案
+      confirmed = confirm('您设置了时间窗口但费用限制为0，这意味着不会有费用限制。\n是否继续？')
+    }
+    if (!confirmed) {
+      return
+    }
+  }
+
   loading.value = true
 
   try {
     // 准备提交的数据
     const data = {
-      tokenLimit:
-        form.tokenLimit !== '' && form.tokenLimit !== null ? parseInt(form.tokenLimit) : 0,
+      tokenLimit: 0, // 清除历史token限制
       rateLimitWindow:
         form.rateLimitWindow !== '' && form.rateLimitWindow !== null
           ? parseInt(form.rateLimitWindow)
@@ -717,6 +783,10 @@ const updateApiKey = async () => {
         form.rateLimitRequests !== '' && form.rateLimitRequests !== null
           ? parseInt(form.rateLimitRequests)
           : 0,
+      rateLimitCost:
+        form.rateLimitCost !== '' && form.rateLimitCost !== null
+          ? parseFloat(form.rateLimitCost)
+          : 0,
       concurrencyLimit:
         form.concurrencyLimit !== '' && form.concurrencyLimit !== null
           ? parseInt(form.concurrencyLimit)
@@ -724,6 +794,10 @@ const updateApiKey = async () => {
       dailyCostLimit:
         form.dailyCostLimit !== '' && form.dailyCostLimit !== null
           ? parseFloat(form.dailyCostLimit)
+          : 0,
+      weeklyOpusCostLimit:
+        form.weeklyOpusCostLimit !== '' && form.weeklyOpusCostLimit !== null
+          ? parseFloat(form.weeklyOpusCostLimit)
           : 0,
       permissions: form.permissions,
       tags: form.tags
@@ -893,11 +967,22 @@ onMounted(async () => {
   }
 
   form.name = props.apiKey.name
+
+  // 处理速率限制迁移：如果有tokenLimit且没有rateLimitCost，提示用户
   form.tokenLimit = props.apiKey.tokenLimit || ''
+  form.rateLimitCost = props.apiKey.rateLimitCost || ''
+
+  // 如果有历史tokenLimit但没有rateLimitCost，提示用户需要重新设置
+  if (props.apiKey.tokenLimit > 0 && !props.apiKey.rateLimitCost) {
+    // 可以根据需要添加提示，或者自动迁移（这里选择让用户手动设置）
+    console.log('检测到历史Token限制，请考虑设置费用限制')
+  }
+
   form.rateLimitWindow = props.apiKey.rateLimitWindow || ''
   form.rateLimitRequests = props.apiKey.rateLimitRequests || ''
   form.concurrencyLimit = props.apiKey.concurrencyLimit || ''
   form.dailyCostLimit = props.apiKey.dailyCostLimit || ''
+  form.weeklyOpusCostLimit = props.apiKey.weeklyOpusCostLimit || ''
   form.permissions = props.apiKey.permissions || 'all'
   // 处理 Claude 账号（区分 OAuth 和 Console）
   if (props.apiKey.claudeConsoleAccountId) {

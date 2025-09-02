@@ -278,21 +278,24 @@ router.post('/api/user-stats', async (req, res) => {
     // 获取当前使用量
     let currentWindowRequests = 0
     let currentWindowTokens = 0
+    let currentWindowCost = 0 // 新增：当前窗口费用
     let currentDailyCost = 0
     let windowStartTime = null
     let windowEndTime = null
     let windowRemainingSeconds = null
 
     try {
-      // 获取当前时间窗口的请求次数和Token使用量
+      // 获取当前时间窗口的请求次数、Token使用量和费用
       if (fullKeyData.rateLimitWindow > 0) {
         const client = redis.getClientSafe()
         const requestCountKey = `rate_limit:requests:${keyId}`
         const tokenCountKey = `rate_limit:tokens:${keyId}`
+        const costCountKey = `rate_limit:cost:${keyId}` // 新增：费用计数key
         const windowStartKey = `rate_limit:window_start:${keyId}`
 
         currentWindowRequests = parseInt((await client.get(requestCountKey)) || '0')
         currentWindowTokens = parseInt((await client.get(tokenCountKey)) || '0')
+        currentWindowCost = parseFloat((await client.get(costCountKey)) || '0') // 新增：获取当前窗口费用
 
         // 获取窗口开始时间和计算剩余时间
         const windowStart = await client.get(windowStartKey)
@@ -313,6 +316,7 @@ router.post('/api/user-stats', async (req, res) => {
             // 重置计数为0，因为窗口已过期
             currentWindowRequests = 0
             currentWindowTokens = 0
+            currentWindowCost = 0 // 新增：重置窗口费用
           }
         }
       }
@@ -356,10 +360,12 @@ router.post('/api/user-stats', async (req, res) => {
         concurrencyLimit: fullKeyData.concurrencyLimit || 0,
         rateLimitWindow: fullKeyData.rateLimitWindow || 0,
         rateLimitRequests: fullKeyData.rateLimitRequests || 0,
+        rateLimitCost: parseFloat(fullKeyData.rateLimitCost) || 0, // 新增：费用限制
         dailyCostLimit: fullKeyData.dailyCostLimit || 0,
         // 当前使用量
         currentWindowRequests,
         currentWindowTokens,
+        currentWindowCost, // 新增：当前窗口费用
         currentDailyCost,
         // 时间窗口信息
         windowStartTime,

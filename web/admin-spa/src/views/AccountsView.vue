@@ -191,7 +191,39 @@
               <th
                 class="w-[10%] min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
               >
-                会话窗口
+                <div class="flex items-center gap-2">
+                  <span>会话窗口</span>
+                  <el-tooltip placement="top">
+                    <template #content>
+                      <div class="space-y-2">
+                        <div>会话窗口进度表示5小时窗口的时间进度</div>
+                        <div class="space-y-1 text-xs">
+                          <div class="flex items-center gap-2">
+                            <div
+                              class="h-2 w-16 rounded bg-gradient-to-r from-blue-500 to-indigo-600"
+                            ></div>
+                            <span>正常：请求正常处理</span>
+                          </div>
+                          <div class="flex items-center gap-2">
+                            <div
+                              class="h-2 w-16 rounded bg-gradient-to-r from-yellow-500 to-orange-500"
+                            ></div>
+                            <span>警告：接近限制</span>
+                          </div>
+                          <div class="flex items-center gap-2">
+                            <div
+                              class="h-2 w-16 rounded bg-gradient-to-r from-red-500 to-red-600"
+                            ></div>
+                            <span>拒绝：达到速率限制</span>
+                          </div>
+                        </div>
+                      </div>
+                    </template>
+                    <i
+                      class="fas fa-question-circle cursor-help text-xs text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-400"
+                    />
+                  </el-tooltip>
+                </div>
               </th>
               <th
                 class="w-[8%] min-w-[80px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
@@ -395,6 +427,14 @@
                   >
                     <i class="fas fa-pause-circle mr-1" />
                     不可调度
+                    <el-tooltip
+                      v-if="getSchedulableReason(account)"
+                      :content="getSchedulableReason(account)"
+                      effect="dark"
+                      placement="top"
+                    >
+                      <i class="fas fa-question-circle ml-1 cursor-help text-gray-500" />
+                    </el-tooltip>
                   </span>
                   <span
                     v-if="account.status === 'blocked' && account.errorMessage"
@@ -450,15 +490,21 @@
               <td class="whitespace-nowrap px-3 py-4 text-sm">
                 <div v-if="account.usage && account.usage.daily" class="space-y-1">
                   <div class="flex items-center gap-2">
-                    <div class="h-2 w-2 rounded-full bg-green-500" />
+                    <div class="h-2 w-2 rounded-full bg-blue-500" />
                     <span class="text-sm font-medium text-gray-900 dark:text-gray-100"
                       >{{ account.usage.daily.requests || 0 }} 次</span
                     >
                   </div>
                   <div class="flex items-center gap-2">
-                    <div class="h-2 w-2 rounded-full bg-blue-500" />
+                    <div class="h-2 w-2 rounded-full bg-purple-500" />
                     <span class="text-xs text-gray-600 dark:text-gray-300"
-                      >{{ formatNumber(account.usage.daily.allTokens || 0) }} tokens</span
+                      >{{ formatNumber(account.usage.daily.allTokens || 0) }}M</span
+                    >
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <div class="h-2 w-2 rounded-full bg-green-500" />
+                    <span class="text-xs text-gray-600 dark:text-gray-300"
+                      >${{ calculateDailyCost(account) }}</span
                     >
                   </div>
                   <div
@@ -479,10 +525,33 @@
                   "
                   class="space-y-2"
                 >
+                  <!-- 使用统计在顶部 -->
+                  <div
+                    v-if="account.usage && account.usage.sessionWindow"
+                    class="flex items-center gap-3 text-xs"
+                  >
+                    <div class="flex items-center gap-1">
+                      <div class="h-1.5 w-1.5 rounded-full bg-purple-500" />
+                      <span class="font-medium text-gray-900 dark:text-gray-100">
+                        {{ formatNumber(account.usage.sessionWindow.totalTokens) }}M
+                      </span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                      <div class="h-1.5 w-1.5 rounded-full bg-green-500" />
+                      <span class="font-medium text-gray-900 dark:text-gray-100">
+                        ${{ formatCost(account.usage.sessionWindow.totalCost) }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- 进度条 -->
                   <div class="flex items-center gap-2">
-                    <div class="h-2 w-24 rounded-full bg-gray-200">
+                    <div class="h-2 w-24 rounded-full bg-gray-200 dark:bg-gray-700">
                       <div
-                        class="h-2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-300"
+                        :class="[
+                          'h-2 rounded-full transition-all duration-300',
+                          getSessionProgressBarClass(account.sessionWindow.sessionWindowStatus)
+                        ]"
                         :style="{ width: account.sessionWindow.progress + '%' }"
                       />
                     </div>
@@ -490,7 +559,9 @@
                       {{ account.sessionWindow.progress }}%
                     </span>
                   </div>
-                  <div class="text-xs text-gray-600 dark:text-gray-300">
+
+                  <!-- 时间信息 -->
+                  <div class="text-xs text-gray-600 dark:text-gray-400">
                     <div>
                       {{
                         formatSessionWindow(
@@ -501,7 +572,7 @@
                     </div>
                     <div
                       v-if="account.sessionWindow.remainingTime > 0"
-                      class="font-medium text-indigo-600"
+                      class="font-medium text-indigo-600 dark:text-indigo-400"
                     >
                       剩余 {{ formatRemainingTime(account.sessionWindow.remainingTime) }}
                     </div>
@@ -649,21 +720,44 @@
           <div class="mb-3 grid grid-cols-2 gap-3">
             <div>
               <p class="text-xs text-gray-500 dark:text-gray-400">今日使用</p>
-              <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                {{ formatNumber(account.usage?.daily?.requests || 0) }} 次
-              </p>
-              <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                {{ formatNumber(account.usage?.daily?.allTokens || 0) }} tokens
-              </p>
+              <div class="space-y-1">
+                <div class="flex items-center gap-1.5">
+                  <div class="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                  <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    {{ account.usage?.daily?.requests || 0 }} 次
+                  </p>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <div class="h-1.5 w-1.5 rounded-full bg-purple-500" />
+                  <p class="text-xs text-gray-600 dark:text-gray-400">
+                    {{ formatNumber(account.usage?.daily?.allTokens || 0) }}M
+                  </p>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <div class="h-1.5 w-1.5 rounded-full bg-green-500" />
+                  <p class="text-xs text-gray-600 dark:text-gray-400">
+                    ${{ calculateDailyCost(account) }}
+                  </p>
+                </div>
+              </div>
             </div>
             <div>
-              <p class="text-xs text-gray-500 dark:text-gray-400">总使用量</p>
-              <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                {{ formatNumber(account.usage?.total?.requests || 0) }} 次
-              </p>
-              <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                {{ formatNumber(account.usage?.total?.allTokens || 0) }} tokens
-              </p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">会话窗口</p>
+              <div v-if="account.usage && account.usage.sessionWindow" class="space-y-1">
+                <div class="flex items-center gap-1.5">
+                  <div class="h-1.5 w-1.5 rounded-full bg-purple-500" />
+                  <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    {{ formatNumber(account.usage.sessionWindow.totalTokens) }}M
+                  </p>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <div class="h-1.5 w-1.5 rounded-full bg-green-500" />
+                  <p class="text-xs text-gray-600 dark:text-gray-400">
+                    ${{ formatCost(account.usage.sessionWindow.totalCost) }}
+                  </p>
+                </div>
+              </div>
+              <div v-else class="text-sm font-semibold text-gray-400">-</div>
             </div>
           </div>
 
@@ -679,14 +773,27 @@
               class="space-y-1.5 rounded-lg bg-gray-50 p-2 dark:bg-gray-700"
             >
               <div class="flex items-center justify-between text-xs">
-                <span class="font-medium text-gray-600 dark:text-gray-300">会话窗口</span>
+                <div class="flex items-center gap-1">
+                  <span class="font-medium text-gray-600 dark:text-gray-300">会话窗口</span>
+                  <el-tooltip
+                    content="会话窗口进度不代表使用量，仅表示距离下一个5小时窗口的剩余时间"
+                    placement="top"
+                  >
+                    <i
+                      class="fas fa-question-circle cursor-help text-xs text-gray-400 hover:text-gray-600"
+                    />
+                  </el-tooltip>
+                </div>
                 <span class="font-medium text-gray-700 dark:text-gray-200">
                   {{ account.sessionWindow.progress }}%
                 </span>
               </div>
               <div class="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-600">
                 <div
-                  class="h-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-300"
+                  :class="[
+                    'h-full transition-all duration-300',
+                    getSessionProgressBarClass(account.sessionWindow.sessionWindowStatus)
+                  ]"
                   :style="{ width: account.sessionWindow.progress + '%' }"
                 />
               </div>
@@ -1104,7 +1211,27 @@ const loadAccounts = async (forceReload = false) => {
       allAccounts.push(...azureOpenaiAccounts)
     }
 
-    accounts.value = allAccounts
+    // 根据分组筛选器过滤账户
+    let filteredAccounts = allAccounts
+    if (groupFilter.value !== 'all') {
+      if (groupFilter.value === 'ungrouped') {
+        // 筛选未分组的账户（没有 groupInfos 或 groupInfos 为空数组）
+        filteredAccounts = allAccounts.filter((account) => {
+          return !account.groupInfos || account.groupInfos.length === 0
+        })
+      } else {
+        // 筛选属于特定分组的账户
+        filteredAccounts = allAccounts.filter((account) => {
+          if (!account.groupInfos || account.groupInfos.length === 0) {
+            return false
+          }
+          // 检查账户是否属于选中的分组
+          return account.groupInfos.some((group) => group.id === groupFilter.value)
+        })
+      }
+    }
+
+    accounts.value = filteredAccounts
   } catch (error) {
     showToast('加载账户失败', 'error')
   } finally {
@@ -1129,9 +1256,11 @@ const formatNumber = (num) => {
   if (num === null || num === undefined) return '0'
   const number = Number(num)
   if (number >= 1000000) {
-    return Math.floor(number / 1000000).toLocaleString() + 'M'
+    return (number / 1000000).toFixed(2)
+  } else if (number >= 1000) {
+    return (number / 1000000).toFixed(4)
   }
-  return number.toLocaleString()
+  return (number / 1000000).toFixed(6)
 }
 
 // 格式化最后使用时间
@@ -1346,7 +1475,8 @@ const resetAccountStatus = async (account) => {
 
     if (data.success) {
       showToast('账户状态已重置', 'success')
-      loadAccounts()
+      // 强制刷新，绕过前端缓存，确保最终一致性
+      loadAccounts(true)
     } else {
       showToast(data.message || '状态重置失败', 'error')
     }
@@ -1475,6 +1605,55 @@ const getClaudeAccountType = (account) => {
   return 'Claude'
 }
 
+// 获取停止调度的原因
+const getSchedulableReason = (account) => {
+  if (account.schedulable !== false) return null
+
+  // Claude Console 账户的错误状态
+  if (account.platform === 'claude-console') {
+    if (account.status === 'unauthorized') {
+      return 'API Key无效或已过期（401错误）'
+    }
+    if (account.overloadStatus === 'overloaded') {
+      return '服务过载（529错误）'
+    }
+    if (account.rateLimitStatus === 'limited') {
+      return '触发限流（429错误）'
+    }
+    if (account.status === 'blocked' && account.errorMessage) {
+      return account.errorMessage
+    }
+  }
+
+  // Claude 官方账户的错误状态
+  if (account.platform === 'claude') {
+    if (account.status === 'unauthorized') {
+      return '认证失败（401错误）'
+    }
+    if (account.status === 'error' && account.errorMessage) {
+      return account.errorMessage
+    }
+    if (account.isRateLimited) {
+      return '触发限流（429错误）'
+    }
+    // 自动停止调度的原因
+    if (account.stoppedReason) {
+      return account.stoppedReason
+    }
+  }
+
+  // 通用原因
+  if (account.stoppedReason) {
+    return account.stoppedReason
+  }
+  if (account.errorMessage) {
+    return account.errorMessage
+  }
+
+  // 默认为手动停止
+  return '手动停止调度'
+}
+
 // 获取账户状态文本
 const getAccountStatusText = (account) => {
   // 检查是否被封锁
@@ -1558,6 +1737,51 @@ const getAccountStatusDotClass = (account) => {
 // 格式化相对时间
 const formatRelativeTime = (dateString) => {
   return formatLastUsed(dateString)
+}
+
+// 获取会话窗口进度条的样式类
+const getSessionProgressBarClass = (status) => {
+  // 根据状态返回不同的颜色类，包含防御性检查
+  if (!status) {
+    // 无状态信息时默认为蓝色
+    return 'bg-gradient-to-r from-blue-500 to-indigo-600'
+  }
+
+  // 转换为小写进行比较，避免大小写问题
+  const normalizedStatus = String(status).toLowerCase()
+
+  if (normalizedStatus === 'rejected') {
+    // 被拒绝 - 红色
+    return 'bg-gradient-to-r from-red-500 to-red-600'
+  } else if (normalizedStatus === 'allowed_warning') {
+    // 警告状态 - 橙色/黄色
+    return 'bg-gradient-to-r from-yellow-500 to-orange-500'
+  } else {
+    // 正常状态（allowed 或其他） - 蓝色
+    return 'bg-gradient-to-r from-blue-500 to-indigo-600'
+  }
+}
+
+// 格式化费用显示
+const formatCost = (cost) => {
+  if (!cost || cost === 0) return '0.0000'
+  if (cost < 0.0001) return cost.toExponential(2)
+  if (cost < 0.01) return cost.toFixed(6)
+  if (cost < 1) return cost.toFixed(4)
+  return cost.toFixed(2)
+}
+
+// 计算每日费用（使用后端返回的精确费用数据）
+const calculateDailyCost = (account) => {
+  if (!account.usage || !account.usage.daily) return '0.0000'
+
+  // 如果后端已经返回了计算好的费用，直接使用
+  if (account.usage.daily.cost !== undefined) {
+    return formatCost(account.usage.daily.cost)
+  }
+
+  // 如果后端没有返回费用（旧版本），返回0
+  return '0.0000'
 }
 
 // 切换调度状态

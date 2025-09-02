@@ -45,10 +45,14 @@
         <div
           v-if="
             statsData.limits.rateLimitWindow > 0 &&
-            (statsData.limits.rateLimitRequests > 0 || statsData.limits.tokenLimit > 0)
+            (statsData.limits.rateLimitRequests > 0 ||
+              statsData.limits.tokenLimit > 0 ||
+              statsData.limits.rateLimitCost > 0)
           "
         >
           <WindowCountdown
+            :cost-limit="statsData.limits.rateLimitCost"
+            :current-cost="statsData.limits.currentWindowCost"
             :current-requests="statsData.limits.currentWindowRequests"
             :current-tokens="statsData.limits.currentWindowTokens"
             label="时间窗口限制"
@@ -64,7 +68,13 @@
 
           <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
             <i class="fas fa-info-circle mr-1" />
-            请求次数和Token使用量为"或"的关系，任一达到限制即触发限流
+            <span v-if="statsData.limits.rateLimitCost > 0">
+              请求次数和费用限制为"或"的关系，任一达到限制即触发限流
+            </span>
+            <span v-else-if="statsData.limits.tokenLimit > 0">
+              请求次数和Token使用量为"或"的关系，任一达到限制即触发限流
+            </span>
+            <span v-else> 仅限制请求次数 </span>
           </div>
         </div>
 

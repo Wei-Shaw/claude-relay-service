@@ -33,6 +33,7 @@
         </div>
       </div>
 
+      <!-- Token限制（向后兼容） -->
       <div v-if="hasTokenLimit" class="space-y-0.5">
         <div class="flex items-center justify-between text-xs">
           <span class="text-gray-400">Token</span>
@@ -45,6 +46,23 @@
             class="h-1 rounded-full transition-all duration-300"
             :class="getTokenProgressColor()"
             :style="{ width: getTokenProgress() + '%' }"
+          />
+        </div>
+      </div>
+
+      <!-- 费用限制（新功能） -->
+      <div v-if="hasCostLimit" class="space-y-0.5">
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-gray-400">费用</span>
+          <span class="text-gray-600">
+            ${{ (currentCost || 0).toFixed(2) }}/${{ costLimit.toFixed(2) }}
+          </span>
+        </div>
+        <div class="h-1 w-full rounded-full bg-gray-200">
+          <div
+            class="h-1 rounded-full transition-all duration-300"
+            :class="getCostProgressColor()"
+            :style="{ width: getCostProgress() + '%' }"
           />
         </div>
       </div>
@@ -102,6 +120,14 @@ const props = defineProps({
     type: Number,
     default: 0
   },
+  currentCost: {
+    type: Number,
+    default: 0
+  },
+  costLimit: {
+    type: Number,
+    default: 0
+  },
   showProgress: {
     type: Boolean,
     default: true
@@ -132,6 +158,7 @@ const windowState = computed(() => {
 
 const hasRequestLimit = computed(() => props.requestLimit > 0)
 const hasTokenLimit = computed(() => props.tokenLimit > 0)
+const hasCostLimit = computed(() => props.costLimit > 0)
 
 // 方法
 const formatTime = (seconds) => {
@@ -194,6 +221,19 @@ const getTokenProgressColor = () => {
   if (progress >= 100) return 'bg-red-500'
   if (progress >= 80) return 'bg-yellow-500'
   return 'bg-purple-500'
+}
+
+const getCostProgress = () => {
+  if (!props.costLimit || props.costLimit === 0) return 0
+  const percentage = ((props.currentCost || 0) / props.costLimit) * 100
+  return Math.min(percentage, 100)
+}
+
+const getCostProgressColor = () => {
+  const progress = getCostProgress()
+  if (progress >= 100) return 'bg-red-500'
+  if (progress >= 80) return 'bg-yellow-500'
+  return 'bg-green-500'
 }
 
 // 更新倒计时

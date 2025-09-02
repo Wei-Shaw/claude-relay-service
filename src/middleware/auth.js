@@ -1,7 +1,8 @@
 const apiKeyService = require('../services/apiKeyService')
+const userService = require('../services/userService')
 const logger = require('../utils/logger')
 const redis = require('../models/redis')
-const { RateLimiterRedis } = require('rate-limiter-flexible')
+// const { RateLimiterRedis } = require('rate-limiter-flexible') // 暂时未使用
 const config = require('../../config/config')
 
 // 🔑 API Key验证中间件（优化版）
@@ -182,11 +183,18 @@ const authenticateApiKey = async (req, res, next) => {
     // 检查时间窗口限流
     const rateLimitWindow = validation.keyData.rateLimitWindow || 0
     const rateLimitRequests = validation.keyData.rateLimitRequests || 0
+    const rateLimitCost = validation.keyData.rateLimitCost || 0 // 新增：费用限制
 
-    if (rateLimitWindow > 0 && (rateLimitRequests > 0 || validation.keyData.tokenLimit > 0)) {
+    // 兼容性检查：如果tokenLimit仍有值，使用tokenLimit；否则使用rateLimitCost
+    const hasRateLimits =
+      rateLimitWindow > 0 &&
+      (rateLimitRequests > 0 || validation.keyData.tokenLimit > 0 || rateLimitCost > 0)
+
+    if (hasRateLimits) {
       const windowStartKey = `rate_limit:window_start:${validation.keyData.id}`
       const requestCountKey = `rate_limit:requests:${validation.keyData.id}`
       const tokenCountKey = `rate_limit:tokens:${validation.keyData.id}`
+      const costCountKey = `rate_limit:cost:${validation.keyData.id}` // 新增：费用计数器
 
       const now = Date.now()
       const windowDuration = rateLimitWindow * 60 * 1000 // 转换为毫秒
@@ -199,6 +207,7 @@ const authenticateApiKey = async (req, res, next) => {
         await redis.getClient().set(windowStartKey, now, 'PX', windowDuration)
         await redis.getClient().set(requestCountKey, 0, 'PX', windowDuration)
         await redis.getClient().set(tokenCountKey, 0, 'PX', windowDuration)
+        await redis.getClient().set(costCountKey, 0, 'PX', windowDuration) // 新增：重置费用
         windowStart = now
       } else {
         windowStart = parseInt(windowStart)
@@ -209,6 +218,7 @@ const authenticateApiKey = async (req, res, next) => {
           await redis.getClient().set(windowStartKey, now, 'PX', windowDuration)
           await redis.getClient().set(requestCountKey, 0, 'PX', windowDuration)
           await redis.getClient().set(tokenCountKey, 0, 'PX', windowDuration)
+          await redis.getClient().set(costCountKey, 0, 'PX', windowDuration) // 新增：重置费用
           windowStart = now
         }
       }
@@ -216,6 +226,7 @@ const authenticateApiKey = async (req, res, next) => {
       // 获取当前计数
       const currentRequests = parseInt((await redis.getClient().get(requestCountKey)) || '0')
       const currentTokens = parseInt((await redis.getClient().get(tokenCountKey)) || '0')
+      const currentCost = parseFloat((await redis.getClient().get(costCountKey)) || '0') // 新增：当前费用
 
       // 检查请求次数限制
       if (rateLimitRequests > 0 && currentRequests >= rateLimitRequests) {
@@ -236,24 +247,46 @@ const authenticateApiKey = async (req, res, next) => {
         })
       }
 
-      // 检查Token使用量限制
+      // 兼容性检查：优先使用Token限制（历史数据），否则使用费用限制
       const tokenLimit = parseInt(validation.keyData.tokenLimit)
-      if (tokenLimit > 0 && currentTokens >= tokenLimit) {
-        const resetTime = new Date(windowStart + windowDuration)
-        const remainingMinutes = Math.ceil((resetTime - now) / 60000)
+      if (tokenLimit > 0) {
+        // 使用Token限制（向后兼容）
+        if (currentTokens >= tokenLimit) {
+          const resetTime = new Date(windowStart + windowDuration)
+          const remainingMinutes = Math.ceil((resetTime - now) / 60000)
 
-        logger.security(
-          `🚦 Rate limit exceeded (tokens) for key: ${validation.keyData.id} (${validation.keyData.name}), tokens: ${currentTokens}/${tokenLimit}`
-        )
+          logger.security(
+            `🚦 Rate limit exceeded (tokens) for key: ${validation.keyData.id} (${validation.keyData.name}), tokens: ${currentTokens}/${tokenLimit}`
+          )
 
-        return res.status(429).json({
-          error: 'Rate limit exceeded',
-          message: `已达到 Token 使用限制 (${tokenLimit} tokens)，将在 ${remainingMinutes} 分钟后重置`,
-          currentTokens,
-          tokenLimit,
-          resetAt: resetTime.toISOString(),
-          remainingMinutes
-        })
+          return res.status(429).json({
+            error: 'Rate limit exceeded',
+            message: `已达到 Token 使用限制 (${tokenLimit} tokens)，将在 ${remainingMinutes} 分钟后重置`,
+            currentTokens,
+            tokenLimit,
+            resetAt: resetTime.toISOString(),
+            remainingMinutes
+          })
+        }
+      } else if (rateLimitCost > 0) {
+        // 使用费用限制（新功能）
+        if (currentCost >= rateLimitCost) {
+          const resetTime = new Date(windowStart + windowDuration)
+          const remainingMinutes = Math.ceil((resetTime - now) / 60000)
+
+          logger.security(
+            `💰 Rate limit exceeded (cost) for key: ${validation.keyData.id} (${validation.keyData.name}), cost: $${currentCost.toFixed(2)}/$${rateLimitCost}`
+          )
+
+          return res.status(429).json({
+            error: 'Rate limit exceeded',
+            message: `已达到费用限制 ($${rateLimitCost})，将在 ${remainingMinutes} 分钟后重置`,
+            currentCost,
+            costLimit: rateLimitCost,
+            resetAt: resetTime.toISOString(),
+            remainingMinutes
+          })
+        }
       }
 
       // 增加请求计数
@@ -265,10 +298,13 @@ const authenticateApiKey = async (req, res, next) => {
         windowDuration,
         requestCountKey,
         tokenCountKey,
+        costCountKey, // 新增：费用计数器
         currentRequests: currentRequests + 1,
         currentTokens,
+        currentCost, // 新增：当前费用
         rateLimitRequests,
-        tokenLimit
+        tokenLimit,
+        rateLimitCost // 新增：费用限制
       }
     }
 
@@ -297,6 +333,46 @@ const authenticateApiKey = async (req, res, next) => {
       )
     }
 
+    // 检查 Opus 周费用限制（仅对 Opus 模型生效）
+    const weeklyOpusCostLimit = validation.keyData.weeklyOpusCostLimit || 0
+    if (weeklyOpusCostLimit > 0) {
+      // 从请求中获取模型信息
+      const requestBody = req.body || {}
+      const model = requestBody.model || ''
+
+      // 判断是否为 Opus 模型
+      if (model && model.toLowerCase().includes('claude-opus')) {
+        const weeklyOpusCost = validation.keyData.weeklyOpusCost || 0
+
+        if (weeklyOpusCost >= weeklyOpusCostLimit) {
+          logger.security(
+            `💰 Weekly Opus cost limit exceeded for key: ${validation.keyData.id} (${validation.keyData.name}), cost: $${weeklyOpusCost.toFixed(2)}/$${weeklyOpusCostLimit}`
+          )
+
+          // 计算下周一的重置时间
+          const now = new Date()
+          const dayOfWeek = now.getDay()
+          const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) % 7 || 7
+          const resetDate = new Date(now)
+          resetDate.setDate(now.getDate() + daysUntilMonday)
+          resetDate.setHours(0, 0, 0, 0)
+
+          return res.status(429).json({
+            error: 'Weekly Opus cost limit exceeded',
+            message: `已达到 Opus 模型周费用限制 ($${weeklyOpusCostLimit})`,
+            currentCost: weeklyOpusCost,
+            costLimit: weeklyOpusCostLimit,
+            resetAt: resetDate.toISOString() // 下周一重置
+          })
+        }
+
+        // 记录当前 Opus 费用使用情况
+        logger.api(
+          `💰 Opus weekly cost usage for key: ${validation.keyData.id} (${validation.keyData.name}), current: $${weeklyOpusCost.toFixed(2)}/$${weeklyOpusCostLimit}`
+        )
+      }
+    }
+
     // 将验证信息添加到请求对象（只包含必要信息）
     req.apiKey = {
       id: validation.keyData.id,
@@ -311,6 +387,7 @@ const authenticateApiKey = async (req, res, next) => {
       concurrencyLimit: validation.keyData.concurrencyLimit,
       rateLimitWindow: validation.keyData.rateLimitWindow,
       rateLimitRequests: validation.keyData.rateLimitRequests,
+      rateLimitCost: validation.keyData.rateLimitCost, // 新增：费用限制
       enableModelRestriction: validation.keyData.enableModelRestriction,
       restrictedModels: validation.keyData.restrictedModels,
       enableClientRestriction: validation.keyData.enableClientRestriction,
@@ -447,6 +524,234 @@ const authenticateAdmin = async (req, res, next) => {
       message: 'Internal server error during admin authentication'
     })
   }
+}
+
+// 👤 用户验证中间件
+const authenticateUser = async (req, res, next) => {
+  const startTime = Date.now()
+
+  try {
+    // 安全提取用户session token，支持多种方式
+    const sessionToken =
+      req.headers['authorization']?.replace(/^Bearer\s+/i, '') ||
+      req.cookies?.userToken ||
+      req.headers['x-user-token']
+
+    if (!sessionToken) {
+      logger.security(`🔒 Missing user session token attempt from ${req.ip || 'unknown'}`)
+      return res.status(401).json({
+        error: 'Missing user session token',
+        message: 'Please login to access this resource'
+      })
+    }
+
+    // 基本token格式验证
+    if (typeof sessionToken !== 'string' || sessionToken.length < 32 || sessionToken.length > 128) {
+      logger.security(`🔒 Invalid user session token format from ${req.ip || 'unknown'}`)
+      return res.status(401).json({
+        error: 'Invalid session token format',
+        message: 'Session token format is invalid'
+      })
+    }
+
+    // 验证用户会话
+    const sessionValidation = await userService.validateUserSession(sessionToken)
+
+    if (!sessionValidation) {
+      logger.security(`🔒 Invalid user session token attempt from ${req.ip || 'unknown'}`)
+      return res.status(401).json({
+        error: 'Invalid session token',
+        message: 'Invalid or expired user session'
+      })
+    }
+
+    const { session, user } = sessionValidation
+
+    // 检查用户是否被禁用
+    if (!user.isActive) {
+      logger.security(
+        `🔒 Disabled user login attempt: ${user.username} from ${req.ip || 'unknown'}`
+      )
+      return res.status(403).json({
+        error: 'Account disabled',
+        message: 'Your account has been disabled. Please contact administrator.'
+      })
+    }
+
+    // 设置用户信息（只包含必要信息）
+    req.user = {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      displayName: user.displayName,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      sessionToken,
+      sessionCreatedAt: session.createdAt
+    }
+
+    const authDuration = Date.now() - startTime
+    logger.info(`👤 User authenticated: ${user.username} (${user.id}) in ${authDuration}ms`)
+
+    return next()
+  } catch (error) {
+    const authDuration = Date.now() - startTime
+    logger.error(`❌ User authentication error (${authDuration}ms):`, {
+      error: error.message,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      url: req.originalUrl
+    })
+
+    return res.status(500).json({
+      error: 'Authentication error',
+      message: 'Internal server error during user authentication'
+    })
+  }
+}
+
+// 👤 用户或管理员验证中间件（支持两种身份）
+const authenticateUserOrAdmin = async (req, res, next) => {
+  const startTime = Date.now()
+
+  try {
+    // 检查是否有管理员token
+    const adminToken =
+      req.headers['authorization']?.replace(/^Bearer\s+/i, '') ||
+      req.cookies?.adminToken ||
+      req.headers['x-admin-token']
+
+    // 检查是否有用户session token
+    const userToken =
+      req.headers['x-user-token'] ||
+      req.cookies?.userToken ||
+      (!adminToken ? req.headers['authorization']?.replace(/^Bearer\s+/i, '') : null)
+
+    // 优先尝试管理员认证
+    if (adminToken) {
+      try {
+        const adminSession = await redis.getSession(adminToken)
+        if (adminSession && Object.keys(adminSession).length > 0) {
+          req.admin = {
+            id: adminSession.adminId || 'admin',
+            username: adminSession.username,
+            sessionId: adminToken,
+            loginTime: adminSession.loginTime
+          }
+          req.userType = 'admin'
+
+          const authDuration = Date.now() - startTime
+          logger.security(`🔐 Admin authenticated: ${adminSession.username} in ${authDuration}ms`)
+          return next()
+        }
+      } catch (error) {
+        logger.debug('Admin authentication failed, trying user authentication:', error.message)
+      }
+    }
+
+    // 尝试用户认证
+    if (userToken) {
+      try {
+        const sessionValidation = await userService.validateUserSession(userToken)
+        if (sessionValidation) {
+          const { session, user } = sessionValidation
+
+          if (user.isActive) {
+            req.user = {
+              id: user.id,
+              username: user.username,
+              email: user.email,
+              displayName: user.displayName,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              role: user.role,
+              sessionToken: userToken,
+              sessionCreatedAt: session.createdAt
+            }
+            req.userType = 'user'
+
+            const authDuration = Date.now() - startTime
+            logger.info(`👤 User authenticated: ${user.username} (${user.id}) in ${authDuration}ms`)
+            return next()
+          }
+        }
+      } catch (error) {
+        logger.debug('User authentication failed:', error.message)
+      }
+    }
+
+    // 如果都失败了，返回未授权
+    logger.security(`🔒 Authentication failed from ${req.ip || 'unknown'}`)
+    return res.status(401).json({
+      error: 'Authentication required',
+      message: 'Please login as user or admin to access this resource'
+    })
+  } catch (error) {
+    const authDuration = Date.now() - startTime
+    logger.error(`❌ User/Admin authentication error (${authDuration}ms):`, {
+      error: error.message,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      url: req.originalUrl
+    })
+
+    return res.status(500).json({
+      error: 'Authentication error',
+      message: 'Internal server error during authentication'
+    })
+  }
+}
+
+// 🛡️ 权限检查中间件
+const requireRole = (allowedRoles) => (req, res, next) => {
+  // 管理员始终有权限
+  if (req.admin) {
+    return next()
+  }
+
+  // 检查用户角色
+  if (req.user) {
+    const userRole = req.user.role
+    const allowed = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles]
+
+    if (allowed.includes(userRole)) {
+      return next()
+    } else {
+      logger.security(
+        `🚫 Access denied for user ${req.user.username} (role: ${userRole}) to ${req.originalUrl}`
+      )
+      return res.status(403).json({
+        error: 'Insufficient permissions',
+        message: `This resource requires one of the following roles: ${allowed.join(', ')}`
+      })
+    }
+  }
+
+  return res.status(401).json({
+    error: 'Authentication required',
+    message: 'Please login to access this resource'
+  })
+}
+
+// 🔒 管理员权限检查中间件
+const requireAdmin = (req, res, next) => {
+  if (req.admin) {
+    return next()
+  }
+
+  // 检查是否是admin角色的用户
+  if (req.user && req.user.role === 'admin') {
+    return next()
+  }
+
+  logger.security(
+    `🚫 Admin access denied for ${req.user?.username || 'unknown'} from ${req.ip || 'unknown'}`
+  )
+  return res.status(403).json({
+    error: 'Admin access required',
+    message: 'This resource requires administrator privileges'
+  })
 }
 
 // 注意：使用统计现在直接在/api/v1/messages路由中处理，
@@ -713,35 +1018,41 @@ const errorHandler = (error, req, res, _next) => {
 }
 
 // 🌐 全局速率限制中间件（延迟初始化）
-let rateLimiter = null
+// const rateLimiter = null // 暂时未使用
 
-const getRateLimiter = () => {
-  if (!rateLimiter) {
-    try {
-      const client = redis.getClient()
-      if (!client) {
-        logger.warn('⚠️ Redis client not available for rate limiter')
-        return null
-      }
+// 暂时注释掉未使用的函数
+// const getRateLimiter = () => {
+//   if (!rateLimiter) {
+//     try {
+//       const client = redis.getClient()
+//       if (!client) {
+//         logger.warn('⚠️ Redis client not available for rate limiter')
+//         return null
+//       }
+//
+//       rateLimiter = new RateLimiterRedis({
+//         storeClient: client,
+//         keyPrefix: 'global_rate_limit',
+//         points: 1000, // 请求数量
+//         duration: 900, // 15分钟 (900秒)
+//         blockDuration: 900 // 阻塞时间15分钟
+//       })
+//
+//       logger.info('✅ Rate limiter initialized successfully')
+//     } catch (error) {
+//       logger.warn('⚠️ Rate limiter initialization failed, using fallback', { error: error.message })
+//       return null
+//     }
+//   }
+//   return rateLimiter
+// }
 
-      rateLimiter = new RateLimiterRedis({
-        storeClient: client,
-        keyPrefix: 'global_rate_limit',
-        points: 1000, // 请求数量
-        duration: 900, // 15分钟 (900秒)
-        blockDuration: 900 // 阻塞时间15分钟
-      })
+const globalRateLimit = async (req, res, next) =>
+  // 已禁用全局IP限流 - 直接跳过所有请求
+  next()
 
-      logger.info('✅ Rate limiter initialized successfully')
-    } catch (error) {
-      logger.warn('⚠️ Rate limiter initialization failed, using fallback', { error: error.message })
-      return null
-    }
-  }
-  return rateLimiter
-}
-
-const globalRateLimit = async (req, res, next) => {
+// 以下代码已被禁用
+/*
   // 跳过健康检查和内部请求
   if (req.path === '/health' || req.path === '/api/health') {
     return next()
@@ -777,7 +1088,7 @@ const globalRateLimit = async (req, res, next) => {
       retryAfter: Math.round(msBeforeNext / 1000)
     })
   }
-}
+  */
 
 // 📊 请求大小限制中间件
 const requestSizeLimit = (req, res, next) => {
@@ -799,6 +1110,10 @@ const requestSizeLimit = (req, res, next) => {
 module.exports = {
   authenticateApiKey,
   authenticateAdmin,
+  authenticateUser,
+  authenticateUserOrAdmin,
+  requireRole,
+  requireAdmin,
   corsMiddleware,
   requestLogger,
   securityMiddleware,

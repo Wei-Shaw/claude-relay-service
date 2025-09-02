@@ -196,6 +196,8 @@
                   时间窗口限制
                 </h5>
                 <WindowCountdown
+                  :cost-limit="apiKey.rateLimitCost"
+                  :current-cost="apiKey.currentWindowCost"
                   :current-requests="apiKey.currentWindowRequests"
                   :current-tokens="apiKey.currentWindowTokens"
                   label="窗口状态"

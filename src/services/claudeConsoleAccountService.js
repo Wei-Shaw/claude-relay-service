@@ -369,6 +369,7 @@ class ClaudeConsoleAccountService {
       // 发送Webhook通知
       try {
         const webhookNotifier = require('../utils/webhookNotifier')
+        const { getISOStringWithTimezone } = require('../utils/dateHelper')
         await webhookNotifier.sendAccountAnomalyNotification({
           accountId,
           accountName: account.name || 'Claude Console Account',
@@ -376,7 +377,7 @@ class ClaudeConsoleAccountService {
           status: 'error',
           errorCode: 'CLAUDE_CONSOLE_RATE_LIMITED',
           reason: `Account rate limited (429 error). ${account.rateLimitDuration ? `Will be blocked for ${account.rateLimitDuration} hours` : 'Temporary rate limit'}`,
-          timestamp: new Date().toISOString()
+          timestamp: getISOStringWithTimezone(new Date())
         })
       } catch (webhookError) {
         logger.error('Failed to send rate limit webhook notification:', webhookError)
@@ -447,6 +448,144 @@ class ClaudeConsoleAccountService {
     } catch (error) {
       logger.error(
         `❌ Failed to check rate limit status for Claude Console account: ${accountId}`,
+        error
+      )
+      return false
+    }
+  }
+
+  // 🚫 标记账号为未授权状态（401错误）
+  async markAccountUnauthorized(accountId) {
+    try {
+      const client = redis.getClientSafe()
+      const account = await this.getAccount(accountId)
+
+      if (!account) {
+        throw new Error('Account not found')
+      }
+
+      const updates = {
+        schedulable: 'false',
+        status: 'unauthorized',
+        errorMessage: 'API Key无效或已过期（401错误）',
+        unauthorizedAt: new Date().toISOString(),
+        unauthorizedCount: String((parseInt(account.unauthorizedCount || '0') || 0) + 1)
+      }
+
+      await client.hset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, updates)
+
+      // 发送Webhook通知
+      try {
+        const webhookNotifier = require('../utils/webhookNotifier')
+        await webhookNotifier.sendAccountAnomalyNotification({
+          accountId,
+          accountName: account.name || 'Claude Console Account',
+          platform: 'claude-console',
+          status: 'error',
+          errorCode: 'CLAUDE_CONSOLE_UNAUTHORIZED',
+          reason: 'API Key无效或已过期（401错误），账户已停止调度',
+          timestamp: new Date().toISOString()
+        })
+      } catch (webhookError) {
+        logger.error('Failed to send unauthorized webhook notification:', webhookError)
+      }
+
+      logger.warn(
+        `🚫 Claude Console account marked as unauthorized: ${account.name} (${accountId})`
+      )
+      return { success: true }
+    } catch (error) {
+      logger.error(`❌ Failed to mark Claude Console account as unauthorized: ${accountId}`, error)
+      throw error
+    }
+  }
+
+  // 🚫 标记账号为过载状态（529错误）
+  async markAccountOverloaded(accountId) {
+    try {
+      const client = redis.getClientSafe()
+      const account = await this.getAccount(accountId)
+
+      if (!account) {
+        throw new Error('Account not found')
+      }
+
+      const updates = {
+        overloadedAt: new Date().toISOString(),
+        overloadStatus: 'overloaded',
+        errorMessage: '服务过载（529错误）'
+      }
+
+      await client.hset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, updates)
+
+      // 发送Webhook通知
+      try {
+        const webhookNotifier = require('../utils/webhookNotifier')
+        await webhookNotifier.sendAccountAnomalyNotification({
+          accountId,
+          accountName: account.name || 'Claude Console Account',
+          platform: 'claude-console',
+          status: 'error',
+          errorCode: 'CLAUDE_CONSOLE_OVERLOADED',
+          reason: '服务过载（529错误）。账户将暂时停止调度',
+          timestamp: new Date().toISOString()
+        })
+      } catch (webhookError) {
+        logger.error('Failed to send overload webhook notification:', webhookError)
+      }
+
+      logger.warn(`🚫 Claude Console account marked as overloaded: ${account.name} (${accountId})`)
+      return { success: true }
+    } catch (error) {
+      logger.error(`❌ Failed to mark Claude Console account as overloaded: ${accountId}`, error)
+      throw error
+    }
+  }
+
+  // ✅ 移除账号的过载状态
+  async removeAccountOverload(accountId) {
+    try {
+      const client = redis.getClientSafe()
+
+      await client.hdel(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, 'overloadedAt', 'overloadStatus')
+
+      logger.success(`✅ Overload status removed for Claude Console account: ${accountId}`)
+      return { success: true }
+    } catch (error) {
+      logger.error(
+        `❌ Failed to remove overload status for Claude Console account: ${accountId}`,
+        error
+      )
+      throw error
+    }
+  }
+
+  // 🔍 检查账号是否处于过载状态
+  async isAccountOverloaded(accountId) {
+    try {
+      const account = await this.getAccount(accountId)
+      if (!account) {
+        return false
+      }
+
+      if (account.overloadStatus === 'overloaded' && account.overloadedAt) {
+        const overloadedAt = new Date(account.overloadedAt)
+        const now = new Date()
+        const minutesSinceOverload = (now - overloadedAt) / (1000 * 60)
+
+        // 过载状态持续10分钟后自动恢复
+        if (minutesSinceOverload >= 10) {
+          await this.removeAccountOverload(accountId)
+          return false
+        }
+
+        return true
+      }
+
+      return false
+    } catch (error) {
+      logger.error(
+        `❌ Failed to check overload status for Claude Console account: ${accountId}`,
         error
       )
       return false

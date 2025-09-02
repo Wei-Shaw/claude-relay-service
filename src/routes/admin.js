@@ -397,11 +397,13 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       concurrencyLimit,
       rateLimitWindow,
       rateLimitRequests,
+      rateLimitCost,
       enableModelRestriction,
       restrictedModels,
       enableClientRestriction,
       allowedClients,
       dailyCostLimit,
+      weeklyOpusCostLimit,
       tags
     } = req.body
 
@@ -494,11 +496,13 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       concurrencyLimit,
       rateLimitWindow,
       rateLimitRequests,
+      rateLimitCost,
       enableModelRestriction,
       restrictedModels,
       enableClientRestriction,
       allowedClients,
       dailyCostLimit,
+      weeklyOpusCostLimit,
       tags
     })
 
@@ -532,6 +536,7 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       enableClientRestriction,
       allowedClients,
       dailyCostLimit,
+      weeklyOpusCostLimit,
       tags
     } = req.body
 
@@ -575,6 +580,7 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
           enableClientRestriction,
           allowedClients,
           dailyCostLimit,
+          weeklyOpusCostLimit,
           tags
         })
 
@@ -684,6 +690,9 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
         }
         if (updates.dailyCostLimit !== undefined) {
           finalUpdates.dailyCostLimit = updates.dailyCostLimit
+        }
+        if (updates.weeklyOpusCostLimit !== undefined) {
+          finalUpdates.weeklyOpusCostLimit = updates.weeklyOpusCostLimit
         }
         if (updates.permissions !== undefined) {
           finalUpdates.permissions = updates.permissions
@@ -795,6 +804,7 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       concurrencyLimit,
       rateLimitWindow,
       rateLimitRequests,
+      rateLimitCost,
       isActive,
       claudeAccountId,
       claudeConsoleAccountId,
@@ -808,6 +818,7 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       allowedClients,
       expiresAt,
       dailyCostLimit,
+      weeklyOpusCostLimit,
       tags
     } = req.body
 
@@ -842,6 +853,14 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
         return res.status(400).json({ error: 'Rate limit requests must be a non-negative integer' })
       }
       updates.rateLimitRequests = Number(rateLimitRequests)
+    }
+
+    if (rateLimitCost !== undefined && rateLimitCost !== null && rateLimitCost !== '') {
+      const cost = Number(rateLimitCost)
+      if (isNaN(cost) || cost < 0) {
+        return res.status(400).json({ error: 'Rate limit cost must be a non-negative number' })
+      }
+      updates.rateLimitCost = cost
     }
 
     if (claudeAccountId !== undefined) {
@@ -933,6 +952,22 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
         return res.status(400).json({ error: 'Daily cost limit must be a non-negative number' })
       }
       updates.dailyCostLimit = costLimit
+    }
+
+    // 处理 Opus 周费用限制
+    if (
+      weeklyOpusCostLimit !== undefined &&
+      weeklyOpusCostLimit !== null &&
+      weeklyOpusCostLimit !== ''
+    ) {
+      const costLimit = Number(weeklyOpusCostLimit)
+      // 明确验证非负数（0 表示禁用，负数无意义）
+      if (isNaN(costLimit) || costLimit < 0) {
+        return res
+          .status(400)
+          .json({ error: 'Weekly Opus cost limit must be a non-negative number' })
+      }
+      updates.weeklyOpusCostLimit = costLimit
     }
 
     // 处理标签
@@ -1067,13 +1102,39 @@ router.delete('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
   try {
     const { keyId } = req.params
 
-    await apiKeyService.deleteApiKey(keyId)
+    await apiKeyService.deleteApiKey(keyId, req.admin.username, 'admin')
 
     logger.success(`🗑️ Admin deleted API key: ${keyId}`)
     return res.json({ success: true, message: 'API key deleted successfully' })
   } catch (error) {
     logger.error('❌ Failed to delete API key:', error)
     return res.status(500).json({ error: 'Failed to delete API key', message: error.message })
+  }
+})
+
+// 📋 获取已删除的API Keys
+router.get('/api-keys/deleted', authenticateAdmin, async (req, res) => {
+  try {
+    const deletedApiKeys = await apiKeyService.getAllApiKeys(true) // Include deleted
+    const onlyDeleted = deletedApiKeys.filter((key) => key.isDeleted === 'true')
+
+    // Add additional metadata for deleted keys
+    const enrichedKeys = onlyDeleted.map((key) => ({
+      ...key,
+      isDeleted: key.isDeleted === 'true',
+      deletedAt: key.deletedAt,
+      deletedBy: key.deletedBy,
+      deletedByType: key.deletedByType,
+      canRestore: false // Deleted keys cannot be restored per requirement
+    }))
+
+    logger.success(`📋 Admin retrieved ${enrichedKeys.length} deleted API keys`)
+    return res.json({ success: true, apiKeys: enrichedKeys, total: enrichedKeys.length })
+  } catch (error) {
+    logger.error('❌ Failed to get deleted API keys:', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to retrieve deleted API keys', message: error.message })
   }
 })
 
@@ -1471,13 +1532,56 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
           const usageStats = await redis.getAccountUsageStats(account.id)
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
+          // 获取会话窗口使用统计（仅对有活跃窗口的账户）
+          let sessionWindowUsage = null
+          if (account.sessionWindow && account.sessionWindow.hasActiveWindow) {
+            const windowUsage = await redis.getAccountSessionWindowUsage(
+              account.id,
+              account.sessionWindow.windowStart,
+              account.sessionWindow.windowEnd
+            )
+
+            // 计算会话窗口的总费用
+            let totalCost = 0
+            const modelCosts = {}
+
+            for (const [modelName, usage] of Object.entries(windowUsage.modelUsage)) {
+              const usageData = {
+                input_tokens: usage.inputTokens,
+                output_tokens: usage.outputTokens,
+                cache_creation_input_tokens: usage.cacheCreateTokens,
+                cache_read_input_tokens: usage.cacheReadTokens
+              }
+
+              logger.debug(`💰 Calculating cost for model ${modelName}:`, JSON.stringify(usageData))
+              const costResult = CostCalculator.calculateCost(usageData, modelName)
+              logger.debug(`💰 Cost result for ${modelName}: total=${costResult.costs.total}`)
+
+              modelCosts[modelName] = {
+                ...usage,
+                cost: costResult.costs.total
+              }
+              totalCost += costResult.costs.total
+            }
+
+            sessionWindowUsage = {
+              totalTokens: windowUsage.totalAllTokens,
+              totalRequests: windowUsage.totalRequests,
+              totalCost,
+              modelUsage: modelCosts
+            }
+          }
+
           return {
             ...account,
+            // 转换schedulable为布尔值
+            schedulable: account.schedulable === 'true' || account.schedulable === true,
             groupInfos,
             usage: {
               daily: usageStats.daily,
               total: usageStats.total,
-              averages: usageStats.averages
+              averages: usageStats.averages,
+              sessionWindow: sessionWindowUsage
             }
           }
         } catch (statsError) {
@@ -1491,7 +1595,8 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
               usage: {
                 daily: { tokens: 0, requests: 0, allTokens: 0 },
                 total: { tokens: 0, requests: 0, allTokens: 0 },
-                averages: { rpm: 0, tpm: 0 }
+                averages: { rpm: 0, tpm: 0 },
+                sessionWindow: null
               }
             }
           } catch (groupError) {
@@ -1505,7 +1610,8 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
               usage: {
                 daily: { tokens: 0, requests: 0, allTokens: 0 },
                 total: { tokens: 0, requests: 0, allTokens: 0 },
-                averages: { rpm: 0, tpm: 0 }
+                averages: { rpm: 0, tpm: 0 },
+                sessionWindow: null
               }
             }
           }
@@ -1535,7 +1641,8 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       platform = 'claude',
       priority,
       groupId,
-      groupIds
+      groupIds,
+      autoStopOnWarning
     } = req.body
 
     if (!name) {
@@ -1574,7 +1681,8 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       proxy,
       accountType: accountType || 'shared', // 默认为共享类型
       platform,
-      priority: priority || 50 // 默认优先级为50
+      priority: priority || 50, // 默认优先级为50
+      autoStopOnWarning: autoStopOnWarning === true // 默认为false
     })
 
     // 如果是分组类型，将账户添加到分组
@@ -1855,6 +1963,8 @@ router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
 
           return {
             ...account,
+            // 转换schedulable为布尔值
+            schedulable: account.schedulable === 'true' || account.schedulable === true,
             groupInfos,
             usage: {
               daily: usageStats.daily,
@@ -1871,6 +1981,8 @@ router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
             const groupInfos = await accountGroupService.getAccountGroups(account.id)
             return {
               ...account,
+              // 转换schedulable为布尔值
+              schedulable: account.schedulable === 'true' || account.schedulable === true,
               groupInfos,
               usage: {
                 daily: { tokens: 0, requests: 0, allTokens: 0 },
@@ -2484,7 +2596,7 @@ router.post('/gemini-accounts/generate-auth-url', authenticateAdmin, async (req,
       state: authState,
       codeVerifier,
       redirectUri: finalRedirectUri
-    } = await geminiAccountService.generateAuthUrl(state, redirectUri)
+    } = await geminiAccountService.generateAuthUrl(state, redirectUri, proxy)
 
     // 创建 OAuth 会话，包含 codeVerifier 和代理配置
     const sessionId = authState
@@ -4847,9 +4959,13 @@ router.get('/oem-settings', async (req, res) => {
       }
     }
 
+    // 添加 LDAP 启用状态到响应中
     return res.json({
       success: true,
-      data: settings
+      data: {
+        ...settings,
+        ldapEnabled: config.ldap && config.ldap.enabled === true
+      }
     })
   } catch (error) {
     logger.error('❌ Failed to get OEM settings:', error)
