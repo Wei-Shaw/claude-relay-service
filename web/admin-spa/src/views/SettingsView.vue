@@ -41,9 +41,8 @@
 
       <!-- 加载状态 -->
       <div v-if="loading" class="py-12 text-center">
-        <div class="loading-spinner mx-auto mb-4">
-          <p class="text-gray-500 dark:text-gray-400">正在加载设置...</p>
-        </div>
+        <div class="loading-spinner mx-auto mb-4"></div>
+        <p class="text-gray-500 dark:text-gray-400">正在加载设置...</p>
       </div>
 
       <!-- 内容区域 -->
@@ -982,14 +981,22 @@ const validateUrl = () => {
 const savePlatform = async () => {
   if (!isMounted.value) return
 
-  if (!platformForm.value.url) {
-    showToast('请输入Webhook URL', 'error')
-    return
-  }
+  // Bark平台只需要deviceKey，其他平台需要URL
+  if (platformForm.value.type === 'bark') {
+    if (!platformForm.value.deviceKey) {
+      showToast('请输入Bark设备密钥', 'error')
+      return
+    }
+  } else {
+    if (!platformForm.value.url) {
+      showToast('请输入Webhook URL', 'error')
+      return
+    }
 
-  if (urlError.value) {
-    showToast('请输入有效的Webhook URL', 'error')
-    return
+    if (urlError.value) {
+      showToast('请输入有效的Webhook URL', 'error')
+      return
+    }
   }
 
   savingPlatform.value = true

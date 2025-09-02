@@ -138,11 +138,19 @@ function createOAuth2Client(redirectUri = null, proxyConfig = null) {
   return new OAuth2Client(clientOptions)
 }
 
-// 生成授权 URL (支持 PKCE)
-async function generateAuthUrl(state = null, redirectUri = null) {
+// 生成授权 URL (支持 PKCE 和代理)
+async function generateAuthUrl(state = null, redirectUri = null, proxyConfig = null) {
   // 使用新的 redirect URI
   const finalRedirectUri = redirectUri || 'https://codeassist.google.com/authcode'
-  const oAuth2Client = createOAuth2Client(finalRedirectUri)
+  const oAuth2Client = createOAuth2Client(finalRedirectUri, proxyConfig)
+
+  if (proxyConfig) {
+    logger.info(
+      `🌐 Using proxy for Gemini auth URL generation: ${ProxyHelper.getProxyDescription(proxyConfig)}`
+    )
+  } else {
+    logger.debug('🌐 No proxy configured for Gemini auth URL generation')
+  }
 
   // 生成 PKCE code verifier
   const codeVerifier = await oAuth2Client.generateCodeVerifierAsync()
@@ -965,12 +973,10 @@ async function getAccountRateLimitInfo(accountId) {
   }
 }
 
-// 获取配置的OAuth客户端 - 参考GeminiCliSimulator的getOauthClient方法
-async function getOauthClient(accessToken, refreshToken) {
-  const client = new OAuth2Client({
-    clientId: OAUTH_CLIENT_ID,
-    clientSecret: OAUTH_CLIENT_SECRET
-  })
+// 获取配置的OAuth客户端 - 参考GeminiCliSimulator的getOauthClient方法（支持代理）
+async function getOauthClient(accessToken, refreshToken, proxyConfig = null) {
+  const client = createOAuth2Client(null, proxyConfig)
+
   const creds = {
     access_token: accessToken,
     refresh_token: refreshToken,
@@ -978,6 +984,14 @@ async function getOauthClient(accessToken, refreshToken) {
       'https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/userinfo.profile openid https://www.googleapis.com/auth/userinfo.email',
     token_type: 'Bearer',
     expiry_date: 1754269905646
+  }
+
+  if (proxyConfig) {
+    logger.info(
+      `🌐 Using proxy for Gemini OAuth client: ${ProxyHelper.getProxyDescription(proxyConfig)}`
+    )
+  } else {
+    logger.debug('🌐 No proxy configured for Gemini OAuth client')
   }
 
   // 设置凭据
@@ -996,8 +1010,8 @@ async function getOauthClient(accessToken, refreshToken) {
   return client
 }
 
-// 调用 Google Code Assist API 的 loadCodeAssist 方法
-async function loadCodeAssist(client, projectId = null) {
+// 调用 Google Code Assist API 的 loadCodeAssist 方法（支持代理）
+async function loadCodeAssist(client, projectId = null, proxyConfig = null) {
   const axios = require('axios')
   const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com'
   const CODE_ASSIST_API_VERSION = 'v1internal'
@@ -1017,7 +1031,7 @@ async function loadCodeAssist(client, projectId = null) {
     metadata: clientMetadata
   }
 
-  const response = await axios({
+  const axiosConfig = {
     url: `${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:loadCodeAssist`,
     method: 'POST',
     headers: {
@@ -1026,7 +1040,20 @@ async function loadCodeAssist(client, projectId = null) {
     },
     data: request,
     timeout: 30000
-  })
+  }
+
+  // 添加代理配置
+  const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+  if (proxyAgent) {
+    axiosConfig.httpsAgent = proxyAgent
+    logger.info(
+      `🌐 Using proxy for Gemini loadCodeAssist: ${ProxyHelper.getProxyDescription(proxyConfig)}`
+    )
+  } else {
+    logger.debug('🌐 No proxy configured for Gemini loadCodeAssist')
+  }
+
+  const response = await axios(axiosConfig)
 
   logger.info('📋 loadCodeAssist API调用成功')
   return response.data
@@ -1059,8 +1086,8 @@ function getOnboardTier(loadRes) {
   }
 }
 
-// 调用 Google Code Assist API 的 onboardUser 方法（包含轮询逻辑）
-async function onboardUser(client, tierId, projectId, clientMetadata) {
+// 调用 Google Code Assist API 的 onboardUser 方法（包含轮询逻辑，支持代理）
+async function onboardUser(client, tierId, projectId, clientMetadata, proxyConfig = null) {
   const axios = require('axios')
   const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com'
   const CODE_ASSIST_API_VERSION = 'v1internal'
@@ -1073,15 +1100,8 @@ async function onboardUser(client, tierId, projectId, clientMetadata) {
     metadata: clientMetadata
   }
 
-  logger.info('📋 开始onboardUser API调用', {
-    tierId,
-    projectId,
-    hasProjectId: !!projectId,
-    isFreeTier: tierId === 'free-tier' || tierId === 'FREE'
-  })
-
-  // 轮询onboardUser直到长运行操作完成
-  let lroRes = await axios({
+  // 创建基础axios配置
+  const baseAxiosConfig = {
     url: `${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:onboardUser`,
     method: 'POST',
     headers: {
@@ -1090,7 +1110,28 @@ async function onboardUser(client, tierId, projectId, clientMetadata) {
     },
     data: onboardReq,
     timeout: 30000
+  }
+
+  // 添加代理配置
+  const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+  if (proxyAgent) {
+    baseAxiosConfig.httpsAgent = proxyAgent
+    logger.info(
+      `🌐 Using proxy for Gemini onboardUser: ${ProxyHelper.getProxyDescription(proxyConfig)}`
+    )
+  } else {
+    logger.debug('🌐 No proxy configured for Gemini onboardUser')
+  }
+
+  logger.info('📋 开始onboardUser API调用', {
+    tierId,
+    projectId,
+    hasProjectId: !!projectId,
+    isFreeTier: tierId === 'free-tier' || tierId === 'FREE'
   })
+
+  // 轮询onboardUser直到长运行操作完成
+  let lroRes = await axios(baseAxiosConfig)
 
   let attempts = 0
   const maxAttempts = 12 // 最多等待1分钟（5秒 * 12次）
@@ -1099,17 +1140,7 @@ async function onboardUser(client, tierId, projectId, clientMetadata) {
     logger.info(`⏳ 等待onboardUser完成... (${attempts + 1}/${maxAttempts})`)
     await new Promise((resolve) => setTimeout(resolve, 5000))
 
-    lroRes = await axios({
-      url: `${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:onboardUser`,
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      data: onboardReq,
-      timeout: 30000
-    })
-
+    lroRes = await axios(baseAxiosConfig)
     attempts++
   }
 
@@ -1121,8 +1152,13 @@ async function onboardUser(client, tierId, projectId, clientMetadata) {
   return lroRes.data
 }
 
-// 完整的用户设置流程 - 参考setup.ts的逻辑
-async function setupUser(client, initialProjectId = null, clientMetadata = null) {
+// 完整的用户设置流程 - 参考setup.ts的逻辑（支持代理）
+async function setupUser(
+  client,
+  initialProjectId = null,
+  clientMetadata = null,
+  proxyConfig = null
+) {
   logger.info('🚀 setupUser 开始', { initialProjectId, hasClientMetadata: !!clientMetadata })
 
   let projectId = initialProjectId || process.env.GOOGLE_CLOUD_PROJECT || null
@@ -1141,7 +1177,7 @@ async function setupUser(client, initialProjectId = null, clientMetadata = null)
 
   // 调用loadCodeAssist
   logger.info('📞 调用 loadCodeAssist...')
-  const loadRes = await loadCodeAssist(client, projectId)
+  const loadRes = await loadCodeAssist(client, projectId, proxyConfig)
   logger.info('✅ loadCodeAssist 完成', {
     hasCloudaicompanionProject: !!loadRes.cloudaicompanionProject
   })
@@ -1164,7 +1200,7 @@ async function setupUser(client, initialProjectId = null, clientMetadata = null)
 
   // 调用onboardUser
   logger.info('📞 调用 onboardUser...', { tierId: tier.id, projectId })
-  const lroRes = await onboardUser(client, tier.id, projectId, clientMetadata)
+  const lroRes = await onboardUser(client, tier.id, projectId, clientMetadata, proxyConfig)
   logger.info('✅ onboardUser 完成', { hasDone: !!lroRes.done, hasResponse: !!lroRes.response })
 
   const result = {
@@ -1178,8 +1214,8 @@ async function setupUser(client, initialProjectId = null, clientMetadata = null)
   return result
 }
 
-// 调用 Code Assist API 计算 token 数量
-async function countTokens(client, contents, model = 'gemini-2.0-flash-exp') {
+// 调用 Code Assist API 计算 token 数量（支持代理）
+async function countTokens(client, contents, model = 'gemini-2.0-flash-exp', proxyConfig = null) {
   const axios = require('axios')
   const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com'
   const CODE_ASSIST_API_VERSION = 'v1internal'
@@ -1196,7 +1232,7 @@ async function countTokens(client, contents, model = 'gemini-2.0-flash-exp') {
 
   logger.info('📊 countTokens API调用开始', { model, contentsLength: contents.length })
 
-  const response = await axios({
+  const axiosConfig = {
     url: `${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:countTokens`,
     method: 'POST',
     headers: {
@@ -1205,7 +1241,20 @@ async function countTokens(client, contents, model = 'gemini-2.0-flash-exp') {
     },
     data: request,
     timeout: 30000
-  })
+  }
+
+  // 添加代理配置
+  const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+  if (proxyAgent) {
+    axiosConfig.httpsAgent = proxyAgent
+    logger.info(
+      `🌐 Using proxy for Gemini countTokens: ${ProxyHelper.getProxyDescription(proxyConfig)}`
+    )
+  } else {
+    logger.debug('🌐 No proxy configured for Gemini countTokens')
+  }
+
+  const response = await axios(axiosConfig)
 
   logger.info('✅ countTokens API调用成功', { totalTokens: response.data.totalTokens })
   return response.data

@@ -1102,13 +1102,39 @@ router.delete('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
   try {
     const { keyId } = req.params
 
-    await apiKeyService.deleteApiKey(keyId)
+    await apiKeyService.deleteApiKey(keyId, req.admin.username, 'admin')
 
     logger.success(`🗑️ Admin deleted API key: ${keyId}`)
     return res.json({ success: true, message: 'API key deleted successfully' })
   } catch (error) {
     logger.error('❌ Failed to delete API key:', error)
     return res.status(500).json({ error: 'Failed to delete API key', message: error.message })
+  }
+})
+
+// 📋 获取已删除的API Keys
+router.get('/api-keys/deleted', authenticateAdmin, async (req, res) => {
+  try {
+    const deletedApiKeys = await apiKeyService.getAllApiKeys(true) // Include deleted
+    const onlyDeleted = deletedApiKeys.filter((key) => key.isDeleted === 'true')
+
+    // Add additional metadata for deleted keys
+    const enrichedKeys = onlyDeleted.map((key) => ({
+      ...key,
+      isDeleted: key.isDeleted === 'true',
+      deletedAt: key.deletedAt,
+      deletedBy: key.deletedBy,
+      deletedByType: key.deletedByType,
+      canRestore: false // Deleted keys cannot be restored per requirement
+    }))
+
+    logger.success(`📋 Admin retrieved ${enrichedKeys.length} deleted API keys`)
+    return res.json({ success: true, apiKeys: enrichedKeys, total: enrichedKeys.length })
+  } catch (error) {
+    logger.error('❌ Failed to get deleted API keys:', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to retrieve deleted API keys', message: error.message })
   }
 })
 
@@ -2527,7 +2553,7 @@ router.post('/gemini-accounts/generate-auth-url', authenticateAdmin, async (req,
       state: authState,
       codeVerifier,
       redirectUri: finalRedirectUri
-    } = await geminiAccountService.generateAuthUrl(state, redirectUri)
+    } = await geminiAccountService.generateAuthUrl(state, redirectUri, proxy)
 
     // 创建 OAuth 会话，包含 codeVerifier 和代理配置
     const sessionId = authState
@@ -4875,9 +4901,13 @@ router.get('/oem-settings', async (req, res) => {
       }
     }
 
+    // 添加 LDAP 启用状态到响应中
     return res.json({
       success: true,
-      data: settings
+      data: {
+        ...settings,
+        ldapEnabled: config.ldap && config.ldap.enabled === true
+      }
     })
   } catch (error) {
     logger.error('❌ Failed to get OEM settings:', error)

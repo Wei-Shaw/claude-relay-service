@@ -34,7 +34,11 @@ class UnifiedOpenAIScheduler {
 
         // 普通专属账户
         const boundAccount = await openaiAccountService.getAccount(apiKeyData.openaiAccountId)
-        if (boundAccount && boundAccount.isActive === 'true' && boundAccount.status !== 'error') {
+        if (
+          boundAccount &&
+          (boundAccount.isActive === true || boundAccount.isActive === 'true') &&
+          boundAccount.status !== 'error'
+        ) {
           // 检查是否被限流
           const isRateLimited = await this.isAccountRateLimited(boundAccount.id)
           if (isRateLimited) {
@@ -165,7 +169,7 @@ class UnifiedOpenAIScheduler {
     const openaiAccounts = await openaiAccountService.getAllAccounts()
     for (const account of openaiAccounts) {
       if (
-        account.isActive === 'true' &&
+        account.isActive &&
         account.status !== 'error' &&
         (account.accountType === 'shared' || !account.accountType) && // 兼容旧数据
         this._isSchedulable(account.schedulable)
@@ -233,7 +237,7 @@ class UnifiedOpenAIScheduler {
     try {
       if (accountType === 'openai') {
         const account = await openaiAccountService.getAccount(accountId)
-        if (!account || account.isActive !== 'true' || account.status === 'error') {
+        if (!account || !account.isActive || account.status === 'error') {
           return false
         }
         // 检查是否可调度
@@ -395,7 +399,7 @@ class UnifiedOpenAIScheduler {
         const account = await openaiAccountService.getAccount(memberId)
         if (
           account &&
-          account.isActive === 'true' &&
+          account.isActive &&
           account.status !== 'error' &&
           this._isSchedulable(account.schedulable)
         ) {

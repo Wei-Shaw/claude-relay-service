@@ -528,7 +528,17 @@
                 >
                 <div class="flex flex-wrap gap-2">
                   <label
-                    v-for="model in ['gpt-4', 'gpt-4-turbo', 'gpt-35-turbo', 'gpt-35-turbo-16k']"
+                    v-for="model in [
+                      'gpt-4',
+                      'gpt-4-turbo',
+                      'gpt-4o',
+                      'gpt-4o-mini',
+                      'gpt-5',
+                      'gpt-5-mini',
+                      'gpt-35-turbo',
+                      'gpt-35-turbo-16k',
+                      'codex-mini'
+                    ]"
                     :key="model"
                     class="flex cursor-pointer items-center"
                   >
@@ -1642,9 +1652,112 @@
             </div>
           </div>
 
+          <!-- Azure OpenAI 特定字段（编辑模式）-->
+          <div v-if="form.platform === 'azure_openai'" class="space-y-4">
+            <div>
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >Azure Endpoint</label
+              >
+              <input
+                v-model="form.azureEndpoint"
+                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                :class="{ 'border-red-500': errors.azureEndpoint }"
+                placeholder="https://your-resource.openai.azure.com"
+                type="url"
+              />
+              <p v-if="errors.azureEndpoint" class="mt-1 text-xs text-red-500">
+                {{ errors.azureEndpoint }}
+              </p>
+            </div>
+
+            <div>
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >API 版本</label
+              >
+              <input
+                v-model="form.apiVersion"
+                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                placeholder="2024-02-01"
+                type="text"
+              />
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Azure OpenAI API 版本，默认使用最新稳定版本 2024-02-01
+              </p>
+            </div>
+
+            <div>
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >部署名称</label
+              >
+              <input
+                v-model="form.deploymentName"
+                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                :class="{ 'border-red-500': errors.deploymentName }"
+                placeholder="gpt-4"
+                type="text"
+              />
+              <p v-if="errors.deploymentName" class="mt-1 text-xs text-red-500">
+                {{ errors.deploymentName }}
+              </p>
+            </div>
+
+            <div>
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >API Key</label
+              >
+              <input
+                v-model="form.apiKey"
+                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                :class="{ 'border-red-500': errors.apiKey }"
+                placeholder="留空表示不更新"
+                type="password"
+              />
+              <p v-if="errors.apiKey" class="mt-1 text-xs text-red-500">
+                {{ errors.apiKey }}
+              </p>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">留空表示不更新 API Key</p>
+            </div>
+
+            <div>
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >支持的模型</label
+              >
+              <div class="flex flex-wrap gap-2">
+                <label
+                  v-for="model in [
+                    'gpt-4',
+                    'gpt-4-turbo',
+                    'gpt-4o',
+                    'gpt-4o-mini',
+                    'gpt-5',
+                    'gpt-5-mini',
+                    'gpt-35-turbo',
+                    'gpt-35-turbo-16k',
+                    'codex-mini'
+                  ]"
+                  :key="model"
+                  class="flex cursor-pointer items-center"
+                >
+                  <input
+                    v-model="form.supportedModels"
+                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="checkbox"
+                    :value="model"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ model }}</span>
+                </label>
+              </div>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">选择此部署支持的模型类型</p>
+            </div>
+          </div>
+
           <!-- Token 更新 -->
           <div
-            v-if="form.platform !== 'claude-console' && form.platform !== 'bedrock'"
+            v-if="
+              form.platform !== 'claude-console' &&
+              form.platform !== 'bedrock' &&
+              form.platform !== 'azure_openai'
+            "
             class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-900/30"
           >
             <div class="mb-4 flex items-start gap-3">
@@ -1821,16 +1934,16 @@ const form = ref({
   priority: props.account?.priority || 50,
   supportedModels: (() => {
     const models = props.account?.supportedModels
-    if (!models) return ''
+    if (!models) return []
     // 处理对象格式（Claude Console 的新格式）
     if (typeof models === 'object' && !Array.isArray(models)) {
-      return Object.keys(models).join('\n')
+      return Object.keys(models)
     }
     // 处理数组格式（向后兼容）
     if (Array.isArray(models)) {
-      return models.join('\n')
+      return models
     }
-    return ''
+    return []
   })(),
   userAgent: props.account?.userAgent || '',
   enableRateLimit: props.account ? props.account.rateLimitDuration > 0 : true,
@@ -1841,7 +1954,11 @@ const form = ref({
   region: props.account?.region || '',
   sessionToken: props.account?.sessionToken || '',
   defaultModel: props.account?.defaultModel || '',
-  smallFastModel: props.account?.smallFastModel || ''
+  smallFastModel: props.account?.smallFastModel || '',
+  // Azure OpenAI 特定字段
+  azureEndpoint: props.account?.azureEndpoint || '',
+  apiVersion: props.account?.apiVersion || '',
+  deploymentName: props.account?.deploymentName || ''
 })
 
 // 模型映射表数据
@@ -1878,7 +1995,9 @@ const errors = ref({
   apiKey: '',
   accessKeyId: '',
   secretAccessKey: '',
-  region: ''
+  region: '',
+  azureEndpoint: '',
+  deploymentName: ''
 })
 
 // 计算是否可以进入下一步
@@ -2146,6 +2265,20 @@ const createAccount = async () => {
       errors.value.region = '请选择 AWS 区域'
       hasError = true
     }
+  } else if (form.value.platform === 'azure_openai') {
+    // Azure OpenAI 验证
+    if (!form.value.azureEndpoint || form.value.azureEndpoint.trim() === '') {
+      errors.value.azureEndpoint = '请填写 Azure Endpoint'
+      hasError = true
+    }
+    if (!form.value.deploymentName || form.value.deploymentName.trim() === '') {
+      errors.value.deploymentName = '请填写部署名称'
+      hasError = true
+    }
+    if (!form.value.apiKey || form.value.apiKey.trim() === '') {
+      errors.value.apiKey = '请填写 API Key'
+      hasError = true
+    }
   } else if (form.value.addType === 'manual') {
     // 手动模式验证
     if (!form.value.accessToken || form.value.accessToken.trim() === '') {
@@ -2307,6 +2440,16 @@ const createAccount = async () => {
       data.priority = form.value.priority || 50
       // 如果不启用限流，传递 0 表示不限流
       data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
+    } else if (form.value.platform === 'azure_openai') {
+      // Azure OpenAI 账户特定数据
+      data.azureEndpoint = form.value.azureEndpoint
+      data.apiKey = form.value.apiKey
+      data.apiVersion = form.value.apiVersion || '2024-02-01'
+      data.deploymentName = form.value.deploymentName
+      data.supportedModels = Array.isArray(form.value.supportedModels)
+        ? form.value.supportedModels
+        : []
+      data.priority = form.value.priority || 50
     }
 
     let result
@@ -2318,6 +2461,8 @@ const createAccount = async () => {
       result = await accountsStore.createBedrockAccount(data)
     } else if (form.value.platform === 'openai') {
       result = await accountsStore.createOpenAIAccount(data)
+    } else if (form.value.platform === 'azure_openai') {
+      result = await accountsStore.createAzureOpenAIAccount(data)
     } else {
       result = await accountsStore.createGeminiAccount(data)
     }
@@ -2492,6 +2637,21 @@ const updateAccount = async () => {
       data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
     }
 
+    // Azure OpenAI 特定更新
+    if (props.account.platform === 'azure_openai') {
+      data.azureEndpoint = form.value.azureEndpoint
+      data.apiVersion = form.value.apiVersion || '2024-02-01'
+      data.deploymentName = form.value.deploymentName
+      data.supportedModels = Array.isArray(form.value.supportedModels)
+        ? form.value.supportedModels
+        : []
+      data.priority = form.value.priority || 50
+      // 只有当有新的 API Key 时才更新
+      if (form.value.apiKey && form.value.apiKey.trim()) {
+        data.apiKey = form.value.apiKey
+      }
+    }
+
     if (props.account.platform === 'claude') {
       await accountsStore.updateClaudeAccount(props.account.id, data)
     } else if (props.account.platform === 'claude-console') {
@@ -2500,6 +2660,8 @@ const updateAccount = async () => {
       await accountsStore.updateBedrockAccount(props.account.id, data)
     } else if (props.account.platform === 'openai') {
       await accountsStore.updateOpenAIAccount(props.account.id, data)
+    } else if (props.account.platform === 'azure_openai') {
+      await accountsStore.updateAzureOpenAIAccount(props.account.id, data)
     } else {
       await accountsStore.updateGeminiAccount(props.account.id, data)
     }
@@ -2548,6 +2710,26 @@ watch(
   () => {
     if (errors.value.apiKey && form.value.apiKey?.trim()) {
       errors.value.apiKey = ''
+    }
+  }
+)
+
+// 监听Azure Endpoint变化，清除错误
+watch(
+  () => form.value.azureEndpoint,
+  () => {
+    if (errors.value.azureEndpoint && form.value.azureEndpoint?.trim()) {
+      errors.value.azureEndpoint = ''
+    }
+  }
+)
+
+// 监听Deployment Name变化，清除错误
+watch(
+  () => form.value.deploymentName,
+  () => {
+    if (errors.value.deploymentName && form.value.deploymentName?.trim()) {
+      errors.value.deploymentName = ''
     }
   }
 )
@@ -2784,16 +2966,16 @@ watch(
         priority: newAccount.priority || 50,
         supportedModels: (() => {
           const models = newAccount.supportedModels
-          if (!models) return ''
+          if (!models) return []
           // 处理对象格式（Claude Console 的新格式）
           if (typeof models === 'object' && !Array.isArray(models)) {
-            return Object.keys(models).join('\n')
+            return Object.keys(models)
           }
           // 处理数组格式（向后兼容）
           if (Array.isArray(models)) {
-            return models.join('\n')
+            return models
           }
-          return ''
+          return []
         })(),
         userAgent: newAccount.userAgent || '',
         enableRateLimit:
@@ -2805,7 +2987,11 @@ watch(
         region: newAccount.region || '',
         sessionToken: '', // 编辑模式不显示现有的会话令牌
         defaultModel: newAccount.defaultModel || '',
-        smallFastModel: newAccount.smallFastModel || ''
+        smallFastModel: newAccount.smallFastModel || '',
+        // Azure OpenAI 特定字段
+        azureEndpoint: newAccount.azureEndpoint || '',
+        apiVersion: newAccount.apiVersion || '',
+        deploymentName: newAccount.deploymentName || ''
       }
 
       // 如果是分组类型，加载分组ID

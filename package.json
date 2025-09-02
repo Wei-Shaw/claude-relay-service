@@ -63,6 +63,7 @@
     "https-proxy-agent": "^7.0.2",
     "inquirer": "^8.2.6",
     "ioredis": "^5.3.2",
+    "ldapjs": "^3.0.7",
     "morgan": "^1.10.0",
     "ora": "^5.4.1",
     "rate-limiter-flexible": "^5.0.5",

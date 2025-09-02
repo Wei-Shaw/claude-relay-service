@@ -1024,13 +1024,10 @@ const sortedAccounts = computed(() => {
 const loadAccounts = async (forceReload = false) => {
   accountsLoading.value = true
   try {
-    // 构建查询参数
+    // 构建查询参数（移除分组参数，因为在前端处理）
     const params = {}
     if (platformFilter.value !== 'all') {
       params.platform = platformFilter.value
-    }
-    if (groupFilter.value !== 'all') {
-      params.groupId = groupFilter.value
     }
 
     // 根据平台筛选决定需要请求哪些接口
@@ -1187,7 +1184,27 @@ const loadAccounts = async (forceReload = false) => {
       allAccounts.push(...azureOpenaiAccounts)
     }
 
-    accounts.value = allAccounts
+    // 根据分组筛选器过滤账户
+    let filteredAccounts = allAccounts
+    if (groupFilter.value !== 'all') {
+      if (groupFilter.value === 'ungrouped') {
+        // 筛选未分组的账户（没有 groupInfos 或 groupInfos 为空数组）
+        filteredAccounts = allAccounts.filter((account) => {
+          return !account.groupInfos || account.groupInfos.length === 0
+        })
+      } else {
+        // 筛选属于特定分组的账户
+        filteredAccounts = allAccounts.filter((account) => {
+          if (!account.groupInfos || account.groupInfos.length === 0) {
+            return false
+          }
+          // 检查账户是否属于选中的分组
+          return account.groupInfos.some((group) => group.id === groupFilter.value)
+        })
+      }
+    }
+
+    accounts.value = filteredAccounts
   } catch (error) {
     showToast('加载账户失败', 'error')
   } finally {
@@ -1431,7 +1448,8 @@ const resetAccountStatus = async (account) => {
 
     if (data.success) {
       showToast('账户状态已重置', 'success')
-      loadAccounts()
+      // 强制刷新，绕过前端缓存，确保最终一致性
+      loadAccounts(true)
     } else {
       showToast(data.message || '状态重置失败', 'error')
     }
