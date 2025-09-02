@@ -4901,9 +4901,13 @@ router.get('/oem-settings', async (req, res) => {
       }
     }
 
+    // 添加 LDAP 启用状态到响应中
     return res.json({
       success: true,
-      data: settings
+      data: {
+        ...settings,
+        ldapEnabled: config.ldap && config.ldap.enabled === true
+      }
     })
   } catch (error) {
     logger.error('❌ Failed to get OEM settings:', error)

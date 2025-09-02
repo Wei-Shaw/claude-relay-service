@@ -5,17 +5,104 @@ const userService = require('../services/userService')
 const apiKeyService = require('../services/apiKeyService')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
+const inputValidator = require('../utils/inputValidator')
+const { RateLimiterRedis } = require('rate-limiter-flexible')
+const redis = require('../models/redis')
 const { authenticateUser, authenticateUserOrAdmin, requireAdmin } = require('../middleware/auth')
+
+// 🚦 配置登录速率限制
+// 只基于IP地址限制，避免攻击者恶意锁定特定账户
+
+// 延迟初始化速率限制器，确保 Redis 已连接
+let ipRateLimiter = null
+let strictIpRateLimiter = null
+
+// 初始化速率限制器函数
+function initRateLimiters() {
+  if (!ipRateLimiter) {
+    try {
+      const redisClient = redis.getClientSafe()
+
+      // IP地址速率限制 - 正常限制
+      ipRateLimiter = new RateLimiterRedis({
+        storeClient: redisClient,
+        keyPrefix: 'login_ip_limiter',
+        points: 30, // 每个IP允许30次尝试
+        duration: 900, // 15分钟窗口期
+        blockDuration: 900 // 超限后封禁15分钟
+      })
+
+      // IP地址速率限制 - 严格限制（用于检测暴力破解）
+      strictIpRateLimiter = new RateLimiterRedis({
+        storeClient: redisClient,
+        keyPrefix: 'login_ip_strict',
+        points: 100, // 每个IP允许100次尝试
+        duration: 3600, // 1小时窗口期
+        blockDuration: 3600 // 超限后封禁1小时
+      })
+    } catch (error) {
+      logger.error('❌ 初始化速率限制器失败:', error)
+      // 速率限制器初始化失败时继续运行，但记录错误
+    }
+  }
+  return { ipRateLimiter, strictIpRateLimiter }
+}
 
 // 🔐 用户登录端点
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body
+    const clientIp = req.ip || req.connection.remoteAddress || 'unknown'
+
+    // 初始化速率限制器（如果尚未初始化）
+    const limiters = initRateLimiters()
+
+    // 检查IP速率限制 - 基础限制
+    if (limiters.ipRateLimiter) {
+      try {
+        await limiters.ipRateLimiter.consume(clientIp)
+      } catch (rateLimiterRes) {
+        const retryAfter = Math.round(rateLimiterRes.msBeforeNext / 1000) || 900
+        logger.security(`🚫 Login rate limit exceeded for IP: ${clientIp}`)
+        res.set('Retry-After', String(retryAfter))
+        return res.status(429).json({
+          error: 'Too many requests',
+          message: `Too many login attempts from this IP. Please try again later.`
+        })
+      }
+    }
+
+    // 检查IP速率限制 - 严格限制（防止暴力破解）
+    if (limiters.strictIpRateLimiter) {
+      try {
+        await limiters.strictIpRateLimiter.consume(clientIp)
+      } catch (rateLimiterRes) {
+        const retryAfter = Math.round(rateLimiterRes.msBeforeNext / 1000) || 3600
+        logger.security(`🚫 Strict rate limit exceeded for IP: ${clientIp} - possible brute force`)
+        res.set('Retry-After', String(retryAfter))
+        return res.status(429).json({
+          error: 'Too many requests',
+          message: 'Too many login attempts detected. Access temporarily blocked.'
+        })
+      }
+    }
 
     if (!username || !password) {
       return res.status(400).json({
         error: 'Missing credentials',
         message: 'Username and password are required'
+      })
+    }
+
+    // 验证输入格式
+    let validatedUsername
+    try {
+      validatedUsername = inputValidator.validateUsername(username)
+      inputValidator.validatePassword(password)
+    } catch (validationError) {
+      return res.status(400).json({
+        error: 'Invalid input',
+        message: validationError.message
       })
     }
 
@@ -28,7 +115,7 @@ router.post('/login', async (req, res) => {
     }
 
     // 检查LDAP是否启用
-    if (!config.ldap.enabled) {
+    if (!config.ldap || !config.ldap.enabled) {
       return res.status(503).json({
         error: 'Service unavailable',
         message: 'LDAP authentication is not enabled'
@@ -36,16 +123,19 @@ router.post('/login', async (req, res) => {
     }
 
     // 尝试LDAP认证
-    const authResult = await ldapService.authenticateUserCredentials(username, password)
+    const authResult = await ldapService.authenticateUserCredentials(validatedUsername, password)
 
     if (!authResult.success) {
+      // 登录失败
+      logger.info(`🚫 Failed login attempt for user: ${validatedUsername} from IP: ${clientIp}`)
       return res.status(401).json({
         error: 'Authentication failed',
         message: authResult.message
       })
     }
 
-    logger.info(`✅ User login successful: ${username}`)
+    // 登录成功
+    logger.info(`✅ User login successful: ${validatedUsername} from IP: ${clientIp}`)
 
     res.json({
       success: true,

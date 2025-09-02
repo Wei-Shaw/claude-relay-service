@@ -20,14 +20,16 @@
             class="h-8 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent opacity-50 dark:via-gray-600"
           />
 
-          <!-- 管理后台按钮 -->
+          <!-- 用户登录按钮 (仅在 LDAP 启用时显示) -->
           <router-link
-            class="user-login-button flex items-center gap-2 rounded-xl px-3 py-2 text-white transition-all duration-300 md:px-4 md:py-2"
+            v-if="oemSettings.ldapEnabled"
+            class="user-login-button flex items-center gap-2 rounded-2xl px-4 py-2 text-white transition-all duration-300 md:px-5 md:py-2.5"
             to="/user-login"
           >
-            <i class="fas fa-user text-sm" />
-            <span class="text-xs font-medium md:text-sm">用户登录</span>
+            <i class="fas fa-user text-sm md:text-base" />
+            <span class="text-xs font-semibold tracking-wide md:text-sm">用户登录</span>
           </router-link>
+          <!-- 管理后台按钮 -->
           <router-link
             class="admin-button-refined flex items-center gap-2 rounded-2xl px-4 py-2 transition-all duration-300 md:px-5 md:py-2.5"
             to="/dashboard"
@@ -319,35 +321,68 @@ watch(apiKey, (newValue) => {
 /* 用户登录按钮 */
 .user-login-button {
   background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   text-decoration: none;
   box-shadow:
-    0 4px 6px -1px rgba(52, 211, 153, 0.3),
-    0 2px 4px -1px rgba(52, 211, 153, 0.1);
+    0 4px 12px rgba(52, 211, 153, 0.25),
+    inset 0 1px 1px rgba(255, 255, 255, 0.2);
   position: relative;
   overflow: hidden;
+  font-weight: 600;
+}
+
+/* 暗色模式下的用户登录按钮 */
+:global(.dark) .user-login-button {
+  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  color: white;
+  box-shadow:
+    0 4px 12px rgba(52, 211, 153, 0.3),
+    inset 0 1px 1px rgba(255, 255, 255, 0.1);
 }
 
 .user-login-button::before {
   content: '';
   position: absolute;
   top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.5s;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
 .user-login-button:hover {
-  transform: translateY(-2px);
+  transform: translateY(-2px) scale(1.02);
   box-shadow:
-    0 10px 15px -3px rgba(52, 211, 153, 0.4),
-    0 4px 6px -2px rgba(52, 211, 153, 0.15);
+    0 8px 20px rgba(52, 211, 153, 0.35),
+    inset 0 1px 1px rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
 .user-login-button:hover::before {
-  left: 100%;
+  opacity: 1;
+}
+
+/* 暗色模式下的悬停效果 */
+:global(.dark) .user-login-button:hover {
+  box-shadow:
+    0 8px 20px rgba(52, 211, 153, 0.4),
+    inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  border-color: rgba(52, 211, 153, 0.5);
+}
+
+.user-login-button:active {
+  transform: translateY(-1px) scale(1);
+}
+
+/* 确保图标和文字在所有模式下都清晰可见 */
+.user-login-button i,
+.user-login-button span {
+  position: relative;
+  z-index: 1;
 }
 
 /* 管理后台按钮 - 精致版本 */

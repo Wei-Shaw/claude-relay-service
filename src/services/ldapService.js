@@ -5,11 +5,11 @@ const userService = require('./userService')
 
 class LdapService {
   constructor() {
-    this.config = config.ldap
+    this.config = config.ldap || {}
     this.client = null
 
-    // 验证配置
-    if (this.config.enabled) {
+    // 验证配置 - 只有在 LDAP 配置存在且启用时才验证
+    if (this.config && this.config.enabled) {
       this.validateConfiguration()
     }
   }
@@ -219,7 +219,17 @@ class LdapService {
   // 🔍 搜索用户
   async searchUser(client, username) {
     return new Promise((resolve, reject) => {
-      const searchFilter = this.config.server.searchFilter.replace('{{username}}', username)
+      // 防止LDAP注入：转义特殊字符
+      // 根据RFC 4515，需要转义的特殊字符：* ( ) \ NUL
+      const escapedUsername = username
+        .replace(/\\/g, '\\5c') // 反斜杠必须先转义
+        .replace(/\*/g, '\\2a') // 星号
+        .replace(/\(/g, '\\28') // 左括号
+        .replace(/\)/g, '\\29') // 右括号
+        .replace(/\0/g, '\\00') // NUL字符
+        .replace(/\//g, '\\2f') // 斜杠
+
+      const searchFilter = this.config.server.searchFilter.replace('{{username}}', escapedUsername)
       const searchOptions = {
         scope: 'sub',
         filter: searchFilter,
@@ -507,7 +517,15 @@ class LdapService {
         message: 'Authentication successful'
       }
     } catch (error) {
-      logger.error('❌ LDAP authentication error:', error)
+      // 记录详细错误供调试，但不向用户暴露
+      logger.error('❌ LDAP authentication error:', {
+        username: sanitizedUsername,
+        error: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      })
+
+      // 返回通用错误消息，避免信息泄露
+      // 不要尝试解析具体的错误信息，因为不同LDAP服务器返回的格式不同
       return {
         success: false,
         message: 'Authentication service unavailable'
@@ -542,11 +560,28 @@ class LdapService {
         searchBase: this.config.server.searchBase
       }
     } catch (error) {
-      logger.error('❌ LDAP connection test failed:', error)
+      logger.error('❌ LDAP connection test failed:', {
+        error: error.message,
+        server: this.config.server.url,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      })
+
+      // 提供通用错误消息，避免泄露系统细节
+      let userMessage = 'LDAP connection failed'
+
+      // 对于某些已知错误类型，提供有用但不泄露细节的信息
+      if (error.code === 'ECONNREFUSED') {
+        userMessage = 'Unable to connect to LDAP server'
+      } else if (error.code === 'ETIMEDOUT') {
+        userMessage = 'LDAP server connection timeout'
+      } else if (error.name === 'InvalidCredentialsError') {
+        userMessage = 'LDAP bind credentials are invalid'
+      }
+
       return {
         success: false,
-        message: `LDAP connection failed: ${error.message}`,
-        server: this.config.server.url
+        message: userMessage,
+        server: this.config.server.url.replace(/:[^:]*@/, ':***@') // 隐藏密码部分
       }
     } finally {
       if (client) {
