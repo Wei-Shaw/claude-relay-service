@@ -1510,15 +1510,18 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
     if (groupId && groupId !== 'all') {
       if (groupId === 'ungrouped') {
         // 筛选未分组账户
-        accounts = accounts.filter(
-          (account) => !account.groupInfos || account.groupInfos.length === 0
-        )
+        const filteredAccounts = []
+        for (const account of accounts) {
+          const groups = await accountGroupService.getAccountGroups(account.id)
+          if (!groups || groups.length === 0) {
+            filteredAccounts.push(account)
+          }
+        }
+        accounts = filteredAccounts
       } else {
         // 筛选特定分组的账户
-        accounts = accounts.filter(
-          (account) =>
-            account.groupInfos && account.groupInfos.some((group) => group.id === groupId)
-        )
+        const groupMembers = await accountGroupService.getGroupMembers(groupId)
+        accounts = accounts.filter((account) => groupMembers.includes(account.id))
       }
     }
 
@@ -1527,7 +1530,7 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
       accounts.map(async (account) => {
         try {
           const usageStats = await redis.getAccountUsageStats(account.id)
-          const groupInfos = await accountGroupService.getAccountGroup(account.id)
+          const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
           // 获取会话窗口使用统计（仅对有活跃窗口的账户）
           let sessionWindowUsage = null
@@ -1585,7 +1588,7 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
           logger.warn(`⚠️ Failed to get usage stats for account ${account.id}:`, statsError.message)
           // 如果获取统计失败，返回空统计
           try {
-            const groupInfos = await accountGroupService.getAccountGroup(account.id)
+            const groupInfos = await accountGroupService.getAccountGroups(account.id)
             return {
               ...account,
               groupInfos,
@@ -1638,6 +1641,7 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       platform = 'claude',
       priority,
       groupId,
+      groupIds,
       autoStopOnWarning
     } = req.body
 
@@ -1652,9 +1656,11 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
         .json({ error: 'Invalid account type. Must be "shared", "dedicated" or "group"' })
     }
 
-    // 如果是分组类型，验证groupId
-    if (accountType === 'group' && !groupId) {
-      return res.status(400).json({ error: 'Group ID is required for group type accounts' })
+    // 如果是分组类型，验证groupId或groupIds
+    if (accountType === 'group' && !groupId && (!groupIds || groupIds.length === 0)) {
+      return res
+        .status(400)
+        .json({ error: 'Group ID or Group IDs are required for group type accounts' })
     }
 
     // 验证priority的有效性
@@ -1680,8 +1686,14 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
     })
 
     // 如果是分组类型，将账户添加到分组
-    if (accountType === 'group' && groupId) {
-      await accountGroupService.addAccountToGroup(newAccount.id, groupId, newAccount.platform)
+    if (accountType === 'group') {
+      if (groupIds && groupIds.length > 0) {
+        // 使用多分组设置
+        await accountGroupService.setAccountGroups(newAccount.id, groupIds, newAccount.platform)
+      } else if (groupId) {
+        // 兼容单分组模式
+        await accountGroupService.addAccountToGroup(newAccount.id, groupId, newAccount.platform)
+      }
     }
 
     logger.success(`🏢 Admin created new Claude account: ${name} (${accountType || 'shared'})`)
@@ -1715,9 +1727,15 @@ router.put('/claude-accounts/:accountId', authenticateAdmin, async (req, res) =>
         .json({ error: 'Invalid account type. Must be "shared", "dedicated" or "group"' })
     }
 
-    // 如果更新为分组类型，验证groupId
-    if (updates.accountType === 'group' && !updates.groupId) {
-      return res.status(400).json({ error: 'Group ID is required for group type accounts' })
+    // 如果更新为分组类型，验证groupId或groupIds
+    if (
+      updates.accountType === 'group' &&
+      !updates.groupId &&
+      (!updates.groupIds || updates.groupIds.length === 0)
+    ) {
+      return res
+        .status(400)
+        .json({ error: 'Group ID or Group IDs are required for group type accounts' })
     }
 
     // 获取账户当前信息以处理分组变更
@@ -1730,16 +1748,24 @@ router.put('/claude-accounts/:accountId', authenticateAdmin, async (req, res) =>
     if (updates.accountType !== undefined) {
       // 如果之前是分组类型，需要从所有分组中移除
       if (currentAccount.accountType === 'group') {
-        const oldGroups = await accountGroupService.getAccountGroup(accountId)
-        for (const oldGroup of oldGroups) {
-          await accountGroupService.removeAccountFromGroup(accountId, oldGroup.id)
-        }
+        await accountGroupService.removeAccountFromAllGroups(accountId)
       }
 
       // 如果新类型是分组，添加到新分组
-      if (updates.accountType === 'group' && updates.groupId) {
-        // 从路由知道这是 Claude OAuth 账户，平台为 'claude'
-        await accountGroupService.addAccountToGroup(accountId, updates.groupId, 'claude')
+      if (updates.accountType === 'group') {
+        // 处理多分组/单分组的兼容性
+        if (Object.prototype.hasOwnProperty.call(updates, 'groupIds')) {
+          if (updates.groupIds && updates.groupIds.length > 0) {
+            // 使用多分组设置
+            await accountGroupService.setAccountGroups(accountId, updates.groupIds, 'claude')
+          } else {
+            // groupIds 为空数组，从所有分组中移除
+            await accountGroupService.removeAccountFromAllGroups(accountId)
+          }
+        } else if (updates.groupId) {
+          // 兼容单分组模式
+          await accountGroupService.addAccountToGroup(accountId, updates.groupId, 'claude')
+        }
       }
     }
 
@@ -1913,15 +1939,18 @@ router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
     if (groupId && groupId !== 'all') {
       if (groupId === 'ungrouped') {
         // 筛选未分组账户
-        accounts = accounts.filter(
-          (account) => !account.groupInfos || account.groupInfos.length === 0
-        )
+        const filteredAccounts = []
+        for (const account of accounts) {
+          const groups = await accountGroupService.getAccountGroups(account.id)
+          if (!groups || groups.length === 0) {
+            filteredAccounts.push(account)
+          }
+        }
+        accounts = filteredAccounts
       } else {
         // 筛选特定分组的账户
-        accounts = accounts.filter(
-          (account) =>
-            account.groupInfos && account.groupInfos.some((group) => group.id === groupId)
-        )
+        const groupMembers = await accountGroupService.getGroupMembers(groupId)
+        accounts = accounts.filter((account) => groupMembers.includes(account.id))
       }
     }
 
@@ -1930,7 +1959,7 @@ router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
       accounts.map(async (account) => {
         try {
           const usageStats = await redis.getAccountUsageStats(account.id)
-          const groupInfos = await accountGroupService.getAccountGroup(account.id)
+          const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
           return {
             ...account,
@@ -1949,7 +1978,7 @@ router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
             statsError.message
           )
           try {
-            const groupInfos = await accountGroupService.getAccountGroup(account.id)
+            const groupInfos = await accountGroupService.getAccountGroups(account.id)
             return {
               ...account,
               // 转换schedulable为布尔值
@@ -2043,7 +2072,7 @@ router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
 
     // 如果是分组类型，将账户添加到分组
     if (accountType === 'group' && groupId) {
-      await accountGroupService.addAccountToGroup(newAccount.id, groupId, 'claude')
+      await accountGroupService.addAccountToGroup(newAccount.id, groupId)
     }
 
     logger.success(`🎮 Admin created Claude Console account: ${name}`)
@@ -2089,15 +2118,26 @@ router.put('/claude-console-accounts/:accountId', authenticateAdmin, async (req,
     if (updates.accountType !== undefined) {
       // 如果之前是分组类型，需要从所有分组中移除
       if (currentAccount.accountType === 'group') {
-        const oldGroups = await accountGroupService.getAccountGroup(accountId)
+        const oldGroups = await accountGroupService.getAccountGroups(accountId)
         for (const oldGroup of oldGroups) {
           await accountGroupService.removeAccountFromGroup(accountId, oldGroup.id)
         }
       }
-      // 如果新类型是分组，添加到新分组
-      if (updates.accountType === 'group' && updates.groupId) {
-        // Claude Console 账户在分组中被视为 'claude' 平台
-        await accountGroupService.addAccountToGroup(accountId, updates.groupId, 'claude')
+      // 如果新类型是分组，处理多分组支持
+      if (updates.accountType === 'group') {
+        if (Object.prototype.hasOwnProperty.call(updates, 'groupIds')) {
+          // 如果明确提供了 groupIds 参数（包括空数组）
+          if (updates.groupIds && updates.groupIds.length > 0) {
+            // 设置新的多分组
+            await accountGroupService.setAccountGroups(accountId, updates.groupIds, 'claude')
+          } else {
+            // groupIds 为空数组，从所有分组中移除
+            await accountGroupService.removeAccountFromAllGroups(accountId)
+          }
+        } else if (updates.groupId) {
+          // 向后兼容：仅当没有 groupIds 但有 groupId 时使用单分组逻辑
+          await accountGroupService.addAccountToGroup(accountId, updates.groupId, 'claude')
+        }
       }
     }
 
@@ -2231,15 +2271,18 @@ router.get('/bedrock-accounts', authenticateAdmin, async (req, res) => {
     if (groupId && groupId !== 'all') {
       if (groupId === 'ungrouped') {
         // 筛选未分组账户
-        accounts = accounts.filter(
-          (account) => !account.groupInfos || account.groupInfos.length === 0
-        )
+        const filteredAccounts = []
+        for (const account of accounts) {
+          const groups = await accountGroupService.getAccountGroups(account.id)
+          if (!groups || groups.length === 0) {
+            filteredAccounts.push(account)
+          }
+        }
+        accounts = filteredAccounts
       } else {
         // 筛选特定分组的账户
-        accounts = accounts.filter(
-          (account) =>
-            account.groupInfos && account.groupInfos.some((group) => group.id === groupId)
-        )
+        const groupMembers = await accountGroupService.getGroupMembers(groupId)
+        accounts = accounts.filter((account) => groupMembers.includes(account.id))
       }
     }
 
@@ -2248,7 +2291,7 @@ router.get('/bedrock-accounts', authenticateAdmin, async (req, res) => {
       accounts.map(async (account) => {
         try {
           const usageStats = await redis.getAccountUsageStats(account.id)
-          const groupInfos = await accountGroupService.getAccountGroup(account.id)
+          const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
           return {
             ...account,
@@ -2265,7 +2308,7 @@ router.get('/bedrock-accounts', authenticateAdmin, async (req, res) => {
             statsError.message
           )
           try {
-            const groupInfos = await accountGroupService.getAccountGroup(account.id)
+            const groupInfos = await accountGroupService.getAccountGroups(account.id)
             return {
               ...account,
               groupInfos,
@@ -2678,15 +2721,18 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
     if (groupId && groupId !== 'all') {
       if (groupId === 'ungrouped') {
         // 筛选未分组账户
-        accounts = accounts.filter(
-          (account) => !account.groupInfos || account.groupInfos.length === 0
-        )
+        const filteredAccounts = []
+        for (const account of accounts) {
+          const groups = await accountGroupService.getAccountGroups(account.id)
+          if (!groups || groups.length === 0) {
+            filteredAccounts.push(account)
+          }
+        }
+        accounts = filteredAccounts
       } else {
         // 筛选特定分组的账户
-        accounts = accounts.filter(
-          (account) =>
-            account.groupInfos && account.groupInfos.some((group) => group.id === groupId)
-        )
+        const groupMembers = await accountGroupService.getGroupMembers(groupId)
+        accounts = accounts.filter((account) => groupMembers.includes(account.id))
       }
     }
 
@@ -2695,7 +2741,7 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
       accounts.map(async (account) => {
         try {
           const usageStats = await redis.getAccountUsageStats(account.id)
-          const groupInfos = await accountGroupService.getAccountGroup(account.id)
+          const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
           return {
             ...account,
@@ -2713,7 +2759,7 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
           )
           // 如果获取统计失败，返回空统计
           try {
-            const groupInfos = await accountGroupService.getAccountGroup(account.id)
+            const groupInfos = await accountGroupService.getAccountGroups(account.id)
             return {
               ...account,
               groupInfos,
@@ -2817,14 +2863,26 @@ router.put('/gemini-accounts/:accountId', authenticateAdmin, async (req, res) =>
     if (updates.accountType !== undefined) {
       // 如果之前是分组类型，需要从所有分组中移除
       if (currentAccount.accountType === 'group') {
-        const oldGroups = await accountGroupService.getAccountGroup(accountId)
+        const oldGroups = await accountGroupService.getAccountGroups(accountId)
         for (const oldGroup of oldGroups) {
           await accountGroupService.removeAccountFromGroup(accountId, oldGroup.id)
         }
       }
-      // 如果新类型是分组，添加到新分组
-      if (updates.accountType === 'group' && updates.groupId) {
-        await accountGroupService.addAccountToGroup(accountId, updates.groupId, 'gemini')
+      // 如果新类型是分组，处理多分组支持
+      if (updates.accountType === 'group') {
+        if (Object.prototype.hasOwnProperty.call(updates, 'groupIds')) {
+          // 如果明确提供了 groupIds 参数（包括空数组）
+          if (updates.groupIds && updates.groupIds.length > 0) {
+            // 设置新的多分组
+            await accountGroupService.setAccountGroups(accountId, updates.groupIds, 'gemini')
+          } else {
+            // groupIds 为空数组，从所有分组中移除
+            await accountGroupService.removeAccountFromAllGroups(accountId)
+          }
+        } else if (updates.groupId) {
+          // 向后兼容：仅当没有 groupIds 但有 groupId 时使用单分组逻辑
+          await accountGroupService.addAccountToGroup(accountId, updates.groupId, 'gemini')
+        }
       }
     }
 
@@ -5189,15 +5247,18 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
     if (groupId && groupId !== 'all') {
       if (groupId === 'ungrouped') {
         // 筛选未分组账户
-        accounts = accounts.filter(
-          (account) => !account.groupInfos || account.groupInfos.length === 0
-        )
+        const filteredAccounts = []
+        for (const account of accounts) {
+          const groups = await accountGroupService.getAccountGroups(account.id)
+          if (!groups || groups.length === 0) {
+            filteredAccounts.push(account)
+          }
+        }
+        accounts = filteredAccounts
       } else {
         // 筛选特定分组的账户
-        accounts = accounts.filter(
-          (account) =>
-            account.groupInfos && account.groupInfos.some((group) => group.id === groupId)
-        )
+        const groupMembers = await accountGroupService.getGroupMembers(groupId)
+        accounts = accounts.filter((account) => groupMembers.includes(account.id))
       }
     }
 
@@ -5518,10 +5579,81 @@ router.put(
 // 获取所有 Azure OpenAI 账户
 router.get('/azure-openai-accounts', authenticateAdmin, async (req, res) => {
   try {
-    const accounts = await azureOpenaiAccountService.getAllAccounts()
+    const { platform, groupId } = req.query
+    let accounts = await azureOpenaiAccountService.getAllAccounts()
+
+    // 根据查询参数进行筛选
+    if (platform && platform !== 'all' && platform !== 'azure_openai') {
+      // 如果指定了其他平台，返回空数组
+      accounts = []
+    }
+
+    // 如果指定了分组筛选
+    if (groupId && groupId !== 'all') {
+      if (groupId === 'ungrouped') {
+        // 筛选未分组账户
+        const filteredAccounts = []
+        for (const account of accounts) {
+          const groups = await accountGroupService.getAccountGroups(account.id)
+          if (!groups || groups.length === 0) {
+            filteredAccounts.push(account)
+          }
+        }
+        accounts = filteredAccounts
+      } else {
+        // 筛选特定分组的账户
+        const groupMembers = await accountGroupService.getGroupMembers(groupId)
+        accounts = accounts.filter((account) => groupMembers.includes(account.id))
+      }
+    }
+
+    // 为每个账户添加使用统计信息和分组信息
+    const accountsWithStats = await Promise.all(
+      accounts.map(async (account) => {
+        try {
+          const usageStats = await redis.getAccountUsageStats(account.id)
+          const groupInfos = await accountGroupService.getAccountGroups(account.id)
+          return {
+            ...account,
+            groupInfos,
+            usage: {
+              daily: usageStats.daily,
+              total: usageStats.total,
+              averages: usageStats.averages
+            }
+          }
+        } catch (error) {
+          logger.debug(`Failed to get usage stats for Azure OpenAI account ${account.id}:`, error)
+          try {
+            const groupInfos = await accountGroupService.getAccountGroups(account.id)
+            return {
+              ...account,
+              groupInfos,
+              usage: {
+                daily: { requests: 0, tokens: 0, allTokens: 0 },
+                total: { requests: 0, tokens: 0, allTokens: 0 },
+                averages: { rpm: 0, tpm: 0 }
+              }
+            }
+          } catch (groupError) {
+            logger.debug(`Failed to get group info for account ${account.id}:`, groupError)
+            return {
+              ...account,
+              groupInfos: [],
+              usage: {
+                daily: { requests: 0, tokens: 0, allTokens: 0 },
+                total: { requests: 0, tokens: 0, allTokens: 0 },
+                averages: { rpm: 0, tpm: 0 }
+              }
+            }
+          }
+        }
+      })
+    )
+
     res.json({
       success: true,
-      data: accounts
+      data: accountsWithStats
     })
   } catch (error) {
     logger.error('Failed to fetch Azure OpenAI accounts:', error)
@@ -5547,6 +5679,7 @@ router.post('/azure-openai-accounts', authenticateAdmin, async (req, res) => {
       supportedModels,
       proxy,
       groupId,
+      groupIds,
       priority,
       isActive,
       schedulable
@@ -5625,6 +5758,17 @@ router.post('/azure-openai-accounts', authenticateAdmin, async (req, res) => {
       isActive: isActive !== false,
       schedulable: schedulable !== false
     })
+
+    // 如果是分组类型，将账户添加到分组
+    if (accountType === 'group') {
+      if (groupIds && groupIds.length > 0) {
+        // 使用多分组设置
+        await accountGroupService.setAccountGroups(account.id, groupIds, 'azure_openai')
+      } else if (groupId) {
+        // 兼容单分组模式
+        await accountGroupService.addAccountToGroup(account.id, groupId, 'azure_openai')
+      }
+    }
 
     res.json({
       success: true,
