@@ -42,6 +42,16 @@ export const useApiStatsStore = defineStore('apistats', () => {
       formattedCost: '$0.000000'
     }
 
+    // 聚合模式下使用聚合数据
+    if (multiKeyMode.value && aggregatedStats.value) {
+      if (statsPeriod.value === 'daily') {
+        return aggregatedStats.value.dailyUsage || defaultData
+      } else {
+        return aggregatedStats.value.monthlyUsage || defaultData
+      }
+    }
+
+    // 单个 Key 模式下使用原有逻辑
     if (statsPeriod.value === 'daily') {
       return dailyStats.value || defaultData
     } else {
@@ -363,6 +373,10 @@ export const useApiStatsStore = defineStore('apistats', () => {
         aggregatedStats.value = batchResult.data.aggregated
         individualStats.value = batchResult.data.individual
         statsData.value = batchResult.data.aggregated // 兼容现有组件
+
+        // 设置聚合模式下的日期统计数据，以保证现有组件的兼容性
+        dailyStats.value = batchResult.data.aggregated.dailyUsage || null
+        monthlyStats.value = batchResult.data.aggregated.monthlyUsage || null
 
         // 加载聚合的模型统计
         await loadBatchModelStats(statsPeriod.value)
