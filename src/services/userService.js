@@ -534,9 +534,15 @@ class UserService {
 
       // 构建匹配字符串数组（只考虑displayName、username、email，去除空值和重复值）
       const matchStrings = new Set()
-      if (displayName) matchStrings.add(displayName.toLowerCase().trim())
-      if (username) matchStrings.add(username.toLowerCase().trim())
-      if (email) matchStrings.add(email.toLowerCase().trim())
+      if (displayName) {
+        matchStrings.add(displayName.toLowerCase().trim())
+      }
+      if (username) {
+        matchStrings.add(username.toLowerCase().trim())
+      }
+      if (email) {
+        matchStrings.add(email.toLowerCase().trim())
+      }
 
       const matchingKeys = []
 
