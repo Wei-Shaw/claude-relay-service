@@ -259,7 +259,7 @@ const userStore = useUserStore()
 const loading = ref(true)
 const apiKeys = ref([])
 const maxApiKeys = computed(() => userStore.config?.maxApiKeysPerUser || 5)
-const allowUserDeleteApiKeys = computed(() => userStore.config?.allowUserDeleteApiKeys !== false)
+const allowUserDeleteApiKeys = computed(() => userStore.config?.allowUserDeleteApiKeys === true)
 
 const showCreateModal = ref(false)
 const showViewModal = ref(false)
