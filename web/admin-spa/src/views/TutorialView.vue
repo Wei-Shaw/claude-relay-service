@@ -1639,7 +1639,7 @@
 </template>
 
 <script setup>
-import {computed, ref} from 'vue'
+import { computed, ref } from 'vue'
 
 // 当前系统选择
 const activeTutorialSystem = ref('windows')
