@@ -34,7 +34,11 @@ class UnifiedOpenAIScheduler {
 
         // 普通专属账户
         const boundAccount = await openaiAccountService.getAccount(apiKeyData.openaiAccountId)
-        if (boundAccount && boundAccount.isActive && boundAccount.status !== 'error') {
+        if (
+          boundAccount &&
+          (boundAccount.isActive === true || boundAccount.isActive === 'true') &&
+          boundAccount.status !== 'error'
+        ) {
           // 检查是否被限流
           const isRateLimited = await this.isAccountRateLimited(boundAccount.id)
           if (isRateLimited) {
