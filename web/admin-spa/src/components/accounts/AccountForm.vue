@@ -244,19 +244,47 @@
                 >选择分组 *</label
               >
               <div class="flex gap-2">
-                <select
-                  v-model="form.groupId"
-                  class="form-input flex-1 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                  required
-                >
-                  <option value="">请选择分组</option>
-                  <option v-for="group in filteredGroups" :key="group.id" :value="group.id">
-                    {{ group.name }} ({{ group.memberCount || 0 }} 个成员)
-                  </option>
-                  <option value="__new__">+ 新建分组</option>
-                </select>
+                <div class="flex-1">
+                  <!-- 多选分组界面 -->
+                  <div
+                    class="max-h-48 space-y-2 overflow-y-auto rounded-md border p-3 dark:border-gray-600 dark:bg-gray-700"
+                  >
+                    <div
+                      v-if="filteredGroups.length === 0"
+                      class="text-sm text-gray-500 dark:text-gray-400"
+                    >
+                      暂无可用分组
+                    </div>
+                    <label
+                      v-for="group in filteredGroups"
+                      :key="group.id"
+                      class="flex cursor-pointer items-center gap-2 rounded-md p-2 hover:bg-gray-50 dark:hover:bg-gray-600"
+                    >
+                      <input
+                        v-model="form.groupIds"
+                        class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                        type="checkbox"
+                        :value="group.id"
+                      />
+                      <span class="text-sm text-gray-700 dark:text-gray-200">
+                        {{ group.name }} ({{ group.memberCount || 0 }} 个成员)
+                      </span>
+                    </label>
+                    <!-- 新建分组选项 -->
+                    <div class="border-t pt-2 dark:border-gray-600">
+                      <button
+                        class="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                        type="button"
+                        @click="handleNewGroup"
+                      >
+                        <i class="fas fa-plus" />
+                        新建分组
+                      </button>
+                    </div>
+                  </div>
+                </div>
                 <button
-                  class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
                   type="button"
                   @click="refreshGroups"
                 >
@@ -1240,19 +1268,47 @@
               >选择分组 *</label
             >
             <div class="flex gap-2">
-              <select
-                v-model="form.groupId"
-                class="form-input flex-1 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                required
-              >
-                <option value="">请选择分组</option>
-                <option v-for="group in filteredGroups" :key="group.id" :value="group.id">
-                  {{ group.name }} ({{ group.memberCount || 0 }} 个成员)
-                </option>
-                <option value="__new__">+ 新建分组</option>
-              </select>
+              <div class="flex-1">
+                <!-- 多选分组界面 -->
+                <div
+                  class="max-h-48 space-y-2 overflow-y-auto rounded-md border p-3 dark:border-gray-600 dark:bg-gray-700"
+                >
+                  <div
+                    v-if="filteredGroups.length === 0"
+                    class="text-sm text-gray-500 dark:text-gray-400"
+                  >
+                    暂无可用分组
+                  </div>
+                  <label
+                    v-for="group in filteredGroups"
+                    :key="group.id"
+                    class="flex cursor-pointer items-center gap-2 rounded-md p-2 hover:bg-gray-50 dark:hover:bg-gray-600"
+                  >
+                    <input
+                      v-model="form.groupIds"
+                      class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                      type="checkbox"
+                      :value="group.id"
+                    />
+                    <span class="text-sm text-gray-700 dark:text-gray-200">
+                      {{ group.name }} ({{ group.memberCount || 0 }} 个成员)
+                    </span>
+                  </label>
+                  <!-- 新建分组选项 -->
+                  <div class="border-t pt-2 dark:border-gray-600">
+                    <button
+                      class="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                      type="button"
+                      @click="handleNewGroup"
+                    >
+                      <i class="fas fa-plus" />
+                      新建分组
+                    </button>
+                  </div>
+                </div>
+              </div>
               <button
-                class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
                 type="button"
                 @click="refreshGroups"
               >
@@ -1771,6 +1827,7 @@ const form = ref({
   accountType: props.account?.accountType || 'shared',
   subscriptionType: 'claude_max', // 默认为 Claude Max，兼容旧数据
   groupId: '',
+  groupIds: [],
   projectId: props.account?.projectId || '',
   idToken: '',
   accessToken: '',
@@ -1872,13 +1929,22 @@ const nextStep = async () => {
     return
   }
 
-  // 分组类型验证
+  // 分组类型验证 - OAuth流程修复
   if (
     form.value.accountType === 'group' &&
-    (!form.value.groupId || form.value.groupId.trim() === '')
+    (!form.value.groupIds || form.value.groupIds.length === 0)
   ) {
     showToast('请选择一个分组', 'error')
     return
+  }
+
+  // 数据同步：确保 groupId 和 groupIds 保持一致 - OAuth流程
+  if (form.value.accountType === 'group') {
+    if (form.value.groupIds && form.value.groupIds.length > 0) {
+      form.value.groupId = form.value.groupIds[0]
+    } else {
+      form.value.groupId = ''
+    }
   }
 
   // 对于Gemini账户，检查项目 ID
@@ -2014,6 +2080,7 @@ const handleOAuthSuccess = async (tokenInfo) => {
       description: form.value.description,
       accountType: form.value.accountType,
       groupId: form.value.accountType === 'group' ? form.value.groupId : undefined,
+      groupIds: form.value.accountType === 'group' ? form.value.groupIds : undefined,
       proxy: form.value.proxy.enabled
         ? {
             type: form.value.proxy.type,
@@ -2106,6 +2173,20 @@ const createAccount = async () => {
       errors.value.region = '请选择 AWS 区域'
       hasError = true
     }
+  } else if (form.value.platform === 'azure_openai') {
+    // Azure OpenAI 验证
+    if (!form.value.azureEndpoint || form.value.azureEndpoint.trim() === '') {
+      errors.value.azureEndpoint = 'Azure Endpoint 是必填项'
+      hasError = true
+    }
+    if (!form.value.deploymentName || form.value.deploymentName.trim() === '') {
+      errors.value.deploymentName = 'Deployment Name 是必填项'
+      hasError = true
+    }
+    if (!form.value.apiKey || form.value.apiKey.trim() === '') {
+      errors.value.apiKey = 'API Key 是必填项'
+      hasError = true
+    }
   } else if (form.value.addType === 'manual') {
     // 手动模式验证
     if (!form.value.accessToken || form.value.accessToken.trim() === '') {
@@ -2122,13 +2203,22 @@ const createAccount = async () => {
     }
   }
 
-  // 分组类型验证
+  // 分组类型验证 - 创建账户流程修复
   if (
     form.value.accountType === 'group' &&
-    (!form.value.groupId || form.value.groupId.trim() === '')
+    (!form.value.groupIds || form.value.groupIds.length === 0)
   ) {
     showToast('请选择一个分组', 'error')
     hasError = true
+  }
+
+  // 数据同步：确保 groupId 和 groupIds 保持一致 - 创建流程
+  if (form.value.accountType === 'group') {
+    if (form.value.groupIds && form.value.groupIds.length > 0) {
+      form.value.groupId = form.value.groupIds[0]
+    } else {
+      form.value.groupId = ''
+    }
   }
 
   if (hasError) {
@@ -2142,6 +2232,7 @@ const createAccount = async () => {
       description: form.value.description,
       accountType: form.value.accountType,
       groupId: form.value.accountType === 'group' ? form.value.groupId : undefined,
+      groupIds: form.value.accountType === 'group' ? form.value.groupIds : undefined,
       proxy: form.value.proxy.enabled
         ? {
             type: form.value.proxy.type,
@@ -2266,6 +2357,16 @@ const createAccount = async () => {
       data.priority = form.value.priority || 50
       // 如果不启用限流，传递 0 表示不限流
       data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
+    } else if (form.value.platform === 'azure_openai') {
+      // Azure OpenAI 账户特定数据
+      data.azureEndpoint = form.value.azureEndpoint
+      data.apiVersion = form.value.apiVersion || '2024-02-01'
+      data.deploymentName = form.value.deploymentName
+      data.apiKey = form.value.apiKey
+      data.supportedModels = form.value.supportedModels || []
+      data.priority = form.value.priority || 50
+      data.isActive = form.value.isActive !== false
+      data.schedulable = form.value.schedulable !== false
     }
 
     let result
@@ -2277,8 +2378,12 @@ const createAccount = async () => {
       result = await accountsStore.createBedrockAccount(data)
     } else if (form.value.platform === 'openai') {
       result = await accountsStore.createOpenAIAccount(data)
-    } else {
+    } else if (form.value.platform === 'azure_openai') {
+      result = await accountsStore.createAzureOpenAIAccount(data)
+    } else if (form.value.platform === 'gemini') {
       result = await accountsStore.createGeminiAccount(data)
+    } else {
+      throw new Error(`不支持的平台: ${form.value.platform}`)
     }
 
     emit('success', result)
@@ -2300,13 +2405,22 @@ const updateAccount = async () => {
     return
   }
 
-  // 分组类型验证
+  // 分组类型验证 - 更新账户流程修复
   if (
     form.value.accountType === 'group' &&
-    (!form.value.groupId || form.value.groupId.trim() === '')
+    (!form.value.groupIds || form.value.groupIds.length === 0)
   ) {
     showToast('请选择一个分组', 'error')
     return
+  }
+
+  // 数据同步：确保 groupId 和 groupIds 保持一致 - 更新流程
+  if (form.value.accountType === 'group') {
+    if (form.value.groupIds && form.value.groupIds.length > 0) {
+      form.value.groupId = form.value.groupIds[0]
+    } else {
+      form.value.groupId = ''
+    }
   }
 
   // 对于Gemini账户，检查项目 ID
@@ -2332,6 +2446,7 @@ const updateAccount = async () => {
       description: form.value.description,
       accountType: form.value.accountType,
       groupId: form.value.accountType === 'group' ? form.value.groupId : undefined,
+      groupIds: form.value.accountType === 'group' ? form.value.groupIds : undefined,
       proxy: form.value.proxy.enabled
         ? {
             type: form.value.proxy.type,
@@ -2458,8 +2573,12 @@ const updateAccount = async () => {
       await accountsStore.updateBedrockAccount(props.account.id, data)
     } else if (props.account.platform === 'openai') {
       await accountsStore.updateOpenAIAccount(props.account.id, data)
-    } else {
+    } else if (props.account.platform === 'azure_openai') {
+      await accountsStore.updateAzureOpenAIAccount(props.account.id, data)
+    } else if (props.account.platform === 'gemini') {
       await accountsStore.updateGeminiAccount(props.account.id, data)
+    } else {
+      throw new Error(`不支持的平台: ${props.account.platform}`)
     }
 
     emit('success')
@@ -2541,6 +2660,11 @@ const refreshGroups = async () => {
   showToast('分组列表已刷新', 'success')
 }
 
+// 处理新建分组
+const handleNewGroup = () => {
+  showGroupManagement.value = true
+}
+
 // 处理分组管理模态框刷新
 const handleGroupRefresh = async () => {
   await loadGroups()
@@ -2567,8 +2691,26 @@ watch(
     // 平台变化时，清空分组选择
     if (form.value.accountType === 'group') {
       form.value.groupId = ''
+      form.value.groupIds = []
     }
   }
+)
+
+// 监听分组选择变化，保持 groupId 和 groupIds 同步
+watch(
+  () => form.value.groupIds,
+  (newGroupIds) => {
+    if (form.value.accountType === 'group') {
+      if (newGroupIds && newGroupIds.length > 0) {
+        // 如果有选中的分组，使用第一个作为主分组
+        form.value.groupId = newGroupIds[0]
+      } else {
+        // 如果没有选中分组，清空主分组
+        form.value.groupId = ''
+      }
+    }
+  },
+  { deep: true }
 )
 
 // 监听Setup Token授权码输入，自动提取URL中的code参数
@@ -2731,6 +2873,7 @@ watch(
         accountType: newAccount.accountType || 'shared',
         subscriptionType: subscriptionType,
         groupId: groupId,
+        groupIds: [],
         projectId: newAccount.projectId || '',
         accessToken: '',
         refreshToken: '',
@@ -2768,24 +2911,35 @@ watch(
       // 如果是分组类型，加载分组ID
       if (newAccount.accountType === 'group') {
         // 先加载分组列表
-        loadGroups().then(() => {
+        loadGroups().then(async () => {
+          const foundGroupIds = []
+
           // 如果账户有 groupInfo，直接使用它的 groupId
           if (newAccount.groupInfo && newAccount.groupInfo.id) {
             form.value.groupId = newAccount.groupInfo.id
+            foundGroupIds.push(newAccount.groupInfo.id)
           } else {
             // 否则查找账户所属的分组
-            groups.value.forEach((group) => {
-              apiClient
-                .get(`/admin/account-groups/${group.id}/members`)
-                .then((response) => {
-                  const members = response.data || []
-                  if (members.some((m) => m.id === newAccount.id)) {
-                    form.value.groupId = group.id
+            const checkPromises = groups.value.map(async (group) => {
+              try {
+                const response = await apiClient.get(`/admin/account-groups/${group.id}/members`)
+                const members = response.data || []
+                if (members.some((m) => m.id === newAccount.id)) {
+                  foundGroupIds.push(group.id)
+                  if (!form.value.groupId) {
+                    form.value.groupId = group.id // 设置第一个找到的分组作为主分组
                   }
-                })
-                .catch(() => {})
+                }
+              } catch (error) {
+                // 忽略错误
+              }
             })
+
+            await Promise.all(checkPromises)
           }
+
+          // 设置多选分组
+          form.value.groupIds = foundGroupIds
         })
       }
     }
