@@ -97,6 +97,38 @@ class LdapService {
     return null
   }
 
+  // 🌐 从DN中提取域名，用于Windows AD UPN格式认证
+  extractDomainFromDN(dnString) {
+    try {
+      if (!dnString || typeof dnString !== 'string') {
+        return null
+      }
+
+      // 提取所有DC组件：DC=test,DC=demo,DC=com
+      const dcMatches = dnString.match(/DC=([^,]+)/gi)
+      if (!dcMatches || dcMatches.length === 0) {
+        return null
+      }
+
+      // 提取DC值并连接成域名
+      const domainParts = dcMatches.map((match) => {
+        const value = match.replace(/DC=/i, '').trim()
+        return value
+      })
+
+      if (domainParts.length > 0) {
+        const domain = domainParts.join('.')
+        logger.debug(`🌐 从DN提取域名: ${domain}`)
+        return domain
+      }
+
+      return null
+    } catch (error) {
+      logger.debug('⚠️ 域名提取失败:', error.message)
+      return null
+    }
+  }
+
   // 🔗 创建LDAP客户端连接
   createClient() {
     try {
@@ -336,6 +368,79 @@ class LdapService {
     })
   }
 
+  // 🔐 Windows AD兼容认证 - 在DN认证失败时尝试多种格式
+  async tryWindowsADAuthentication(username, password) {
+    if (!username || !password) {
+      return false
+    }
+
+    // 从searchBase提取域名
+    const domain = this.extractDomainFromDN(this.config.server.searchBase)
+
+    const adFormats = []
+
+    if (domain) {
+      // UPN格式（Windows AD标准）
+      adFormats.push(`${username}@${domain}`)
+
+      // 如果域名有多个部分，也尝试简化版本
+      const domainParts = domain.split('.')
+      if (domainParts.length > 1) {
+        adFormats.push(`${username}@${domainParts.slice(-2).join('.')}`) // 只取后两部分
+      }
+
+      // 域\用户名格式
+      const firstDomainPart = domainParts[0]
+      if (firstDomainPart) {
+        adFormats.push(`${firstDomainPart}\\${username}`)
+        adFormats.push(`${firstDomainPart.toUpperCase()}\\${username}`)
+      }
+    }
+
+    // 纯用户名（最后尝试）
+    adFormats.push(username)
+
+    logger.info(`🔄 尝试 ${adFormats.length} 种Windows AD认证格式...`)
+
+    for (const format of adFormats) {
+      try {
+        logger.info(`🔍 尝试格式: ${format}`)
+        const result = await this.tryDirectBind(format, password)
+        if (result) {
+          logger.info(`✅ Windows AD认证成功: ${format}`)
+          return true
+        }
+        logger.debug(`❌ 认证失败: ${format}`)
+      } catch (error) {
+        logger.debug(`认证异常 ${format}:`, error.message)
+      }
+    }
+
+    logger.info(`🚫 所有Windows AD格式认证都失败了`)
+    return false
+  }
+
+  // 🔐 直接尝试绑定认证的辅助方法
+  async tryDirectBind(identifier, password) {
+    return new Promise((resolve, reject) => {
+      const authClient = this.createClient()
+
+      authClient.bind(identifier, password, (err) => {
+        authClient.unbind()
+
+        if (err) {
+          if (err.name === 'InvalidCredentialsError') {
+            resolve(false)
+          } else {
+            reject(err)
+          }
+        } else {
+          resolve(true)
+        }
+      })
+    })
+  }
+
   // 📝 提取用户信息
   extractUserInfo(ldapEntry, username) {
     try {
@@ -478,10 +583,32 @@ class LdapService {
         return { success: false, message: 'Authentication service error' }
       }
 
-      // 4. 验证用户密码
-      const isPasswordValid = await this.authenticateUser(userDN, password)
+      // 4. 验证用户密码 - 支持传统LDAP和Windows AD
+      let isPasswordValid = false
+
+      // 首先尝试传统的DN认证（保持原有LDAP逻辑）
+      try {
+        isPasswordValid = await this.authenticateUser(userDN, password)
+        if (isPasswordValid) {
+          logger.info(`✅ DN authentication successful for user: ${sanitizedUsername}`)
+        }
+      } catch (error) {
+        logger.debug(
+          `DN authentication failed for user: ${sanitizedUsername}, error: ${error.message}`
+        )
+      }
+
+      // 如果DN认证失败，尝试Windows AD多格式认证
       if (!isPasswordValid) {
-        logger.info(`🚫 Invalid password for user: ${sanitizedUsername}`)
+        logger.debug(`🔄 Trying Windows AD authentication formats for user: ${sanitizedUsername}`)
+        isPasswordValid = await this.tryWindowsADAuthentication(sanitizedUsername, password)
+        if (isPasswordValid) {
+          logger.info(`✅ Windows AD authentication successful for user: ${sanitizedUsername}`)
+        }
+      }
+
+      if (!isPasswordValid) {
+        logger.info(`🚫 All authentication methods failed for user: ${sanitizedUsername}`)
         return { success: false, message: 'Invalid username or password' }
       }
 

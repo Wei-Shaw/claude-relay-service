@@ -105,7 +105,7 @@
                   <input
                     v-model="searchKeyword"
                     class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 pl-9 text-sm text-gray-700 placeholder-gray-400 shadow-sm transition-all duration-200 hover:border-gray-300 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 dark:hover:border-gray-500"
-                    placeholder="搜索名称..."
+                    placeholder="搜索名称或所有者..."
                     type="text"
                     @input="currentPage = 1"
                   />
@@ -403,6 +403,11 @@
                               <i class="fas fa-share-alt mr-1" />
                               使用共享池
                             </div>
+                          </div>
+                          <!-- 显示所有者信息 -->
+                          <div v-if="key.ownerDisplayName" class="mt-1 text-xs text-red-600">
+                            <i class="fas fa-user mr-1" />
+                            {{ key.ownerDisplayName }}
                           </div>
                         </div>
                       </div>
@@ -1024,6 +1029,11 @@
                 >
                   <i class="fas fa-share-alt mr-1" />
                   使用共享池
+                </div>
+                <!-- 显示所有者信息 -->
+                <div v-if="key.ownerDisplayName" class="text-xs text-red-600">
+                  <i class="fas fa-user mr-1" />
+                  {{ key.ownerDisplayName }}
                 </div>
               </div>
 
@@ -1647,12 +1657,18 @@ const sortedApiKeys = computed(() => {
     )
   }
 
-  // 然后进行名称搜索
+  // 然后进行名称搜索（搜索API Key名称和所有者名称）
   if (searchKeyword.value) {
     const keyword = searchKeyword.value.toLowerCase().trim()
-    filteredKeys = filteredKeys.filter(
-      (key) => key.name && key.name.toLowerCase().includes(keyword)
-    )
+    filteredKeys = filteredKeys.filter((key) => {
+      // 搜索API Key名称
+      const nameMatch = key.name && key.name.toLowerCase().includes(keyword)
+      // 搜索所有者名称
+      const ownerMatch =
+        key.ownerDisplayName && key.ownerDisplayName.toLowerCase().includes(keyword)
+      // 如果API Key名称或所有者名称匹配，则包含该条目
+      return nameMatch || ownerMatch
+    })
   }
 
   // 如果没有排序字段，返回筛选后的结果
