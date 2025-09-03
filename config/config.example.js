@@ -143,20 +143,8 @@ const config = {
       searchAttributes: process.env.LDAP_SEARCH_ATTRIBUTES
         ? process.env.LDAP_SEARCH_ATTRIBUTES.split(',')
         : process.env.LDAP_SERVER_TYPE === 'activedirectory'
-          ? [
-              'dn',
-              'sAMAccountName',
-              'userPrincipalName',
-              'cn',
-              'displayName',
-              'mail',
-              'givenName',
-              'sn',
-              'memberOf',
-              'objectClass',
-              'userAccountControl'
-            ]
-          : ['dn', 'uid', 'cn', 'mail', 'givenName', 'sn'],
+        ? ['dn', 'sAMAccountName', 'userPrincipalName', 'cn', 'displayName', 'mail', 'givenName', 'sn', 'memberOf', 'objectClass', 'userAccountControl']
+        : ['dn', 'uid', 'cn', 'mail', 'givenName', 'sn'],
       timeout: parseInt(process.env.LDAP_TIMEOUT) || 5000,
       connectTimeout: parseInt(process.env.LDAP_CONNECT_TIMEOUT) || 10000,
       // TLS/SSL 配置
@@ -181,12 +169,8 @@ const config = {
     },
     // 用户属性映射 - 根据服务器类型自动设置默认值
     userMapping: {
-      username:
-        process.env.LDAP_USER_ATTR_USERNAME ||
-        (process.env.LDAP_SERVER_TYPE === 'activedirectory' ? 'sAMAccountName' : 'uid'),
-      displayName:
-        process.env.LDAP_USER_ATTR_DISPLAY_NAME ||
-        (process.env.LDAP_SERVER_TYPE === 'activedirectory' ? 'displayName' : 'cn'),
+      username: process.env.LDAP_USER_ATTR_USERNAME || (process.env.LDAP_SERVER_TYPE === 'activedirectory' ? 'sAMAccountName' : 'uid'),
+      displayName: process.env.LDAP_USER_ATTR_DISPLAY_NAME || (process.env.LDAP_SERVER_TYPE === 'activedirectory' ? 'displayName' : 'cn'),
       email: process.env.LDAP_USER_ATTR_EMAIL || 'mail',
       firstName: process.env.LDAP_USER_ATTR_FIRST_NAME || 'givenName',
       lastName: process.env.LDAP_USER_ATTR_LAST_NAME || 'sn'
