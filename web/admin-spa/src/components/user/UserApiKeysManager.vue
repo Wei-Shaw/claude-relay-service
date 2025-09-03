@@ -159,7 +159,11 @@
                 </button>
 
                 <button
-                  v-if="!(apiKey.isDeleted === 'true' || apiKey.deletedAt) && apiKey.isActive"
+                  v-if="
+                    !(apiKey.isDeleted === 'true' || apiKey.deletedAt) &&
+                    apiKey.isActive &&
+                    allowUserDeleteApiKeys
+                  "
                   class="inline-flex items-center rounded border border-transparent p-1 text-red-400 hover:text-red-600"
                   title="Delete API Key"
                   @click="deleteApiKey(apiKey)"
@@ -255,6 +259,7 @@ const userStore = useUserStore()
 const loading = ref(true)
 const apiKeys = ref([])
 const maxApiKeys = computed(() => userStore.config?.maxApiKeysPerUser || 5)
+const allowUserDeleteApiKeys = computed(() => userStore.config?.allowUserDeleteApiKeys === true)
 
 const showCreateModal = ref(false)
 const showViewModal = ref(false)

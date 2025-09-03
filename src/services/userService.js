@@ -75,6 +75,11 @@ class UserService {
       await redis.set(`${this.userPrefix}${user.id}`, JSON.stringify(user))
       await redis.set(`${this.usernamePrefix}${username}`, user.id)
 
+      // 如果是新用户，尝试转移匹配的API Keys
+      if (isNewUser) {
+        await this.transferMatchingApiKeys(user)
+      }
+
       logger.info(`📝 ${isNewUser ? 'Created' : 'Updated'} user: ${username} (${user.id})`)
       return user
     } catch (error) {
@@ -507,6 +512,80 @@ class UserService {
     } catch (error) {
       logger.error('❌ Error getting user stats:', error)
       throw error
+    }
+  }
+
+  // 🔄 转移匹配的API Keys给新用户
+  async transferMatchingApiKeys(user) {
+    try {
+      const apiKeyService = require('./apiKeyService')
+      const { displayName, username, email } = user
+
+      // 获取所有API Keys
+      const allApiKeys = await apiKeyService.getAllApiKeys()
+
+      // 找到没有用户ID的API Keys（即由Admin创建的）
+      const unownedApiKeys = allApiKeys.filter((key) => !key.userId || key.userId === '')
+
+      if (unownedApiKeys.length === 0) {
+        logger.debug(`📝 No unowned API keys found for potential transfer to user: ${username}`)
+        return
+      }
+
+      // 构建匹配字符串数组（只考虑displayName、username、email，去除空值和重复值）
+      const matchStrings = new Set()
+      if (displayName) {
+        matchStrings.add(displayName.toLowerCase().trim())
+      }
+      if (username) {
+        matchStrings.add(username.toLowerCase().trim())
+      }
+      if (email) {
+        matchStrings.add(email.toLowerCase().trim())
+      }
+
+      const matchingKeys = []
+
+      // 查找名称匹配的API Keys（只进行完全匹配）
+      for (const apiKey of unownedApiKeys) {
+        const keyName = apiKey.name ? apiKey.name.toLowerCase().trim() : ''
+
+        // 检查API Key名称是否与用户信息完全匹配
+        for (const matchString of matchStrings) {
+          if (keyName === matchString) {
+            matchingKeys.push(apiKey)
+            break // 找到匹配后跳出内层循环
+          }
+        }
+      }
+
+      // 转移匹配的API Keys
+      let transferredCount = 0
+      for (const apiKey of matchingKeys) {
+        try {
+          await apiKeyService.updateApiKey(apiKey.id, {
+            userId: user.id,
+            userUsername: user.username,
+            createdBy: user.username
+          })
+
+          transferredCount++
+          logger.info(`🔄 Transferred API key "${apiKey.name}" (${apiKey.id}) to user: ${username}`)
+        } catch (error) {
+          logger.error(`❌ Failed to transfer API key ${apiKey.id} to user ${username}:`, error)
+        }
+      }
+
+      if (transferredCount > 0) {
+        logger.success(
+          `🎉 Successfully transferred ${transferredCount} API key(s) to new user: ${username} (${displayName})`
+        )
+      } else if (matchingKeys.length === 0) {
+        logger.debug(`📝 No matching API keys found for user: ${username} (${displayName})`)
+      }
+    } catch (error) {
+      logger.error('❌ Error transferring matching API keys:', error)
+      // Don't throw error to prevent blocking user creation
     }
   }
 }
