@@ -30,7 +30,24 @@ const router = express.Router()
 router.get('/users', authenticateAdmin, async (req, res) => {
   try {
     const userService = require('../services/userService')
-    const result = await userService.getAllUsers({ isActive: true, limit: 1000 }) // Get all active users
+
+    // Extract query parameters for filtering
+    const { role, isActive } = req.query
+    const options = { limit: 1000 }
+
+    // Apply role filter if provided
+    if (role) {
+      options.role = role
+    }
+
+    // Apply isActive filter if provided, otherwise default to active users only
+    if (isActive !== undefined) {
+      options.isActive = isActive === 'true'
+    } else {
+      options.isActive = true // Default to active users for backwards compatibility
+    }
+
+    const result = await userService.getAllUsers(options)
 
     // Extract users array from the paginated result
     const allUsers = result.users || []
