@@ -1639,7 +1639,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 
 // 当前系统选择
 const activeTutorialSystem = ref('windows')
@@ -1653,6 +1653,14 @@ const tutorialSystems = [
 
 // 获取基础URL前缀
 const getBaseUrlPrefix = () => {
+  // 优先使用环境变量配置的自定义前缀
+  const customPrefix = import.meta.env.VITE_API_BASE_PREFIX
+  if (customPrefix) {
+    // 去除末尾的斜杠
+    return customPrefix.replace(/\/$/, '')
+  }
+
+  // 否则使用当前浏览器访问地址
   // 更健壮的获取 origin 的方法，兼容旧版浏览器和特殊环境
   let origin = ''
 

@@ -13,7 +13,7 @@ class AccountGroupService {
    * 创建账户分组
    * @param {Object} groupData - 分组数据
    * @param {string} groupData.name - 分组名称
-   * @param {string} groupData.platform - 平台类型 (claude/gemini)
+   * @param {string} groupData.platform - 平台类型 (claude/gemini/openai)
    * @param {string} groupData.description - 分组描述
    * @returns {Object} 创建的分组
    */
@@ -328,11 +328,35 @@ class AccountGroupService {
   }
 
   /**
+   * 根据账户ID获取其所属的分组（兼容性方法，返回单个分组）
+   * @param {string} accountId - 账户ID
+   * @returns {Object|null} 分组信息
+   */
+  async getAccountGroup(accountId) {
+    try {
+      const client = redis.getClientSafe()
+      const allGroupIds = await client.smembers(this.GROUPS_KEY)
+
+      for (const groupId of allGroupIds) {
+        const isMember = await client.sismember(`${this.GROUP_MEMBERS_PREFIX}${groupId}`, accountId)
+        if (isMember) {
+          return await this.getGroup(groupId)
+        }
+      }
+
+      return null
+    } catch (error) {
+      logger.error('❌ 获取账户所属分组失败:', error)
+      throw error
+    }
+  }
+
+  /**
    * 根据账户ID获取其所属的所有分组
    * @param {string} accountId - 账户ID
    * @returns {Array} 分组信息数组
    */
-  async getAccountGroup(accountId) {
+  async getAccountGroups(accountId) {
     try {
       const client = redis.getClientSafe()
       const allGroupIds = await client.smembers(this.GROUPS_KEY)
@@ -354,6 +378,49 @@ class AccountGroupService {
       return memberGroups
     } catch (error) {
       logger.error('❌ 获取账户所属分组列表失败:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 批量设置账户的分组
+   * @param {string} accountId - 账户ID
+   * @param {Array} groupIds - 分组ID数组
+   * @param {string} accountPlatform - 账户平台
+   */
+  async setAccountGroups(accountId, groupIds, accountPlatform) {
+    try {
+      // 首先移除账户的所有现有分组
+      await this.removeAccountFromAllGroups(accountId)
+
+      // 然后添加到新的分组中
+      for (const groupId of groupIds) {
+        await this.addAccountToGroup(accountId, groupId, accountPlatform)
+      }
+
+      logger.success(`✅ 批量设置账户分组成功: ${accountId} -> [${groupIds.join(', ')}]`)
+    } catch (error) {
+      logger.error('❌ 批量设置账户分组失败:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 从所有分组中移除账户
+   * @param {string} accountId - 账户ID
+   */
+  async removeAccountFromAllGroups(accountId) {
+    try {
+      const client = redis.getClientSafe()
+      const allGroupIds = await client.smembers(this.GROUPS_KEY)
+
+      for (const groupId of allGroupIds) {
+        await client.srem(`${this.GROUP_MEMBERS_PREFIX}${groupId}`, accountId)
+      }
+
+      logger.success(`✅ 从所有分组移除账户成功: ${accountId}`)
+    } catch (error) {
+      logger.error('❌ 从所有分组移除账户失败:', error)
       throw error
     }
   }

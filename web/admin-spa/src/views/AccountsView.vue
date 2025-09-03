@@ -458,7 +458,8 @@
                     account.platform === 'claude-console' ||
                     account.platform === 'bedrock' ||
                     account.platform === 'gemini' ||
-                    account.platform === 'openai'
+                    account.platform === 'openai' ||
+                    account.platform === 'azure_openai'
                   "
                   class="flex items-center gap-2"
                 >
@@ -1024,10 +1025,25 @@ const sortedAccounts = computed(() => {
 const loadAccounts = async (forceReload = false) => {
   accountsLoading.value = true
   try {
-    // 构建查询参数（移除分组参数，因为在前端处理）
+    // 检查是否选择了特定分组
+    if (groupFilter.value && groupFilter.value !== 'all' && groupFilter.value !== 'ungrouped') {
+      // 直接调用分组成员接口
+      const response = await apiClient.get(`/admin/account-groups/${groupFilter.value}/members`)
+      if (response.success) {
+        // 分组成员接口已经包含了完整的账户信息，直接使用
+        accounts.value = response.data
+        accountsLoading.value = false
+        return
+      }
+    }
+
+    // 构建查询参数（用于其他筛选情况）
     const params = {}
     if (platformFilter.value !== 'all') {
       params.platform = platformFilter.value
+    }
+    if (groupFilter.value === 'ungrouped') {
+      params.groupId = groupFilter.value
     }
 
     // 根据平台筛选决定需要请求哪些接口
@@ -1106,6 +1122,17 @@ const loadAccounts = async (forceReload = false) => {
             apiClient.get('/admin/azure-openai-accounts', { params })
           )
           break
+        default:
+          // 默认情况下返回空数组
+          requests.push(
+            Promise.resolve({ success: true, data: [] }),
+            Promise.resolve({ success: true, data: [] }),
+            Promise.resolve({ success: true, data: [] }),
+            Promise.resolve({ success: true, data: [] }),
+            Promise.resolve({ success: true, data: [] }),
+            Promise.resolve({ success: true, data: [] })
+          )
+          break
       }
     }
 
@@ -1178,8 +1205,8 @@ const loadAccounts = async (forceReload = false) => {
         const boundApiKeysCount = apiKeys.value.filter(
           (key) => key.azureOpenaiAccountId === acc.id
         ).length
-        const groupInfo = accountGroupMap.value.get(acc.id) || null
-        return { ...acc, platform: 'azure_openai', boundApiKeysCount, groupInfo }
+        // 后端已经包含了groupInfos，直接使用
+        return { ...acc, platform: 'azure_openai', boundApiKeysCount }
       })
       allAccounts.push(...azureOpenaiAccounts)
     }

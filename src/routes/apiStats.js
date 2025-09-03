@@ -407,6 +407,317 @@ router.post('/api/user-stats', async (req, res) => {
   }
 })
 
+// 📊 批量查询统计数据接口
+router.post('/api/batch-stats', async (req, res) => {
+  try {
+    const { apiIds } = req.body
+
+    // 验证输入
+    if (!apiIds || !Array.isArray(apiIds) || apiIds.length === 0) {
+      return res.status(400).json({
+        error: 'Invalid input',
+        message: 'API IDs array is required'
+      })
+    }
+
+    // 限制最多查询 30 个
+    if (apiIds.length > 30) {
+      return res.status(400).json({
+        error: 'Too many keys',
+        message: 'Maximum 30 API keys can be queried at once'
+      })
+    }
+
+    // 验证所有 ID 格式
+    const uuidRegex = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
+    const invalidIds = apiIds.filter((id) => !uuidRegex.test(id))
+    if (invalidIds.length > 0) {
+      return res.status(400).json({
+        error: 'Invalid API ID format',
+        message: `Invalid API IDs: ${invalidIds.join(', ')}`
+      })
+    }
+
+    const individualStats = []
+    const aggregated = {
+      totalKeys: apiIds.length,
+      activeKeys: 0,
+      usage: {
+        requests: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheCreateTokens: 0,
+        cacheReadTokens: 0,
+        allTokens: 0,
+        cost: 0,
+        formattedCost: '$0.000000'
+      },
+      dailyUsage: {
+        requests: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheCreateTokens: 0,
+        cacheReadTokens: 0,
+        allTokens: 0,
+        cost: 0,
+        formattedCost: '$0.000000'
+      },
+      monthlyUsage: {
+        requests: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheCreateTokens: 0,
+        cacheReadTokens: 0,
+        allTokens: 0,
+        cost: 0,
+        formattedCost: '$0.000000'
+      }
+    }
+
+    // 并行查询所有 API Key 数据（复用单key查询逻辑）
+    const results = await Promise.allSettled(
+      apiIds.map(async (apiId) => {
+        const keyData = await redis.getApiKey(apiId)
+
+        if (!keyData || Object.keys(keyData).length === 0) {
+          return { error: 'Not found', apiId }
+        }
+
+        // 检查是否激活
+        if (keyData.isActive !== 'true') {
+          return { error: 'Disabled', apiId }
+        }
+
+        // 检查是否过期
+        if (keyData.expiresAt && new Date() > new Date(keyData.expiresAt)) {
+          return { error: 'Expired', apiId }
+        }
+
+        // 复用单key查询的逻辑：获取使用统计
+        const usage = await redis.getUsageStats(apiId)
+
+        // 获取费用统计（与单key查询一致）
+        const costStats = await redis.getCostStats(apiId)
+
+        return {
+          apiId,
+          name: keyData.name,
+          description: keyData.description || '',
+          isActive: true,
+          createdAt: keyData.createdAt,
+          usage: usage.total || {},
+          dailyStats: {
+            ...usage.daily,
+            cost: costStats.daily
+          },
+          monthlyStats: {
+            ...usage.monthly,
+            cost: costStats.monthly
+          },
+          totalCost: costStats.total
+        }
+      })
+    )
+
+    // 处理结果并聚合
+    results.forEach((result) => {
+      if (result.status === 'fulfilled' && result.value && !result.value.error) {
+        const stats = result.value
+        aggregated.activeKeys++
+
+        // 聚合总使用量
+        if (stats.usage) {
+          aggregated.usage.requests += stats.usage.requests || 0
+          aggregated.usage.inputTokens += stats.usage.inputTokens || 0
+          aggregated.usage.outputTokens += stats.usage.outputTokens || 0
+          aggregated.usage.cacheCreateTokens += stats.usage.cacheCreateTokens || 0
+          aggregated.usage.cacheReadTokens += stats.usage.cacheReadTokens || 0
+          aggregated.usage.allTokens += stats.usage.allTokens || 0
+        }
+
+        // 聚合总费用
+        aggregated.usage.cost += stats.totalCost || 0
+
+        // 聚合今日使用量
+        aggregated.dailyUsage.requests += stats.dailyStats.requests || 0
+        aggregated.dailyUsage.inputTokens += stats.dailyStats.inputTokens || 0
+        aggregated.dailyUsage.outputTokens += stats.dailyStats.outputTokens || 0
+        aggregated.dailyUsage.cacheCreateTokens += stats.dailyStats.cacheCreateTokens || 0
+        aggregated.dailyUsage.cacheReadTokens += stats.dailyStats.cacheReadTokens || 0
+        aggregated.dailyUsage.allTokens += stats.dailyStats.allTokens || 0
+        aggregated.dailyUsage.cost += stats.dailyStats.cost || 0
+
+        // 聚合本月使用量
+        aggregated.monthlyUsage.requests += stats.monthlyStats.requests || 0
+        aggregated.monthlyUsage.inputTokens += stats.monthlyStats.inputTokens || 0
+        aggregated.monthlyUsage.outputTokens += stats.monthlyStats.outputTokens || 0
+        aggregated.monthlyUsage.cacheCreateTokens += stats.monthlyStats.cacheCreateTokens || 0
+        aggregated.monthlyUsage.cacheReadTokens += stats.monthlyStats.cacheReadTokens || 0
+        aggregated.monthlyUsage.allTokens += stats.monthlyStats.allTokens || 0
+        aggregated.monthlyUsage.cost += stats.monthlyStats.cost || 0
+
+        // 添加到个体统计
+        individualStats.push({
+          apiId: stats.apiId,
+          name: stats.name,
+          isActive: true,
+          usage: stats.usage,
+          dailyUsage: {
+            ...stats.dailyStats,
+            formattedCost: CostCalculator.formatCost(stats.dailyStats.cost || 0)
+          },
+          monthlyUsage: {
+            ...stats.monthlyStats,
+            formattedCost: CostCalculator.formatCost(stats.monthlyStats.cost || 0)
+          }
+        })
+      }
+    })
+
+    // 格式化费用显示
+    aggregated.usage.formattedCost = CostCalculator.formatCost(aggregated.usage.cost)
+    aggregated.dailyUsage.formattedCost = CostCalculator.formatCost(aggregated.dailyUsage.cost)
+    aggregated.monthlyUsage.formattedCost = CostCalculator.formatCost(aggregated.monthlyUsage.cost)
+
+    logger.api(`📊 Batch stats query for ${apiIds.length} keys from ${req.ip || 'unknown'}`)
+
+    return res.json({
+      success: true,
+      data: {
+        aggregated,
+        individual: individualStats
+      }
+    })
+  } catch (error) {
+    logger.error('❌ Failed to process batch stats query:', error)
+    return res.status(500).json({
+      error: 'Internal server error',
+      message: 'Failed to retrieve batch statistics'
+    })
+  }
+})
+
+// 📊 批量模型统计查询接口
+router.post('/api/batch-model-stats', async (req, res) => {
+  try {
+    const { apiIds, period = 'daily' } = req.body
+
+    // 验证输入
+    if (!apiIds || !Array.isArray(apiIds) || apiIds.length === 0) {
+      return res.status(400).json({
+        error: 'Invalid input',
+        message: 'API IDs array is required'
+      })
+    }
+
+    // 限制最多查询 30 个
+    if (apiIds.length > 30) {
+      return res.status(400).json({
+        error: 'Too many keys',
+        message: 'Maximum 30 API keys can be queried at once'
+      })
+    }
+
+    const client = redis.getClientSafe()
+    const tzDate = redis.getDateInTimezone()
+    const today = redis.getDateStringInTimezone()
+    const currentMonth = `${tzDate.getFullYear()}-${String(tzDate.getMonth() + 1).padStart(2, '0')}`
+
+    const modelUsageMap = new Map()
+
+    // 并行查询所有 API Key 的模型统计
+    await Promise.all(
+      apiIds.map(async (apiId) => {
+        const pattern =
+          period === 'daily'
+            ? `usage:${apiId}:model:daily:*:${today}`
+            : `usage:${apiId}:model:monthly:*:${currentMonth}`
+
+        const keys = await client.keys(pattern)
+
+        for (const key of keys) {
+          const match = key.match(
+            period === 'daily'
+              ? /usage:.+:model:daily:(.+):\d{4}-\d{2}-\d{2}$/
+              : /usage:.+:model:monthly:(.+):\d{4}-\d{2}$/
+          )
+
+          if (!match) {
+            continue
+          }
+
+          const model = match[1]
+          const data = await client.hgetall(key)
+
+          if (data && Object.keys(data).length > 0) {
+            if (!modelUsageMap.has(model)) {
+              modelUsageMap.set(model, {
+                requests: 0,
+                inputTokens: 0,
+                outputTokens: 0,
+                cacheCreateTokens: 0,
+                cacheReadTokens: 0,
+                allTokens: 0
+              })
+            }
+
+            const modelUsage = modelUsageMap.get(model)
+            modelUsage.requests += parseInt(data.requests) || 0
+            modelUsage.inputTokens += parseInt(data.inputTokens) || 0
+            modelUsage.outputTokens += parseInt(data.outputTokens) || 0
+            modelUsage.cacheCreateTokens += parseInt(data.cacheCreateTokens) || 0
+            modelUsage.cacheReadTokens += parseInt(data.cacheReadTokens) || 0
+            modelUsage.allTokens += parseInt(data.allTokens) || 0
+          }
+        }
+      })
+    )
+
+    // 转换为数组并计算费用
+    const modelStats = []
+    for (const [model, usage] of modelUsageMap) {
+      const usageData = {
+        input_tokens: usage.inputTokens,
+        output_tokens: usage.outputTokens,
+        cache_creation_input_tokens: usage.cacheCreateTokens,
+        cache_read_input_tokens: usage.cacheReadTokens
+      }
+
+      const costData = CostCalculator.calculateCost(usageData, model)
+
+      modelStats.push({
+        model,
+        requests: usage.requests,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        cacheCreateTokens: usage.cacheCreateTokens,
+        cacheReadTokens: usage.cacheReadTokens,
+        allTokens: usage.allTokens,
+        costs: costData.costs,
+        formatted: costData.formatted,
+        pricing: costData.pricing
+      })
+    }
+
+    // 按总 token 数降序排列
+    modelStats.sort((a, b) => b.allTokens - a.allTokens)
+
+    logger.api(`📊 Batch model stats query for ${apiIds.length} keys, period: ${period}`)
+
+    return res.json({
+      success: true,
+      data: modelStats,
+      period
+    })
+  } catch (error) {
+    logger.error('❌ Failed to process batch model stats query:', error)
+    return res.status(500).json({
+      error: 'Internal server error',
+      message: 'Failed to retrieve batch model statistics'
+    })
+  }
+})
+
 // 📊 用户模型统计查询接口 - 安全的自查询接口
 router.post('/api/user-model-stats', async (req, res) => {
   try {
