@@ -33,12 +33,16 @@
               >名称</label
             >
             <input
-              class="form-input w-full cursor-not-allowed bg-gray-100 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400"
-              disabled
+              v-model="form.name"
+              class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+              maxlength="100"
+              placeholder="请输入API Key名称"
+              required
               type="text"
-              :value="form.name"
             />
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 sm:mt-2">名称不可修改</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 sm:mt-2">
+              用于识别此 API Key 的用途
+            </p>
           </div>
 
           <!-- 所有者选择 -->
@@ -798,6 +802,7 @@ const updateApiKey = async () => {
   try {
     // 准备提交的数据
     const data = {
+      name: form.name, // 添加名称字段
       tokenLimit: 0, // 清除历史token限制
       rateLimitWindow:
         form.rateLimitWindow !== '' && form.rateLimitWindow !== null

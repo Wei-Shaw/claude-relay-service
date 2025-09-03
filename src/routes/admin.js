@@ -890,6 +890,7 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
   try {
     const { keyId } = req.params
     const {
+      name, // 添加名称字段
       tokenLimit,
       concurrencyLimit,
       rateLimitWindow,
@@ -915,6 +916,18 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
 
     // 只允许更新指定字段
     const updates = {}
+
+    // 处理名称字段
+    if (name !== undefined && name !== null && name !== '') {
+      const trimmedName = name.toString().trim()
+      if (trimmedName.length === 0) {
+        return res.status(400).json({ error: 'API Key name cannot be empty' })
+      }
+      if (trimmedName.length > 100) {
+        return res.status(400).json({ error: 'API Key name must be less than 100 characters' })
+      }
+      updates.name = trimmedName
+    }
 
     if (tokenLimit !== undefined && tokenLimit !== null && tokenLimit !== '') {
       if (!Number.isInteger(Number(tokenLimit)) || Number(tokenLimit) < 0) {
