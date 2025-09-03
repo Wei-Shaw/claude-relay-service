@@ -76,6 +76,22 @@ class ApiStatsClient {
       }
     }
   }
+
+  // 批量查询统计数据
+  async getBatchStats(apiIds) {
+    return this.request('/apiStats/api/batch-stats', {
+      method: 'POST',
+      body: JSON.stringify({ apiIds })
+    })
+  }
+
+  // 批量查询模型统计
+  async getBatchModelStats(apiIds, period = 'daily') {
+    return this.request('/apiStats/api/batch-model-stats', {
+      method: 'POST',
+      body: JSON.stringify({ apiIds, period })
+    })
+  }
 }
 
 export const apiStatsClient = new ApiStatsClient()
