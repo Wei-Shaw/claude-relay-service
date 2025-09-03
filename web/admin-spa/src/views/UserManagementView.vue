@@ -562,7 +562,7 @@ const loadUsers = async () => {
     if (selectedStatus.value !== '') {
       params.isActive = selectedStatus.value
     }
-    
+
     const [usersResponse, statsResponse] = await Promise.all([
       apiClient.get('/users', { params }),
       apiClient.get('/users/stats/overview')
