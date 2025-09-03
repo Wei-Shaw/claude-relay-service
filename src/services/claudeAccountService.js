@@ -59,7 +59,8 @@ class ClaudeAccountService {
       priority = 50, // 调度优先级 (1-100，数字越小优先级越高)
       schedulable = true, // 是否可被调度
       subscriptionInfo = null, // 手动设置的订阅信息
-      autoStopOnWarning = false // 5小时使用量接近限制时自动停止调度
+      autoStopOnWarning = false, // 5小时使用量接近限制时自动停止调度
+      useUnifiedUserAgent = false // 是否使用统一Claude Code版本的User-Agent
     } = options
 
     const accountId = uuidv4()
@@ -91,6 +92,7 @@ class ClaudeAccountService {
         errorMessage: '',
         schedulable: schedulable.toString(), // 是否可被调度
         autoStopOnWarning: autoStopOnWarning.toString(), // 5小时使用量接近限制时自动停止调度
+        useUnifiedUserAgent: useUnifiedUserAgent.toString(), // 是否使用统一Claude Code版本的User-Agent
         // 优先使用手动设置的订阅信息，否则使用OAuth数据中的，否则默认为空
         subscriptionInfo: subscriptionInfo
           ? JSON.stringify(subscriptionInfo)
@@ -122,6 +124,7 @@ class ClaudeAccountService {
         errorMessage: '',
         schedulable: schedulable.toString(), // 是否可被调度
         autoStopOnWarning: autoStopOnWarning.toString(), // 5小时使用量接近限制时自动停止调度
+        useUnifiedUserAgent: useUnifiedUserAgent.toString(), // 是否使用统一Claude Code版本的User-Agent
         // 手动设置的订阅信息
         subscriptionInfo: subscriptionInfo ? JSON.stringify(subscriptionInfo) : ''
       }
@@ -487,6 +490,8 @@ class ClaudeAccountService {
             schedulable: account.schedulable !== 'false', // 默认为true，兼容历史数据
             // 添加自动停止调度设置
             autoStopOnWarning: account.autoStopOnWarning === 'true', // 默认为false
+            // 添加统一User-Agent设置
+            useUnifiedUserAgent: account.useUnifiedUserAgent === 'true', // 默认为false
             // 添加停止原因
             stoppedReason: account.stoppedReason || null
           }
@@ -522,7 +527,8 @@ class ClaudeAccountService {
         'priority',
         'schedulable',
         'subscriptionInfo',
-        'autoStopOnWarning'
+        'autoStopOnWarning',
+        'useUnifiedUserAgent'
       ]
       const updatedData = { ...accountData }
 

@@ -5961,4 +5961,54 @@ router.post('/migrate-api-keys-azure', authenticateAdmin, async (req, res) => {
   }
 })
 
+// 📋 获取统一Claude Code User-Agent信息
+router.get('/claude-code-version', authenticateAdmin, async (req, res) => {
+  try {
+    const CACHE_KEY = 'claude_code_user_agent:daily'
+
+    // 获取缓存的统一User-Agent
+    const unifiedUserAgent = await redis.client.get(CACHE_KEY)
+    const ttl = unifiedUserAgent ? await redis.client.ttl(CACHE_KEY) : 0
+
+    res.json({
+      success: true,
+      userAgent: unifiedUserAgent,
+      isActive: !!unifiedUserAgent,
+      ttlSeconds: ttl,
+      lastUpdated: unifiedUserAgent ? new Date().toISOString() : null
+    })
+  } catch (error) {
+    logger.error('❌ Get unified Claude Code User-Agent error:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get User-Agent information',
+      error: error.message
+    })
+  }
+})
+
+// 🗑️ 清除统一Claude Code User-Agent缓存
+router.post('/claude-code-version/clear', authenticateAdmin, async (req, res) => {
+  try {
+    const CACHE_KEY = 'claude_code_user_agent:daily'
+
+    // 删除缓存的统一User-Agent
+    await redis.client.del(CACHE_KEY)
+
+    logger.info(`🗑️ Admin manually cleared unified Claude Code User-Agent cache`)
+
+    res.json({
+      success: true,
+      message: 'Unified User-Agent cache cleared successfully'
+    })
+  } catch (error) {
+    logger.error('❌ Clear unified User-Agent cache error:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to clear cache',
+      error: error.message
+    })
+  }
+})
+
 module.exports = router
