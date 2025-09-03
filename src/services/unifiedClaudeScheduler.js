@@ -636,6 +636,32 @@ class UnifiedClaudeScheduler {
     }
   }
 
+  // 🚫 标记账户为被封锁状态（403错误）
+  async markAccountBlocked(accountId, accountType, sessionHash = null) {
+    try {
+      // 只处理claude-official类型的账户，不处理claude-console和gemini
+      if (accountType === 'claude-official') {
+        await claudeAccountService.markAccountBlocked(accountId, sessionHash)
+
+        // 删除会话映射
+        if (sessionHash) {
+          await this._deleteSessionMapping(sessionHash)
+        }
+
+        logger.warn(`🚫 Account ${accountId} marked as blocked due to 403 error`)
+      } else {
+        logger.info(
+          `ℹ️ Skipping blocked marking for non-Claude OAuth account: ${accountId} (${accountType})`
+        )
+      }
+
+      return { success: true }
+    } catch (error) {
+      logger.error(`❌ Failed to mark account as blocked: ${accountId} (${accountType})`, error)
+      throw error
+    }
+  }
+
   // 🚫 标记Claude Console账户为封锁状态（模型不支持）
   async blockConsoleAccount(accountId, reason) {
     try {
