@@ -249,6 +249,10 @@ async function updateAccount(accountId, updates) {
 
 // 删除账户
 async function deleteAccount(accountId) {
+  // 首先从所有分组中移除此账户
+  const accountGroupService = require('./accountGroupService')
+  await accountGroupService.removeAccountFromAllGroups(accountId)
+
   const client = redisClient.getClientSafe()
   const accountKey = `${AZURE_OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`
 

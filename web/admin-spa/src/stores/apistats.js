@@ -21,6 +21,14 @@ export const useApiStatsStore = defineStore('apistats', () => {
     siteIconData: ''
   })
 
+  // 多 Key 模式相关状态
+  const multiKeyMode = ref(false)
+  const apiKeys = ref([]) // 多个 API Key 数组
+  const apiIds = ref([]) // 对应的 ID 数组
+  const aggregatedStats = ref(null) // 聚合后的统计数据
+  const individualStats = ref([]) // 各个 Key 的独立数据
+  const invalidKeys = ref([]) // 无效的 Keys 列表
+
   // 计算属性
   const currentPeriodData = computed(() => {
     const defaultData = {
@@ -34,6 +42,16 @@ export const useApiStatsStore = defineStore('apistats', () => {
       formattedCost: '$0.000000'
     }
 
+    // 聚合模式下使用聚合数据
+    if (multiKeyMode.value && aggregatedStats.value) {
+      if (statsPeriod.value === 'daily') {
+        return aggregatedStats.value.dailyUsage || defaultData
+      } else {
+        return aggregatedStats.value.monthlyUsage || defaultData
+      }
+    }
+
+    // 单个 Key 模式下使用原有逻辑
     if (statsPeriod.value === 'daily') {
       return dailyStats.value || defaultData
     } else {
@@ -69,6 +87,11 @@ export const useApiStatsStore = defineStore('apistats', () => {
 
   // 查询统计数据
   async function queryStats() {
+    // 多 Key 模式处理
+    if (multiKeyMode.value) {
+      return queryBatchStats()
+    }
+
     if (!apiKey.value.trim()) {
       error.value = '请输入 API Key'
       return
@@ -204,6 +227,12 @@ export const useApiStatsStore = defineStore('apistats', () => {
 
     statsPeriod.value = period
 
+    // 多 Key 模式下加载批量模型统计
+    if (multiKeyMode.value && apiIds.value.length > 0) {
+      await loadBatchModelStats(period)
+      return
+    }
+
     // 如果对应时间段的数据还没有加载，则加载它
     if (
       (period === 'daily' && !dailyStats.value) ||
@@ -297,6 +326,127 @@ export const useApiStatsStore = defineStore('apistats', () => {
     }
   }
 
+  // 批量查询统计数据
+  async function queryBatchStats() {
+    const keys = parseApiKeys()
+    if (keys.length === 0) {
+      error.value = '请输入至少一个有效的 API Key'
+      return
+    }
+
+    loading.value = true
+    error.value = ''
+    aggregatedStats.value = null
+    individualStats.value = []
+    invalidKeys.value = []
+    modelStats.value = []
+    apiKeys.value = keys
+    apiIds.value = []
+
+    try {
+      // 批量获取 API Key IDs
+      const idResults = await Promise.allSettled(keys.map((key) => apiStatsClient.getKeyId(key)))
+
+      const validIds = []
+      const validKeys = []
+
+      idResults.forEach((result, index) => {
+        if (result.status === 'fulfilled' && result.value.success) {
+          validIds.push(result.value.data.id)
+          validKeys.push(keys[index])
+        } else {
+          invalidKeys.value.push(keys[index])
+        }
+      })
+
+      if (validIds.length === 0) {
+        throw new Error('所有 API Key 都无效')
+      }
+
+      apiIds.value = validIds
+      apiKeys.value = validKeys
+
+      // 批量查询统计数据
+      const batchResult = await apiStatsClient.getBatchStats(validIds)
+
+      if (batchResult.success) {
+        aggregatedStats.value = batchResult.data.aggregated
+        individualStats.value = batchResult.data.individual
+        statsData.value = batchResult.data.aggregated // 兼容现有组件
+
+        // 设置聚合模式下的日期统计数据，以保证现有组件的兼容性
+        dailyStats.value = batchResult.data.aggregated.dailyUsage || null
+        monthlyStats.value = batchResult.data.aggregated.monthlyUsage || null
+
+        // 加载聚合的模型统计
+        await loadBatchModelStats(statsPeriod.value)
+
+        // 更新 URL
+        updateBatchURL()
+      } else {
+        throw new Error(batchResult.message || '批量查询失败')
+      }
+    } catch (err) {
+      console.error('Batch query error:', err)
+      error.value = err.message || '批量查询统计数据失败'
+      aggregatedStats.value = null
+      individualStats.value = []
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 加载批量模型统计
+  async function loadBatchModelStats(period = 'daily') {
+    if (apiIds.value.length === 0) return
+
+    modelStatsLoading.value = true
+
+    try {
+      const result = await apiStatsClient.getBatchModelStats(apiIds.value, period)
+
+      if (result.success) {
+        modelStats.value = result.data || []
+      } else {
+        throw new Error(result.message || '加载批量模型统计失败')
+      }
+    } catch (err) {
+      console.error('Load batch model stats error:', err)
+      modelStats.value = []
+    } finally {
+      modelStatsLoading.value = false
+    }
+  }
+
+  // 解析 API Keys
+  function parseApiKeys() {
+    if (!apiKey.value) return []
+
+    const keys = apiKey.value
+      .split(/[,\n]+/)
+      .map((key) => key.trim())
+      .filter((key) => key.length > 0)
+
+    // 去重并限制最多30个
+    const uniqueKeys = [...new Set(keys)]
+    return uniqueKeys.slice(0, 30)
+  }
+
+  // 更新批量查询 URL
+  function updateBatchURL() {
+    if (apiIds.value.length > 0) {
+      const url = new URL(window.location)
+      url.searchParams.set('apiIds', apiIds.value.join(','))
+      url.searchParams.set('batch', 'true')
+      window.history.pushState({}, '', url)
+    }
+  }
+
+  // 清空输入
+  function clearInput() {
+    apiKey.value = ''
+  }
+
   // 清除数据
   function clearData() {
     statsData.value = null
@@ -306,11 +456,18 @@ export const useApiStatsStore = defineStore('apistats', () => {
     error.value = ''
     statsPeriod.value = 'daily'
     apiId.value = null
+    // 清除多 Key 模式数据
+    apiKeys.value = []
+    apiIds.value = []
+    aggregatedStats.value = null
+    individualStats.value = []
+    invalidKeys.value = []
   }
 
   // 重置
   function reset() {
     apiKey.value = ''
+    multiKeyMode.value = false
     clearData()
   }
 
@@ -328,6 +485,13 @@ export const useApiStatsStore = defineStore('apistats', () => {
     dailyStats,
     monthlyStats,
     oemSettings,
+    // 多 Key 模式状态
+    multiKeyMode,
+    apiKeys,
+    apiIds,
+    aggregatedStats,
+    individualStats,
+    invalidKeys,
 
     // Computed
     currentPeriodData,
@@ -335,13 +499,16 @@ export const useApiStatsStore = defineStore('apistats', () => {
 
     // Actions
     queryStats,
+    queryBatchStats,
     loadAllPeriodStats,
     loadPeriodStats,
     loadModelStats,
+    loadBatchModelStats,
     switchPeriod,
     loadStatsWithApiId,
     loadOemSettings,
     clearData,
+    clearInput,
     reset
   }
 })

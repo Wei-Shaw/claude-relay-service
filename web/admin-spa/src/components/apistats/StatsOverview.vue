@@ -1,14 +1,83 @@
 <template>
   <div class="mb-6 grid grid-cols-1 gap-4 md:mb-8 md:gap-6 lg:grid-cols-2">
-    <!-- API Key 基本信息 -->
+    <!-- API Key 基本信息 / 批量查询概要 -->
     <div class="card p-4 md:p-6">
       <h3
         class="mb-3 flex items-center text-lg font-bold text-gray-900 dark:text-gray-100 md:mb-4 md:text-xl"
       >
-        <i class="fas fa-info-circle mr-2 text-sm text-blue-500 md:mr-3 md:text-base" />
-        API Key 信息
+        <i
+          class="mr-2 text-sm md:mr-3 md:text-base"
+          :class="
+            multiKeyMode ? 'fas fa-layer-group text-purple-500' : 'fas fa-info-circle text-blue-500'
+          "
+        />
+        {{ multiKeyMode ? '批量查询概要' : 'API Key 信息' }}
       </h3>
-      <div class="space-y-2 md:space-y-3">
+
+      <!-- 多 Key 模式下的概要信息 -->
+      <div v-if="multiKeyMode && aggregatedStats" class="space-y-2 md:space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">查询 Keys 数</span>
+          <span class="text-sm font-medium text-gray-900 dark:text-gray-100 md:text-base">
+            {{ aggregatedStats.totalKeys }} 个
+          </span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">有效 Keys 数</span>
+          <span class="text-sm font-medium text-green-600 md:text-base">
+            <i class="fas fa-check-circle mr-1 text-xs md:text-sm" />
+            {{ aggregatedStats.activeKeys }} 个
+          </span>
+        </div>
+        <div v-if="invalidKeys.length > 0" class="flex items-center justify-between">
+          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">无效 Keys 数</span>
+          <span class="text-sm font-medium text-red-600 md:text-base">
+            <i class="fas fa-times-circle mr-1 text-xs md:text-sm" />
+            {{ invalidKeys.length }} 个
+          </span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">总请求数</span>
+          <span class="text-sm font-medium text-gray-900 dark:text-gray-100 md:text-base">
+            {{ formatNumber(aggregatedStats.usage.requests) }}
+          </span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">总 Token 数</span>
+          <span class="text-sm font-medium text-gray-900 dark:text-gray-100 md:text-base">
+            {{ formatNumber(aggregatedStats.usage.allTokens) }}
+          </span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">总费用</span>
+          <span class="text-sm font-medium text-indigo-600 md:text-base">
+            {{ aggregatedStats.usage.formattedCost }}
+          </span>
+        </div>
+
+        <!-- 各 Key 贡献占比（可选） -->
+        <div
+          v-if="individualStats.length > 1"
+          class="border-t border-gray-200 pt-2 dark:border-gray-700"
+        >
+          <div class="mb-2 text-xs text-gray-500 dark:text-gray-400">各 Key 贡献占比</div>
+          <div class="space-y-1">
+            <div
+              v-for="stat in topContributors"
+              :key="stat.apiId"
+              class="flex items-center justify-between text-xs"
+            >
+              <span class="truncate text-gray-600 dark:text-gray-400">{{ stat.name }}</span>
+              <span class="text-gray-900 dark:text-gray-100"
+                >{{ calculateContribution(stat) }}%</span
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 单 Key 模式下的详细信息 -->
+      <div v-else class="space-y-2 md:space-y-3">
         <div class="flex items-center justify-between">
           <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">名称</span>
           <span
@@ -128,12 +197,38 @@
 </template>
 
 <script setup>
+/* eslint-disable no-unused-vars */
+import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
 import dayjs from 'dayjs'
 
 const apiStatsStore = useApiStatsStore()
-const { statsData, statsPeriod, currentPeriodData } = storeToRefs(apiStatsStore)
+const {
+  statsData,
+  statsPeriod,
+  currentPeriodData,
+  multiKeyMode,
+  aggregatedStats,
+  individualStats,
+  invalidKeys
+} = storeToRefs(apiStatsStore)
+
+// 计算前3个贡献最大的 Key
+const topContributors = computed(() => {
+  if (!individualStats.value || individualStats.value.length === 0) return []
+
+  return [...individualStats.value]
+    .sort((a, b) => (b.usage?.allTokens || 0) - (a.usage?.allTokens || 0))
+    .slice(0, 3)
+})
+
+// 计算单个 Key 的贡献占比
+const calculateContribution = (stat) => {
+  if (!aggregatedStats.value || !aggregatedStats.value.usage.allTokens) return 0
+  const percentage = ((stat.usage?.allTokens || 0) / aggregatedStats.value.usage.allTokens) * 100
+  return percentage.toFixed(1)
+}
 
 // 格式化日期
 const formatDate = (dateString) => {

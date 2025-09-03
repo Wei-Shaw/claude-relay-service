@@ -188,12 +188,14 @@
 
                 <div>
                   <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300"
-                    >Token 限制</label
+                    >费用限制 (美元)</label
                   >
                   <input
-                    v-model="form.tokenLimit"
+                    v-model="form.rateLimitCost"
                     class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                    min="0"
                     placeholder="不修改"
+                    step="0.01"
                     type="number"
                   />
                 </div>
@@ -214,6 +216,24 @@
               step="0.01"
               type="number"
             />
+          </div>
+
+          <!-- Opus 模型周费用限制 -->
+          <div>
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+              Opus 模型周费用限制 (美元)
+            </label>
+            <input
+              v-model="form.weeklyOpusCostLimit"
+              class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+              min="0"
+              placeholder="不修改 (0 表示无限制)"
+              step="0.01"
+              type="number"
+            />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              设置 Opus 模型的周费用限制（周一到周日），仅限 Claude 官方账户
+            </p>
           </div>
 
           <!-- 并发限制 -->
@@ -496,11 +516,12 @@ const unselectedTags = computed(() => {
 
 // 表单数据
 const form = reactive({
-  tokenLimit: '',
+  rateLimitCost: '', // 费用限制替代token限制
   rateLimitWindow: '',
   rateLimitRequests: '',
   concurrencyLimit: '',
   dailyCostLimit: '',
+  weeklyOpusCostLimit: '', // 新增Opus周费用限制
   permissions: '', // 空字符串表示不修改
   claudeAccountId: '',
   geminiAccountId: '',
@@ -616,8 +637,8 @@ const batchUpdateApiKeys = async () => {
     const updates = {}
 
     // 只有非空值才添加到更新对象中
-    if (form.tokenLimit !== '' && form.tokenLimit !== null) {
-      updates.tokenLimit = parseInt(form.tokenLimit)
+    if (form.rateLimitCost !== '' && form.rateLimitCost !== null) {
+      updates.rateLimitCost = parseFloat(form.rateLimitCost)
     }
     if (form.rateLimitWindow !== '' && form.rateLimitWindow !== null) {
       updates.rateLimitWindow = parseInt(form.rateLimitWindow)
@@ -630,6 +651,9 @@ const batchUpdateApiKeys = async () => {
     }
     if (form.dailyCostLimit !== '' && form.dailyCostLimit !== null) {
       updates.dailyCostLimit = parseFloat(form.dailyCostLimit)
+    }
+    if (form.weeklyOpusCostLimit !== '' && form.weeklyOpusCostLimit !== null) {
+      updates.weeklyOpusCostLimit = parseFloat(form.weeklyOpusCostLimit)
     }
 
     // 权限设置

@@ -621,10 +621,7 @@ class ClaudeAccountService {
     try {
       // 首先从所有分组中移除此账户
       const accountGroupService = require('./accountGroupService')
-      const groups = await accountGroupService.getAccountGroup(accountId)
-      for (const group of groups) {
-        await accountGroupService.removeAccountFromGroup(accountId, group.id)
-      }
+      await accountGroupService.removeAccountFromAllGroups(accountId)
 
       const result = await redis.deleteClaudeAccount(accountId)
 
