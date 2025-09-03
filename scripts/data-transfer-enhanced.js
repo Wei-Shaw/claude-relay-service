@@ -103,12 +103,12 @@ function isPlaintextApiKey(apiKey) {
   if (!apiKey || typeof apiKey !== 'string') {
     return false
   }
-  
+
   // SHA256哈希值固定为64个十六进制字符，如果是哈希值则返回false
   if (apiKey.length === 64 && /^[a-f0-9]+$/i.test(apiKey)) {
     return false // 已经是哈希值
   }
-  
+
   // 其他情况都认为是明文API Key（包括sk-ant-、cr_、自定义前缀等）
   return true
 }
@@ -810,7 +810,7 @@ async function importData() {
           // 检查并处理API Key哈希
           let plainTextApiKey = null
           let hashedApiKey = null
-          
+
           if (apiKeyData.apiKey && isPlaintextApiKey(apiKeyData.apiKey)) {
             // 如果是明文API Key，保存明文并计算哈希
             plainTextApiKey = apiKeyData.apiKey
@@ -837,7 +837,9 @@ async function importData() {
           // 更新哈希映射：hash_map的key必须是哈希值
           if (!importDataObj.metadata.sanitized && hashedApiKey) {
             await redis.client.hset('apikey:hash_map', hashedApiKey, apiKey.id)
-            logger.info(`📝 Updated hash mapping: ${hashedApiKey.substring(0, 8)}... -> ${apiKey.id}`)
+            logger.info(
+              `📝 Updated hash mapping: ${hashedApiKey.substring(0, 8)}... -> ${apiKey.id}`
+            )
           }
 
           // 导入使用统计数据
