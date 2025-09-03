@@ -105,7 +105,7 @@
                   <input
                     v-model="searchKeyword"
                     class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 pl-9 text-sm text-gray-700 placeholder-gray-400 shadow-sm transition-all duration-200 hover:border-gray-300 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 dark:hover:border-gray-500"
-                    placeholder="搜索名称..."
+                    :placeholder="isLdapEnabled ? '搜索名称或所有者...' : '搜索名称...'"
                     type="text"
                     @input="currentPage = 1"
                   />
@@ -403,6 +403,14 @@
                               <i class="fas fa-share-alt mr-1" />
                               使用共享池
                             </div>
+                          </div>
+                          <!-- 显示所有者信息 -->
+                          <div
+                            v-if="isLdapEnabled && key.ownerDisplayName"
+                            class="mt-1 text-xs text-red-600"
+                          >
+                            <i class="fas fa-user mr-1" />
+                            {{ key.ownerDisplayName }}
                           </div>
                         </div>
                       </div>
@@ -1025,6 +1033,11 @@
                   <i class="fas fa-share-alt mr-1" />
                   使用共享池
                 </div>
+                <!-- 显示所有者信息 -->
+                <div v-if="isLdapEnabled && key.ownerDisplayName" class="text-xs text-red-600">
+                  <i class="fas fa-user mr-1" />
+                  {{ key.ownerDisplayName }}
+                </div>
               </div>
 
               <!-- 统计信息 -->
@@ -1327,6 +1340,7 @@
                       名称
                     </th>
                     <th
+                      v-if="isLdapEnabled"
                       class="w-[15%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                     >
                       创建者
@@ -1383,7 +1397,7 @@
                         </div>
                       </div>
                     </td>
-                    <td class="px-3 py-4">
+                    <td v-if="isLdapEnabled" class="px-3 py-4">
                       <div class="text-sm">
                         <span v-if="key.createdBy === 'admin'" class="text-blue-600">
                           <i class="fas fa-user-shield mr-1" />
@@ -1545,6 +1559,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
 import { useClientsStore } from '@/stores/clients'
+import { useAuthStore } from '@/stores/auth'
 import CreateApiKeyModal from '@/components/apikeys/CreateApiKeyModal.vue'
 import EditApiKeyModal from '@/components/apikeys/EditApiKeyModal.vue'
 import RenewApiKeyModal from '@/components/apikeys/RenewApiKeyModal.vue'
@@ -1558,7 +1573,11 @@ import CustomDropdown from '@/components/common/CustomDropdown.vue'
 
 // 响应式数据
 const clientsStore = useClientsStore()
+const authStore = useAuthStore()
 const apiKeys = ref([])
+
+// 获取 LDAP 启用状态
+const isLdapEnabled = computed(() => authStore.oemSettings?.ldapEnabled || false)
 
 // 多选相关状态
 const selectedApiKeys = ref([])
@@ -1647,12 +1666,22 @@ const sortedApiKeys = computed(() => {
     )
   }
 
-  // 然后进行名称搜索
+  // 然后进行名称搜索（搜索API Key名称和所有者名称）
   if (searchKeyword.value) {
     const keyword = searchKeyword.value.toLowerCase().trim()
-    filteredKeys = filteredKeys.filter(
-      (key) => key.name && key.name.toLowerCase().includes(keyword)
-    )
+    filteredKeys = filteredKeys.filter((key) => {
+      // 搜索API Key名称
+      const nameMatch = key.name && key.name.toLowerCase().includes(keyword)
+      // 如果启用了 LDAP，搜索所有者名称
+      if (isLdapEnabled.value) {
+        const ownerMatch =
+          key.ownerDisplayName && key.ownerDisplayName.toLowerCase().includes(keyword)
+        // 如果API Key名称或所有者名称匹配，则包含该条目
+        return nameMatch || ownerMatch
+      }
+      // 未启用 LDAP 时只搜索名称
+      return nameMatch
+    })
   }
 
   // 如果没有排序字段，返回筛选后的结果

@@ -24,6 +24,51 @@ const ProxyHelper = require('../utils/proxyHelper')
 
 const router = express.Router()
 
+// 👥 用户管理
+
+// 获取所有用户列表（用于API Key分配）
+router.get('/users', authenticateAdmin, async (req, res) => {
+  try {
+    const userService = require('../services/userService')
+    const result = await userService.getAllUsers({ isActive: true, limit: 1000 }) // Get all active users
+
+    // Extract users array from the paginated result
+    const allUsers = result.users || []
+
+    // Map to the format needed for the dropdown
+    const activeUsers = allUsers.map((user) => ({
+      id: user.id,
+      username: user.username,
+      displayName: user.displayName || user.username,
+      email: user.email,
+      role: user.role
+    }))
+
+    // 添加Admin选项作为第一个
+    const usersWithAdmin = [
+      {
+        id: 'admin',
+        username: 'admin',
+        displayName: 'Admin',
+        email: '',
+        role: 'admin'
+      },
+      ...activeUsers
+    ]
+
+    return res.json({
+      success: true,
+      data: usersWithAdmin
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get users list:', error)
+    return res.status(500).json({
+      error: 'Failed to get users list',
+      message: error.message
+    })
+  }
+})
+
 // 🔑 API Keys 管理
 
 // 调试：获取API Key费用详情
@@ -62,6 +107,9 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
   try {
     const { timeRange = 'all' } = req.query // all, 7days, monthly
     const apiKeys = await apiKeyService.getAllApiKeys()
+
+    // 获取用户服务来补充owner信息
+    const userService = require('../services/userService')
 
     // 根据时间范围计算查询模式
     const now = new Date()
@@ -310,6 +358,28 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
 
         // 为了保持兼容性，也更新total字段
         apiKey.usage.total = apiKey.usage[timeRange]
+      }
+    }
+
+    // 为每个API Key添加owner的displayName
+    for (const apiKey of apiKeys) {
+      // 如果API Key有关联的用户ID，获取用户信息
+      if (apiKey.userId) {
+        try {
+          const user = await userService.getUserById(apiKey.userId, false)
+          if (user) {
+            apiKey.ownerDisplayName = user.displayName || user.username || 'Unknown User'
+          } else {
+            apiKey.ownerDisplayName = 'Unknown User'
+          }
+        } catch (error) {
+          logger.debug(`无法获取用户 ${apiKey.userId} 的信息:`, error)
+          apiKey.ownerDisplayName = 'Unknown User'
+        }
+      } else {
+        // 如果没有userId，使用createdBy字段或默认为Admin
+        apiKey.ownerDisplayName =
+          apiKey.createdBy === 'admin' ? 'Admin' : apiKey.createdBy || 'Admin'
       }
     }
 
@@ -803,6 +873,7 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
   try {
     const { keyId } = req.params
     const {
+      name, // 添加名称字段
       tokenLimit,
       concurrencyLimit,
       rateLimitWindow,
@@ -822,11 +893,24 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       expiresAt,
       dailyCostLimit,
       weeklyOpusCostLimit,
-      tags
+      tags,
+      ownerId // 新增：所有者ID字段
     } = req.body
 
     // 只允许更新指定字段
     const updates = {}
+
+    // 处理名称字段
+    if (name !== undefined && name !== null && name !== '') {
+      const trimmedName = name.toString().trim()
+      if (trimmedName.length === 0) {
+        return res.status(400).json({ error: 'API Key name cannot be empty' })
+      }
+      if (trimmedName.length > 100) {
+        return res.status(400).json({ error: 'API Key name must be less than 100 characters' })
+      }
+      updates.name = trimmedName
+    }
 
     if (tokenLimit !== undefined && tokenLimit !== null && tokenLimit !== '') {
       if (!Number.isInteger(Number(tokenLimit)) || Number(tokenLimit) < 0) {
@@ -990,6 +1074,45 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
         return res.status(400).json({ error: 'isActive must be a boolean' })
       }
       updates.isActive = isActive
+    }
+
+    // 处理所有者变更
+    if (ownerId !== undefined) {
+      const userService = require('../services/userService')
+
+      if (ownerId === 'admin') {
+        // 分配给Admin
+        updates.userId = ''
+        updates.userUsername = ''
+        updates.createdBy = 'admin'
+      } else if (ownerId) {
+        // 分配给用户
+        try {
+          const user = await userService.getUserById(ownerId, false)
+          if (!user) {
+            return res.status(400).json({ error: 'Invalid owner: User not found' })
+          }
+          if (!user.isActive) {
+            return res.status(400).json({ error: 'Cannot assign to inactive user' })
+          }
+
+          // 设置新的所有者信息
+          updates.userId = ownerId
+          updates.userUsername = user.username
+          updates.createdBy = user.username
+
+          // 管理员重新分配时，不检查用户的API Key数量限制
+          logger.info(`🔄 Admin reassigning API key ${keyId} to user ${user.username}`)
+        } catch (error) {
+          logger.error('Error fetching user for owner reassignment:', error)
+          return res.status(400).json({ error: 'Invalid owner ID' })
+        }
+      } else {
+        // 清空所有者（分配给Admin）
+        updates.userId = ''
+        updates.userUsername = ''
+        updates.createdBy = 'admin'
+      }
     }
 
     await apiKeyService.updateApiKey(keyId, updates)

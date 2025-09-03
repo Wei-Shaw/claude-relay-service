@@ -368,7 +368,10 @@ class ApiKeyService {
         'allowedClients',
         'dailyCostLimit',
         'weeklyOpusCostLimit',
-        'tags'
+        'tags',
+        'userId', // 新增：用户ID（所有者变更）
+        'userUsername', // 新增：用户名（所有者变更）
+        'createdBy' // 新增：创建者（所有者变更）
       ]
       const updatedData = { ...keyData }
 
