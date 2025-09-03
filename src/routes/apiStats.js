@@ -438,10 +438,9 @@ router.post('/api/batch-stats', async (req, res) => {
       })
     }
 
-    const client = redis.getClientSafe()
     const individualStats = []
     const aggregated = {
-      totalKeys: 0,
+      totalKeys: apiIds.length,
       activeKeys: 0,
       usage: {
         requests: 0,
@@ -475,7 +474,7 @@ router.post('/api/batch-stats', async (req, res) => {
       }
     }
 
-    // 并行查询所有 API Key 数据
+    // 并行查询所有 API Key 数据（复用单key查询逻辑）
     const results = await Promise.allSettled(
       apiIds.map(async (apiId) => {
         const keyData = await redis.getApiKey(apiId)
@@ -494,76 +493,11 @@ router.post('/api/batch-stats', async (req, res) => {
           return { error: 'Expired', apiId }
         }
 
-        // 获取使用统计
+        // 复用单key查询的逻辑：获取使用统计
         const usage = await redis.getUsageStats(apiId)
 
-        // 获取今日和本月统计
-        const tzDate = redis.getDateInTimezone()
-        const today = redis.getDateStringInTimezone()
-        const currentMonth = `${tzDate.getFullYear()}-${String(tzDate.getMonth() + 1).padStart(2, '0')}`
-
-        // 获取今日模型统计
-        const dailyKeys = await client.keys(`usage:${apiId}:model:daily:*:${today}`)
-        const dailyStats = {
-          requests: 0,
-          inputTokens: 0,
-          outputTokens: 0,
-          cacheCreateTokens: 0,
-          cacheReadTokens: 0,
-          allTokens: 0,
-          cost: 0
-        }
-
-        for (const key of dailyKeys) {
-          const data = await client.hgetall(key)
-          if (data && Object.keys(data).length > 0) {
-            dailyStats.requests += parseInt(data.requests) || 0
-            dailyStats.inputTokens += parseInt(data.inputTokens) || 0
-            dailyStats.outputTokens += parseInt(data.outputTokens) || 0
-            dailyStats.cacheCreateTokens += parseInt(data.cacheCreateTokens) || 0
-            dailyStats.cacheReadTokens += parseInt(data.cacheReadTokens) || 0
-            dailyStats.allTokens += parseInt(data.allTokens) || 0
-          }
-        }
-
-        // 获取本月模型统计
-        const monthlyKeys = await client.keys(`usage:${apiId}:model:monthly:*:${currentMonth}`)
-        const monthlyStats = {
-          requests: 0,
-          inputTokens: 0,
-          outputTokens: 0,
-          cacheCreateTokens: 0,
-          cacheReadTokens: 0,
-          allTokens: 0,
-          cost: 0
-        }
-
-        for (const key of monthlyKeys) {
-          const data = await client.hgetall(key)
-          if (data && Object.keys(data).length > 0) {
-            monthlyStats.requests += parseInt(data.requests) || 0
-            monthlyStats.inputTokens += parseInt(data.inputTokens) || 0
-            monthlyStats.outputTokens += parseInt(data.outputTokens) || 0
-            monthlyStats.cacheCreateTokens += parseInt(data.cacheCreateTokens) || 0
-            monthlyStats.cacheReadTokens += parseInt(data.cacheReadTokens) || 0
-            monthlyStats.allTokens += parseInt(data.allTokens) || 0
-          }
-        }
-
-        // 计算费用
-        const calculateCostForStats = (stats) => {
-          const usageData = {
-            input_tokens: stats.inputTokens,
-            output_tokens: stats.outputTokens,
-            cache_creation_input_tokens: stats.cacheCreateTokens,
-            cache_read_input_tokens: stats.cacheReadTokens
-          }
-          const costResult = CostCalculator.calculateCost(usageData, 'claude-3-5-sonnet-20241022')
-          return costResult.costs.total
-        }
-
-        dailyStats.cost = calculateCostForStats(dailyStats)
-        monthlyStats.cost = calculateCostForStats(monthlyStats)
+        // 获取费用统计（与单key查询一致）
+        const costStats = await redis.getCostStats(apiId)
 
         return {
           apiId,
@@ -572,8 +506,15 @@ router.post('/api/batch-stats', async (req, res) => {
           isActive: true,
           createdAt: keyData.createdAt,
           usage: usage.total || {},
-          dailyStats,
-          monthlyStats
+          dailyStats: {
+            ...usage.daily,
+            cost: costStats.daily
+          },
+          monthlyStats: {
+            ...usage.monthly,
+            cost: costStats.monthly
+          },
+          totalCost: costStats.total
         }
       })
     )
@@ -594,23 +535,26 @@ router.post('/api/batch-stats', async (req, res) => {
           aggregated.usage.allTokens += stats.usage.allTokens || 0
         }
 
+        // 聚合总费用
+        aggregated.usage.cost += stats.totalCost || 0
+
         // 聚合今日使用量
-        aggregated.dailyUsage.requests += stats.dailyStats.requests
-        aggregated.dailyUsage.inputTokens += stats.dailyStats.inputTokens
-        aggregated.dailyUsage.outputTokens += stats.dailyStats.outputTokens
-        aggregated.dailyUsage.cacheCreateTokens += stats.dailyStats.cacheCreateTokens
-        aggregated.dailyUsage.cacheReadTokens += stats.dailyStats.cacheReadTokens
-        aggregated.dailyUsage.allTokens += stats.dailyStats.allTokens
-        aggregated.dailyUsage.cost += stats.dailyStats.cost
+        aggregated.dailyUsage.requests += stats.dailyStats.requests || 0
+        aggregated.dailyUsage.inputTokens += stats.dailyStats.inputTokens || 0
+        aggregated.dailyUsage.outputTokens += stats.dailyStats.outputTokens || 0
+        aggregated.dailyUsage.cacheCreateTokens += stats.dailyStats.cacheCreateTokens || 0
+        aggregated.dailyUsage.cacheReadTokens += stats.dailyStats.cacheReadTokens || 0
+        aggregated.dailyUsage.allTokens += stats.dailyStats.allTokens || 0
+        aggregated.dailyUsage.cost += stats.dailyStats.cost || 0
 
         // 聚合本月使用量
-        aggregated.monthlyUsage.requests += stats.monthlyStats.requests
-        aggregated.monthlyUsage.inputTokens += stats.monthlyStats.inputTokens
-        aggregated.monthlyUsage.outputTokens += stats.monthlyStats.outputTokens
-        aggregated.monthlyUsage.cacheCreateTokens += stats.monthlyStats.cacheCreateTokens
-        aggregated.monthlyUsage.cacheReadTokens += stats.monthlyStats.cacheReadTokens
-        aggregated.monthlyUsage.allTokens += stats.monthlyStats.allTokens
-        aggregated.monthlyUsage.cost += stats.monthlyStats.cost
+        aggregated.monthlyUsage.requests += stats.monthlyStats.requests || 0
+        aggregated.monthlyUsage.inputTokens += stats.monthlyStats.inputTokens || 0
+        aggregated.monthlyUsage.outputTokens += stats.monthlyStats.outputTokens || 0
+        aggregated.monthlyUsage.cacheCreateTokens += stats.monthlyStats.cacheCreateTokens || 0
+        aggregated.monthlyUsage.cacheReadTokens += stats.monthlyStats.cacheReadTokens || 0
+        aggregated.monthlyUsage.allTokens += stats.monthlyStats.allTokens || 0
+        aggregated.monthlyUsage.cost += stats.monthlyStats.cost || 0
 
         // 添加到个体统计
         individualStats.push({
@@ -622,23 +566,8 @@ router.post('/api/batch-stats', async (req, res) => {
       }
     })
 
-    aggregated.totalKeys = apiIds.length
-
-    // 计算总费用
-    const totalUsageData = {
-      input_tokens: aggregated.usage.inputTokens,
-      output_tokens: aggregated.usage.outputTokens,
-      cache_creation_input_tokens: aggregated.usage.cacheCreateTokens,
-      cache_read_input_tokens: aggregated.usage.cacheReadTokens
-    }
-    const totalCostResult = CostCalculator.calculateCost(
-      totalUsageData,
-      'claude-3-5-sonnet-20241022'
-    )
-    aggregated.usage.cost = totalCostResult.costs.total
-    aggregated.usage.formattedCost = totalCostResult.formatted.total
-
-    // 格式化每日和每月费用
+    // 格式化费用显示
+    aggregated.usage.formattedCost = CostCalculator.formatCost(aggregated.usage.cost)
     aggregated.dailyUsage.formattedCost = CostCalculator.formatCost(aggregated.dailyUsage.cost)
     aggregated.monthlyUsage.formattedCost = CostCalculator.formatCost(aggregated.monthlyUsage.cost)
 
