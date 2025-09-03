@@ -208,7 +208,8 @@ router.get('/profile', authenticateUser, async (req, res) => {
         totalUsage: user.totalUsage
       },
       config: {
-        maxApiKeysPerUser: config.userManagement.maxApiKeysPerUser
+        maxApiKeysPerUser: config.userManagement.maxApiKeysPerUser,
+        allowUserDeleteApiKeys: config.userManagement.allowUserDeleteApiKeys
       }
     })
   } catch (error) {
@@ -351,6 +352,15 @@ router.post('/api-keys', authenticateUser, async (req, res) => {
 router.delete('/api-keys/:keyId', authenticateUser, async (req, res) => {
   try {
     const { keyId } = req.params
+
+    // 检查是否允许用户删除自己的API Keys
+    if (!config.userManagement.allowUserDeleteApiKeys) {
+      return res.status(403).json({
+        error: 'Operation not allowed',
+        message:
+          'Users are not allowed to delete their own API keys. Please contact an administrator.'
+      })
+    }
 
     // 检查API Key是否属于当前用户
     const existingKey = await apiKeyService.getApiKeyById(keyId)

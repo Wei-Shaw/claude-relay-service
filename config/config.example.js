@@ -175,7 +175,8 @@ const config = {
     enabled: process.env.USER_MANAGEMENT_ENABLED === 'true',
     defaultUserRole: process.env.DEFAULT_USER_ROLE || 'user',
     userSessionTimeout: parseInt(process.env.USER_SESSION_TIMEOUT) || 86400000, // 24小时
-    maxApiKeysPerUser: parseInt(process.env.MAX_API_KEYS_PER_USER) || 5
+    maxApiKeysPerUser: parseInt(process.env.MAX_API_KEYS_PER_USER) || 1,
+    allowUserDeleteApiKeys: process.env.ALLOW_USER_DELETE_API_KEYS === 'true' // 默认不允许用户删除自己的API Keys
   },
 
   // 📢 Webhook通知配置
