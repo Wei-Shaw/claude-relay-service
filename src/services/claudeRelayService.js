@@ -9,6 +9,7 @@ const sessionHelper = require('../utils/sessionHelper')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
 const claudeCodeHeadersService = require('./claudeCodeHeadersService')
+const redis = require('../models/redis')
 
 class ClaudeRelayService {
   constructor() {
@@ -610,6 +611,12 @@ class ClaudeRelayService {
   ) {
     const url = new URL(this.claudeApiUrl)
 
+    // 获取账户信息用于统一 User-Agent
+    const account = await claudeAccountService.getAccount(accountId)
+
+    // 获取统一的 User-Agent
+    const unifiedUA = await this.captureAndGetUnifiedUserAgent(clientHeaders, account)
+
     // 获取过滤后的客户端 headers
     const filteredHeaders = this._filterClientHeaders(clientHeaders)
 
@@ -656,10 +663,18 @@ class ClaudeRelayService {
         timeout: config.proxy.timeout
       }
 
-      // 如果客户端没有提供 User-Agent，使用默认值
+      // 使用统一 User-Agent 或客户端提供的，最后使用默认值
       if (!options.headers['User-Agent'] && !options.headers['user-agent']) {
-        options.headers['User-Agent'] = 'claude-cli/1.0.57 (external, cli)'
+        const userAgent =
+          unifiedUA ||
+          clientHeaders?.['user-agent'] ||
+          clientHeaders?.['User-Agent'] ||
+          'claude-cli/1.0.102 (external, cli)'
+        options.headers['User-Agent'] = userAgent
       }
+
+      logger.info(`🔗 指纹是这个: ${options.headers['User-Agent']}`)
+      logger.info(`🔗 指纹是这个: ${options.headers['user-agent']}`)
 
       // 使用自定义的 betaHeader 或默认值
       const betaHeader =
@@ -868,6 +883,12 @@ class ClaudeRelayService {
     streamTransformer = null,
     requestOptions = {}
   ) {
+    // 获取账户信息用于统一 User-Agent
+    const account = await claudeAccountService.getAccount(accountId)
+
+    // 获取统一的 User-Agent
+    const unifiedUA = await this.captureAndGetUnifiedUserAgent(clientHeaders, account)
+
     // 获取过滤后的客户端 headers
     const filteredHeaders = this._filterClientHeaders(clientHeaders)
 
@@ -908,9 +929,14 @@ class ClaudeRelayService {
         timeout: config.proxy.timeout
       }
 
-      // 如果客户端没有提供 User-Agent，使用默认值
+      // 使用统一 User-Agent 或客户端提供的，最后使用默认值
       if (!options.headers['User-Agent'] && !options.headers['user-agent']) {
-        options.headers['User-Agent'] = 'claude-cli/1.0.57 (external, cli)'
+        const userAgent =
+          unifiedUA ||
+          clientHeaders?.['user-agent'] ||
+          clientHeaders?.['User-Agent'] ||
+          'claude-cli/1.0.102 (external, cli)'
+        options.headers['User-Agent'] = userAgent
       }
 
       // 使用自定义的 betaHeader 或默认值
@@ -1398,7 +1424,12 @@ class ClaudeRelayService {
 
       // 如果客户端没有提供 User-Agent，使用默认值
       if (!filteredHeaders['User-Agent'] && !filteredHeaders['user-agent']) {
-        options.headers['User-Agent'] = 'claude-cli/1.0.53 (external, cli)'
+        // 第三个方法不支持统一 User-Agent，使用简化逻辑
+        const userAgent =
+          clientHeaders?.['user-agent'] ||
+          clientHeaders?.['User-Agent'] ||
+          'claude-cli/1.0.102 (external, cli)'
+        options.headers['User-Agent'] = userAgent
       }
 
       // 使用自定义的 betaHeader 或默认值
@@ -1535,7 +1566,6 @@ class ClaudeRelayService {
   async recordUnauthorizedError(accountId) {
     try {
       const key = `claude_account:${accountId}:401_errors`
-      const redis = require('../models/redis')
 
       // 增加错误计数，设置5分钟过期时间
       await redis.client.incr(key)
@@ -1551,7 +1581,6 @@ class ClaudeRelayService {
   async getUnauthorizedErrorCount(accountId) {
     try {
       const key = `claude_account:${accountId}:401_errors`
-      const redis = require('../models/redis')
 
       const count = await redis.client.get(key)
       return parseInt(count) || 0
@@ -1565,13 +1594,109 @@ class ClaudeRelayService {
   async clearUnauthorizedErrors(accountId) {
     try {
       const key = `claude_account:${accountId}:401_errors`
-      const redis = require('../models/redis')
 
       await redis.client.del(key)
       logger.info(`✅ Cleared 401 error count for account ${accountId}`)
     } catch (error) {
       logger.error(`❌ Failed to clear 401 errors for account ${accountId}:`, error)
     }
+  }
+
+  // 🔧 动态捕获并获取统一的 User-Agent
+  async captureAndGetUnifiedUserAgent(clientHeaders, account) {
+    if (account.useUnifiedUserAgent !== 'true') {
+      return null
+    }
+
+    const CACHE_KEY = 'claude_code_user_agent:daily'
+    const TTL = 90000 // 25小时
+
+    // ⚠️ 重要：这里通过 'claude-cli/' 判断是否为 Claude Code 客户端
+    // 如果未来 Claude Code 的 User-Agent 格式发生变化（不再包含 'claude-cli/'），
+    // 需要更新这个判断条件！
+    // 当前已知格式：claude-cli/1.0.102 (external, cli)
+    const CLAUDE_CODE_UA_IDENTIFIER = 'claude-cli/'
+
+    const clientUA = clientHeaders?.['user-agent'] || clientHeaders?.['User-Agent']
+    let cachedUA = await redis.client.get(CACHE_KEY)
+
+    if (clientUA?.includes(CLAUDE_CODE_UA_IDENTIFIER)) {
+      if (!cachedUA) {
+        // 没有缓存，直接存储
+        await redis.client.setex(CACHE_KEY, TTL, clientUA)
+        logger.info(`📱 Captured unified Claude Code User-Agent: ${clientUA}`)
+        cachedUA = clientUA
+      } else {
+        // 有缓存，比较版本号，保存更新的版本
+        const shouldUpdate = this.compareClaudeCodeVersions(clientUA, cachedUA)
+        if (shouldUpdate) {
+          await redis.client.setex(CACHE_KEY, TTL, clientUA)
+          logger.info(`🔄 Updated to newer Claude Code User-Agent: ${clientUA} (was: ${cachedUA})`)
+          cachedUA = clientUA
+        } else {
+          // 当前版本不比缓存版本新，仅刷新TTL
+          await redis.client.expire(CACHE_KEY, TTL)
+        }
+      }
+    }
+
+    return cachedUA // 没有缓存返回 null
+  }
+
+  // 🔄 比较Claude Code版本号，判断是否需要更新
+  // 返回 true 表示 newUA 版本更新，需要更新缓存
+  compareClaudeCodeVersions(newUA, cachedUA) {
+    try {
+      // 提取版本号：claude-cli/1.0.102 (external, cli) -> 1.0.102
+      const newVersionMatch = newUA.match(/claude-cli\/([0-9]+\.[0-9]+\.[0-9]+)/)
+      const cachedVersionMatch = cachedUA.match(/claude-cli\/([0-9]+\.[0-9]+\.[0-9]+)/)
+
+      if (!newVersionMatch || !cachedVersionMatch) {
+        // 无法解析版本号，优先使用新的
+        logger.warn(`⚠️ Unable to parse Claude Code versions: new=${newUA}, cached=${cachedUA}`)
+        return true
+      }
+
+      const newVersion = newVersionMatch[1]
+      const cachedVersion = cachedVersionMatch[1]
+
+      // 比较版本号 (semantic version)
+      const compareResult = this.compareSemanticVersions(newVersion, cachedVersion)
+
+      logger.debug(`🔍 Version comparison: ${newVersion} vs ${cachedVersion} = ${compareResult}`)
+
+      return compareResult > 0 // 新版本更大则返回 true
+    } catch (error) {
+      logger.warn(`⚠️ Error comparing Claude Code versions, defaulting to update: ${error.message}`)
+      return true // 出错时优先使用新的
+    }
+  }
+
+  // 🔢 比较版本号
+  // 返回：1 表示 v1 > v2，-1 表示 v1 < v2，0 表示相等
+  compareSemanticVersions(version1, version2) {
+    // 将版本号字符串按"."分割成数字数组
+    const arr1 = version1.split('.')
+    const arr2 = version2.split('.')
+
+    // 获取两个版本号数组中的最大长度
+    const maxLength = Math.max(arr1.length, arr2.length)
+
+    // 循环遍历，逐段比较版本号
+    for (let i = 0; i < maxLength; i++) {
+      // 如果某个版本号的某一段不存在，则视为0
+      const num1 = parseInt(arr1[i] || 0, 10)
+      const num2 = parseInt(arr2[i] || 0, 10)
+
+      if (num1 > num2) {
+        return 1 // version1 大于 version2
+      }
+      if (num1 < num2) {
+        return -1 // version1 小于 version2
+      }
+    }
+
+    return 0 // 两个版本号相等
   }
 
   // 🎯 健康检查
