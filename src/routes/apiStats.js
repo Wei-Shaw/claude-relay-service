@@ -561,7 +561,9 @@ router.post('/api/batch-stats', async (req, res) => {
           apiId: stats.apiId,
           name: stats.name,
           isActive: true,
-          usage: stats.usage
+          usage: stats.usage,
+          dailyUsage: stats.dailyStats,
+          monthlyUsage: stats.monthlyStats
         })
       }
     })

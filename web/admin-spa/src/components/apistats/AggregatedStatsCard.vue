@@ -33,8 +33,8 @@
         <div
           class="mt-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
         >
-          <span>{{ formatNumber(stat.usage?.requests || 0) }}次</span>
-          <span>{{ stat.usage?.formattedCost || '$0.00' }}</span>
+          <span>{{ formatNumber(getStatUsage(stat)?.requests || 0) }}次</span>
+          <span>{{ getStatUsage(stat)?.formattedCost || '$0.00' }}</span>
         </div>
       </div>
 
@@ -76,12 +76,27 @@ import { useApiStatsStore } from '@/stores/apistats'
 const apiStatsStore = useApiStatsStore()
 const { aggregatedStats, individualStats, statsPeriod, multiKeyMode } = storeToRefs(apiStatsStore)
 
+// 获取当前时间段的使用数据
+const getStatUsage = (stat) => {
+  if (!stat) return null
+
+  if (statsPeriod.value === 'daily') {
+    return stat.dailyUsage || stat.usage
+  } else {
+    return stat.monthlyUsage || stat.usage
+  }
+}
+
 // 获取TOP Keys（最多显示5个）
 const topKeys = computed(() => {
   if (!individualStats.value || individualStats.value.length === 0) return []
 
   return [...individualStats.value]
-    .sort((a, b) => (b.usage?.cost || 0) - (a.usage?.cost || 0))
+    .sort((a, b) => {
+      const aUsage = getStatUsage(a)
+      const bUsage = getStatUsage(b)
+      return (bUsage?.cost || 0) - (aUsage?.cost || 0)
+    })
     .slice(0, 5)
 })
 
@@ -95,7 +110,10 @@ const otherKeysCount = computed(() => {
 const otherPercentage = computed(() => {
   if (!individualStats.value || !aggregatedStats.value) return 0
 
-  const topKeysCost = topKeys.value.reduce((sum, stat) => sum + (stat.usage?.cost || 0), 0)
+  const topKeysCost = topKeys.value.reduce((sum, stat) => {
+    const usage = getStatUsage(stat)
+    return sum + (usage?.cost || 0)
+  }, 0)
   const totalCost =
     statsPeriod.value === 'daily'
       ? aggregatedStats.value.dailyUsage?.cost || 0
@@ -116,7 +134,8 @@ const calculatePercentage = (stat) => {
       : aggregatedStats.value.monthlyUsage?.cost || 0
 
   if (totalCost === 0) return 0
-  const percentage = ((stat.usage?.cost || 0) / totalCost) * 100
+  const usage = getStatUsage(stat)
+  const percentage = ((usage?.cost || 0) / totalCost) * 100
   return Math.round(percentage)
 }
 
