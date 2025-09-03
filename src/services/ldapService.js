@@ -8,6 +8,10 @@ class LdapService {
     this.config = config.ldap || {}
     this.client = null
 
+    // 设置服务器类型，默认为 OpenLDAP
+    this.serverType = this.config.serverType || 'openldap'
+    this.isActiveDirectory = this.serverType === 'activedirectory'
+
     // 验证配置 - 只有在 LDAP 配置存在且启用时才验证
     if (this.config && this.config.enabled) {
       this.validateConfiguration()
@@ -51,6 +55,93 @@ class LdapService {
       logger.warn('⚠️ LDAP authentication may not work properly due to configuration errors')
     } else {
       logger.info('✅ LDAP configuration validation passed')
+    }
+  }
+
+  // 🔍 解析Windows AD用户名格式
+  parseActiveDirectoryUsername(username) {
+    if (!this.isActiveDirectory) {
+      return { username, domain: null, format: 'simple' }
+    }
+
+    const trimmedUsername = username.trim()
+
+    // 检查UPN格式 (user@domain.com)
+    if (trimmedUsername.includes('@')) {
+      const parts = trimmedUsername.split('@')
+      if (parts.length === 2 && parts[0] && parts[1]) {
+        return {
+          username: parts[0],
+          domain: parts[1],
+          format: 'upn',
+          fullUsername: trimmedUsername
+        }
+      }
+    }
+
+    // 检查域\用户名格式 (DOMAIN\user)
+    if (trimmedUsername.includes('\\')) {
+      const parts = trimmedUsername.split('\\')
+      if (parts.length === 2 && parts[0] && parts[1]) {
+        return {
+          username: parts[1],
+          domain: parts[0],
+          format: 'domain',
+          fullUsername: trimmedUsername
+        }
+      }
+    }
+
+    // 简单用户名格式
+    return {
+      username: trimmedUsername,
+      domain: null,
+      format: 'simple',
+      fullUsername: trimmedUsername
+    }
+  }
+
+  // 🔍 获取服务器类型特定的搜索过滤器
+  getServerSpecificSearchFilter(usernameInfo) {
+    if (this.isActiveDirectory) {
+      const { username, fullUsername } = usernameInfo
+      // Windows AD: 支持 sAMAccountName 和 userPrincipalName
+      if (fullUsername && fullUsername.includes('@')) {
+        // 如果是UPN格式，优先使用userPrincipalName搜索
+        return `(|(userPrincipalName=${fullUsername})(sAMAccountName=${username}))`
+      } else {
+        // 否则同时搜索两个属性
+        return `(|(sAMAccountName=${username})(userPrincipalName=${username}))`
+      }
+    } else {
+      // OpenLDAP: 使用配置的搜索过滤器或默认的uid
+      const filterTemplate = this.config.server.searchFilter || '(uid={{username}})'
+      return filterTemplate.replace('{{username}}', usernameInfo.username)
+    }
+  }
+
+  // 🔍 获取服务器类型特定的搜索属性
+  getServerSpecificSearchAttributes() {
+    if (this.isActiveDirectory) {
+      // Windows AD 特定属性
+      return (
+        this.config.server.searchAttributes || [
+          'dn',
+          'sAMAccountName',
+          'userPrincipalName',
+          'cn',
+          'displayName',
+          'mail',
+          'givenName',
+          'sn',
+          'memberOf',
+          'objectClass',
+          'userAccountControl'
+        ]
+      )
+    } else {
+      // OpenLDAP 默认属性
+      return this.config.server.searchAttributes || ['dn', 'uid', 'cn', 'mail', 'givenName', 'sn']
     }
   }
 
@@ -219,9 +310,12 @@ class LdapService {
   // 🔍 搜索用户
   async searchUser(client, username) {
     return new Promise((resolve, reject) => {
+      // 解析用户名（对Windows AD进行特殊处理）
+      const usernameInfo = this.parseActiveDirectoryUsername(username)
+
       // 防止LDAP注入：转义特殊字符
       // 根据RFC 4515，需要转义的特殊字符：* ( ) \ NUL
-      const escapedUsername = username
+      const escapedUsername = usernameInfo.username
         .replace(/\\/g, '\\5c') // 反斜杠必须先转义
         .replace(/\*/g, '\\2a') // 星号
         .replace(/\(/g, '\\28') // 左括号
@@ -229,14 +323,41 @@ class LdapService {
         .replace(/\0/g, '\\00') // NUL字符
         .replace(/\//g, '\\2f') // 斜杠
 
-      const searchFilter = this.config.server.searchFilter.replace('{{username}}', escapedUsername)
+      // 如果是UPN格式，也需要转义完整用户名
+      let escapedFullUsername = usernameInfo.fullUsername
+      if (escapedFullUsername && escapedFullUsername !== usernameInfo.username) {
+        escapedFullUsername = escapedFullUsername
+          .replace(/\\/g, '\\5c')
+          .replace(/\*/g, '\\2a')
+          .replace(/\(/g, '\\28')
+          .replace(/\)/g, '\\29')
+          .replace(/\0/g, '\\00')
+          .replace(/\//g, '\\2f')
+      }
+
+      // 构建转义后的用户名信息
+      const escapedUsernameInfo = {
+        ...usernameInfo,
+        username: escapedUsername,
+        fullUsername: escapedFullUsername
+      }
+
+      // 获取服务器特定的搜索过滤器和属性
+      const searchFilter = this.getServerSpecificSearchFilter(escapedUsernameInfo)
+      const searchAttributes = this.getServerSpecificSearchAttributes()
+
       const searchOptions = {
         scope: 'sub',
         filter: searchFilter,
-        attributes: this.config.server.searchAttributes
+        attributes: searchAttributes
       }
 
-      logger.debug(`🔍 Searching for user: ${username} with filter: ${searchFilter}`)
+      logger.debug(
+        `🔍 Searching for user: ${username} (${usernameInfo.format} format) with filter: ${searchFilter}`
+      )
+      if (this.isActiveDirectory && usernameInfo.domain) {
+        logger.debug(`🏢 Domain detected: ${usernameInfo.domain}`)
+      }
 
       const entries = []
 
@@ -254,7 +375,8 @@ class LdapService {
             type: typeof entry.dn,
             entryType: typeof entry,
             hasAttributes: !!entry.attributes,
-            attributeCount: entry.attributes ? entry.attributes.length : 0
+            attributeCount: entry.attributes ? entry.attributes.length : 0,
+            serverType: this.serverType
           })
           entries.push(entry)
         })
@@ -270,7 +392,7 @@ class LdapService {
 
         res.on('end', (result) => {
           logger.debug(
-            `✅ LDAP search completed. Status: ${result.status}, Found ${entries.length} entries`
+            `✅ LDAP search completed. Status: ${result.status}, Found ${entries.length} entries (${this.serverType})`
           )
 
           if (entries.length === 0) {
@@ -282,14 +404,17 @@ class LdapService {
                 entryType: typeof entries[0],
                 entryConstructor: entries[0].constructor?.name,
                 entryKeys: Object.keys(entries[0]),
-                entryStringified: JSON.stringify(entries[0], null, 2).substring(0, 500)
+                entryStringified: JSON.stringify(entries[0], null, 2).substring(0, 500),
+                serverType: this.serverType
               })
             }
 
             if (entries.length === 1) {
               resolve(entries[0])
             } else {
-              logger.warn(`⚠️ Multiple LDAP entries found for username: ${username}`)
+              logger.warn(
+                `⚠️ Multiple LDAP entries found for username: ${username} (${this.serverType})`
+              )
               resolve(entries[0]) // 使用第一个结果
             }
           }
@@ -350,13 +475,70 @@ class LdapService {
         attrMap[name] = values.length === 1 ? values[0] : values
       })
 
-      // 根据配置映射用户属性
-      const mapping = this.config.userMapping
+      // 根据服务器类型和配置映射用户属性
+      if (this.isActiveDirectory) {
+        // Windows AD 特定属性映射
+        const mapping = this.config.userMapping || {}
 
-      userInfo.displayName = attrMap[mapping.displayName] || username
-      userInfo.email = attrMap[mapping.email] || ''
-      userInfo.firstName = attrMap[mapping.firstName] || ''
-      userInfo.lastName = attrMap[mapping.lastName] || ''
+        // 显示名称：优先使用displayName，其次cn
+        userInfo.displayName =
+          attrMap[mapping.displayName || 'displayName'] ||
+          attrMap[mapping.displayName || 'cn'] ||
+          attrMap['displayName'] ||
+          attrMap['cn'] ||
+          username
+
+        // 邮箱
+        userInfo.email =
+          attrMap[mapping.email || 'mail'] ||
+          attrMap['mail'] ||
+          attrMap['userPrincipalName'] || // UPN作为后备邮箱
+          ''
+
+        // 名字
+        userInfo.firstName = attrMap[mapping.firstName || 'givenName'] || attrMap['givenName'] || ''
+
+        // 姓氏
+        userInfo.lastName = attrMap[mapping.lastName || 'sn'] || attrMap['sn'] || ''
+
+        // Windows AD 特有信息
+        userInfo.sAMAccountName = attrMap['sAMAccountName'] || username
+        userInfo.userPrincipalName = attrMap['userPrincipalName'] || ''
+
+        // 检查用户账户是否被禁用
+        const { userAccountControl } = attrMap
+        if (userAccountControl) {
+          // 检查 ADS_UF_ACCOUNTDISABLE 标志位 (0x02)
+          const isDisabled = (parseInt(userAccountControl) & 0x02) !== 0
+          if (isDisabled) {
+            userInfo.accountDisabled = true
+            logger.warn(`⚠️ Windows AD account is disabled: ${username}`)
+          }
+        }
+
+        logger.debug('📋 Extracted Windows AD user info:', {
+          username: userInfo.username,
+          displayName: userInfo.displayName,
+          email: userInfo.email,
+          sAMAccountName: userInfo.sAMAccountName,
+          userPrincipalName: userInfo.userPrincipalName,
+          accountDisabled: userInfo.accountDisabled || false
+        })
+      } else {
+        // OpenLDAP 标准属性映射
+        const mapping = this.config.userMapping || {}
+
+        userInfo.displayName = attrMap[mapping.displayName || 'cn'] || attrMap['cn'] || username
+        userInfo.email = attrMap[mapping.email || 'mail'] || attrMap['mail'] || ''
+        userInfo.firstName = attrMap[mapping.firstName || 'givenName'] || attrMap['givenName'] || ''
+        userInfo.lastName = attrMap[mapping.lastName || 'sn'] || attrMap['sn'] || ''
+
+        logger.debug('📋 Extracted OpenLDAP user info:', {
+          username: userInfo.username,
+          displayName: userInfo.displayName,
+          email: userInfo.email
+        })
+      }
 
       // 如果没有displayName，尝试组合firstName和lastName
       if (!userInfo.displayName || userInfo.displayName === username) {
@@ -364,12 +546,6 @@ class LdapService {
           userInfo.displayName = `${userInfo.firstName || ''} ${userInfo.lastName || ''}`.trim()
         }
       }
-
-      logger.debug('📋 Extracted user info:', {
-        username: userInfo.username,
-        displayName: userInfo.displayName,
-        email: userInfo.email
-      })
 
       return userInfo
     } catch (error) {
@@ -386,23 +562,87 @@ class LdapService {
 
     const trimmedUsername = username.trim()
 
-    // 用户名只能包含字母、数字、下划线和连字符
-    const usernameRegex = /^[a-zA-Z0-9_-]+$/
-    if (!usernameRegex.test(trimmedUsername)) {
-      throw new Error('Username can only contain letters, numbers, underscores, and hyphens')
-    }
+    if (this.isActiveDirectory) {
+      // Windows AD 用户名验证：支持 UPN 和 domain\username 格式
+      // UPN 格式：user@domain.com
+      if (trimmedUsername.includes('@')) {
+        const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+        if (!emailRegex.test(trimmedUsername)) {
+          throw new Error('Invalid UPN format (user@domain.com)')
+        }
 
-    // 长度限制 (防止过长的输入)
-    if (trimmedUsername.length > 64) {
-      throw new Error('Username cannot exceed 64 characters')
-    }
+        if (trimmedUsername.length > 256) {
+          throw new Error('UPN cannot exceed 256 characters')
+        }
 
-    // 不能以连字符开头或结尾
-    if (trimmedUsername.startsWith('-') || trimmedUsername.endsWith('-')) {
-      throw new Error('Username cannot start or end with a hyphen')
-    }
+        return trimmedUsername
+      }
 
-    return trimmedUsername
+      // Domain\username 格式
+      if (trimmedUsername.includes('\\')) {
+        const parts = trimmedUsername.split('\\')
+        if (parts.length !== 2 || !parts[0] || !parts[1]) {
+          throw new Error('Invalid domain\\username format')
+        }
+
+        const domain = parts[0]
+        const user = parts[1]
+
+        // 验证域名（允许字母数字和连字符）
+        const domainRegex = /^[a-zA-Z0-9-]+$/
+        if (!domainRegex.test(domain)) {
+          throw new Error('Domain name can only contain letters, numbers, and hyphens')
+        }
+
+        // 验证用户名部分
+        const userRegex = /^[a-zA-Z0-9._-]+$/
+        if (!userRegex.test(user)) {
+          throw new Error(
+            'Username can only contain letters, numbers, dots, underscores, and hyphens'
+          )
+        }
+
+        if (trimmedUsername.length > 256) {
+          throw new Error('Domain\\username cannot exceed 256 characters')
+        }
+
+        return trimmedUsername
+      }
+
+      // 简单用户名格式（sAMAccountName）
+      const samAccountRegex = /^[a-zA-Z0-9._-]+$/
+      if (!samAccountRegex.test(trimmedUsername)) {
+        throw new Error(
+          'sAMAccountName can only contain letters, numbers, dots, underscores, and hyphens'
+        )
+      }
+
+      // sAMAccountName 长度限制（AD 限制为 20 字符）
+      if (trimmedUsername.length > 20) {
+        throw new Error('sAMAccountName cannot exceed 20 characters')
+      }
+
+      return trimmedUsername
+    } else {
+      // OpenLDAP 用户名验证（原有逻辑）
+      // 用户名只能包含字母、数字、下划线和连字符
+      const usernameRegex = /^[a-zA-Z0-9_-]+$/
+      if (!usernameRegex.test(trimmedUsername)) {
+        throw new Error('Username can only contain letters, numbers, underscores, and hyphens')
+      }
+
+      // 长度限制 (防止过长的输入)
+      if (trimmedUsername.length > 64) {
+        throw new Error('Username cannot exceed 64 characters')
+      }
+
+      // 不能以连字符开头或结尾
+      if (trimmedUsername.startsWith('-') || trimmedUsername.endsWith('-')) {
+        throw new Error('Username cannot start or end with a hyphen')
+      }
+
+      return trimmedUsername
+    }
   }
 
   // 🔐 主要的登录验证方法
@@ -488,10 +728,21 @@ class LdapService {
       // 5. 提取用户信息
       const userInfo = this.extractUserInfo(ldapEntry, sanitizedUsername)
 
-      // 6. 创建或更新本地用户
+      // 6. Windows AD 特定检查：验证账户是否被禁用
+      if (this.isActiveDirectory && userInfo.accountDisabled) {
+        logger.security(
+          `🔒 Disabled Windows AD account login attempt: ${sanitizedUsername} from LDAP authentication`
+        )
+        return {
+          success: false,
+          message: 'Your account has been disabled. Please contact administrator.'
+        }
+      }
+
+      // 7. 创建或更新本地用户
       const user = await userService.createOrUpdateUser(userInfo)
 
-      // 7. 检查用户是否被禁用
+      // 8. 检查用户是否被禁用
       if (!user.isActive) {
         logger.security(
           `🔒 Disabled user LDAP login attempt: ${sanitizedUsername} from LDAP authentication`
@@ -502,13 +753,15 @@ class LdapService {
         }
       }
 
-      // 8. 记录登录
+      // 9. 记录登录
       await userService.recordUserLogin(user.id)
 
-      // 9. 创建用户会话
+      // 10. 创建用户会话
       const sessionToken = await userService.createUserSession(user.id)
 
-      logger.info(`✅ LDAP authentication successful for user: ${sanitizedUsername}`)
+      logger.info(
+        `✅ LDAP authentication successful for user: ${sanitizedUsername} (${this.serverType})`
+      )
 
       return {
         success: true,
@@ -598,6 +851,8 @@ class LdapService {
   getConfigInfo() {
     const configInfo = {
       enabled: this.config.enabled,
+      serverType: this.serverType,
+      isActiveDirectory: this.isActiveDirectory,
       server: {
         url: this.config.server.url,
         searchBase: this.config.server.searchBase,
@@ -616,6 +871,16 @@ class LdapService {
         hasCert: !!this.config.server.tls.cert,
         hasKey: !!this.config.server.tls.key,
         servername: this.config.server.tls.servername
+      }
+    }
+
+    // Windows AD 特定配置信息
+    if (this.isActiveDirectory) {
+      configInfo.activeDirectoryFeatures = {
+        supportsUPN: true,
+        supportsDomainUsername: true,
+        supportsGlobalCatalog: true,
+        checksAccountDisabled: true
       }
     }
 

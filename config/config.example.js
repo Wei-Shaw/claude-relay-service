@@ -130,14 +130,20 @@ const config = {
   // 🔐 LDAP 认证配置
   ldap: {
     enabled: process.env.LDAP_ENABLED === 'true',
+    // 服务器类型：'openldap' 或 'activedirectory'
+    serverType: process.env.LDAP_SERVER_TYPE || 'openldap',
     server: {
       url: process.env.LDAP_URL || 'ldap://localhost:389',
       bindDN: process.env.LDAP_BIND_DN || 'cn=admin,dc=example,dc=com',
       bindCredentials: process.env.LDAP_BIND_PASSWORD || 'admin',
       searchBase: process.env.LDAP_SEARCH_BASE || 'dc=example,dc=com',
+      // 搜索过滤器 - OpenLDAP 默认使用 uid，Windows AD 会自动使用 sAMAccountName/userPrincipalName
       searchFilter: process.env.LDAP_SEARCH_FILTER || '(uid={{username}})',
+      // 搜索属性 - 根据服务器类型自动设置默认值
       searchAttributes: process.env.LDAP_SEARCH_ATTRIBUTES
         ? process.env.LDAP_SEARCH_ATTRIBUTES.split(',')
+        : process.env.LDAP_SERVER_TYPE === 'activedirectory'
+        ? ['dn', 'sAMAccountName', 'userPrincipalName', 'cn', 'displayName', 'mail', 'givenName', 'sn', 'memberOf', 'objectClass', 'userAccountControl']
         : ['dn', 'uid', 'cn', 'mail', 'givenName', 'sn'],
       timeout: parseInt(process.env.LDAP_TIMEOUT) || 5000,
       connectTimeout: parseInt(process.env.LDAP_CONNECT_TIMEOUT) || 10000,
@@ -161,9 +167,10 @@ const config = {
         servername: process.env.LDAP_TLS_SERVERNAME || undefined
       }
     },
+    // 用户属性映射 - 根据服务器类型自动设置默认值
     userMapping: {
-      username: process.env.LDAP_USER_ATTR_USERNAME || 'uid',
-      displayName: process.env.LDAP_USER_ATTR_DISPLAY_NAME || 'cn',
+      username: process.env.LDAP_USER_ATTR_USERNAME || (process.env.LDAP_SERVER_TYPE === 'activedirectory' ? 'sAMAccountName' : 'uid'),
+      displayName: process.env.LDAP_USER_ATTR_DISPLAY_NAME || (process.env.LDAP_SERVER_TYPE === 'activedirectory' ? 'displayName' : 'cn'),
       email: process.env.LDAP_USER_ATTR_EMAIL || 'mail',
       firstName: process.env.LDAP_USER_ATTR_FIRST_NAME || 'givenName',
       lastName: process.env.LDAP_USER_ATTR_LAST_NAME || 'sn'
