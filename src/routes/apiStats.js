@@ -562,8 +562,14 @@ router.post('/api/batch-stats', async (req, res) => {
           name: stats.name,
           isActive: true,
           usage: stats.usage,
-          dailyUsage: stats.dailyStats,
-          monthlyUsage: stats.monthlyStats
+          dailyUsage: {
+            ...stats.dailyStats,
+            formattedCost: CostCalculator.formatCost(stats.dailyStats.cost || 0)
+          },
+          monthlyUsage: {
+            ...stats.monthlyStats,
+            formattedCost: CostCalculator.formatCost(stats.monthlyStats.cost || 0)
+          }
         })
       }
     })

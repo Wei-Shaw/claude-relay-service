@@ -153,7 +153,7 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
     headers['host'] = 'chatgpt.com'
     headers['accept'] = isStream ? 'text/event-stream' : 'application/json'
     headers['content-type'] = 'application/json'
-    req.body['store'] = false
+    req.body['store'] = true
 
     // 创建代理 agent
     const proxyAgent = createProxyAgent(proxy)
