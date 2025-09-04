@@ -376,9 +376,11 @@
                         ? 'bg-orange-100 text-orange-800'
                         : account.status === 'unauthorized'
                           ? 'bg-red-100 text-red-800'
-                          : account.isActive
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
+                          : account.status === 'temp_error'
+                            ? 'bg-orange-100 text-orange-800'
+                            : account.isActive
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
                     ]"
                   >
                     <div
@@ -388,9 +390,11 @@
                           ? 'bg-orange-500'
                           : account.status === 'unauthorized'
                             ? 'bg-red-500'
-                            : account.isActive
-                              ? 'bg-green-500'
-                              : 'bg-red-500'
+                            : account.status === 'temp_error'
+                              ? 'bg-orange-500'
+                              : account.isActive
+                                ? 'bg-green-500'
+                                : 'bg-red-500'
                       ]"
                     />
                     {{
@@ -398,9 +402,11 @@
                         ? '已封锁'
                         : account.status === 'unauthorized'
                           ? '异常'
-                          : account.isActive
-                            ? '正常'
-                            : '异常'
+                          : account.status === 'temp_error'
+                            ? '临时异常'
+                            : account.isActive
+                              ? '正常'
+                              : '异常'
                     }}
                   </span>
                   <span
@@ -1630,6 +1636,9 @@ const getSchedulableReason = (account) => {
     if (account.status === 'unauthorized') {
       return '认证失败（401错误）'
     }
+    if (account.status === 'temp_error' && account.errorMessage) {
+      return account.errorMessage
+    }
     if (account.status === 'error' && account.errorMessage) {
       return account.errorMessage
     }
@@ -1668,6 +1677,8 @@ const getAccountStatusText = (account) => {
     account.rateLimitStatus === 'limited'
   )
     return '限流中'
+  // 检查是否临时错误
+  if (account.status === 'temp_error') return '临时异常'
   // 检查是否错误
   if (account.status === 'error' || !account.isActive) return '错误'
   // 检查是否可调度
@@ -1690,6 +1701,9 @@ const getAccountStatusClass = (account) => {
     (account.rateLimitStatus && account.rateLimitStatus.isRateLimited) ||
     account.rateLimitStatus === 'limited'
   ) {
+    return 'bg-orange-100 text-orange-800'
+  }
+  if (account.status === 'temp_error') {
     return 'bg-orange-100 text-orange-800'
   }
   if (account.status === 'error' || !account.isActive) {
@@ -1715,6 +1729,9 @@ const getAccountStatusDotClass = (account) => {
     (account.rateLimitStatus && account.rateLimitStatus.isRateLimited) ||
     account.rateLimitStatus === 'limited'
   ) {
+    return 'bg-orange-500'
+  }
+  if (account.status === 'temp_error') {
     return 'bg-orange-500'
   }
   if (account.status === 'error' || !account.isActive) {
