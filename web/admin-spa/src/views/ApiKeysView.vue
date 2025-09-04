@@ -244,22 +244,39 @@
                   <th
                     class="w-[17%] min-w-[140px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    使用统计
-                    <span
-                      class="cursor-pointer rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600"
-                      @click="sortApiKeys('cost')"
-                    >
-                      (费用
-                      <i
-                        v-if="apiKeysSortBy === 'cost'"
-                        :class="[
-                          'fas',
-                          apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down',
-                          'ml-1'
-                        ]"
-                      />
-                      <i v-else class="fas fa-sort ml-1 text-gray-400" />)
-                    </span>
+                    <div class="flex items-center gap-2">
+                      <span>使用统计</span>
+                      <span
+                        class="cursor-pointer rounded px-1.5 py-0.5 text-xs normal-case hover:bg-gray-100 dark:hover:bg-gray-600"
+                        @click="sortApiKeys('dailyCost')"
+                      >
+                        今日费用
+                        <i
+                          v-if="apiKeysSortBy === 'dailyCost'"
+                          :class="[
+                            'fas',
+                            apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down',
+                            'ml-0.5 text-[10px]'
+                          ]"
+                        />
+                        <i v-else class="fas fa-sort ml-0.5 text-[10px] text-gray-400" />
+                      </span>
+                      <span
+                        class="cursor-pointer rounded px-1.5 py-0.5 text-xs normal-case hover:bg-gray-100 dark:hover:bg-gray-600"
+                        @click="sortApiKeys('totalCost')"
+                      >
+                        总费用
+                        <i
+                          v-if="apiKeysSortBy === 'totalCost'"
+                          :class="[
+                            'fas',
+                            apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down',
+                            'ml-0.5 text-[10px]'
+                          ]"
+                        />
+                        <i v-else class="fas fa-sort ml-0.5 text-[10px] text-gray-400" />
+                      </span>
+                    </div>
                   </th>
                   <th
                     class="w-[10%] min-w-[90px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
@@ -463,6 +480,12 @@
                             <span class="text-gray-600 dark:text-gray-400">今日费用</span>
                             <span class="font-semibold text-green-600"
                               >${{ (key.dailyCost || 0).toFixed(4) }}</span
+                            >
+                          </div>
+                          <div class="flex items-center justify-between text-sm">
+                            <span class="text-gray-600 dark:text-gray-400">总费用</span>
+                            <span class="font-semibold text-blue-600"
+                              >${{ (key.totalCost || 0).toFixed(4) }}</span
                             >
                           </div>
                           <div class="flex items-center justify-between text-sm">
@@ -1590,8 +1613,8 @@ const apiKeyStatsTimeRange = ref('today')
 const activeTab = ref('active')
 const deletedApiKeys = ref([])
 const deletedApiKeysLoading = ref(false)
-const apiKeysSortBy = ref('')
-const apiKeysSortOrder = ref('asc')
+const apiKeysSortBy = ref('dailyCost')
+const apiKeysSortOrder = ref('desc')
 const expandedApiKeys = ref({})
 const apiKeyModelStats = ref({})
 const apiKeyDateFilters = ref({})
@@ -1696,9 +1719,12 @@ const sortedApiKeys = computed(() => {
     if (apiKeysSortBy.value === 'status') {
       aVal = a.isActive ? 1 : 0
       bVal = b.isActive ? 1 : 0
-    } else if (apiKeysSortBy.value === 'cost') {
-      aVal = parseFloat(calculateApiKeyCost(a.usage).replace('$', ''))
-      bVal = parseFloat(calculateApiKeyCost(b.usage).replace('$', ''))
+    } else if (apiKeysSortBy.value === 'dailyCost') {
+      aVal = a.dailyCost || 0
+      bVal = b.dailyCost || 0
+    } else if (apiKeysSortBy.value === 'totalCost') {
+      aVal = a.totalCost || 0
+      bVal = b.totalCost || 0
     } else if (apiKeysSortBy.value === 'createdAt' || apiKeysSortBy.value === 'expiresAt') {
       aVal = aVal ? new Date(aVal).getTime() : 0
       bVal = bVal ? new Date(bVal).getTime() : 0
@@ -1881,13 +1907,6 @@ const sortApiKeys = (field) => {
 const formatNumber = (num) => {
   if (!num && num !== 0) return '0'
   return num.toLocaleString('zh-CN')
-}
-
-// 计算API Key费用
-const calculateApiKeyCost = (usage) => {
-  if (!usage || !usage.total) return '$0.0000'
-  const cost = usage.total.cost || 0
-  return `$${cost.toFixed(4)}`
 }
 
 // 获取绑定账户名称
