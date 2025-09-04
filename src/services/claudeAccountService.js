@@ -1878,6 +1878,10 @@ class ClaudeAccountService {
             delete account.errorMessage
             delete account.tempErrorAt
             await redis.setClaudeAccount(account.id, account)
+
+            // 显式从 Redis 中删除这些字段（因为 HSET 不会删除现有字段）
+            await redis.client.hdel(`claude:account:${account.id}`, 'errorMessage', 'tempErrorAt')
+
             // 同时清除500错误计数
             await this.clearInternalErrors(account.id)
             cleanedCount++
@@ -1964,6 +1968,52 @@ class ClaudeAccountService {
 
       // 保存更新后的账户数据
       await redis.setClaudeAccount(accountId, updatedAccountData)
+
+      // 设置 5 分钟后自动恢复（一次性定时器）
+      setTimeout(
+        async () => {
+          try {
+            const account = await redis.getClaudeAccount(accountId)
+            if (account && account.status === 'temp_error' && account.tempErrorAt) {
+              // 验证是否确实过了 5 分钟（防止重复定时器）
+              const tempErrorAt = new Date(account.tempErrorAt)
+              const now = new Date()
+              const minutesSince = (now - tempErrorAt) / (1000 * 60)
+
+              if (minutesSince >= 5) {
+                // 恢复账户
+                account.status = 'active'
+                account.schedulable = 'true'
+                delete account.errorMessage
+                delete account.tempErrorAt
+
+                await redis.setClaudeAccount(accountId, account)
+
+                // 显式删除 Redis 字段
+                await redis.client.hdel(
+                  `claude:account:${accountId}`,
+                  'errorMessage',
+                  'tempErrorAt'
+                )
+
+                // 清除 500 错误计数
+                await this.clearInternalErrors(accountId)
+
+                logger.success(
+                  `✅ Auto-recovered temp_error after 5 minutes: ${account.name} (${accountId})`
+                )
+              } else {
+                logger.debug(
+                  `⏰ Temp error timer triggered but only ${minutesSince.toFixed(1)} minutes passed for ${account.name} (${accountId})`
+                )
+              }
+            }
+          } catch (error) {
+            logger.error(`❌ Failed to auto-recover temp_error account ${accountId}:`, error)
+          }
+        },
+        6 * 60 * 1000
+      ) // 6 分钟后执行，确保已过 5 分钟
 
       // 如果有sessionHash，删除粘性会话映射
       if (sessionHash) {
