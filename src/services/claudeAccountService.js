@@ -1813,6 +1813,20 @@ class ClaudeAccountService {
       // 保存更新后的账户数据
       await redis.setClaudeAccount(accountId, updatedAccountData)
 
+      // 显式从 Redis 中删除这些字段（因为 HSET 不会删除现有字段）
+      const fieldsToDelete = [
+        'errorMessage',
+        'unauthorizedAt',
+        'blockedAt',
+        'rateLimitedAt',
+        'rateLimitStatus',
+        'rateLimitEndAt',
+        'tempErrorAt',
+        'sessionWindowStart',
+        'sessionWindowEnd'
+      ]
+      await redis.client.hdel(`claude:account:${accountId}`, ...fieldsToDelete)
+
       // 清除401错误计数
       const errorKey = `claude_account:${accountId}:401_errors`
       await redis.client.del(errorKey)
