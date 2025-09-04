@@ -246,6 +246,14 @@ async function handleMessagesRequest(req, res) {
                   logger.error('❌ Failed to record stream usage:', error)
                 })
 
+              // 检查 Claude Console 账户额度（非阻塞）
+              if (usageAccountId) {
+                const claudeConsoleAccountService = require('../services/claudeConsoleAccountService')
+                claudeConsoleAccountService.checkQuotaUsage(usageAccountId).catch((error) => {
+                  logger.error('❌ Failed to check Claude Console quota:', error)
+                })
+              }
+
               // 更新时间窗口内的token计数和费用
               if (req.rateLimitInfo) {
                 const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens

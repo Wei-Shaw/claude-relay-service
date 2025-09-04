@@ -182,6 +182,10 @@ class ClaudeConsoleRelayService {
       } else if (response.status === 429) {
         logger.warn(`🚫 Rate limit detected for Claude Console account ${accountId}`)
         await claudeConsoleAccountService.markAccountRateLimited(accountId)
+        // 检查是否因为超过每日额度
+        await claudeConsoleAccountService.checkQuotaUsage(accountId).catch((err) => {
+          logger.error('❌ Failed to check quota after 429 error:', err)
+        })
       } else if (response.status === 529) {
         logger.warn(`🚫 Overload error detected for Claude Console account ${accountId}`)
         await claudeConsoleAccountService.markAccountOverloaded(accountId)
@@ -377,6 +381,10 @@ class ClaudeConsoleRelayService {
               claudeConsoleAccountService.markAccountUnauthorized(accountId)
             } else if (response.status === 429) {
               claudeConsoleAccountService.markAccountRateLimited(accountId)
+              // 检查是否因为超过每日额度
+              claudeConsoleAccountService.checkQuotaUsage(accountId).catch((err) => {
+                logger.error('❌ Failed to check quota after 429 error:', err)
+              })
             } else if (response.status === 529) {
               claudeConsoleAccountService.markAccountOverloaded(accountId)
             }
@@ -589,6 +597,10 @@ class ClaudeConsoleRelayService {
               claudeConsoleAccountService.markAccountUnauthorized(accountId)
             } else if (error.response.status === 429) {
               claudeConsoleAccountService.markAccountRateLimited(accountId)
+              // 检查是否因为超过每日额度
+              claudeConsoleAccountService.checkQuotaUsage(accountId).catch((err) => {
+                logger.error('❌ Failed to check quota after 429 error:', err)
+              })
             } else if (error.response.status === 529) {
               claudeConsoleAccountService.markAccountOverloaded(accountId)
             }

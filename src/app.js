@@ -55,6 +55,11 @@ class Application {
       // 📊 初始化缓存监控
       await this.initializeCacheMonitoring()
 
+      // 🔄 初始化Claude Console额度重置调度器
+      logger.info('🔄 Initializing Claude Console quota reset scheduler...')
+      const quotaResetScheduler = require('./services/quotaResetScheduler')
+      await quotaResetScheduler.initialize()
+
       // 🔧 初始化管理员凭据
       logger.info('🔄 Initializing admin credentials...')
       await this.initializeAdmin()
