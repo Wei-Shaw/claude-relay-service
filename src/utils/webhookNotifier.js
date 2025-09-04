@@ -68,6 +68,7 @@ class WebhookNotifier {
     const errorCodes = {
       'claude-oauth': {
         unauthorized: 'CLAUDE_OAUTH_UNAUTHORIZED',
+        blocked: 'CLAUDE_OAUTH_BLOCKED',
         error: 'CLAUDE_OAUTH_ERROR',
         disabled: 'CLAUDE_OAUTH_MANUALLY_DISABLED'
       },

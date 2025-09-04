@@ -1695,9 +1695,31 @@ class ClaudeAccountService {
     }
   }
 
-  // 🚫 标记账户为未授权状态（401错误）
-  async markAccountUnauthorized(accountId, sessionHash = null) {
+  // 🚫 通用的账户错误标记方法
+  async markAccountError(accountId, errorType, sessionHash = null) {
+    const ERROR_CONFIG = {
+      unauthorized: {
+        status: 'unauthorized',
+        errorMessage: 'Account unauthorized (401 errors detected)',
+        timestampField: 'unauthorizedAt',
+        errorCode: 'CLAUDE_OAUTH_UNAUTHORIZED',
+        logMessage: 'unauthorized'
+      },
+      blocked: {
+        status: 'blocked',
+        errorMessage: 'Account blocked (403 error detected - account may be suspended by Claude)',
+        timestampField: 'blockedAt',
+        errorCode: 'CLAUDE_OAUTH_BLOCKED',
+        logMessage: 'blocked'
+      }
+    }
+
     try {
+      const errorConfig = ERROR_CONFIG[errorType]
+      if (!errorConfig) {
+        throw new Error(`Unsupported error type: ${errorType}`)
+      }
+
       const accountData = await redis.getClaudeAccount(accountId)
       if (!accountData || Object.keys(accountData).length === 0) {
         throw new Error('Account not found')
@@ -1705,10 +1727,10 @@ class ClaudeAccountService {
 
       // 更新账户状态
       const updatedAccountData = { ...accountData }
-      updatedAccountData.status = 'unauthorized'
+      updatedAccountData.status = errorConfig.status
       updatedAccountData.schedulable = 'false' // 设置为不可调度
-      updatedAccountData.errorMessage = 'Account unauthorized (401 errors detected)'
-      updatedAccountData.unauthorizedAt = new Date().toISOString()
+      updatedAccountData.errorMessage = errorConfig.errorMessage
+      updatedAccountData[errorConfig.timestampField] = new Date().toISOString()
 
       // 保存更新后的账户数据
       await redis.setClaudeAccount(accountId, updatedAccountData)
@@ -1720,7 +1742,7 @@ class ClaudeAccountService {
       }
 
       logger.warn(
-        `⚠️ Account ${accountData.name} (${accountId}) marked as unauthorized and disabled for scheduling`
+        `⚠️ Account ${accountData.name} (${accountId}) marked as ${errorConfig.logMessage} and disabled for scheduling`
       )
 
       // 发送Webhook通知
@@ -1730,9 +1752,10 @@ class ClaudeAccountService {
           accountId,
           accountName: accountData.name,
           platform: 'claude-oauth',
-          status: 'unauthorized',
-          errorCode: 'CLAUDE_OAUTH_UNAUTHORIZED',
-          reason: 'Account unauthorized (401 errors detected)'
+          status: errorConfig.status,
+          errorCode: errorConfig.errorCode,
+          reason: errorConfig.errorMessage,
+          timestamp: getISOStringWithTimezone(new Date())
         })
       } catch (webhookError) {
         logger.error('Failed to send webhook notification:', webhookError)
@@ -1740,9 +1763,19 @@ class ClaudeAccountService {
 
       return { success: true }
     } catch (error) {
-      logger.error(`❌ Failed to mark account ${accountId} as unauthorized:`, error)
+      logger.error(`❌ Failed to mark account ${accountId} as ${errorType}:`, error)
       throw error
     }
+  }
+
+  // 🚫 标记账户为未授权状态（401错误）
+  async markAccountUnauthorized(accountId, sessionHash = null) {
+    return this.markAccountError(accountId, 'unauthorized', sessionHash)
+  }
+
+  // 🚫 标记账户为被封锁状态（403错误）
+  async markAccountBlocked(accountId, sessionHash = null) {
+    return this.markAccountError(accountId, 'blocked', sessionHash)
   }
 
   // 🔄 重置账户所有异常状态
@@ -1769,6 +1802,7 @@ class ClaudeAccountService {
       // 清除错误相关字段
       delete updatedAccountData.errorMessage
       delete updatedAccountData.unauthorizedAt
+      delete updatedAccountData.blockedAt
       delete updatedAccountData.rateLimitedAt
       delete updatedAccountData.rateLimitStatus
       delete updatedAccountData.rateLimitEndAt
