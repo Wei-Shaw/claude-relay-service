@@ -4,7 +4,7 @@ const logger = require('./logger')
 class SessionHelper {
   /**
    * 生成会话哈希，用于sticky会话保持
-   * 基于Anthropic的prompt caching机制，优先使用cacheable内容
+   * 基于Anthropic的prompt caching机制，优先使用metadata中的session ID
    * @param {Object} requestBody - 请求体
    * @returns {string|null} - 32字符的会话哈希，如果无法生成则返回null
    */
@@ -13,15 +13,17 @@ class SessionHelper {
       return null
     }
 
-    // 1. 优先提取metadata.user_id
+    // 1. 最高优先级：使用metadata中的session ID（直接使用，无需hash）
     if (requestBody.metadata && requestBody.metadata.user_id) {
-      const hash = crypto
-        .createHash('sha256')
-        .update(requestBody.metadata.user_id)
-        .digest('hex')
-        .substring(0, 32)
-      logger.debug(`📋 Session hash generated from metadata.user_id: ${hash}`)
-      return hash
+      // 提取 session_xxx 部分
+      const userIdString = requestBody.metadata.user_id
+      const sessionMatch = userIdString.match(/session_([a-f0-9-]{36})/)
+      if (sessionMatch && sessionMatch[1]) {
+        const sessionId = sessionMatch[1]
+        // 直接返回session ID
+        logger.debug(`📋 Session ID extracted from metadata.user_id: ${sessionId}`)
+        return sessionId
+      }
     }
 
     let cacheableContent = ''
