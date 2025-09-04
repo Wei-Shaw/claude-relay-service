@@ -481,6 +481,14 @@ export OPENAI_BASE_URL="http://127.0.0.1:3000/openai" # 根据实际填写你服
 export OPENAI_API_KEY="后台创建的API密钥"  # 使用后台创建的API密钥
 ```
 
+**Codex 额外配置：**
+
+需要在 `~/.codex/config.toml` 文件中添加以下配置来禁用响应存储：
+
+```toml
+disable_response_storage = true
+```
+
 ### 5. 第三方工具API接入
 
 本服务支持多种API端点格式，方便接入不同的第三方工具（如Cherry Studio等）：

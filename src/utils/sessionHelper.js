@@ -4,7 +4,7 @@ const logger = require('./logger')
 class SessionHelper {
   /**
    * 生成会话哈希，用于sticky会话保持
-   * 基于Anthropic的prompt caching机制，优先使用cacheable内容
+   * 基于Anthropic的prompt caching机制，优先使用metadata中的session ID
    * @param {Object} requestBody - 请求体
    * @returns {string|null} - 32字符的会话哈希，如果无法生成则返回null
    */
@@ -13,11 +13,24 @@ class SessionHelper {
       return null
     }
 
+    // 1. 最高优先级：使用metadata中的session ID（直接使用，无需hash）
+    if (requestBody.metadata && requestBody.metadata.user_id) {
+      // 提取 session_xxx 部分
+      const userIdString = requestBody.metadata.user_id
+      const sessionMatch = userIdString.match(/session_([a-f0-9-]{36})/)
+      if (sessionMatch && sessionMatch[1]) {
+        const sessionId = sessionMatch[1]
+        // 直接返回session ID
+        logger.debug(`📋 Session ID extracted from metadata.user_id: ${sessionId}`)
+        return sessionId
+      }
+    }
+
     let cacheableContent = ''
     const system = requestBody.system || ''
     const messages = requestBody.messages || []
 
-    // 1. 优先提取带有cache_control: {"type": "ephemeral"}的内容
+    // 2. 提取带有cache_control: {"type": "ephemeral"}的内容
     // 检查system中的cacheable内容
     if (Array.isArray(system)) {
       for (const part of system) {
@@ -30,13 +43,13 @@ class SessionHelper {
     // 检查messages中的cacheable内容
     for (const msg of messages) {
       const content = msg.content || ''
+      let hasCacheControl = false
+
       if (Array.isArray(content)) {
         for (const part of content) {
           if (part && part.cache_control && part.cache_control.type === 'ephemeral') {
-            if (part.type === 'text') {
-              cacheableContent += part.text || ''
-            }
-            // 其他类型（如image）不参与hash计算
+            hasCacheControl = true
+            break
           }
         }
       } else if (
@@ -44,12 +57,31 @@ class SessionHelper {
         msg.cache_control &&
         msg.cache_control.type === 'ephemeral'
       ) {
-        // 罕见情况，但需要检查
-        cacheableContent += content
+        hasCacheControl = true
+      }
+
+      if (hasCacheControl) {
+        for (const message of messages) {
+          let messageText = ''
+          if (typeof message.content === 'string') {
+            messageText = message.content
+          } else if (Array.isArray(message.content)) {
+            messageText = message.content
+              .filter((part) => part.type === 'text')
+              .map((part) => part.text || '')
+              .join('')
+          }
+
+          if (messageText) {
+            cacheableContent += messageText
+            break
+          }
+        }
+        break
       }
     }
 
-    // 2. 如果有cacheable内容，直接使用
+    // 3. 如果有cacheable内容，直接使用
     if (cacheableContent) {
       const hash = crypto
         .createHash('sha256')
@@ -60,7 +92,7 @@ class SessionHelper {
       return hash
     }
 
-    // 3. Fallback: 使用system内容
+    // 4. Fallback: 使用system内容
     if (system) {
       let systemText = ''
       if (typeof system === 'string') {
@@ -76,7 +108,7 @@ class SessionHelper {
       }
     }
 
-    // 4. 最后fallback: 使用第一条消息内容
+    // 5. 最后fallback: 使用第一条消息内容
     if (messages.length > 0) {
       const firstMessage = messages[0]
       let firstMessageText = ''
