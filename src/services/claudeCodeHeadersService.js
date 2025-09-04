@@ -50,7 +50,7 @@ class ClaudeCodeHeadersService {
     if (!userAgent) {
       return null
     }
-    const match = userAgent.match(/claude-cli\/(\d+\.\d+\.\d+)/)
+    const match = userAgent.match(/claude-cli\/([\d.]+(?:[a-zA-Z0-9-]*)?)/i)
     return match ? match[1] : null
   }
 
@@ -113,7 +113,7 @@ class ClaudeCodeHeadersService {
 
       // 检查是否有 user-agent
       const userAgent = extractedHeaders['user-agent']
-      if (!userAgent || !userAgent.includes('claude-cli')) {
+      if (!userAgent || !/^claude-cli\/[\d.]+\s+\(/i.test(userAgent)) {
         // 不是 Claude Code 的请求，不存储
         return
       }

@@ -24,7 +24,7 @@ class ClaudeRelayService {
   isRealClaudeCodeRequest(requestBody, clientHeaders) {
     // 检查 user-agent 是否匹配 Claude Code 格式
     const userAgent = clientHeaders?.['user-agent'] || clientHeaders?.['User-Agent'] || ''
-    const isClaudeCodeUserAgent = /claude-cli\/\d+\.\d+\.\d+/.test(userAgent)
+    const isClaudeCodeUserAgent = /^claude-cli\/[\d.]+\s+\(/i.test(userAgent)
 
     // 检查系统提示词是否包含 Claude Code 标识
     const hasClaudeCodeSystemPrompt = this._hasClaudeCodeSystemPrompt(requestBody)
@@ -1611,16 +1611,15 @@ class ClaudeRelayService {
     const CACHE_KEY = 'claude_code_user_agent:daily'
     const TTL = 90000 // 25小时
 
-    // ⚠️ 重要：这里通过 'claude-cli/' 判断是否为 Claude Code 客户端
-    // 如果未来 Claude Code 的 User-Agent 格式发生变化（不再包含 'claude-cli/'），
-    // 需要更新这个判断条件！
+    // ⚠️ 重要：这里通过正则表达式判断是否为 Claude Code 客户端
+    // 如果未来 Claude Code 的 User-Agent 格式发生变化，需要更新这个正则表达式
     // 当前已知格式：claude-cli/1.0.102 (external, cli)
-    const CLAUDE_CODE_UA_IDENTIFIER = 'claude-cli/'
+    const CLAUDE_CODE_UA_PATTERN = /^claude-cli\/[\d.]+\s+\(/i
 
     const clientUA = clientHeaders?.['user-agent'] || clientHeaders?.['User-Agent']
     let cachedUA = await redis.client.get(CACHE_KEY)
 
-    if (clientUA?.includes(CLAUDE_CODE_UA_IDENTIFIER)) {
+    if (clientUA && CLAUDE_CODE_UA_PATTERN.test(clientUA)) {
       if (!cachedUA) {
         // 没有缓存，直接存储
         await redis.client.setex(CACHE_KEY, TTL, clientUA)
@@ -1648,8 +1647,9 @@ class ClaudeRelayService {
   compareClaudeCodeVersions(newUA, cachedUA) {
     try {
       // 提取版本号：claude-cli/1.0.102 (external, cli) -> 1.0.102
-      const newVersionMatch = newUA.match(/claude-cli\/([0-9]+\.[0-9]+\.[0-9]+)/)
-      const cachedVersionMatch = cachedUA.match(/claude-cli\/([0-9]+\.[0-9]+\.[0-9]+)/)
+      // 支持多段版本号格式，如 1.0.102、2.1.0.beta1 等
+      const newVersionMatch = newUA.match(/claude-cli\/([\d.]+(?:[a-zA-Z0-9-]*)?)/i)
+      const cachedVersionMatch = cachedUA.match(/claude-cli\/([\d.]+(?:[a-zA-Z0-9-]*)?)/i)
 
       if (!newVersionMatch || !cachedVersionMatch) {
         // 无法解析版本号，优先使用新的
