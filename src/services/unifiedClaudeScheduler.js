@@ -284,7 +284,12 @@ class UnifiedClaudeScheduler {
         // 主动触发一次额度检查
         try {
           await claudeConsoleAccountService.checkQuotaUsage(boundConsoleAccount.id)
-        } catch (e) {}
+        } catch (e) {
+          logger.warn(
+            `Failed to check quota for bound Claude Console account ${boundConsoleAccount.name}: ${e.message}`
+          )
+          // 继续使用该账号
+        }
 
         // 检查限流状态和额度状态
         const isRateLimited = await claudeConsoleAccountService.isAccountRateLimited(
@@ -396,7 +401,12 @@ class UnifiedClaudeScheduler {
         // 主动触发一次额度检查，确保状态即时生效
         try {
           await claudeConsoleAccountService.checkQuotaUsage(account.id)
-        } catch (e) {}
+        } catch (e) {
+          logger.warn(
+            `Failed to check quota for Claude Console account ${account.name}: ${e.message}`
+          )
+          // 继续处理该账号
+        }
 
         // 检查是否被限流
         const isRateLimited = await claudeConsoleAccountService.isAccountRateLimited(account.id)
@@ -549,7 +559,10 @@ class UnifiedClaudeScheduler {
         // 检查是否超额
         try {
           await claudeConsoleAccountService.checkQuotaUsage(accountId)
-        } catch (e) {}
+        } catch (e) {
+          logger.warn(`Failed to check quota for Claude Console account ${accountId}: ${e.message}`)
+          // 继续处理
+        }
 
         // 检查是否被限流
         if (await claudeConsoleAccountService.isAccountRateLimited(accountId)) {
