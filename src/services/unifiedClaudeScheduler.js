@@ -20,6 +20,77 @@ class UnifiedClaudeScheduler {
     return schedulable !== false && schedulable !== 'false'
   }
 
+  // 🔍 检查账户是否支持请求的模型
+  _isModelSupportedByAccount(account, accountType, requestedModel, context = '') {
+    if (!requestedModel) {
+      return true // 没有指定模型时，默认支持
+    }
+
+    // Claude OAuth 账户的 Opus 模型检查
+    if (accountType === 'claude-official') {
+      if (requestedModel.toLowerCase().includes('opus')) {
+        if (account.subscriptionInfo) {
+          try {
+            const info =
+              typeof account.subscriptionInfo === 'string'
+                ? JSON.parse(account.subscriptionInfo)
+                : account.subscriptionInfo
+
+            // Pro 和 Free 账号不支持 Opus
+            if (info.hasClaudePro === true && info.hasClaudeMax !== true) {
+              logger.info(
+                `🚫 Claude account ${account.name} (Pro) does not support Opus model${context ? ` ${context}` : ''}`
+              )
+              return false
+            }
+            if (info.accountType === 'claude_pro' || info.accountType === 'claude_free') {
+              logger.info(
+                `🚫 Claude account ${account.name} (${info.accountType}) does not support Opus model${context ? ` ${context}` : ''}`
+              )
+              return false
+            }
+          } catch (e) {
+            // 解析失败，假设为旧数据，默认支持（兼容旧数据为 Max）
+            logger.debug(
+              `Account ${account.name} has invalid subscriptionInfo${context ? ` ${context}` : ''}, assuming Max`
+            )
+          }
+        }
+        // 没有订阅信息的账号，默认当作支持（兼容旧数据）
+      }
+    }
+
+    // Claude Console 账户的模型支持检查
+    if (accountType === 'claude-console' && account.supportedModels) {
+      // 兼容旧格式（数组）和新格式（对象）
+      if (Array.isArray(account.supportedModels)) {
+        // 旧格式：数组
+        if (
+          account.supportedModels.length > 0 &&
+          !account.supportedModels.includes(requestedModel)
+        ) {
+          logger.info(
+            `🚫 Claude Console account ${account.name} does not support model ${requestedModel}${context ? ` ${context}` : ''}`
+          )
+          return false
+        }
+      } else if (typeof account.supportedModels === 'object') {
+        // 新格式：映射表
+        if (
+          Object.keys(account.supportedModels).length > 0 &&
+          !claudeConsoleAccountService.isModelSupported(account.supportedModels, requestedModel)
+        ) {
+          logger.info(
+            `🚫 Claude Console account ${account.name} does not support model ${requestedModel}${context ? ` ${context}` : ''}`
+          )
+          return false
+        }
+      }
+    }
+
+    return true
+  }
+
   // 🎯 统一调度Claude账号（官方和Console）
   async selectAccountForApiKey(apiKeyData, sessionHash = null, requestedModel = null) {
     try {
@@ -102,7 +173,8 @@ class UnifiedClaudeScheduler {
           // 验证映射的账户是否仍然可用
           const isAvailable = await this._isAccountAvailable(
             mappedAccount.accountId,
-            mappedAccount.accountType
+            mappedAccount.accountType,
+            requestedModel
           )
           if (isAvailable) {
             logger.info(
@@ -279,33 +351,9 @@ class UnifiedClaudeScheduler {
       ) {
         // 检查是否可调度
 
-        // 检查模型支持（如果请求的是 Opus 模型）
-        if (requestedModel && requestedModel.toLowerCase().includes('opus')) {
-          // 检查账号的订阅信息
-          if (account.subscriptionInfo) {
-            try {
-              const info =
-                typeof account.subscriptionInfo === 'string'
-                  ? JSON.parse(account.subscriptionInfo)
-                  : account.subscriptionInfo
-
-              // Pro 和 Free 账号不支持 Opus
-              if (info.hasClaudePro === true && info.hasClaudeMax !== true) {
-                logger.info(`🚫 Claude account ${account.name} (Pro) does not support Opus model`)
-                continue // Claude Pro 不支持 Opus
-              }
-              if (info.accountType === 'claude_pro' || info.accountType === 'claude_free') {
-                logger.info(
-                  `🚫 Claude account ${account.name} (${info.accountType}) does not support Opus model`
-                )
-                continue // 明确标记为 Pro 或 Free 的账号不支持
-              }
-            } catch (e) {
-              // 解析失败，假设为旧数据，默认支持（兼容旧数据为 Max）
-              logger.debug(`Account ${account.name} has invalid subscriptionInfo, assuming Max`)
-            }
-          }
-          // 没有订阅信息的账号，默认当作支持（兼容旧数据）
+        // 检查模型支持
+        if (!this._isModelSupportedByAccount(account, 'claude-official', requestedModel)) {
+          continue
         }
 
         // 检查是否被限流
@@ -340,32 +388,9 @@ class UnifiedClaudeScheduler {
       ) {
         // 检查是否可调度
 
-        // 检查模型支持（如果有请求的模型）
-        if (requestedModel && account.supportedModels) {
-          // 兼容旧格式（数组）和新格式（对象）
-          if (Array.isArray(account.supportedModels)) {
-            // 旧格式：数组
-            if (
-              account.supportedModels.length > 0 &&
-              !account.supportedModels.includes(requestedModel)
-            ) {
-              logger.info(
-                `🚫 Claude Console account ${account.name} does not support model ${requestedModel}`
-              )
-              continue
-            }
-          } else if (typeof account.supportedModels === 'object') {
-            // 新格式：映射表
-            if (
-              Object.keys(account.supportedModels).length > 0 &&
-              !claudeConsoleAccountService.isModelSupported(account.supportedModels, requestedModel)
-            ) {
-              logger.info(
-                `🚫 Claude Console account ${account.name} does not support model ${requestedModel}`
-              )
-              continue
-            }
-          }
+        // 检查模型支持
+        if (!this._isModelSupportedByAccount(account, 'claude-console', requestedModel)) {
+          continue
         }
 
         // 主动触发一次额度检查，确保状态即时生效
@@ -373,7 +398,7 @@ class UnifiedClaudeScheduler {
           await claudeConsoleAccountService.checkQuotaUsage(account.id)
         } catch (e) {}
 
-        // 检查是否被限流或额度超限
+        // 检查是否被限流
         const isRateLimited = await claudeConsoleAccountService.isAccountRateLimited(account.id)
         const isQuotaExceeded = await claudeConsoleAccountService.isAccountQuotaExceeded(account.id)
 
@@ -461,7 +486,7 @@ class UnifiedClaudeScheduler {
   }
 
   // 🔍 检查账户是否可用
-  async _isAccountAvailable(accountId, accountType) {
+  async _isAccountAvailable(accountId, accountType, requestedModel = null) {
     try {
       if (accountType === 'claude-official') {
         const account = await redis.getClaudeAccount(accountId)
@@ -478,6 +503,19 @@ class UnifiedClaudeScheduler {
           logger.info(`🚫 Account ${accountId} is not schedulable`)
           return false
         }
+
+        // 检查模型兼容性
+        if (
+          !this._isModelSupportedByAccount(
+            account,
+            'claude-official',
+            requestedModel,
+            'in session check'
+          )
+        ) {
+          return false
+        }
+
         return !(await claudeAccountService.isAccountRateLimited(accountId))
       } else if (accountType === 'claude-console') {
         const account = await claudeConsoleAccountService.getAccount(accountId)
@@ -497,11 +535,23 @@ class UnifiedClaudeScheduler {
           logger.info(`🚫 Claude Console account ${accountId} is not schedulable`)
           return false
         }
-        // 主动触发一次额度检查
+        // 检查模型支持
+        if (
+          !this._isModelSupportedByAccount(
+            account,
+            'claude-console',
+            requestedModel,
+            'in session check'
+          )
+        ) {
+          return false
+        }
+        // 检查是否超额
         try {
           await claudeConsoleAccountService.checkQuotaUsage(accountId)
         } catch (e) {}
-        // 检查是否被限流或额度超限
+
+        // 检查是否被限流
         if (await claudeConsoleAccountService.isAccountRateLimited(accountId)) {
           return false
         }
@@ -722,7 +772,8 @@ class UnifiedClaudeScheduler {
           if (memberIds.includes(mappedAccount.accountId)) {
             const isAvailable = await this._isAccountAvailable(
               mappedAccount.accountId,
-              mappedAccount.accountType
+              mappedAccount.accountType,
+              requestedModel
             )
             if (isAvailable) {
               logger.info(
@@ -785,19 +836,9 @@ class UnifiedClaudeScheduler {
             : account.status === 'active'
 
         if (isActive && status && this._isSchedulable(account.schedulable)) {
-          // 检查模型支持（Console账户）
-          if (
-            accountType === 'claude-console' &&
-            requestedModel &&
-            account.supportedModels &&
-            account.supportedModels.length > 0
-          ) {
-            if (!account.supportedModels.includes(requestedModel)) {
-              logger.info(
-                `🚫 Account ${account.name} in group does not support model ${requestedModel}`
-              )
-              continue
-            }
+          // 检查模型支持
+          if (!this._isModelSupportedByAccount(account, accountType, requestedModel, 'in group')) {
+            continue
           }
 
           // 检查是否被限流
