@@ -3,6 +3,7 @@ const crypto = require('crypto')
 const logger = require('../utils/logger')
 const webhookConfigService = require('./webhookConfigService')
 const { getISOStringWithTimezone } = require('../utils/dateHelper')
+const config = require('../../config/config')
 
 class WebhookService {
   constructor() {
@@ -15,6 +16,7 @@ class WebhookService {
       custom: this.sendToCustom.bind(this),
       bark: this.sendToBark.bind(this)
     }
+    this.timezone = config.system.timezone || 'Asia/Shanghai'
   }
 
   /**
@@ -309,11 +311,10 @@ class WebhookService {
   formatMessageForWechatWork(type, data) {
     const title = this.getNotificationTitle(type)
     const details = this.formatNotificationDetails(data)
-
     return (
       `## ${title}\n\n` +
       `> **服务**: Claude Relay Service\n` +
-      `> **时间**: ${new Date().toLocaleString('zh-CN')}\n\n${details}`
+      `> **时间**: ${new Date().toLocaleString('zh-CN', {timeZone: this.timezone})}\n\n${details}`
     )
   }
 
@@ -325,7 +326,7 @@ class WebhookService {
 
     return (
       `#### 服务: Claude Relay Service\n` +
-      `#### 时间: ${new Date().toLocaleString('zh-CN')}\n\n${details}`
+      `#### 时间: ${new Date().toLocaleString('zh-CN', {timeZone: this.timezone})}\n\n${details}`
     )
   }
 
@@ -450,7 +451,7 @@ class WebhookService {
 
     // 添加服务标识和时间戳
     lines.push(`\n服务: Claude Relay Service`)
-    lines.push(`时间: ${new Date().toLocaleString('zh-CN')}`)
+    lines.push(`时间: ${new Date().toLocaleString('zh-CN', {timeZone: this.timezone})}`)
 
     return lines.join('\n')
   }
