@@ -2294,7 +2294,9 @@ router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
       rateLimitDuration,
       proxy,
       accountType,
-      groupId
+      groupId,
+      dailyQuota,
+      quotaResetTime
     } = req.body
 
     if (!name || !apiUrl || !apiKey) {
@@ -2329,7 +2331,9 @@ router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
       rateLimitDuration:
         rateLimitDuration !== undefined && rateLimitDuration !== null ? rateLimitDuration : 60,
       proxy,
-      accountType: accountType || 'shared'
+      accountType: accountType || 'shared',
+      dailyQuota: dailyQuota || 0,
+      quotaResetTime: quotaResetTime || '00:00'
     })
 
     // 如果是分组类型，将账户添加到分组
@@ -2507,6 +2511,56 @@ router.put(
     }
   }
 )
+
+// 获取Claude Console账户的使用统计
+router.get('/claude-console-accounts/:accountId/usage', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+    const usageStats = await claudeConsoleAccountService.getAccountUsageStats(accountId)
+
+    if (!usageStats) {
+      return res.status(404).json({ error: 'Account not found' })
+    }
+
+    return res.json(usageStats)
+  } catch (error) {
+    logger.error('❌ Failed to get Claude Console account usage stats:', error)
+    return res.status(500).json({ error: 'Failed to get usage stats', message: error.message })
+  }
+})
+
+// 手动重置Claude Console账户的每日使用量
+router.post(
+  '/claude-console-accounts/:accountId/reset-usage',
+  authenticateAdmin,
+  async (req, res) => {
+    try {
+      const { accountId } = req.params
+      await claudeConsoleAccountService.resetDailyUsage(accountId)
+
+      logger.success(`✅ Admin manually reset daily usage for Claude Console account: ${accountId}`)
+      return res.json({ success: true, message: 'Daily usage reset successfully' })
+    } catch (error) {
+      logger.error('❌ Failed to reset Claude Console account daily usage:', error)
+      return res.status(500).json({ error: 'Failed to reset daily usage', message: error.message })
+    }
+  }
+)
+
+// 手动重置所有Claude Console账户的每日使用量
+router.post('/claude-console-accounts/reset-all-usage', authenticateAdmin, async (req, res) => {
+  try {
+    await claudeConsoleAccountService.resetAllDailyUsage()
+
+    logger.success('✅ Admin manually reset daily usage for all Claude Console accounts')
+    return res.json({ success: true, message: 'All daily usage reset successfully' })
+  } catch (error) {
+    logger.error('❌ Failed to reset all Claude Console accounts daily usage:', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to reset all daily usage', message: error.message })
+  }
+})
 
 // ☁️ Bedrock 账户管理
 

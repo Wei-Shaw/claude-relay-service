@@ -584,6 +584,44 @@
                     </div>
                   </div>
                 </div>
+                <!-- Claude Console: 显示每日额度使用进度 -->
+                <div v-else-if="account.platform === 'claude-console'" class="space-y-2">
+                  <div v-if="Number(account.dailyQuota) > 0">
+                    <div class="flex items-center justify-between text-xs">
+                      <span class="text-gray-600 dark:text-gray-300">额度进度</span>
+                      <span class="font-medium text-gray-700 dark:text-gray-200">
+                        {{ getQuotaUsagePercent(account).toFixed(1) }}%
+                      </span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <div class="h-2 w-24 rounded-full bg-gray-200 dark:bg-gray-700">
+                        <div
+                          :class="[
+                            'h-2 rounded-full transition-all duration-300',
+                            getQuotaBarClass(getQuotaUsagePercent(account))
+                          ]"
+                          :style="{ width: Math.min(100, getQuotaUsagePercent(account)) + '%' }"
+                        />
+                      </div>
+                      <span
+                        class="min-w-[32px] text-xs font-medium text-gray-700 dark:text-gray-200"
+                      >
+                        ${{ formatCost(account.usage?.daily?.cost || 0) }} / ${{
+                          Number(account.dailyQuota).toFixed(2)
+                        }}
+                      </span>
+                    </div>
+                    <div class="text-xs text-gray-600 dark:text-gray-400">
+                      剩余 ${{ formatRemainingQuota(account) }}
+                      <span class="ml-2 text-gray-400"
+                        >重置 {{ account.quotaResetTime || '00:00' }}</span
+                      >
+                    </div>
+                  </div>
+                  <div v-else class="text-sm text-gray-400">
+                    <i class="fas fa-minus" />
+                  </div>
+                </div>
                 <div v-else-if="account.platform === 'claude'" class="text-sm text-gray-400">
                   <i class="fas fa-minus" />
                 </div>
@@ -1786,6 +1824,29 @@ const formatCost = (cost) => {
   if (cost < 0.01) return cost.toFixed(6)
   if (cost < 1) return cost.toFixed(4)
   return cost.toFixed(2)
+}
+
+// 额度使用百分比（Claude Console）
+const getQuotaUsagePercent = (account) => {
+  const used = Number(account?.usage?.daily?.cost || 0)
+  const quota = Number(account?.dailyQuota || 0)
+  if (!quota || quota <= 0) return 0
+  return (used / quota) * 100
+}
+
+// 额度进度条颜色（Claude Console）
+const getQuotaBarClass = (percent) => {
+  if (percent >= 90) return 'bg-red-500'
+  if (percent >= 70) return 'bg-yellow-500'
+  return 'bg-green-500'
+}
+
+// 剩余额度（Claude Console）
+const formatRemainingQuota = (account) => {
+  const used = Number(account?.usage?.daily?.cost || 0)
+  const quota = Number(account?.dailyQuota || 0)
+  if (!quota || quota <= 0) return '0.00'
+  return Math.max(0, quota - used).toFixed(2)
 }
 
 // 计算每日费用（使用后端返回的精确费用数据）

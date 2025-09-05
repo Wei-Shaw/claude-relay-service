@@ -281,10 +281,25 @@ class UnifiedClaudeScheduler {
         boundConsoleAccount.isActive === true &&
         boundConsoleAccount.status === 'active'
       ) {
+        // 主动触发一次额度检查
+        try {
+          await claudeConsoleAccountService.checkQuotaUsage(boundConsoleAccount.id)
+        } catch (e) {
+          logger.warn(
+            `Failed to check quota for bound Claude Console account ${boundConsoleAccount.name}: ${e.message}`
+          )
+          // 继续使用该账号
+        }
+
+        // 检查限流状态和额度状态
         const isRateLimited = await claudeConsoleAccountService.isAccountRateLimited(
           boundConsoleAccount.id
         )
-        if (!isRateLimited) {
+        const isQuotaExceeded = await claudeConsoleAccountService.isAccountQuotaExceeded(
+          boundConsoleAccount.id
+        )
+
+        if (!isRateLimited && !isQuotaExceeded) {
           logger.info(
             `🎯 Using bound dedicated Claude Console account: ${boundConsoleAccount.name} (${apiKeyData.claudeConsoleAccountId})`
           )
@@ -383,9 +398,21 @@ class UnifiedClaudeScheduler {
           continue
         }
 
+        // 主动触发一次额度检查，确保状态即时生效
+        try {
+          await claudeConsoleAccountService.checkQuotaUsage(account.id)
+        } catch (e) {
+          logger.warn(
+            `Failed to check quota for Claude Console account ${account.name}: ${e.message}`
+          )
+          // 继续处理该账号
+        }
+
         // 检查是否被限流
         const isRateLimited = await claudeConsoleAccountService.isAccountRateLimited(account.id)
-        if (!isRateLimited) {
+        const isQuotaExceeded = await claudeConsoleAccountService.isAccountQuotaExceeded(account.id)
+
+        if (!isRateLimited && !isQuotaExceeded) {
           availableAccounts.push({
             ...account,
             accountId: account.id,
@@ -397,7 +424,12 @@ class UnifiedClaudeScheduler {
             `✅ Added Claude Console account to available pool: ${account.name} (priority: ${account.priority})`
           )
         } else {
-          logger.warn(`⚠️ Claude Console account ${account.name} is rate limited`)
+          if (isRateLimited) {
+            logger.warn(`⚠️ Claude Console account ${account.name} is rate limited`)
+          }
+          if (isQuotaExceeded) {
+            logger.warn(`💰 Claude Console account ${account.name} quota exceeded`)
+          }
         }
       } else {
         logger.info(
@@ -513,7 +545,6 @@ class UnifiedClaudeScheduler {
           logger.info(`🚫 Claude Console account ${accountId} is not schedulable`)
           return false
         }
-
         // 检查模型支持
         if (
           !this._isModelSupportedByAccount(
@@ -525,9 +556,19 @@ class UnifiedClaudeScheduler {
         ) {
           return false
         }
+        // 检查是否超额
+        try {
+          await claudeConsoleAccountService.checkQuotaUsage(accountId)
+        } catch (e) {
+          logger.warn(`Failed to check quota for Claude Console account ${accountId}: ${e.message}`)
+          // 继续处理
+        }
 
         // 检查是否被限流
         if (await claudeConsoleAccountService.isAccountRateLimited(accountId)) {
+          return false
+        }
+        if (await claudeConsoleAccountService.isAccountQuotaExceeded(accountId)) {
           return false
         }
         // 检查是否未授权（401错误）
