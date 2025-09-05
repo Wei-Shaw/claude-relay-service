@@ -3,7 +3,7 @@ const crypto = require('crypto')
 const logger = require('../utils/logger')
 const webhookConfigService = require('./webhookConfigService')
 const { getISOStringWithTimezone } = require('../utils/dateHelper')
-const config = require('../../config/config')
+const appConfig = require('../../config/config')
 
 class WebhookService {
   constructor() {
@@ -16,7 +16,7 @@ class WebhookService {
       custom: this.sendToCustom.bind(this),
       bark: this.sendToBark.bind(this)
     }
-    this.timezone = config.system.timezone || 'Asia/Shanghai'
+    this.timezone = appConfig.system.timezone || 'Asia/Shanghai'
   }
 
   /**
