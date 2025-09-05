@@ -1902,7 +1902,8 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       priority,
       groupId,
       groupIds,
-      autoStopOnWarning
+      autoStopOnWarning,
+      useUnifiedUserAgent
     } = req.body
 
     if (!name) {
@@ -1942,7 +1943,8 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       accountType: accountType || 'shared', // 默认为共享类型
       platform,
       priority: priority || 50, // 默认优先级为50
-      autoStopOnWarning: autoStopOnWarning === true // 默认为false
+      autoStopOnWarning: autoStopOnWarning === true, // 默认为false
+      useUnifiedUserAgent: useUnifiedUserAgent === true // 默认为false
     })
 
     // 如果是分组类型，将账户添加到分组
