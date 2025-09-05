@@ -658,6 +658,41 @@
                 </p>
               </div>
 
+              <!-- 额度管理字段 -->
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    每日额度限制 ($)
+                  </label>
+                  <input
+                    v-model.number="form.dailyQuota"
+                    class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                    min="0"
+                    placeholder="0 表示不限制"
+                    step="0.01"
+                    type="number"
+                  />
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    设置每日使用额度，0 表示不限制
+                  </p>
+                </div>
+
+                <div>
+                  <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    额度重置时间
+                  </label>
+                  <input
+                    v-model="form.quotaResetTime"
+                    class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                    placeholder="00:00"
+                    type="time"
+                  />
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    每日自动重置额度的时间
+                  </p>
+                </div>
+              </div>
+
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >模型映射表 (可选)</label
@@ -1544,6 +1579,75 @@
               <p class="mt-1 text-xs text-gray-500">留空表示不更新 API Key</p>
             </div>
 
+            <!-- 额度管理字段 -->
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  每日额度限制 ($)
+                </label>
+                <input
+                  v-model.number="form.dailyQuota"
+                  class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  min="0"
+                  placeholder="0 表示不限制"
+                  step="0.01"
+                  type="number"
+                />
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  设置每日使用额度，0 表示不限制
+                </p>
+              </div>
+
+              <div>
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  额度重置时间
+                </label>
+                <input
+                  v-model="form.quotaResetTime"
+                  class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  placeholder="00:00"
+                  type="time"
+                />
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">每日自动重置额度的时间</p>
+              </div>
+            </div>
+
+            <!-- 当前使用情况（仅编辑模式显示） -->
+            <div
+              v-if="isEdit && form.dailyQuota > 0"
+              class="rounded-lg bg-gray-50 p-4 dark:bg-gray-800"
+            >
+              <div class="mb-2 flex items-center justify-between">
+                <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  今日使用情况
+                </span>
+                <span class="text-sm text-gray-500 dark:text-gray-400">
+                  ${{ calculateCurrentUsage().toFixed(4) }} / ${{ form.dailyQuota.toFixed(2) }}
+                </span>
+              </div>
+              <div class="relative h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
+                <div
+                  class="absolute left-0 top-0 h-full rounded-full transition-all"
+                  :class="
+                    usagePercentage >= 90
+                      ? 'bg-red-500'
+                      : usagePercentage >= 70
+                        ? 'bg-yellow-500'
+                        : 'bg-green-500'
+                  "
+                  :style="{ width: `${Math.min(usagePercentage, 100)}%` }"
+                />
+              </div>
+              <div class="mt-2 flex items-center justify-between text-xs">
+                <span class="text-gray-500 dark:text-gray-400">
+                  剩余: ${{ Math.max(0, form.dailyQuota - calculateCurrentUsage()).toFixed(2) }}
+                </span>
+                <span class="text-gray-500 dark:text-gray-400">
+                  {{ usagePercentage.toFixed(1) }}% 已使用
+                </span>
+              </div>
+            </div>
+
             <div>
               <label class="mb-3 block text-sm font-semibold text-gray-700"
                 >模型映射表 (可选)</label
@@ -2100,6 +2204,10 @@ const form = ref({
   userAgent: props.account?.userAgent || '',
   enableRateLimit: props.account ? props.account.rateLimitDuration > 0 : true,
   rateLimitDuration: props.account?.rateLimitDuration || 60,
+  // 额度管理字段
+  dailyQuota: props.account?.dailyQuota || 0,
+  dailyUsage: props.account?.dailyUsage || 0,
+  quotaResetTime: props.account?.quotaResetTime || '00:00',
   // Bedrock 特定字段
   accessKeyId: props.account?.accessKeyId || '',
   secretAccessKey: props.account?.secretAccessKey || '',
@@ -2161,6 +2269,45 @@ const canProceed = computed(() => {
 const canExchangeSetupToken = computed(() => {
   return setupTokenAuthUrl.value && setupTokenAuthCode.value.trim()
 })
+
+// 获取当前使用量（实时）
+const calculateCurrentUsage = () => {
+  // 如果不是编辑模式或没有账户ID，返回0
+  if (!isEdit.value || !props.account?.id) {
+    return 0
+  }
+
+  // 如果已经加载了今日使用数据，直接使用
+  if (typeof form.value.dailyUsage === 'number') {
+    return form.value.dailyUsage
+  }
+
+  return 0
+}
+
+// 计算额度使用百分比
+const usagePercentage = computed(() => {
+  if (!form.value.dailyQuota || form.value.dailyQuota <= 0) {
+    return 0
+  }
+  const currentUsage = calculateCurrentUsage()
+  return (currentUsage / form.value.dailyQuota) * 100
+})
+
+// 加载账户今日使用情况
+const loadAccountUsage = async () => {
+  if (!isEdit.value || !props.account?.id) return
+
+  try {
+    const response = await apiClient.get(`/admin/claude-console-accounts/${props.account.id}/usage`)
+    if (response) {
+      // 更新表单中的使用量数据
+      form.value.dailyUsage = response.dailyUsage || 0
+    }
+  } catch (error) {
+    console.warn('Failed to load account usage:', error)
+  }
+}
 
 // // 计算是否可以创建
 // const canCreate = computed(() => {
@@ -2601,6 +2748,9 @@ const createAccount = async () => {
       data.userAgent = form.value.userAgent || null
       // 如果不启用限流，传递 0 表示不限流
       data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
+      // 额度管理字段
+      data.dailyQuota = form.value.dailyQuota || 0
+      data.quotaResetTime = form.value.quotaResetTime || '00:00'
     } else if (form.value.platform === 'bedrock') {
       // Bedrock 账户特定数据 - 构造 awsCredentials 对象
       data.awsCredentials = {
@@ -2798,6 +2948,9 @@ const updateAccount = async () => {
       data.userAgent = form.value.userAgent || null
       // 如果不启用限流，传递 0 表示不限流
       data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
+      // 额度管理字段
+      data.dailyQuota = form.value.dailyQuota || 0
+      data.quotaResetTime = form.value.quotaResetTime || '00:00'
     }
 
     // Bedrock 特定更新
@@ -3207,7 +3360,16 @@ watch(
         // Azure OpenAI 特定字段
         azureEndpoint: newAccount.azureEndpoint || '',
         apiVersion: newAccount.apiVersion || '',
-        deploymentName: newAccount.deploymentName || ''
+        deploymentName: newAccount.deploymentName || '',
+        // 额度管理字段
+        dailyQuota: newAccount.dailyQuota || 0,
+        dailyUsage: newAccount.dailyUsage || 0,
+        quotaResetTime: newAccount.quotaResetTime || '00:00'
+      }
+
+      // 如果是Claude Console账户，加载实时使用情况
+      if (newAccount.platform === 'claude-console') {
+        loadAccountUsage()
       }
 
       // 如果是分组类型，加载分组ID
@@ -3287,6 +3449,10 @@ const clearUnifiedCache = async () => {
 onMounted(() => {
   // 获取Claude Code统一User-Agent信息
   fetchUnifiedUserAgent()
+  // 如果是编辑模式且是Claude Console账户，加载使用情况
+  if (isEdit.value && props.account?.platform === 'claude-console') {
+    loadAccountUsage()
+  }
 })
 
 // 监听平台变化，当切换到Claude平台时获取统一User-Agent信息
