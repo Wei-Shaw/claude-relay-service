@@ -314,7 +314,7 @@ class WebhookService {
     return (
       `## ${title}\n\n` +
       `> **服务**: Claude Relay Service\n` +
-      `> **时间**: ${new Date().toLocaleString('zh-CN', {timeZone: this.timezone})}\n\n${details}`
+      `> **时间**: ${new Date().toLocaleString('zh-CN', { timeZone: this.timezone })}\n\n${details}`
     )
   }
 
@@ -326,7 +326,7 @@ class WebhookService {
 
     return (
       `#### 服务: Claude Relay Service\n` +
-      `#### 时间: ${new Date().toLocaleString('zh-CN', {timeZone: this.timezone})}\n\n${details}`
+      `#### 时间: ${new Date().toLocaleString('zh-CN', { timeZone: this.timezone })}\n\n${details}`
     )
   }
 
@@ -451,7 +451,7 @@ class WebhookService {
 
     // 添加服务标识和时间戳
     lines.push(`\n服务: Claude Relay Service`)
-    lines.push(`时间: ${new Date().toLocaleString('zh-CN', {timeZone: this.timezone})}`)
+    lines.push(`时间: ${new Date().toLocaleString('zh-CN', { timeZone: this.timezone })}`)
 
     return lines.join('\n')
   }
