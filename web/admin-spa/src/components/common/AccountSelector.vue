@@ -298,12 +298,8 @@ const filteredGroups = computed(() => {
 
 // 过滤的 OAuth 账号
 const filteredOAuthAccounts = computed(() => {
-  let accounts = sortedAccounts.value.filter(
-    (a) =>
-      a.accountType === 'dedicated' &&
-      (props.platform === 'claude'
-        ? a.platform === 'claude-oauth'
-        : a.platform !== 'claude-console')
+  let accounts = sortedAccounts.value.filter((a) =>
+    props.platform === 'claude' ? a.platform === 'claude-oauth' : a.platform !== 'claude-console'
   )
 
   if (searchQuery.value) {
@@ -318,9 +314,7 @@ const filteredOAuthAccounts = computed(() => {
 const filteredConsoleAccounts = computed(() => {
   if (props.platform !== 'claude') return []
 
-  let accounts = sortedAccounts.value.filter(
-    (a) => a.accountType === 'dedicated' && a.platform === 'claude-console'
-  )
+  let accounts = sortedAccounts.value.filter((a) => a.platform === 'claude-console')
 
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
