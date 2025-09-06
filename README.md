@@ -483,6 +483,7 @@ model_provider = "crs"
 model = "gpt-5"
 model_reasoning_effort = "high"
 disable_response_storage = true
+preferred_auth_method = "apikey"
 
 [model_providers.crs]
 name = "crs"
@@ -494,7 +495,7 @@ wire_api = "responses"
 
 ```json
 {
-  "OPENAI_API_KEY": "你的后台创建的API密钥"
+    "OPENAI_API_KEY": "你的后台创建的API密钥"
 }
 ```
 
