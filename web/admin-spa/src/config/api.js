@@ -82,7 +82,16 @@ class ApiClient {
 
       // 如果响应不成功，抛出错误
       if (!response.ok) {
-        throw new Error(data.message || `HTTP ${response.status}`)
+        // 创建一个包含完整错误信息的错误对象
+        const error = new Error(data.message || `HTTP ${response.status}`)
+        // 保留完整的响应数据，以便错误处理时可以访问详细信息
+        error.response = {
+          status: response.status,
+          data: data
+        }
+        // 为了向后兼容，也保留原始的 message
+        error.message = data.message || error.message
+        throw error
       }
 
       return data

@@ -2,7 +2,7 @@
   <div ref="triggerRef" class="relative">
     <!-- 选择器主体 -->
     <div
-      class="form-input flex w-full cursor-pointer items-center justify-between dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+      class="form-input flex w-full cursor-pointer items-center justify-between border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
       :class="{ 'opacity-50': disabled }"
       @click="!disabled && toggleDropdown()"
     >
@@ -40,7 +40,7 @@
               <input
                 ref="searchInput"
                 v-model="searchQuery"
-                class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 placeholder="搜索账号名称..."
                 style="padding-left: 40px; padding-right: 36px"
                 type="text"

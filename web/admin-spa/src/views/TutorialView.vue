@@ -420,73 +420,41 @@
           </p>
 
           <div class="space-y-4">
-            <div class="rounded-lg border border-indigo-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
-                PowerShell 设置方法
-              </h6>
-              <p class="mb-3 text-sm text-gray-600">在 PowerShell 中运行以下命令：</p>
+            <div class="rounded-lg border border-yellow-200 bg-yellow-50 p-3 sm:p-4">
+              <h6 class="mb-2 font-medium text-yellow-800">Codex 配置文件</h6>
+              <p class="mb-3 text-sm text-yellow-700">
+                在
+                <code class="rounded bg-yellow-100 px-1">~/.codex/config.toml</code>
+                文件中添加以下配置：
+              </p>
               <div
                 class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
               >
-                <div class="whitespace-nowrap text-gray-300">
-                  $env:OPENAI_BASE_URL = "{{ openaiBaseUrl }}"
-                </div>
-                <div class="whitespace-nowrap text-gray-300">
-                  $env:OPENAI_API_KEY = "你的API密钥"
-                </div>
+                <div class="whitespace-nowrap text-gray-300">model_provider = "crs"</div>
+                <div class="whitespace-nowrap text-gray-300">model = "gpt-5"</div>
+                <div class="whitespace-nowrap text-gray-300">model_reasoning_effort = "high"</div>
+                <div class="whitespace-nowrap text-gray-300">disable_response_storage = true</div>
+                <div class="mt-2"></div>
+                <div class="whitespace-nowrap text-gray-300">[model_providers.crs]</div>
+                <div class="whitespace-nowrap text-gray-300">name = "crs"</div>
+                <div class="whitespace-nowrap text-gray-300">base_url = "{{ openaiBaseUrl }}"</div>
+                <div class="whitespace-nowrap text-gray-300">wire_api = "responses"</div>
+              </div>
+              <p class="mt-3 text-sm text-yellow-700">
+                在
+                <code class="rounded bg-yellow-100 px-1">~/.codex/auth.json</code>
+                文件中配置API密钥：
+              </p>
+              <div
+                class="mt-2 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              >
+                <div class="whitespace-nowrap text-gray-300">{</div>
+                <div class="whitespace-nowrap text-gray-300">"OPENAI_API_KEY": "你的API密钥"</div>
+                <div class="whitespace-nowrap text-gray-300">}</div>
               </div>
               <p class="mt-2 text-xs text-yellow-700">
                 💡 使用与 Claude Code 相同的 API 密钥即可，格式如 cr_xxxxxxxxxx。
               </p>
-            </div>
-
-            <div class="rounded-lg border border-indigo-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
-                PowerShell 永久设置（用户级）
-              </h6>
-              <p class="mb-3 text-sm text-gray-600">在 PowerShell 中运行以下命令：</p>
-              <div
-                class="mb-3 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
-              >
-                <div class="mb-2"># 设置用户级环境变量（永久生效）</div>
-                <div class="whitespace-nowrap text-gray-300">
-                  [System.Environment]::SetEnvironmentVariable("OPENAI_BASE_URL", "{{
-                    openaiBaseUrl
-                  }}", [System.EnvironmentVariableTarget]::User)
-                </div>
-                <div class="whitespace-nowrap text-gray-300">
-                  [System.Environment]::SetEnvironmentVariable("OPENAI_API_KEY", "你的API密钥",
-                  [System.EnvironmentVariableTarget]::User)
-                </div>
-              </div>
-              <p class="mt-2 text-xs text-blue-700">
-                💡 设置后需要重新打开 PowerShell 窗口才能生效。
-              </p>
-            </div>
-
-            <div class="rounded-lg border border-indigo-200 bg-indigo-50 p-3 sm:p-4">
-              <h6 class="mb-2 font-medium text-indigo-800">验证 Codex 环境变量</h6>
-              <p class="mb-3 text-sm text-indigo-700">在 PowerShell 中验证：</p>
-              <div
-                class="space-y-1 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
-              >
-                <div class="whitespace-nowrap text-gray-300">echo $env:OPENAI_BASE_URL</div>
-                <div class="whitespace-nowrap text-gray-300">echo $env:OPENAI_API_KEY</div>
-              </div>
-            </div>
-
-            <div class="rounded-lg border border-yellow-200 bg-yellow-50 p-3 sm:p-4">
-              <h6 class="mb-2 font-medium text-yellow-800">Codex 额外配置</h6>
-              <p class="mb-3 text-sm text-yellow-700">
-                需要在
-                <code class="rounded bg-yellow-100 px-1">~/.codex/config.toml</code>
-                文件中添加以下配置来禁用响应存储：
-              </p>
-              <div
-                class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
-              >
-                <div class="whitespace-nowrap text-gray-300">disable_response_storage = true</div>
-              </div>
             </div>
           </div>
         </div>
@@ -938,80 +906,41 @@
           </p>
 
           <div class="space-y-4">
-            <div class="rounded-lg border border-indigo-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
-                Terminal 设置方法
-              </h6>
-              <p class="mb-3 text-sm text-gray-600">在 Terminal 中运行以下命令：</p>
+            <div class="rounded-lg border border-yellow-200 bg-yellow-50 p-3 sm:p-4">
+              <h6 class="mb-2 font-medium text-yellow-800">Codex 配置文件</h6>
+              <p class="mb-3 text-sm text-yellow-700">
+                在
+                <code class="rounded bg-yellow-100 px-1">~/.codex/config.toml</code>
+                文件中添加以下配置：
+              </p>
               <div
                 class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
               >
-                <div class="whitespace-nowrap text-gray-300">
-                  export OPENAI_BASE_URL="{{ openaiBaseUrl }}"
-                </div>
-                <div class="whitespace-nowrap text-gray-300">
-                  export OPENAI_API_KEY="你的API密钥"
-                </div>
+                <div class="whitespace-nowrap text-gray-300">model_provider = "crs"</div>
+                <div class="whitespace-nowrap text-gray-300">model = "gpt-5"</div>
+                <div class="whitespace-nowrap text-gray-300">model_reasoning_effort = "high"</div>
+                <div class="whitespace-nowrap text-gray-300">disable_response_storage = true</div>
+                <div class="mt-2"></div>
+                <div class="whitespace-nowrap text-gray-300">[model_providers.crs]</div>
+                <div class="whitespace-nowrap text-gray-300">name = "crs"</div>
+                <div class="whitespace-nowrap text-gray-300">base_url = "{{ openaiBaseUrl }}"</div>
+                <div class="whitespace-nowrap text-gray-300">wire_api = "responses"</div>
+              </div>
+              <p class="mt-3 text-sm text-yellow-700">
+                在
+                <code class="rounded bg-yellow-100 px-1">~/.codex/auth.json</code>
+                文件中配置API密钥：
+              </p>
+              <div
+                class="mt-2 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              >
+                <div class="whitespace-nowrap text-gray-300">{</div>
+                <div class="whitespace-nowrap text-gray-300">"OPENAI_API_KEY": "你的API密钥"</div>
+                <div class="whitespace-nowrap text-gray-300">}</div>
               </div>
               <p class="mt-2 text-xs text-yellow-700">
                 💡 使用与 Claude Code 相同的 API 密钥即可，格式如 cr_xxxxxxxxxx。
               </p>
-            </div>
-
-            <div class="rounded-lg border border-indigo-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
-                永久设置方法
-              </h6>
-              <p class="mb-3 text-sm text-gray-600">添加到你的 shell 配置文件：</p>
-              <div
-                class="mb-3 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
-              >
-                <div class="mb-2"># 对于 zsh (默认)</div>
-                <div class="whitespace-nowrap text-gray-300">
-                  echo 'export OPENAI_BASE_URL="{{ openaiBaseUrl }}"' >> ~/.zshrc
-                </div>
-                <div class="whitespace-nowrap text-gray-300">
-                  echo 'export OPENAI_API_KEY="你的API密钥"' >> ~/.zshrc
-                </div>
-                <div class="whitespace-nowrap text-gray-300">source ~/.zshrc</div>
-              </div>
-              <div
-                class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
-              >
-                <div class="mb-2"># 对于 bash</div>
-                <div class="whitespace-nowrap text-gray-300">
-                  echo 'export OPENAI_BASE_URL="{{ openaiBaseUrl }}"' >> ~/.bash_profile
-                </div>
-                <div class="whitespace-nowrap text-gray-300">
-                  echo 'export OPENAI_API_KEY="你的API密钥"' >> ~/.bash_profile
-                </div>
-                <div class="whitespace-nowrap text-gray-300">source ~/.bash_profile</div>
-              </div>
-            </div>
-
-            <div class="rounded-lg border border-indigo-200 bg-indigo-50 p-3 sm:p-4">
-              <h6 class="mb-2 font-medium text-indigo-800">验证 Codex 环境变量</h6>
-              <p class="mb-3 text-sm text-indigo-700">在 Terminal 中验证：</p>
-              <div
-                class="space-y-1 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
-              >
-                <div class="whitespace-nowrap text-gray-300">echo $OPENAI_BASE_URL</div>
-                <div class="whitespace-nowrap text-gray-300">echo $OPENAI_API_KEY</div>
-              </div>
-            </div>
-
-            <div class="rounded-lg border border-yellow-200 bg-yellow-50 p-3 sm:p-4">
-              <h6 class="mb-2 font-medium text-yellow-800">Codex 额外配置</h6>
-              <p class="mb-3 text-sm text-yellow-700">
-                需要在
-                <code class="rounded bg-yellow-100 px-1">~/.codex/config.toml</code>
-                文件中添加以下配置来禁用响应存储：
-              </p>
-              <div
-                class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
-              >
-                <div class="whitespace-nowrap text-gray-300">disable_response_storage = true</div>
-              </div>
             </div>
           </div>
         </div>
@@ -1454,80 +1383,41 @@
           </p>
 
           <div class="space-y-4">
-            <div class="rounded-lg border border-indigo-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
-                终端设置方法
-              </h6>
-              <p class="mb-3 text-sm text-gray-600">在终端中运行以下命令：</p>
+            <div class="rounded-lg border border-yellow-200 bg-yellow-50 p-3 sm:p-4">
+              <h6 class="mb-2 font-medium text-yellow-800">Codex 配置文件</h6>
+              <p class="mb-3 text-sm text-yellow-700">
+                在
+                <code class="rounded bg-yellow-100 px-1">~/.codex/config.toml</code>
+                文件中添加以下配置：
+              </p>
               <div
                 class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
               >
-                <div class="whitespace-nowrap text-gray-300">
-                  export OPENAI_BASE_URL="{{ openaiBaseUrl }}"
-                </div>
-                <div class="whitespace-nowrap text-gray-300">
-                  export OPENAI_API_KEY="你的API密钥"
-                </div>
+                <div class="whitespace-nowrap text-gray-300">model_provider = "crs"</div>
+                <div class="whitespace-nowrap text-gray-300">model = "gpt-5"</div>
+                <div class="whitespace-nowrap text-gray-300">model_reasoning_effort = "high"</div>
+                <div class="whitespace-nowrap text-gray-300">disable_response_storage = true</div>
+                <div class="mt-2"></div>
+                <div class="whitespace-nowrap text-gray-300">[model_providers.crs]</div>
+                <div class="whitespace-nowrap text-gray-300">name = "crs"</div>
+                <div class="whitespace-nowrap text-gray-300">base_url = "{{ openaiBaseUrl }}"</div>
+                <div class="whitespace-nowrap text-gray-300">wire_api = "responses"</div>
+              </div>
+              <p class="mt-3 text-sm text-yellow-700">
+                在
+                <code class="rounded bg-yellow-100 px-1">~/.codex/auth.json</code>
+                文件中配置API密钥：
+              </p>
+              <div
+                class="mt-2 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              >
+                <div class="whitespace-nowrap text-gray-300">{</div>
+                <div class="whitespace-nowrap text-gray-300">"OPENAI_API_KEY": "你的API密钥"</div>
+                <div class="whitespace-nowrap text-gray-300">}</div>
               </div>
               <p class="mt-2 text-xs text-yellow-700">
                 💡 使用与 Claude Code 相同的 API 密钥即可，格式如 cr_xxxxxxxxxx。
               </p>
-            </div>
-
-            <div class="rounded-lg border border-indigo-200 bg-white p-3 sm:p-4">
-              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-600 sm:text-base">
-                永久设置方法
-              </h6>
-              <p class="mb-3 text-sm text-gray-600">添加到你的 shell 配置文件：</p>
-              <div
-                class="mb-3 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
-              >
-                <div class="mb-2"># 对于 bash (默认)</div>
-                <div class="whitespace-nowrap text-gray-300">
-                  echo 'export OPENAI_BASE_URL="{{ openaiBaseUrl }}"' >> ~/.bashrc
-                </div>
-                <div class="whitespace-nowrap text-gray-300">
-                  echo 'export OPENAI_API_KEY="你的API密钥"' >> ~/.bashrc
-                </div>
-                <div class="whitespace-nowrap text-gray-300">source ~/.bashrc</div>
-              </div>
-              <div
-                class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
-              >
-                <div class="mb-2"># 对于 zsh</div>
-                <div class="whitespace-nowrap text-gray-300">
-                  echo 'export OPENAI_BASE_URL="{{ openaiBaseUrl }}"' >> ~/.zshrc
-                </div>
-                <div class="whitespace-nowrap text-gray-300">
-                  echo 'export OPENAI_API_KEY="你的API密钥"' >> ~/.zshrc
-                </div>
-                <div class="whitespace-nowrap text-gray-300">source ~/.zshrc</div>
-              </div>
-            </div>
-
-            <div class="rounded-lg border border-indigo-200 bg-indigo-50 p-3 sm:p-4">
-              <h6 class="mb-2 font-medium text-indigo-800">验证 Codex 环境变量</h6>
-              <p class="mb-3 text-sm text-indigo-700">在终端中验证：</p>
-              <div
-                class="space-y-1 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
-              >
-                <div class="whitespace-nowrap text-gray-300">echo $OPENAI_BASE_URL</div>
-                <div class="whitespace-nowrap text-gray-300">echo $OPENAI_API_KEY</div>
-              </div>
-            </div>
-
-            <div class="rounded-lg border border-yellow-200 bg-yellow-50 p-3 sm:p-4">
-              <h6 class="mb-2 font-medium text-yellow-800">Codex 额外配置</h6>
-              <p class="mb-3 text-sm text-yellow-700">
-                需要在
-                <code class="rounded bg-yellow-100 px-1">~/.codex/config.toml</code>
-                文件中添加以下配置来禁用响应存储：
-              </p>
-              <div
-                class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
-              >
-                <div class="whitespace-nowrap text-gray-300">disable_response_storage = true</div>
-              </div>
             </div>
           </div>
         </div>

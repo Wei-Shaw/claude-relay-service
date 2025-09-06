@@ -127,7 +127,7 @@
                   <div class="flex gap-2">
                     <input
                       v-model="newTag"
-                      class="form-input flex-1 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                      class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                       placeholder="输入新标签名称"
                       type="text"
                       @keypress.enter.prevent="addTag"
@@ -166,7 +166,7 @@
                   </label>
                   <input
                     v-model="form.rateLimitWindow"
-                    class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                    class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                     min="1"
                     placeholder="不修改"
                     type="number"
@@ -179,7 +179,7 @@
                   >
                   <input
                     v-model="form.rateLimitRequests"
-                    class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                    class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                     min="1"
                     placeholder="不修改"
                     type="number"
@@ -192,7 +192,7 @@
                   >
                   <input
                     v-model="form.rateLimitCost"
-                    class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                    class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                     min="0"
                     placeholder="不修改"
                     step="0.01"
@@ -210,7 +210,7 @@
             </label>
             <input
               v-model="form.dailyCostLimit"
-              class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+              class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
               min="0"
               placeholder="不修改 (0 表示无限制)"
               step="0.01"
@@ -225,7 +225,7 @@
             </label>
             <input
               v-model="form.weeklyOpusCostLimit"
-              class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+              class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
               min="0"
               placeholder="不修改 (0 表示无限制)"
               step="0.01"
@@ -243,7 +243,7 @@
             >
             <input
               v-model="form.concurrencyLimit"
-              class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+              class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
               min="0"
               placeholder="不修改 (0 表示无限制)"
               type="number"
@@ -330,7 +330,7 @@
                 >
                 <select
                   v-model="form.claudeAccountId"
-                  class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                   :disabled="form.permissions === 'gemini' || form.permissions === 'openai'"
                 >
                   <option value="">不修改</option>
@@ -365,7 +365,7 @@
                 >
                 <select
                   v-model="form.geminiAccountId"
-                  class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                   :disabled="form.permissions === 'claude' || form.permissions === 'openai'"
                 >
                   <option value="">不修改</option>
@@ -396,7 +396,7 @@
                 >
                 <select
                   v-model="form.openaiAccountId"
-                  class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                   :disabled="form.permissions === 'claude' || form.permissions === 'gemini'"
                 >
                   <option value="">不修改</option>
@@ -427,7 +427,7 @@
                 >
                 <select
                   v-model="form.bedrockAccountId"
-                  class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                   :disabled="form.permissions === 'gemini' || form.permissions === 'openai'"
                 >
                   <option value="">不修改</option>

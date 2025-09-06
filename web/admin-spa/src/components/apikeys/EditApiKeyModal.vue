@@ -34,7 +34,7 @@
             >
             <input
               v-model="form.name"
-              class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+              class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
               maxlength="100"
               placeholder="请输入API Key名称"
               required
@@ -53,7 +53,7 @@
             >
             <select
               v-model="form.ownerId"
-              class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+              class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
             >
               <option v-for="user in availableUsers" :key="user.id" :value="user.id">
                 {{ user.displayName }} ({{ user.username }})
@@ -122,7 +122,7 @@
                 <div class="flex gap-2">
                   <input
                     v-model="newTag"
-                    class="form-input flex-1 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                    class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                     placeholder="输入新标签名称"
                     type="text"
                     @keypress.enter.prevent="addTag"
@@ -166,7 +166,7 @@
                   >
                   <input
                     v-model="form.rateLimitWindow"
-                    class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                    class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                     min="1"
                     placeholder="无限制"
                     type="number"
@@ -180,7 +180,7 @@
                   >
                   <input
                     v-model="form.rateLimitRequests"
-                    class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                    class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                     min="1"
                     placeholder="无限制"
                     type="number"
@@ -194,7 +194,7 @@
                   >
                   <input
                     v-model="form.rateLimitCost"
-                    class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                    class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                     min="0"
                     placeholder="无限制"
                     step="0.01"
@@ -259,7 +259,7 @@
               </div>
               <input
                 v-model="form.dailyCostLimit"
-                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 min="0"
                 placeholder="0 表示无限制"
                 step="0.01"
@@ -308,7 +308,7 @@
               </div>
               <input
                 v-model="form.weeklyOpusCostLimit"
-                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 min="0"
                 placeholder="0 表示无限制"
                 step="0.01"
@@ -326,7 +326,7 @@
             >
             <input
               v-model="form.concurrencyLimit"
-              class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+              class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
               min="0"
               placeholder="0 表示无限制"
               type="number"
@@ -558,7 +558,7 @@
                   <div class="flex gap-2">
                     <input
                       v-model="form.modelInput"
-                      class="form-input flex-1 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                      class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                       placeholder="输入模型名称，按回车添加"
                       type="text"
                       @keydown.enter.prevent="addRestrictedModel"

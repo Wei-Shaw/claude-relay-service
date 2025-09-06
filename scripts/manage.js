@@ -185,7 +185,7 @@ class ServiceManager {
 
   restart(daemon = false) {
     console.log('🔄 重启服务...')
-
+    this.stop()
     // 等待停止完成
     setTimeout(() => {
       this.start(daemon)
