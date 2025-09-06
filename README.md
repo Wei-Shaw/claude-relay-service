@@ -474,50 +474,101 @@ claude
 gemini  # 或其他 Gemini CLI 命令
 ```
 
-**Codex 设置环境变量：**
+**Codex 配置：**
 
-```bash
-export OPENAI_BASE_URL="http://127.0.0.1:3000/openai" # 根据实际填写你服务器的ip地址或者域名
-export OPENAI_API_KEY="后台创建的API密钥"  # 使用后台创建的API密钥
-```
-
-**Codex 额外配置：**
-
-需要在 `~/.codex/config.toml` 文件中添加以下配置来禁用响应存储：
+在 `~/.codex/config.toml` 文件中添加以下配置：
 
 ```toml
+model_provider = "crs"
+model = "gpt-5"
+model_reasoning_effort = "high"
 disable_response_storage = true
+
+[model_providers.crs]
+name = "crs"
+base_url = "http://127.0.0.1:3000/openai"  # 根据实际填写你服务器的ip地址或者域名
+wire_api = "responses"
+```
+
+在 `~/.codex/auth.json` 文件中配置API密钥：
+
+```json
+{
+  "OPENAI_API_KEY": "你的后台创建的API密钥"
+}
 ```
 
 ### 5. 第三方工具API接入
 
-本服务支持多种API端点格式，方便接入不同的第三方工具（如Cherry Studio等）：
+本服务支持多种API端点格式，方便接入不同的第三方工具（如Cherry Studio等）。
 
-**Claude标准格式：**
+#### Cherry Studio 接入示例
+
+Cherry Studio支持多种AI服务的接入，下面是不同账号类型的详细配置：
+
+**1. Claude账号接入：**
 
 ```
-# 如果工具支持Claude标准格式，请使用该接口
+# API地址
 http://你的服务器:3000/claude/
+
+# 模型ID示例
+claude-sonnet-4-20250514  # Claude Sonnet 4
+claude-opus-4-20250514     # Claude Opus 4
 ```
 
-**OpenAI兼容格式：**
+配置步骤：
+- 供应商类型选择"Anthropic"
+- API地址填入：`http://你的服务器:3000/claude/`
+- API Key填入：后台创建的API密钥（cr_开头）
+
+**2. Gemini账号接入：**
 
 ```
-# 适用于需要OpenAI格式的第三方工具
-http://你的服务器:3000/openai/claude/v1/
+# API地址
+http://你的服务器:3000/gemini/
+
+# 模型ID示例
+gemini-2.5-pro             # Gemini 2.5 Pro
 ```
 
-**接入示例：**
+配置步骤：
+- 供应商类型选择"Gemini"
+- API地址填入：`http://你的服务器:3000/gemini/`
+- API Key填入：后台创建的API密钥（cr_开头）
 
-- **Cherry Studio**: 使用OpenAI格式 `http://你的服务器:3000/openai/claude/v1/` 使用Codex cli API `http://你的服务器:3000/openai/responses`
-- **其他支持自定义API的工具**: 根据工具要求选择合适的格式
+**3. Codex接入：**
+
+```
+# API地址
+http://你的服务器:3000/openai/
+
+# 模型ID（固定）
+gpt-5                      # Codex使用固定模型ID
+```
+
+配置步骤：
+- 供应商类型选择"Openai-Response"
+- API地址填入：`http://你的服务器:3000/openai/`
+- API Key填入：后台创建的API密钥（cr_开头）
+- **重要**：Codex只支持Openai-Response标准
+
+#### 其他第三方工具接入
+
+**接入要点：**
+
+- 所有账号类型都使用相同的API密钥（在后台统一创建）
+- 根据不同的路由前缀自动识别账号类型
+- `/claude/` - 使用Claude账号池
+- `/gemini/` - 使用Gemini账号池  
+- `/openai/` - 使用Codex账号（只支持Openai-Response格式）
+- 支持所有标准API端点（messages、models等）
 
 **重要说明：**
 
-- 所有格式都支持相同的功能，仅是路径不同
-- `/api/v1/messages` = `/claude/v1/messages` = `/openai/claude/v1/messages`
-- 选择适合你使用工具的格式即可
-- 支持所有Claude API端点（messages、models等）
+- 确保在后台已添加对应类型的账号（Claude/Gemini/Codex）
+- API密钥可以通用，系统会根据路由自动选择账号类型
+- 建议为不同用户创建不同的API密钥便于使用统计
 
 ---
 

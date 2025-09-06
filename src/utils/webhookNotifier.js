@@ -81,6 +81,12 @@ class WebhookNotifier {
         error: 'GEMINI_ERROR',
         unauthorized: 'GEMINI_UNAUTHORIZED',
         disabled: 'GEMINI_MANUALLY_DISABLED'
+      },
+      openai: {
+        error: 'OPENAI_ERROR',
+        unauthorized: 'OPENAI_UNAUTHORIZED',
+        blocked: 'OPENAI_RATE_LIMITED',
+        disabled: 'OPENAI_MANUALLY_DISABLED'
       }
     }
 

@@ -81,7 +81,7 @@
                   <div class="flex items-center gap-2">
                     <input
                       v-model.number="form.batchCount"
-                      class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                      class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                       max="500"
                       min="2"
                       placeholder="输入数量 (2-500)"
@@ -112,7 +112,7 @@
             >
             <input
               v-model="form.name"
-              class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+              class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
               :class="{ 'border-red-500': errors.name }"
               :placeholder="
                 form.createType === 'batch'
@@ -184,7 +184,7 @@
                 <div class="flex gap-2">
                   <input
                     v-model="newTag"
-                    class="form-input flex-1 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                    class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                     placeholder="输入新标签名称"
                     type="text"
                     @keypress.enter.prevent="addTag"
@@ -228,7 +228,7 @@
                   >
                   <input
                     v-model="form.rateLimitWindow"
-                    class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                    class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                     min="1"
                     placeholder="无限制"
                     type="number"
@@ -242,7 +242,7 @@
                   >
                   <input
                     v-model="form.rateLimitRequests"
-                    class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                    class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                     min="1"
                     placeholder="无限制"
                     type="number"
@@ -256,7 +256,7 @@
                   >
                   <input
                     v-model="form.rateLimitCost"
-                    class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                    class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                     min="0"
                     placeholder="无限制"
                     step="0.01"
@@ -321,7 +321,7 @@
               </div>
               <input
                 v-model="form.dailyCostLimit"
-                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 min="0"
                 placeholder="0 表示无限制"
                 step="0.01"
@@ -370,7 +370,7 @@
               </div>
               <input
                 v-model="form.weeklyOpusCostLimit"
-                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 min="0"
                 placeholder="0 表示无限制"
                 step="0.01"
@@ -388,7 +388,7 @@
             >
             <input
               v-model="form.concurrencyLimit"
-              class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+              class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
               min="0"
               placeholder="0 表示无限制"
               type="number"
@@ -404,7 +404,7 @@
             >
             <textarea
               v-model="form.description"
-              class="form-input w-full resize-none text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+              class="form-input w-full resize-none border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
               placeholder="描述此 API Key 的用途..."
               rows="2"
             />
@@ -412,34 +412,103 @@
 
           <div>
             <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >有效期限</label
+              >过期设置</label
             >
-            <select
-              v-model="form.expireDuration"
-              class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-              @change="updateExpireAt"
+            <!-- 过期模式选择 -->
+            <div
+              class="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800"
             >
-              <option value="">永不过期</option>
-              <option value="1d">1 天</option>
-              <option value="7d">7 天</option>
-              <option value="30d">30 天</option>
-              <option value="90d">90 天</option>
-              <option value="180d">180 天</option>
-              <option value="365d">365 天</option>
-              <option value="custom">自定义日期</option>
-            </select>
-            <div v-if="form.expireDuration === 'custom'" class="mt-3">
-              <input
-                v-model="form.customExpireDate"
-                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                :min="minDateTime"
-                type="datetime-local"
-                @change="updateCustomExpireAt"
-              />
+              <div class="flex items-center gap-4">
+                <label class="flex cursor-pointer items-center">
+                  <input
+                    v-model="form.expirationMode"
+                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="radio"
+                    value="fixed"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">固定时间过期</span>
+                </label>
+                <label class="flex cursor-pointer items-center">
+                  <input
+                    v-model="form.expirationMode"
+                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="radio"
+                    value="activation"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">首次使用后激活</span>
+                </label>
+              </div>
+              <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                <span v-if="form.expirationMode === 'fixed'">
+                  <i class="fas fa-info-circle mr-1" />
+                  固定时间模式：Key 创建后立即生效，按设定时间过期
+                </span>
+                <span v-else>
+                  <i class="fas fa-info-circle mr-1" />
+                  激活模式：Key 首次使用时激活，激活后按设定天数过期（适合批量销售）
+                </span>
+              </p>
             </div>
-            <p v-if="form.expiresAt" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              将于 {{ formatExpireDate(form.expiresAt) }} 过期
-            </p>
+
+            <!-- 固定时间模式 -->
+            <div v-if="form.expirationMode === 'fixed'">
+              <select
+                v-model="form.expireDuration"
+                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                @change="updateExpireAt"
+              >
+                <option value="">永不过期</option>
+                <option value="1d">1 天</option>
+                <option value="7d">7 天</option>
+                <option value="30d">30 天</option>
+                <option value="90d">90 天</option>
+                <option value="180d">180 天</option>
+                <option value="365d">365 天</option>
+                <option value="custom">自定义日期</option>
+              </select>
+              <div v-if="form.expireDuration === 'custom'" class="mt-3">
+                <input
+                  v-model="form.customExpireDate"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  :min="minDateTime"
+                  type="datetime-local"
+                  @change="updateCustomExpireAt"
+                />
+              </div>
+              <p v-if="form.expiresAt" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                将于 {{ formatExpireDate(form.expiresAt) }} 过期
+              </p>
+            </div>
+
+            <!-- 激活模式 -->
+            <div v-else>
+              <div class="flex items-center gap-2">
+                <input
+                  v-model.number="form.activationDays"
+                  class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  max="3650"
+                  min="1"
+                  placeholder="输入天数"
+                  type="number"
+                />
+                <span class="text-sm text-gray-600 dark:text-gray-400">天</span>
+              </div>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <button
+                  v-for="days in [30, 90, 180, 365]"
+                  :key="days"
+                  class="rounded-md border border-gray-300 px-3 py-1 text-xs hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-700"
+                  type="button"
+                  @click="form.activationDays = days"
+                >
+                  {{ days }}天
+                </button>
+              </div>
+              <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                <i class="fas fa-clock mr-1" />
+                Key 将在首次使用后激活，激活后 {{ form.activationDays || 30 }} 天过期
+              </p>
+            </div>
           </div>
 
           <div>
@@ -794,6 +863,8 @@ const form = reactive({
   expireDuration: '',
   customExpireDate: '',
   expiresAt: null,
+  expirationMode: 'fixed', // 过期模式：fixed(固定) 或 activation(激活)
+  activationDays: 30, // 激活后有效天数
   permissions: 'all',
   claudeAccountId: '',
   geminiAccountId: '',
@@ -1082,7 +1153,9 @@ const createApiKey = async () => {
         form.weeklyOpusCostLimit !== '' && form.weeklyOpusCostLimit !== null
           ? parseFloat(form.weeklyOpusCostLimit)
           : 0,
-      expiresAt: form.expiresAt || undefined,
+      expiresAt: form.expirationMode === 'fixed' ? form.expiresAt || undefined : undefined,
+      expirationMode: form.expirationMode,
+      activationDays: form.expirationMode === 'activation' ? form.activationDays : undefined,
       permissions: form.permissions,
       tags: form.tags.length > 0 ? form.tags : undefined,
       enableModelRestriction: form.enableModelRestriction,

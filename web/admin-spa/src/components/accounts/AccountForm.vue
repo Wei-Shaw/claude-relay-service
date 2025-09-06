@@ -176,7 +176,7 @@
               >
               <input
                 v-model="form.name"
-                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 :class="{ 'border-red-500': errors.name }"
                 placeholder="为账户设置一个易识别的名称"
                 required
@@ -193,7 +193,7 @@
               >
               <textarea
                 v-model="form.description"
-                class="form-input w-full resize-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                class="form-input w-full resize-none border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 placeholder="账户用途说明..."
                 rows="3"
               />
@@ -300,7 +300,7 @@
               >
               <input
                 v-model="form.projectId"
-                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 placeholder="例如：verdant-wares-464411-k9"
                 type="text"
               />
@@ -351,7 +351,7 @@
                 >
                 <input
                   v-model="form.accessKeyId"
-                  class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   :class="{ 'border-red-500': errors.accessKeyId }"
                   placeholder="请输入 AWS Access Key ID"
                   required
@@ -368,7 +368,7 @@
                 >
                 <input
                   v-model="form.secretAccessKey"
-                  class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   :class="{ 'border-red-500': errors.secretAccessKey }"
                   placeholder="请输入 AWS Secret Access Key"
                   required
@@ -385,7 +385,7 @@
                 >
                 <input
                   v-model="form.region"
-                  class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   :class="{ 'border-red-500': errors.region }"
                   placeholder="例如：us-east-1"
                   required
@@ -419,7 +419,7 @@
                 >
                 <input
                   v-model="form.sessionToken"
-                  class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   placeholder="如果使用临时凭证，请输入会话令牌"
                   type="password"
                 />
@@ -434,7 +434,7 @@
                 >
                 <input
                   v-model="form.defaultModel"
-                  class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   placeholder="例如：us.anthropic.claude-sonnet-4-20250514-v1:0"
                   type="text"
                 />
@@ -463,7 +463,7 @@
                 >
                 <input
                   v-model="form.smallFastModel"
-                  class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   placeholder="例如：us.anthropic.claude-3-5-haiku-20241022-v1:0"
                   type="text"
                 />
@@ -481,7 +481,7 @@
                 >
                 <input
                   v-model="form.azureEndpoint"
-                  class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   :class="{ 'border-red-500': errors.azureEndpoint }"
                   placeholder="https://your-resource.openai.azure.com"
                   required
@@ -501,7 +501,7 @@
                 >
                 <input
                   v-model="form.apiVersion"
-                  class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   placeholder="2024-02-01"
                   type="text"
                 />
@@ -516,7 +516,7 @@
                 >
                 <input
                   v-model="form.deploymentName"
-                  class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   :class="{ 'border-red-500': errors.deploymentName }"
                   placeholder="gpt-4"
                   required
@@ -536,7 +536,7 @@
                 >
                 <input
                   v-model="form.apiKey"
-                  class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   :class="{ 'border-red-500': errors.apiKey }"
                   placeholder="请输入 Azure OpenAI API Key"
                   required
@@ -610,7 +610,7 @@
                   >
                   <input
                     v-model.number="form.rateLimitDuration"
-                    class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                    class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                     min="1"
                     placeholder="默认60分钟"
                     type="number"
@@ -630,7 +630,7 @@
                 >
                 <input
                   v-model="form.apiUrl"
-                  class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   :class="{ 'border-red-500': errors.apiUrl }"
                   placeholder="例如：https://api.example.com"
                   required
@@ -647,7 +647,7 @@
                 >
                 <input
                   v-model="form.apiKey"
-                  class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   :class="{ 'border-red-500': errors.apiKey }"
                   placeholder="请输入API Key"
                   required
@@ -666,7 +666,7 @@
                   </label>
                   <input
                     v-model.number="form.dailyQuota"
-                    class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                    class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                     min="0"
                     placeholder="0 表示不限制"
                     step="0.01"
@@ -683,7 +683,7 @@
                   </label>
                   <input
                     v-model="form.quotaResetTime"
-                    class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                    class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                     placeholder="00:00"
                     type="time"
                   />
@@ -713,14 +713,14 @@
                   >
                     <input
                       v-model="mapping.from"
-                      class="form-input flex-1 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                      class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                       placeholder="原始模型名称"
                       type="text"
                     />
                     <i class="fas fa-arrow-right text-gray-400 dark:text-gray-500" />
                     <input
                       v-model="mapping.to"
-                      class="form-input flex-1 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                      class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                       placeholder="映射后的模型名称"
                       type="text"
                     />
@@ -794,7 +794,7 @@
                 >
                 <input
                   v-model="form.userAgent"
-                  class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   placeholder="留空则透传客户端 User-Agent"
                   type="text"
                 />
@@ -827,7 +827,7 @@
                   >
                   <input
                     v-model.number="form.rateLimitDuration"
-                    class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                    class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                     min="1"
                     placeholder="默认60分钟"
                     type="number"
@@ -941,7 +941,7 @@
               >
               <input
                 v-model.number="form.priority"
-                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 max="100"
                 min="1"
                 placeholder="数字越小优先级越高，默认50"
@@ -1033,34 +1033,29 @@
                 </div>
               </div>
 
-              <!-- OpenAI 平台需要 ID Token -->
               <div v-if="form.platform === 'openai'">
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >ID Token *</label
+                  >Access Token (可选)</label
                 >
                 <textarea
-                  v-model="form.idToken"
-                  class="form-input w-full resize-none font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                  :class="{ 'border-red-500': errors.idToken }"
-                  placeholder="请输入 ID Token (JWT 格式)..."
-                  required
+                  v-model="form.accessToken"
+                  class="form-input w-full resize-none border-gray-300 font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  placeholder="可选：如果不填写，系统会自动通过 Refresh Token 获取..."
                   rows="4"
                 />
-                <p v-if="errors.idToken" class="mt-1 text-xs text-red-500">
-                  {{ errors.idToken }}
-                </p>
                 <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                  ID Token 是 OpenAI OAuth 认证返回的 JWT token，包含用户信息和组织信息
+                  <i class="fas fa-info-circle mr-1" />
+                  Access Token 可选填。如果不提供，系统会通过 Refresh Token 自动获取。
                 </p>
               </div>
 
-              <div>
+              <div v-else>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >Access Token *</label
                 >
                 <textarea
                   v-model="form.accessToken"
-                  class="form-input w-full resize-none font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  class="form-input w-full resize-none border-gray-300 font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   :class="{ 'border-red-500': errors.accessToken }"
                   placeholder="请输入 Access Token..."
                   required
@@ -1071,13 +1066,34 @@
                 </p>
               </div>
 
-              <div>
+              <div v-if="form.platform === 'openai'">
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  >Refresh Token *</label
+                >
+                <textarea
+                  v-model="form.refreshToken"
+                  class="form-input w-full resize-none border-gray-300 font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  :class="{ 'border-red-500': errors.refreshToken }"
+                  placeholder="请输入 Refresh Token（必填）..."
+                  required
+                  rows="4"
+                />
+                <p v-if="errors.refreshToken" class="mt-1 text-xs text-red-500">
+                  {{ errors.refreshToken }}
+                </p>
+                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  <i class="fas fa-info-circle mr-1" />
+                  系统将使用 Refresh Token 自动获取 Access Token 和用户信息
+                </p>
+              </div>
+
+              <div v-else>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >Refresh Token (可选)</label
                 >
                 <textarea
                   v-model="form.refreshToken"
-                  class="form-input w-full resize-none font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  class="form-input w-full resize-none border-gray-300 font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   placeholder="请输入 Refresh Token..."
                   rows="4"
                 />
@@ -1265,7 +1281,7 @@
                               </label>
                               <textarea
                                 v-model="setupTokenAuthCode"
-                                class="form-input w-full resize-none font-mono text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                                class="form-input w-full resize-none border-gray-300 font-mono text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                                 placeholder="粘贴从Claude Code授权页面获取的Authorization Code..."
                                 rows="3"
                               />
@@ -1313,7 +1329,7 @@
             >
             <input
               v-model="form.name"
-              class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+              class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
               placeholder="为账户设置一个易识别的名称"
               required
               type="text"
@@ -1326,7 +1342,7 @@
             >
             <textarea
               v-model="form.description"
-              class="form-input w-full resize-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+              class="form-input w-full resize-none border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
               placeholder="账户用途说明..."
               rows="3"
             />
@@ -1433,7 +1449,7 @@
             >
             <input
               v-model="form.projectId"
-              class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+              class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
               placeholder="例如：verdant-wares-464411-k9"
               type="text"
             />
@@ -1544,7 +1560,7 @@
             >
             <input
               v-model.number="form.priority"
-              class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+              class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
               max="100"
               min="1"
               placeholder="数字越小优先级越高"
@@ -1587,7 +1603,7 @@
                 </label>
                 <input
                   v-model.number="form.dailyQuota"
-                  class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                   min="0"
                   placeholder="0 表示不限制"
                   step="0.01"
@@ -1604,7 +1620,7 @@
                 </label>
                 <input
                   v-model="form.quotaResetTime"
-                  class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                   placeholder="00:00"
                   type="time"
                 />
@@ -1910,7 +1926,7 @@
               >
               <input
                 v-model="form.azureEndpoint"
-                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 :class="{ 'border-red-500': errors.azureEndpoint }"
                 placeholder="https://your-resource.openai.azure.com"
                 type="url"
@@ -1926,7 +1942,7 @@
               >
               <input
                 v-model="form.apiVersion"
-                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 placeholder="2024-02-01"
                 type="text"
               />
@@ -1941,7 +1957,7 @@
               >
               <input
                 v-model="form.deploymentName"
-                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 :class="{ 'border-red-500': errors.deploymentName }"
                 placeholder="gpt-4"
                 type="text"
@@ -1957,7 +1973,7 @@
               >
               <input
                 v-model="form.apiKey"
-                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 :class="{ 'border-red-500': errors.apiKey }"
                 placeholder="留空表示不更新"
                 type="password"
@@ -2032,7 +2048,7 @@
                 >
                 <textarea
                   v-model="form.accessToken"
-                  class="form-input w-full resize-none font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  class="form-input w-full resize-none border-gray-300 font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   placeholder="留空表示不更新..."
                   rows="4"
                 />
@@ -2044,7 +2060,7 @@
                 >
                 <textarea
                   v-model="form.refreshToken"
-                  class="form-input w-full resize-none font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  class="form-input w-full resize-none border-gray-300 font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   placeholder="留空表示不更新..."
                   rows="4"
                 />
@@ -2180,7 +2196,6 @@ const form = ref({
   groupId: '',
   groupIds: [],
   projectId: props.account?.projectId || '',
-  idToken: '',
   accessToken: '',
   refreshToken: '',
   proxy: initProxyConfig(),
@@ -2249,7 +2264,7 @@ const initModelMappings = () => {
 // 表单验证错误
 const errors = ref({
   name: '',
-  idToken: '',
+  refreshToken: '',
   accessToken: '',
   apiUrl: '',
   apiKey: '',
@@ -2530,7 +2545,35 @@ const handleOAuthSuccess = async (tokenInfo) => {
 
     emit('success', result)
   } catch (error) {
-    showToast(error.message || '账户创建失败', 'error')
+    // 显示详细的错误信息
+    const errorMessage = error.response?.data?.error || error.message || '账户创建失败'
+    const suggestion = error.response?.data?.suggestion || ''
+    const errorDetails = error.response?.data?.errorDetails || null
+
+    // 构建完整的错误提示
+    let fullMessage = errorMessage
+    if (suggestion) {
+      fullMessage += `\n${suggestion}`
+    }
+
+    // 如果有详细的 OAuth 错误信息，也显示出来
+    if (errorDetails && errorDetails.error_description) {
+      fullMessage += `\n详细信息: ${errorDetails.error_description}`
+    } else if (errorDetails && errorDetails.error && errorDetails.error.message) {
+      // 处理 OpenAI 格式的错误
+      fullMessage += `\n详细信息: ${errorDetails.error.message}`
+    }
+
+    showToast(fullMessage, 'error', '', 8000)
+
+    // 在控制台打印完整的错误信息以便调试
+    console.error('账户创建失败:', {
+      message: errorMessage,
+      suggestion,
+      errorDetails,
+      errorCode: error.response?.data?.errorCode,
+      networkError: error.response?.data?.networkError
+    })
   } finally {
     loading.value = false
   }
@@ -2591,17 +2634,19 @@ const createAccount = async () => {
     }
   } else if (form.value.addType === 'manual') {
     // 手动模式验证
-    if (!form.value.accessToken || form.value.accessToken.trim() === '') {
-      errors.value.accessToken = '请填写 Access Token'
-      hasError = true
-    }
-    // OpenAI 平台需要验证 ID Token
-    if (
-      form.value.platform === 'openai' &&
-      (!form.value.idToken || form.value.idToken.trim() === '')
-    ) {
-      errors.value.idToken = '请填写 ID Token'
-      hasError = true
+    if (form.value.platform === 'openai') {
+      // OpenAI 平台必须有 Refresh Token
+      if (!form.value.refreshToken || form.value.refreshToken.trim() === '') {
+        errors.value.refreshToken = '请填写 Refresh Token'
+        hasError = true
+      }
+      // Access Token 可选，如果没有会通过 Refresh Token 获取
+    } else {
+      // 其他平台（Gemini）需要 Access Token
+      if (!form.value.accessToken || form.value.accessToken.trim() === '') {
+        errors.value.accessToken = '请填写 Access Token'
+        hasError = true
+      }
     }
   }
 
@@ -2695,14 +2740,14 @@ const createAccount = async () => {
         : 365 * 24 * 60 * 60 * 1000 // 1年
 
       data.openaiOauth = {
-        idToken: form.value.idToken, // 使用用户输入的 ID Token
-        accessToken: form.value.accessToken,
-        refreshToken: form.value.refreshToken || '',
+        idToken: '', // 不再需要用户输入，系统会自动获取
+        accessToken: form.value.accessToken || '', // Access Token 可选
+        refreshToken: form.value.refreshToken, // Refresh Token 必填
         expires_in: Math.floor(expiresInMs / 1000) // 转换为秒
       }
 
-      // 手动模式下，尝试从 ID Token 解析用户信息
-      let accountInfo = {
+      // 账户信息将在首次刷新时自动获取
+      data.accountInfo = {
         accountId: '',
         chatgptUserId: '',
         organizationId: '',
@@ -2713,31 +2758,9 @@ const createAccount = async () => {
         emailVerified: false
       }
 
-      // 尝试解析 ID Token (JWT)
-      if (form.value.idToken) {
-        try {
-          const idTokenParts = form.value.idToken.split('.')
-          if (idTokenParts.length === 3) {
-            const payload = JSON.parse(atob(idTokenParts[1]))
-            const authClaims = payload['https://api.openai.com/auth'] || {}
-
-            accountInfo = {
-              accountId: authClaims.accountId || '',
-              chatgptUserId: authClaims.chatgptUserId || '',
-              organizationId: authClaims.organizationId || '',
-              organizationRole: authClaims.organizationRole || '',
-              organizationTitle: authClaims.organizationTitle || '',
-              planType: authClaims.planType || '',
-              email: payload.email || '',
-              emailVerified: payload.email_verified || false
-            }
-          }
-        } catch (e) {
-          console.warn('Failed to parse ID Token:', e)
-        }
-      }
-
-      data.accountInfo = accountInfo
+      // OpenAI 手动模式必须刷新以获取完整信息（包括 ID Token）
+      data.needsImmediateRefresh = true
+      data.requireRefreshSuccess = true // 必须刷新成功才能创建账户
       data.priority = form.value.priority || 50
     } else if (form.value.platform === 'claude-console') {
       // Claude Console 账户特定数据
@@ -2797,7 +2820,35 @@ const createAccount = async () => {
 
     emit('success', result)
   } catch (error) {
-    showToast(error.message || '账户创建失败', 'error')
+    // 显示详细的错误信息
+    const errorMessage = error.response?.data?.error || error.message || '账户创建失败'
+    const suggestion = error.response?.data?.suggestion || ''
+    const errorDetails = error.response?.data?.errorDetails || null
+
+    // 构建完整的错误提示
+    let fullMessage = errorMessage
+    if (suggestion) {
+      fullMessage += `\n${suggestion}`
+    }
+
+    // 如果有详细的 OAuth 错误信息，也显示出来
+    if (errorDetails && errorDetails.error_description) {
+      fullMessage += `\n详细信息: ${errorDetails.error_description}`
+    } else if (errorDetails && errorDetails.error && errorDetails.error.message) {
+      // 处理 OpenAI 格式的错误
+      fullMessage += `\n详细信息: ${errorDetails.error.message}`
+    }
+
+    showToast(fullMessage, 'error', '', 8000)
+
+    // 在控制台打印完整的错误信息以便调试
+    console.error('账户创建失败:', {
+      message: errorMessage,
+      suggestion,
+      errorDetails,
+      errorCode: error.response?.data?.errorCode,
+      networkError: error.response?.data?.networkError
+    })
   } finally {
     loading.value = false
   }
@@ -2901,10 +2952,16 @@ const updateAccount = async () => {
           : 365 * 24 * 60 * 60 * 1000 // 1年
 
         data.openaiOauth = {
-          idToken: form.value.idToken || '', // 更新时使用用户输入的 ID Token
+          idToken: '', // 不需要用户输入
           accessToken: form.value.accessToken || '',
           refreshToken: form.value.refreshToken || '',
           expires_in: Math.floor(expiresInMs / 1000) // 转换为秒
+        }
+
+        // 编辑 OpenAI 账户时，如果更新了 Refresh Token，也需要验证
+        if (form.value.refreshToken && form.value.refreshToken !== props.account.refreshToken) {
+          data.needsImmediateRefresh = true
+          data.requireRefreshSuccess = true
         }
       }
     }
@@ -3012,7 +3069,35 @@ const updateAccount = async () => {
 
     emit('success')
   } catch (error) {
-    showToast(error.message || '账户更新失败', 'error')
+    // 显示详细的错误信息
+    const errorMessage = error.response?.data?.error || error.message || '账户更新失败'
+    const suggestion = error.response?.data?.suggestion || ''
+    const errorDetails = error.response?.data?.errorDetails || null
+
+    // 构建完整的错误提示
+    let fullMessage = errorMessage
+    if (suggestion) {
+      fullMessage += `\n${suggestion}`
+    }
+
+    // 如果有详细的 OAuth 错误信息，也显示出来
+    if (errorDetails && errorDetails.error_description) {
+      fullMessage += `\n详细信息: ${errorDetails.error_description}`
+    } else if (errorDetails && errorDetails.error && errorDetails.error.message) {
+      // 处理 OpenAI 格式的错误
+      fullMessage += `\n详细信息: ${errorDetails.error.message}`
+    }
+
+    showToast(fullMessage, 'error', '', 8000)
+
+    // 在控制台打印完整的错误信息以便调试
+    console.error('账户更新失败:', {
+      message: errorMessage,
+      suggestion,
+      errorDetails,
+      errorCode: error.response?.data?.errorCode,
+      networkError: error.response?.data?.networkError
+    })
   } finally {
     loading.value = false
   }

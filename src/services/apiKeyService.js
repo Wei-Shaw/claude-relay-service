@@ -34,7 +34,9 @@ class ApiKeyService {
       allowedClients = [],
       dailyCostLimit = 0,
       weeklyOpusCostLimit = 0,
-      tags = []
+      tags = [],
+      activationDays = 0, // 新增：激活后有效天数（0表示不使用此功能）
+      expirationMode = 'fixed' // 新增：过期模式 'fixed'(固定时间) 或 'activation'(首次使用后激活)
     } = options
 
     // 生成简单的API Key (64字符十六进制)
@@ -67,9 +69,13 @@ class ApiKeyService {
       dailyCostLimit: String(dailyCostLimit || 0),
       weeklyOpusCostLimit: String(weeklyOpusCostLimit || 0),
       tags: JSON.stringify(tags || []),
+      activationDays: String(activationDays || 0), // 新增：激活后有效天数
+      expirationMode: expirationMode || 'fixed', // 新增：过期模式
+      isActivated: expirationMode === 'fixed' ? 'true' : 'false', // 根据模式决定激活状态
+      activatedAt: expirationMode === 'fixed' ? new Date().toISOString() : '', // 激活时间
       createdAt: new Date().toISOString(),
       lastUsedAt: '',
-      expiresAt: expiresAt || '',
+      expiresAt: expirationMode === 'fixed' ? expiresAt || '' : '', // 固定模式才设置过期时间
       createdBy: options.createdBy || 'admin',
       userId: options.userId || '',
       userUsername: options.userUsername || ''
@@ -105,6 +111,10 @@ class ApiKeyService {
       dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
       weeklyOpusCostLimit: parseFloat(keyData.weeklyOpusCostLimit || 0),
       tags: JSON.parse(keyData.tags || '[]'),
+      activationDays: parseInt(keyData.activationDays || 0),
+      expirationMode: keyData.expirationMode || 'fixed',
+      isActivated: keyData.isActivated === 'true',
+      activatedAt: keyData.activatedAt,
       createdAt: keyData.createdAt,
       expiresAt: keyData.expiresAt,
       createdBy: keyData.createdBy
@@ -131,6 +141,27 @@ class ApiKeyService {
       // 检查是否激活
       if (keyData.isActive !== 'true') {
         return { valid: false, error: 'API key is disabled' }
+      }
+
+      // 处理激活逻辑（仅在 activation 模式下）
+      if (keyData.expirationMode === 'activation' && keyData.isActivated !== 'true') {
+        // 首次使用，需要激活
+        const now = new Date()
+        const activationDays = parseInt(keyData.activationDays || 30) // 默认30天
+        const expiresAt = new Date(now.getTime() + activationDays * 24 * 60 * 60 * 1000)
+
+        // 更新激活状态和过期时间
+        keyData.isActivated = 'true'
+        keyData.activatedAt = now.toISOString()
+        keyData.expiresAt = expiresAt.toISOString()
+        keyData.lastUsedAt = now.toISOString()
+
+        // 保存到Redis
+        await redis.setApiKey(keyData.id, keyData)
+
+        logger.success(
+          `🔓 API key activated: ${keyData.id} (${keyData.name}), will expire in ${activationDays} days at ${expiresAt.toISOString()}`
+        )
       }
 
       // 检查是否过期
@@ -261,6 +292,10 @@ class ApiKeyService {
         key.weeklyOpusCostLimit = parseFloat(key.weeklyOpusCostLimit || 0)
         key.dailyCost = (await redis.getDailyCost(key.id)) || 0
         key.weeklyOpusCost = (await redis.getWeeklyOpusCost(key.id)) || 0
+        key.activationDays = parseInt(key.activationDays || 0)
+        key.expirationMode = key.expirationMode || 'fixed'
+        key.isActivated = key.isActivated === 'true'
+        key.activatedAt = key.activatedAt || null
 
         // 获取当前时间窗口的请求次数、Token使用量和费用
         if (key.rateLimitWindow > 0) {
@@ -362,6 +397,10 @@ class ApiKeyService {
         'bedrockAccountId', // 添加 Bedrock 账号ID
         'permissions',
         'expiresAt',
+        'activationDays', // 新增：激活后有效天数
+        'expirationMode', // 新增：过期模式
+        'isActivated', // 新增：是否已激活
+        'activatedAt', // 新增：激活时间
         'enableModelRestriction',
         'restrictedModels',
         'enableClientRestriction',
@@ -380,9 +419,16 @@ class ApiKeyService {
           if (field === 'restrictedModels' || field === 'allowedClients' || field === 'tags') {
             // 特殊处理数组字段
             updatedData[field] = JSON.stringify(value || [])
-          } else if (field === 'enableModelRestriction' || field === 'enableClientRestriction') {
+          } else if (
+            field === 'enableModelRestriction' ||
+            field === 'enableClientRestriction' ||
+            field === 'isActivated'
+          ) {
             // 布尔值转字符串
             updatedData[field] = String(value)
+          } else if (field === 'expiresAt' || field === 'activatedAt') {
+            // 日期字段保持原样，不要toString()
+            updatedData[field] = value || ''
           } else {
             updatedData[field] = (value !== null && value !== undefined ? value : '').toString()
           }

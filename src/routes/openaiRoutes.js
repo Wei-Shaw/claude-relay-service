@@ -3,7 +3,6 @@ const axios = require('axios')
 const router = express.Router()
 const logger = require('../utils/logger')
 const { authenticateApiKey } = require('../middleware/auth')
-const claudeAccountService = require('../services/claudeAccountService')
 const unifiedOpenAIScheduler = require('../services/unifiedOpenAIScheduler')
 const openaiAccountService = require('../services/openaiAccountService')
 const apiKeyService = require('../services/apiKeyService')
@@ -35,13 +34,31 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
     }
 
     // 获取账户详情
-    const account = await openaiAccountService.getAccount(result.accountId)
+    let account = await openaiAccountService.getAccount(result.accountId)
     if (!account || !account.accessToken) {
       throw new Error(`OpenAI account ${result.accountId} has no valid accessToken`)
     }
 
-    // 解密 accessToken
-    const accessToken = claudeAccountService._decryptSensitiveData(account.accessToken)
+    // 检查 token 是否过期并自动刷新（双重保护）
+    if (openaiAccountService.isTokenExpired(account)) {
+      if (account.refreshToken) {
+        logger.info(`🔄 Token expired, auto-refreshing for account ${account.name} (fallback)`)
+        try {
+          await openaiAccountService.refreshAccountToken(result.accountId)
+          // 重新获取更新后的账户
+          account = await openaiAccountService.getAccount(result.accountId)
+          logger.info(`✅ Token refreshed successfully in route handler`)
+        } catch (refreshError) {
+          logger.error(`Failed to refresh token for ${account.name}:`, refreshError)
+          throw new Error(`Token expired and refresh failed: ${refreshError.message}`)
+        }
+      } else {
+        throw new Error(`Token expired and no refresh token available for account ${account.name}`)
+      }
+    }
+
+    // 解密 accessToken（account.accessToken 是加密的）
+    const accessToken = openaiAccountService.decrypt(account.accessToken)
     if (!accessToken) {
       throw new Error('Failed to decrypt OpenAI accessToken')
     }
@@ -161,7 +178,7 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
     // 配置请求选项
     const axiosConfig = {
       headers,
-      timeout: 60000,
+      timeout: 60 * 1000 * 10,
       validateStatus: () => true
     }
 

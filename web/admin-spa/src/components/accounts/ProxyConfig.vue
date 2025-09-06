@@ -36,7 +36,7 @@
         >
         <select
           v-model="proxy.type"
-          class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+          class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
         >
           <option value="socks5">SOCKS5</option>
           <option value="http">HTTP</option>
@@ -51,7 +51,7 @@
           >
           <input
             v-model="proxy.host"
-            class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+            class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
             placeholder="例如: 192.168.1.100"
             type="text"
           />
@@ -62,7 +62,7 @@
           >
           <input
             v-model="proxy.port"
-            class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+            class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
             placeholder="例如: 1080"
             type="number"
           />
@@ -92,7 +92,7 @@
             >
             <input
               v-model="proxy.username"
-              class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+              class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
               placeholder="代理用户名"
               type="text"
             />
@@ -104,7 +104,7 @@
             <div class="relative">
               <input
                 v-model="proxy.password"
-                class="form-input w-full pr-10 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                class="form-input w-full border-gray-300 pr-10 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 placeholder="代理密码"
                 :type="showPassword ? 'text' : 'password'"
               />

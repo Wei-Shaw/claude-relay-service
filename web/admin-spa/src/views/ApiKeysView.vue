@@ -570,7 +570,16 @@
                     </td>
                     <td class="whitespace-nowrap px-3 py-4 text-sm">
                       <div class="inline-flex items-center gap-1.5">
-                        <span v-if="key.expiresAt">
+                        <!-- 未激活状态 -->
+                        <span
+                          v-if="key.expirationMode === 'activation' && !key.isActivated"
+                          class="inline-flex items-center text-blue-600 dark:text-blue-400"
+                        >
+                          <i class="fas fa-pause-circle mr-1" />
+                          未激活 ({{ key.activationDays || 30 }}天)
+                        </span>
+                        <!-- 已设置过期时间 -->
+                        <span v-else-if="key.expiresAt">
                           <span
                             v-if="isApiKeyExpired(key.expiresAt)"
                             class="inline-flex items-center text-red-600"
@@ -589,6 +598,7 @@
                             {{ formatExpireDate(key.expiresAt) }}
                           </span>
                         </span>
+                        <!-- 永不过期 -->
                         <span
                           v-else
                           class="inline-flex items-center text-gray-400 dark:text-gray-500"
@@ -2650,18 +2660,29 @@ const closeExpiryEdit = () => {
 }
 
 // 保存过期时间
-const handleSaveExpiry = async ({ keyId, expiresAt }) => {
+const handleSaveExpiry = async ({ keyId, expiresAt, activateNow }) => {
   try {
-    const data = await apiClient.put(`/admin/api-keys/${keyId}`, {
-      expiresAt: expiresAt || null
+    // 使用新的PATCH端点来修改过期时间
+    const data = await apiClient.patch(`/admin/api-keys/${keyId}/expiration`, {
+      expiresAt: expiresAt || null,
+      activateNow: activateNow || false
     })
 
     if (data.success) {
-      showToast('过期时间已更新', 'success')
+      showToast(activateNow ? 'API Key已激活' : '过期时间已更新', 'success')
       // 更新本地数据
       const key = apiKeys.value.find((k) => k.id === keyId)
       if (key) {
-        key.expiresAt = expiresAt || null
+        if (activateNow && data.updates) {
+          key.isActivated = true
+          key.activatedAt = data.updates.activatedAt
+          key.expiresAt = data.updates.expiresAt
+        } else {
+          key.expiresAt = expiresAt || null
+          if (expiresAt && !key.isActivated) {
+            key.isActivated = true
+          }
+        }
       }
       closeExpiryEdit()
     } else {
