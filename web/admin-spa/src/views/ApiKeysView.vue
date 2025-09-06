@@ -54,7 +54,8 @@
         <!-- Tab Content -->
         <!-- 活跃 API Keys Tab Panel -->
         <div v-if="activeTab === 'active'" class="tab-panel">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <!-- 工具栏区域 - 添加 mb-4 增加与表格的间距 -->
+          <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <!-- 筛选器组 -->
             <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
               <!-- 时间范围筛选 -->
@@ -104,7 +105,7 @@
                   <input
                     v-model="searchKeyword"
                     class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 pl-9 text-sm text-gray-700 placeholder-gray-400 shadow-sm transition-all duration-200 hover:border-gray-300 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 dark:hover:border-gray-500"
-                    placeholder="搜索名称..."
+                    :placeholder="isLdapEnabled ? '搜索名称或所有者...' : '搜索名称...'"
                     type="text"
                     @input="currentPage = 1"
                   />
@@ -136,40 +137,41 @@
                 />
                 <span class="relative">刷新</span>
               </button>
+
+              <!-- 批量编辑按钮 - 移到刷新按钮旁边 -->
+              <button
+                v-if="selectedApiKeys.length > 0"
+                class="group relative flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 shadow-sm transition-all duration-200 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md dark:border-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 sm:w-auto"
+                @click="openBatchEditModal()"
+              >
+                <div
+                  class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+                ></div>
+                <i class="fas fa-edit relative text-blue-600 dark:text-blue-400" />
+                <span class="relative">编辑选中 ({{ selectedApiKeys.length }})</span>
+              </button>
+
+              <!-- 批量删除按钮 - 移到刷新按钮旁边 -->
+              <button
+                v-if="selectedApiKeys.length > 0"
+                class="group relative flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 shadow-sm transition-all duration-200 hover:border-red-300 hover:bg-red-100 hover:shadow-md dark:border-red-700 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50 sm:w-auto"
+                @click="batchDeleteApiKeys()"
+              >
+                <div
+                  class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-red-500 to-pink-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+                ></div>
+                <i class="fas fa-trash relative text-red-600 dark:text-red-400" />
+                <span class="relative">删除选中 ({{ selectedApiKeys.length }})</span>
+              </button>
             </div>
-            <!-- 创建按钮 -->
+
+            <!-- 创建按钮 - 独立在右侧 -->
             <button
               class="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow-md transition-all duration-200 hover:from-blue-600 hover:to-blue-700 hover:shadow-lg sm:w-auto"
               @click.stop="openCreateApiKeyModal"
             >
               <i class="fas fa-plus"></i>
               <span>创建新 Key</span>
-            </button>
-
-            <!-- 批量编辑按钮 -->
-            <button
-              v-if="selectedApiKeys.length > 0"
-              class="group relative flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 shadow-sm transition-all duration-200 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md dark:border-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 sm:w-auto"
-              @click="openBatchEditModal()"
-            >
-              <div
-                class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
-              ></div>
-              <i class="fas fa-edit relative text-blue-600 dark:text-blue-400" />
-              <span class="relative">编辑选中 ({{ selectedApiKeys.length }})</span>
-            </button>
-
-            <!-- 批量删除按钮 -->
-            <button
-              v-if="selectedApiKeys.length > 0"
-              class="group relative flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 shadow-sm transition-all duration-200 hover:border-red-300 hover:bg-red-100 hover:shadow-md dark:border-red-700 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50 sm:w-auto"
-              @click="batchDeleteApiKeys()"
-            >
-              <div
-                class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-red-500 to-pink-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
-              ></div>
-              <i class="fas fa-trash relative text-red-600 dark:text-red-400" />
-              <span class="relative">删除选中 ({{ selectedApiKeys.length }})</span>
             </button>
           </div>
 
@@ -242,22 +244,39 @@
                   <th
                     class="w-[17%] min-w-[140px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    使用统计
-                    <span
-                      class="cursor-pointer rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-600"
-                      @click="sortApiKeys('cost')"
-                    >
-                      (费用
-                      <i
-                        v-if="apiKeysSortBy === 'cost'"
-                        :class="[
-                          'fas',
-                          apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down',
-                          'ml-1'
-                        ]"
-                      />
-                      <i v-else class="fas fa-sort ml-1 text-gray-400" />)
-                    </span>
+                    <div class="flex items-center gap-2">
+                      <span>使用统计</span>
+                      <span
+                        class="cursor-pointer rounded px-1.5 py-0.5 text-xs normal-case hover:bg-gray-100 dark:hover:bg-gray-600"
+                        @click="sortApiKeys('dailyCost')"
+                      >
+                        今日费用
+                        <i
+                          v-if="apiKeysSortBy === 'dailyCost'"
+                          :class="[
+                            'fas',
+                            apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down',
+                            'ml-0.5 text-[10px]'
+                          ]"
+                        />
+                        <i v-else class="fas fa-sort ml-0.5 text-[10px] text-gray-400" />
+                      </span>
+                      <span
+                        class="cursor-pointer rounded px-1.5 py-0.5 text-xs normal-case hover:bg-gray-100 dark:hover:bg-gray-600"
+                        @click="sortApiKeys('totalCost')"
+                      >
+                        总费用
+                        <i
+                          v-if="apiKeysSortBy === 'totalCost'"
+                          :class="[
+                            'fas',
+                            apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down',
+                            'ml-0.5 text-[10px]'
+                          ]"
+                        />
+                        <i v-else class="fas fa-sort ml-0.5 text-[10px] text-gray-400" />
+                      </span>
+                    </div>
                   </th>
                   <th
                     class="w-[10%] min-w-[90px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
@@ -402,6 +421,14 @@
                               使用共享池
                             </div>
                           </div>
+                          <!-- 显示所有者信息 -->
+                          <div
+                            v-if="isLdapEnabled && key.ownerDisplayName"
+                            class="mt-1 text-xs text-red-600"
+                          >
+                            <i class="fas fa-user mr-1" />
+                            {{ key.ownerDisplayName }}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -453,6 +480,12 @@
                             <span class="text-gray-600 dark:text-gray-400">今日费用</span>
                             <span class="font-semibold text-green-600"
                               >${{ (key.dailyCost || 0).toFixed(4) }}</span
+                            >
+                          </div>
+                          <div class="flex items-center justify-between text-sm">
+                            <span class="text-gray-600 dark:text-gray-400">总费用</span>
+                            <span class="font-semibold text-blue-600"
+                              >${{ (key.totalCost || 0).toFixed(4) }}</span
                             >
                           </div>
                           <div class="flex items-center justify-between text-sm">
@@ -537,7 +570,16 @@
                     </td>
                     <td class="whitespace-nowrap px-3 py-4 text-sm">
                       <div class="inline-flex items-center gap-1.5">
-                        <span v-if="key.expiresAt">
+                        <!-- 未激活状态 -->
+                        <span
+                          v-if="key.expirationMode === 'activation' && !key.isActivated"
+                          class="inline-flex items-center text-blue-600 dark:text-blue-400"
+                        >
+                          <i class="fas fa-pause-circle mr-1" />
+                          未激活 ({{ key.activationDays || 30 }}天)
+                        </span>
+                        <!-- 已设置过期时间 -->
+                        <span v-else-if="key.expiresAt">
                           <span
                             v-if="isApiKeyExpired(key.expiresAt)"
                             class="inline-flex items-center text-red-600"
@@ -556,6 +598,7 @@
                             {{ formatExpireDate(key.expiresAt) }}
                           </span>
                         </span>
+                        <!-- 永不过期 -->
                         <span
                           v-else
                           class="inline-flex items-center text-gray-400 dark:text-gray-500"
@@ -1023,6 +1066,11 @@
                   <i class="fas fa-share-alt mr-1" />
                   使用共享池
                 </div>
+                <!-- 显示所有者信息 -->
+                <div v-if="isLdapEnabled && key.ownerDisplayName" class="text-xs text-red-600">
+                  <i class="fas fa-user mr-1" />
+                  {{ key.ownerDisplayName }}
+                </div>
               </div>
 
               <!-- 统计信息 -->
@@ -1302,131 +1350,176 @@
           </div>
 
           <!-- 已删除的 API Keys 表格 -->
-          <div v-else class="table-container">
-            <table class="w-full table-fixed">
-              <thead class="bg-gray-50/80 backdrop-blur-sm dark:bg-gray-700/80">
-                <tr>
-                  <th
-                    class="w-[20%] min-w-[150px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    名称
-                  </th>
-                  <th
-                    class="w-[15%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    创建者
-                  </th>
-                  <th
-                    class="w-[15%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    创建时间
-                  </th>
-                  <th
-                    class="w-[15%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    删除者
-                  </th>
-                  <th
-                    class="w-[15%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    删除时间
-                  </th>
-                  <th
-                    class="w-[20%] min-w-[150px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    使用统计
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-200/50 dark:divide-gray-600/50">
-                <tr v-for="key in deletedApiKeys" :key="key.id" class="table-row">
-                  <td class="px-3 py-4">
-                    <div class="flex items-center">
-                      <div
-                        class="mr-2 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-red-500 to-red-600"
-                      >
-                        <i class="fas fa-trash text-xs text-white" />
-                      </div>
-                      <div class="min-w-0">
+          <div v-else>
+            <!-- 工具栏 -->
+            <div class="mb-4 flex justify-end">
+              <button
+                v-if="deletedApiKeys.length > 0"
+                class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
+                @click="clearAllDeletedApiKeys"
+              >
+                <i class="fas fa-trash-alt mr-2" />
+                清空所有已删除 ({{ deletedApiKeys.length }})
+              </button>
+            </div>
+
+            <div class="table-container">
+              <table class="w-full table-fixed">
+                <thead class="bg-gray-50/80 backdrop-blur-sm dark:bg-gray-700/80">
+                  <tr>
+                    <th
+                      class="w-[20%] min-w-[150px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      名称
+                    </th>
+                    <th
+                      v-if="isLdapEnabled"
+                      class="w-[15%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      创建者
+                    </th>
+                    <th
+                      class="w-[15%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      创建时间
+                    </th>
+                    <th
+                      class="w-[15%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      删除者
+                    </th>
+                    <th
+                      class="w-[15%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      删除时间
+                    </th>
+                    <th
+                      class="w-[20%] min-w-[150px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      使用统计
+                    </th>
+                    <th
+                      class="w-[10%] min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      操作
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200/50 dark:divide-gray-600/50">
+                  <tr v-for="key in deletedApiKeys" :key="key.id" class="table-row">
+                    <td class="px-3 py-4">
+                      <div class="flex items-center">
                         <div
-                          class="truncate text-sm font-semibold text-gray-900 dark:text-gray-100"
-                          :title="key.name"
+                          class="mr-2 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-red-500 to-red-600"
                         >
-                          {{ key.name }}
+                          <i class="fas fa-trash text-xs text-white" />
                         </div>
-                        <div
-                          class="truncate text-xs text-gray-500 dark:text-gray-400"
-                          :title="key.id"
+                        <div class="min-w-0">
+                          <div
+                            class="truncate text-sm font-semibold text-gray-900 dark:text-gray-100"
+                            :title="key.name"
+                          >
+                            {{ key.name }}
+                          </div>
+                          <div
+                            class="truncate text-xs text-gray-500 dark:text-gray-400"
+                            :title="key.id"
+                          >
+                            {{ key.id }}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td v-if="isLdapEnabled" class="px-3 py-4">
+                      <div class="text-sm">
+                        <span v-if="key.createdBy === 'admin'" class="text-blue-600">
+                          <i class="fas fa-user-shield mr-1" />
+                          管理员
+                        </span>
+                        <span v-else-if="key.userUsername" class="text-green-600">
+                          <i class="fas fa-user mr-1" />
+                          {{ key.userUsername }}
+                        </span>
+                        <span v-else class="text-gray-500 dark:text-gray-400">
+                          <i class="fas fa-question-circle mr-1" />
+                          未知
+                        </span>
+                      </div>
+                    </td>
+                    <td
+                      class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 dark:text-gray-400"
+                    >
+                      {{ formatDate(key.createdAt) }}
+                    </td>
+                    <td class="px-3 py-4">
+                      <div class="text-sm">
+                        <span v-if="key.deletedByType === 'admin'" class="text-blue-600">
+                          <i class="fas fa-user-shield mr-1" />
+                          {{ key.deletedBy }}
+                        </span>
+                        <span v-else-if="key.deletedByType === 'user'" class="text-green-600">
+                          <i class="fas fa-user mr-1" />
+                          {{ key.deletedBy }}
+                        </span>
+                        <span v-else class="text-gray-500 dark:text-gray-400">
+                          <i class="fas fa-cog mr-1" />
+                          {{ key.deletedBy }}
+                        </span>
+                      </div>
+                    </td>
+                    <td
+                      class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 dark:text-gray-400"
+                    >
+                      {{ formatDate(key.deletedAt) }}
+                    </td>
+                    <td class="px-3 py-4">
+                      <div class="text-sm">
+                        <div class="flex items-center justify-between">
+                          <span class="text-gray-600 dark:text-gray-400">请求</span>
+                          <span class="font-semibold text-gray-900 dark:text-gray-100">
+                            {{ formatNumber(key.usage?.total?.requests || 0) }}次
+                          </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                          <span class="text-gray-600 dark:text-gray-400">费用</span>
+                          <span class="font-semibold text-green-600">
+                            ${{ (key.usage?.total?.cost || 0).toFixed(4) }}
+                          </span>
+                        </div>
+                        <div v-if="key.lastUsedAt" class="flex items-center justify-between">
+                          <span class="text-gray-600 dark:text-gray-400">最后使用</span>
+                          <span class="font-medium text-gray-700 dark:text-gray-300">
+                            {{ formatLastUsed(key.lastUsedAt) }}
+                          </span>
+                        </div>
+                        <div v-else class="text-xs text-gray-400">从未使用</div>
+                      </div>
+                    </td>
+                    <td class="px-3 py-4">
+                      <div class="flex items-center gap-2">
+                        <button
+                          v-if="key.canRestore"
+                          class="rounded-lg bg-green-50 px-3 py-1.5 text-xs font-medium text-green-600 transition-colors hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
+                          title="恢复 API Key"
+                          @click="restoreApiKey(key.id)"
                         >
-                          {{ key.id }}
-                        </div>
+                          <i class="fas fa-undo mr-1" />
+                          恢复
+                        </button>
+                        <button
+                          class="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
+                          title="彻底删除 API Key"
+                          @click="permanentDeleteApiKey(key.id)"
+                        >
+                          <i class="fas fa-times mr-1" />
+                          彻底删除
+                        </button>
                       </div>
-                    </div>
-                  </td>
-                  <td class="px-3 py-4">
-                    <div class="text-sm">
-                      <span v-if="key.createdBy === 'admin'" class="text-blue-600">
-                        <i class="fas fa-user-shield mr-1" />
-                        管理员
-                      </span>
-                      <span v-else-if="key.userUsername" class="text-green-600">
-                        <i class="fas fa-user mr-1" />
-                        {{ key.userUsername }}
-                      </span>
-                      <span v-else class="text-gray-500 dark:text-gray-400">
-                        <i class="fas fa-question-circle mr-1" />
-                        未知
-                      </span>
-                    </div>
-                  </td>
-                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 dark:text-gray-400">
-                    {{ formatDate(key.createdAt) }}
-                  </td>
-                  <td class="px-3 py-4">
-                    <div class="text-sm">
-                      <span v-if="key.deletedByType === 'admin'" class="text-blue-600">
-                        <i class="fas fa-user-shield mr-1" />
-                        {{ key.deletedBy }}
-                      </span>
-                      <span v-else-if="key.deletedByType === 'user'" class="text-green-600">
-                        <i class="fas fa-user mr-1" />
-                        {{ key.deletedBy }}
-                      </span>
-                      <span v-else class="text-gray-500 dark:text-gray-400">
-                        <i class="fas fa-cog mr-1" />
-                        {{ key.deletedBy }}
-                      </span>
-                    </div>
-                  </td>
-                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 dark:text-gray-400">
-                    {{ formatDate(key.deletedAt) }}
-                  </td>
-                  <td class="px-3 py-4">
-                    <div class="text-sm">
-                      <div class="flex items-center justify-between">
-                        <span class="text-gray-600 dark:text-gray-400">请求</span>
-                        <span class="font-semibold text-gray-900 dark:text-gray-100">
-                          {{ formatNumber(key.usage?.total?.requests || 0) }}次
-                        </span>
-                      </div>
-                      <div class="flex items-center justify-between">
-                        <span class="text-gray-600 dark:text-gray-400">费用</span>
-                        <span class="font-semibold text-green-600">
-                          ${{ (key.usage?.total?.cost || 0).toFixed(4) }}
-                        </span>
-                      </div>
-                      <div v-if="key.lastUsedAt" class="flex items-center justify-between">
-                        <span class="text-gray-600 dark:text-gray-400">最后使用</span>
-                        <span class="font-medium text-gray-700 dark:text-gray-300">
-                          {{ formatLastUsed(key.lastUsedAt) }}
-                        </span>
-                      </div>
-                      <div v-else class="text-xs text-gray-400">从未使用</div>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -1499,6 +1592,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
 import { useClientsStore } from '@/stores/clients'
+import { useAuthStore } from '@/stores/auth'
 import CreateApiKeyModal from '@/components/apikeys/CreateApiKeyModal.vue'
 import EditApiKeyModal from '@/components/apikeys/EditApiKeyModal.vue'
 import RenewApiKeyModal from '@/components/apikeys/RenewApiKeyModal.vue'
@@ -1512,7 +1606,11 @@ import CustomDropdown from '@/components/common/CustomDropdown.vue'
 
 // 响应式数据
 const clientsStore = useClientsStore()
+const authStore = useAuthStore()
 const apiKeys = ref([])
+
+// 获取 LDAP 启用状态
+const isLdapEnabled = computed(() => authStore.oemSettings?.ldapEnabled || false)
 
 // 多选相关状态
 const selectedApiKeys = ref([])
@@ -1525,8 +1623,8 @@ const apiKeyStatsTimeRange = ref('today')
 const activeTab = ref('active')
 const deletedApiKeys = ref([])
 const deletedApiKeysLoading = ref(false)
-const apiKeysSortBy = ref('')
-const apiKeysSortOrder = ref('asc')
+const apiKeysSortBy = ref('dailyCost')
+const apiKeysSortOrder = ref('desc')
 const expandedApiKeys = ref({})
 const apiKeyModelStats = ref({})
 const apiKeyDateFilters = ref({})
@@ -1601,12 +1699,22 @@ const sortedApiKeys = computed(() => {
     )
   }
 
-  // 然后进行名称搜索
+  // 然后进行名称搜索（搜索API Key名称和所有者名称）
   if (searchKeyword.value) {
     const keyword = searchKeyword.value.toLowerCase().trim()
-    filteredKeys = filteredKeys.filter(
-      (key) => key.name && key.name.toLowerCase().includes(keyword)
-    )
+    filteredKeys = filteredKeys.filter((key) => {
+      // 搜索API Key名称
+      const nameMatch = key.name && key.name.toLowerCase().includes(keyword)
+      // 如果启用了 LDAP，搜索所有者名称
+      if (isLdapEnabled.value) {
+        const ownerMatch =
+          key.ownerDisplayName && key.ownerDisplayName.toLowerCase().includes(keyword)
+        // 如果API Key名称或所有者名称匹配，则包含该条目
+        return nameMatch || ownerMatch
+      }
+      // 未启用 LDAP 时只搜索名称
+      return nameMatch
+    })
   }
 
   // 如果没有排序字段，返回筛选后的结果
@@ -1621,9 +1729,12 @@ const sortedApiKeys = computed(() => {
     if (apiKeysSortBy.value === 'status') {
       aVal = a.isActive ? 1 : 0
       bVal = b.isActive ? 1 : 0
-    } else if (apiKeysSortBy.value === 'cost') {
-      aVal = parseFloat(calculateApiKeyCost(a.usage).replace('$', ''))
-      bVal = parseFloat(calculateApiKeyCost(b.usage).replace('$', ''))
+    } else if (apiKeysSortBy.value === 'dailyCost') {
+      aVal = a.dailyCost || 0
+      bVal = b.dailyCost || 0
+    } else if (apiKeysSortBy.value === 'totalCost') {
+      aVal = a.totalCost || 0
+      bVal = b.totalCost || 0
     } else if (apiKeysSortBy.value === 'createdAt' || apiKeysSortBy.value === 'expiresAt') {
       aVal = aVal ? new Date(aVal).getTime() : 0
       bVal = bVal ? new Date(bVal).getTime() : 0
@@ -1806,13 +1917,6 @@ const sortApiKeys = (field) => {
 const formatNumber = (num) => {
   if (!num && num !== 0) return '0'
   return num.toLocaleString('zh-CN')
-}
-
-// 计算API Key费用
-const calculateApiKeyCost = (usage) => {
-  if (!usage || !usage.total) return '$0.0000'
-  const cost = usage.total.cost || 0
-  return `$${cost.toFixed(4)}`
 }
 
 // 获取绑定账户名称
@@ -2309,6 +2413,118 @@ const deleteApiKey = async (keyId) => {
   }
 }
 
+// 恢复API Key
+const restoreApiKey = async (keyId) => {
+  let confirmed = false
+
+  if (window.showConfirm) {
+    confirmed = await window.showConfirm(
+      '恢复 API Key',
+      '确定要恢复这个 API Key 吗？恢复后可以重新使用。',
+      '确定恢复',
+      '取消'
+    )
+  } else {
+    // 降级方案
+    confirmed = confirm('确定要恢复这个 API Key 吗？恢复后可以重新使用。')
+  }
+
+  if (!confirmed) return
+
+  try {
+    const data = await apiClient.post(`/admin/api-keys/${keyId}/restore`)
+    if (data.success) {
+      showToast('API Key 已成功恢复', 'success')
+      // 刷新已删除列表
+      await loadDeletedApiKeys()
+      // 同时刷新活跃列表
+      await loadApiKeys()
+    } else {
+      showToast(data.error || '恢复失败', 'error')
+    }
+  } catch (error) {
+    showToast(error.response?.data?.error || '恢复失败', 'error')
+  }
+}
+
+// 彻底删除API Key
+const permanentDeleteApiKey = async (keyId) => {
+  let confirmed = false
+
+  if (window.showConfirm) {
+    confirmed = await window.showConfirm(
+      '彻底删除 API Key',
+      '确定要彻底删除这个 API Key 吗？此操作不可恢复，所有相关数据将被永久删除。',
+      '确定彻底删除',
+      '取消'
+    )
+  } else {
+    // 降级方案
+    confirmed = confirm('确定要彻底删除这个 API Key 吗？此操作不可恢复，所有相关数据将被永久删除。')
+  }
+
+  if (!confirmed) return
+
+  try {
+    const data = await apiClient.delete(`/admin/api-keys/${keyId}/permanent`)
+    if (data.success) {
+      showToast('API Key 已彻底删除', 'success')
+      // 刷新已删除列表
+      loadDeletedApiKeys()
+    } else {
+      showToast(data.error || '彻底删除失败', 'error')
+    }
+  } catch (error) {
+    showToast(error.response?.data?.error || '彻底删除失败', 'error')
+  }
+}
+
+// 清空所有已删除的API Keys
+const clearAllDeletedApiKeys = async () => {
+  const count = deletedApiKeys.value.length
+  if (count === 0) {
+    showToast('没有需要清空的 API Keys', 'info')
+    return
+  }
+
+  let confirmed = false
+
+  if (window.showConfirm) {
+    confirmed = await window.showConfirm(
+      '清空所有已删除的 API Keys',
+      `确定要彻底删除全部 ${count} 个已删除的 API Keys 吗？此操作不可恢复，所有相关数据将被永久删除。`,
+      '确定清空全部',
+      '取消'
+    )
+  } else {
+    // 降级方案
+    confirmed = confirm(`确定要彻底删除全部 ${count} 个已删除的 API Keys 吗？此操作不可恢复。`)
+  }
+
+  if (!confirmed) return
+
+  try {
+    const data = await apiClient.delete('/admin/api-keys/deleted/clear-all')
+    if (data.success) {
+      showToast(data.message || '已清空所有已删除的 API Keys', 'success')
+
+      // 如果有失败的，显示详细信息
+      if (data.details && data.details.failedCount > 0) {
+        const errors = data.details.errors
+        console.error('部分API Keys清空失败:', errors)
+        showToast(`${data.details.failedCount} 个清空失败，请查看控制台`, 'warning')
+      }
+
+      // 刷新已删除列表
+      loadDeletedApiKeys()
+    } else {
+      showToast(data.error || '清空失败', 'error')
+    }
+  } catch (error) {
+    showToast(error.response?.data?.error || '清空失败', 'error')
+  }
+}
+
 // 批量删除API Keys
 const batchDeleteApiKeys = async () => {
   const selectedCount = selectedApiKeys.value.length
@@ -2444,18 +2660,29 @@ const closeExpiryEdit = () => {
 }
 
 // 保存过期时间
-const handleSaveExpiry = async ({ keyId, expiresAt }) => {
+const handleSaveExpiry = async ({ keyId, expiresAt, activateNow }) => {
   try {
-    const data = await apiClient.put(`/admin/api-keys/${keyId}`, {
-      expiresAt: expiresAt || null
+    // 使用新的PATCH端点来修改过期时间
+    const data = await apiClient.patch(`/admin/api-keys/${keyId}/expiration`, {
+      expiresAt: expiresAt || null,
+      activateNow: activateNow || false
     })
 
     if (data.success) {
-      showToast('过期时间已更新', 'success')
+      showToast(activateNow ? 'API Key已激活' : '过期时间已更新', 'success')
       // 更新本地数据
       const key = apiKeys.value.find((k) => k.id === keyId)
       if (key) {
-        key.expiresAt = expiresAt || null
+        if (activateNow && data.updates) {
+          key.isActivated = true
+          key.activatedAt = data.updates.activatedAt
+          key.expiresAt = data.updates.expiresAt
+        } else {
+          key.expiresAt = expiresAt || null
+          if (expiresAt && !key.isActivated) {
+            key.isActivated = true
+          }
+        }
       }
       closeExpiryEdit()
     } else {

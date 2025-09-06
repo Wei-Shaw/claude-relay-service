@@ -86,6 +86,33 @@ function decryptGeminiData(encryptedData) {
   }
 }
 
+// API Key 哈希函数（与apiKeyService保持一致）
+function hashApiKey(apiKey) {
+  if (!apiKey || !config.security.encryptionKey) {
+    return apiKey
+  }
+
+  return crypto
+    .createHash('sha256')
+    .update(apiKey + config.security.encryptionKey)
+    .digest('hex')
+}
+
+// 检查是否为明文API Key（通过格式判断，不依赖前缀）
+function isPlaintextApiKey(apiKey) {
+  if (!apiKey || typeof apiKey !== 'string') {
+    return false
+  }
+
+  // SHA256哈希值固定为64个十六进制字符，如果是哈希值则返回false
+  if (apiKey.length === 64 && /^[a-f0-9]+$/i.test(apiKey)) {
+    return false // 已经是哈希值
+  }
+
+  // 其他情况都认为是明文API Key（包括sk-ant-、cr_、自定义前缀等）
+  return true
+}
+
 // 数据加密函数（用于导入）
 function encryptClaudeData(data) {
   if (!data || !config.security.encryptionKey) {
@@ -651,6 +678,13 @@ Important Notes:
   - If importing decrypted data, it will be re-encrypted automatically
   - If importing encrypted data, it will be stored as-is
   - Sanitized exports cannot be properly imported (missing sensitive data)
+  - Automatic handling of plaintext API Keys
+    * Uses your configured API_KEY_PREFIX from config (sk-, cr_, etc.)
+    * Automatically detects plaintext vs hashed API Keys by format
+    * Plaintext API Keys are automatically hashed during import
+    * Hash mappings are created correctly for plaintext keys
+    * Supports custom prefixes and legacy format detection
+    * No manual conversion needed - just import your backup file
 
 Examples:
   # Export all data with decryption (for migration)
@@ -659,7 +693,7 @@ Examples:
   # Export without decrypting (for backup)
   node scripts/data-transfer-enhanced.js export --decrypt=false
 
-  # Import data (auto-handles encryption)
+  # Import data (auto-handles encryption and plaintext API keys)
   node scripts/data-transfer-enhanced.js import --input=backup.json
 
   # Import with force overwrite
@@ -773,6 +807,26 @@ async function importData() {
           const apiKeyData = { ...apiKey }
           delete apiKeyData.usageStats
 
+          // 检查并处理API Key哈希
+          let plainTextApiKey = null
+          let hashedApiKey = null
+
+          if (apiKeyData.apiKey && isPlaintextApiKey(apiKeyData.apiKey)) {
+            // 如果是明文API Key，保存明文并计算哈希
+            plainTextApiKey = apiKeyData.apiKey
+            hashedApiKey = hashApiKey(plainTextApiKey)
+            logger.info(`🔐 Detected plaintext API Key for: ${apiKey.name} (${apiKey.id})`)
+          } else if (apiKeyData.apiKey) {
+            // 如果已经是哈希值，直接使用
+            hashedApiKey = apiKeyData.apiKey
+            logger.info(`🔍 Using existing hashed API Key for: ${apiKey.name} (${apiKey.id})`)
+          }
+
+          // API Key字段始终存储哈希值
+          if (hashedApiKey) {
+            apiKeyData.apiKey = hashedApiKey
+          }
+
           // 使用 hset 存储到哈希表
           const pipeline = redis.client.pipeline()
           for (const [field, value] of Object.entries(apiKeyData)) {
@@ -780,9 +834,12 @@ async function importData() {
           }
           await pipeline.exec()
 
-          // 更新哈希映射
-          if (apiKey.apiKey && !importDataObj.metadata.sanitized) {
-            await redis.client.hset('apikey:hash_map', apiKey.apiKey, apiKey.id)
+          // 更新哈希映射：hash_map的key必须是哈希值
+          if (!importDataObj.metadata.sanitized && hashedApiKey) {
+            await redis.client.hset('apikey:hash_map', hashedApiKey, apiKey.id)
+            logger.info(
+              `📝 Updated hash mapping: ${hashedApiKey.substring(0, 8)}... -> ${apiKey.id}`
+            )
           }
 
           // 导入使用统计数据

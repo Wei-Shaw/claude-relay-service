@@ -343,20 +343,22 @@ async function handleLoadCodeAssist(req, res) {
 
     const client = await geminiAccountService.getOauthClient(accessToken, refreshToken, proxyConfig)
 
-    // 根据账户配置决定项目ID：
-    // 1. 如果账户有项目ID -> 使用账户的项目ID（强制覆盖）
-    // 2. 如果账户没有项目ID -> 传递 null（移除项目ID）
-    let effectiveProjectId = null
+    // 智能处理项目ID：
+    // 1. 如果账户配置了项目ID -> 使用账户的项目ID（覆盖请求中的）
+    // 2. 如果账户没有项目ID -> 使用请求中的cloudaicompanionProject
+    // 3. 都没有 -> 传null
+    const effectiveProjectId = projectId || cloudaicompanionProject || null
 
-    if (projectId) {
-      // 账户配置了项目ID，强制使用它
-      effectiveProjectId = projectId
-      logger.info('Using account project ID for loadCodeAssist:', effectiveProjectId)
-    } else {
-      // 账户没有配置项目ID，确保不传递项目ID
-      effectiveProjectId = null
-      logger.info('No project ID in account for loadCodeAssist, removing project parameter')
-    }
+    logger.info('📋 loadCodeAssist项目ID处理逻辑', {
+      accountProjectId: projectId,
+      requestProjectId: cloudaicompanionProject,
+      effectiveProjectId,
+      decision: projectId
+        ? '使用账户配置'
+        : cloudaicompanionProject
+          ? '使用请求参数'
+          : '不使用项目ID'
+    })
 
     const response = await geminiAccountService.loadCodeAssist(
       client,
@@ -413,20 +415,22 @@ async function handleOnboardUser(req, res) {
 
     const client = await geminiAccountService.getOauthClient(accessToken, refreshToken, proxyConfig)
 
-    // 根据账户配置决定项目ID：
-    // 1. 如果账户有项目ID -> 使用账户的项目ID（强制覆盖）
-    // 2. 如果账户没有项目ID -> 传递 null（移除项目ID）
-    let effectiveProjectId = null
+    // 智能处理项目ID：
+    // 1. 如果账户配置了项目ID -> 使用账户的项目ID（覆盖请求中的）
+    // 2. 如果账户没有项目ID -> 使用请求中的cloudaicompanionProject
+    // 3. 都没有 -> 传null
+    const effectiveProjectId = projectId || cloudaicompanionProject || null
 
-    if (projectId) {
-      // 账户配置了项目ID，强制使用它
-      effectiveProjectId = projectId
-      logger.info('Using account project ID:', effectiveProjectId)
-    } else {
-      // 账户没有配置项目ID，确保不传递项目ID（即使客户端传了也要移除）
-      effectiveProjectId = null
-      logger.info('No project ID in account, removing project parameter')
-    }
+    logger.info('📋 onboardUser项目ID处理逻辑', {
+      accountProjectId: projectId,
+      requestProjectId: cloudaicompanionProject,
+      effectiveProjectId,
+      decision: projectId
+        ? '使用账户配置'
+        : cloudaicompanionProject
+          ? '使用请求参数'
+          : '不使用项目ID'
+    })
 
     // 如果提供了 tierId，直接调用 onboardUser
     if (tierId) {
@@ -593,11 +597,24 @@ async function handleGenerateContent(req, res) {
 
     const client = await geminiAccountService.getOauthClient(accessToken, refreshToken, proxyConfig)
 
+    // 智能处理项目ID：
+    // 1. 如果账户配置了项目ID -> 使用账户的项目ID（覆盖请求中的）
+    // 2. 如果账户没有项目ID -> 使用请求中的项目ID（如果有的话）
+    // 3. 都没有 -> 传null
+    const effectiveProjectId = account.projectId || project || null
+
+    logger.info('📋 项目ID处理逻辑', {
+      accountProjectId: account.projectId,
+      requestProjectId: project,
+      effectiveProjectId,
+      decision: account.projectId ? '使用账户配置' : project ? '使用请求参数' : '不使用项目ID'
+    })
+
     const response = await geminiAccountService.generateContent(
       client,
       { model, request: actualRequestData },
       user_prompt_id,
-      account.projectId, // 始终使用账户配置的项目ID，忽略请求中的project
+      effectiveProjectId, // 使用智能决策的项目ID
       req.apiKey?.id, // 使用 API Key ID 作为 session ID
       proxyConfig // 传递代理配置
     )
@@ -729,11 +746,24 @@ async function handleStreamGenerateContent(req, res) {
 
     const client = await geminiAccountService.getOauthClient(accessToken, refreshToken, proxyConfig)
 
+    // 智能处理项目ID：
+    // 1. 如果账户配置了项目ID -> 使用账户的项目ID（覆盖请求中的）
+    // 2. 如果账户没有项目ID -> 使用请求中的项目ID（如果有的话）
+    // 3. 都没有 -> 传null
+    const effectiveProjectId = account.projectId || project || null
+
+    logger.info('📋 流式请求项目ID处理逻辑', {
+      accountProjectId: account.projectId,
+      requestProjectId: project,
+      effectiveProjectId,
+      decision: account.projectId ? '使用账户配置' : project ? '使用请求参数' : '不使用项目ID'
+    })
+
     const streamResponse = await geminiAccountService.generateContentStream(
       client,
       { model, request: actualRequestData },
       user_prompt_id,
-      account.projectId, // 始终使用账户配置的项目ID，忽略请求中的project
+      effectiveProjectId, // 使用智能决策的项目ID
       req.apiKey?.id, // 使用 API Key ID 作为 session ID
       abortController.signal, // 传递中止信号
       proxyConfig // 传递代理配置

@@ -123,7 +123,10 @@
           <!-- Token 分布和限制配置 -->
           <div class="mb-6 grid grid-cols-1 gap-4 md:mb-8 md:gap-6 lg:grid-cols-2">
             <TokenDistribution />
-            <LimitConfig />
+            <!-- 单key模式下显示限制配置 -->
+            <LimitConfig v-if="!multiKeyMode" />
+            <!-- 多key模式下显示聚合统计卡片，填充右侧空白 -->
+            <AggregatedStatsCard v-if="multiKeyMode" />
           </div>
 
           <!-- 模型使用统计 -->
@@ -153,6 +156,7 @@ import ApiKeyInput from '@/components/apistats/ApiKeyInput.vue'
 import StatsOverview from '@/components/apistats/StatsOverview.vue'
 import TokenDistribution from '@/components/apistats/TokenDistribution.vue'
 import LimitConfig from '@/components/apistats/LimitConfig.vue'
+import AggregatedStatsCard from '@/components/apistats/AggregatedStatsCard.vue'
 import ModelUsageStats from '@/components/apistats/ModelUsageStats.vue'
 import TutorialView from './TutorialView.vue'
 
@@ -175,7 +179,8 @@ const {
   error,
   statsPeriod,
   statsData,
-  oemSettings
+  oemSettings,
+  multiKeyMode
 } = storeToRefs(apiStatsStore)
 
 const { queryStats, switchPeriod, loadStatsWithApiId, loadOemSettings, reset } = apiStatsStore

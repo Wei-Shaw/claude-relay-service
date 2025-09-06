@@ -1022,13 +1022,21 @@ async function loadCodeAssist(client, projectId = null, proxyConfig = null) {
   const clientMetadata = {
     ideType: 'IDE_UNSPECIFIED',
     platform: 'PLATFORM_UNSPECIFIED',
-    pluginType: 'GEMINI',
-    duetProject: projectId
+    pluginType: 'GEMINI'
+  }
+
+  // 只有当projectId存在时才添加duetProject
+  if (projectId) {
+    clientMetadata.duetProject = projectId
   }
 
   const request = {
-    cloudaicompanionProject: projectId,
     metadata: clientMetadata
+  }
+
+  // 只有当projectId存在时才添加cloudaicompanionProject
+  if (projectId) {
+    request.cloudaicompanionProject = projectId
   }
 
   const axiosConfig = {
@@ -1096,8 +1104,12 @@ async function onboardUser(client, tierId, projectId, clientMetadata, proxyConfi
 
   const onboardReq = {
     tierId,
-    cloudaicompanionProject: projectId,
     metadata: clientMetadata
+  }
+
+  // 只有当projectId存在时才添加cloudaicompanionProject
+  if (projectId) {
+    onboardReq.cloudaicompanionProject = projectId
   }
 
   // 创建基础axios配置
@@ -1278,12 +1290,16 @@ async function generateContent(
   // 按照 gemini-cli 的转换格式构造请求
   const request = {
     model: requestData.model,
-    project: projectId,
     user_prompt_id: userPromptId,
     request: {
       ...requestData.request,
       session_id: sessionId
     }
+  }
+
+  // 只有当projectId存在时才添加project字段
+  if (projectId) {
+    request.project = projectId
   }
 
   logger.info('🤖 generateContent API调用开始', {
@@ -1340,12 +1356,16 @@ async function generateContentStream(
   // 按照 gemini-cli 的转换格式构造请求
   const request = {
     model: requestData.model,
-    project: projectId,
     user_prompt_id: userPromptId,
     request: {
       ...requestData.request,
       session_id: sessionId
     }
+  }
+
+  // 只有当projectId存在时才添加project字段
+  if (projectId) {
+    request.project = projectId
   }
 
   logger.info('🌊 streamGenerateContent API调用开始', {

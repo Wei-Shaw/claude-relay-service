@@ -198,6 +198,13 @@ class ClaudeRelayService {
             )
           }
         }
+        // 检查是否为403状态码（禁止访问）
+        else if (response.statusCode === 403) {
+          logger.error(
+            `🚫 Forbidden error (403) detected for account ${accountId}, marking as blocked`
+          )
+          await unifiedClaudeScheduler.markAccountBlocked(accountId, accountType, sessionHash)
+        }
         // 检查是否为5xx状态码
         else if (response.statusCode >= 500 && response.statusCode < 600) {
           logger.warn(`🔥 Server error (${response.statusCode}) detected for account ${accountId}`)
@@ -664,7 +671,10 @@ class ClaudeRelayService {
       }
 
       // 使用统一 User-Agent 或客户端提供的，最后使用默认值
-      if (!options.headers['User-Agent'] && !options.headers['user-agent']) {
+      if (
+        (!options.headers['User-Agent'] && !options.headers['user-agent']) ||
+        account.useUnifiedUserAgent === 'true'
+      ) {
         const userAgent =
           unifiedUA ||
           clientHeaders?.['user-agent'] ||
@@ -673,8 +683,9 @@ class ClaudeRelayService {
         options.headers['User-Agent'] = userAgent
       }
 
-      logger.info(`🔗 指纹是这个: ${options.headers['User-Agent']}`)
-      logger.info(`🔗 指纹是这个: ${options.headers['user-agent']}`)
+      logger.info(
+        `🔗 指纹是这个: ${options.headers['User-Agent'] || options.headers['user-agent']}`
+      )
 
       // 使用自定义的 betaHeader 或默认值
       const betaHeader =
@@ -930,7 +941,10 @@ class ClaudeRelayService {
       }
 
       // 使用统一 User-Agent 或客户端提供的，最后使用默认值
-      if (!options.headers['User-Agent'] && !options.headers['user-agent']) {
+      if (
+        (!options.headers['User-Agent'] && !options.headers['user-agent']) ||
+        account.useUnifiedUserAgent === 'true'
+      ) {
         const userAgent =
           unifiedUA ||
           clientHeaders?.['user-agent'] ||
@@ -939,6 +953,9 @@ class ClaudeRelayService {
         options.headers['User-Agent'] = userAgent
       }
 
+      logger.info(
+        `🔗 指纹是这个: ${options.headers['User-Agent'] || options.headers['user-agent']}`
+      )
       // 使用自定义的 betaHeader 或默认值
       const betaHeader =
         requestOptions?.betaHeader !== undefined ? requestOptions.betaHeader : this.betaHeader
@@ -953,8 +970,32 @@ class ClaudeRelayService {
         if (res.statusCode !== 200) {
           // 将错误处理逻辑封装在一个异步函数中
           const handleErrorResponse = async () => {
-            // 增加对5xx错误的处理
-            if (res.statusCode >= 500 && res.statusCode < 600) {
+            if (res.statusCode === 401) {
+              logger.warn(`🔐 [Stream] Unauthorized error (401) detected for account ${accountId}`)
+
+              await this.recordUnauthorizedError(accountId)
+
+              const errorCount = await this.getUnauthorizedErrorCount(accountId)
+              logger.info(
+                `🔐 [Stream] Account ${accountId} has ${errorCount} consecutive 401 errors in the last 5 minutes`
+              )
+
+              if (errorCount >= 1) {
+                logger.error(
+                  `❌ [Stream] Account ${accountId} encountered 401 error (${errorCount} errors), marking as unauthorized`
+                )
+                await unifiedClaudeScheduler.markAccountUnauthorized(
+                  accountId,
+                  accountType,
+                  sessionHash
+                )
+              }
+            } else if (res.statusCode === 403) {
+              logger.error(
+                `🚫 [Stream] Forbidden error (403) detected for account ${accountId}, marking as blocked`
+              )
+              await unifiedClaudeScheduler.markAccountBlocked(accountId, accountType, sessionHash)
+            } else if (res.statusCode >= 500 && res.statusCode < 600) {
               logger.warn(
                 `🔥 [Stream] Server error (${res.statusCode}) detected for account ${accountId}`
               )

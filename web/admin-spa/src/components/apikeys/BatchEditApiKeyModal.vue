@@ -127,7 +127,7 @@
                   <div class="flex gap-2">
                     <input
                       v-model="newTag"
-                      class="form-input flex-1 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                      class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                       placeholder="输入新标签名称"
                       type="text"
                       @keypress.enter.prevent="addTag"
@@ -166,7 +166,7 @@
                   </label>
                   <input
                     v-model="form.rateLimitWindow"
-                    class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                    class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                     min="1"
                     placeholder="不修改"
                     type="number"
@@ -179,7 +179,7 @@
                   >
                   <input
                     v-model="form.rateLimitRequests"
-                    class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                    class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                     min="1"
                     placeholder="不修改"
                     type="number"
@@ -188,12 +188,14 @@
 
                 <div>
                   <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300"
-                    >Token 限制</label
+                    >费用限制 (美元)</label
                   >
                   <input
-                    v-model="form.tokenLimit"
-                    class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                    v-model="form.rateLimitCost"
+                    class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                    min="0"
                     placeholder="不修改"
+                    step="0.01"
                     type="number"
                   />
                 </div>
@@ -208,12 +210,30 @@
             </label>
             <input
               v-model="form.dailyCostLimit"
-              class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+              class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
               min="0"
               placeholder="不修改 (0 表示无限制)"
               step="0.01"
               type="number"
             />
+          </div>
+
+          <!-- Opus 模型周费用限制 -->
+          <div>
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+              Opus 模型周费用限制 (美元)
+            </label>
+            <input
+              v-model="form.weeklyOpusCostLimit"
+              class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+              min="0"
+              placeholder="不修改 (0 表示无限制)"
+              step="0.01"
+              type="number"
+            />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              设置 Opus 模型的周费用限制（周一到周日），仅限 Claude 官方账户
+            </p>
           </div>
 
           <!-- 并发限制 -->
@@ -223,7 +243,7 @@
             >
             <input
               v-model="form.concurrencyLimit"
-              class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+              class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
               min="0"
               placeholder="不修改 (0 表示无限制)"
               type="number"
@@ -310,7 +330,7 @@
                 >
                 <select
                   v-model="form.claudeAccountId"
-                  class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                   :disabled="form.permissions === 'gemini' || form.permissions === 'openai'"
                 >
                   <option value="">不修改</option>
@@ -345,7 +365,7 @@
                 >
                 <select
                   v-model="form.geminiAccountId"
-                  class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                   :disabled="form.permissions === 'claude' || form.permissions === 'openai'"
                 >
                   <option value="">不修改</option>
@@ -376,7 +396,7 @@
                 >
                 <select
                   v-model="form.openaiAccountId"
-                  class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                   :disabled="form.permissions === 'claude' || form.permissions === 'gemini'"
                 >
                   <option value="">不修改</option>
@@ -407,7 +427,7 @@
                 >
                 <select
                   v-model="form.bedrockAccountId"
-                  class="form-input w-full dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                   :disabled="form.permissions === 'gemini' || form.permissions === 'openai'"
                 >
                   <option value="">不修改</option>
@@ -496,11 +516,12 @@ const unselectedTags = computed(() => {
 
 // 表单数据
 const form = reactive({
-  tokenLimit: '',
+  rateLimitCost: '', // 费用限制替代token限制
   rateLimitWindow: '',
   rateLimitRequests: '',
   concurrencyLimit: '',
   dailyCostLimit: '',
+  weeklyOpusCostLimit: '', // 新增Opus周费用限制
   permissions: '', // 空字符串表示不修改
   claudeAccountId: '',
   geminiAccountId: '',
@@ -616,8 +637,8 @@ const batchUpdateApiKeys = async () => {
     const updates = {}
 
     // 只有非空值才添加到更新对象中
-    if (form.tokenLimit !== '' && form.tokenLimit !== null) {
-      updates.tokenLimit = parseInt(form.tokenLimit)
+    if (form.rateLimitCost !== '' && form.rateLimitCost !== null) {
+      updates.rateLimitCost = parseFloat(form.rateLimitCost)
     }
     if (form.rateLimitWindow !== '' && form.rateLimitWindow !== null) {
       updates.rateLimitWindow = parseInt(form.rateLimitWindow)
@@ -630,6 +651,9 @@ const batchUpdateApiKeys = async () => {
     }
     if (form.dailyCostLimit !== '' && form.dailyCostLimit !== null) {
       updates.dailyCostLimit = parseFloat(form.dailyCostLimit)
+    }
+    if (form.weeklyOpusCostLimit !== '' && form.weeklyOpusCostLimit !== null) {
+      updates.weeklyOpusCostLimit = parseFloat(form.weeklyOpusCostLimit)
     }
 
     // 权限设置
