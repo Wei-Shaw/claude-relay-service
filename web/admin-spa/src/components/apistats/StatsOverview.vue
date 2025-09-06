@@ -115,7 +115,19 @@
           <span class="mt-1 flex-shrink-0 text-sm text-gray-600 dark:text-gray-400 md:text-base"
             >过期时间</span
           >
-          <div v-if="statsData.expiresAt" class="text-right">
+          <!-- 未激活状态 -->
+          <div
+            v-if="statsData.expirationMode === 'activation' && !statsData.isActivated"
+            class="text-sm font-medium text-amber-600 dark:text-amber-500 md:text-base"
+          >
+            <i class="fas fa-pause-circle mr-1 text-xs md:text-sm" />
+            未激活
+            <span class="ml-1 text-xs text-gray-500 dark:text-gray-400"
+              >(首次使用后{{ statsData.activationDays || 30 }}天过期)</span
+            >
+          </div>
+          <!-- 已设置过期时间 -->
+          <div v-else-if="statsData.expiresAt" class="text-right">
             <div
               v-if="isApiKeyExpired(statsData.expiresAt)"
               class="text-sm font-medium text-red-600 md:text-base"
@@ -137,6 +149,7 @@
               {{ formatExpireDate(statsData.expiresAt) }}
             </div>
           </div>
+          <!-- 永不过期 -->
           <div v-else class="text-sm font-medium text-gray-400 dark:text-gray-500 md:text-base">
             <i class="fas fa-infinity mr-1 text-xs md:text-sm" />
             永不过期
