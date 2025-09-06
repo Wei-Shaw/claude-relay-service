@@ -554,13 +554,17 @@ const formatDate = (dateString) => {
 const loadUsers = async () => {
   loading.value = true
   try {
+    // Build params object, only including parameters with actual values
+    const params = {}
+    if (selectedRole.value && selectedRole.value.trim() !== '') {
+      params.role = selectedRole.value
+    }
+    if (selectedStatus.value !== '') {
+      params.isActive = selectedStatus.value
+    }
+
     const [usersResponse, statsResponse] = await Promise.all([
-      apiClient.get('/users', {
-        params: {
-          role: selectedRole.value || undefined,
-          isActive: selectedStatus.value !== '' ? selectedStatus.value : undefined
-        }
-      }),
+      apiClient.get('/users', { params }),
       apiClient.get('/users/stats/overview')
     ])
 

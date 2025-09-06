@@ -14,7 +14,7 @@ const {
   logRefreshSkipped
 } = require('../utils/tokenRefreshLogger')
 const LRUCache = require('../utils/lruCache')
-// const tokenRefreshService = require('./tokenRefreshService')
+const tokenRefreshService = require('./tokenRefreshService')
 
 // 加密相关常量
 const ALGORITHM = 'aes-256-cbc'
@@ -57,7 +57,17 @@ function encrypt(text) {
 
 // 解密函数
 function decrypt(text) {
-  if (!text) {
+  if (!text || text === '') {
+    return ''
+  }
+
+  // 检查是否是有效的加密格式（至少需要 32 个字符的 IV + 冒号 + 加密文本）
+  if (text.length < 33 || text.charAt(32) !== ':') {
+    logger.warn('Invalid encrypted text format, returning empty string', {
+      textLength: text ? text.length : 0,
+      char32: text && text.length > 32 ? text.charAt(32) : 'N/A',
+      first50: text ? text.substring(0, 50) : 'N/A'
+    })
     return ''
   }
 
@@ -135,6 +145,7 @@ async function refreshAccessToken(refreshToken, proxy = null) {
     const proxyAgent = ProxyHelper.createProxyAgent(proxy)
     if (proxyAgent) {
       requestOptions.httpsAgent = proxyAgent
+      requestOptions.proxy = false // 重要：禁用 axios 的默认代理，强制使用我们的 httpsAgent
       logger.info(
         `🌐 Using proxy for OpenAI token refresh: ${ProxyHelper.getProxyDescription(proxy)}`
       )
@@ -143,6 +154,7 @@ async function refreshAccessToken(refreshToken, proxy = null) {
     }
 
     // 发送请求
+    logger.info('🔍 发送 token 刷新请求，使用代理:', !!requestOptions.httpsAgent)
     const response = await axios(requestOptions)
 
     if (response.status === 200 && response.data) {
@@ -164,22 +176,73 @@ async function refreshAccessToken(refreshToken, proxy = null) {
   } catch (error) {
     if (error.response) {
       // 服务器响应了错误状态码
+      const errorData = error.response.data || {}
       logger.error('OpenAI token refresh failed:', {
         status: error.response.status,
-        data: error.response.data,
+        data: errorData,
         headers: error.response.headers
       })
-      throw new Error(
-        `Token refresh failed: ${error.response.status} - ${JSON.stringify(error.response.data)}`
-      )
+
+      // 构建详细的错误信息
+      let errorMessage = `OpenAI 服务器返回错误 (${error.response.status})`
+
+      if (error.response.status === 400) {
+        if (errorData.error === 'invalid_grant') {
+          errorMessage = 'Refresh Token 无效或已过期，请重新授权'
+        } else if (errorData.error === 'invalid_request') {
+          errorMessage = `请求参数错误：${errorData.error_description || errorData.error}`
+        } else {
+          errorMessage = `请求错误：${errorData.error_description || errorData.error || '未知错误'}`
+        }
+      } else if (error.response.status === 401) {
+        errorMessage = '认证失败：Refresh Token 无效'
+      } else if (error.response.status === 403) {
+        errorMessage = '访问被拒绝：可能是 IP 被封或账户被禁用'
+      } else if (error.response.status === 429) {
+        errorMessage = '请求过于频繁，请稍后重试'
+      } else if (error.response.status >= 500) {
+        errorMessage = 'OpenAI 服务器内部错误，请稍后重试'
+      } else if (errorData.error_description) {
+        errorMessage = errorData.error_description
+      } else if (errorData.error) {
+        errorMessage = errorData.error
+      } else if (errorData.message) {
+        errorMessage = errorData.message
+      }
+
+      const fullError = new Error(errorMessage)
+      fullError.status = error.response.status
+      fullError.details = errorData
+      throw fullError
     } else if (error.request) {
       // 请求已发出但没有收到响应
       logger.error('OpenAI token refresh no response:', error.message)
-      throw new Error(`Token refresh failed: No response from server - ${error.message}`)
+
+      let errorMessage = '无法连接到 OpenAI 服务器'
+      if (proxy) {
+        errorMessage += `（代理: ${ProxyHelper.getProxyDescription(proxy)}）`
+      }
+      if (error.code === 'ECONNREFUSED') {
+        errorMessage += ' - 连接被拒绝'
+      } else if (error.code === 'ETIMEDOUT') {
+        errorMessage += ' - 连接超时'
+      } else if (error.code === 'ENOTFOUND') {
+        errorMessage += ' - 无法解析域名'
+      } else if (error.code === 'EPROTO') {
+        errorMessage += ' - 协议错误（可能是代理配置问题）'
+      } else if (error.message) {
+        errorMessage += ` - ${error.message}`
+      }
+
+      const fullError = new Error(errorMessage)
+      fullError.code = error.code
+      throw fullError
     } else {
       // 设置请求时发生错误
       logger.error('OpenAI token refresh error:', error.message)
-      throw new Error(`Token refresh failed: ${error.message}`)
+      const fullError = new Error(`请求设置错误: ${error.message}`)
+      fullError.originalError = error
+      throw fullError
     }
   }
 }
@@ -192,34 +255,71 @@ function isTokenExpired(account) {
   return new Date(account.expiresAt) <= new Date()
 }
 
-// 刷新账户的 access token
+// 刷新账户的 access token（带分布式锁）
 async function refreshAccountToken(accountId) {
-  const account = await getAccount(accountId)
-  if (!account) {
-    throw new Error('Account not found')
-  }
-
-  const accountName = account.name || accountId
-  logRefreshStart(accountId, accountName, 'openai')
-
-  // 检查是否有 refresh token
-  const refreshToken = account.refreshToken ? decrypt(account.refreshToken) : null
-  if (!refreshToken) {
-    logRefreshSkipped(accountId, accountName, 'openai', 'No refresh token available')
-    throw new Error('No refresh token available')
-  }
-
-  // 获取代理配置
-  let proxy = null
-  if (account.proxy) {
-    try {
-      proxy = typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
-    } catch (e) {
-      logger.warn(`Failed to parse proxy config for account ${accountId}:`, e)
-    }
-  }
+  let lockAcquired = false
+  let account = null
+  let accountName = accountId
 
   try {
+    account = await getAccount(accountId)
+    if (!account) {
+      throw new Error('Account not found')
+    }
+
+    accountName = account.name || accountId
+
+    // 检查是否有 refresh token
+    // account.refreshToken 在 getAccount 中已经被解密了，直接使用即可
+    const refreshToken = account.refreshToken || null
+
+    if (!refreshToken) {
+      logRefreshSkipped(accountId, accountName, 'openai', 'No refresh token available')
+      throw new Error('No refresh token available')
+    }
+
+    // 尝试获取分布式锁
+    lockAcquired = await tokenRefreshService.acquireRefreshLock(accountId, 'openai')
+
+    if (!lockAcquired) {
+      // 如果无法获取锁，说明另一个进程正在刷新
+      logger.info(
+        `🔒 Token refresh already in progress for OpenAI account: ${accountName} (${accountId})`
+      )
+      logRefreshSkipped(accountId, accountName, 'openai', 'already_locked')
+
+      // 等待一段时间后返回，期望其他进程已完成刷新
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+
+      // 重新获取账户数据（可能已被其他进程刷新）
+      const updatedAccount = await getAccount(accountId)
+      if (updatedAccount && !isTokenExpired(updatedAccount)) {
+        return {
+          access_token: decrypt(updatedAccount.accessToken),
+          id_token: updatedAccount.idToken,
+          refresh_token: updatedAccount.refreshToken,
+          expires_in: 3600,
+          expiry_date: new Date(updatedAccount.expiresAt).getTime()
+        }
+      }
+
+      throw new Error('Token refresh in progress by another process')
+    }
+
+    // 获取锁成功，开始刷新
+    logRefreshStart(accountId, accountName, 'openai')
+    logger.info(`🔄 Starting token refresh for OpenAI account: ${accountName} (${accountId})`)
+
+    // 获取代理配置
+    let proxy = null
+    if (account.proxy) {
+      try {
+        proxy = typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
+      } catch (e) {
+        logger.warn(`Failed to parse proxy config for account ${accountId}:`, e)
+      }
+    }
+
     const newTokens = await refreshAccessToken(refreshToken, proxy)
     if (!newTokens) {
       throw new Error('Failed to refresh token')
@@ -231,9 +331,51 @@ async function refreshAccountToken(accountId) {
       expiresAt: new Date(newTokens.expiry_date).toISOString()
     }
 
-    // 如果有新的 ID token，也更新它
+    // 如果有新的 ID token，也更新它（这对于首次未提供 ID Token 的账户特别重要）
     if (newTokens.id_token) {
       updates.idToken = encrypt(newTokens.id_token)
+
+      // 如果之前没有 ID Token，尝试解析并更新用户信息
+      if (!account.idToken || account.idToken === '') {
+        try {
+          const idTokenParts = newTokens.id_token.split('.')
+          if (idTokenParts.length === 3) {
+            const payload = JSON.parse(Buffer.from(idTokenParts[1], 'base64').toString())
+            const authClaims = payload['https://api.openai.com/auth'] || {}
+
+            // 更新账户信息 - 使用正确的字段名
+            // OpenAI ID Token中用户ID在chatgpt_account_id、chatgpt_user_id和user_id字段
+            if (authClaims.chatgpt_account_id) {
+              updates.accountId = authClaims.chatgpt_account_id
+            }
+            if (authClaims.chatgpt_user_id) {
+              updates.chatgptUserId = authClaims.chatgpt_user_id
+            } else if (authClaims.user_id) {
+              // 有些情况下可能只有user_id字段
+              updates.chatgptUserId = authClaims.user_id
+            }
+            if (authClaims.organizations?.[0]?.id) {
+              updates.organizationId = authClaims.organizations[0].id
+            }
+            if (authClaims.organizations?.[0]?.role) {
+              updates.organizationRole = authClaims.organizations[0].role
+            }
+            if (authClaims.organizations?.[0]?.title) {
+              updates.organizationTitle = authClaims.organizations[0].title
+            }
+            if (payload.email) {
+              updates.email = encrypt(payload.email)
+            }
+            if (payload.email_verified !== undefined) {
+              updates.emailVerified = payload.email_verified
+            }
+
+            logger.info(`Updated user info from ID Token for account ${accountId}`)
+          }
+        } catch (e) {
+          logger.warn(`Failed to parse ID Token for account ${accountId}:`, e)
+        }
+      }
     }
 
     // 如果返回了新的 refresh token，更新它
@@ -248,8 +390,34 @@ async function refreshAccountToken(accountId) {
     logRefreshSuccess(accountId, accountName, 'openai', newTokens.expiry_date)
     return newTokens
   } catch (error) {
-    logRefreshError(accountId, accountName, 'openai', error.message)
+    logRefreshError(accountId, account?.name || accountName, 'openai', error.message)
+
+    // 发送 Webhook 通知（如果启用）
+    try {
+      const webhookNotifier = require('../utils/webhookNotifier')
+      await webhookNotifier.sendAccountAnomalyNotification({
+        accountId,
+        accountName: account?.name || accountName,
+        platform: 'openai',
+        status: 'error',
+        errorCode: 'OPENAI_TOKEN_REFRESH_FAILED',
+        reason: `Token refresh failed: ${error.message}`,
+        timestamp: new Date().toISOString()
+      })
+      logger.info(
+        `📢 Webhook notification sent for OpenAI account ${account?.name || accountName} refresh failure`
+      )
+    } catch (webhookError) {
+      logger.error('Failed to send webhook notification:', webhookError)
+    }
+
     throw error
+  } finally {
+    // 确保释放锁
+    if (lockAcquired) {
+      await tokenRefreshService.releaseRefreshLock(accountId, 'openai')
+      logger.debug(`🔓 Released refresh lock for OpenAI account ${accountId}`)
+    }
   }
 }
 
@@ -270,6 +438,10 @@ async function createAccount(accountData) {
   // 处理账户信息
   const accountInfo = accountData.accountInfo || {}
 
+  // 检查邮箱是否已经是加密格式（包含冒号分隔的32位十六进制字符）
+  const isEmailEncrypted =
+    accountInfo.email && accountInfo.email.length >= 33 && accountInfo.email.charAt(32) === ':'
+
   const account = {
     id: accountId,
     name: accountData.name,
@@ -282,19 +454,25 @@ async function createAccount(accountData) {
         ? accountData.rateLimitDuration
         : 60,
     // OAuth相关字段（加密存储）
-    idToken: encrypt(oauthData.idToken || ''),
-    accessToken: encrypt(oauthData.accessToken || ''),
-    refreshToken: encrypt(oauthData.refreshToken || ''),
+    // ID Token 现在是可选的，如果没有提供会在首次刷新时自动获取
+    idToken: oauthData.idToken && oauthData.idToken.trim() ? encrypt(oauthData.idToken) : '',
+    accessToken:
+      oauthData.accessToken && oauthData.accessToken.trim() ? encrypt(oauthData.accessToken) : '',
+    refreshToken:
+      oauthData.refreshToken && oauthData.refreshToken.trim()
+        ? encrypt(oauthData.refreshToken)
+        : '',
     openaiOauth: encrypt(JSON.stringify(oauthData)),
-    // 账户信息字段
+    // 账户信息字段 - 确保所有字段都被保存，即使是空字符串
     accountId: accountInfo.accountId || '',
     chatgptUserId: accountInfo.chatgptUserId || '',
     organizationId: accountInfo.organizationId || '',
     organizationRole: accountInfo.organizationRole || '',
     organizationTitle: accountInfo.organizationTitle || '',
     planType: accountInfo.planType || '',
-    email: encrypt(accountInfo.email || ''),
-    emailVerified: accountInfo.emailVerified || false,
+    // 邮箱字段：检查是否已经加密，避免双重加密
+    email: isEmailEncrypted ? accountInfo.email : encrypt(accountInfo.email || ''),
+    emailVerified: accountInfo.emailVerified === true ? 'true' : 'false',
     // 过期时间
     expiresAt: oauthData.expires_in
       ? new Date(Date.now() + oauthData.expires_in * 1000).toISOString()
@@ -339,9 +517,10 @@ async function getAccount(accountId) {
   if (accountData.idToken) {
     accountData.idToken = decrypt(accountData.idToken)
   }
-  if (accountData.accessToken) {
-    accountData.accessToken = decrypt(accountData.accessToken)
-  }
+  // 注意：accessToken 在 openaiRoutes.js 中会被单独解密，这里不解密
+  // if (accountData.accessToken) {
+  //   accountData.accessToken = decrypt(accountData.accessToken)
+  // }
   if (accountData.refreshToken) {
     accountData.refreshToken = decrypt(accountData.refreshToken)
   }
@@ -391,7 +570,7 @@ async function updateAccount(accountId, updates) {
   if (updates.accessToken) {
     updates.accessToken = encrypt(updates.accessToken)
   }
-  if (updates.refreshToken) {
+  if (updates.refreshToken && updates.refreshToken.trim()) {
     updates.refreshToken = encrypt(updates.refreshToken)
   }
   if (updates.email) {
@@ -476,6 +655,9 @@ async function getAllAccounts() {
         accountData.email = decrypt(accountData.email)
       }
 
+      // 先保存 refreshToken 是否存在的标记
+      const hasRefreshTokenFlag = !!accountData.refreshToken
+
       // 屏蔽敏感信息（token等不应该返回给前端）
       delete accountData.idToken
       delete accountData.accessToken
@@ -512,7 +694,7 @@ async function getAllAccounts() {
         scopes:
           accountData.scopes && accountData.scopes.trim() ? accountData.scopes.split(' ') : [],
         // 添加 hasRefreshToken 标记
-        hasRefreshToken: !!accountData.refreshToken,
+        hasRefreshToken: hasRefreshTokenFlag,
         // 添加限流状态信息（统一格式）
         rateLimitStatus: rateLimitInfo
           ? {
@@ -640,6 +822,26 @@ async function setAccountRateLimited(accountId, isLimited) {
 
   await updateAccount(accountId, updates)
   logger.info(`Set rate limit status for OpenAI account ${accountId}: ${updates.rateLimitStatus}`)
+
+  // 如果被限流，发送 Webhook 通知
+  if (isLimited) {
+    try {
+      const account = await getAccount(accountId)
+      const webhookNotifier = require('../utils/webhookNotifier')
+      await webhookNotifier.sendAccountAnomalyNotification({
+        accountId,
+        accountName: account.name || accountId,
+        platform: 'openai',
+        status: 'blocked',
+        errorCode: 'OPENAI_RATE_LIMITED',
+        reason: 'Account rate limited (429 error). Estimated reset in 1 hour',
+        timestamp: new Date().toISOString()
+      })
+      logger.info(`📢 Webhook notification sent for OpenAI account ${account.name} rate limit`)
+    } catch (webhookError) {
+      logger.error('Failed to send rate limit webhook notification:', webhookError)
+    }
+  }
 }
 
 // 切换账户调度状态

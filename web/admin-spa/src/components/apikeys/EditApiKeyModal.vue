@@ -33,12 +33,36 @@
               >名称</label
             >
             <input
-              class="form-input w-full cursor-not-allowed bg-gray-100 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400"
-              disabled
+              v-model="form.name"
+              class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+              maxlength="100"
+              placeholder="请输入API Key名称"
+              required
               type="text"
-              :value="form.name"
             />
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 sm:mt-2">名称不可修改</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 sm:mt-2">
+              用于识别此 API Key 的用途
+            </p>
+          </div>
+
+          <!-- 所有者选择 -->
+          <div>
+            <label
+              class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-3 sm:text-sm"
+              >所有者</label
+            >
+            <select
+              v-model="form.ownerId"
+              class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+            >
+              <option v-for="user in availableUsers" :key="user.id" :value="user.id">
+                {{ user.displayName }} ({{ user.username }})
+                <span v-if="user.role === 'admin'" class="text-gray-500">- 管理员</span>
+              </option>
+            </select>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 sm:mt-2">
+              分配此 API Key 给指定用户或管理员，管理员分配时不受用户 API Key 数量限制
+            </p>
           </div>
 
           <!-- 标签 -->
@@ -98,7 +122,7 @@
                 <div class="flex gap-2">
                   <input
                     v-model="newTag"
-                    class="form-input flex-1 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                    class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                     placeholder="输入新标签名称"
                     type="text"
                     @keypress.enter.prevent="addTag"
@@ -142,7 +166,7 @@
                   >
                   <input
                     v-model="form.rateLimitWindow"
-                    class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                    class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                     min="1"
                     placeholder="无限制"
                     type="number"
@@ -156,7 +180,7 @@
                   >
                   <input
                     v-model="form.rateLimitRequests"
-                    class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                    class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                     min="1"
                     placeholder="无限制"
                     type="number"
@@ -170,7 +194,7 @@
                   >
                   <input
                     v-model="form.rateLimitCost"
-                    class="form-input w-full text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                    class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                     min="0"
                     placeholder="无限制"
                     step="0.01"
@@ -235,7 +259,7 @@
               </div>
               <input
                 v-model="form.dailyCostLimit"
-                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 min="0"
                 placeholder="0 表示无限制"
                 step="0.01"
@@ -284,7 +308,7 @@
               </div>
               <input
                 v-model="form.weeklyOpusCostLimit"
-                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 min="0"
                 placeholder="0 表示无限制"
                 step="0.01"
@@ -302,7 +326,7 @@
             >
             <input
               v-model="form.concurrencyLimit"
-              class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+              class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
               min="0"
               placeholder="0 表示无限制"
               type="number"
@@ -534,7 +558,7 @@
                   <div class="flex gap-2">
                     <input
                       v-model="form.modelInput"
-                      class="form-input flex-1 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                      class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                       placeholder="输入模型名称，按回车添加"
                       type="text"
                       @keydown.enter.prevent="addRestrictedModel"
@@ -666,6 +690,9 @@ const localAccounts = ref({
 // 支持的客户端列表
 const supportedClients = ref([])
 
+// 可用用户列表
+const availableUsers = ref([])
+
 // 标签相关
 const newTag = ref('')
 const availableTags = ref([])
@@ -696,7 +723,8 @@ const form = reactive({
   enableClientRestriction: false,
   allowedClients: [],
   tags: [],
-  isActive: true
+  isActive: true,
+  ownerId: '' // 新增：所有者ID
 })
 
 // 添加限制的模型
@@ -774,6 +802,7 @@ const updateApiKey = async () => {
   try {
     // 准备提交的数据
     const data = {
+      name: form.name, // 添加名称字段
       tokenLimit: 0, // 清除历史token限制
       rateLimitWindow:
         form.rateLimitWindow !== '' && form.rateLimitWindow !== null
@@ -855,6 +884,11 @@ const updateApiKey = async () => {
 
     // 活跃状态
     data.isActive = form.isActive
+
+    // 所有者
+    if (form.ownerId !== undefined) {
+      data.ownerId = form.ownerId
+    }
 
     const result = await apiClient.put(`/admin/api-keys/${props.apiKey.id}`, data)
 
@@ -947,11 +981,45 @@ const refreshAccounts = async () => {
   }
 }
 
+// 加载用户列表
+const loadUsers = async () => {
+  try {
+    const response = await apiClient.get('/admin/users')
+    if (response.success) {
+      availableUsers.value = response.data || []
+    }
+  } catch (error) {
+    console.error('Failed to load users:', error)
+    availableUsers.value = [
+      {
+        id: 'admin',
+        username: 'admin',
+        displayName: 'Admin',
+        email: '',
+        role: 'admin'
+      }
+    ]
+  }
+}
+
 // 初始化表单数据
 onMounted(async () => {
-  // 加载支持的客户端和已存在的标签
-  supportedClients.value = await clientsStore.loadSupportedClients()
-  availableTags.value = await apiKeysStore.fetchTags()
+  try {
+    // 并行加载所有需要的数据
+    const [clients, tags] = await Promise.all([
+      clientsStore.loadSupportedClients(),
+      apiKeysStore.fetchTags(),
+      loadUsers()
+    ])
+
+    supportedClients.value = clients || []
+    availableTags.value = tags || []
+  } catch (error) {
+    console.error('Error loading initial data:', error)
+    // Fallback to empty arrays if loading fails
+    supportedClients.value = []
+    availableTags.value = []
+  }
 
   // 初始化账号数据
   if (props.accounts) {
@@ -1001,6 +1069,9 @@ onMounted(async () => {
   form.enableClientRestriction = props.apiKey.enableClientRestriction || false
   // 初始化活跃状态，默认为 true
   form.isActive = props.apiKey.isActive !== undefined ? props.apiKey.isActive : true
+
+  // 初始化所有者
+  form.ownerId = props.apiKey.userId || 'admin'
 })
 </script>
 

@@ -31,6 +31,9 @@ export function showToast(message, type = 'info', title = '', duration = 3000) {
     info: 'fas fa-info-circle'
   }
 
+  // 处理消息中的换行符，转换为 HTML 换行
+  const formattedMessage = message.replace(/\n/g, '<br>')
+
   toast.innerHTML = `
     <div class="flex items-start gap-3">
       <div class="flex-shrink-0 mt-0.5">
@@ -38,7 +41,7 @@ export function showToast(message, type = 'info', title = '', duration = 3000) {
       </div>
       <div class="flex-1 min-w-0">
         ${title ? `<h4 class="font-semibold text-sm mb-1">${title}</h4>` : ''}
-        <p class="text-sm opacity-90 leading-relaxed">${message}</p>
+        <p class="text-sm opacity-90 leading-relaxed">${formattedMessage}</p>
       </div>
       <button onclick="this.parentElement.parentElement.remove()" 
               class="flex-shrink-0 text-white/70 hover:text-white transition-colors ml-2">

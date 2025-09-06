@@ -39,11 +39,18 @@
           >
             <div class="flex items-center justify-between">
               <div>
-                <p class="mb-1 text-xs font-medium text-gray-600 dark:text-gray-400">
-                  当前过期时间
-                </p>
+                <p class="mb-1 text-xs font-medium text-gray-600 dark:text-gray-400">当前状态</p>
                 <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                  <template v-if="apiKey.expiresAt">
+                  <!-- 未激活状态 -->
+                  <template v-if="apiKey.expirationMode === 'activation' && !apiKey.isActivated">
+                    <i class="fas fa-pause-circle mr-1 text-blue-500" />
+                    未激活
+                    <span class="ml-2 text-xs font-normal text-gray-600">
+                      (激活后 {{ apiKey.activationDays || 30 }} 天过期)
+                    </span>
+                  </template>
+                  <!-- 已设置过期时间 -->
+                  <template v-else-if="apiKey.expiresAt">
                     {{ formatExpireDate(apiKey.expiresAt) }}
                     <span
                       v-if="getExpiryStatus(apiKey.expiresAt)"
@@ -53,6 +60,7 @@
                       ({{ getExpiryStatus(apiKey.expiresAt).text }})
                     </span>
                   </template>
+                  <!-- 永不过期 -->
                   <template v-else>
                     <i class="fas fa-infinity mr-1 text-gray-500" />
                     永不过期
@@ -72,6 +80,21 @@
                 />
               </div>
             </div>
+          </div>
+
+          <!-- 激活按钮（仅在未激活状态显示） -->
+          <div v-if="apiKey.expirationMode === 'activation' && !apiKey.isActivated" class="mb-4">
+            <button
+              class="w-full rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-3 font-semibold text-white transition-all hover:from-blue-600 hover:to-blue-700 hover:shadow-lg"
+              @click="handleActivateNow"
+            >
+              <i class="fas fa-rocket mr-2" />
+              立即激活 (激活后 {{ apiKey.activationDays || 30 }} 天过期)
+            </button>
+            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              <i class="fas fa-info-circle mr-1" />
+              点击立即激活此 API Key，激活后将在 {{ apiKey.activationDays || 30 }} 天后过期
+            </p>
           </div>
 
           <!-- 快捷选项 -->
@@ -115,7 +138,7 @@
             >
             <input
               v-model="localForm.customExpireDate"
-              class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+              class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
               :min="minDateTime"
               type="datetime-local"
               @change="updateCustomExpiryPreview"
@@ -367,6 +390,35 @@ const handleSave = () => {
   emit('save', {
     keyId: props.apiKey.id,
     expiresAt: localForm.expiresAt
+  })
+}
+
+// 立即激活
+const handleActivateNow = async () => {
+  // 使用确认弹窗
+  let confirmed = true
+  if (window.showConfirm) {
+    confirmed = await window.showConfirm(
+      '激活 API Key',
+      `确定要立即激活此 API Key 吗？激活后将在 ${props.apiKey.activationDays || 30} 天后自动过期。`,
+      '确定激活',
+      '取消'
+    )
+  } else {
+    // 降级方案
+    confirmed = confirm(
+      `确定要立即激活此 API Key 吗？激活后将在 ${props.apiKey.activationDays || 30} 天后自动过期。`
+    )
+  }
+
+  if (!confirmed) {
+    return
+  }
+
+  saving.value = true
+  emit('save', {
+    keyId: props.apiKey.id,
+    activateNow: true
   })
 }
 

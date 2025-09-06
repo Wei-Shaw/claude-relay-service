@@ -24,6 +24,68 @@ const ProxyHelper = require('../utils/proxyHelper')
 
 const router = express.Router()
 
+// 👥 用户管理
+
+// 获取所有用户列表（用于API Key分配）
+router.get('/users', authenticateAdmin, async (req, res) => {
+  try {
+    const userService = require('../services/userService')
+
+    // Extract query parameters for filtering
+    const { role, isActive } = req.query
+    const options = { limit: 1000 }
+
+    // Apply role filter if provided
+    if (role) {
+      options.role = role
+    }
+
+    // Apply isActive filter if provided, otherwise default to active users only
+    if (isActive !== undefined) {
+      options.isActive = isActive === 'true'
+    } else {
+      options.isActive = true // Default to active users for backwards compatibility
+    }
+
+    const result = await userService.getAllUsers(options)
+
+    // Extract users array from the paginated result
+    const allUsers = result.users || []
+
+    // Map to the format needed for the dropdown
+    const activeUsers = allUsers.map((user) => ({
+      id: user.id,
+      username: user.username,
+      displayName: user.displayName || user.username,
+      email: user.email,
+      role: user.role
+    }))
+
+    // 添加Admin选项作为第一个
+    const usersWithAdmin = [
+      {
+        id: 'admin',
+        username: 'admin',
+        displayName: 'Admin',
+        email: '',
+        role: 'admin'
+      },
+      ...activeUsers
+    ]
+
+    return res.json({
+      success: true,
+      data: usersWithAdmin
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get users list:', error)
+    return res.status(500).json({
+      error: 'Failed to get users list',
+      message: error.message
+    })
+  }
+})
+
 // 🔑 API Keys 管理
 
 // 调试：获取API Key费用详情
@@ -62,6 +124,9 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
   try {
     const { timeRange = 'all' } = req.query // all, 7days, monthly
     const apiKeys = await apiKeyService.getAllApiKeys()
+
+    // 获取用户服务来补充owner信息
+    const userService = require('../services/userService')
 
     // 根据时间范围计算查询模式
     const now = new Date()
@@ -313,6 +378,28 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
       }
     }
 
+    // 为每个API Key添加owner的displayName
+    for (const apiKey of apiKeys) {
+      // 如果API Key有关联的用户ID，获取用户信息
+      if (apiKey.userId) {
+        try {
+          const user = await userService.getUserById(apiKey.userId, false)
+          if (user) {
+            apiKey.ownerDisplayName = user.displayName || user.username || 'Unknown User'
+          } else {
+            apiKey.ownerDisplayName = 'Unknown User'
+          }
+        } catch (error) {
+          logger.debug(`无法获取用户 ${apiKey.userId} 的信息:`, error)
+          apiKey.ownerDisplayName = 'Unknown User'
+        }
+      } else {
+        // 如果没有userId，使用createdBy字段或默认为Admin
+        apiKey.ownerDisplayName =
+          apiKey.createdBy === 'admin' ? 'Admin' : apiKey.createdBy || 'Admin'
+      }
+    }
+
     return res.json({ success: true, data: apiKeys })
   } catch (error) {
     logger.error('❌ Failed to get API keys:', error)
@@ -404,7 +491,9 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       allowedClients,
       dailyCostLimit,
       weeklyOpusCostLimit,
-      tags
+      tags,
+      activationDays, // 新增：激活后有效天数
+      expirationMode // 新增：过期模式
     } = req.body
 
     // 输入验证
@@ -482,6 +571,31 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'All tags must be non-empty strings' })
     }
 
+    // 验证激活相关字段
+    if (expirationMode && !['fixed', 'activation'].includes(expirationMode)) {
+      return res
+        .status(400)
+        .json({ error: 'Expiration mode must be either "fixed" or "activation"' })
+    }
+
+    if (expirationMode === 'activation') {
+      if (
+        !activationDays ||
+        !Number.isInteger(Number(activationDays)) ||
+        Number(activationDays) < 1
+      ) {
+        return res
+          .status(400)
+          .json({ error: 'Activation days must be a positive integer when using activation mode' })
+      }
+      // 激活模式下不应该设置固定过期时间
+      if (expiresAt) {
+        return res
+          .status(400)
+          .json({ error: 'Cannot set fixed expiration date when using activation mode' })
+      }
+    }
+
     const newKey = await apiKeyService.generateApiKey({
       name,
       description,
@@ -503,7 +617,9 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       allowedClients,
       dailyCostLimit,
       weeklyOpusCostLimit,
-      tags
+      tags,
+      activationDays,
+      expirationMode
     })
 
     logger.success(`🔑 Admin created new API key: ${name}`)
@@ -537,7 +653,9 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       allowedClients,
       dailyCostLimit,
       weeklyOpusCostLimit,
-      tags
+      tags,
+      activationDays,
+      expirationMode
     } = req.body
 
     // 输入验证
@@ -581,7 +699,9 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
           allowedClients,
           dailyCostLimit,
           weeklyOpusCostLimit,
-          tags
+          tags,
+          activationDays,
+          expirationMode
         })
 
         // 保留原始 API Key 供返回
@@ -678,6 +798,9 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
         }
         if (updates.tokenLimit !== undefined) {
           finalUpdates.tokenLimit = updates.tokenLimit
+        }
+        if (updates.rateLimitCost !== undefined) {
+          finalUpdates.rateLimitCost = updates.rateLimitCost
         }
         if (updates.concurrencyLimit !== undefined) {
           finalUpdates.concurrencyLimit = updates.concurrencyLimit
@@ -800,6 +923,7 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
   try {
     const { keyId } = req.params
     const {
+      name, // 添加名称字段
       tokenLimit,
       concurrencyLimit,
       rateLimitWindow,
@@ -819,11 +943,24 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       expiresAt,
       dailyCostLimit,
       weeklyOpusCostLimit,
-      tags
+      tags,
+      ownerId // 新增：所有者ID字段
     } = req.body
 
     // 只允许更新指定字段
     const updates = {}
+
+    // 处理名称字段
+    if (name !== undefined && name !== null && name !== '') {
+      const trimmedName = name.toString().trim()
+      if (trimmedName.length === 0) {
+        return res.status(400).json({ error: 'API Key name cannot be empty' })
+      }
+      if (trimmedName.length > 100) {
+        return res.status(400).json({ error: 'API Key name must be less than 100 characters' })
+      }
+      updates.name = trimmedName
+    }
 
     if (tokenLimit !== undefined && tokenLimit !== null && tokenLimit !== '') {
       if (!Number.isInteger(Number(tokenLimit)) || Number(tokenLimit) < 0) {
@@ -989,6 +1126,45 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       updates.isActive = isActive
     }
 
+    // 处理所有者变更
+    if (ownerId !== undefined) {
+      const userService = require('../services/userService')
+
+      if (ownerId === 'admin') {
+        // 分配给Admin
+        updates.userId = ''
+        updates.userUsername = ''
+        updates.createdBy = 'admin'
+      } else if (ownerId) {
+        // 分配给用户
+        try {
+          const user = await userService.getUserById(ownerId, false)
+          if (!user) {
+            return res.status(400).json({ error: 'Invalid owner: User not found' })
+          }
+          if (!user.isActive) {
+            return res.status(400).json({ error: 'Cannot assign to inactive user' })
+          }
+
+          // 设置新的所有者信息
+          updates.userId = ownerId
+          updates.userUsername = user.username
+          updates.createdBy = user.username
+
+          // 管理员重新分配时，不检查用户的API Key数量限制
+          logger.info(`🔄 Admin reassigning API key ${keyId} to user ${user.username}`)
+        } catch (error) {
+          logger.error('Error fetching user for owner reassignment:', error)
+          return res.status(400).json({ error: 'Invalid owner ID' })
+        }
+      } else {
+        // 清空所有者（分配给Admin）
+        updates.userId = ''
+        updates.userUsername = ''
+        updates.createdBy = 'admin'
+      }
+    }
+
     await apiKeyService.updateApiKey(keyId, updates)
 
     logger.success(`📝 Admin updated API key: ${keyId}`)
@@ -996,6 +1172,85 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
   } catch (error) {
     logger.error('❌ Failed to update API key:', error)
     return res.status(500).json({ error: 'Failed to update API key', message: error.message })
+  }
+})
+
+// 修改API Key过期时间（包括手动激活功能）
+router.patch('/api-keys/:keyId/expiration', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyId } = req.params
+    const { expiresAt, activateNow } = req.body
+
+    // 获取当前API Key信息
+    const keyData = await redis.getApiKey(keyId)
+    if (!keyData || Object.keys(keyData).length === 0) {
+      return res.status(404).json({ error: 'API key not found' })
+    }
+
+    const updates = {}
+
+    // 如果是激活操作（用于未激活的key）
+    if (activateNow === true) {
+      if (keyData.expirationMode === 'activation' && keyData.isActivated !== 'true') {
+        const now = new Date()
+        const activationDays = parseInt(keyData.activationDays || 30)
+        const newExpiresAt = new Date(now.getTime() + activationDays * 24 * 60 * 60 * 1000)
+
+        updates.isActivated = 'true'
+        updates.activatedAt = now.toISOString()
+        updates.expiresAt = newExpiresAt.toISOString()
+
+        logger.success(
+          `🔓 API key manually activated by admin: ${keyId} (${keyData.name}), expires at ${newExpiresAt.toISOString()}`
+        )
+      } else {
+        return res.status(400).json({
+          error: 'Cannot activate',
+          message: 'Key is either already activated or not in activation mode'
+        })
+      }
+    }
+
+    // 如果提供了新的过期时间（但不是激活操作）
+    if (expiresAt !== undefined && activateNow !== true) {
+      // 验证过期时间格式
+      if (expiresAt && isNaN(Date.parse(expiresAt))) {
+        return res.status(400).json({ error: 'Invalid expiration date format' })
+      }
+
+      // 如果设置了过期时间，确保key是激活状态
+      if (expiresAt) {
+        updates.expiresAt = new Date(expiresAt).toISOString()
+        // 如果之前是未激活状态，现在激活它
+        if (keyData.isActivated !== 'true') {
+          updates.isActivated = 'true'
+          updates.activatedAt = new Date().toISOString()
+        }
+      } else {
+        // 清除过期时间（永不过期）
+        updates.expiresAt = ''
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No valid updates provided' })
+    }
+
+    // 更新API Key
+    await apiKeyService.updateApiKey(keyId, updates)
+
+    logger.success(`📝 Updated API key expiration: ${keyId} (${keyData.name})`)
+    return res.json({
+      success: true,
+      message: 'API key expiration updated successfully',
+      updates
+    })
+  } catch (error) {
+    logger.error('❌ Failed to update API key expiration:', error)
+    return res.status(500).json({
+      error: 'Failed to update API key expiration',
+      message: error.message
+    })
   }
 })
 
@@ -1125,7 +1380,7 @@ router.get('/api-keys/deleted', authenticateAdmin, async (req, res) => {
       deletedAt: key.deletedAt,
       deletedBy: key.deletedBy,
       deletedByType: key.deletedByType,
-      canRestore: false // Deleted keys cannot be restored per requirement
+      canRestore: true // 已删除的API Key可以恢复
     }))
 
     logger.success(`📋 Admin retrieved ${enrichedKeys.length} deleted API keys`)
@@ -1135,6 +1390,123 @@ router.get('/api-keys/deleted', authenticateAdmin, async (req, res) => {
     return res
       .status(500)
       .json({ error: 'Failed to retrieve deleted API keys', message: error.message })
+  }
+})
+
+// 🔄 恢复已删除的API Key
+router.post('/api-keys/:keyId/restore', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyId } = req.params
+    const adminUsername = req.session?.admin?.username || 'unknown'
+
+    // 调用服务层的恢复方法
+    const result = await apiKeyService.restoreApiKey(keyId, adminUsername, 'admin')
+
+    if (result.success) {
+      logger.success(`✅ Admin ${adminUsername} restored API key: ${keyId}`)
+      return res.json({
+        success: true,
+        message: 'API Key 已成功恢复',
+        apiKey: result.apiKey
+      })
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'Failed to restore API key'
+      })
+    }
+  } catch (error) {
+    logger.error('❌ Failed to restore API key:', error)
+
+    // 根据错误类型返回适当的响应
+    if (error.message === 'API key not found') {
+      return res.status(404).json({
+        success: false,
+        error: 'API Key 不存在'
+      })
+    } else if (error.message === 'API key is not deleted') {
+      return res.status(400).json({
+        success: false,
+        error: '该 API Key 未被删除，无需恢复'
+      })
+    }
+
+    return res.status(500).json({
+      success: false,
+      error: '恢复 API Key 失败',
+      message: error.message
+    })
+  }
+})
+
+// 🗑️ 彻底删除API Key（物理删除）
+router.delete('/api-keys/:keyId/permanent', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyId } = req.params
+    const adminUsername = req.session?.admin?.username || 'unknown'
+
+    // 调用服务层的彻底删除方法
+    const result = await apiKeyService.permanentDeleteApiKey(keyId)
+
+    if (result.success) {
+      logger.success(`🗑️ Admin ${adminUsername} permanently deleted API key: ${keyId}`)
+      return res.json({
+        success: true,
+        message: 'API Key 已彻底删除'
+      })
+    }
+  } catch (error) {
+    logger.error('❌ Failed to permanently delete API key:', error)
+
+    if (error.message === 'API key not found') {
+      return res.status(404).json({
+        success: false,
+        error: 'API Key 不存在'
+      })
+    } else if (error.message === '只能彻底删除已经删除的API Key') {
+      return res.status(400).json({
+        success: false,
+        error: '只能彻底删除已经删除的API Key'
+      })
+    }
+
+    return res.status(500).json({
+      success: false,
+      error: '彻底删除 API Key 失败',
+      message: error.message
+    })
+  }
+})
+
+// 🧹 清空所有已删除的API Keys
+router.delete('/api-keys/deleted/clear-all', authenticateAdmin, async (req, res) => {
+  try {
+    const adminUsername = req.session?.admin?.username || 'unknown'
+
+    // 调用服务层的清空方法
+    const result = await apiKeyService.clearAllDeletedApiKeys()
+
+    logger.success(
+      `🧹 Admin ${adminUsername} cleared deleted API keys: ${result.successCount}/${result.total}`
+    )
+
+    return res.json({
+      success: true,
+      message: `成功清空 ${result.successCount} 个已删除的 API Keys`,
+      details: {
+        total: result.total,
+        successCount: result.successCount,
+        failedCount: result.failedCount,
+        errors: result.errors
+      }
+    })
+  } catch (error) {
+    logger.error('❌ Failed to clear all deleted API keys:', error)
+    return res.status(500).json({
+      success: false,
+      error: '清空已删除的 API Keys 失败',
+      message: error.message
+    })
   }
 })
 
@@ -1642,7 +2014,8 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       priority,
       groupId,
       groupIds,
-      autoStopOnWarning
+      autoStopOnWarning,
+      useUnifiedUserAgent
     } = req.body
 
     if (!name) {
@@ -1682,7 +2055,8 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       accountType: accountType || 'shared', // 默认为共享类型
       platform,
       priority: priority || 50, // 默认优先级为50
-      autoStopOnWarning: autoStopOnWarning === true // 默认为false
+      autoStopOnWarning: autoStopOnWarning === true, // 默认为false
+      useUnifiedUserAgent: useUnifiedUserAgent === true // 默认为false
     })
 
     // 如果是分组类型，将账户添加到分组
@@ -2032,7 +2406,9 @@ router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
       rateLimitDuration,
       proxy,
       accountType,
-      groupId
+      groupId,
+      dailyQuota,
+      quotaResetTime
     } = req.body
 
     if (!name || !apiUrl || !apiKey) {
@@ -2067,7 +2443,9 @@ router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
       rateLimitDuration:
         rateLimitDuration !== undefined && rateLimitDuration !== null ? rateLimitDuration : 60,
       proxy,
-      accountType: accountType || 'shared'
+      accountType: accountType || 'shared',
+      dailyQuota: dailyQuota || 0,
+      quotaResetTime: quotaResetTime || '00:00'
     })
 
     // 如果是分组类型，将账户添加到分组
@@ -2245,6 +2623,56 @@ router.put(
     }
   }
 )
+
+// 获取Claude Console账户的使用统计
+router.get('/claude-console-accounts/:accountId/usage', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+    const usageStats = await claudeConsoleAccountService.getAccountUsageStats(accountId)
+
+    if (!usageStats) {
+      return res.status(404).json({ error: 'Account not found' })
+    }
+
+    return res.json(usageStats)
+  } catch (error) {
+    logger.error('❌ Failed to get Claude Console account usage stats:', error)
+    return res.status(500).json({ error: 'Failed to get usage stats', message: error.message })
+  }
+})
+
+// 手动重置Claude Console账户的每日使用量
+router.post(
+  '/claude-console-accounts/:accountId/reset-usage',
+  authenticateAdmin,
+  async (req, res) => {
+    try {
+      const { accountId } = req.params
+      await claudeConsoleAccountService.resetDailyUsage(accountId)
+
+      logger.success(`✅ Admin manually reset daily usage for Claude Console account: ${accountId}`)
+      return res.json({ success: true, message: 'Daily usage reset successfully' })
+    } catch (error) {
+      logger.error('❌ Failed to reset Claude Console account daily usage:', error)
+      return res.status(500).json({ error: 'Failed to reset daily usage', message: error.message })
+    }
+  }
+)
+
+// 手动重置所有Claude Console账户的每日使用量
+router.post('/claude-console-accounts/reset-all-usage', authenticateAdmin, async (req, res) => {
+  try {
+    await claudeConsoleAccountService.resetAllDailyUsage()
+
+    logger.success('✅ Admin manually reset daily usage for all Claude Console accounts')
+    return res.json({ success: true, message: 'All daily usage reset successfully' })
+  } catch (error) {
+    logger.error('❌ Failed to reset all Claude Console accounts daily usage:', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to reset all daily usage', message: error.message })
+  }
+})
 
 // ☁️ Bedrock 账户管理
 
@@ -5317,7 +5745,9 @@ router.post('/openai-accounts', authenticateAdmin, async (req, res) => {
       accountType,
       groupId,
       rateLimitDuration,
-      priority
+      priority,
+      needsImmediateRefresh, // 是否需要立即刷新
+      requireRefreshSuccess // 是否必须刷新成功才能创建
     } = req.body
 
     if (!name) {
@@ -5326,7 +5756,8 @@ router.post('/openai-accounts', authenticateAdmin, async (req, res) => {
         message: '账户名称不能为空'
       })
     }
-    // 创建账户数据
+
+    // 准备账户数据
     const accountData = {
       name,
       description: description || '',
@@ -5341,12 +5772,99 @@ router.post('/openai-accounts', authenticateAdmin, async (req, res) => {
       schedulable: true
     }
 
-    // 创建账户
+    // 如果需要立即刷新且必须成功（OpenAI 手动模式）
+    if (needsImmediateRefresh && requireRefreshSuccess) {
+      // 先创建临时账户以测试刷新
+      const tempAccount = await openaiAccountService.createAccount(accountData)
+
+      try {
+        logger.info(`🔄 测试刷新 OpenAI 账户以获取完整 token 信息`)
+
+        // 尝试刷新 token（会自动使用账户配置的代理）
+        await openaiAccountService.refreshAccountToken(tempAccount.id)
+
+        // 刷新成功，获取更新后的账户信息
+        const refreshedAccount = await openaiAccountService.getAccount(tempAccount.id)
+
+        // 检查是否获取到了 ID Token
+        if (!refreshedAccount.idToken || refreshedAccount.idToken === '') {
+          // 没有获取到 ID Token，删除账户
+          await openaiAccountService.deleteAccount(tempAccount.id)
+          throw new Error('无法获取 ID Token，请检查 Refresh Token 是否有效')
+        }
+
+        // 如果是分组类型，添加到分组
+        if (accountType === 'group' && groupId) {
+          await accountGroupService.addAccountToGroup(tempAccount.id, groupId, 'openai')
+        }
+
+        // 清除敏感信息后返回
+        delete refreshedAccount.idToken
+        delete refreshedAccount.accessToken
+        delete refreshedAccount.refreshToken
+
+        logger.success(`✅ 创建并验证 OpenAI 账户成功: ${name} (ID: ${tempAccount.id})`)
+
+        return res.json({
+          success: true,
+          data: refreshedAccount,
+          message: '账户创建成功，并已获取完整 token 信息'
+        })
+      } catch (refreshError) {
+        // 刷新失败，删除临时创建的账户
+        logger.warn(`❌ 刷新失败，删除临时账户: ${refreshError.message}`)
+        await openaiAccountService.deleteAccount(tempAccount.id)
+
+        // 构建详细的错误信息
+        const errorResponse = {
+          success: false,
+          message: '账户创建失败',
+          error: refreshError.message
+        }
+
+        // 添加更详细的错误信息
+        if (refreshError.status) {
+          errorResponse.errorCode = refreshError.status
+        }
+        if (refreshError.details) {
+          errorResponse.errorDetails = refreshError.details
+        }
+        if (refreshError.code) {
+          errorResponse.networkError = refreshError.code
+        }
+
+        // 提供更友好的错误提示
+        if (refreshError.message.includes('Refresh Token 无效')) {
+          errorResponse.suggestion = '请检查 Refresh Token 是否正确，或重新通过 OAuth 授权获取'
+        } else if (refreshError.message.includes('代理')) {
+          errorResponse.suggestion = '请检查代理配置是否正确，包括地址、端口和认证信息'
+        } else if (refreshError.message.includes('过于频繁')) {
+          errorResponse.suggestion = '请稍后再试，或更换代理 IP'
+        } else if (refreshError.message.includes('连接')) {
+          errorResponse.suggestion = '请检查网络连接和代理设置'
+        }
+
+        return res.status(400).json(errorResponse)
+      }
+    }
+
+    // 不需要强制刷新的情况（OAuth 模式或其他平台）
     const createdAccount = await openaiAccountService.createAccount(accountData)
 
     // 如果是分组类型，添加到分组
     if (accountType === 'group' && groupId) {
       await accountGroupService.addAccountToGroup(createdAccount.id, groupId, 'openai')
+    }
+
+    // 如果需要刷新但不强制成功（OAuth 模式可能已有完整信息）
+    if (needsImmediateRefresh && !requireRefreshSuccess) {
+      try {
+        logger.info(`🔄 尝试刷新 OpenAI 账户 ${createdAccount.id}`)
+        await openaiAccountService.refreshAccountToken(createdAccount.id)
+        logger.info(`✅ 刷新成功`)
+      } catch (refreshError) {
+        logger.warn(`⚠️ 刷新失败，但账户已创建: ${refreshError.message}`)
+      }
     }
 
     logger.success(`✅ 创建 OpenAI 账户成功: ${name} (ID: ${createdAccount.id})`)
@@ -5370,6 +5888,7 @@ router.put('/openai-accounts/:id', authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params
     const updates = req.body
+    const { needsImmediateRefresh, requireRefreshSuccess } = updates
 
     // 验证accountType的有效性
     if (updates.accountType && !['shared', 'dedicated', 'group'].includes(updates.accountType)) {
@@ -5387,6 +5906,93 @@ router.put('/openai-accounts/:id', authenticateAdmin, async (req, res) => {
     const currentAccount = await openaiAccountService.getAccount(id)
     if (!currentAccount) {
       return res.status(404).json({ error: 'Account not found' })
+    }
+
+    // 如果更新了 Refresh Token，需要验证其有效性
+    if (updates.openaiOauth?.refreshToken && needsImmediateRefresh && requireRefreshSuccess) {
+      // 先更新 token 信息
+      const tempUpdateData = {}
+      if (updates.openaiOauth.refreshToken) {
+        tempUpdateData.refreshToken = updates.openaiOauth.refreshToken
+      }
+      if (updates.openaiOauth.accessToken) {
+        tempUpdateData.accessToken = updates.openaiOauth.accessToken
+      }
+      // 更新代理配置（如果有）
+      if (updates.proxy !== undefined) {
+        tempUpdateData.proxy = updates.proxy
+      }
+
+      // 临时更新账户以测试新的 token
+      await openaiAccountService.updateAccount(id, tempUpdateData)
+
+      try {
+        logger.info(`🔄 验证更新的 OpenAI token (账户: ${id})`)
+
+        // 尝试刷新 token（会使用账户配置的代理）
+        await openaiAccountService.refreshAccountToken(id)
+
+        // 获取刷新后的账户信息
+        const refreshedAccount = await openaiAccountService.getAccount(id)
+
+        // 检查是否获取到了 ID Token
+        if (!refreshedAccount.idToken || refreshedAccount.idToken === '') {
+          // 恢复原始 token
+          await openaiAccountService.updateAccount(id, {
+            refreshToken: currentAccount.refreshToken,
+            accessToken: currentAccount.accessToken,
+            idToken: currentAccount.idToken
+          })
+
+          return res.status(400).json({
+            success: false,
+            message: '无法获取 ID Token，请检查 Refresh Token 是否有效',
+            error: 'Invalid refresh token'
+          })
+        }
+
+        logger.success(`✅ Token 验证成功，继续更新账户信息`)
+      } catch (refreshError) {
+        // 刷新失败，恢复原始 token
+        logger.warn(`❌ Token 验证失败，恢复原始配置: ${refreshError.message}`)
+        await openaiAccountService.updateAccount(id, {
+          refreshToken: currentAccount.refreshToken,
+          accessToken: currentAccount.accessToken,
+          idToken: currentAccount.idToken,
+          proxy: currentAccount.proxy
+        })
+
+        // 构建详细的错误信息
+        const errorResponse = {
+          success: false,
+          message: '更新失败',
+          error: refreshError.message
+        }
+
+        // 添加更详细的错误信息
+        if (refreshError.status) {
+          errorResponse.errorCode = refreshError.status
+        }
+        if (refreshError.details) {
+          errorResponse.errorDetails = refreshError.details
+        }
+        if (refreshError.code) {
+          errorResponse.networkError = refreshError.code
+        }
+
+        // 提供更友好的错误提示
+        if (refreshError.message.includes('Refresh Token 无效')) {
+          errorResponse.suggestion = '请检查 Refresh Token 是否正确，或重新通过 OAuth 授权获取'
+        } else if (refreshError.message.includes('代理')) {
+          errorResponse.suggestion = '请检查代理配置是否正确，包括地址、端口和认证信息'
+        } else if (refreshError.message.includes('过于频繁')) {
+          errorResponse.suggestion = '请稍后再试，或更换代理 IP'
+        } else if (refreshError.message.includes('连接')) {
+          errorResponse.suggestion = '请检查网络连接和代理设置'
+        }
+
+        return res.status(400).json(errorResponse)
+      }
     }
 
     // 处理分组的变更
@@ -5410,9 +6016,7 @@ router.put('/openai-accounts/:id', authenticateAdmin, async (req, res) => {
     // 处理敏感数据加密
     if (updates.openaiOauth) {
       updateData.openaiOauth = updates.openaiOauth
-      if (updates.openaiOauth.idToken) {
-        updateData.idToken = updates.openaiOauth.idToken
-      }
+      // 编辑时不允许直接输入 ID Token，只能通过刷新获取
       if (updates.openaiOauth.accessToken) {
         updateData.accessToken = updates.openaiOauth.accessToken
       }
@@ -5445,6 +6049,17 @@ router.put('/openai-accounts/:id', authenticateAdmin, async (req, res) => {
     }
 
     const updatedAccount = await openaiAccountService.updateAccount(id, updateData)
+
+    // 如果需要刷新但不强制成功（非关键更新）
+    if (needsImmediateRefresh && !requireRefreshSuccess) {
+      try {
+        logger.info(`🔄 尝试刷新 OpenAI 账户 ${id}`)
+        await openaiAccountService.refreshAccountToken(id)
+        logger.info(`✅ 刷新成功`)
+      } catch (refreshError) {
+        logger.warn(`⚠️ 刷新失败，但账户信息已更新: ${refreshError.message}`)
+      }
+    }
 
     logger.success(`📝 Admin updated OpenAI account: ${id}`)
     return res.json({ success: true, data: updatedAccount })

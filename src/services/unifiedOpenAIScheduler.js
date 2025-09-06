@@ -167,7 +167,7 @@ class UnifiedOpenAIScheduler {
 
     // 获取所有OpenAI账户（共享池）
     const openaiAccounts = await openaiAccountService.getAllAccounts()
-    for (const account of openaiAccounts) {
+    for (let account of openaiAccounts) {
       if (
         account.isActive &&
         account.status !== 'error' &&
@@ -176,13 +176,27 @@ class UnifiedOpenAIScheduler {
       ) {
         // 检查是否可调度
 
-        // 检查token是否过期
+        // 检查token是否过期并自动刷新
         const isExpired = openaiAccountService.isTokenExpired(account)
-        if (isExpired && !account.refreshToken) {
-          logger.warn(
-            `⚠️ OpenAI account ${account.name} token expired and no refresh token available`
-          )
-          continue
+        if (isExpired) {
+          if (!account.refreshToken) {
+            logger.warn(
+              `⚠️ OpenAI account ${account.name} token expired and no refresh token available`
+            )
+            continue
+          }
+
+          // 自动刷新过期的 token
+          try {
+            logger.info(`🔄 Auto-refreshing expired token for OpenAI account ${account.name}`)
+            await openaiAccountService.refreshAccountToken(account.id)
+            // 重新获取更新后的账户信息
+            account = await openaiAccountService.getAccount(account.id)
+            logger.info(`✅ Token refreshed successfully for ${account.name}`)
+          } catch (refreshError) {
+            logger.error(`❌ Failed to refresh token for ${account.name}:`, refreshError.message)
+            continue // 刷新失败，跳过此账户
+          }
         }
 
         // 检查模型支持（仅在明确设置了supportedModels且不为空时才检查）
