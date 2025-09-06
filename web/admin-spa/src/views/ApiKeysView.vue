@@ -64,12 +64,33 @@
                   class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
                 ></div>
                 <CustomDropdown
-                  v-model="apiKeyStatsTimeRange"
+                  v-model="globalDateFilter.preset"
                   icon="fa-calendar-alt"
                   icon-color="text-blue-500"
-                  :options="timeRangeOptions"
+                  :options="timeRangeDropdownOptions"
                   placeholder="选择时间范围"
-                  @change="loadApiKeys()"
+                  @change="handleTimeRangeChange"
+                />
+              </div>
+
+              <!-- 自定义日期范围选择器 - 在选择自定义时显示 -->
+              <div v-if="globalDateFilter.type === 'custom'" class="flex items-center">
+                <el-date-picker
+                  class="api-key-date-picker custom-date-range-picker"
+                  :clearable="true"
+                  :default-time="defaultTime"
+                  :disabled-date="disabledDate"
+                  end-placeholder="结束日期"
+                  format="YYYY-MM-DD HH:mm:ss"
+                  :model-value="globalDateFilter.customRange"
+                  range-separator="至"
+                  size="small"
+                  start-placeholder="开始日期"
+                  style="width: 320px"
+                  type="datetimerange"
+                  :unlink-panels="false"
+                  value-format="YYYY-MM-DD HH:mm:ss"
+                  @update:model-value="onGlobalCustomDateRangeChange"
                 />
               </div>
 
@@ -245,29 +266,13 @@
                     class="w-[17%] min-w-[140px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
                     <div class="flex items-center gap-2">
-                      <span>使用统计</span>
                       <span
                         class="cursor-pointer rounded px-1.5 py-0.5 text-xs normal-case hover:bg-gray-100 dark:hover:bg-gray-600"
-                        @click="sortApiKeys('dailyCost')"
+                        @click="sortApiKeys('periodCost')"
                       >
-                        今日费用
+                        使用统计（按费用排序）
                         <i
-                          v-if="apiKeysSortBy === 'dailyCost'"
-                          :class="[
-                            'fas',
-                            apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down',
-                            'ml-0.5 text-[10px]'
-                          ]"
-                        />
-                        <i v-else class="fas fa-sort ml-0.5 text-[10px] text-gray-400" />
-                      </span>
-                      <span
-                        class="cursor-pointer rounded px-1.5 py-0.5 text-xs normal-case hover:bg-gray-100 dark:hover:bg-gray-600"
-                        @click="sortApiKeys('totalCost')"
-                      >
-                        总费用
-                        <i
-                          v-if="apiKeysSortBy === 'totalCost'"
+                          v-if="apiKeysSortBy === 'periodCost'"
                           :class="[
                             'fas',
                             apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down',
@@ -471,21 +476,19 @@
                         <!-- 今日使用统计 -->
                         <div class="mb-2">
                           <div class="mb-1 flex items-center justify-between text-sm">
-                            <span class="text-gray-600 dark:text-gray-400">今日请求</span>
+                            <span class="text-gray-600 dark:text-gray-400">{{
+                              getPeriodRequestLabel()
+                            }}</span>
                             <span class="font-semibold text-gray-900 dark:text-gray-100"
                               >{{ formatNumber(key.usage?.daily?.requests || 0) }}次</span
                             >
                           </div>
                           <div class="flex items-center justify-between text-sm">
-                            <span class="text-gray-600 dark:text-gray-400">今日费用</span>
-                            <span class="font-semibold text-green-600"
-                              >${{ (key.dailyCost || 0).toFixed(4) }}</span
-                            >
-                          </div>
-                          <div class="flex items-center justify-between text-sm">
-                            <span class="text-gray-600 dark:text-gray-400">总费用</span>
+                            <span class="text-gray-600 dark:text-gray-400">{{
+                              getPeriodCostLabel()
+                            }}</span>
                             <span class="font-semibold text-blue-600"
-                              >${{ (key.totalCost || 0).toFixed(4) }}</span
+                              >${{ getPeriodCost(key).toFixed(4) }}</span
                             >
                           </div>
                           <div class="flex items-center justify-between text-sm">
@@ -1078,7 +1081,9 @@
                 <!-- 今日使用 -->
                 <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-700">
                   <div class="mb-2 flex items-center justify-between">
-                    <span class="text-xs text-gray-600 dark:text-gray-400">今日使用</span>
+                    <span class="text-xs text-gray-600 dark:text-gray-400">{{
+                      globalDateFilter.type === 'custom' ? '累计统计' : '今日使用'
+                    }}</span>
                     <button
                       class="text-xs text-blue-600 hover:text-blue-800"
                       @click="showUsageDetails(key)"
@@ -1588,7 +1593,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
 import { useClientsStore } from '@/stores/clients'
@@ -1619,11 +1624,43 @@ const isIndeterminate = ref(false)
 const apiKeysLoading = ref(false)
 const apiKeyStatsTimeRange = ref('today')
 
+// 全局日期筛选器
+const globalDateFilter = reactive({
+  type: 'preset',
+  preset: '7days',
+  customStart: '',
+  customEnd: '',
+  customRange: null
+})
+
+// 时间范围下拉选项
+const timeRangeDropdownOptions = computed(() => [
+  { value: '7days', label: '最近7天', icon: 'fa-calendar-week' },
+  { value: '30days', label: '最近30天', icon: 'fa-calendar-alt' },
+  { value: 'all', label: '全部时间', icon: 'fa-infinity' },
+  { value: 'custom', label: '自定义范围', icon: 'fa-calendar-check' }
+])
+
+// 全局预设选项（用于内部计算）
+const globalPresetOptions = [
+  { value: 'today', label: '今日', days: 1 },
+  { value: '3days', label: '3天', days: 3 },
+  { value: '7days', label: '7天', days: 7 },
+  { value: '14days', label: '14天', days: 14 },
+  { value: '30days', label: '30天', days: 30 },
+  { value: '90days', label: '90天', days: 90 },
+  { value: 'thisWeek', label: '本周', days: -1 },
+  { value: 'thisMonth', label: '本月', days: -2 },
+  { value: 'lastMonth', label: '上月', days: -3 },
+  { value: 'custom', label: '自定义', days: -1 },
+  { value: 'all', label: '全部', days: -99 }
+]
+
 // Tab management
 const activeTab = ref('active')
 const deletedApiKeys = ref([])
 const deletedApiKeysLoading = ref(false)
-const apiKeysSortBy = ref('dailyCost')
+const apiKeysSortBy = ref('periodCost')
 const apiKeysSortOrder = ref('desc')
 const expandedApiKeys = ref({})
 const apiKeyModelStats = ref({})
@@ -1651,12 +1688,7 @@ const availableTags = ref([])
 const searchKeyword = ref('')
 
 // 下拉选项数据
-const timeRangeOptions = ref([
-  { value: 'today', label: '今日', icon: 'fa-clock' },
-  { value: '7days', label: '最近7天', icon: 'fa-calendar-week' },
-  { value: 'monthly', label: '本月', icon: 'fa-calendar' },
-  { value: 'all', label: '全部时间', icon: 'fa-infinity' }
-])
+// Removed timeRangeOptions as we now use globalPresetOptions
 
 const tagOptions = computed(() => {
   const options = [{ value: '', label: '所有标签', icon: 'fa-asterisk' }]
@@ -1729,6 +1761,9 @@ const sortedApiKeys = computed(() => {
     if (apiKeysSortBy.value === 'status') {
       aVal = a.isActive ? 1 : 0
       bVal = b.isActive ? 1 : 0
+    } else if (apiKeysSortBy.value === 'periodCost') {
+      aVal = calculatePeriodCost(a)
+      bVal = calculatePeriodCost(b)
     } else if (apiKeysSortBy.value === 'dailyCost') {
       aVal = a.dailyCost || 0
       bVal = b.dailyCost || 0
@@ -1867,10 +1902,26 @@ const loadAccounts = async () => {
 const loadApiKeys = async () => {
   apiKeysLoading.value = true
   try {
-    const data = await apiClient.get(`/admin/api-keys?timeRange=${apiKeyStatsTimeRange.value}`)
+    // 构建请求参数
+    let params = {}
+    if (
+      globalDateFilter.type === 'custom' &&
+      globalDateFilter.customStart &&
+      globalDateFilter.customEnd
+    ) {
+      params.startDate = globalDateFilter.customStart
+      params.endDate = globalDateFilter.customEnd
+      params.timeRange = 'custom'
+    } else if (globalDateFilter.preset === 'all') {
+      params.timeRange = 'all'
+    } else {
+      params.timeRange = globalDateFilter.preset
+    }
+
+    const queryString = new URLSearchParams(params).toString()
+    const data = await apiClient.get(`/admin/api-keys?${queryString}`)
     if (data.success) {
       apiKeys.value = data.data || []
-
       // 更新可用标签列表
       const tagsSet = new Set()
       apiKeys.value.forEach((key) => {
@@ -2157,6 +2208,184 @@ const calculateModelCost = (stat) => {
   return '$0.000000'
 }
 
+// 获取费用统计标签
+const getPeriodCostLabel = () => {
+  if (
+    globalDateFilter.type === 'custom' &&
+    globalDateFilter.customStart &&
+    globalDateFilter.customEnd
+  ) {
+    return '累计费用'
+  }
+  if (globalDateFilter.preset === 'all') {
+    return '总费用'
+  }
+  const preset = globalPresetOptions.find((opt) => opt.value === globalDateFilter.preset)
+  return preset ? `${preset.label}费用` : '费用统计'
+}
+
+// 获取请求数量标签
+const getPeriodRequestLabel = () => {
+  if (
+    globalDateFilter.type === 'custom' &&
+    globalDateFilter.customStart &&
+    globalDateFilter.customEnd
+  ) {
+    return '累计请求'
+  }
+  if (globalDateFilter.preset === 'all') {
+    return '总请求'
+  }
+  return '今日请求'
+}
+
+// 获取日期范围内的费用
+const getPeriodCost = (key) => {
+  // 根据全局日期筛选器返回对应的费用
+  if (globalDateFilter.type === 'custom') {
+    // 自定义日期范围，使用服务器返回的 usage['custom'].cost
+    if (key.usage) {
+      if (key.usage['custom'] && key.usage['custom'].cost !== undefined) {
+        return key.usage['custom'].cost
+      }
+      if (key.usage.total && key.usage.total.cost !== undefined) {
+        return key.usage.total.cost
+      }
+    }
+    return 0
+  } else if (globalDateFilter.preset === 'today') {
+    return key.dailyCost || 0
+  } else if (globalDateFilter.preset === '7days') {
+    // 使用 usage['7days'].cost
+    if (key.usage && key.usage['7days'] && key.usage['7days'].cost !== undefined) {
+      return key.usage['7days'].cost
+    }
+    return key.weeklyCost || key.periodCost || 0
+  } else if (globalDateFilter.preset === '30days') {
+    // 使用 usage['30days'].cost 或 usage.monthly.cost
+    if (key.usage) {
+      if (key.usage['30days'] && key.usage['30days'].cost !== undefined) {
+        return key.usage['30days'].cost
+      }
+      if (key.usage.monthly && key.usage.monthly.cost !== undefined) {
+        return key.usage.monthly.cost
+      }
+      if (key.usage.total && key.usage.total.cost !== undefined) {
+        return key.usage.total.cost
+      }
+    }
+    return key.monthlyCost || key.periodCost || 0
+  } else if (globalDateFilter.preset === 'all') {
+    // 全部时间，返回 usage['all'].cost 或 totalCost
+    if (key.usage && key.usage['all'] && key.usage['all'].cost !== undefined) {
+      return key.usage['all'].cost
+    }
+    return key.totalCost || 0
+  } else {
+    // 默认返回 usage.total.cost
+    return key.periodCost || key.totalCost || 0
+  }
+}
+
+// 计算日期范围内的总费用（用于展开的详细统计）
+const calculatePeriodCost = (key) => {
+  // 如果没有展开，使用缓存的费用数据
+  if (!apiKeyModelStats.value[key.id]) {
+    return getPeriodCost(key)
+  }
+
+  // 计算所有模型的费用总和
+  const stats = apiKeyModelStats.value[key.id] || []
+  let totalCost = 0
+
+  stats.forEach((stat) => {
+    if (stat.cost !== undefined) {
+      totalCost += stat.cost
+    } else if (stat.formatted && stat.formatted.total) {
+      // 尝试从格式化的字符串中提取数字
+      const costStr = stat.formatted.total.replace('$', '').replace(',', '')
+      const cost = parseFloat(costStr)
+      if (!isNaN(cost)) {
+        totalCost += cost
+      }
+    }
+  })
+
+  return totalCost
+}
+
+// 处理时间范围下拉框变化
+const handleTimeRangeChange = (value) => {
+  setGlobalDateFilterPreset(value)
+}
+
+// 设置全局日期预设
+const setGlobalDateFilterPreset = (preset) => {
+  globalDateFilter.preset = preset
+
+  if (preset === 'custom') {
+    // 自定义选项，不自动设置日期，等待用户选择
+    globalDateFilter.type = 'custom'
+    // 如果没有自定义范围，设置默认为最近7天
+    if (!globalDateFilter.customRange) {
+      const today = new Date()
+      const startDate = new Date(today)
+      startDate.setDate(today.getDate() - 6)
+
+      const formatDate = (date) => {
+        return (
+          date.getFullYear() +
+          '-' +
+          String(date.getMonth() + 1).padStart(2, '0') +
+          '-' +
+          String(date.getDate()).padStart(2, '0') +
+          ' 00:00:00'
+        )
+      }
+
+      globalDateFilter.customRange = [formatDate(startDate), formatDate(today)]
+      globalDateFilter.customStart = startDate.toISOString().split('T')[0]
+      globalDateFilter.customEnd = today.toISOString().split('T')[0]
+    }
+  } else if (preset === 'all') {
+    // 全部时间选项
+    globalDateFilter.type = 'preset'
+    globalDateFilter.customStart = null
+    globalDateFilter.customEnd = null
+  } else {
+    // 预设选项（7天或30天）
+    globalDateFilter.type = 'preset'
+    const today = new Date()
+    const startDate = new Date(today)
+
+    if (preset === '7days') {
+      startDate.setDate(today.getDate() - 6)
+    } else if (preset === '30days') {
+      startDate.setDate(today.getDate() - 29)
+    }
+
+    globalDateFilter.customStart = startDate.toISOString().split('T')[0]
+    globalDateFilter.customEnd = today.toISOString().split('T')[0]
+  }
+
+  loadApiKeys()
+}
+
+// 全局自定义日期范围变化
+const onGlobalCustomDateRangeChange = (value) => {
+  if (value && value.length === 2) {
+    globalDateFilter.type = 'custom'
+    globalDateFilter.preset = 'custom'
+    globalDateFilter.customRange = value
+    globalDateFilter.customStart = value[0].split(' ')[0]
+    globalDateFilter.customEnd = value[1].split(' ')[0]
+    loadApiKeys()
+  } else if (value === null) {
+    // 清空时恢复默认7天
+    setGlobalDateFilterPreset('7days')
+  }
+}
+
 // 初始化API Key的日期筛选器
 const initApiKeyDateFilter = (keyId) => {
   const today = new Date()
@@ -2172,7 +2401,8 @@ const initApiKeyDateFilter = (keyId) => {
     presetOptions: [
       { value: 'today', label: '今日', days: 1 },
       { value: '7days', label: '7天', days: 7 },
-      { value: '30days', label: '30天', days: 30 }
+      { value: '30days', label: '30天', days: 30 },
+      { value: 'custom', label: '自定义', days: -1 }
     ]
   }
 }
@@ -2193,25 +2423,52 @@ const setApiKeyDateFilterPreset = (preset, keyId) => {
 
   const option = filter.presetOptions.find((opt) => opt.value === preset)
   if (option) {
-    const today = new Date()
-    const startDate = new Date(today)
-    startDate.setDate(today.getDate() - (option.days - 1))
+    if (preset === 'custom') {
+      // 自定义选项，不自动设置日期，等待用户选择
+      filter.type = 'custom'
+      // 如果没有自定义范围，设置默认为最近7天
+      if (!filter.customRange) {
+        const today = new Date()
+        const startDate = new Date(today)
+        startDate.setDate(today.getDate() - 6)
 
-    filter.customStart = startDate.toISOString().split('T')[0]
-    filter.customEnd = today.toISOString().split('T')[0]
+        const formatDate = (date) => {
+          return (
+            date.getFullYear() +
+            '-' +
+            String(date.getMonth() + 1).padStart(2, '0') +
+            '-' +
+            String(date.getDate()).padStart(2, '0') +
+            ' 00:00:00'
+          )
+        }
 
-    const formatDate = (date) => {
-      return (
-        date.getFullYear() +
-        '-' +
-        String(date.getMonth() + 1).padStart(2, '0') +
-        '-' +
-        String(date.getDate()).padStart(2, '0') +
-        ' 00:00:00'
-      )
+        filter.customRange = [formatDate(startDate), formatDate(today)]
+        filter.customStart = startDate.toISOString().split('T')[0]
+        filter.customEnd = today.toISOString().split('T')[0]
+      }
+    } else {
+      // 预设选项
+      const today = new Date()
+      const startDate = new Date(today)
+      startDate.setDate(today.getDate() - (option.days - 1))
+
+      filter.customStart = startDate.toISOString().split('T')[0]
+      filter.customEnd = today.toISOString().split('T')[0]
+
+      const formatDate = (date) => {
+        return (
+          date.getFullYear() +
+          '-' +
+          String(date.getMonth() + 1).padStart(2, '0') +
+          '-' +
+          String(date.getDate()).padStart(2, '0') +
+          ' 00:00:00'
+        )
+      }
+
+      filter.customRange = [formatDate(startDate), formatDate(today)]
     }
-
-    filter.customRange = [formatDate(startDate), formatDate(today)]
   }
 
   loadApiKeyModelStats(keyId, true)
@@ -2223,7 +2480,7 @@ const onApiKeyCustomDateRangeChange = (keyId, value) => {
 
   if (value && value.length === 2) {
     filter.type = 'custom'
-    filter.preset = ''
+    filter.preset = 'custom'
     filter.customRange = value
     filter.customStart = value[0].split(' ')[0]
     filter.customEnd = value[1].split(' ')[0]
@@ -2638,12 +2895,9 @@ const copyApiStatsLink = (apiKey) => {
       showToast(`已复制统计页面链接`, 'success')
     } else {
       showToast('复制失败，请手动复制', 'error')
-      console.log('统计页面链接:', statsUrl)
     }
   } catch (err) {
     showToast('复制失败，请手动复制', 'error')
-    console.error('复制错误:', err)
-    console.log('统计页面链接:', statsUrl)
   } finally {
     document.body.removeChild(textarea)
   }
@@ -2864,5 +3118,20 @@ onMounted(async () => {
 
 .api-key-date-picker :deep(.el-range-separator) {
   @apply text-gray-500;
+}
+
+/* 自定义日期范围选择器高度对齐 */
+.custom-date-range-picker :deep(.el-input__wrapper) {
+  @apply h-[38px] rounded-lg border border-gray-200 bg-white shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md dark:border-gray-600 dark:bg-gray-800;
+}
+.custom-date-range-picker :deep(.el-input__inner) {
+  @apply h-full py-2 text-sm font-medium text-gray-700 dark:text-gray-200;
+}
+.custom-date-range-picker :deep(.el-input__prefix),
+.custom-date-range-picker :deep(.el-input__suffix) {
+  @apply flex items-center;
+}
+.custom-date-range-picker :deep(.el-range-separator) {
+  @apply mx-2 text-gray-500;
 }
 </style>
