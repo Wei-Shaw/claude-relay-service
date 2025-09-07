@@ -672,16 +672,13 @@ class ClaudeRelayService {
 
       // 使用统一 User-Agent 或客户端提供的，最后使用默认值
       if (!options.headers['User-Agent'] && !options.headers['user-agent']) {
-        const userAgent =
-          unifiedUA ||
-          clientHeaders?.['user-agent'] ||
-          clientHeaders?.['User-Agent'] ||
-          'claude-cli/1.0.102 (external, cli)'
+        const userAgent = unifiedUA || 'claude-cli/1.0.57 (external, cli)'
         options.headers['User-Agent'] = userAgent
       }
 
-      logger.info(`🔗 指纹是这个: ${options.headers['User-Agent']}`)
-      logger.info(`🔗 指纹是这个: ${options.headers['user-agent']}`)
+      logger.info(
+        `🔗 指纹是这个: ${options.headers['User-Agent'] || options.headers['user-agent']}`
+      )
 
       // 使用自定义的 betaHeader 或默认值
       const betaHeader =
@@ -938,14 +935,13 @@ class ClaudeRelayService {
 
       // 使用统一 User-Agent 或客户端提供的，最后使用默认值
       if (!options.headers['User-Agent'] && !options.headers['user-agent']) {
-        const userAgent =
-          unifiedUA ||
-          clientHeaders?.['user-agent'] ||
-          clientHeaders?.['User-Agent'] ||
-          'claude-cli/1.0.102 (external, cli)'
+        const userAgent = unifiedUA || 'claude-cli/1.0.57 (external, cli)'
         options.headers['User-Agent'] = userAgent
       }
 
+      logger.info(
+        `🔗 指纹是这个: ${options.headers['User-Agent'] || options.headers['user-agent']}`
+      )
       // 使用自定义的 betaHeader 或默认值
       const betaHeader =
         requestOptions?.betaHeader !== undefined ? requestOptions.betaHeader : this.betaHeader
