@@ -168,6 +168,18 @@
                 <span>{{ showCheckboxes ? '取消选择' : '选择' }}</span>
               </button>
 
+              <!-- 导出数据按钮 -->
+              <button
+                class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-500 sm:w-auto"
+                @click="exportToExcel"
+              >
+                <div
+                  class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-emerald-500 to-green-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+                ></div>
+                <i class="fas fa-file-excel relative text-emerald-500" />
+                <span class="relative">导出数据</span>
+              </button>
+
               <!-- 批量编辑按钮 - 移到刷新按钮旁边 -->
               <button
                 v-if="selectedApiKeys.length > 0"
@@ -1754,6 +1766,7 @@ import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
 import { useClientsStore } from '@/stores/clients'
 import { useAuthStore } from '@/stores/auth'
+import * as XLSX from 'xlsx'
 import CreateApiKeyModal from '@/components/apikeys/CreateApiKeyModal.vue'
 import EditApiKeyModal from '@/components/apikeys/EditApiKeyModal.vue'
 import RenewApiKeyModal from '@/components/apikeys/RenewApiKeyModal.vue'
@@ -3207,6 +3220,13 @@ const getWeeklyOpusCostProgressColor = (key) => {
   return 'bg-green-500'
 }
 
+// 获取总费用进度 - 暂时不用
+// const getTotalCostProgress = (key) => {
+//   if (!key.totalCostLimit || key.totalCostLimit === 0) return 0
+//   const percentage = ((key.totalCost || 0) / key.totalCostLimit) * 100
+//   return Math.min(percentage, 100)
+// }
+
 // 显示使用详情
 const showUsageDetails = (apiKey) => {
   selectedApiKeyForDetail.value = apiKey
@@ -3230,6 +3250,137 @@ const formatLastUsed = (dateString) => {
 const clearSearch = () => {
   searchKeyword.value = ''
   currentPage.value = 1
+}
+
+// 导出数据到Excel
+const exportToExcel = () => {
+  try {
+    // 准备导出的数据 - 仅导出用量数据
+    const exportData = sortedApiKeys.value.map((key) => {
+      // 基础数据
+      const baseData = {
+        'API Key名称': key.name || '',
+        所有者: key.ownerDisplayName || '',
+
+        // 当前筛选时间段的统计
+        请求总数: getPeriodRequests(key),
+        '总费用($)': calculatePeriodCost(key).toFixed(4),
+        总Token数: getPeriodTokens(key),
+
+        // 今日统计
+        今日请求数: key.usage?.daily?.requests || 0,
+        '今日费用($)': (key.dailyCost || 0).toFixed(4),
+        今日Token数: key.usage?.daily?.totalTokens || 0,
+
+        // 累计总统计
+        累计总请求数: key.usage?.total?.requests || 0,
+        '累计总费用($)': (key.totalCost || 0).toFixed(4),
+        累计总Token数: key.usage?.total?.totalTokens || 0
+      }
+
+      // 添加分模型统计（如果有）
+      const modelStats = {}
+
+      // 处理每日模型统计
+      if (key.usage?.daily?.models) {
+        Object.entries(key.usage.daily.models).forEach(([model, stats]) => {
+          const modelName = model.replace(/[:/]/g, '_') // 处理模型名中的特殊字符
+          modelStats[`今日_${modelName}_请求数`] = stats.requests || 0
+          modelStats[`今日_${modelName}_费用($)`] = (stats.cost || 0).toFixed(4)
+          modelStats[`今日_${modelName}_输入Token`] = stats.inputTokens || 0
+          modelStats[`今日_${modelName}_输出Token`] = stats.outputTokens || 0
+          modelStats[`今日_${modelName}_总Token`] = stats.totalTokens || 0
+        })
+      }
+
+      // 处理总计模型统计
+      if (key.usage?.total?.models) {
+        Object.entries(key.usage.total.models).forEach(([model, stats]) => {
+          const modelName = model.replace(/[:/]/g, '_')
+          modelStats[`累计_${modelName}_请求数`] = stats.requests || 0
+          modelStats[`累计_${modelName}_费用($)`] = (stats.cost || 0).toFixed(4)
+          modelStats[`累计_${modelName}_输入Token`] = stats.inputTokens || 0
+          modelStats[`累计_${modelName}_输出Token`] = stats.outputTokens || 0
+          modelStats[`累计_${modelName}_总Token`] = stats.totalTokens || 0
+        })
+      }
+
+      // 处理筛选时间段的模型统计
+      if (globalDateFilter.preset === '7days' && key.usage?.weekly?.models) {
+        Object.entries(key.usage.weekly.models).forEach(([model, stats]) => {
+          const modelName = model.replace(/[:/]/g, '_')
+          modelStats[`本周_${modelName}_请求数`] = stats.requests || 0
+          modelStats[`本周_${modelName}_费用($)`] = (stats.cost || 0).toFixed(4)
+          modelStats[`本周_${modelName}_输入Token`] = stats.inputTokens || 0
+          modelStats[`本周_${modelName}_输出Token`] = stats.outputTokens || 0
+          modelStats[`本周_${modelName}_总Token`] = stats.totalTokens || 0
+        })
+      } else if (globalDateFilter.preset === '30days' && key.usage?.monthly?.models) {
+        Object.entries(key.usage.monthly.models).forEach(([model, stats]) => {
+          const modelName = model.replace(/[:/]/g, '_')
+          modelStats[`本月_${modelName}_请求数`] = stats.requests || 0
+          modelStats[`本月_${modelName}_费用($)`] = (stats.cost || 0).toFixed(4)
+          modelStats[`本月_${modelName}_输入Token`] = stats.inputTokens || 0
+          modelStats[`本月_${modelName}_输出Token`] = stats.outputTokens || 0
+          modelStats[`本月_${modelName}_总Token`] = stats.totalTokens || 0
+        })
+      }
+
+      return { ...baseData, ...modelStats }
+    })
+
+    // 创建工作簿
+    const ws = XLSX.utils.json_to_sheet(exportData)
+
+    // 动态设置列宽
+    const headers = Object.keys(exportData[0] || {})
+    const colWidths = headers.map((header) => {
+      if (header.includes('名称') || header.includes('所有者')) return { wch: 20 }
+      if (header.includes('费用')) return { wch: 15 }
+      if (header.includes('Token')) return { wch: 15 }
+      if (header.includes('请求')) return { wch: 12 }
+      return { wch: 15 }
+    })
+    ws['!cols'] = colWidths
+
+    // 创建工作簿
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, '用量统计')
+
+    // 生成文件名（包含时间戳和筛选条件）
+    const now = new Date()
+    const timestamp =
+      now.getFullYear() +
+      String(now.getMonth() + 1).padStart(2, '0') +
+      String(now.getDate()).padStart(2, '0') +
+      '_' +
+      String(now.getHours()).padStart(2, '0') +
+      String(now.getMinutes()).padStart(2, '0') +
+      String(now.getSeconds()).padStart(2, '0')
+
+    let timeRangeLabel = ''
+    if (globalDateFilter.type === 'preset') {
+      const presetLabels = {
+        today: '今日',
+        '7days': '最近7天',
+        '30days': '最近30天',
+        all: '全部时间'
+      }
+      timeRangeLabel = presetLabels[globalDateFilter.preset] || globalDateFilter.preset
+    } else {
+      timeRangeLabel = '自定义时间'
+    }
+
+    const filename = `API_Keys_用量统计_${timeRangeLabel}_${timestamp}.xlsx`
+
+    // 导出文件
+    XLSX.writeFile(wb, filename)
+
+    showToast(`成功导出 ${exportData.length} 条API Key用量数据`, 'success')
+  } catch (error) {
+    console.error('导出失败:', error)
+    showToast('导出失败，请重试', 'error')
+  }
 }
 
 // 监听筛选条件变化，重置页码和选中状态
