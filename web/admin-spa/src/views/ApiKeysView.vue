@@ -125,7 +125,7 @@
                 <div class="relative flex items-center">
                   <input
                     v-model="searchKeyword"
-                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 pl-9 text-sm text-gray-700 placeholder-gray-400 shadow-sm transition-all duration-200 hover:border-gray-300 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 dark:hover:border-gray-500"
+                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 pl-9 text-sm text-gray-700 placeholder-gray-400 shadow-sm transition-all duration-200 hover:border-gray-300 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 dark:hover:border-gray-500"
                     :placeholder="isLdapEnabled ? '搜索名称或所有者...' : '搜索名称...'"
                     type="text"
                     @input="currentPage = 1"
@@ -209,7 +209,7 @@
 
             <!-- 创建按钮 - 独立在右侧 -->
             <button
-              class="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow-md transition-all duration-200 hover:from-blue-600 hover:to-blue-700 hover:shadow-lg sm:w-auto"
+              class="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 px-5 py-2 text-sm font-medium text-white shadow-md transition-all duration-200 hover:from-blue-600 hover:to-blue-700 hover:shadow-lg sm:w-auto"
               @click.stop="openCreateApiKeyModal"
             >
               <i class="fas fa-plus"></i>
@@ -250,7 +250,7 @@
                       </div>
                     </th>
                     <th
-                      class="w-[20%] min-w-[160px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                      class="w-[18%] min-w-[140px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                       @click="sortApiKeys('name')"
                     >
                       名称
@@ -263,11 +263,6 @@
                         ]"
                       />
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
-                    </th>
-                    <th
-                      class="w-[10%] min-w-[90px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                    >
-                      账号
                     </th>
                     <th
                       class="w-[10%] min-w-[80px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
@@ -323,7 +318,7 @@
                       class="w-[7%] min-w-[70px] cursor-pointer px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                       @click="sortApiKeys('periodTokens')"
                     >
-                      Token数量
+                      Token数
                       <i
                         v-if="apiKeysSortBy === 'periodTokens'"
                         :class="[
@@ -390,7 +385,7 @@
                   <template v-for="key in paginatedApiKeys" :key="key.id">
                     <!-- API Key 主行 -->
                     <tr class="table-row">
-                      <td v-if="shouldShowCheckboxes" class="px-3 py-2.5">
+                      <td v-if="shouldShowCheckboxes" class="px-3 py-1.5">
                         <div class="flex items-center">
                           <input
                             v-model="selectedApiKeys"
@@ -401,16 +396,149 @@
                           />
                         </div>
                       </td>
-                      <td class="px-3 py-2.5">
+                      <td class="px-3 py-1.5">
                         <div class="min-w-0">
-                          <div
-                            class="truncate text-sm font-semibold text-gray-900 dark:text-gray-100"
-                            :title="key.name"
-                          >
-                            {{ key.name }}
+                          <div class="flex items-start gap-2.5">
+                            <!-- API Key 图标 -->
+                            <IconPicker
+                              v-model="key.icon"
+                              class="mt-0.5"
+                              size="small"
+                              @update:model-value="(val) => updateApiKeyIcon(key.id, val)"
+                            />
+                            <div class="min-w-0 flex-1">
+                              <!-- 名称 -->
+                              <div
+                                class="truncate text-sm font-semibold text-gray-900 dark:text-gray-100"
+                                :title="key.name"
+                              >
+                                {{ key.name }}
+                              </div>
+                              <!-- 次要信息显示：所属账号 -->
+                              <div class="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">
+                                <!-- Claude OAuth 账号 -->
+                                <span
+                                  v-if="
+                                    key.claudeAccountId && !key.claudeAccountId.startsWith('group:')
+                                  "
+                                  class="inline-flex items-center gap-1"
+                                >
+                                  <i class="fas fa-robot text-[9px] text-blue-500" />
+                                  <span>{{
+                                    getClaudeBindingInfo(key)
+                                      .replace(/^🔒\s*专属-/, '')
+                                      .replace(/^⚠️\s*/, '')
+                                  }}</span>
+                                </span>
+                                <!-- Claude Console 账号 -->
+                                <span
+                                  v-else-if="key.claudeConsoleAccountId"
+                                  class="inline-flex items-center gap-1"
+                                >
+                                  <i class="fas fa-terminal text-[9px] text-purple-500" />
+                                  <span>{{
+                                    getClaudeBindingInfo(key)
+                                      .replace(/^🔒\s*专属-/, '')
+                                      .replace(/^⚠️\s*/, '')
+                                  }}</span>
+                                </span>
+                                <!-- Claude 分组 -->
+                                <span
+                                  v-else-if="
+                                    key.claudeAccountId && key.claudeAccountId.startsWith('group:')
+                                  "
+                                  class="inline-flex items-center gap-1"
+                                >
+                                  <i class="fas fa-layer-group text-[9px] text-blue-500" />
+                                  <span>{{ getClaudeBindingInfo(key) }}</span>
+                                </span>
+                                <!-- Gemini 账号 -->
+                                <span
+                                  v-else-if="
+                                    key.geminiAccountId && !key.geminiAccountId.startsWith('group:')
+                                  "
+                                  class="inline-flex items-center gap-1"
+                                >
+                                  <i class="fas fa-gem text-[9px] text-green-500" />
+                                  <span>{{
+                                    getGeminiBindingInfo(key)
+                                      .replace(/^🔒\s*专属-/, '')
+                                      .replace(/^⚠️\s*/, '')
+                                  }}</span>
+                                </span>
+                                <!-- Gemini 分组 -->
+                                <span
+                                  v-else-if="
+                                    key.geminiAccountId && key.geminiAccountId.startsWith('group:')
+                                  "
+                                  class="inline-flex items-center gap-1"
+                                >
+                                  <i class="fas fa-layer-group text-[9px] text-green-500" />
+                                  <span>{{ getGeminiBindingInfo(key) }}</span>
+                                </span>
+                                <!-- OpenAI 账号 -->
+                                <span
+                                  v-else-if="
+                                    key.openaiAccountId && !key.openaiAccountId.startsWith('group:')
+                                  "
+                                  class="inline-flex items-center gap-1"
+                                >
+                                  <i class="fas fa-brain text-[9px] text-orange-500" />
+                                  <span>{{
+                                    getOpenAIBindingInfo(key)
+                                      .replace(/^🔒\s*专属-/, '')
+                                      .replace(/^⚠️\s*/, '')
+                                  }}</span>
+                                </span>
+                                <!-- OpenAI 分组 -->
+                                <span
+                                  v-else-if="
+                                    key.openaiAccountId && key.openaiAccountId.startsWith('group:')
+                                  "
+                                  class="inline-flex items-center gap-1"
+                                >
+                                  <i class="fas fa-layer-group text-[9px] text-orange-500" />
+                                  <span>{{ getOpenAIBindingInfo(key) }}</span>
+                                </span>
+                                <!-- Bedrock 账号 -->
+                                <span
+                                  v-else-if="
+                                    key.bedrockAccountId &&
+                                    !key.bedrockAccountId.startsWith('group:')
+                                  "
+                                  class="inline-flex items-center gap-1"
+                                >
+                                  <i class="fas fa-cube text-[9px] text-indigo-500" />
+                                  <span>{{
+                                    getBedrockBindingInfo(key)
+                                      .replace(/^🔒\s*专属-/, '')
+                                      .replace(/^⚠️\s*/, '')
+                                  }}</span>
+                                </span>
+                                <!-- Bedrock 分组 -->
+                                <span
+                                  v-else-if="
+                                    key.bedrockAccountId &&
+                                    key.bedrockAccountId.startsWith('group:')
+                                  "
+                                  class="inline-flex items-center gap-1"
+                                >
+                                  <i class="fas fa-layer-group text-[9px] text-indigo-500" />
+                                  <span>{{ getBedrockBindingInfo(key) }}</span>
+                                </span>
+                                <!-- 共享池 -->
+                                <span
+                                  v-else
+                                  class="inline-flex items-center gap-1 text-gray-400 dark:text-gray-500"
+                                >
+                                  <i class="fas fa-share-alt text-[9px]" />
+                                  <span>共享池</span>
+                                </span>
+                              </div>
+                            </div>
                           </div>
                           <!-- 账户绑定信息 -->
-                          <div class="mt-1.5 space-y-1">
+                          <div class="mt-1.5 space-y-1 pl-12">
                             <!-- Claude 绑定 -->
                             <div
                               v-if="key.claudeAccountId || key.claudeConsoleAccountId"
@@ -469,65 +597,14 @@
                           <!-- 显示所有者信息 -->
                           <div
                             v-if="isLdapEnabled && key.ownerDisplayName"
-                            class="mt-1 text-xs text-red-600"
+                            class="mt-1 pl-12 text-xs text-red-600"
                           >
                             <i class="fas fa-user mr-1" />
                             {{ key.ownerDisplayName }}
                           </div>
                         </div>
                       </td>
-                      <!-- 账号 -->
-                      <td class="whitespace-nowrap px-3 py-2.5 text-sm">
-                        <div class="text-gray-700 dark:text-gray-300">
-                          <!-- Claude 账号 -->
-                          <span v-if="key.claudeAccountId" class="inline-flex items-center">
-                            <i class="fas fa-robot mr-1 text-xs text-blue-500" />
-                            <span class="text-xs">{{
-                              getClaudeAccountName(key.claudeAccountId)
-                            }}</span>
-                          </span>
-                          <!-- Claude Console 账号 -->
-                          <span
-                            v-else-if="key.claudeConsoleAccountId"
-                            class="inline-flex items-center"
-                          >
-                            <i class="fas fa-terminal mr-1 text-xs text-purple-500" />
-                            <span class="text-xs">{{
-                              getClaudeConsoleAccountName(key.claudeConsoleAccountId)
-                            }}</span>
-                          </span>
-                          <!-- Gemini 账号 -->
-                          <span v-else-if="key.geminiAccountId" class="inline-flex items-center">
-                            <i class="fas fa-gem mr-1 text-xs text-green-500" />
-                            <span class="text-xs">{{
-                              getGeminiAccountName(key.geminiAccountId)
-                            }}</span>
-                          </span>
-                          <!-- OpenAI 账号 -->
-                          <span v-else-if="key.openaiAccountId" class="inline-flex items-center">
-                            <i class="fas fa-brain mr-1 text-xs text-orange-500" />
-                            <span class="text-xs">{{
-                              getOpenAIAccountName(key.openaiAccountId)
-                            }}</span>
-                          </span>
-                          <!-- Bedrock 账号 -->
-                          <span v-else-if="key.bedrockAccountId" class="inline-flex items-center">
-                            <i class="fas fa-layer-group mr-1 text-xs text-indigo-500" />
-                            <span class="text-xs">{{
-                              getBedrockAccountName(key.bedrockAccountId)
-                            }}</span>
-                          </span>
-                          <!-- 共享池 -->
-                          <span
-                            v-else
-                            class="inline-flex items-center text-gray-500 dark:text-gray-400"
-                          >
-                            <i class="fas fa-share-alt mr-1 text-xs" />
-                            <span class="text-xs">共享池</span>
-                          </span>
-                        </div>
-                      </td>
-                      <td class="px-3 py-2.5">
+                      <td class="px-3 py-1.5">
                         <div class="flex flex-wrap gap-1">
                           <span
                             v-for="tag in key.tags || []"
@@ -543,7 +620,7 @@
                           >
                         </div>
                       </td>
-                      <td class="whitespace-nowrap px-3 py-2.5">
+                      <td class="whitespace-nowrap px-3 py-1.5">
                         <span
                           :class="[
                             'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold',
@@ -562,7 +639,7 @@
                         </span>
                       </td>
                       <!-- 请求数 -->
-                      <td class="whitespace-nowrap px-3 py-2.5 text-right text-sm">
+                      <td class="whitespace-nowrap px-3 py-1.5 text-right text-sm">
                         <div class="flex items-center justify-end gap-1">
                           <span class="font-medium text-gray-900 dark:text-gray-100">
                             {{ formatNumber(getPeriodRequests(key)) }}
@@ -571,7 +648,7 @@
                         </div>
                       </td>
                       <!-- 费用 -->
-                      <td class="whitespace-nowrap px-3 py-2.5 text-right text-sm">
+                      <td class="whitespace-nowrap px-3 py-1.5 text-right text-sm">
                         <div class="space-y-2">
                           <span class="font-medium text-blue-600 dark:text-blue-400">
                             ${{ getPeriodCost(key).toFixed(4) }}
@@ -634,7 +711,7 @@
                         </div>
                       </td>
                       <!-- Token数量 -->
-                      <td class="whitespace-nowrap px-3 py-2.5 text-right text-sm">
+                      <td class="whitespace-nowrap px-3 py-1.5 text-right text-sm">
                         <div class="flex items-center justify-end gap-1">
                           <span class="font-medium text-purple-600 dark:text-purple-400">
                             {{ formatTokenCount(getPeriodTokens(key)) }}
@@ -643,17 +720,24 @@
                       </td>
                       <!-- 最后使用 -->
                       <td
-                        class="whitespace-nowrap px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300"
+                        class="whitespace-nowrap px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300"
                       >
-                        {{ formatLastUsed(key.lastUsedAt) }}
+                        <span
+                          v-if="key.lastUsedAt"
+                          class="cursor-help"
+                          :title="new Date(key.lastUsedAt).toLocaleString('zh-CN')"
+                        >
+                          {{ formatLastUsed(key.lastUsedAt) }}
+                        </span>
+                        <span v-else class="text-gray-400">从未使用</span>
                       </td>
                       <!-- 创建时间 -->
                       <td
-                        class="whitespace-nowrap px-3 py-2.5 text-sm text-gray-500 dark:text-gray-400"
+                        class="whitespace-nowrap px-3 py-1.5 text-sm text-gray-500 dark:text-gray-400"
                       >
                         {{ new Date(key.createdAt).toLocaleDateString() }}
                       </td>
-                      <td class="whitespace-nowrap px-3 py-2.5 text-sm">
+                      <td class="whitespace-nowrap px-3 py-1.5 text-sm">
                         <div class="inline-flex items-center gap-1.5">
                           <!-- 未激活状态 -->
                           <span
@@ -667,52 +751,40 @@
                           <span v-else-if="key.expiresAt">
                             <span
                               v-if="isApiKeyExpired(key.expiresAt)"
-                              class="inline-flex items-center text-red-600"
+                              class="inline-flex cursor-pointer items-center text-red-600 hover:underline"
+                              @click.stop="startEditExpiry(key)"
                             >
                               <i class="fas fa-exclamation-circle mr-1" />
                               已过期
                             </span>
                             <span
                               v-else-if="isApiKeyExpiringSoon(key.expiresAt)"
-                              class="inline-flex items-center text-orange-600"
+                              class="inline-flex cursor-pointer items-center text-orange-600 hover:underline"
+                              @click.stop="startEditExpiry(key)"
                             >
                               <i class="fas fa-clock mr-1" />
                               {{ formatExpireDate(key.expiresAt) }}
                             </span>
-                            <span v-else class="text-gray-600 dark:text-gray-400">
+                            <span
+                              v-else
+                              class="cursor-pointer text-gray-600 hover:underline dark:text-gray-400"
+                              @click.stop="startEditExpiry(key)"
+                            >
                               {{ formatExpireDate(key.expiresAt) }}
                             </span>
                           </span>
                           <!-- 永不过期 -->
                           <span
                             v-else
-                            class="inline-flex items-center text-gray-400 dark:text-gray-500"
+                            class="inline-flex cursor-pointer items-center text-gray-400 hover:underline dark:text-gray-500"
+                            @click.stop="startEditExpiry(key)"
                           >
                             <i class="fas fa-infinity mr-1" />
                             永不过期
                           </span>
-                          <button
-                            class="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-300 transition-all duration-200 hover:bg-blue-50 hover:text-blue-500 dark:hover:bg-blue-900/20"
-                            title="编辑过期时间"
-                            @click.stop="startEditExpiry(key)"
-                          >
-                            <svg
-                              class="h-3 w-3"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                              ></path>
-                            </svg>
-                          </button>
                         </div>
                       </td>
-                      <td class="whitespace-nowrap px-3 py-2.5 text-sm">
+                      <td class="whitespace-nowrap px-3 py-1.5 text-sm">
                         <div class="flex gap-1">
                           <button
                             class="rounded px-2 py-1 text-xs font-medium text-purple-600 transition-colors hover:bg-purple-50 hover:text-purple-900 dark:hover:bg-purple-900/20"
@@ -1065,11 +1137,12 @@
                     :value="key.id"
                     @change="updateSelectAllState"
                   />
-                  <div
-                    class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600"
-                  >
-                    <i class="fas fa-key text-sm text-white" />
-                  </div>
+                  <!-- API Key 图标 -->
+                  <IconPicker
+                    v-model="key.icon"
+                    size="medium"
+                    @update:model-value="(val) => updateApiKeyIcon(key.id, val)"
+                  />
                   <div>
                     <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">
                       {{ key.name }}
@@ -1294,14 +1367,14 @@
               <!-- 操作按钮 -->
               <div class="mt-3 flex gap-2 border-t border-gray-100 pt-3 dark:border-gray-600">
                 <button
-                  class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-600 transition-colors hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50"
+                  class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-blue-50 px-3 py-1.5 text-xs text-blue-600 transition-colors hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50"
                   @click="showUsageDetails(key)"
                 >
                   <i class="fas fa-chart-line" />
                   查看详情
                 </button>
                 <button
-                  class="flex-1 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600 transition-colors hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  class="flex-1 rounded-lg bg-gray-50 px-3 py-1.5 text-xs text-gray-600 transition-colors hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   @click="openEditApiKeyModal(key)"
                 >
                   <i class="fas fa-edit mr-1" />
@@ -1312,7 +1385,7 @@
                     key.expiresAt &&
                     (isApiKeyExpired(key.expiresAt) || isApiKeyExpiringSoon(key.expiresAt))
                   "
-                  class="flex-1 rounded-lg bg-orange-50 px-3 py-2 text-xs text-orange-600 transition-colors hover:bg-orange-100 dark:bg-orange-900/30 dark:hover:bg-orange-900/50"
+                  class="flex-1 rounded-lg bg-orange-50 px-3 py-1.5 text-xs text-orange-600 transition-colors hover:bg-orange-100 dark:bg-orange-900/30 dark:hover:bg-orange-900/50"
                   @click="openRenewApiKeyModal(key)"
                 >
                   <i class="fas fa-clock mr-1" />
@@ -1323,7 +1396,7 @@
                     key.isActive
                       ? 'bg-orange-50 text-orange-600 hover:bg-orange-100 dark:bg-orange-900/30 dark:hover:bg-orange-900/50'
                       : 'bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/30 dark:hover:bg-green-900/50',
-                    'rounded-lg px-3 py-2 text-xs transition-colors'
+                    'rounded-lg px-3 py-1.5 text-xs transition-colors'
                   ]"
                   @click="toggleApiKeyStatus(key)"
                 >
@@ -1331,7 +1404,7 @@
                   {{ key.isActive ? '禁用' : '激活' }}
                 </button>
                 <button
-                  class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600 transition-colors hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50"
+                  class="rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600 transition-colors hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50"
                   @click="deleteApiKey(key.id)"
                 >
                   <i class="fas fa-trash" />
@@ -1512,7 +1585,7 @@
                       <th
                         class="w-[7%] min-w-[70px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                       >
-                        Token数量
+                        Token数
                       </th>
                       <th
                         class="w-[9%] min-w-[80px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
@@ -1528,7 +1601,7 @@
                   </thead>
                   <tbody class="divide-y divide-gray-200/50 dark:divide-gray-600/50">
                     <tr v-for="key in deletedApiKeys" :key="key.id" class="table-row">
-                      <td class="px-3 py-2.5">
+                      <td class="px-3 py-1.5">
                         <div class="flex items-center">
                           <div
                             class="mr-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-red-500 to-red-600"
@@ -1545,58 +1618,7 @@
                           </div>
                         </div>
                       </td>
-                      <!-- 账号 -->
-                      <td class="whitespace-nowrap px-3 py-2.5 text-sm">
-                        <div class="text-gray-700 dark:text-gray-300">
-                          <!-- Claude 账号 -->
-                          <span v-if="key.claudeAccountId" class="inline-flex items-center">
-                            <i class="fas fa-robot mr-1 text-xs text-blue-500" />
-                            <span class="text-xs">{{
-                              getClaudeAccountName(key.claudeAccountId)
-                            }}</span>
-                          </span>
-                          <!-- Claude Console 账号 -->
-                          <span
-                            v-else-if="key.claudeConsoleAccountId"
-                            class="inline-flex items-center"
-                          >
-                            <i class="fas fa-terminal mr-1 text-xs text-purple-500" />
-                            <span class="text-xs">{{
-                              getClaudeConsoleAccountName(key.claudeConsoleAccountId)
-                            }}</span>
-                          </span>
-                          <!-- Gemini 账号 -->
-                          <span v-else-if="key.geminiAccountId" class="inline-flex items-center">
-                            <i class="fas fa-gem mr-1 text-xs text-green-500" />
-                            <span class="text-xs">{{
-                              getGeminiAccountName(key.geminiAccountId)
-                            }}</span>
-                          </span>
-                          <!-- OpenAI 账号 -->
-                          <span v-else-if="key.openaiAccountId" class="inline-flex items-center">
-                            <i class="fas fa-brain mr-1 text-xs text-orange-500" />
-                            <span class="text-xs">{{
-                              getOpenAIAccountName(key.openaiAccountId)
-                            }}</span>
-                          </span>
-                          <!-- Bedrock 账号 -->
-                          <span v-else-if="key.bedrockAccountId" class="inline-flex items-center">
-                            <i class="fas fa-layer-group mr-1 text-xs text-indigo-500" />
-                            <span class="text-xs">{{
-                              getBedrockAccountName(key.bedrockAccountId)
-                            }}</span>
-                          </span>
-                          <!-- 共享池 -->
-                          <span
-                            v-else
-                            class="inline-flex items-center text-gray-500 dark:text-gray-400"
-                          >
-                            <i class="fas fa-share-alt mr-1 text-xs" />
-                            <span class="text-xs">共享池</span>
-                          </span>
-                        </div>
-                      </td>
-                      <td v-if="isLdapEnabled" class="px-3 py-2.5">
+                      <td v-if="isLdapEnabled" class="px-3 py-1.5">
                         <div class="text-sm">
                           <span v-if="key.createdBy === 'admin'" class="text-blue-600">
                             <i class="fas fa-user-shield mr-1" />
@@ -1613,11 +1635,11 @@
                         </div>
                       </td>
                       <td
-                        class="whitespace-nowrap px-3 py-2.5 text-sm text-gray-500 dark:text-gray-400"
+                        class="whitespace-nowrap px-3 py-1.5 text-sm text-gray-500 dark:text-gray-400"
                       >
                         {{ formatDate(key.createdAt) }}
                       </td>
-                      <td class="px-3 py-2.5">
+                      <td class="px-3 py-1.5">
                         <div class="text-sm">
                           <span v-if="key.deletedByType === 'admin'" class="text-blue-600">
                             <i class="fas fa-user-shield mr-1" />
@@ -1634,12 +1656,12 @@
                         </div>
                       </td>
                       <td
-                        class="whitespace-nowrap px-3 py-2.5 text-sm text-gray-500 dark:text-gray-400"
+                        class="whitespace-nowrap px-3 py-1.5 text-sm text-gray-500 dark:text-gray-400"
                       >
                         {{ formatDate(key.deletedAt) }}
                       </td>
                       <!-- 请求数 -->
-                      <td class="whitespace-nowrap px-3 py-2.5 text-right text-sm">
+                      <td class="whitespace-nowrap px-3 py-1.5 text-right text-sm">
                         <div class="flex items-center justify-end gap-1">
                           <span class="font-medium text-gray-900 dark:text-gray-100">
                             {{ formatNumber(key.usage?.total?.requests || 0) }}
@@ -1648,26 +1670,26 @@
                         </div>
                       </td>
                       <!-- 费用 -->
-                      <td class="whitespace-nowrap px-3 py-2.5 text-right text-sm">
+                      <td class="whitespace-nowrap px-3 py-1.5 text-right text-sm">
                         <span class="font-medium text-green-600 dark:text-green-400">
                           ${{ (key.usage?.total?.cost || 0).toFixed(4) }}
                         </span>
                       </td>
                       <!-- Token数量 -->
-                      <td class="whitespace-nowrap px-3 py-2.5 text-right text-sm">
+                      <td class="whitespace-nowrap px-3 py-1.5 text-right text-sm">
                         <span class="font-medium text-purple-600 dark:text-purple-400">
                           {{ formatTokenCount(key.usage?.total?.tokens || 0) }}
                         </span>
                       </td>
                       <td
-                        class="whitespace-nowrap px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300"
+                        class="whitespace-nowrap px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300"
                       >
                         <span v-if="key.lastUsedAt">
                           {{ formatLastUsed(key.lastUsedAt) }}
                         </span>
                         <span v-else class="text-gray-400">从未使用</span>
                       </td>
-                      <td class="px-3 py-2.5">
+                      <td class="px-3 py-1.5">
                         <div class="flex items-center gap-2">
                           <button
                             v-if="key.canRestore"
@@ -1767,6 +1789,7 @@ import { apiClient } from '@/config/api'
 import { useClientsStore } from '@/stores/clients'
 import { useAuthStore } from '@/stores/auth'
 import * as XLSX from 'xlsx-js-style'
+import IconPicker from '@/components/common/IconPicker.vue'
 import CreateApiKeyModal from '@/components/apikeys/CreateApiKeyModal.vue'
 import EditApiKeyModal from '@/components/apikeys/EditApiKeyModal.vue'
 import RenewApiKeyModal from '@/components/apikeys/RenewApiKeyModal.vue'
@@ -2980,6 +3003,29 @@ const toggleApiKeyStatus = async (key) => {
   }
 }
 
+// 更新API Key图标
+const updateApiKeyIcon = async (keyId, icon) => {
+  try {
+    const data = await apiClient.put(`/admin/api-keys/${keyId}`, {
+      icon: icon
+    })
+
+    if (data.success) {
+      // 更新本地数据
+      const localKey = apiKeys.value.find((k) => k.id === keyId)
+      if (localKey) {
+        localKey.icon = icon
+      }
+      showToast('图标已更新', 'success')
+    } else {
+      showToast(data.message || '更新图标失败', 'error')
+    }
+  } catch (error) {
+    console.error('更新图标失败:', error)
+    showToast('更新图标失败，请重试', 'error')
+  }
+}
+
 // 删除API Key
 const deleteApiKey = async (keyId) => {
   let confirmed = false
@@ -3592,7 +3638,7 @@ onMounted(async () => {
 }
 
 .table-container {
-  overflow-x: auto;
+  overflow-x: hidden;
   overflow-y: hidden;
   margin: 0;
   padding: 0;
@@ -3625,7 +3671,6 @@ onMounted(async () => {
 
 .table-row {
   transition: background-color 0.2s ease;
-  position: relative;
 }
 
 .table-row:hover {

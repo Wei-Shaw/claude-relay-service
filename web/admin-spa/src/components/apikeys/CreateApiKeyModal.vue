@@ -110,19 +110,23 @@
               class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-2 sm:text-sm"
               >名称 <span class="text-red-500">*</span></label
             >
-            <input
-              v-model="form.name"
-              class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-              :class="{ 'border-red-500': errors.name }"
-              :placeholder="
-                form.createType === 'batch'
-                  ? '输入基础名称（将自动添加序号）'
-                  : '为您的 API Key 取一个名称'
-              "
-              required
-              type="text"
-              @input="errors.name = ''"
-            />
+            <div class="flex items-center gap-2">
+              <!-- 图标选择器 -->
+              <IconPicker v-model="form.icon" size="medium" />
+              <input
+                v-model="form.name"
+                class="form-input flex-1 border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                :class="{ 'border-red-500': errors.name }"
+                :placeholder="
+                  form.createType === 'batch'
+                    ? '输入基础名称（将自动添加序号）'
+                    : '为您的 API Key 取一个名称'
+                "
+                required
+                type="text"
+                @input="errors.name = ''"
+              />
+            </div>
             <p v-if="errors.name" class="mt-1 text-xs text-red-500 dark:text-red-400">
               {{ errors.name }}
             </p>
@@ -807,6 +811,7 @@ import { useClientsStore } from '@/stores/clients'
 import { useApiKeysStore } from '@/stores/apiKeys'
 import { apiClient } from '@/config/api'
 import AccountSelector from '@/components/common/AccountSelector.vue'
+import IconPicker from '@/components/common/IconPicker.vue'
 
 const props = defineProps({
   accounts: {
@@ -853,6 +858,7 @@ const form = reactive({
   createType: 'single',
   batchCount: 10,
   name: '',
+  icon: '',
   description: '',
   rateLimitWindow: '',
   rateLimitRequests: '',
@@ -1198,7 +1204,8 @@ const createApiKey = async () => {
       // 单个创建
       const data = {
         ...baseData,
-        name: form.name
+        name: form.name,
+        icon: form.icon || ''
       }
 
       const result = await apiClient.post('/admin/api-keys', data)
@@ -1216,7 +1223,8 @@ const createApiKey = async () => {
         ...baseData,
         createType: 'batch',
         baseName: form.name,
-        count: form.batchCount
+        count: form.batchCount,
+        icon: form.icon || ''
       }
 
       const result = await apiClient.post('/admin/api-keys/batch', data)

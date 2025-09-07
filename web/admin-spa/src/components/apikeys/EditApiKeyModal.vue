@@ -32,14 +32,18 @@
               class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-3 sm:text-sm"
               >名称</label
             >
-            <input
-              v-model="form.name"
-              class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-              maxlength="100"
-              placeholder="请输入API Key名称"
-              required
-              type="text"
-            />
+            <div class="flex items-center gap-2">
+              <!-- 图标选择器 -->
+              <IconPicker v-model="form.icon" size="medium" />
+              <input
+                v-model="form.name"
+                class="form-input flex-1 border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                maxlength="100"
+                placeholder="请输入API Key名称"
+                required
+                type="text"
+              />
+            </div>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 sm:mt-2">
               用于识别此 API Key 的用途
             </p>
@@ -658,6 +662,7 @@ import { useClientsStore } from '@/stores/clients'
 import { useApiKeysStore } from '@/stores/apiKeys'
 import { apiClient } from '@/config/api'
 import AccountSelector from '@/components/common/AccountSelector.vue'
+import IconPicker from '@/components/common/IconPicker.vue'
 
 const props = defineProps({
   apiKey: {
@@ -705,6 +710,7 @@ const unselectedTags = computed(() => {
 // 表单数据
 const form = reactive({
   name: '',
+  icon: '',
   tokenLimit: '', // 保留用于检测历史数据
   rateLimitWindow: '',
   rateLimitRequests: '',
@@ -803,6 +809,7 @@ const updateApiKey = async () => {
     // 准备提交的数据
     const data = {
       name: form.name, // 添加名称字段
+      icon: form.icon || '', // 添加图标字段
       tokenLimit: 0, // 清除历史token限制
       rateLimitWindow:
         form.rateLimitWindow !== '' && form.rateLimitWindow !== null
@@ -1035,6 +1042,7 @@ onMounted(async () => {
   }
 
   form.name = props.apiKey.name
+  form.icon = props.apiKey.icon || ''
 
   // 处理速率限制迁移：如果有tokenLimit且没有rateLimitCost，提示用户
   form.tokenLimit = props.apiKey.tokenLimit || ''
