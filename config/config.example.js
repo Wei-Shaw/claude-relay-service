@@ -32,6 +32,14 @@ const config = {
     enableTLS: process.env.REDIS_ENABLE_TLS === 'true'
   },
 
+  // 🔗 会话管理配置
+  session: {
+    // 粘性会话TTL配置（天）
+    stickyTtlDays: parseInt(process.env.STICKY_SESSION_TTL_DAYS) || 15,
+    // 续期阈值（天）
+    renewalThresholdDays: parseInt(process.env.STICKY_SESSION_RENEWAL_THRESHOLD_DAYS) || 14
+  },
+
   // 🎯 Claude API配置
   claude: {
     apiUrl: process.env.CLAUDE_API_URL || 'https://api.anthropic.com/v1/messages',

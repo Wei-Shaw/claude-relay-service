@@ -1356,14 +1356,62 @@ class RedisClient {
   }
 
   // 🔗 会话sticky映射管理
-  async setSessionAccountMapping(sessionHash, accountId, ttl = 3600) {
+  async setSessionAccountMapping(sessionHash, accountId, ttl = null) {
+    const appConfig = require('../../config/config')
+    const defaultTTL = ttl !== null ? ttl : (appConfig.session?.stickyTtlDays || 15) * 24 * 60 * 60
     const key = `sticky_session:${sessionHash}`
-    await this.client.set(key, accountId, 'EX', ttl)
+    await this.client.set(key, accountId, 'EX', defaultTTL)
   }
 
   async getSessionAccountMapping(sessionHash) {
     const key = `sticky_session:${sessionHash}`
     return await this.client.get(key)
+  }
+
+  // 🚀 智能会话TTL续期：剩余时间少于阈值时自动续期
+  async extendSessionAccountMappingTTL(sessionHash) {
+    const appConfig = require('../../config/config')
+    const key = `sticky_session:${sessionHash}`
+
+    // 📊 从配置获取参数
+    const ttlDays = appConfig.session?.stickyTtlDays || 15
+    const thresholdDays = appConfig.session?.renewalThresholdDays || 14
+
+    const fullTTL = ttlDays * 24 * 60 * 60 // 转换为秒
+    const renewalThreshold = thresholdDays * 24 * 60 * 60 // 转换为秒
+
+    try {
+      // 获取当前剩余TTL（秒）
+      const remainingTTL = await this.client.ttl(key)
+
+      // 键不存在或已过期
+      if (remainingTTL === -2) {
+        return false
+      }
+
+      // 键存在但没有TTL（永不过期，不需要处理）
+      if (remainingTTL === -1) {
+        return true
+      }
+
+      // 🎯 智能续期策略：仅在剩余时间少于阈值时才续期
+      if (remainingTTL < renewalThreshold) {
+        await this.client.expire(key, fullTTL)
+        logger.debug(
+          `🔄 Renewed sticky session TTL: ${sessionHash} (was ${Math.round(remainingTTL / 24 / 3600)}d, renewed to ${ttlDays}d)`
+        )
+        return true
+      }
+
+      // 剩余时间充足，无需续期
+      logger.debug(
+        `✅ Sticky session TTL sufficient: ${sessionHash} (remaining ${Math.round(remainingTTL / 24 / 3600)}d)`
+      )
+      return true
+    } catch (error) {
+      logger.error('❌ Failed to extend session TTL:', error)
+      return false
+    }
   }
 
   async deleteSessionAccountMapping(sessionHash) {

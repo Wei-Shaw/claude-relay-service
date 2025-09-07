@@ -695,6 +695,8 @@ class ClaudeAccountService {
           // 验证映射的账户是否仍然可用
           const mappedAccount = activeAccounts.find((acc) => acc.id === mappedAccountId)
           if (mappedAccount) {
+            // 🚀 智能会话续期：剩余时间少于14天时自动续期到15天
+            await redis.extendSessionAccountMappingTTL(sessionHash)
             logger.info(
               `🎯 Using sticky session account: ${mappedAccount.name} (${mappedAccountId}) for session ${sessionHash}`
             )
@@ -815,6 +817,8 @@ class ClaudeAccountService {
               )
               await redis.deleteSessionAccountMapping(sessionHash)
             } else {
+              // 🚀 智能会话续期：剩余时间少于14天时自动续期到15天
+              await redis.extendSessionAccountMappingTTL(sessionHash)
               logger.info(
                 `🎯 Using sticky session shared account: ${mappedAccount.name} (${mappedAccountId}) for session ${sessionHash}`
               )

@@ -61,6 +61,8 @@ class UnifiedGeminiScheduler {
             mappedAccount.accountType
           )
           if (isAvailable) {
+            // 🚀 智能会话续期：剩余时间少于14天时自动续期到15天
+            await redis.extendSessionAccountMappingTTL(sessionHash)
             logger.info(
               `🎯 Using sticky session account: ${mappedAccount.accountId} (${mappedAccount.accountType}) for session ${sessionHash}`
             )
@@ -382,6 +384,8 @@ class UnifiedGeminiScheduler {
               mappedAccount.accountType
             )
             if (isAvailable) {
+              // 🚀 智能会话续期：剩余时间少于14天时自动续期到15天
+              await redis.extendSessionAccountMappingTTL(sessionHash)
               logger.info(
                 `🎯 Using sticky session account from group: ${mappedAccount.accountId} (${mappedAccount.accountType}) for session ${sessionHash}`
               )
