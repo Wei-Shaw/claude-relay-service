@@ -208,19 +208,7 @@ class ClaudeRelayService {
         // 检查是否为5xx状态码
         else if (response.statusCode >= 500 && response.statusCode < 600) {
           logger.warn(`🔥 Server error (${response.statusCode}) detected for account ${accountId}`)
-          // 记录5xx错误
-          await claudeAccountService.recordServerError(accountId, response.statusCode)
-          // 检查是否需要标记为临时错误状态（连续3次500）
-          const errorCount = await claudeAccountService.getServerErrorCount(accountId)
-          logger.info(
-            `🔥 Account ${accountId} has ${errorCount} consecutive 5xx errors in the last 5 minutes`
-          )
-          if (errorCount > 10) {
-            logger.error(
-              `❌ Account ${accountId} exceeded 5xx error threshold (${errorCount} errors), marking as temp_error`
-            )
-            await claudeAccountService.markAccountTempError(accountId, sessionHash)
-          }
+          await this._handleServerError(accountId, response.statusCode, sessionHash)
         }
         // 检查是否为429状态码
         else if (response.statusCode === 429) {
@@ -742,7 +730,7 @@ class ClaudeRelayService {
         onRequest(req)
       }
 
-      req.on('error', (error) => {
+      req.on('error', async (error) => {
         console.error(': ❌ ', error)
         logger.error('❌ Claude API request error:', error.message, {
           code: error.code,
@@ -762,14 +750,19 @@ class ClaudeRelayService {
           errorMessage = 'Connection refused by Claude API server'
         } else if (error.code === 'ETIMEDOUT') {
           errorMessage = 'Connection timed out to Claude API server'
+
+          await this._handleServerError(accountId, 504, null, 'Network')
         }
 
         reject(new Error(errorMessage))
       })
 
-      req.on('timeout', () => {
+      req.on('timeout', async () => {
         req.destroy()
         logger.error('❌ Claude API request timeout')
+
+        await this._handleServerError(accountId, 504, null, 'Request')
+
         reject(new Error('Request timeout'))
       })
 
@@ -989,19 +982,7 @@ class ClaudeRelayService {
               logger.warn(
                 `🔥 [Stream] Server error (${res.statusCode}) detected for account ${accountId}`
               )
-              // 记录5xx错误
-              await claudeAccountService.recordServerError(accountId, res.statusCode)
-              // 检查是否需要标记为临时错误状态（连续3次500）
-              const errorCount = await claudeAccountService.getServerErrorCount(accountId)
-              logger.info(
-                `🔥 [Stream] Account ${accountId} has ${errorCount} consecutive 5xx errors in the last 5 minutes`
-              )
-              if (errorCount > 10) {
-                logger.error(
-                  `❌ [Stream] Account ${accountId} exceeded 5xx error threshold (${errorCount} errors), marking as temp_error`
-                )
-                await claudeAccountService.markAccountTempError(accountId, sessionHash)
-              }
+              await this._handleServerError(accountId, res.statusCode, sessionHash, '[Stream]')
             }
           }
 
@@ -1337,7 +1318,7 @@ class ClaudeRelayService {
         })
       })
 
-      req.on('error', (error) => {
+      req.on('error', async (error) => {
         logger.error('❌ Claude stream request error:', error.message, {
           code: error.code,
           errno: error.errno,
@@ -1384,9 +1365,10 @@ class ClaudeRelayService {
         reject(error)
       })
 
-      req.on('timeout', () => {
+      req.on('timeout', async () => {
         req.destroy()
         logger.error('❌ Claude stream request timeout')
+
         if (!responseStream.headersSent) {
           responseStream.writeHead(504, {
             'Content-Type': 'text/event-stream',
@@ -1486,7 +1468,7 @@ class ClaudeRelayService {
         })
       })
 
-      req.on('error', (error) => {
+      req.on('error', async (error) => {
         logger.error('❌ Claude stream request error:', error.message, {
           code: error.code,
           errno: error.errno,
@@ -1533,9 +1515,10 @@ class ClaudeRelayService {
         reject(error)
       })
 
-      req.on('timeout', () => {
+      req.on('timeout', async () => {
         req.destroy()
         logger.error('❌ Claude stream request timeout')
+
         if (!responseStream.headersSent) {
           responseStream.writeHead(504, {
             'Content-Type': 'text/event-stream',
@@ -1570,6 +1553,33 @@ class ClaudeRelayService {
       req.write(JSON.stringify(body))
       req.end()
     })
+  }
+
+  // 🛠️ 统一的错误处理方法
+  async _handleServerError(accountId, statusCode, sessionHash = null, context = '') {
+    try {
+      await claudeAccountService.recordServerError(accountId, statusCode)
+      const errorCount = await claudeAccountService.getServerErrorCount(accountId)
+
+      // 根据错误类型设置不同的阈值和日志前缀
+      const isTimeout = statusCode === 504
+      const threshold = 3 // 统一使用3次阈值
+      const prefix = context ? `${context} ` : ''
+
+      logger.warn(
+        `⏱️ ${prefix}${isTimeout ? 'Timeout' : 'Server'} error for account ${accountId}, error count: ${errorCount}/${threshold}`
+      )
+
+      if (errorCount > threshold) {
+        const errorTypeLabel = isTimeout ? 'timeout' : '5xx'
+        logger.error(
+          `❌ ${prefix}Account ${accountId} exceeded ${errorTypeLabel} error threshold (${errorCount} errors), marking as temp_error`
+        )
+        await claudeAccountService.markAccountTempError(accountId, sessionHash)
+      }
+    } catch (handlingError) {
+      logger.error(`❌ Failed to handle ${context} server error:`, handlingError)
+    }
   }
 
   // 🔄 重试逻辑
