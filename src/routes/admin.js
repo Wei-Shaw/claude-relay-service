@@ -143,10 +143,10 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
         return res.status(400).json({ error: 'Start date must be before or equal to end date' })
       }
 
-      // 限制最大范围为31天
+      // 限制最大范围为365天
       const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1
-      if (daysDiff > 31) {
-        return res.status(400).json({ error: 'Date range cannot exceed 31 days' })
+      if (daysDiff > 365) {
+        return res.status(400).json({ error: 'Date range cannot exceed 365 days' })
       }
 
       // 生成日期范围内每天的搜索模式
@@ -3916,10 +3916,10 @@ router.get('/model-stats', authenticateAdmin, async (req, res) => {
         return res.status(400).json({ error: 'Start date must be before or equal to end date' })
       }
 
-      // 限制最大范围为31天
+      // 限制最大范围为365天
       const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1
-      if (daysDiff > 31) {
-        return res.status(400).json({ error: 'Date range cannot exceed 31 days' })
+      if (daysDiff > 365) {
+        return res.status(400).json({ error: 'Date range cannot exceed 365 days' })
       }
 
       // 生成日期范围内所有日期的搜索模式
@@ -4380,10 +4380,10 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
         return res.status(400).json({ error: 'Start date must be before or equal to end date' })
       }
 
-      // 限制最大范围为31天
+      // 限制最大范围为365天
       const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1
-      if (daysDiff > 31) {
-        return res.status(400).json({ error: 'Date range cannot exceed 31 days' })
+      if (daysDiff > 365) {
+        return res.status(400).json({ error: 'Date range cannot exceed 365 days' })
       }
 
       // 生成日期范围内所有日期的搜索模式

@@ -6,7 +6,7 @@
 
       <!-- 模态框 -->
       <div
-        class="modal-content relative mx-auto flex max-h-[90vh] w-[95%] max-w-2xl flex-col p-4 sm:w-full sm:max-w-3xl sm:p-6 md:p-8"
+        class="modal-content relative mx-auto flex max-h-[90vh] w-[95%] max-w-5xl flex-col p-4 sm:w-full sm:p-6 md:p-8"
       >
         <!-- 标题栏 -->
         <div class="mb-4 flex items-center justify-between sm:mb-6">

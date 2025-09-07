@@ -1820,7 +1820,7 @@ const apiKeyStatsTimeRange = ref('today')
 // 全局日期筛选器
 const globalDateFilter = reactive({
   type: 'preset',
-  preset: '7days',
+  preset: 'today',
   customStart: '',
   customEnd: '',
   customRange: null
@@ -1844,6 +1844,7 @@ const toggleSelectionMode = () => {
 
 // 时间范围下拉选项
 const timeRangeDropdownOptions = computed(() => [
+  { value: 'today', label: '今日', icon: 'fa-calendar-day' },
   { value: '7days', label: '最近7天', icon: 'fa-calendar-week' },
   { value: '30days', label: '最近30天', icon: 'fa-calendar-alt' },
   { value: 'all', label: '全部时间', icon: 'fa-infinity' },
@@ -2723,12 +2724,15 @@ const setGlobalDateFilterPreset = (preset) => {
     globalDateFilter.customStart = null
     globalDateFilter.customEnd = null
   } else {
-    // 预设选项（7天或30天）
+    // 预设选项（今日、7天或30天）
     globalDateFilter.type = 'preset'
     const today = new Date()
     const startDate = new Date(today)
 
-    if (preset === '7days') {
+    if (preset === 'today') {
+      // 今日：从今天开始到今天结束
+      startDate.setHours(0, 0, 0, 0)
+    } else if (preset === '7days') {
       startDate.setDate(today.getDate() - 6)
     } else if (preset === '30days') {
       startDate.setDate(today.getDate() - 29)
@@ -2751,8 +2755,8 @@ const onGlobalCustomDateRangeChange = (value) => {
     globalDateFilter.customEnd = value[1].split(' ')[0]
     loadApiKeys()
   } else if (value === null) {
-    // 清空时恢复默认7天
-    setGlobalDateFilterPreset('7days')
+    // 清空时恢复默认今日
+    setGlobalDateFilterPreset('today')
   }
 }
 
@@ -2760,12 +2764,12 @@ const onGlobalCustomDateRangeChange = (value) => {
 const initApiKeyDateFilter = (keyId) => {
   const today = new Date()
   const startDate = new Date(today)
-  startDate.setDate(today.getDate() - 6) // 7天前
+  startDate.setHours(0, 0, 0, 0) // 今日从0点开始
 
   apiKeyDateFilters.value[keyId] = {
     type: 'preset',
-    preset: '7days',
-    customStart: startDate.toISOString().split('T')[0],
+    preset: 'today',
+    customStart: today.toISOString().split('T')[0],
     customEnd: today.toISOString().split('T')[0],
     customRange: null,
     presetOptions: [
@@ -2871,15 +2875,15 @@ const disabledDate = (date) => {
 const resetApiKeyDateFilter = (keyId) => {
   const filter = getApiKeyDateFilter(keyId)
 
-  // 重置为默认的7天
+  // 重置为默认的今日
   filter.type = 'preset'
-  filter.preset = '7days'
+  filter.preset = 'today'
 
   const today = new Date()
   const startDate = new Date(today)
-  startDate.setDate(today.getDate() - 6)
+  startDate.setHours(0, 0, 0, 0) // 今日从0点开始
 
-  filter.customStart = startDate.toISOString().split('T')[0]
+  filter.customStart = today.toISOString().split('T')[0]
   filter.customEnd = today.toISOString().split('T')[0]
   filter.customRange = null
 
