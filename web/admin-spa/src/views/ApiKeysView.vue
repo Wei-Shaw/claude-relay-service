@@ -55,8 +55,8 @@
         <!-- 活跃 API Keys Tab Panel -->
         <div v-if="activeTab === 'active'" class="tab-panel">
           <!-- 工具栏区域 - 添加 mb-4 增加与表格的间距 -->
-          <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <!-- 筛选器组 -->
+          <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <!-- 左侧：查询筛选器组 -->
             <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
               <!-- 时间范围筛选 -->
               <div class="group relative min-w-[140px]">
@@ -140,7 +140,10 @@
                   </button>
                 </div>
               </div>
+            </div>
 
+            <!-- 右侧：操作按钮组 -->
+            <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
               <!-- 刷新按钮 -->
               <button
                 class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-500 sm:w-auto"
@@ -205,16 +208,16 @@
                 <i class="fas fa-trash relative text-red-600 dark:text-red-400" />
                 <span class="relative">删除选中 ({{ selectedApiKeys.length }})</span>
               </button>
-            </div>
 
-            <!-- 创建按钮 - 独立在右侧 -->
-            <button
-              class="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 px-5 py-2 text-sm font-medium text-white shadow-md transition-all duration-200 hover:from-blue-600 hover:to-blue-700 hover:shadow-lg sm:w-auto"
-              @click.stop="openCreateApiKeyModal"
-            >
-              <i class="fas fa-plus"></i>
-              <span>创建新 Key</span>
-            </button>
+              <!-- 创建按钮 -->
+              <button
+                class="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 px-5 py-2 text-sm font-medium text-white shadow-md transition-all duration-200 hover:from-blue-600 hover:to-blue-700 hover:shadow-lg sm:w-auto"
+                @click.stop="openCreateApiKeyModal"
+              >
+                <i class="fas fa-plus"></i>
+                <span>创建新 Key</span>
+              </button>
+            </div>
           </div>
 
           <div v-if="apiKeysLoading" class="py-12 text-center">
@@ -3413,6 +3416,7 @@ const exportToExcel = () => {
       // 基础数据
       const baseData = {
         名称: key.name || '',
+        标签: key.tags && key.tags.length > 0 ? key.tags.join(', ') : '无',
         请求总数: periodRequests,
         '总费用($)': periodCost.toFixed(4),
         Token数: formatTokenCount(periodTokens),
@@ -3469,6 +3473,7 @@ const exportToExcel = () => {
     const headers = Object.keys(exportData[0] || {})
     const columnWidths = headers.map((header) => {
       if (header === '名称') return { wch: 25 }
+      if (header === '标签') return { wch: 20 }
       if (header === '最后使用时间') return { wch: 20 }
       if (header.includes('费用')) return { wch: 15 }
       if (header.includes('Token')) return { wch: 15 }
@@ -3535,6 +3540,11 @@ const exportToExcel = () => {
         // 根据列类型设置对齐和特殊样式
         if (header === '名称') {
           cellStyle.alignment = { horizontal: 'left', vertical: 'center' }
+        } else if (header === '标签') {
+          cellStyle.alignment = { horizontal: 'left', vertical: 'center' }
+          if (value === '无') {
+            cellStyle.font = { ...cellStyle.font, color: { rgb: '999999' }, italic: true }
+          }
         } else if (header === '最后使用时间') {
           cellStyle.alignment = { horizontal: 'right', vertical: 'center' }
           if (value === '从未使用') {
