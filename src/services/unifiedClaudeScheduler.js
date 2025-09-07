@@ -206,8 +206,8 @@ class UnifiedClaudeScheduler {
         }
       }
 
-      // 按优先级和最后使用时间排序
-      const sortedAccounts = this._sortAccountsByPriority(availableAccounts)
+      // 基于日费用排序账户（费用最少的优先）
+      const sortedAccounts = await this._sortAccountsByCost(availableAccounts)
 
       // 选择第一个账户
       const selectedAccount = sortedAccounts[0]
@@ -482,19 +482,104 @@ class UnifiedClaudeScheduler {
     return availableAccounts
   }
 
-  // 🔢 按优先级和最后使用时间排序账户
-  _sortAccountsByPriority(accounts) {
-    return accounts.sort((a, b) => {
-      // 首先按优先级排序（数字越小优先级越高）
-      if (a.priority !== b.priority) {
-        return a.priority - b.priority
+  // 💰 基于日费用排序账户（费用最少的优先，支持多种账户类型）
+  async _sortAccountsByCost(accounts) {
+    try {
+      // 并行获取所有账号的日费用
+      const accountsWithCost = await Promise.all(
+        accounts.map(async (account) => {
+          try {
+            let dailyCost = 0
+
+            // 根据账户类型获取日费用
+            if (account.accountType === 'claude-official') {
+              dailyCost = await redis.getAccountDailyCost(account.accountId || account.id)
+            } else if (account.accountType === 'claude-console') {
+              // Claude Console 账户也使用相同的费用存储机制
+              dailyCost = await redis.getAccountDailyCost(account.accountId || account.id)
+            } else if (account.accountType === 'bedrock') {
+              // Bedrock 账户也使用相同的费用存储机制
+              dailyCost = await redis.getAccountDailyCost(account.accountId || account.id)
+            }
+
+            return {
+              ...account,
+              _dailyCost: dailyCost
+            }
+          } catch (error) {
+            logger.warn(
+              `Failed to get daily cost for account ${account.accountId || account.id}: ${error.message}`
+            )
+            return {
+              ...account,
+              _dailyCost: Number.MAX_SAFE_INTEGER, // 获取费用失败时，设为最高值（最低优先级）
+              _costError: true
+            }
+          }
+        })
+      )
+
+      // 按日费用排序（费用最少的优先）
+      const sortedAccounts = accountsWithCost.sort((a, b) => {
+        // 如果费用相同，按优先级排序
+        if (Math.abs(a._dailyCost - b._dailyCost) < 0.000001) {
+          // 优先级相同时，按最后使用时间排序（最久未使用的优先）
+          if (a.priority === b.priority) {
+            const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
+            const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
+            return aLastUsed - bLastUsed
+          }
+          return a.priority - b.priority
+        }
+        return a._dailyCost - b._dailyCost
+      })
+
+      // 检查是否所有账号的费用获取都失败了
+      const allAccountsHaveErrors = sortedAccounts.every((account) => account._costError)
+
+      if (allAccountsHaveErrors) {
+        logger.warn(
+          '⚠️ All accounts failed to get daily cost, falling back to priority-based sorting'
+        )
+        return accounts.sort((a, b) => {
+          // 首先按优先级排序
+          if (a.priority !== b.priority) {
+            return a.priority - b.priority
+          }
+          // 优先级相同时，按最后使用时间排序
+          const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
+          const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
+          return aLastUsed - bLastUsed
+        })
       }
 
-      // 优先级相同时，按最后使用时间排序（最久未使用的优先）
-      const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
-      const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
-      return aLastUsed - bLastUsed
-    })
+      logger.debug('💰 Account cost ranking:')
+      sortedAccounts.forEach((account, index) => {
+        const costDisplay = account._costError ? 'ERROR' : `$${account._dailyCost.toFixed(4)}`
+        const accountDisplayName = account.name || account.accountId || account.id
+        logger.debug(
+          `   ${index + 1}. ${accountDisplayName} (${account.accountType}): ${costDisplay}`
+        )
+      })
+
+      return sortedAccounts
+    } catch (error) {
+      logger.error(
+        '❌ Failed to sort accounts by cost, falling back to priority-based sorting:',
+        error
+      )
+      // 回退到原有的按优先级排序策略
+      return accounts.sort((a, b) => {
+        // 首先按优先级排序
+        if (a.priority !== b.priority) {
+          return a.priority - b.priority
+        }
+        // 优先级相同时，按最后使用时间排序
+        const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
+        const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
+        return aLastUsed - bLastUsed
+      })
+    }
   }
 
   // 🔍 检查账户是否可用
@@ -876,8 +961,8 @@ class UnifiedClaudeScheduler {
         throw new Error(`No available accounts in group ${group.name}`)
       }
 
-      // 使用现有的优先级排序逻辑
-      const sortedAccounts = this._sortAccountsByPriority(availableAccounts)
+      // 使用基于费用的排序逻辑
+      const sortedAccounts = await this._sortAccountsByCost(availableAccounts)
 
       // 选择第一个账户
       const selectedAccount = sortedAccounts[0]
