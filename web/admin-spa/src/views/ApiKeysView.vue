@@ -1766,7 +1766,7 @@ import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
 import { useClientsStore } from '@/stores/clients'
 import { useAuthStore } from '@/stores/auth'
-import * as XLSX from 'xlsx'
+import * as XLSX from 'xlsx-js-style'
 import CreateApiKeyModal from '@/components/apikeys/CreateApiKeyModal.vue'
 import EditApiKeyModal from '@/components/apikeys/EditApiKeyModal.vue'
 import RenewApiKeyModal from '@/components/apikeys/RenewApiKeyModal.vue'
@@ -2538,6 +2538,102 @@ const getPeriodTokens = (key) => {
   }
 }
 
+// 获取日期范围内的输入token数量
+const getPeriodInputTokens = (key) => {
+  // 根据全局日期筛选器返回对应的输入token数量
+  if (globalDateFilter.type === 'custom') {
+    // 自定义日期范围
+    if (key.usage) {
+      if (key.usage['custom'] && key.usage['custom'].inputTokens !== undefined) {
+        return key.usage['custom'].inputTokens
+      }
+      if (key.usage.total && key.usage.total.inputTokens !== undefined) {
+        return key.usage.total.inputTokens
+      }
+    }
+    return 0
+  } else if (globalDateFilter.preset === 'today') {
+    return key.usage?.daily?.inputTokens || 0
+  } else if (globalDateFilter.preset === '7days') {
+    // 使用 usage['7days'].inputTokens
+    if (key.usage && key.usage['7days'] && key.usage['7days'].inputTokens !== undefined) {
+      return key.usage['7days'].inputTokens
+    }
+    return 0
+  } else if (globalDateFilter.preset === '30days') {
+    // 使用 usage['30days'].inputTokens 或 usage.monthly.inputTokens
+    if (key.usage) {
+      if (key.usage['30days'] && key.usage['30days'].inputTokens !== undefined) {
+        return key.usage['30days'].inputTokens
+      }
+      if (key.usage.monthly && key.usage.monthly.inputTokens !== undefined) {
+        return key.usage.monthly.inputTokens
+      }
+      if (key.usage.total && key.usage.total.inputTokens !== undefined) {
+        return key.usage.total.inputTokens
+      }
+    }
+    return 0
+  } else if (globalDateFilter.preset === 'all') {
+    // 全部时间
+    if (key.usage && key.usage['all'] && key.usage['all'].inputTokens !== undefined) {
+      return key.usage['all'].inputTokens
+    }
+    return key.usage?.total?.inputTokens || 0
+  } else {
+    // 默认返回
+    return key.usage?.total?.inputTokens || 0
+  }
+}
+
+// 获取日期范围内的输出token数量
+const getPeriodOutputTokens = (key) => {
+  // 根据全局日期筛选器返回对应的输出token数量
+  if (globalDateFilter.type === 'custom') {
+    // 自定义日期范围
+    if (key.usage) {
+      if (key.usage['custom'] && key.usage['custom'].outputTokens !== undefined) {
+        return key.usage['custom'].outputTokens
+      }
+      if (key.usage.total && key.usage.total.outputTokens !== undefined) {
+        return key.usage.total.outputTokens
+      }
+    }
+    return 0
+  } else if (globalDateFilter.preset === 'today') {
+    return key.usage?.daily?.outputTokens || 0
+  } else if (globalDateFilter.preset === '7days') {
+    // 使用 usage['7days'].outputTokens
+    if (key.usage && key.usage['7days'] && key.usage['7days'].outputTokens !== undefined) {
+      return key.usage['7days'].outputTokens
+    }
+    return 0
+  } else if (globalDateFilter.preset === '30days') {
+    // 使用 usage['30days'].outputTokens 或 usage.monthly.outputTokens
+    if (key.usage) {
+      if (key.usage['30days'] && key.usage['30days'].outputTokens !== undefined) {
+        return key.usage['30days'].outputTokens
+      }
+      if (key.usage.monthly && key.usage.monthly.outputTokens !== undefined) {
+        return key.usage.monthly.outputTokens
+      }
+      if (key.usage.total && key.usage.total.outputTokens !== undefined) {
+        return key.usage.total.outputTokens
+      }
+    }
+    return 0
+  } else if (globalDateFilter.preset === 'all') {
+    // 全部时间
+    if (key.usage && key.usage['all'] && key.usage['all'].outputTokens !== undefined) {
+      return key.usage['all'].outputTokens
+    }
+    return key.usage?.total?.outputTokens || 0
+  } else {
+    // 默认返回
+    return key.usage?.total?.outputTokens || 0
+  }
+}
+
 // 计算日期范围内的总费用（用于展开的详细统计）
 const calculatePeriodCost = (key) => {
   // 如果没有展开，使用缓存的费用数据
@@ -3255,74 +3351,57 @@ const clearSearch = () => {
 // 导出数据到Excel
 const exportToExcel = () => {
   try {
-    // 准备导出的数据 - 仅导出用量数据
+    // 准备导出的数据 - 简化版本
     const exportData = sortedApiKeys.value.map((key) => {
+      // 获取当前时间段的数据
+      const periodRequests = getPeriodRequests(key)
+      const periodCost = calculatePeriodCost(key)
+      const periodTokens = getPeriodTokens(key)
+      const periodInputTokens = getPeriodInputTokens(key)
+      const periodOutputTokens = getPeriodOutputTokens(key)
+
       // 基础数据
       const baseData = {
-        'API Key名称': key.name || '',
-        所有者: key.ownerDisplayName || '',
-
-        // 当前筛选时间段的统计
-        请求总数: getPeriodRequests(key),
-        '总费用($)': calculatePeriodCost(key).toFixed(4),
-        总Token数: getPeriodTokens(key),
-
-        // 今日统计
-        今日请求数: key.usage?.daily?.requests || 0,
-        '今日费用($)': (key.dailyCost || 0).toFixed(4),
-        今日Token数: key.usage?.daily?.totalTokens || 0,
-
-        // 累计总统计
-        累计总请求数: key.usage?.total?.requests || 0,
-        '累计总费用($)': (key.totalCost || 0).toFixed(4),
-        累计总Token数: key.usage?.total?.totalTokens || 0
+        名称: key.name || '',
+        请求总数: periodRequests,
+        '总费用($)': periodCost.toFixed(4),
+        Token数: formatTokenCount(periodTokens),
+        输入Token: formatTokenCount(periodInputTokens),
+        输出Token: formatTokenCount(periodOutputTokens),
+        最后使用时间: key.lastUsedAt ? formatDate(key.lastUsedAt) : '从未使用'
       }
 
-      // 添加分模型统计（如果有）
+      // 添加分模型统计
       const modelStats = {}
 
-      // 处理每日模型统计
-      if (key.usage?.daily?.models) {
-        Object.entries(key.usage.daily.models).forEach(([model, stats]) => {
-          const modelName = model.replace(/[:/]/g, '_') // 处理模型名中的特殊字符
-          modelStats[`今日_${modelName}_请求数`] = stats.requests || 0
-          modelStats[`今日_${modelName}_费用($)`] = (stats.cost || 0).toFixed(4)
-          modelStats[`今日_${modelName}_输入Token`] = stats.inputTokens || 0
-          modelStats[`今日_${modelName}_输出Token`] = stats.outputTokens || 0
-          modelStats[`今日_${modelName}_总Token`] = stats.totalTokens || 0
-        })
+      // 根据当前时间筛选条件获取对应的模型统计
+      let modelsData = null
+
+      if (globalDateFilter.preset === 'today') {
+        modelsData = key.usage?.daily?.models
+      } else if (globalDateFilter.preset === '7days') {
+        modelsData = key.usage?.weekly?.models
+      } else if (globalDateFilter.preset === '30days') {
+        modelsData = key.usage?.monthly?.models
+      } else if (globalDateFilter.preset === 'all') {
+        modelsData = key.usage?.total?.models
       }
 
-      // 处理总计模型统计
-      if (key.usage?.total?.models) {
-        Object.entries(key.usage.total.models).forEach(([model, stats]) => {
-          const modelName = model.replace(/[:/]/g, '_')
-          modelStats[`累计_${modelName}_请求数`] = stats.requests || 0
-          modelStats[`累计_${modelName}_费用($)`] = (stats.cost || 0).toFixed(4)
-          modelStats[`累计_${modelName}_输入Token`] = stats.inputTokens || 0
-          modelStats[`累计_${modelName}_输出Token`] = stats.outputTokens || 0
-          modelStats[`累计_${modelName}_总Token`] = stats.totalTokens || 0
-        })
-      }
+      // 处理模型统计
+      if (modelsData) {
+        Object.entries(modelsData).forEach(([model, stats]) => {
+          // 简化模型名称，去掉前缀
+          let modelName = model
+          if (model.includes(':')) {
+            modelName = model.split(':').pop() // 取最后一部分
+          }
+          modelName = modelName.replace(/[:/]/g, '_')
 
-      // 处理筛选时间段的模型统计
-      if (globalDateFilter.preset === '7days' && key.usage?.weekly?.models) {
-        Object.entries(key.usage.weekly.models).forEach(([model, stats]) => {
-          const modelName = model.replace(/[:/]/g, '_')
-          modelStats[`本周_${modelName}_请求数`] = stats.requests || 0
-          modelStats[`本周_${modelName}_费用($)`] = (stats.cost || 0).toFixed(4)
-          modelStats[`本周_${modelName}_输入Token`] = stats.inputTokens || 0
-          modelStats[`本周_${modelName}_输出Token`] = stats.outputTokens || 0
-          modelStats[`本周_${modelName}_总Token`] = stats.totalTokens || 0
-        })
-      } else if (globalDateFilter.preset === '30days' && key.usage?.monthly?.models) {
-        Object.entries(key.usage.monthly.models).forEach(([model, stats]) => {
-          const modelName = model.replace(/[:/]/g, '_')
-          modelStats[`本月_${modelName}_请求数`] = stats.requests || 0
-          modelStats[`本月_${modelName}_费用($)`] = (stats.cost || 0).toFixed(4)
-          modelStats[`本月_${modelName}_输入Token`] = stats.inputTokens || 0
-          modelStats[`本月_${modelName}_输出Token`] = stats.outputTokens || 0
-          modelStats[`本月_${modelName}_总Token`] = stats.totalTokens || 0
+          modelStats[`${modelName}_请求数`] = stats.requests || 0
+          modelStats[`${modelName}_费用($)`] = (stats.cost || 0).toFixed(4)
+          modelStats[`${modelName}_Token`] = formatTokenCount(stats.totalTokens || 0)
+          modelStats[`${modelName}_输入Token`] = formatTokenCount(stats.inputTokens || 0)
+          modelStats[`${modelName}_输出Token`] = formatTokenCount(stats.outputTokens || 0)
         })
       }
 
@@ -3330,21 +3409,98 @@ const exportToExcel = () => {
     })
 
     // 创建工作簿
+    const wb = XLSX.utils.book_new()
     const ws = XLSX.utils.json_to_sheet(exportData)
 
-    // 动态设置列宽
+    // 获取工作表范围
+    const range = XLSX.utils.decode_range(ws['!ref'])
+
+    // 设置列宽
     const headers = Object.keys(exportData[0] || {})
-    const colWidths = headers.map((header) => {
-      if (header.includes('名称') || header.includes('所有者')) return { wch: 20 }
+    const columnWidths = headers.map((header) => {
+      if (header === '名称') return { wch: 25 }
+      if (header === '最后使用时间') return { wch: 20 }
       if (header.includes('费用')) return { wch: 15 }
       if (header.includes('Token')) return { wch: 15 }
       if (header.includes('请求')) return { wch: 12 }
       return { wch: 15 }
     })
-    ws['!cols'] = colWidths
+    ws['!cols'] = columnWidths
 
-    // 创建工作簿
-    const wb = XLSX.utils.book_new()
+    // 应用样式到标题行
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C })
+      if (!ws[cellAddress]) continue
+
+      const header = headers[C]
+      const isModelColumn = header && header.includes('_')
+
+      ws[cellAddress].s = {
+        fill: {
+          fgColor: { rgb: isModelColumn ? '70AD47' : '4472C4' }
+        },
+        font: {
+          color: { rgb: 'FFFFFF' },
+          bold: true,
+          sz: 12
+        },
+        alignment: {
+          horizontal: 'center',
+          vertical: 'center'
+        },
+        border: {
+          top: { style: 'thin', color: { rgb: '2F5597' } },
+          bottom: { style: 'thin', color: { rgb: '2F5597' } },
+          left: { style: 'thin', color: { rgb: '2F5597' } },
+          right: { style: 'thin', color: { rgb: '2F5597' } }
+        }
+      }
+    }
+
+    // 应用样式到数据行
+    for (let R = 1; R <= range.e.r; ++R) {
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C })
+        if (!ws[cellAddress]) continue
+
+        const header = headers[C]
+        const value = ws[cellAddress].v
+
+        // 基础样式
+        const cellStyle = {
+          font: { sz: 11 },
+          border: {
+            top: { style: 'thin', color: { rgb: 'D3D3D3' } },
+            bottom: { style: 'thin', color: { rgb: 'D3D3D3' } },
+            left: { style: 'thin', color: { rgb: 'D3D3D3' } },
+            right: { style: 'thin', color: { rgb: 'D3D3D3' } }
+          }
+        }
+
+        // 偶数行背景色
+        if (R % 2 === 0) {
+          cellStyle.fill = { fgColor: { rgb: 'F2F2F2' } }
+        }
+
+        // 根据列类型设置对齐和特殊样式
+        if (header === '名称') {
+          cellStyle.alignment = { horizontal: 'left', vertical: 'center' }
+        } else if (header === '最后使用时间') {
+          cellStyle.alignment = { horizontal: 'right', vertical: 'center' }
+          if (value === '从未使用') {
+            cellStyle.font = { ...cellStyle.font, color: { rgb: '999999' }, italic: true }
+          }
+        } else if (header && header.includes('费用')) {
+          cellStyle.alignment = { horizontal: 'right', vertical: 'center' }
+          cellStyle.font = { ...cellStyle.font, color: { rgb: '0066CC' }, bold: true }
+        } else if (header && (header.includes('Token') || header.includes('请求'))) {
+          cellStyle.alignment = { horizontal: 'right', vertical: 'center' }
+        }
+
+        ws[cellAddress].s = cellStyle
+      }
+    }
+
     XLSX.utils.book_append_sheet(wb, ws, '用量统计')
 
     // 生成文件名（包含时间戳和筛选条件）

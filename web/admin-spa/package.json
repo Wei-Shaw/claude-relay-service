@@ -19,7 +19,8 @@
     "pinia": "^2.1.7",
     "vue": "^3.3.4",
     "vue-router": "^4.2.5",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
