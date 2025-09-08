@@ -377,9 +377,7 @@
           >
             <div class="flex items-center justify-between">
               <div>
-                <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                  启用 Webhook 通知
-                </h2>
+                <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">启用通知</h2>
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
                   开启后，系统将按配置发送通知到指定平台
                 </p>
@@ -1679,7 +1677,8 @@ const getNotificationTypeName = (type) => {
     accountAnomaly: '账号异常',
     quotaWarning: '配额警告',
     systemError: '系统错误',
-    securityAlert: '安全警报'
+    securityAlert: '安全警报',
+    test: '测试通知'
   }
   return names[type] || type
 }
@@ -1689,7 +1688,8 @@ const getNotificationTypeDescription = (type) => {
     accountAnomaly: '账号状态异常、认证失败等',
     quotaWarning: 'API调用配额不足警告',
     systemError: '系统运行错误和故障',
-    securityAlert: '安全相关的警报通知'
+    securityAlert: '安全相关的警报通知',
+    test: '用于测试Webhook连接是否正常'
   }
   return descriptions[type] || ''
 }
