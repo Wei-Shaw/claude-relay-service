@@ -23,7 +23,51 @@ export default {
     adminPanel: '管理后台',
     userMenu: '用户菜单',
     logout: '退出登录',
-    settings: '系统设置'
+    settings: '系统设置',
+    
+    // Version related
+    currentVersion: '当前版本',
+    newVersionAvailable: '有新版本可用',
+    newVersion: '新版本',
+    hasUpdate: '有新版本',
+    viewUpdate: '查看更新',
+    checkingUpdate: '检查更新中...',
+    alreadyLatest: '当前已是最新版本',
+    checkUpdate: '检查更新',
+    
+    // User menu items
+    changeAccountInfo: '修改账户信息',
+    
+    // Change password modal
+    changePasswordModal: {
+      title: '修改账户信息',
+      currentUsername: '当前用户名',
+      currentUsernameHint: '当前用户名，输入新用户名以修改',
+      newUsername: '新用户名',
+      newUsernamePlaceholder: '输入新用户名（留空保持不变）',
+      newUsernameHint: '留空表示不修改用户名',
+      currentPassword: '当前密码',
+      currentPasswordPlaceholder: '请输入当前密码',
+      newPassword: '新密码',
+      newPasswordPlaceholder: '请输入新密码',
+      newPasswordHint: '密码长度至少8位',
+      confirmPassword: '确认新密码',
+      confirmPasswordPlaceholder: '请再次输入新密码',
+      saving: '保存中...',
+      save: '保存修改',
+      
+      // Messages
+      passwordMismatch: '两次输入的密码不一致',
+      passwordTooShort: '新密码长度至少8位',
+      accountInfoChangeSuccess: '账户信息修改成功，请重新登录',
+      passwordChangeSuccess: '密码修改成功，请重新登录',
+      changeFailed: '修改失败',
+      changePasswordFailed: '修改密码失败'
+    },
+    
+    // Logout
+    logoutConfirm: '确定要退出登录吗？',
+    logoutSuccess: '已安全退出'
   },
   apiStats: {
     title: 'API Key 使用统计',
@@ -160,5 +204,16 @@ export default {
     securityNoticeSingle: '您的 API Key 仅用于查询自己的统计数据，不会被存储或用于其他用途',
     securityNoticeMulti: '您的 API Keys 仅用于查询统计数据，不会被存储。聚合模式下部分个体化信息将不显示。',
     multiKeyTip: '提示：最多支持同时查询 30 个 API Keys。使用 Ctrl+Enter 快速查询。'
+  },
+  
+  // Login page
+  login: {
+    title: '管理后台',
+    username: '用户名',
+    usernamePlaceholder: '请输入用户名',
+    password: '密码',
+    passwordPlaceholder: '请输入密码',
+    loginButton: '登录',
+    loggingIn: '登录中...'
   }
 }

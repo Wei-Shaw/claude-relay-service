@@ -1,7 +1,10 @@
 <template>
   <div class="flex min-h-screen items-center justify-center p-4 sm:p-6">
-    <!-- 主题切换按钮 - 固定在右上角 -->
-    <div class="fixed right-4 top-4 z-50">
+    <!-- 右上角工具栏 -->
+    <div class="fixed right-4 top-4 z-50 flex items-center gap-2 sm:gap-3">
+      <!-- 语言切换按钮 -->
+      <LanguageSwitch mode="dropdown" size="medium" />
+      <!-- 主题切换按钮 -->
       <ThemeToggle mode="dropdown" />
     </div>
 
@@ -34,18 +37,18 @@
           v-else-if="oemLoading"
           class="mx-auto mb-2 h-8 w-48 animate-pulse rounded bg-gray-300/50 sm:h-9 sm:w-64"
         />
-        <p class="text-base text-gray-600 dark:text-gray-400 sm:text-lg">管理后台</p>
+        <p class="text-base text-gray-600 dark:text-gray-400 sm:text-lg">{{ t('login.title') }}</p>
       </div>
 
       <form class="space-y-4 sm:space-y-6" @submit.prevent="handleLogin">
         <div>
           <label class="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100 sm:mb-3"
-            >用户名</label
+            >{{ t('login.username') }}</label
           >
           <input
             v-model="loginForm.username"
             class="form-input w-full"
-            placeholder="请输入用户名"
+            :placeholder="t('login.usernamePlaceholder')"
             required
             type="text"
           />
@@ -53,12 +56,12 @@
 
         <div>
           <label class="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100 sm:mb-3"
-            >密码</label
+            >{{ t('login.password') }}</label
           >
           <input
             v-model="loginForm.password"
             class="form-input w-full"
-            placeholder="请输入密码"
+            :placeholder="t('login.passwordPlaceholder')"
             required
             type="password"
           />
@@ -71,7 +74,7 @@
         >
           <i v-if="!authStore.loginLoading" class="fas fa-sign-in-alt mr-2" />
           <div v-if="authStore.loginLoading" class="loading-spinner mr-2" />
-          {{ authStore.loginLoading ? '登录中...' : '登录' }}
+          {{ authStore.loginLoading ? t('login.loggingIn') : t('login.loginButton') }}
         </button>
       </form>
 
@@ -87,12 +90,15 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
+import LanguageSwitch from '@/components/common/LanguageSwitch.vue'
 
 const authStore = useAuthStore()
 const themeStore = useThemeStore()
+const { t } = useI18n()
 const oemLoading = computed(() => authStore.oemLoading)
 
 const loginForm = ref({
