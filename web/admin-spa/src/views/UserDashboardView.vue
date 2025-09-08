@@ -56,6 +56,17 @@
                 >
                   Usage Stats
                 </button>
+                <button
+                  :class="[
+                    'rounded-md px-3 py-2 text-sm font-medium',
+                    activeTab === 'tutorial'
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                  ]"
+                  @click="handleTabChange('tutorial')"
+                >
+                  Tutorial
+                </button>
               </div>
             </div>
           </div>
@@ -315,6 +326,11 @@
       <div v-else-if="activeTab === 'usage'">
         <UserUsageStats />
       </div>
+
+      <!-- Tutorial Tab -->
+      <div v-else-if="activeTab === 'tutorial'" class="space-y-6">
+        <TutorialView />
+      </div>
     </main>
   </div>
 </template>
@@ -328,6 +344,7 @@ import { showToast } from '@/utils/toast'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import UserApiKeysManager from '@/components/user/UserApiKeysManager.vue'
 import UserUsageStats from '@/components/user/UserUsageStats.vue'
+import TutorialView from '@/views/TutorialView.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
