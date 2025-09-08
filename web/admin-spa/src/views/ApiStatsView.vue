@@ -168,9 +168,9 @@ import TokenDistribution from '@/components/apistats/TokenDistribution.vue'
 import LimitConfig from '@/components/apistats/LimitConfig.vue'
 import AggregatedStatsCard from '@/components/apistats/AggregatedStatsCard.vue'
 import ModelUsageStats from '@/components/apistats/ModelUsageStats.vue'
-import TutorialViewZhCn from './TutorialView.vue'
-import TutorialViewZhTw from './TutorialView.vue'
-import TutorialViewEn from './TutorialView.vue'
+import TutorialViewZhCn from './tutorials/TutorialView-zh-cn.vue'
+import TutorialViewZhTw from './tutorials/TutorialView-zh-tw.vue'
+import TutorialViewEn from './tutorials/TutorialView-en.vue'
 
 const route = useRoute()
 const { t } = useI18n()
