@@ -14,12 +14,18 @@
       <!-- 文字层 -->
       <div class="relative z-10 flex h-full items-center justify-between px-2">
         <div class="flex items-center gap-1.5">
-          <i :class="['text-xs', iconClass]" />
-          <span class="text-xs font-medium" :class="textClass">{{ label }}</span>
+          <i :class="['text-xs', iconClass]" :style="textShadowStyle" />
+          <span class="text-xs font-medium" :class="textClass" :style="textShadowStyle">{{
+            label
+          }}</span>
         </div>
         <div class="flex items-center gap-1">
-          <span class="text-xs font-bold" :class="valueTextClass"> ${{ current.toFixed(2) }} </span>
-          <span class="text-xs" :class="textClass">/ ${{ limit.toFixed(2) }}</span>
+          <span class="text-xs font-bold" :class="valueTextClass" :style="valueShadowStyle">
+            ${{ current.toFixed(2) }}
+          </span>
+          <span class="text-xs" :class="textClass" :style="textShadowStyle"
+            >/ ${{ limit.toFixed(2) }}</span
+          >
         </div>
       </div>
 
@@ -109,7 +115,8 @@ const progressBarClass = computed(() => {
     } else if (p >= 70) {
       return 'bg-gradient-to-r from-orange-500 to-amber-500'
     } else {
-      return 'bg-gradient-to-r from-purple-500 to-indigo-600'
+      // 使用更亮的紫色渐变，确保与白色文字有良好对比度
+      return 'bg-gradient-to-r from-purple-600 to-indigo-600'
     }
   }
 
@@ -169,26 +176,100 @@ const iconClass = computed(() => {
   return `${iconName} ${colorClass}`
 })
 
-// 文字颜色（根据进度自动调整）
+// 文字颜色（根据进度条类型和进度值智能调整）
 const textClass = computed(() => {
   const p = progress.value
-  if (p > 50) {
-    // 进度超过50%时，文字使用白色（在深色进度条上）
-    return 'text-white drop-shadow-sm'
+
+  // 对于有颜色的进度条，判断是否需要白色文字
+  const needsWhiteText = () => {
+    // Opus类型（紫色系）
+    if (props.type === 'opus') {
+      // 紫色进度条在任何进度下都使用白色文字，确保对比度
+      if (p > 0) return true
+    }
+    // 窗口类型（蓝色系）
+    if (props.type === 'window') {
+      // 蓝色进度条在任何进度下都使用白色文字
+      if (p > 0) return true
+    }
+    // 每日类型（绿色/黄色/红色）
+    if (props.type === 'daily') {
+      // 绿色、黄色、红色进度条都使用白色文字
+      if (p > 0) return true
+    }
+    return false
+  }
+
+  if (needsWhiteText()) {
+    // 增强阴影效果，确保在各种颜色背景上都清晰可见
+    return 'text-white font-medium'
   } else {
-    // 进度较低时，文字使用深色
-    return 'text-gray-600 dark:text-gray-300'
+    // 在浅色背景上使用深色文字
+    return 'text-gray-700 dark:text-gray-300 font-medium'
   }
 })
 
-// 数值文字颜色（更突出）
+// 数值文字颜色（更突出，增强可读性）
 const valueTextClass = computed(() => {
   const p = progress.value
-  if (p > 50) {
-    return 'text-white drop-shadow-md'
-  } else {
-    return 'text-gray-800 dark:text-gray-200'
+
+  // 与文字颜色保持一致的逻辑
+  const needsWhiteText = () => {
+    if (props.type === 'opus' && p > 0) return true
+    if (props.type === 'window' && p > 0) return true
+    if (props.type === 'daily' && p > 0) return true
+    return false
   }
+
+  if (needsWhiteText()) {
+    // 数值文字使用更粗的字重和更强的阴影
+    return 'text-white font-bold'
+  } else {
+    // 在浅色背景上使用更深的颜色
+    return 'text-gray-900 dark:text-gray-100 font-bold'
+  }
+})
+
+// 文字阴影样式（增强对比度）
+const textShadowStyle = computed(() => {
+  const p = progress.value
+
+  // 判断是否需要强阴影
+  const needsStrongShadow = () => {
+    if (props.type === 'opus' && p > 0) return true
+    if (props.type === 'window' && p > 0) return true
+    if (props.type === 'daily' && p > 0) return true
+    return false
+  }
+
+  if (needsStrongShadow()) {
+    // 在彩色背景上使用强阴影效果
+    return {
+      textShadow: '0 1px 3px rgba(0, 0, 0, 0.5), 0 0 8px rgba(0, 0, 0, 0.3)'
+    }
+  }
+  return {}
+})
+
+// 数值文字阴影样式（更强的阴影效果）
+const valueShadowStyle = computed(() => {
+  const p = progress.value
+
+  // 判断是否需要强阴影
+  const needsStrongShadow = () => {
+    if (props.type === 'opus' && p > 0) return true
+    if (props.type === 'window' && p > 0) return true
+    if (props.type === 'daily' && p > 0) return true
+    return false
+  }
+
+  if (needsStrongShadow()) {
+    // 数值文字使用更强的阴影，确保清晰可见
+    return {
+      textShadow: '0 1px 4px rgba(0, 0, 0, 0.6), 0 0 10px rgba(0, 0, 0, 0.4)'
+    }
+  }
+  return {}
 })
 </script>
 
