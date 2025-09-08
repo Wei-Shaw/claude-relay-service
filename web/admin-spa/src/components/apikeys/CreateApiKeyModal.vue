@@ -110,19 +110,21 @@
               class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-2 sm:text-sm"
               >名称 <span class="text-red-500">*</span></label
             >
-            <input
-              v-model="form.name"
-              class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-              :class="{ 'border-red-500': errors.name }"
-              :placeholder="
-                form.createType === 'batch'
-                  ? '输入基础名称（将自动添加序号）'
-                  : '为您的 API Key 取一个名称'
-              "
-              required
-              type="text"
-              @input="errors.name = ''"
-            />
+            <div>
+              <input
+                v-model="form.name"
+                class="form-input flex-1 border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                :class="{ 'border-red-500': errors.name }"
+                :placeholder="
+                  form.createType === 'batch'
+                    ? '输入基础名称（将自动添加序号）'
+                    : '为您的 API Key 取一个名称'
+                "
+                required
+                type="text"
+                @input="errors.name = ''"
+              />
+            </div>
             <p v-if="errors.name" class="mt-1 text-xs text-red-500 dark:text-red-400">
               {{ errors.name }}
             </p>

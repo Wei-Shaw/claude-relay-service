@@ -122,7 +122,7 @@ router.get('/api-keys/:keyId/cost-debug', authenticateAdmin, async (req, res) =>
 // 获取所有API Keys
 router.get('/api-keys', authenticateAdmin, async (req, res) => {
   try {
-    const { timeRange = 'all' } = req.query // all, 7days, monthly
+    const { timeRange = 'all', startDate, endDate } = req.query // all, 7days, monthly, custom
     const apiKeys = await apiKeyService.getAllApiKeys()
 
     // 获取用户服务来补充owner信息
@@ -132,7 +132,32 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
     const now = new Date()
     const searchPatterns = []
 
-    if (timeRange === 'today') {
+    if (timeRange === 'custom' && startDate && endDate) {
+      // 自定义日期范围
+      const redisClient = require('../models/redis')
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+
+      // 确保日期范围有效
+      if (start > end) {
+        return res.status(400).json({ error: 'Start date must be before or equal to end date' })
+      }
+
+      // 限制最大范围为365天
+      const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1
+      if (daysDiff > 365) {
+        return res.status(400).json({ error: 'Date range cannot exceed 365 days' })
+      }
+
+      // 生成日期范围内每天的搜索模式
+      const currentDate = new Date(start)
+      while (currentDate <= end) {
+        const tzDate = redisClient.getDateInTimezone(currentDate)
+        const dateStr = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}-${String(tzDate.getUTCDate()).padStart(2, '0')}`
+        searchPatterns.push(`usage:daily:*:${dateStr}`)
+        currentDate.setDate(currentDate.getDate() + 1)
+      }
+    } else if (timeRange === 'today') {
       // 今日 - 使用时区日期
       const redisClient = require('../models/redis')
       const tzDate = redisClient.getDateInTimezone(now)
@@ -233,7 +258,7 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
           apiKey.usage.total.formattedCost = CostCalculator.formatCost(totalCost)
         }
       } else {
-        // 7天或本月：重新计算统计数据
+        // 7天、本月或自定义日期范围：重新计算统计数据
         const tempUsage = {
           requests: 0,
           tokens: 0,
@@ -274,12 +299,28 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
         const tzDate = redisClient.getDateInTimezone(now)
         const tzMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
 
-        const modelKeys =
-          timeRange === 'today'
-            ? await client.keys(`usage:${apiKey.id}:model:daily:*:${tzToday}`)
-            : timeRange === '7days'
-              ? await client.keys(`usage:${apiKey.id}:model:daily:*:*`)
-              : await client.keys(`usage:${apiKey.id}:model:monthly:*:${tzMonth}`)
+        let modelKeys = []
+        if (timeRange === 'custom' && startDate && endDate) {
+          // 自定义日期范围：获取范围内所有日期的模型统计
+          const start = new Date(startDate)
+          const end = new Date(endDate)
+          const currentDate = new Date(start)
+
+          while (currentDate <= end) {
+            const tzDateForKey = redisClient.getDateInTimezone(currentDate)
+            const dateStr = `${tzDateForKey.getUTCFullYear()}-${String(tzDateForKey.getUTCMonth() + 1).padStart(2, '0')}-${String(tzDateForKey.getUTCDate()).padStart(2, '0')}`
+            const dayKeys = await client.keys(`usage:${apiKey.id}:model:daily:*:${dateStr}`)
+            modelKeys = modelKeys.concat(dayKeys)
+            currentDate.setDate(currentDate.getDate() + 1)
+          }
+        } else {
+          modelKeys =
+            timeRange === 'today'
+              ? await client.keys(`usage:${apiKey.id}:model:daily:*:${tzToday}`)
+              : timeRange === '7days'
+                ? await client.keys(`usage:${apiKey.id}:model:daily:*:*`)
+                : await client.keys(`usage:${apiKey.id}:model:monthly:*:${tzMonth}`)
+        }
 
         const modelStatsMap = new Map()
 
@@ -295,8 +336,8 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
                 continue
               }
             }
-          } else if (timeRange === 'today') {
-            // today选项已经在查询时过滤了，不需要额外处理
+          } else if (timeRange === 'today' || timeRange === 'custom') {
+            // today和custom选项已经在查询时过滤了，不需要额外处理
           }
 
           const modelMatch = key.match(
@@ -619,7 +660,8 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       weeklyOpusCostLimit,
       tags,
       activationDays,
-      expirationMode
+      expirationMode,
+      icon
     })
 
     logger.success(`🔑 Admin created new API key: ${name}`)
@@ -655,7 +697,8 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       weeklyOpusCostLimit,
       tags,
       activationDays,
-      expirationMode
+      expirationMode,
+      icon
     } = req.body
 
     // 输入验证
@@ -701,7 +744,8 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
           weeklyOpusCostLimit,
           tags,
           activationDays,
-          expirationMode
+          expirationMode,
+          icon
         })
 
         // 保留原始 API Key 供返回
@@ -3878,10 +3922,10 @@ router.get('/model-stats', authenticateAdmin, async (req, res) => {
         return res.status(400).json({ error: 'Start date must be before or equal to end date' })
       }
 
-      // 限制最大范围为31天
+      // 限制最大范围为365天
       const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1
-      if (daysDiff > 31) {
-        return res.status(400).json({ error: 'Date range cannot exceed 31 days' })
+      if (daysDiff > 365) {
+        return res.status(400).json({ error: 'Date range cannot exceed 365 days' })
       }
 
       // 生成日期范围内所有日期的搜索模式
@@ -4342,10 +4386,10 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
         return res.status(400).json({ error: 'Start date must be before or equal to end date' })
       }
 
-      // 限制最大范围为31天
+      // 限制最大范围为365天
       const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1
-      if (daysDiff > 31) {
-        return res.status(400).json({ error: 'Date range cannot exceed 31 days' })
+      if (daysDiff > 365) {
+        return res.status(400).json({ error: 'Date range cannot exceed 365 days' })
       }
 
       // 生成日期范围内所有日期的搜索模式
