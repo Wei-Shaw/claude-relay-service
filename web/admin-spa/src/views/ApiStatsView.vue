@@ -17,6 +17,7 @@
 
           <!-- 分隔线 -->
           <div
+            v-if="oemSettings.ldapEnabled || oemSettings.showAdminButton !== false"
             class="h-8 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent opacity-50 dark:via-gray-600"
           />
 
@@ -31,6 +32,7 @@
           </router-link>
           <!-- 管理后台按钮 -->
           <router-link
+            v-if="oemSettings.showAdminButton !== false"
             class="admin-button-refined flex items-center gap-2 rounded-2xl px-4 py-2 transition-all duration-300 md:px-5 md:py-2.5"
             to="/dashboard"
           >
