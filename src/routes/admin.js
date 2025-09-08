@@ -2059,7 +2059,9 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       groupId,
       groupIds,
       autoStopOnWarning,
-      useUnifiedUserAgent
+      useUnifiedUserAgent,
+      useUnifiedClientId,
+      unifiedClientId
     } = req.body
 
     if (!name) {
@@ -2100,7 +2102,9 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       platform,
       priority: priority || 50, // 默认优先级为50
       autoStopOnWarning: autoStopOnWarning === true, // 默认为false
-      useUnifiedUserAgent: useUnifiedUserAgent === true // 默认为false
+      useUnifiedUserAgent: useUnifiedUserAgent === true, // 默认为false
+      useUnifiedClientId: useUnifiedClientId === true, // 默认为false
+      unifiedClientId: unifiedClientId || '' // 统一的客户端标识
     })
 
     // 如果是分组类型，将账户添加到分组
@@ -2699,6 +2703,23 @@ router.post(
     } catch (error) {
       logger.error('❌ Failed to reset Claude Console account daily usage:', error)
       return res.status(500).json({ error: 'Failed to reset daily usage', message: error.message })
+    }
+  }
+)
+
+// 重置Claude Console账户状态（清除所有异常状态）
+router.post(
+  '/claude-console-accounts/:accountId/reset-status',
+  authenticateAdmin,
+  async (req, res) => {
+    try {
+      const { accountId } = req.params
+      const result = await claudeConsoleAccountService.resetAccountStatus(accountId)
+      logger.success(`✅ Admin reset status for Claude Console account: ${accountId}`)
+      return res.json({ success: true, data: result })
+    } catch (error) {
+      logger.error('❌ Failed to reset Claude Console account status:', error)
+      return res.status(500).json({ error: 'Failed to reset status', message: error.message })
     }
   }
 )
@@ -5419,6 +5440,7 @@ router.get('/oem-settings', async (req, res) => {
       siteName: 'Claude Relay Service',
       siteIcon: '',
       siteIconData: '', // Base64编码的图标数据
+      showAdminButton: true, // 是否显示管理后台按钮
       updatedAt: new Date().toISOString()
     }
 
@@ -5448,7 +5470,7 @@ router.get('/oem-settings', async (req, res) => {
 // 更新OEM设置
 router.put('/oem-settings', authenticateAdmin, async (req, res) => {
   try {
-    const { siteName, siteIcon, siteIconData } = req.body
+    const { siteName, siteIcon, siteIconData, showAdminButton } = req.body
 
     // 验证输入
     if (!siteName || typeof siteName !== 'string' || siteName.trim().length === 0) {
@@ -5479,6 +5501,7 @@ router.put('/oem-settings', authenticateAdmin, async (req, res) => {
       siteName: siteName.trim(),
       siteIcon: (siteIcon || '').trim(),
       siteIconData: (siteIconData || '').trim(), // Base64数据
+      showAdminButton: showAdminButton !== false, // 默认为true
       updatedAt: new Date().toISOString()
     }
 
@@ -6187,6 +6210,21 @@ router.put('/openai-accounts/:id/toggle', authenticateAdmin, async (req, res) =>
       message: '切换账户状态失败',
       error: error.message
     })
+  }
+})
+
+// 重置 OpenAI 账户状态（清除所有异常状态）
+router.post('/openai-accounts/:accountId/reset-status', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+
+    const result = await openaiAccountService.resetAccountStatus(accountId)
+
+    logger.success(`✅ Admin reset status for OpenAI account: ${accountId}`)
+    return res.json({ success: true, data: result })
+  } catch (error) {
+    logger.error('❌ Failed to reset OpenAI account status:', error)
+    return res.status(500).json({ error: 'Failed to reset status', message: error.message })
   }
 })
 

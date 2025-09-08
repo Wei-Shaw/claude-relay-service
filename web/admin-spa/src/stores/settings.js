@@ -8,6 +8,7 @@ export const useSettingsStore = defineStore('settings', () => {
     siteName: 'Claude Relay Service',
     siteIcon: '',
     siteIconData: '',
+    showAdminButton: true, // 控制管理后台按钮的显示
     updatedAt: null
   })
 
@@ -64,6 +65,7 @@ export const useSettingsStore = defineStore('settings', () => {
       siteName: 'Claude Relay Service',
       siteIcon: '',
       siteIconData: '',
+      showAdminButton: true,
       updatedAt: null
     }
 

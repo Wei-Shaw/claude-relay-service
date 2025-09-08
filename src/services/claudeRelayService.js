@@ -126,8 +126,11 @@ class ClaudeRelayService {
       // 获取有效的访问token
       const accessToken = await claudeAccountService.getValidAccessToken(accountId)
 
+      // 获取账户信息
+      const account = await claudeAccountService.getAccount(accountId)
+
       // 处理请求体（传递 clientHeaders 以判断是否需要设置 Claude Code 系统提示词）
-      const processedBody = this._processRequestBody(requestBody, clientHeaders)
+      const processedBody = this._processRequestBody(requestBody, clientHeaders, account)
 
       // 获取代理配置
       const proxyAgent = await this._getProxyAgent(accountId)
@@ -344,7 +347,7 @@ class ClaudeRelayService {
   }
 
   // 🔄 处理请求体
-  _processRequestBody(body, clientHeaders = {}) {
+  _processRequestBody(body, clientHeaders = {}, account = null) {
     if (!body) {
       return body
     }
@@ -446,7 +449,29 @@ class ClaudeRelayService {
       delete processedBody.top_p
     }
 
+    // 处理统一的客户端标识
+    if (account && account.useUnifiedClientId && account.unifiedClientId) {
+      this._replaceClientId(processedBody, account.unifiedClientId)
+    }
+
     return processedBody
+  }
+
+  // 🔄 替换请求中的客户端标识
+  _replaceClientId(body, unifiedClientId) {
+    if (!body || !body.metadata || !body.metadata.user_id || !unifiedClientId) {
+      return
+    }
+
+    const userId = body.metadata.user_id
+    // user_id格式：user_{64位十六进制}_account__session_{uuid}
+    // 只替换第一个下划线后到_account之前的部分（客户端标识）
+    const match = userId.match(/^user_[a-f0-9]{64}(_account__session_[a-f0-9-]{36})$/)
+    if (match && match[1]) {
+      // 替换客户端标识部分
+      body.metadata.user_id = `user_${unifiedClientId}${match[1]}`
+      logger.info(`🔄 Replaced client ID with unified ID: ${body.metadata.user_id}`)
+    }
   }
 
   // 🔢 验证并限制max_tokens参数
@@ -660,16 +685,13 @@ class ClaudeRelayService {
 
       // 使用统一 User-Agent 或客户端提供的，最后使用默认值
       if (!options.headers['User-Agent'] && !options.headers['user-agent']) {
-        const userAgent =
-          unifiedUA ||
-          clientHeaders?.['user-agent'] ||
-          clientHeaders?.['User-Agent'] ||
-          'claude-cli/1.0.102 (external, cli)'
+        const userAgent = unifiedUA || 'claude-cli/1.0.57 (external, cli)'
         options.headers['User-Agent'] = userAgent
       }
 
-      logger.info(`🔗 指纹是这个: ${options.headers['User-Agent']}`)
-      logger.info(`🔗 指纹是这个: ${options.headers['user-agent']}`)
+      logger.info(
+        `🔗 指纹是这个: ${options.headers['User-Agent'] || options.headers['user-agent']}`
+      )
 
       // 使用自定义的 betaHeader 或默认值
       const betaHeader =
@@ -840,8 +862,11 @@ class ClaudeRelayService {
       // 获取有效的访问token
       const accessToken = await claudeAccountService.getValidAccessToken(accountId)
 
+      // 获取账户信息
+      const account = await claudeAccountService.getAccount(accountId)
+
       // 处理请求体（传递 clientHeaders 以判断是否需要设置 Claude Code 系统提示词）
-      const processedBody = this._processRequestBody(requestBody, clientHeaders)
+      const processedBody = this._processRequestBody(requestBody, clientHeaders, account)
 
       // 获取代理配置
       const proxyAgent = await this._getProxyAgent(accountId)
@@ -931,14 +956,13 @@ class ClaudeRelayService {
 
       // 使用统一 User-Agent 或客户端提供的，最后使用默认值
       if (!options.headers['User-Agent'] && !options.headers['user-agent']) {
-        const userAgent =
-          unifiedUA ||
-          clientHeaders?.['user-agent'] ||
-          clientHeaders?.['User-Agent'] ||
-          'claude-cli/1.0.102 (external, cli)'
+        const userAgent = unifiedUA || 'claude-cli/1.0.57 (external, cli)'
         options.headers['User-Agent'] = userAgent
       }
 
+      logger.info(
+        `🔗 指纹是这个: ${options.headers['User-Agent'] || options.headers['user-agent']}`
+      )
       // 使用自定义的 betaHeader 或默认值
       const betaHeader =
         requestOptions?.betaHeader !== undefined ? requestOptions.betaHeader : this.betaHeader

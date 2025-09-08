@@ -190,7 +190,7 @@ const securityLogger = winston.createLogger({
 const authDetailLogger = winston.createLogger({
   level: 'info',
   format: winston.format.combine(
-    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+    winston.format.timestamp({ format: () => formatDateWithTimezone(new Date(), false) }),
     winston.format.printf(({ level, message, timestamp, data }) => {
       // 使用更深的深度和格式化的JSON输出
       const jsonData = data ? JSON.stringify(data, null, 2) : '{}'

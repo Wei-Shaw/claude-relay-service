@@ -434,6 +434,7 @@
                 <div class="whitespace-nowrap text-gray-300">model = "gpt-5"</div>
                 <div class="whitespace-nowrap text-gray-300">model_reasoning_effort = "high"</div>
                 <div class="whitespace-nowrap text-gray-300">disable_response_storage = true</div>
+                <div class="whitespace-nowrap text-gray-300">preferred_auth_method = "apikey"</div>
                 <div class="mt-2"></div>
                 <div class="whitespace-nowrap text-gray-300">[model_providers.crs]</div>
                 <div class="whitespace-nowrap text-gray-300">name = "crs"</div>
@@ -920,6 +921,7 @@
                 <div class="whitespace-nowrap text-gray-300">model = "gpt-5"</div>
                 <div class="whitespace-nowrap text-gray-300">model_reasoning_effort = "high"</div>
                 <div class="whitespace-nowrap text-gray-300">disable_response_storage = true</div>
+                <div class="whitespace-nowrap text-gray-300">preferred_auth_method = "apikey"</div>
                 <div class="mt-2"></div>
                 <div class="whitespace-nowrap text-gray-300">[model_providers.crs]</div>
                 <div class="whitespace-nowrap text-gray-300">name = "crs"</div>
@@ -1397,6 +1399,7 @@
                 <div class="whitespace-nowrap text-gray-300">model = "gpt-5"</div>
                 <div class="whitespace-nowrap text-gray-300">model_reasoning_effort = "high"</div>
                 <div class="whitespace-nowrap text-gray-300">disable_response_storage = true</div>
+                <div class="whitespace-nowrap text-gray-300">preferred_auth_method = "apikey"</div>
                 <div class="mt-2"></div>
                 <div class="whitespace-nowrap text-gray-300">[model_providers.crs]</div>
                 <div class="whitespace-nowrap text-gray-300">name = "crs"</div>

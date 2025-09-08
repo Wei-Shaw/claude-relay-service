@@ -258,6 +258,126 @@ class ApiKeyService {
     }
   }
 
+  // 🔍 验证API Key（仅用于统计查询，不触发激活）
+  async validateApiKeyForStats(apiKey) {
+    try {
+      if (!apiKey || !apiKey.startsWith(this.prefix)) {
+        return { valid: false, error: 'Invalid API key format' }
+      }
+
+      // 计算API Key的哈希值
+      const hashedKey = this._hashApiKey(apiKey)
+
+      // 通过哈希值直接查找API Key（性能优化）
+      const keyData = await redis.findApiKeyByHash(hashedKey)
+
+      if (!keyData) {
+        return { valid: false, error: 'API key not found' }
+      }
+
+      // 检查是否激活
+      if (keyData.isActive !== 'true') {
+        return { valid: false, error: 'API key is disabled' }
+      }
+
+      // 注意：这里不处理激活逻辑，保持 API Key 的未激活状态
+
+      // 检查是否过期（仅对已激活的 Key 检查）
+      if (
+        keyData.isActivated === 'true' &&
+        keyData.expiresAt &&
+        new Date() > new Date(keyData.expiresAt)
+      ) {
+        return { valid: false, error: 'API key has expired' }
+      }
+
+      // 如果API Key属于某个用户，检查用户是否被禁用
+      if (keyData.userId) {
+        try {
+          const userService = require('./userService')
+          const user = await userService.getUserById(keyData.userId, false)
+          if (!user || !user.isActive) {
+            return { valid: false, error: 'User account is disabled' }
+          }
+        } catch (userError) {
+          // 如果用户服务出错，记录但不影响API Key验证
+          logger.warn(`Failed to check user status for API key ${keyData.id}:`, userError)
+        }
+      }
+
+      // 获取当日费用
+      const dailyCost = (await redis.getDailyCost(keyData.id)) || 0
+
+      // 获取使用统计
+      const usage = await redis.getUsageStats(keyData.id)
+
+      // 解析限制模型数据
+      let restrictedModels = []
+      try {
+        restrictedModels = keyData.restrictedModels ? JSON.parse(keyData.restrictedModels) : []
+      } catch (e) {
+        restrictedModels = []
+      }
+
+      // 解析允许的客户端
+      let allowedClients = []
+      try {
+        allowedClients = keyData.allowedClients ? JSON.parse(keyData.allowedClients) : []
+      } catch (e) {
+        allowedClients = []
+      }
+
+      // 解析标签
+      let tags = []
+      try {
+        tags = keyData.tags ? JSON.parse(keyData.tags) : []
+      } catch (e) {
+        tags = []
+      }
+
+      return {
+        valid: true,
+        keyData: {
+          id: keyData.id,
+          name: keyData.name,
+          description: keyData.description,
+          createdAt: keyData.createdAt,
+          expiresAt: keyData.expiresAt,
+          // 添加激活相关字段
+          expirationMode: keyData.expirationMode || 'fixed',
+          isActivated: keyData.isActivated === 'true',
+          activationDays: parseInt(keyData.activationDays || 0),
+          activatedAt: keyData.activatedAt || null,
+          claudeAccountId: keyData.claudeAccountId,
+          claudeConsoleAccountId: keyData.claudeConsoleAccountId,
+          geminiAccountId: keyData.geminiAccountId,
+          openaiAccountId: keyData.openaiAccountId,
+          azureOpenaiAccountId: keyData.azureOpenaiAccountId,
+          bedrockAccountId: keyData.bedrockAccountId,
+          permissions: keyData.permissions || 'all',
+          tokenLimit: parseInt(keyData.tokenLimit),
+          concurrencyLimit: parseInt(keyData.concurrencyLimit || 0),
+          rateLimitWindow: parseInt(keyData.rateLimitWindow || 0),
+          rateLimitRequests: parseInt(keyData.rateLimitRequests || 0),
+          rateLimitCost: parseFloat(keyData.rateLimitCost || 0),
+          enableModelRestriction: keyData.enableModelRestriction === 'true',
+          restrictedModels,
+          enableClientRestriction: keyData.enableClientRestriction === 'true',
+          allowedClients,
+          dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
+          weeklyOpusCostLimit: parseFloat(keyData.weeklyOpusCostLimit || 0),
+          dailyCost: dailyCost || 0,
+          weeklyOpusCost: (await redis.getWeeklyOpusCost(keyData.id)) || 0,
+          tags,
+          usage
+        }
+      }
+    } catch (error) {
+      logger.error('❌ API key validation error (stats):', error)
+      return { valid: false, error: 'Internal validation error' }
+    }
+  }
+
   // 📋 获取所有API Keys
   async getAllApiKeys(includeDeleted = false) {
     try {

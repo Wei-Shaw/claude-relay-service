@@ -147,6 +147,41 @@
                   </td>
                 </tr>
 
+                <!-- 管理后台按钮显示控制 -->
+                <tr class="table-row">
+                  <td class="w-48 whitespace-nowrap px-6 py-4">
+                    <div class="flex items-center">
+                      <div
+                        class="mr-3 flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600"
+                      >
+                        <i class="fas fa-eye-slash text-xs text-white" />
+                      </div>
+                      <div>
+                        <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                          管理入口
+                        </div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">登录按钮显示</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4">
+                    <div class="flex items-center">
+                      <label class="inline-flex cursor-pointer items-center">
+                        <input v-model="hideAdminButton" class="peer sr-only" type="checkbox" />
+                        <div
+                          class="peer relative h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800"
+                        ></div>
+                        <span class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300">{{
+                          hideAdminButton ? '隐藏登录按钮' : '显示登录按钮'
+                        }}</span>
+                      </label>
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      隐藏后，用户需要直接访问 /admin/login 页面登录
+                    </p>
+                  </td>
+                </tr>
+
                 <!-- 操作按钮 -->
                 <tr>
                   <td class="px-6 py-6" colspan="2">
@@ -189,7 +224,148 @@
 
           <!-- 移动端卡片视图 -->
           <div class="space-y-4 sm:hidden">
-            <!-- 省略移动端视图代码... -->
+            <!-- 站点名称卡片 -->
+            <div class="glass-card p-4">
+              <div class="mb-3 flex items-center gap-3">
+                <div
+                  class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 text-white shadow-md"
+                >
+                  <i class="fas fa-tag"></i>
+                </div>
+                <div>
+                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">站点名称</h3>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">自定义您的站点品牌名称</p>
+                </div>
+              </div>
+              <input
+                v-model="oemSettings.siteName"
+                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                maxlength="100"
+                placeholder="Claude Relay Service"
+                type="text"
+              />
+            </div>
+
+            <!-- 站点图标卡片 -->
+            <div class="glass-card p-4">
+              <div class="mb-3 flex items-center gap-3">
+                <div
+                  class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 text-white shadow-md"
+                >
+                  <i class="fas fa-image"></i>
+                </div>
+                <div>
+                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">站点图标</h3>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    上传自定义图标或输入图标URL
+                  </p>
+                </div>
+              </div>
+              <div class="space-y-3">
+                <!-- 图标预览 -->
+                <div
+                  v-if="oemSettings.siteIconData || oemSettings.siteIcon"
+                  class="inline-flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-700"
+                >
+                  <img
+                    alt="图标预览"
+                    class="h-8 w-8"
+                    :src="oemSettings.siteIconData || oemSettings.siteIcon"
+                    @error="handleIconError"
+                  />
+                  <span class="text-sm text-gray-600 dark:text-gray-400">当前图标</span>
+                  <button
+                    class="rounded-lg px-3 py-1 font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-900"
+                    @click="removeIcon"
+                  >
+                    删除
+                  </button>
+                </div>
+
+                <!-- 上传按钮 -->
+                <div>
+                  <input
+                    ref="iconFileInputMobile"
+                    accept=".ico,.png,.jpg,.jpeg,.svg"
+                    class="hidden"
+                    type="file"
+                    @change="handleIconUpload"
+                  />
+                  <button
+                    class="btn btn-success px-4 py-2"
+                    @click="$refs.iconFileInputMobile.click()"
+                  >
+                    <i class="fas fa-upload mr-2" />
+                    上传图标
+                  </button>
+                  <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    支持 .ico, .png, .jpg, .svg 格式，最大 350KB
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- 管理后台按钮显示控制卡片 -->
+            <div class="glass-card p-4">
+              <div class="mb-3 flex items-center gap-3">
+                <div
+                  class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-md"
+                >
+                  <i class="fas fa-eye-slash"></i>
+                </div>
+                <div>
+                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">管理入口</h3>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">控制登录按钮在首页的显示</p>
+                </div>
+              </div>
+              <div class="space-y-2">
+                <label class="inline-flex cursor-pointer items-center">
+                  <input v-model="hideAdminButton" class="peer sr-only" type="checkbox" />
+                  <div
+                    class="peer relative h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800"
+                  ></div>
+                  <span class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300">{{
+                    hideAdminButton ? '隐藏登录按钮' : '显示登录按钮'
+                  }}</span>
+                </label>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  隐藏后，用户需要直接访问 /admin/login 页面登录
+                </p>
+              </div>
+            </div>
+
+            <!-- 操作按钮卡片 -->
+            <div class="glass-card p-4">
+              <div class="flex flex-col gap-3">
+                <button
+                  class="btn btn-primary w-full px-6 py-3"
+                  :class="{ 'cursor-not-allowed opacity-50': saving }"
+                  :disabled="saving"
+                  @click="saveOemSettings"
+                >
+                  <div v-if="saving" class="loading-spinner mr-2"></div>
+                  <i v-else class="fas fa-save mr-2" />
+                  {{ saving ? '保存中...' : '保存设置' }}
+                </button>
+
+                <button
+                  class="btn w-full bg-gray-100 px-6 py-3 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  :disabled="saving"
+                  @click="resetOemSettings"
+                >
+                  <i class="fas fa-undo mr-2" />
+                  重置为默认
+                </button>
+
+                <div
+                  v-if="oemSettings.updatedAt"
+                  class="text-center text-sm text-gray-500 dark:text-gray-400"
+                >
+                  <i class="fas fa-clock mr-1" />
+                  上次更新: {{ formatDateTime(oemSettings.updatedAt) }}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -791,6 +967,16 @@ const isMounted = ref(true)
 // API请求取消控制器
 const abortController = ref(new AbortController())
 
+// 计算属性：隐藏管理后台按钮（反转 showAdminButton 的值）
+const hideAdminButton = computed({
+  get() {
+    return !oemSettings.value.showAdminButton
+  },
+  set(value) {
+    oemSettings.value.showAdminButton = !value
+  }
+})
+
 // URL 验证状态
 const urlError = ref(false)
 const urlValid = ref(false)
@@ -1286,7 +1472,8 @@ const saveOemSettings = async () => {
     const settings = {
       siteName: oemSettings.value.siteName,
       siteIcon: oemSettings.value.siteIcon,
-      siteIconData: oemSettings.value.siteIconData
+      siteIconData: oemSettings.value.siteIconData,
+      showAdminButton: oemSettings.value.showAdminButton
     }
     const result = await settingsStore.saveOemSettings(settings)
     if (result && result.success) {

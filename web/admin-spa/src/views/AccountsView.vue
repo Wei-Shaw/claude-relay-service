@@ -272,7 +272,12 @@
                       >
                         <i class="fas fa-share-alt mr-1" />共享
                       </span>
-                      <!-- 显示所有分组 -->
+                    </div>
+                    <!-- 显示所有分组 - 换行显示 -->
+                    <div
+                      v-if="account.groupInfos && account.groupInfos.length > 0"
+                      class="flex items-center gap-2"
+                    >
                       <span
                         v-for="group in account.groupInfos"
                         :key="group.id"
@@ -424,7 +429,7 @@
                         typeof account.rateLimitStatus === 'object' &&
                         account.rateLimitStatus.minutesRemaining > 0
                       "
-                      >({{ account.rateLimitStatus.minutesRemaining }}分钟)</span
+                      >({{ formatRateLimitTime(account.rateLimitStatus.minutesRemaining) }})</span
                     >
                   </span>
                   <span
@@ -636,7 +641,9 @@
                 <div class="flex flex-wrap items-center gap-1">
                   <button
                     v-if="
-                      account.platform === 'claude' &&
+                      (account.platform === 'claude' ||
+                        account.platform === 'claude-console' ||
+                        account.platform === 'openai') &&
                       (account.status === 'unauthorized' ||
                         account.status !== 'active' ||
                         account.rateLimitStatus?.isRateLimited ||
@@ -1336,7 +1343,7 @@ const loadApiKeys = async (forceReload = false) => {
       apiKeysLoaded.value = true
     }
   } catch (error) {
-    console.error('Failed to load API keys:', error)
+    // 静默处理错误
   }
 }
 
@@ -1353,7 +1360,7 @@ const loadAccountGroups = async (forceReload = false) => {
       groupsLoaded.value = true
     }
   } catch (error) {
-    console.error('Failed to load account groups:', error)
+    // 静默处理错误
   }
 }
 
@@ -1424,6 +1431,38 @@ const formatRemainingTime = (minutes) => {
     return `${hours}小时${mins}分钟`
   }
   return `${mins}分钟`
+}
+
+// 格式化限流时间（支持显示天数）
+const formatRateLimitTime = (minutes) => {
+  if (!minutes || minutes <= 0) return ''
+
+  // 转换为整数，避免小数
+  minutes = Math.floor(minutes)
+
+  // 计算天数、小时和分钟
+  const days = Math.floor(minutes / 1440) // 1天 = 1440分钟
+  const remainingAfterDays = minutes % 1440
+  const hours = Math.floor(remainingAfterDays / 60)
+  const mins = remainingAfterDays % 60
+
+  // 根据时间长度返回不同格式
+  if (days > 0) {
+    // 超过1天，显示天数和小时
+    if (hours > 0) {
+      return `${days}天${hours}小时`
+    }
+    return `${days}天`
+  } else if (hours > 0) {
+    // 超过1小时但不到1天，显示小时和分钟
+    if (mins > 0) {
+      return `${hours}小时${mins}分钟`
+    }
+    return `${hours}小时`
+  } else {
+    // 不到1小时，只显示分钟
+    return `${mins}分钟`
+  }
 }
 
 // 打开创建账户模态框
@@ -1515,7 +1554,22 @@ const resetAccountStatus = async (account) => {
 
   try {
     account.isResetting = true
-    const data = await apiClient.post(`/admin/claude-accounts/${account.id}/reset-status`)
+
+    // 根据账户平台选择不同的 API 端点
+    let endpoint = ''
+    if (account.platform === 'openai') {
+      endpoint = `/admin/openai-accounts/${account.id}/reset-status`
+    } else if (account.platform === 'claude') {
+      endpoint = `/admin/claude-accounts/${account.id}/reset-status`
+    } else if (account.platform === 'claude-console') {
+      endpoint = `/admin/claude-console-accounts/${account.id}/reset-status`
+    } else {
+      showToast('不支持的账户类型', 'error')
+      account.isResetting = false
+      return
+    }
+
+    const data = await apiClient.post(endpoint)
 
     if (data.success) {
       showToast('账户状态已重置', 'success')
@@ -1621,13 +1675,7 @@ const getClaudeAccountType = (account) => {
           ? JSON.parse(account.subscriptionInfo)
           : account.subscriptionInfo
 
-      // 添加调试日志
-      console.log('Account subscription info:', {
-        accountName: account.name,
-        subscriptionInfo: info,
-        hasClaudeMax: info.hasClaudeMax,
-        hasClaudePro: info.hasClaudePro
-      })
+      // 订阅信息已解析
 
       // 根据 has_claude_max 和 has_claude_pro 判断
       if (info.hasClaudeMax === true) {
@@ -1639,13 +1687,11 @@ const getClaudeAccountType = (account) => {
       }
     } catch (e) {
       // 解析失败，返回默认值
-      console.error('Failed to parse subscription info:', e)
       return 'Claude'
     }
   }
 
   // 没有订阅信息，保持原有显示
-  console.log('No subscription info for account:', account.name)
   return 'Claude'
 }
 

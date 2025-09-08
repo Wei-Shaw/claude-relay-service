@@ -375,6 +375,7 @@ class WebhookService {
       quotaWarning: '📊 配额警告',
       systemError: '❌ 系统错误',
       securityAlert: '🔒 安全警报',
+      rateLimitRecovery: '🎉 限流恢复通知',
       test: '🧪 测试通知'
     }
 
@@ -390,6 +391,7 @@ class WebhookService {
       quotaWarning: 'active',
       systemError: 'critical',
       securityAlert: 'critical',
+      rateLimitRecovery: 'active',
       test: 'passive'
     }
 
@@ -405,6 +407,7 @@ class WebhookService {
       quotaWarning: 'bell',
       systemError: 'alert',
       securityAlert: 'alarm',
+      rateLimitRecovery: 'success',
       test: 'default'
     }
 
@@ -468,6 +471,14 @@ class WebhookService {
 
     if (data.platform) {
       lines.push(`**平台**: ${data.platform}`)
+    }
+
+    if (data.platforms) {
+      lines.push(`**涉及平台**: ${data.platforms.join(', ')}`)
+    }
+
+    if (data.totalAccounts) {
+      lines.push(`**恢复账户数**: ${data.totalAccounts}`)
     }
 
     if (data.status) {
@@ -539,6 +550,7 @@ class WebhookService {
       quotaWarning: 'yellow',
       systemError: 'red',
       securityAlert: 'red',
+      rateLimitRecovery: 'green',
       test: 'blue'
     }
 
@@ -554,6 +566,7 @@ class WebhookService {
       quotaWarning: ':chart_with_downwards_trend:',
       systemError: ':x:',
       securityAlert: ':lock:',
+      rateLimitRecovery: ':tada:',
       test: ':test_tube:'
     }
 
@@ -569,6 +582,7 @@ class WebhookService {
       quotaWarning: 0xffeb3b, // 黄色
       systemError: 0xf44336, // 红色
       securityAlert: 0xf44336, // 红色
+      rateLimitRecovery: 0x4caf50, // 绿色
       test: 0x2196f3 // 蓝色
     }
 

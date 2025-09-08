@@ -31,8 +31,8 @@ router.post('/api/get-key-id', async (req, res) => {
       })
     }
 
-    // 验证API Key
-    const validation = await apiKeyService.validateApiKey(apiKey)
+    // 验证API Key（使用不触发激活的验证方法）
+    const validation = await apiKeyService.validateApiKeyForStats(apiKey)
 
     if (!validation.valid) {
       const clientIP = req.ip || req.connection?.remoteAddress || 'unknown'
@@ -146,6 +146,11 @@ router.post('/api/user-stats', async (req, res) => {
         enableClientRestriction: keyData.enableClientRestriction === 'true',
         allowedClients,
         permissions: keyData.permissions || 'all',
+        // 添加激活相关字段
+        expirationMode: keyData.expirationMode || 'fixed',
+        isActivated: keyData.isActivated === 'true',
+        activationDays: parseInt(keyData.activationDays || 0),
+        activatedAt: keyData.activatedAt || null,
         usage // 使用完整的 usage 数据，而不是只有 total
       }
     } else if (apiKey) {
@@ -158,8 +163,8 @@ router.post('/api/user-stats', async (req, res) => {
         })
       }
 
-      // 验证API Key（重用现有的验证逻辑）
-      const validation = await apiKeyService.validateApiKey(apiKey)
+      // 验证API Key（使用不触发激活的验证方法）
+      const validation = await apiKeyService.validateApiKeyForStats(apiKey)
 
       if (!validation.valid) {
         const clientIP = req.ip || req.connection?.remoteAddress || 'unknown'
@@ -335,6 +340,11 @@ router.post('/api/user-stats', async (req, res) => {
       isActive: true, // 如果能通过validateApiKey验证，说明一定是激活的
       createdAt: keyData.createdAt,
       expiresAt: keyData.expiresAt,
+      // 添加激活相关字段
+      expirationMode: keyData.expirationMode || 'fixed',
+      isActivated: keyData.isActivated === 'true',
+      activationDays: parseInt(keyData.activationDays || 0),
+      activatedAt: keyData.activatedAt || null,
       permissions: fullKeyData.permissions,
 
       // 使用统计（使用验证结果中的完整数据）
