@@ -1358,7 +1358,8 @@ class RedisClient {
   // 🔗 会话sticky映射管理
   async setSessionAccountMapping(sessionHash, accountId, ttl = null) {
     const appConfig = require('../../config/config')
-    const defaultTTL = ttl !== null ? ttl : (appConfig.session?.stickyTtlDays || 15) * 24 * 60 * 60
+    // 从配置读取TTL（小时），转换为秒，默认1小时
+    const defaultTTL = ttl !== null ? ttl : (appConfig.session?.stickyTtlHours || 1) * 60 * 60
     const key = `sticky_session:${sessionHash}`
     await this.client.set(key, accountId, 'EX', defaultTTL)
   }
@@ -1374,11 +1375,16 @@ class RedisClient {
     const key = `sticky_session:${sessionHash}`
 
     // 📊 从配置获取参数
-    const ttlDays = appConfig.session?.stickyTtlDays || 15
-    const thresholdDays = appConfig.session?.renewalThresholdDays || 14
+    const ttlHours = appConfig.session?.stickyTtlHours || 1 // 小时，默认1小时
+    const thresholdMinutes = appConfig.session?.renewalThresholdMinutes || 0 // 分钟，默认0（不续期）
 
-    const fullTTL = ttlDays * 24 * 60 * 60 // 转换为秒
-    const renewalThreshold = thresholdDays * 24 * 60 * 60 // 转换为秒
+    // 如果阈值为0，不执行续期
+    if (thresholdMinutes === 0) {
+      return true
+    }
+
+    const fullTTL = ttlHours * 60 * 60 // 转换为秒
+    const renewalThreshold = thresholdMinutes * 60 // 转换为秒
 
     try {
       // 获取当前剩余TTL（秒）
@@ -1398,14 +1404,14 @@ class RedisClient {
       if (remainingTTL < renewalThreshold) {
         await this.client.expire(key, fullTTL)
         logger.debug(
-          `🔄 Renewed sticky session TTL: ${sessionHash} (was ${Math.round(remainingTTL / 24 / 3600)}d, renewed to ${ttlDays}d)`
+          `🔄 Renewed sticky session TTL: ${sessionHash} (was ${Math.round(remainingTTL / 60)}min, renewed to ${ttlHours}h)`
         )
         return true
       }
 
       // 剩余时间充足，无需续期
       logger.debug(
-        `✅ Sticky session TTL sufficient: ${sessionHash} (remaining ${Math.round(remainingTTL / 24 / 3600)}d)`
+        `✅ Sticky session TTL sufficient: ${sessionHash} (remaining ${Math.round(remainingTTL / 60)}min)`
       )
       return true
     } catch (error) {

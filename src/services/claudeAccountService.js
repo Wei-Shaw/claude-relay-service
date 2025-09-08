@@ -3,8 +3,8 @@ const crypto = require('crypto')
 const ProxyHelper = require('../utils/proxyHelper')
 const axios = require('axios')
 const redis = require('../models/redis')
-const logger = require('../utils/logger')
 const config = require('../../config/config')
+const logger = require('../utils/logger')
 const { maskToken } = require('../utils/tokenMask')
 const {
   logRefreshStart,
@@ -723,7 +723,9 @@ class ClaudeAccountService {
 
       // 如果有会话哈希，建立新的映射
       if (sessionHash) {
-        await redis.setSessionAccountMapping(sessionHash, selectedAccountId, 3600) // 1小时过期
+        // 从配置获取TTL（小时），转换为秒
+        const ttlSeconds = (config.session?.stickyTtlHours || 1) * 60 * 60
+        await redis.setSessionAccountMapping(sessionHash, selectedAccountId, ttlSeconds)
         logger.info(
           `🎯 Created new sticky session mapping: ${sortedAccounts[0].name} (${selectedAccountId}) for session ${sessionHash}`
         )
@@ -877,7 +879,9 @@ class ClaudeAccountService {
 
       // 如果有会话哈希，建立新的映射
       if (sessionHash) {
-        await redis.setSessionAccountMapping(sessionHash, selectedAccountId, 3600) // 1小时过期
+        // 从配置获取TTL（小时），转换为秒
+        const ttlSeconds = (config.session?.stickyTtlHours || 1) * 60 * 60
+        await redis.setSessionAccountMapping(sessionHash, selectedAccountId, ttlSeconds)
         logger.info(
           `🎯 Created new sticky session mapping for shared account: ${candidateAccounts[0].name} (${selectedAccountId}) for session ${sessionHash}`
         )
