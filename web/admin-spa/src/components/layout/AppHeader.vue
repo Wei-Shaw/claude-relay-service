@@ -38,6 +38,11 @@
       </div>
       <!-- 主题切换和用户菜单 -->
       <div class="flex items-center gap-2 sm:gap-4">
+        <!-- 语言切换按钮 -->
+        <div class="flex items-center">
+          <LanguageSwitch mode="dropdown" size="medium" />
+        </div>
+
         <!-- 主题切换按钮 -->
         <div class="flex items-center">
           <ThemeToggle mode="dropdown" />
@@ -273,6 +278,7 @@ import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
 import LogoTitle from '@/components/common/LogoTitle.vue'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
+import LanguageSwitch from '@/components/common/LanguageSwitch.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
