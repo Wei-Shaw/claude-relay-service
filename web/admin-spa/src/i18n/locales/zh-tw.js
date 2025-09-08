@@ -9,7 +9,8 @@ export default {
     create: '建立',
     update: '更新',
     search: '搜尋',
-    reset: '重置'
+    reset: '重置',
+    locale: 'zh-TW'
   },
   language: {
     zh: '簡體中文',
@@ -33,6 +34,131 @@ export default {
     tutorial: '使用教學',
     timeRange: '統計時間範圍',
     today: '今日',
-    thisMonth: '本月'
+    thisMonth: '本月',
+    
+    // API Key Input
+    usageStatsQuery: '使用統計查詢',
+    apiKeyDescription: '查詢您的 API Key 使用情況和統計資料',
+    enterApiKey: '輸入您的 API Key',
+    enterApiKeys: '輸入您的 API Keys（每行一個或用逗號分隔）',
+    singleMode: '單一',
+    aggregateMode: '彙整',
+    singleModeTitle: '單一模式',
+    aggregateModeTitle: '彙整模式',
+    queryButton: '查詢',
+    
+    // Stats Overview
+    batchQuerySummary: '批次查詢概要',
+    apiKeyInfo: 'API Key 資訊',
+    queryKeysCount: '查詢 Keys 數',
+    activeKeysCount: '有效 Keys 數',
+    invalidKeysCount: '無效 Keys 數',
+    totalRequests: '總請求數',
+    totalTokens: '總 Token 數',
+    totalCost: '總費用',
+    individual: '個',
+    
+    // Aggregated Stats Card
+    usageRatio: '使用占比',
+    requests: '次',
+    otherKeys: '其他',
+    keys: 'Keys',
+    
+    // Model Usage Stats
+    modelUsageStats: '模型使用統計',
+    loadingModelStats: '載入模型統計資料中...',
+    requestCount: '次請求',
+    totalCost: '總費用',
+    inputTokens: '輸入 Token',
+    outputTokens: '輸出 Token',
+    cacheCreateTokens: '快取建立',
+    cacheReadTokens: '快取讀取',
+    noModelData: '暫無{period}模型使用資料',
+    
+    // Token Distribution
+    tokenDistribution: 'Token 使用分佈',
+    inputToken: '輸入 Token',
+    outputToken: '輸出 Token',
+    cacheCreateToken: '快取建立 Token',
+    cacheReadToken: '快取讀取 Token',
+    
+    // Limit Config
+    limitConfig: '限制設定',
+    limitConfigAggregate: '限制設定（彙整查詢模式）',
+    apiKeysOverview: 'API Keys 概況',
+    totalKeys: '總計 Keys',
+    activeKeys: '啟用 Keys',
+    aggregatedStats: '彙整統計',
+    dailyLimit: '日限制',
+    monthlyLimit: '月限制',
+    usageToday: '今日使用',
+    usageThisMonth: '本月使用',
+    remaining: '剩餘',
+    
+    // Stats Overview - Additional keys
+    name: '名稱',
+    status: '狀態',
+    permissions: '權限',
+    createdAt: '建立時間',
+    expiresAt: '過期時間',
+    active: '活躍',
+    inactive: '已停用',
+    notActivated: '未啓動',
+    expired: '已過期',
+    neverExpires: '永不過期',
+    allModels: '全部模型',
+    unknown: '未知',
+    none: '無',
+    formatError: '格式錯誤',
+    usageStatsOverview: '使用統計概覽',
+    keyContribution: '各 Key 貢獻占比',
+    firstUseDays: '首次使用後{days}天過期',
+    todayRequests: '今日請求數',
+    todayTokens: '今日Token數',
+    todayCost: '今日費用',
+    todayInputTokens: '今日輸入Token',
+    monthlyRequests: '本月請求數',
+    monthlyTokens: '本月Token數',
+    monthlyCost: '本月費用',
+    monthlyInputTokens: '本月輸入Token',
+    
+    // Limit Config - Additional keys
+    dailyCostLimit: '每日費用限制',
+    concurrencyLimit: '並發限制',
+    modelLimit: '模型限制',
+    clientLimit: '用戶端限制',
+    restrictedModelsCount: '限制 {count} 個模型',
+    allowAllModels: '允許所有模型',
+    restrictedClientsCount: '限制 {count} 個用戶端',
+    allowAllClients: '允許所有用戶端',
+    detailedLimitInfo: '詳細限制資訊',
+    restrictedModelsList: '受限模型清單',
+    restrictedModelsNote: '此 API Key 不能存取以上列出的模型',
+    allowedClientsList: '允許的用戶端',
+    allowedClientsNote: '此 API Key 只能被以上列出的用戶端使用',
+    timeWindowLimit: '時間視窗限制',
+    aggregateStatsNote: '每個 API Key 有獨立的限制設定，彙整模式下不顯示單個限制配置',
+    aggregateStatsSummary: '彙整統計摘要',
+    invalidKeysCount: '{count} 個無效的 API Key',
+    orRelationshipRequests: '請求次數和費用限制為「或」的關係，任一達到限制即觸發限流',
+    orRelationshipTokens: '請求次數和Token使用量為「或」的關係，任一達到限制即觸發限流',
+    onlyRequestsLimit: '僅限制請求次數',
+    
+    // Token Distribution - Additional keys
+    totalAmount: '總計',
+    todayTotal: '今日總計',
+    monthlyTotal: '本月總計',
+    
+    // Additional missing keys
+    usageRatioOnlyInMultiMode: '使用占比僅在多Key查詢時顯示',
+    noData: '暫無資料',
+    
+    // ApiKeyInput placeholders and texts
+    apiKeyPlaceholder: '請輸入您的 API Key (cr_...)',
+    apiKeysPlaceholder: '請輸入您的 API Keys，支援以下格式：\ncr_xxx\ncr_yyy\n或\ncr_xxx, cr_yyy',
+    clearInput: '清空輸入',
+    securityNoticeSingle: '您的 API Key 僅用於查詢自己的統計資料，不會被儲存或用於其他用途',
+    securityNoticeMulti: '您的 API Keys 僅用於查詢統計資料，不會被儲存。彙整模式下部分個體化資訊將不顯示。',
+    multiKeyTip: '提示：最多支援同時查詢 30 個 API Keys。使用 Ctrl+Enter 快速查詢。'
   }
 }
