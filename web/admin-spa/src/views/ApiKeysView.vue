@@ -86,7 +86,7 @@
                   range-separator="至"
                   size="small"
                   start-placeholder="开始日期"
-                  style="width: 320px"
+                  style="width: 320px; height: 38px"
                   type="datetimerange"
                   :unlink-panels="false"
                   value-format="YYYY-MM-DD HH:mm:ss"
@@ -253,7 +253,7 @@
                       </div>
                     </th>
                     <th
-                      class="w-[18%] min-w-[140px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                      class="w-[14%] min-w-[120px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                       @click="sortApiKeys('name')"
                     >
                       名称
@@ -268,12 +268,17 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
+                      class="w-[15%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      所属账号
+                    </th>
+                    <th
                       class="w-[10%] min-w-[80px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                     >
                       标签
                     </th>
                     <th
-                      class="w-[8%] min-w-[70px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                      class="w-[6%] min-w-[60px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                       @click="sortApiKeys('status')"
                     >
                       状态
@@ -288,22 +293,7 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[6%] min-w-[60px] cursor-pointer px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
-                      @click="sortApiKeys('periodRequests')"
-                    >
-                      请求数
-                      <i
-                        v-if="apiKeysSortBy === 'periodRequests'"
-                        :class="[
-                          'fas',
-                          apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down',
-                          'ml-1'
-                        ]"
-                      />
-                      <i v-else class="fas fa-sort ml-1 text-gray-400" />
-                    </th>
-                    <th
-                      class="w-[6%] min-w-[60px] cursor-pointer px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                      class="w-[8%] min-w-[60px] cursor-pointer px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                       @click="sortApiKeys('periodCost')"
                     >
                       费用
@@ -318,12 +308,27 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[7%] min-w-[70px] cursor-pointer px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                      class="w-[8%] min-w-[60px] cursor-pointer px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                       @click="sortApiKeys('periodTokens')"
                     >
-                      Token数
+                      Token
                       <i
                         v-if="apiKeysSortBy === 'periodTokens'"
+                        :class="[
+                          'fas',
+                          apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down',
+                          'ml-1'
+                        ]"
+                      />
+                      <i v-else class="fas fa-sort ml-1 text-gray-400" />
+                    </th>
+                    <th
+                      class="w-[8%] min-w-[60px] cursor-pointer px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                      @click="sortApiKeys('periodRequests')"
+                    >
+                      请求数
+                      <i
+                        v-if="apiKeysSortBy === 'periodRequests'"
                         :class="[
                           'fas',
                           apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down',
@@ -348,7 +353,7 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[10%] min-w-[90px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                      class="w-[9%] min-w-[80px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                       @click="sortApiKeys('createdAt')"
                     >
                       创建时间
@@ -363,7 +368,7 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[10%] min-w-[90px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                      class="w-[9%] min-w-[80px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                       @click="sortApiKeys('expiresAt')"
                     >
                       过期时间
@@ -378,7 +383,7 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[20%] min-w-[180px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                      class="w-[27%] min-w-[180px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                     >
                       操作
                     </th>
@@ -401,212 +406,94 @@
                       </td>
                       <td class="px-3 py-1.5">
                         <div class="min-w-0">
-                          <div class="flex items-start gap-2.5">
-                            <!-- API Key 图标 -->
-                            <IconPicker
-                              v-model="key.icon"
-                              class="mt-0.5"
-                              size="small"
-                              @update:model-value="(val) => updateApiKeyIcon(key.id, val)"
-                            />
-                            <div class="min-w-0 flex-1">
-                              <!-- 名称 -->
-                              <div
-                                class="truncate text-sm font-semibold text-gray-900 dark:text-gray-100"
-                                :title="key.name"
-                              >
-                                {{ key.name }}
-                              </div>
-                              <!-- 次要信息显示：所属账号 -->
-                              <div class="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">
-                                <!-- Claude OAuth 账号 -->
-                                <span
-                                  v-if="
-                                    key.claudeAccountId && !key.claudeAccountId.startsWith('group:')
-                                  "
-                                  class="inline-flex items-center gap-1"
-                                >
-                                  <i class="fas fa-robot text-[9px] text-blue-500" />
-                                  <span>{{
-                                    getClaudeBindingInfo(key)
-                                      .replace(/^🔒\s*专属-/, '')
-                                      .replace(/^⚠️\s*/, '')
-                                  }}</span>
-                                </span>
-                                <!-- Claude Console 账号 -->
-                                <span
-                                  v-else-if="key.claudeConsoleAccountId"
-                                  class="inline-flex items-center gap-1"
-                                >
-                                  <i class="fas fa-terminal text-[9px] text-purple-500" />
-                                  <span>{{
-                                    getClaudeBindingInfo(key)
-                                      .replace(/^🔒\s*专属-/, '')
-                                      .replace(/^⚠️\s*/, '')
-                                  }}</span>
-                                </span>
-                                <!-- Claude 分组 -->
-                                <span
-                                  v-else-if="
-                                    key.claudeAccountId && key.claudeAccountId.startsWith('group:')
-                                  "
-                                  class="inline-flex items-center gap-1"
-                                >
-                                  <i class="fas fa-layer-group text-[9px] text-blue-500" />
-                                  <span>{{ getClaudeBindingInfo(key) }}</span>
-                                </span>
-                                <!-- Gemini 账号 -->
-                                <span
-                                  v-else-if="
-                                    key.geminiAccountId && !key.geminiAccountId.startsWith('group:')
-                                  "
-                                  class="inline-flex items-center gap-1"
-                                >
-                                  <i class="fas fa-gem text-[9px] text-green-500" />
-                                  <span>{{
-                                    getGeminiBindingInfo(key)
-                                      .replace(/^🔒\s*专属-/, '')
-                                      .replace(/^⚠️\s*/, '')
-                                  }}</span>
-                                </span>
-                                <!-- Gemini 分组 -->
-                                <span
-                                  v-else-if="
-                                    key.geminiAccountId && key.geminiAccountId.startsWith('group:')
-                                  "
-                                  class="inline-flex items-center gap-1"
-                                >
-                                  <i class="fas fa-layer-group text-[9px] text-green-500" />
-                                  <span>{{ getGeminiBindingInfo(key) }}</span>
-                                </span>
-                                <!-- OpenAI 账号 -->
-                                <span
-                                  v-else-if="
-                                    key.openaiAccountId && !key.openaiAccountId.startsWith('group:')
-                                  "
-                                  class="inline-flex items-center gap-1"
-                                >
-                                  <i class="fas fa-brain text-[9px] text-orange-500" />
-                                  <span>{{
-                                    getOpenAIBindingInfo(key)
-                                      .replace(/^🔒\s*专属-/, '')
-                                      .replace(/^⚠️\s*/, '')
-                                  }}</span>
-                                </span>
-                                <!-- OpenAI 分组 -->
-                                <span
-                                  v-else-if="
-                                    key.openaiAccountId && key.openaiAccountId.startsWith('group:')
-                                  "
-                                  class="inline-flex items-center gap-1"
-                                >
-                                  <i class="fas fa-layer-group text-[9px] text-orange-500" />
-                                  <span>{{ getOpenAIBindingInfo(key) }}</span>
-                                </span>
-                                <!-- Bedrock 账号 -->
-                                <span
-                                  v-else-if="
-                                    key.bedrockAccountId &&
-                                    !key.bedrockAccountId.startsWith('group:')
-                                  "
-                                  class="inline-flex items-center gap-1"
-                                >
-                                  <i class="fas fa-cube text-[9px] text-indigo-500" />
-                                  <span>{{
-                                    getBedrockBindingInfo(key)
-                                      .replace(/^🔒\s*专属-/, '')
-                                      .replace(/^⚠️\s*/, '')
-                                  }}</span>
-                                </span>
-                                <!-- Bedrock 分组 -->
-                                <span
-                                  v-else-if="
-                                    key.bedrockAccountId &&
-                                    key.bedrockAccountId.startsWith('group:')
-                                  "
-                                  class="inline-flex items-center gap-1"
-                                >
-                                  <i class="fas fa-layer-group text-[9px] text-indigo-500" />
-                                  <span>{{ getBedrockBindingInfo(key) }}</span>
-                                </span>
-                                <!-- 共享池 -->
-                                <span
-                                  v-else
-                                  class="inline-flex items-center gap-1 text-gray-400 dark:text-gray-500"
-                                >
-                                  <i class="fas fa-share-alt text-[9px]" />
-                                  <span>共享池</span>
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          <!-- 账户绑定信息 -->
-                          <div class="mt-1.5 space-y-1 pl-12">
-                            <!-- Claude 绑定 -->
-                            <div
-                              v-if="key.claudeAccountId || key.claudeConsoleAccountId"
-                              class="flex items-center gap-1 text-xs"
-                            >
-                              <span
-                                class="inline-flex items-center rounded bg-indigo-100 px-1.5 py-0.5 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
-                              >
-                                <i class="fas fa-brain mr-1 text-[10px]" />
-                                Claude
-                              </span>
-                              <span class="truncate text-gray-600 dark:text-gray-400">
-                                {{ getClaudeBindingInfo(key) }}
-                              </span>
-                            </div>
-                            <!-- Gemini 绑定 -->
-                            <div v-if="key.geminiAccountId" class="flex items-center gap-1 text-xs">
-                              <span
-                                class="inline-flex items-center rounded bg-yellow-100 px-1.5 py-0.5 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
-                              >
-                                <i class="fas fa-robot mr-1 text-[10px]" />
-                                Gemini
-                              </span>
-                              <span class="truncate text-gray-600 dark:text-gray-400">
-                                {{ getGeminiBindingInfo(key) }}
-                              </span>
-                            </div>
-                            <!-- OpenAI 绑定 -->
-                            <div v-if="key.openaiAccountId" class="flex items-center gap-1 text-xs">
-                              <span
-                                class="inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
-                              >
-                                <i class="fa-openai mr-1 text-[10px]" />
-                                OpenAI
-                              </span>
-                              <span class="truncate text-gray-600 dark:text-gray-400">
-                                {{ getOpenAIBindingInfo(key) }}
-                              </span>
-                            </div>
-                            <!-- Bedrock 绑定 -->
-                            <div
-                              v-if="key.bedrockAccountId"
-                              class="flex items-center gap-1 text-xs"
-                            >
-                              <span
-                                class="inline-flex items-center rounded bg-orange-100 px-1.5 py-0.5 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
-                              >
-                                <i class="fas fa-cloud mr-1 text-[10px]" />
-                                Bedrock
-                              </span>
-                              <span class="truncate text-gray-600 dark:text-gray-400">
-                                {{ getBedrockBindingInfo(key) }}
-                              </span>
-                            </div>
+                          <!-- 名称 -->
+                          <div
+                            class="truncate text-sm font-semibold text-gray-900 dark:text-gray-100"
+                            :title="key.name"
+                          >
+                            {{ key.name }}
                           </div>
                           <!-- 显示所有者信息 -->
                           <div
                             v-if="isLdapEnabled && key.ownerDisplayName"
-                            class="mt-1 pl-12 text-xs text-red-600"
+                            class="mt-1 text-xs text-red-600"
                           >
                             <i class="fas fa-user mr-1" />
                             {{ key.ownerDisplayName }}
                           </div>
                         </div>
                       </td>
+                      <!-- 所属账号列 -->
+                      <td class="px-3 py-1.5">
+                        <div class="space-y-1">
+                          <!-- Claude 绑定 -->
+                          <div
+                            v-if="key.claudeAccountId || key.claudeConsoleAccountId"
+                            class="flex items-center gap-1 text-xs"
+                          >
+                            <span
+                              class="inline-flex items-center rounded bg-indigo-100 px-1.5 py-0.5 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+                            >
+                              <i class="fas fa-brain mr-1 text-[10px]" />
+                              Claude
+                            </span>
+                            <span class="truncate text-gray-600 dark:text-gray-400">
+                              {{ getClaudeBindingInfo(key) }}
+                            </span>
+                          </div>
+                          <!-- Gemini 绑定 -->
+                          <div v-if="key.geminiAccountId" class="flex items-center gap-1 text-xs">
+                            <span
+                              class="inline-flex items-center rounded bg-yellow-100 px-1.5 py-0.5 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
+                            >
+                              <i class="fas fa-robot mr-1 text-[10px]" />
+                              Gemini
+                            </span>
+                            <span class="truncate text-gray-600 dark:text-gray-400">
+                              {{ getGeminiBindingInfo(key) }}
+                            </span>
+                          </div>
+                          <!-- OpenAI 绑定 -->
+                          <div v-if="key.openaiAccountId" class="flex items-center gap-1 text-xs">
+                            <span
+                              class="inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
+                            >
+                              <i class="fa-openai mr-1 text-[10px]" />
+                              OpenAI
+                            </span>
+                            <span class="truncate text-gray-600 dark:text-gray-400">
+                              {{ getOpenAIBindingInfo(key) }}
+                            </span>
+                          </div>
+                          <!-- Bedrock 绑定 -->
+                          <div v-if="key.bedrockAccountId" class="flex items-center gap-1 text-xs">
+                            <span
+                              class="inline-flex items-center rounded bg-orange-100 px-1.5 py-0.5 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
+                            >
+                              <i class="fas fa-cloud mr-1 text-[10px]" />
+                              Bedrock
+                            </span>
+                            <span class="truncate text-gray-600 dark:text-gray-400">
+                              {{ getBedrockBindingInfo(key) }}
+                            </span>
+                          </div>
+                          <!-- 共享池 -->
+                          <div
+                            v-if="
+                              !key.claudeAccountId &&
+                              !key.claudeConsoleAccountId &&
+                              !key.geminiAccountId &&
+                              !key.openaiAccountId &&
+                              !key.bedrockAccountId
+                            "
+                            class="text-xs text-gray-500 dark:text-gray-400"
+                          >
+                            <i class="fas fa-share-alt mr-1" />
+                            共享池
+                          </div>
+                        </div>
+                      </td>
+                      <!-- 标签列 -->
                       <td class="px-3 py-1.5">
                         <div class="flex flex-wrap gap-1">
                           <span
@@ -641,20 +528,14 @@
                           {{ key.isActive ? '活跃' : '禁用' }}
                         </span>
                       </td>
-                      <!-- 请求数 -->
-                      <td class="whitespace-nowrap px-3 py-1.5 text-right text-sm">
-                        <div class="flex items-center justify-end gap-1">
-                          <span class="font-medium text-gray-900 dark:text-gray-100">
-                            {{ formatNumber(getPeriodRequests(key)) }}
-                          </span>
-                          <span class="text-xs text-gray-500">次</span>
-                        </div>
-                      </td>
                       <!-- 费用 -->
-                      <td class="whitespace-nowrap px-3 py-1.5 text-right text-sm">
+                      <td class="whitespace-nowrap px-3 py-1.5 text-right" style="font-size: 13px">
                         <div class="space-y-2">
-                          <span class="font-medium text-blue-600 dark:text-blue-400">
-                            ${{ getPeriodCost(key).toFixed(4) }}
+                          <span
+                            class="font-medium text-blue-600 dark:text-blue-400"
+                            style="font-size: 13px"
+                          >
+                            ${{ getPeriodCost(key).toFixed(2) }}
                           </span>
 
                           <!-- 每日费用限制进度条 -->
@@ -714,40 +595,61 @@
                         </div>
                       </td>
                       <!-- Token数量 -->
-                      <td class="whitespace-nowrap px-3 py-1.5 text-right text-sm">
+                      <td class="whitespace-nowrap px-3 py-1.5 text-right" style="font-size: 13px">
                         <div class="flex items-center justify-end gap-1">
-                          <span class="font-medium text-purple-600 dark:text-purple-400">
+                          <span
+                            class="font-medium text-purple-600 dark:text-purple-400"
+                            style="font-size: 13px"
+                          >
                             {{ formatTokenCount(getPeriodTokens(key)) }}
                           </span>
                         </div>
                       </td>
+                      <!-- 请求数 -->
+                      <td class="whitespace-nowrap px-3 py-1.5 text-right" style="font-size: 13px">
+                        <div class="flex items-center justify-end gap-1">
+                          <span
+                            class="font-medium text-gray-900 dark:text-gray-100"
+                            style="font-size: 13px"
+                          >
+                            {{ formatNumber(getPeriodRequests(key)) }}
+                          </span>
+                          <span class="text-xs text-gray-500">次</span>
+                        </div>
+                      </td>
                       <!-- 最后使用 -->
                       <td
-                        class="whitespace-nowrap px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300"
+                        class="whitespace-nowrap px-3 py-1.5 text-gray-700 dark:text-gray-300"
+                        style="font-size: 13px"
                       >
                         <span
                           v-if="key.lastUsedAt"
                           class="cursor-help"
+                          style="font-size: 13px"
                           :title="new Date(key.lastUsedAt).toLocaleString('zh-CN')"
                         >
                           {{ formatLastUsed(key.lastUsedAt) }}
                         </span>
-                        <span v-else class="text-gray-400">从未使用</span>
+                        <span v-else class="text-gray-400" style="font-size: 13px">从未使用</span>
                       </td>
                       <!-- 创建时间 -->
                       <td
-                        class="whitespace-nowrap px-3 py-1.5 text-sm text-gray-500 dark:text-gray-400"
+                        class="whitespace-nowrap px-3 py-1.5 text-gray-700 dark:text-gray-300"
+                        style="font-size: 13px"
                       >
                         {{ new Date(key.createdAt).toLocaleDateString() }}
                       </td>
-                      <td class="whitespace-nowrap px-3 py-1.5 text-sm">
+                      <td
+                        class="whitespace-nowrap px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300"
+                      >
                         <div class="inline-flex items-center gap-1.5">
                           <!-- 未激活状态 -->
                           <span
                             v-if="key.expirationMode === 'activation' && !key.isActivated"
                             class="inline-flex items-center text-blue-600 dark:text-blue-400"
+                            style="font-size: 13px"
                           >
-                            <i class="fas fa-pause-circle mr-1" />
+                            <i class="fas fa-pause-circle mr-1 text-xs" />
                             未激活 ({{ key.activationDays || 30 }}天)
                           </span>
                           <!-- 已设置过期时间 -->
@@ -755,22 +657,25 @@
                             <span
                               v-if="isApiKeyExpired(key.expiresAt)"
                               class="inline-flex cursor-pointer items-center text-red-600 hover:underline"
+                              style="font-size: 13px"
                               @click.stop="startEditExpiry(key)"
                             >
-                              <i class="fas fa-exclamation-circle mr-1" />
+                              <i class="fas fa-exclamation-circle mr-1 text-xs" />
                               已过期
                             </span>
                             <span
                               v-else-if="isApiKeyExpiringSoon(key.expiresAt)"
                               class="inline-flex cursor-pointer items-center text-orange-600 hover:underline"
+                              style="font-size: 13px"
                               @click.stop="startEditExpiry(key)"
                             >
-                              <i class="fas fa-clock mr-1" />
+                              <i class="fas fa-clock mr-1 text-xs" />
                               {{ formatExpireDate(key.expiresAt) }}
                             </span>
                             <span
                               v-else
                               class="cursor-pointer text-gray-600 hover:underline dark:text-gray-400"
+                              style="font-size: 13px"
                               @click.stop="startEditExpiry(key)"
                             >
                               {{ formatExpireDate(key.expiresAt) }}
@@ -780,14 +685,15 @@
                           <span
                             v-else
                             class="inline-flex cursor-pointer items-center text-gray-400 hover:underline dark:text-gray-500"
+                            style="font-size: 13px"
                             @click.stop="startEditExpiry(key)"
                           >
-                            <i class="fas fa-infinity mr-1" />
+                            <i class="fas fa-infinity mr-1 text-xs" />
                             永不过期
                           </span>
                         </div>
                       </td>
-                      <td class="whitespace-nowrap px-3 py-1.5 text-sm">
+                      <td class="whitespace-nowrap px-3 py-1.5" style="font-size: 13px">
                         <div class="flex gap-1">
                           <button
                             class="rounded px-2 py-1 text-xs font-medium text-purple-600 transition-colors hover:bg-purple-50 hover:text-purple-900 dark:hover:bg-purple-900/20"
@@ -1271,7 +1177,7 @@
                     </div>
                     <div>
                       <p class="text-sm font-semibold text-green-600">
-                        ${{ (key.dailyCost || 0).toFixed(4) }}
+                        ${{ (key.dailyCost || 0).toFixed(2) }}
                       </p>
                       <p class="text-xs text-gray-500 dark:text-gray-400">费用</p>
                     </div>
@@ -1545,14 +1451,14 @@
                   <thead class="bg-gray-50/80 backdrop-blur-sm dark:bg-gray-700/80">
                     <tr>
                       <th
-                        class="w-[18%] min-w-[140px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                        class="w-[14%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                       >
                         名称
                       </th>
                       <th
-                        class="w-[10%] min-w-[90px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                        class="w-[15%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                       >
-                        账号
+                        所属账号
                       </th>
                       <th
                         v-if="isLdapEnabled"
@@ -1566,29 +1472,29 @@
                         创建时间
                       </th>
                       <th
-                        class="w-[15%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                        class="w-[10%] min-w-[90px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                       >
                         删除者
                       </th>
                       <th
-                        class="w-[15%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                        class="w-[10%] min-w-[90px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                       >
                         删除时间
                       </th>
                       <th
-                        class="w-[6%] min-w-[60px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                      >
-                        请求数
-                      </th>
-                      <th
-                        class="w-[6%] min-w-[60px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                        class="w-[8%] min-w-[60px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                       >
                         费用
                       </th>
                       <th
-                        class="w-[7%] min-w-[70px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                        class="w-[8%] min-w-[60px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                       >
-                        Token数
+                        Token
+                      </th>
+                      <th
+                        class="w-[8%] min-w-[60px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                      >
+                        请求数
                       </th>
                       <th
                         class="w-[9%] min-w-[80px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
@@ -1596,7 +1502,7 @@
                         最后使用
                       </th>
                       <th
-                        class="w-[10%] min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                        class="w-[15%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                       >
                         操作
                       </th>
@@ -1621,76 +1527,136 @@
                           </div>
                         </div>
                       </td>
+                      <!-- 所属账号 -->
+                      <td class="px-3 py-1.5">
+                        <div class="space-y-1">
+                          <!-- Claude OAuth 绑定 -->
+                          <div v-if="key.claudeAccountId" class="flex items-center gap-1 text-xs">
+                            <span
+                              class="inline-flex items-center rounded bg-blue-100 px-1.5 py-0.5 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                            >
+                              <i class="fas fa-robot mr-1 text-[10px]" />
+                              Claude OAuth
+                            </span>
+                          </div>
+                          <!-- Claude Console 绑定 -->
+                          <div
+                            v-else-if="key.claudeConsoleAccountId"
+                            class="flex items-center gap-1 text-xs"
+                          >
+                            <span
+                              class="inline-flex items-center rounded bg-green-100 px-1.5 py-0.5 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                            >
+                              <i class="fas fa-terminal mr-1 text-[10px]" />
+                              Claude Console
+                            </span>
+                          </div>
+                          <!-- Gemini 绑定 -->
+                          <div
+                            v-else-if="key.geminiAccountId"
+                            class="flex items-center gap-1 text-xs"
+                          >
+                            <span
+                              class="inline-flex items-center rounded bg-purple-100 px-1.5 py-0.5 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
+                            >
+                              <i class="fa-google mr-1 text-[10px]" />
+                              Gemini
+                            </span>
+                          </div>
+                          <!-- 共享池 -->
+                          <div v-else class="text-xs text-gray-500 dark:text-gray-400">
+                            <i class="fas fa-share-alt mr-1" />
+                            共享池
+                          </div>
+                        </div>
+                      </td>
+                      <!-- 创建者 -->
                       <td v-if="isLdapEnabled" class="px-3 py-1.5">
-                        <div class="text-sm">
+                        <div class="text-xs">
                           <span v-if="key.createdBy === 'admin'" class="text-blue-600">
-                            <i class="fas fa-user-shield mr-1" />
+                            <i class="fas fa-user-shield mr-1 text-xs" />
                             管理员
                           </span>
                           <span v-else-if="key.userUsername" class="text-green-600">
-                            <i class="fas fa-user mr-1" />
+                            <i class="fas fa-user mr-1 text-xs" />
                             {{ key.userUsername }}
                           </span>
                           <span v-else class="text-gray-500 dark:text-gray-400">
-                            <i class="fas fa-question-circle mr-1" />
+                            <i class="fas fa-question-circle mr-1 text-xs" />
                             未知
                           </span>
                         </div>
                       </td>
+                      <!-- 创建时间 -->
                       <td
-                        class="whitespace-nowrap px-3 py-1.5 text-sm text-gray-500 dark:text-gray-400"
+                        class="whitespace-nowrap px-3 py-1.5 text-gray-700 dark:text-gray-300"
+                        style="font-size: 13px"
                       >
                         {{ formatDate(key.createdAt) }}
                       </td>
+                      <!-- 删除者 -->
                       <td class="px-3 py-1.5">
-                        <div class="text-sm">
+                        <div class="text-xs">
                           <span v-if="key.deletedByType === 'admin'" class="text-blue-600">
-                            <i class="fas fa-user-shield mr-1" />
+                            <i class="fas fa-user-shield mr-1 text-xs" />
                             {{ key.deletedBy }}
                           </span>
                           <span v-else-if="key.deletedByType === 'user'" class="text-green-600">
-                            <i class="fas fa-user mr-1" />
+                            <i class="fas fa-user mr-1 text-xs" />
                             {{ key.deletedBy }}
                           </span>
                           <span v-else class="text-gray-500 dark:text-gray-400">
-                            <i class="fas fa-cog mr-1" />
+                            <i class="fas fa-cog mr-1 text-xs" />
                             {{ key.deletedBy }}
                           </span>
                         </div>
                       </td>
+                      <!-- 删除时间 -->
                       <td
-                        class="whitespace-nowrap px-3 py-1.5 text-sm text-gray-500 dark:text-gray-400"
+                        class="whitespace-nowrap px-3 py-1.5 text-gray-700 dark:text-gray-300"
+                        style="font-size: 13px"
                       >
                         {{ formatDate(key.deletedAt) }}
                       </td>
+                      <!-- 费用 -->
+                      <td class="whitespace-nowrap px-3 py-1.5 text-right" style="font-size: 13px">
+                        <span
+                          class="font-medium text-blue-600 dark:text-blue-400"
+                          style="font-size: 13px"
+                        >
+                          ${{ (key.usage?.total?.cost || 0).toFixed(2) }}
+                        </span>
+                      </td>
+                      <!-- Token -->
+                      <td class="whitespace-nowrap px-3 py-1.5 text-right" style="font-size: 13px">
+                        <span
+                          class="font-medium text-purple-600 dark:text-purple-400"
+                          style="font-size: 13px"
+                        >
+                          {{ formatTokenCount(key.usage?.total?.tokens || 0) }}
+                        </span>
+                      </td>
                       <!-- 请求数 -->
-                      <td class="whitespace-nowrap px-3 py-1.5 text-right text-sm">
+                      <td class="whitespace-nowrap px-3 py-1.5 text-right" style="font-size: 13px">
                         <div class="flex items-center justify-end gap-1">
-                          <span class="font-medium text-gray-900 dark:text-gray-100">
+                          <span
+                            class="font-medium text-gray-900 dark:text-gray-100"
+                            style="font-size: 13px"
+                          >
                             {{ formatNumber(key.usage?.total?.requests || 0) }}
                           </span>
                           <span class="text-xs text-gray-500">次</span>
                         </div>
                       </td>
-                      <!-- 费用 -->
-                      <td class="whitespace-nowrap px-3 py-1.5 text-right text-sm">
-                        <span class="font-medium text-green-600 dark:text-green-400">
-                          ${{ (key.usage?.total?.cost || 0).toFixed(4) }}
-                        </span>
-                      </td>
-                      <!-- Token数量 -->
-                      <td class="whitespace-nowrap px-3 py-1.5 text-right text-sm">
-                        <span class="font-medium text-purple-600 dark:text-purple-400">
-                          {{ formatTokenCount(key.usage?.total?.tokens || 0) }}
-                        </span>
-                      </td>
+                      <!-- 最后使用 -->
                       <td
-                        class="whitespace-nowrap px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300"
+                        class="whitespace-nowrap px-3 py-1.5 text-gray-700 dark:text-gray-300"
+                        style="font-size: 13px"
                       >
-                        <span v-if="key.lastUsedAt">
+                        <span v-if="key.lastUsedAt" style="font-size: 13px">
                           {{ formatLastUsed(key.lastUsedAt) }}
                         </span>
-                        <span v-else class="text-gray-400">从未使用</span>
+                        <span v-else class="text-gray-400" style="font-size: 13px">从未使用</span>
                       </td>
                       <td class="px-3 py-1.5">
                         <div class="flex items-center gap-2">
@@ -3418,7 +3384,7 @@ const exportToExcel = () => {
         名称: key.name || '',
         标签: key.tags && key.tags.length > 0 ? key.tags.join(', ') : '无',
         请求总数: periodRequests,
-        '总费用($)': periodCost.toFixed(4),
+        '总费用($)': periodCost.toFixed(2),
         Token数: formatTokenCount(periodTokens),
         输入Token: formatTokenCount(periodInputTokens),
         输出Token: formatTokenCount(periodOutputTokens),
@@ -3452,7 +3418,7 @@ const exportToExcel = () => {
           modelName = modelName.replace(/[:/]/g, '_')
 
           modelStats[`${modelName}_请求数`] = stats.requests || 0
-          modelStats[`${modelName}_费用($)`] = (stats.cost || 0).toFixed(4)
+          modelStats[`${modelName}_费用($)`] = (stats.cost || 0).toFixed(2)
           modelStats[`${modelName}_Token`] = formatTokenCount(stats.totalTokens || 0)
           modelStats[`${modelName}_输入Token`] = formatTokenCount(stats.inputTokens || 0)
           modelStats[`${modelName}_输出Token`] = formatTokenCount(stats.outputTokens || 0)

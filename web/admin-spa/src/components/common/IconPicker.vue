@@ -3,7 +3,7 @@
     <!-- 当前图标显示 -->
     <div
       class="icon-display"
-      :class="{ 'has-icon': currentIcon }"
+      :class="[{ 'has-icon': currentIcon }, `size-${size}`]"
       :title="currentIcon ? '点击更换图标' : '点击选择图标'"
       @click="showPicker = true"
     >
@@ -755,6 +755,18 @@ const applyCropAndSave = () => {
   background: #f3f4f6;
   border: 2px solid transparent;
   transition: all 0.2s;
+}
+
+.icon-display.size-small {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+}
+
+.icon-display.size-large {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
 }
 
 .dark .icon-display {
