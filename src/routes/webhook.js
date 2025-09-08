@@ -124,7 +124,16 @@ router.post('/test', authenticateAdmin, async (req, res) => {
       serverUrl,
       level,
       sound,
-      group
+      group,
+      // SMTP 相关字段
+      host,
+      port,
+      secure,
+      user,
+      pass,
+      from,
+      to,
+      ignoreTLS
     } = req.body
 
     // Bark平台特殊处理
@@ -149,6 +158,34 @@ router.post('/test', authenticateAdmin, async (req, res) => {
       }
 
       logger.info(`🧪 测试webhook: ${type} - Device Key: ${deviceKey.substring(0, 8)}...`)
+    } else if (type === 'smtp') {
+      // SMTP平台验证
+      if (!host) {
+        return res.status(400).json({
+          error: 'Missing SMTP host',
+          message: '请提供SMTP服务器地址'
+        })
+      }
+      if (!user) {
+        return res.status(400).json({
+          error: 'Missing SMTP user',
+          message: '请提供SMTP用户名'
+        })
+      }
+      if (!pass) {
+        return res.status(400).json({
+          error: 'Missing SMTP password',
+          message: '请提供SMTP密码'
+        })
+      }
+      if (!to) {
+        return res.status(400).json({
+          error: 'Missing recipient email',
+          message: '请提供收件人邮箱'
+        })
+      }
+
+      logger.info(`🧪 测试webhook: ${type} - ${host}:${port || 587} -> ${to}`)
     } else {
       // 其他平台验证URL
       if (!url) {
@@ -188,6 +225,16 @@ router.post('/test', authenticateAdmin, async (req, res) => {
       platform.level = level
       platform.sound = sound
       platform.group = group
+    } else if (type === 'smtp') {
+      // 添加SMTP特有字段
+      platform.host = host
+      platform.port = port || 587
+      platform.secure = secure || false
+      platform.user = user
+      platform.pass = pass
+      platform.from = from
+      platform.to = to
+      platform.ignoreTLS = ignoreTLS || false
     }
 
     const result = await webhookService.testWebhook(platform)
