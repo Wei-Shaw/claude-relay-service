@@ -222,7 +222,7 @@ class ClaudeConsoleRelayService {
         throw new Error('Client disconnected')
       }
 
-      logger.error('❌ Claude Console Claude relay request failed:', error.message)
+      logger.error(`❌ Claude Console relay request failed (Account: ${account?.name || accountId}):`, error.message)
 
       // 不再因为模型不支持而block账号
 
@@ -297,7 +297,7 @@ class ClaudeConsoleRelayService {
       // 更新最后使用时间
       await this._updateLastUsedTime(accountId)
     } catch (error) {
-      logger.error('❌ Claude Console Claude stream relay failed:', error)
+      logger.error(`❌ Claude Console stream relay failed (Account: ${account?.name || accountId}):`, error)
       throw error
     }
   }
@@ -376,7 +376,7 @@ class ClaudeConsoleRelayService {
 
           // 错误响应处理
           if (response.status !== 200) {
-            logger.error(`❌ Claude Console API returned error status: ${response.status}`)
+            logger.error(`❌ Claude Console API returned error status: ${response.status} | Account: ${account?.name || accountId}`)
 
             if (response.status === 401) {
               claudeConsoleAccountService.markAccountUnauthorized(accountId)
@@ -528,7 +528,7 @@ class ClaudeConsoleRelayService {
                 }
               }
             } catch (error) {
-              logger.error('❌ Error processing Claude Console stream data:', error)
+              logger.error(`❌ Error processing Claude Console stream data (Account: ${account?.name || accountId}):`, error)
               if (!responseStream.destroyed) {
                 responseStream.write('event: error\n')
                 responseStream.write(
@@ -570,7 +570,7 @@ class ClaudeConsoleRelayService {
           })
 
           response.data.on('error', (error) => {
-            logger.error('❌ Claude Console stream error:', error)
+            logger.error(`❌ Claude Console stream error (Account: ${account?.name || accountId}):`, error)
             if (!responseStream.destroyed) {
               responseStream.write('event: error\n')
               responseStream.write(
@@ -590,7 +590,7 @@ class ClaudeConsoleRelayService {
             return
           }
 
-          logger.error('❌ Claude Console Claude stream request error:', error.message)
+          logger.error(`❌ Claude Console stream request error (Account: ${account?.name || accountId}):`, error.message)
 
           // 检查错误状态
           if (error.response) {
