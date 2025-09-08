@@ -680,7 +680,7 @@ class ClaudeRelayService {
           ...finalHeaders
         },
         agent: proxyAgent,
-        timeout: config.proxy.timeout
+        timeout: config.requestTimeout || 600000
       }
 
       // 使用统一 User-Agent 或客户端提供的，最后使用默认值
@@ -951,7 +951,7 @@ class ClaudeRelayService {
           ...finalHeaders
         },
         agent: proxyAgent,
-        timeout: config.proxy.timeout
+        timeout: config.requestTimeout || 600000
       }
 
       // 使用统一 User-Agent 或客户端提供的，最后使用默认值
@@ -1456,7 +1456,7 @@ class ClaudeRelayService {
           ...filteredHeaders
         },
         agent: proxyAgent,
-        timeout: config.proxy.timeout
+        timeout: config.requestTimeout || 600000
       }
 
       // 如果客户端没有提供 User-Agent，使用默认值

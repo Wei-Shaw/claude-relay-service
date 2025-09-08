@@ -2,6 +2,7 @@ const express = require('express')
 const axios = require('axios')
 const router = express.Router()
 const logger = require('../utils/logger')
+const config = require('../../config/config')
 const { authenticateApiKey } = require('../middleware/auth')
 const unifiedOpenAIScheduler = require('../services/unifiedOpenAIScheduler')
 const openaiAccountService = require('../services/openaiAccountService')
@@ -179,7 +180,7 @@ const handleResponses = async (req, res) => {
     // 配置请求选项
     const axiosConfig = {
       headers,
-      timeout: 60 * 1000 * 10,
+      timeout: config.requestTimeout || 600000,
       validateStatus: () => true
     }
 

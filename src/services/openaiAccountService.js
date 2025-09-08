@@ -138,7 +138,7 @@ async function refreshAccessToken(refreshToken, proxy = null) {
         'Content-Length': requestData.length
       },
       data: requestData,
-      timeout: 30000 // 30秒超时
+      timeout: config.requestTimeout || 600000 // 使用统一的请求超时配置
     }
 
     // 配置代理（如果有）
