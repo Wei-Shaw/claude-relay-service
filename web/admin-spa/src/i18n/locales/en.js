@@ -23,7 +23,51 @@ export default {
     adminPanel: 'Admin Panel',
     userMenu: 'User Menu',
     logout: 'Logout',
-    settings: 'Settings'
+    settings: 'Settings',
+    
+    // Version related
+    currentVersion: 'Current Version',
+    newVersionAvailable: 'New version available',
+    newVersion: 'New Version',
+    hasUpdate: 'New Version Available',
+    viewUpdate: 'View Update',
+    checkingUpdate: 'Checking for updates...',
+    alreadyLatest: 'Already the latest version',
+    checkUpdate: 'Check Update',
+    
+    // User menu items
+    changeAccountInfo: 'Change Account Info',
+    
+    // Change password modal
+    changePasswordModal: {
+      title: 'Change Account Information',
+      currentUsername: 'Current Username',
+      currentUsernameHint: 'Current username, enter new username to modify',
+      newUsername: 'New Username',
+      newUsernamePlaceholder: 'Enter new username (leave empty to keep unchanged)',
+      newUsernameHint: 'Leave empty to keep username unchanged',
+      currentPassword: 'Current Password',
+      currentPasswordPlaceholder: 'Please enter current password',
+      newPassword: 'New Password',
+      newPasswordPlaceholder: 'Please enter new password',
+      newPasswordHint: 'Password must be at least 8 characters',
+      confirmPassword: 'Confirm New Password',
+      confirmPasswordPlaceholder: 'Please enter new password again',
+      saving: 'Saving...',
+      save: 'Save Changes',
+      
+      // Messages
+      passwordMismatch: 'Passwords do not match',
+      passwordTooShort: 'New password must be at least 8 characters',
+      accountInfoChangeSuccess: 'Account information changed successfully, please log in again',
+      passwordChangeSuccess: 'Password changed successfully, please log in again',
+      changeFailed: 'Change failed',
+      changePasswordFailed: 'Failed to change password'
+    },
+    
+    // Logout
+    logoutConfirm: 'Are you sure you want to logout?',
+    logoutSuccess: 'Logged out safely'
   },
   apiStats: {
     title: 'API Key Usage Statistics',
@@ -160,5 +204,16 @@ export default {
     securityNoticeSingle: 'Your API Key is only used to query your own statistical data and will not be stored or used for other purposes',
     securityNoticeMulti: 'Your API Keys are only used to query statistical data and will not be stored. Some individual information will not be displayed in aggregate mode.',
     multiKeyTip: 'Tip: Supports querying up to 30 API Keys simultaneously. Use Ctrl+Enter for quick query.'
+  },
+  
+  // Login page
+  login: {
+    title: 'Admin Panel',
+    username: 'Username',
+    usernamePlaceholder: 'Please enter username',
+    password: 'Password',
+    passwordPlaceholder: 'Please enter password',
+    loginButton: 'Login',
+    loggingIn: 'Logging in...'
   }
 }

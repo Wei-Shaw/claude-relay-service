@@ -23,7 +23,51 @@ export default {
     adminPanel: '管理後台',
     userMenu: '用戶選單',
     logout: '退出登錄',
-    settings: '系統設置'
+    settings: '系統設置',
+    
+    // Version related
+    currentVersion: '當前版本',
+    newVersionAvailable: '有新版本可用',
+    newVersion: '新版本',
+    hasUpdate: '有新版本',
+    viewUpdate: '查看更新',
+    checkingUpdate: '檢查更新中...',
+    alreadyLatest: '當前已是最新版本',
+    checkUpdate: '檢查更新',
+    
+    // User menu items
+    changeAccountInfo: '修改帳戶資訊',
+    
+    // Change password modal
+    changePasswordModal: {
+      title: '修改帳戶資訊',
+      currentUsername: '當前用戶名',
+      currentUsernameHint: '當前用戶名，輸入新用戶名以修改',
+      newUsername: '新用戶名',
+      newUsernamePlaceholder: '輸入新用戶名（留空保持不變）',
+      newUsernameHint: '留空表示不修改用戶名',
+      currentPassword: '當前密碼',
+      currentPasswordPlaceholder: '請輸入當前密碼',
+      newPassword: '新密碼',
+      newPasswordPlaceholder: '請輸入新密碼',
+      newPasswordHint: '密碼長度至少8位',
+      confirmPassword: '確認新密碼',
+      confirmPasswordPlaceholder: '請再次輸入新密碼',
+      saving: '保存中...',
+      save: '保存修改',
+      
+      // Messages
+      passwordMismatch: '兩次輸入的密碼不一致',
+      passwordTooShort: '新密碼長度至少8位',
+      accountInfoChangeSuccess: '帳戶資訊修改成功，請重新登錄',
+      passwordChangeSuccess: '密碼修改成功，請重新登錄',
+      changeFailed: '修改失敗',
+      changePasswordFailed: '修改密碼失敗'
+    },
+    
+    // Logout
+    logoutConfirm: '確定要退出登錄嗎？',
+    logoutSuccess: '已安全退出'
   },
   apiStats: {
     title: 'API Key 使用統計',
@@ -160,5 +204,16 @@ export default {
     securityNoticeSingle: '您的 API Key 僅用於查詢自己的統計資料，不會被儲存或用於其他用途',
     securityNoticeMulti: '您的 API Keys 僅用於查詢統計資料，不會被儲存。彙整模式下部分個體化資訊將不顯示。',
     multiKeyTip: '提示：最多支援同時查詢 30 個 API Keys。使用 Ctrl+Enter 快速查詢。'
+  },
+  
+  // Login page
+  login: {
+    title: '管理後台',
+    username: '用戶名',
+    usernamePlaceholder: '請輸入用戶名',
+    password: '密碼',
+    passwordPlaceholder: '請輸入密碼',
+    loginButton: '登錄',
+    loggingIn: '登錄中...'
   }
 }
