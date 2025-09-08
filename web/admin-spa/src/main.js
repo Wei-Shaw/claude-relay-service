@@ -7,6 +7,7 @@ import 'element-plus/theme-chalk/dark/css-vars.css'
 import App from './App.vue'
 import router from './router'
 import { useUserStore } from './stores/user'
+import i18n from './i18n'
 import './assets/styles/main.css'
 import './assets/styles/global.css'
 
@@ -19,6 +20,9 @@ app.use(pinia)
 
 // 使用路由
 app.use(router)
+
+// 使用Vue I18n
+app.use(i18n)
 
 // 使用Element Plus
 app.use(ElementPlus, {
