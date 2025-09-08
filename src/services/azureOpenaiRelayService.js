@@ -1,6 +1,7 @@
 const axios = require('axios')
 const ProxyHelper = require('../utils/proxyHelper')
 const logger = require('../utils/logger')
+const config = require('../../config/config')
 
 // 转换模型名称（去掉 azure/ 前缀）
 function normalizeModelName(model) {
@@ -29,7 +30,7 @@ async function handleAzureOpenAIRequest({
     deploymentName = account.deploymentName || 'default'
     // Azure Responses API requires preview versions; fall back appropriately
     const apiVersion =
-      account.apiVersion || (endpoint === 'responses' ? '2024-10-01-preview' : '2024-02-01')
+      account.apiVersion || (endpoint === 'responses' ? '2025-04-01-preview' : '2024-02-01')
     if (endpoint === 'chat/completions') {
       requestUrl = `${baseUrl}/openai/deployments/${deploymentName}/chat/completions?api-version=${apiVersion}`
     } else if (endpoint === 'responses') {
@@ -53,7 +54,9 @@ async function handleAzureOpenAIRequest({
     const processedBody = { ...requestBody }
 
     // 标准化模型名称
-    if (processedBody.model) {
+    if (endpoint === 'responses') {
+      processedBody.model = deploymentName
+    } else if (processedBody.model) {
       processedBody.model = normalizeModelName(processedBody.model)
     } else {
       processedBody.model = 'gpt-4'
@@ -68,7 +71,7 @@ async function handleAzureOpenAIRequest({
       url: requestUrl,
       headers: requestHeaders,
       data: processedBody,
-      timeout: 600000, // 10 minutes for Azure OpenAI
+      timeout: config.requestTimeout || 600000,
       validateStatus: () => true,
       // 添加连接保活选项
       keepAlive: true,

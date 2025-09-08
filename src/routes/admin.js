@@ -534,7 +534,8 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       weeklyOpusCostLimit,
       tags,
       activationDays, // 新增：激活后有效天数
-      expirationMode // 新增：过期模式
+      expirationMode, // 新增：过期模式
+      icon // 新增：图标
     } = req.body
 
     // 输入验证
