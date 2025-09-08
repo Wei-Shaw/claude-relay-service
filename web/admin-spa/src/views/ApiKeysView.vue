@@ -293,7 +293,7 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[8%] min-w-[60px] cursor-pointer px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                      class="w-[4%] min-w-[40px] cursor-pointer px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                       @click="sortApiKeys('periodCost')"
                     >
                       费用
@@ -308,7 +308,12 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[8%] min-w-[60px] cursor-pointer px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                      class="w-[14%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      限制
+                    </th>
+                    <th
+                      class="w-[5%] min-w-[45px] cursor-pointer px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                       @click="sortApiKeys('periodTokens')"
                     >
                       Token
@@ -323,7 +328,7 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[8%] min-w-[60px] cursor-pointer px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                      class="w-[5%] min-w-[45px] cursor-pointer px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                       @click="sortApiKeys('periodRequests')"
                     >
                       请求数
@@ -338,7 +343,7 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[9%] min-w-[80px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                      class="w-[8%] min-w-[70px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                       @click="sortApiKeys('lastUsedAt')"
                     >
                       最后使用
@@ -353,7 +358,7 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[9%] min-w-[80px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                      class="w-[8%] min-w-[70px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                       @click="sortApiKeys('createdAt')"
                     >
                       创建时间
@@ -368,7 +373,7 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[9%] min-w-[80px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                      class="w-[8%] min-w-[70px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                       @click="sortApiKeys('expiresAt')"
                     >
                       过期时间
@@ -383,7 +388,7 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[27%] min-w-[180px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                      class="w-[23%] min-w-[170px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                     >
                       操作
                     </th>
@@ -530,68 +535,63 @@
                       </td>
                       <!-- 费用 -->
                       <td class="whitespace-nowrap px-3 py-1.5 text-right" style="font-size: 13px">
-                        <div class="space-y-2">
-                          <span
-                            class="font-medium text-blue-600 dark:text-blue-400"
-                            style="font-size: 13px"
-                          >
-                            ${{ getPeriodCost(key).toFixed(2) }}
-                          </span>
-
+                        <span
+                          class="font-semibold text-blue-600 dark:text-blue-400"
+                          style="font-size: 14px"
+                        >
+                          ${{ getPeriodCost(key).toFixed(2) }}
+                        </span>
+                      </td>
+                      <!-- 限制 -->
+                      <td class="px-2 py-1.5" style="font-size: 12px">
+                        <div class="flex flex-col gap-1.5">
                           <!-- 每日费用限制进度条 -->
-                          <div v-if="key.dailyCostLimit > 0" class="space-y-1">
-                            <div class="flex items-center justify-between text-xs">
-                              <span class="text-gray-500 dark:text-gray-400">每日费用</span>
-                              <span class="text-gray-700 dark:text-gray-300">
-                                ${{ (key.dailyCost || 0).toFixed(2) }} / ${{
-                                  key.dailyCostLimit.toFixed(2)
-                                }}
-                              </span>
-                            </div>
-                            <div class="h-1.5 w-full rounded-full bg-gray-200 dark:bg-gray-700">
-                              <div
-                                class="h-1.5 rounded-full transition-all duration-300"
-                                :class="getDailyCostProgressColor(key)"
-                                :style="{ width: getDailyCostProgress(key) + '%' }"
-                              />
-                            </div>
-                          </div>
+                          <LimitProgressBar
+                            v-if="key.dailyCostLimit > 0"
+                            :current="key.dailyCost || 0"
+                            label="每日"
+                            :limit="key.dailyCostLimit"
+                            type="daily"
+                          />
 
                           <!-- Opus 周费用限制进度条 -->
-                          <div v-if="key.weeklyOpusCostLimit > 0" class="space-y-1">
-                            <div class="flex items-center justify-between text-xs">
-                              <span class="text-gray-500 dark:text-gray-400">Opus周费用</span>
-                              <span class="text-gray-700 dark:text-gray-300">
-                                ${{ (key.weeklyOpusCost || 0).toFixed(2) }} / ${{
-                                  key.weeklyOpusCostLimit.toFixed(2)
-                                }}
-                              </span>
-                            </div>
-                            <div class="h-1.5 w-full rounded-full bg-gray-200">
-                              <div
-                                class="h-1.5 rounded-full transition-all duration-300"
-                                :class="getWeeklyOpusCostProgressColor(key)"
-                                :style="{ width: getWeeklyOpusCostProgress(key) + '%' }"
-                              />
-                            </div>
-                          </div>
+                          <LimitProgressBar
+                            v-if="key.weeklyOpusCostLimit > 0"
+                            :current="key.weeklyOpusCost || 0"
+                            label="Opus"
+                            :limit="key.weeklyOpusCostLimit"
+                            type="opus"
+                          />
 
                           <!-- 时间窗口限制进度条 -->
-                          <WindowCountdown
+                          <WindowLimitBar
                             v-if="key.rateLimitWindow > 0"
-                            :cost-limit="key.rateLimitCost"
-                            :current-cost="key.currentWindowCost"
-                            :current-requests="key.currentWindowRequests"
-                            :current-tokens="key.currentWindowTokens"
+                            :cost-limit="key.rateLimitCost || 0"
+                            :current-cost="key.currentWindowCost || 0"
+                            :current-requests="key.currentWindowRequests || 0"
+                            :current-tokens="key.currentWindowTokens || 0"
                             :rate-limit-window="key.rateLimitWindow"
-                            :request-limit="key.rateLimitRequests"
-                            :show-progress="true"
-                            :show-tooltip="false"
-                            :token-limit="key.tokenLimit"
-                            :window-end-time="key.windowEndTime"
-                            :window-remaining-seconds="key.windowRemainingSeconds"
-                            :window-start-time="key.windowStartTime"
+                            :remaining-seconds="key.windowRemainingSeconds || 0"
+                            :request-limit="key.rateLimitRequests || 0"
+                            :token-limit="key.tokenLimit || 0"
                           />
+
+                          <!-- 如果没有任何限制 -->
+                          <div
+                            v-if="
+                              !key.dailyCostLimit &&
+                              !key.weeklyOpusCostLimit &&
+                              !key.rateLimitWindow
+                            "
+                            class="dark:to-gray-750 relative h-7 w-full overflow-hidden rounded-md border border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 dark:border-gray-700 dark:from-gray-800"
+                          >
+                            <div class="flex h-full items-center justify-center gap-1.5">
+                              <i class="fas fa-infinity text-xs text-gray-400 dark:text-gray-500" />
+                              <span class="text-xs font-medium text-gray-400 dark:text-gray-500">
+                                无限制
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </td>
                       <!-- Token数量 -->
@@ -767,7 +767,7 @@
 
                     <!-- 模型统计展开区域 -->
                     <tr v-if="key && key.id && expandedApiKeys[key.id]">
-                      <td class="bg-gray-50 px-3 py-3 dark:bg-gray-700" colspan="12">
+                      <td class="bg-gray-50 px-3 py-3 dark:bg-gray-700" colspan="13">
                         <div v-if="!apiKeyModelStats[key.id]" class="py-4 text-center">
                           <div class="loading-spinner mx-auto" />
                           <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
@@ -1184,42 +1184,52 @@
                   </div>
                 </div>
 
-                <!-- 限制进度 -->
-                <div v-if="key.dailyCostLimit > 0" class="space-y-1">
-                  <div class="flex items-center justify-between text-xs">
-                    <span class="text-gray-500 dark:text-gray-400">每日费用限额</span>
-                    <span class="text-gray-700 dark:text-gray-300">
-                      ${{ (key.dailyCost || 0).toFixed(2) }} / ${{ key.dailyCostLimit.toFixed(2) }}
-                    </span>
-                  </div>
-                  <div class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
-                    <div
-                      class="h-2 rounded-full transition-all duration-300"
-                      :class="getDailyCostProgressColor(key)"
-                      :style="{ width: getDailyCostProgress(key) + '%' }"
-                    />
+                <!-- 限制进度条 -->
+                <div class="space-y-1.5">
+                  <!-- 每日费用限制 -->
+                  <LimitProgressBar
+                    v-if="key.dailyCostLimit > 0"
+                    :current="key.dailyCost || 0"
+                    label="每日"
+                    :limit="key.dailyCostLimit"
+                    type="daily"
+                  />
+
+                  <!-- Opus 周费用限制 -->
+                  <LimitProgressBar
+                    v-if="key.weeklyOpusCostLimit > 0"
+                    :current="key.weeklyOpusCost || 0"
+                    label="Opus"
+                    :limit="key.weeklyOpusCostLimit"
+                    type="opus"
+                  />
+
+                  <!-- 时间窗口限制 -->
+                  <WindowLimitBar
+                    v-if="key.rateLimitWindow > 0"
+                    :cost-limit="key.rateLimitCost || 0"
+                    :current-cost="key.currentWindowCost || 0"
+                    :current-requests="key.currentWindowRequests || 0"
+                    :current-tokens="key.currentWindowTokens || 0"
+                    :rate-limit-window="key.rateLimitWindow"
+                    :remaining-seconds="key.windowRemainingSeconds || 0"
+                    :request-limit="key.rateLimitRequests || 0"
+                    :token-limit="key.tokenLimit || 0"
+                  />
+
+                  <!-- 无限制显示 -->
+                  <div
+                    v-if="!key.dailyCostLimit && !key.weeklyOpusCostLimit && !key.rateLimitWindow"
+                    class="dark:to-gray-750 relative h-7 w-full overflow-hidden rounded-md border border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 dark:border-gray-700 dark:from-gray-800"
+                  >
+                    <div class="flex h-full items-center justify-center gap-1.5">
+                      <i class="fas fa-infinity text-xs text-gray-400 dark:text-gray-500" />
+                      <span class="text-xs font-medium text-gray-400 dark:text-gray-500">
+                        无限制
+                      </span>
+                    </div>
                   </div>
                 </div>
-
-                <!-- 移动端时间窗口限制 -->
-                <WindowCountdown
-                  v-if="
-                    key.rateLimitWindow > 0 &&
-                    (key.rateLimitRequests > 0 || key.tokenLimit > 0 || key.rateLimitCost > 0)
-                  "
-                  :cost-limit="key.rateLimitCost"
-                  :current-cost="key.currentWindowCost"
-                  :current-requests="key.currentWindowRequests"
-                  :current-tokens="key.currentWindowTokens"
-                  :rate-limit-window="key.rateLimitWindow"
-                  :request-limit="key.rateLimitRequests"
-                  :show-progress="true"
-                  :show-tooltip="false"
-                  :token-limit="key.tokenLimit"
-                  :window-end-time="key.windowEndTime"
-                  :window-remaining-seconds="key.windowRemainingSeconds"
-                  :window-start-time="key.windowStartTime"
-                />
               </div>
 
               <!-- 时间信息 -->
@@ -1760,7 +1770,8 @@ import BatchApiKeyModal from '@/components/apikeys/BatchApiKeyModal.vue'
 import BatchEditApiKeyModal from '@/components/apikeys/BatchEditApiKeyModal.vue'
 import ExpiryEditModal from '@/components/apikeys/ExpiryEditModal.vue'
 import UsageDetailModal from '@/components/apikeys/UsageDetailModal.vue'
-import WindowCountdown from '@/components/apikeys/WindowCountdown.vue'
+import LimitProgressBar from '@/components/apikeys/LimitProgressBar.vue'
+import WindowLimitBar from '@/components/apikeys/WindowLimitBar.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 
 // 响应式数据
@@ -2058,7 +2069,7 @@ const loadAccounts = async () => {
       accounts.value.openaiGroups = allGroups.filter((g) => g.platform === 'openai')
     }
   } catch (error) {
-    console.error('加载账户列表失败:', error)
+    // console.error('加载账户列表失败:', error)
   }
 }
 
@@ -3104,9 +3115,9 @@ const clearAllDeletedApiKeys = async () => {
 
       // 如果有失败的，显示详细信息
       if (data.details && data.details.failedCount > 0) {
-        const errors = data.details.errors
-        console.error('部分API Keys清空失败:', errors)
-        showToast(`${data.details.failedCount} 个清空失败，请查看控制台`, 'warning')
+        // const errors = data.details.errors
+        // console.error('部分API Keys清空失败:', errors)
+        showToast(`${data.details.failedCount} 个清空失败`, 'warning')
       }
 
       // 刷新已删除列表
@@ -3169,7 +3180,7 @@ const batchDeleteApiKeys = async () => {
     }
   } catch (error) {
     showToast('批量删除失败', 'error')
-    console.error('批量删除 API Keys 失败:', error)
+    // console.error('批量删除 API Keys 失败:', error)
   }
 }
 
@@ -3276,35 +3287,35 @@ const formatDate = (dateString) => {
     .replace(/\//g, '-')
 }
 
-// 获取每日费用进度
-const getDailyCostProgress = (key) => {
-  if (!key.dailyCostLimit || key.dailyCostLimit === 0) return 0
-  const percentage = ((key.dailyCost || 0) / key.dailyCostLimit) * 100
-  return Math.min(percentage, 100)
-}
+// 获取每日费用进度 - 已移到 LimitProgressBar 组件中
+// const getDailyCostProgress = (key) => {
+//   if (!key.dailyCostLimit || key.dailyCostLimit === 0) return 0
+//   const percentage = ((key.dailyCost || 0) / key.dailyCostLimit) * 100
+//   return Math.min(percentage, 100)
+// }
 
-// 获取每日费用进度条颜色
-const getDailyCostProgressColor = (key) => {
-  const progress = getDailyCostProgress(key)
-  if (progress >= 100) return 'bg-red-500'
-  if (progress >= 80) return 'bg-yellow-500'
-  return 'bg-green-500'
-}
+// 获取每日费用进度条颜色 - 已移到 LimitProgressBar 组件中
+// const getDailyCostProgressColor = (key) => {
+//   const progress = getDailyCostProgress(key)
+//   if (progress >= 100) return 'bg-red-500'
+//   if (progress >= 80) return 'bg-yellow-500'
+//   return 'bg-green-500'
+// }
 
-// 获取 Opus 周费用进度
-const getWeeklyOpusCostProgress = (key) => {
-  if (!key.weeklyOpusCostLimit || key.weeklyOpusCostLimit === 0) return 0
-  const percentage = ((key.weeklyOpusCost || 0) / key.weeklyOpusCostLimit) * 100
-  return Math.min(percentage, 100)
-}
+// 获取 Opus 周费用进度 - 已移到 LimitBadge 组件中
+// const getWeeklyOpusCostProgress = (key) => {
+//   if (!key.weeklyOpusCostLimit || key.weeklyOpusCostLimit === 0) return 0
+//   const percentage = ((key.weeklyOpusCost || 0) / key.weeklyOpusCostLimit) * 100
+//   return Math.min(percentage, 100)
+// }
 
-// 获取 Opus 周费用进度条颜色
-const getWeeklyOpusCostProgressColor = (key) => {
-  const progress = getWeeklyOpusCostProgress(key)
-  if (progress >= 100) return 'bg-red-500'
-  if (progress >= 80) return 'bg-yellow-500'
-  return 'bg-green-500'
-}
+// 获取 Opus 周费用进度条颜色 - 已移到 LimitBadge 组件中
+// const getWeeklyOpusCostProgressColor = (key) => {
+//   const progress = getWeeklyOpusCostProgress(key)
+//   if (progress >= 100) return 'bg-red-500'
+//   if (progress >= 80) return 'bg-yellow-500'
+//   return 'bg-green-500'
+// }
 
 // 获取总费用进度 - 暂时不用
 // const getTotalCostProgress = (key) => {
@@ -3318,6 +3329,23 @@ const showUsageDetails = (apiKey) => {
   selectedApiKeyForDetail.value = apiKey
   showUsageDetailModal.value = true
 }
+
+// 格式化时间（秒转换为可读格式） - 已移到 WindowLimitBar 组件中
+// const formatTime = (seconds) => {
+//   if (seconds === null || seconds === undefined) return '--:--'
+//
+//   const hours = Math.floor(seconds / 3600)
+//   const minutes = Math.floor((seconds % 3600) / 60)
+//   const secs = seconds % 60
+//
+//   if (hours > 0) {
+//     return `${hours}h ${minutes}m`
+//   } else if (minutes > 0) {
+//     return `${minutes}m ${secs}s`
+//   } else {
+//     return `${secs}s`
+//   }
+// }
 
 // 格式化最后使用时间
 const formatLastUsed = (dateString) => {
@@ -3531,7 +3559,7 @@ const exportToExcel = () => {
 
     showToast(`成功导出 ${exportData.length} 条API Key用量数据`, 'success')
   } catch (error) {
-    console.error('导出失败:', error)
+    // console.error('导出失败:', error)
     showToast('导出失败，请重试', 'error')
   }
 }
