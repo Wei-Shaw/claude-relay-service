@@ -814,14 +814,37 @@ function isRateLimited(account) {
 }
 
 // 设置账户限流状态
-async function setAccountRateLimited(accountId, isLimited) {
+async function setAccountRateLimited(accountId, isLimited, resetsInSeconds = null) {
   const updates = {
     rateLimitStatus: isLimited ? 'limited' : 'normal',
-    rateLimitedAt: isLimited ? new Date().toISOString() : null
+    rateLimitedAt: isLimited ? new Date().toISOString() : null,
+    // 限流时停止调度，解除限流时恢复调度
+    schedulable: isLimited ? 'false' : 'true'
+  }
+
+  // 如果提供了重置时间（秒数），计算重置时间戳
+  if (isLimited && resetsInSeconds !== null && resetsInSeconds > 0) {
+    const resetTime = new Date(Date.now() + resetsInSeconds * 1000).toISOString()
+    updates.rateLimitResetAt = resetTime
+    logger.info(
+      `🕐 Account ${accountId} will be reset at ${resetTime} (in ${resetsInSeconds} seconds / ${Math.ceil(resetsInSeconds / 60)} minutes)`
+    )
+  } else if (isLimited) {
+    // 如果没有提供重置时间，使用默认的60分钟
+    const defaultResetSeconds = 60 * 60 // 1小时
+    const resetTime = new Date(Date.now() + defaultResetSeconds * 1000).toISOString()
+    updates.rateLimitResetAt = resetTime
+    logger.warn(
+      `⚠️ No reset time provided for account ${accountId}, using default 60 minutes. Reset at ${resetTime}`
+    )
+  } else if (!isLimited) {
+    updates.rateLimitResetAt = null
   }
 
   await updateAccount(accountId, updates)
-  logger.info(`Set rate limit status for OpenAI account ${accountId}: ${updates.rateLimitStatus}`)
+  logger.info(
+    `Set rate limit status for OpenAI account ${accountId}: ${updates.rateLimitStatus}, schedulable: ${updates.schedulable}`
+  )
 
   // 如果被限流，发送 Webhook 通知
   if (isLimited) {
@@ -834,7 +857,9 @@ async function setAccountRateLimited(accountId, isLimited) {
         platform: 'openai',
         status: 'blocked',
         errorCode: 'OPENAI_RATE_LIMITED',
-        reason: 'Account rate limited (429 error). Estimated reset in 1 hour',
+        reason: resetsInSeconds
+          ? `Account rate limited (429 error). Reset in ${Math.ceil(resetsInSeconds / 60)} minutes`
+          : 'Account rate limited (429 error). Estimated reset in 1 hour',
         timestamp: new Date().toISOString()
       })
       logger.info(`📢 Webhook notification sent for OpenAI account ${account.name} rate limit`)
@@ -842,6 +867,48 @@ async function setAccountRateLimited(accountId, isLimited) {
       logger.error('Failed to send rate limit webhook notification:', webhookError)
     }
   }
+}
+
+// 🔄 重置账户所有异常状态
+async function resetAccountStatus(accountId) {
+  const account = await getAccount(accountId)
+  if (!account) {
+    throw new Error('Account not found')
+  }
+
+  const updates = {
+    // 根据是否有有效的 accessToken 来设置 status
+    status: account.accessToken ? 'active' : 'created',
+    // 恢复可调度状态
+    schedulable: 'true',
+    // 清除错误相关字段
+    errorMessage: null,
+    rateLimitedAt: null,
+    rateLimitStatus: 'normal',
+    rateLimitResetAt: null
+  }
+
+  await updateAccount(accountId, updates)
+  logger.info(`✅ Reset all error status for OpenAI account ${accountId}`)
+
+  // 发送 Webhook 通知
+  try {
+    const webhookNotifier = require('../utils/webhookNotifier')
+    await webhookNotifier.sendAccountAnomalyNotification({
+      accountId,
+      accountName: account.name || accountId,
+      platform: 'openai',
+      status: 'recovered',
+      errorCode: 'STATUS_RESET',
+      reason: 'Account status manually reset',
+      timestamp: new Date().toISOString()
+    })
+    logger.info(`📢 Webhook notification sent for OpenAI account ${account.name} status reset`)
+  } catch (webhookError) {
+    logger.error('Failed to send status reset webhook notification:', webhookError)
+  }
+
+  return { success: true, message: 'Account status reset successfully' }
 }
 
 // 切换账户调度状态
@@ -873,15 +940,26 @@ async function getAccountRateLimitInfo(accountId) {
     return null
   }
 
-  if (account.rateLimitStatus === 'limited' && account.rateLimitedAt) {
-    const limitedAt = new Date(account.rateLimitedAt).getTime()
+  if (account.rateLimitStatus === 'limited') {
     const now = Date.now()
-    const limitDuration = 60 * 60 * 1000 // 1小时
-    const remainingTime = Math.max(0, limitedAt + limitDuration - now)
+    let remainingTime = 0
+
+    // 优先使用 rateLimitResetAt 字段（精确的重置时间）
+    if (account.rateLimitResetAt) {
+      const resetAt = new Date(account.rateLimitResetAt).getTime()
+      remainingTime = Math.max(0, resetAt - now)
+    }
+    // 回退到使用 rateLimitedAt + 默认1小时
+    else if (account.rateLimitedAt) {
+      const limitedAt = new Date(account.rateLimitedAt).getTime()
+      const limitDuration = 60 * 60 * 1000 // 默认1小时
+      remainingTime = Math.max(0, limitedAt + limitDuration - now)
+    }
 
     return {
       isRateLimited: remainingTime > 0,
       rateLimitedAt: account.rateLimitedAt,
+      rateLimitResetAt: account.rateLimitResetAt,
       minutesRemaining: Math.ceil(remainingTime / (60 * 1000))
     }
   }
@@ -889,6 +967,7 @@ async function getAccountRateLimitInfo(accountId) {
   return {
     isRateLimited: false,
     rateLimitedAt: null,
+    rateLimitResetAt: null,
     minutesRemaining: 0
   }
 }
@@ -926,6 +1005,7 @@ module.exports = {
   refreshAccountToken,
   isTokenExpired,
   setAccountRateLimited,
+  resetAccountStatus,
   toggleSchedulable,
   getAccountRateLimitInfo,
   updateAccountUsage,

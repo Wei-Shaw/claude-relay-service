@@ -934,6 +934,64 @@
               </label>
             </div>
 
+            <!-- Claude 统一客户端标识配置 -->
+            <div v-if="form.platform === 'claude'" class="mt-4">
+              <label class="flex items-start">
+                <input
+                  v-model="form.useUnifiedClientId"
+                  class="mt-1 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  type="checkbox"
+                  @change="handleUnifiedClientIdChange"
+                />
+                <div class="ml-3 flex-1">
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    使用统一的客户端标识
+                  </span>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    开启后将使用固定的客户端标识，使所有请求看起来来自同一个客户端，减少特征
+                  </p>
+                  <div v-if="form.useUnifiedClientId" class="mt-3">
+                    <div
+                      class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50"
+                    >
+                      <div class="mb-2 flex items-center justify-between">
+                        <span class="text-xs font-medium text-gray-600 dark:text-gray-400"
+                          >客户端标识 ID</span
+                        >
+                        <button
+                          class="rounded-md bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
+                          type="button"
+                          @click="regenerateClientId"
+                        >
+                          <i class="fas fa-sync-alt mr-1" />
+                          重新生成
+                        </button>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <code
+                          class="block w-full select-all break-all rounded bg-gray-100 px-3 py-2 font-mono text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300"
+                        >
+                          <span class="text-blue-600 dark:text-blue-400">{{
+                            form.unifiedClientId.substring(0, 8)
+                          }}</span
+                          ><span class="text-gray-500 dark:text-gray-500">{{
+                            form.unifiedClientId.substring(8, 56)
+                          }}</span
+                          ><span class="text-blue-600 dark:text-blue-400">{{
+                            form.unifiedClientId.substring(56)
+                          }}</span>
+                        </code>
+                      </div>
+                      <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        <i class="fas fa-info-circle mr-1 text-blue-500" />
+                        此ID将替换请求中的user_id客户端部分，保留session部分用于粘性会话
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </label>
+            </div>
+
             <!-- 所有平台的优先级设置 -->
             <div>
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -1553,6 +1611,64 @@
             </label>
           </div>
 
+          <!-- Claude 统一客户端标识配置（编辑模式） -->
+          <div v-if="form.platform === 'claude'" class="mt-4">
+            <label class="flex items-start">
+              <input
+                v-model="form.useUnifiedClientId"
+                class="mt-1 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                type="checkbox"
+                @change="handleUnifiedClientIdChange"
+              />
+              <div class="ml-3 flex-1">
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  使用统一的客户端标识
+                </span>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  开启后将使用固定的客户端标识，使所有请求看起来来自同一个客户端，减少特征
+                </p>
+                <div v-if="form.useUnifiedClientId" class="mt-3">
+                  <div
+                    class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50"
+                  >
+                    <div class="mb-2 flex items-center justify-between">
+                      <span class="text-xs font-medium text-gray-600 dark:text-gray-400"
+                        >客户端标识 ID</span
+                      >
+                      <button
+                        class="rounded-md bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
+                        type="button"
+                        @click="regenerateClientId"
+                      >
+                        <i class="fas fa-sync-alt mr-1" />
+                        重新生成
+                      </button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <code
+                        class="block w-full select-all break-all rounded bg-gray-100 px-3 py-2 font-mono text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300"
+                      >
+                        <span class="text-blue-600 dark:text-blue-400">{{
+                          form.unifiedClientId.substring(0, 8)
+                        }}</span
+                        ><span class="text-gray-500 dark:text-gray-500">{{
+                          form.unifiedClientId.substring(8, 56)
+                        }}</span
+                        ><span class="text-blue-600 dark:text-blue-400">{{
+                          form.unifiedClientId.substring(56)
+                        }}</span>
+                      </code>
+                    </div>
+                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                      <i class="fas fa-info-circle mr-1 text-blue-500" />
+                      此ID将替换请求中的user_id客户端部分，保留session部分用于粘性会话
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </label>
+          </div>
+
           <!-- 所有平台的优先级设置（编辑模式） -->
           <div>
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -2155,6 +2271,8 @@ const setupTokenSessionId = ref('')
 // Claude Code 统一 User-Agent 信息
 const unifiedUserAgent = ref('')
 const clearingCache = ref(false)
+// 客户端标识编辑状态（已废弃，不再需要编辑功能）
+// const editingClientId = ref(false)
 
 // 初始化代理配置
 const initProxyConfig = () => {
@@ -2193,6 +2311,8 @@ const form = ref({
   subscriptionType: 'claude_max', // 默认为 Claude Max，兼容旧数据
   autoStopOnWarning: props.account?.autoStopOnWarning || false, // 5小时限制自动停止调度
   useUnifiedUserAgent: props.account?.useUnifiedUserAgent || false, // 使用统一Claude Code版本
+  useUnifiedClientId: props.account?.useUnifiedClientId || false, // 使用统一的客户端标识
+  unifiedClientId: props.account?.unifiedClientId || '', // 统一的客户端标识
   groupId: '',
   groupIds: [],
   projectId: props.account?.projectId || '',
@@ -2477,6 +2597,11 @@ const exchangeSetupTokenCode = async () => {
 
     const tokenInfo = await accountsStore.exchangeClaudeSetupTokenCode(data)
 
+    // Setup Token模式也需要确保生成客户端ID
+    if (form.value.useUnifiedClientId && !form.value.unifiedClientId) {
+      form.value.unifiedClientId = generateClientId()
+    }
+
     // 调用相同的成功处理函数
     await handleOAuthSuccess(tokenInfo)
   } catch (error) {
@@ -2490,6 +2615,15 @@ const exchangeSetupTokenCode = async () => {
 const handleOAuthSuccess = async (tokenInfo) => {
   loading.value = true
   try {
+    // OAuth模式也需要确保生成客户端ID
+    if (
+      form.value.platform === 'claude' &&
+      form.value.useUnifiedClientId &&
+      !form.value.unifiedClientId
+    ) {
+      form.value.unifiedClientId = generateClientId()
+    }
+
     const data = {
       name: form.value.name,
       description: form.value.description,
@@ -2513,6 +2647,8 @@ const handleOAuthSuccess = async (tokenInfo) => {
       data.priority = form.value.priority || 50
       data.autoStopOnWarning = form.value.autoStopOnWarning || false
       data.useUnifiedUserAgent = form.value.useUnifiedUserAgent || false
+      data.useUnifiedClientId = form.value.useUnifiedClientId || false
+      data.unifiedClientId = form.value.unifiedClientId || ''
       // 添加订阅类型信息
       data.subscriptionInfo = {
         accountType: form.value.subscriptionType || 'claude_max',
@@ -2697,6 +2833,11 @@ const createAccount = async () => {
         ? 10 * 60 * 1000 // 10分钟
         : 365 * 24 * 60 * 60 * 1000 // 1年
 
+      // 手动模式也需要确保生成客户端ID
+      if (form.value.useUnifiedClientId && !form.value.unifiedClientId) {
+        form.value.unifiedClientId = generateClientId()
+      }
+
       data.claudeAiOauth = {
         accessToken: form.value.accessToken,
         refreshToken: form.value.refreshToken || '',
@@ -2706,6 +2847,8 @@ const createAccount = async () => {
       data.priority = form.value.priority || 50
       data.autoStopOnWarning = form.value.autoStopOnWarning || false
       data.useUnifiedUserAgent = form.value.useUnifiedUserAgent || false
+      data.useUnifiedClientId = form.value.useUnifiedClientId || false
+      data.unifiedClientId = form.value.unifiedClientId || ''
       // 添加订阅类型信息
       data.subscriptionInfo = {
         accountType: form.value.subscriptionType || 'claude_max',
@@ -2972,9 +3115,16 @@ const updateAccount = async () => {
 
     // Claude 官方账号优先级和订阅类型更新
     if (props.account.platform === 'claude') {
+      // 更新模式也需要确保生成客户端ID
+      if (form.value.useUnifiedClientId && !form.value.unifiedClientId) {
+        form.value.unifiedClientId = generateClientId()
+      }
+
       data.priority = form.value.priority || 50
       data.autoStopOnWarning = form.value.autoStopOnWarning || false
       data.useUnifiedUserAgent = form.value.useUnifiedUserAgent || false
+      data.useUnifiedClientId = form.value.useUnifiedClientId || false
+      data.unifiedClientId = form.value.unifiedClientId || ''
       // 更新订阅类型信息
       data.subscriptionInfo = {
         accountType: form.value.subscriptionType || 'claude_max',
@@ -3408,6 +3558,8 @@ watch(
         subscriptionType: subscriptionType,
         autoStopOnWarning: newAccount.autoStopOnWarning || false,
         useUnifiedUserAgent: newAccount.useUnifiedUserAgent || false,
+        useUnifiedClientId: newAccount.useUnifiedClientId || false,
+        unifiedClientId: newAccount.unifiedClientId || '',
         groupId: groupId,
         groupIds: [],
         projectId: newAccount.projectId || '',
@@ -3527,6 +3679,32 @@ const clearUnifiedCache = async () => {
     showToast('清除缓存失败：' + (error.message || '未知错误'), 'error')
   } finally {
     clearingCache.value = false
+  }
+}
+
+// 生成客户端标识
+const generateClientId = () => {
+  // 生成64位十六进制字符串（32字节）
+  const bytes = new Uint8Array(32)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+// 重新生成客户端标识
+const regenerateClientId = () => {
+  form.value.unifiedClientId = generateClientId()
+  showToast('已生成新的客户端标识', 'success')
+}
+
+// 处理统一客户端标识复选框变化
+const handleUnifiedClientIdChange = () => {
+  if (form.value.useUnifiedClientId) {
+    // 如果启用了统一客户端标识，自动启用统一User-Agent
+    form.value.useUnifiedUserAgent = true
+    // 如果没有客户端标识，自动生成一个
+    if (!form.value.unifiedClientId) {
+      form.value.unifiedClientId = generateClientId()
+    }
   }
 }
 

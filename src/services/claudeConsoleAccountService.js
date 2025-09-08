@@ -400,6 +400,7 @@ class ClaudeConsoleAccountService {
         rateLimitedAt: new Date().toISOString(),
         rateLimitStatus: 'limited',
         isActive: 'false', // 禁用账户
+        schedulable: 'false', // 停止调度，与其他平台保持一致
         errorMessage: `Rate limited at ${new Date().toISOString()}`
       }
 
@@ -468,6 +469,7 @@ class ClaudeConsoleAccountService {
           // 没有额度限制，完全恢复
           await client.hset(accountKey, {
             isActive: 'true',
+            schedulable: 'true', // 恢复调度，与其他平台保持一致
             status: 'active',
             errorMessage: ''
           })
@@ -1129,6 +1131,66 @@ class ClaudeConsoleAccountService {
     } catch (error) {
       logger.error('Failed to get account usage stats:', error)
       return null
+    }
+  }
+
+  // 🔄 重置账户所有异常状态
+  async resetAccountStatus(accountId) {
+    try {
+      const accountData = await this.getAccount(accountId)
+      if (!accountData) {
+        throw new Error('Account not found')
+      }
+
+      const client = redis.getClientSafe()
+      const accountKey = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+
+      // 准备要更新的字段
+      const updates = {
+        status: 'active',
+        errorMessage: '',
+        schedulable: 'true',
+        isActive: 'true' // 重要：必须恢复isActive状态
+      }
+
+      // 删除所有异常状态相关的字段
+      const fieldsToDelete = [
+        'rateLimitedAt',
+        'rateLimitStatus',
+        'unauthorizedAt',
+        'unauthorizedCount',
+        'overloadedAt',
+        'overloadStatus',
+        'blockedAt',
+        'quotaStoppedAt'
+      ]
+
+      // 执行更新
+      await client.hset(accountKey, updates)
+      await client.hdel(accountKey, ...fieldsToDelete)
+
+      logger.success(`✅ Reset all error status for Claude Console account ${accountId}`)
+
+      // 发送 Webhook 通知
+      try {
+        const webhookNotifier = require('../utils/webhookNotifier')
+        await webhookNotifier.sendAccountAnomalyNotification({
+          accountId,
+          accountName: accountData.name || accountId,
+          platform: 'claude-console',
+          status: 'recovered',
+          errorCode: 'STATUS_RESET',
+          reason: 'Account status manually reset',
+          timestamp: new Date().toISOString()
+        })
+      } catch (webhookError) {
+        logger.warn('Failed to send webhook notification:', webhookError)
+      }
+
+      return { success: true, accountId }
+    } catch (error) {
+      logger.error(`❌ Failed to reset Claude Console account status: ${accountId}`, error)
+      throw error
     }
   }
 }

@@ -60,7 +60,9 @@ class ClaudeAccountService {
       schedulable = true, // 是否可被调度
       subscriptionInfo = null, // 手动设置的订阅信息
       autoStopOnWarning = false, // 5小时使用量接近限制时自动停止调度
-      useUnifiedUserAgent = false // 是否使用统一Claude Code版本的User-Agent
+      useUnifiedUserAgent = false, // 是否使用统一Claude Code版本的User-Agent
+      useUnifiedClientId = false, // 是否使用统一的客户端标识
+      unifiedClientId = '' // 统一的客户端标识
     } = options
 
     const accountId = uuidv4()
@@ -93,6 +95,8 @@ class ClaudeAccountService {
         schedulable: schedulable.toString(), // 是否可被调度
         autoStopOnWarning: autoStopOnWarning.toString(), // 5小时使用量接近限制时自动停止调度
         useUnifiedUserAgent: useUnifiedUserAgent.toString(), // 是否使用统一Claude Code版本的User-Agent
+        useUnifiedClientId: useUnifiedClientId.toString(), // 是否使用统一的客户端标识
+        unifiedClientId: unifiedClientId || '', // 统一的客户端标识
         // 优先使用手动设置的订阅信息，否则使用OAuth数据中的，否则默认为空
         subscriptionInfo: subscriptionInfo
           ? JSON.stringify(subscriptionInfo)
@@ -166,7 +170,10 @@ class ClaudeAccountService {
       createdAt: accountData.createdAt,
       expiresAt: accountData.expiresAt,
       scopes: claudeAiOauth ? claudeAiOauth.scopes : [],
-      autoStopOnWarning
+      autoStopOnWarning,
+      useUnifiedUserAgent,
+      useUnifiedClientId,
+      unifiedClientId
     }
   }
 
@@ -492,6 +499,9 @@ class ClaudeAccountService {
             autoStopOnWarning: account.autoStopOnWarning === 'true', // 默认为false
             // 添加统一User-Agent设置
             useUnifiedUserAgent: account.useUnifiedUserAgent === 'true', // 默认为false
+            // 添加统一客户端标识设置
+            useUnifiedClientId: account.useUnifiedClientId === 'true', // 默认为false
+            unifiedClientId: account.unifiedClientId || '', // 统一的客户端标识
             // 添加停止原因
             stoppedReason: account.stoppedReason || null
           }
@@ -528,7 +538,9 @@ class ClaudeAccountService {
         'schedulable',
         'subscriptionInfo',
         'autoStopOnWarning',
-        'useUnifiedUserAgent'
+        'useUnifiedUserAgent',
+        'useUnifiedClientId',
+        'unifiedClientId'
       ]
       const updatedData = { ...accountData }
 
@@ -1067,6 +1079,8 @@ class ClaudeAccountService {
       const updatedAccountData = { ...accountData }
       updatedAccountData.rateLimitedAt = new Date().toISOString()
       updatedAccountData.rateLimitStatus = 'limited'
+      // 限流时停止调度，与 OpenAI 账号保持一致
+      updatedAccountData.schedulable = false
 
       // 如果提供了准确的限流重置时间戳（来自API响应头）
       if (rateLimitResetTimestamp) {
@@ -1151,9 +1165,33 @@ class ClaudeAccountService {
       delete accountData.rateLimitedAt
       delete accountData.rateLimitStatus
       delete accountData.rateLimitEndAt // 清除限流结束时间
+      // 恢复可调度状态，与 OpenAI 账号保持一致
+      accountData.schedulable = true
       await redis.setClaudeAccount(accountId, accountData)
 
-      logger.success(`✅ Rate limit removed for account: ${accountData.name} (${accountId})`)
+      logger.success(
+        `✅ Rate limit removed for account: ${accountData.name} (${accountId}), schedulable restored`
+      )
+
+      // 发送 Webhook 通知限流已解除
+      try {
+        const webhookNotifier = require('../utils/webhookNotifier')
+        await webhookNotifier.sendAccountAnomalyNotification({
+          accountId,
+          accountName: accountData.name || 'Claude Account',
+          platform: 'claude-oauth',
+          status: 'recovered',
+          errorCode: 'CLAUDE_OAUTH_RATE_LIMIT_CLEARED',
+          reason: 'Rate limit has been cleared and account is now schedulable',
+          timestamp: getISOStringWithTimezone(new Date())
+        })
+        logger.info(
+          `📢 Webhook notification sent for Claude account ${accountData.name} rate limit cleared`
+        )
+      } catch (webhookError) {
+        logger.error('Failed to send rate limit cleared webhook notification:', webhookError)
+      }
+
       return { success: true }
     } catch (error) {
       logger.error(`❌ Failed to remove rate limit for account: ${accountId}`, error)

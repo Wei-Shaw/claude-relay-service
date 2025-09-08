@@ -301,10 +301,10 @@ class UnifiedOpenAIScheduler {
   }
 
   // 🚫 标记账户为限流状态
-  async markAccountRateLimited(accountId, accountType, sessionHash = null) {
+  async markAccountRateLimited(accountId, accountType, sessionHash = null, resetsInSeconds = null) {
     try {
       if (accountType === 'openai') {
-        await openaiAccountService.setAccountRateLimited(accountId, true)
+        await openaiAccountService.setAccountRateLimited(accountId, true, resetsInSeconds)
       }
 
       // 删除会话映射
@@ -347,12 +347,30 @@ class UnifiedOpenAIScheduler {
         return false
       }
 
-      if (account.rateLimitStatus === 'limited' && account.rateLimitedAt) {
-        const limitedAt = new Date(account.rateLimitedAt).getTime()
-        const now = Date.now()
-        const limitDuration = 60 * 60 * 1000 // 1小时
+      if (account.rateLimitStatus === 'limited') {
+        // 如果有具体的重置时间，使用它
+        if (account.rateLimitResetAt) {
+          const resetTime = new Date(account.rateLimitResetAt).getTime()
+          const now = Date.now()
+          const isStillLimited = now < resetTime
 
-        return now < limitedAt + limitDuration
+          // 如果已经过了重置时间，自动清除限流状态
+          if (!isStillLimited) {
+            logger.info(`✅ Auto-clearing rate limit for account ${accountId} (reset time reached)`)
+            await openaiAccountService.setAccountRateLimited(accountId, false)
+            return false
+          }
+
+          return isStillLimited
+        }
+
+        // 如果没有具体的重置时间，使用默认的1小时
+        if (account.rateLimitedAt) {
+          const limitedAt = new Date(account.rateLimitedAt).getTime()
+          const now = Date.now()
+          const limitDuration = 60 * 60 * 1000 // 1小时
+          return now < limitedAt + limitDuration
+        }
       }
       return false
     } catch (error) {
