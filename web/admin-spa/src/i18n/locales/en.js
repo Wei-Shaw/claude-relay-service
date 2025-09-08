@@ -215,5 +215,106 @@ export default {
     passwordPlaceholder: 'Please enter password',
     loginButton: 'Login',
     loggingIn: 'Logging in...'
+  },
+  
+  // Dashboard page
+  dashboard: {
+    // Main stats cards
+    totalApiKeys: 'Total API Keys',
+    activeApiKeys: 'Active',
+    serviceAccounts: 'Service Accounts',
+    normalAccounts: 'Normal',
+    abnormalAccounts: 'Abnormal',
+    pausedAccounts: 'Paused',
+    rateLimitedAccounts: 'Rate Limited',
+    todayRequests: 'Today Requests',
+    totalRequests: 'Total Requests',
+    systemStatus: 'System Status',
+    uptime: 'Uptime',
+    
+    // Platform accounts tooltip
+    claudeAccount: 'Claude: {total} accounts (Normal: {normal})',
+    consoleAccount: 'Console: {total} accounts (Normal: {normal})',
+    geminiAccount: 'Gemini: {total} accounts (Normal: {normal})',
+    bedrockAccount: 'Bedrock: {total} accounts (Normal: {normal})',
+    openaiAccount: 'OpenAI: {total} accounts (Normal: {normal})',
+    azureOpenaiAccount: 'Azure OpenAI: {total} accounts (Normal: {normal})',
+    
+    // Token stats cards
+    todayToken: 'Today Tokens',
+    totalTokenConsumption: 'Total Token Consumption',
+    inputTokens: 'Input',
+    outputTokens: 'Output',
+    cacheCreateTokens: 'Cache Create',
+    cacheReadTokens: 'Cache Read',
+    
+    // Real-time metrics
+    realtimeRPM: 'Realtime RPM',
+    realtimeTPM: 'Realtime TPM',
+    requestsPerMinute: 'Requests per Minute',
+    tokensPerMinute: 'Tokens per Minute',
+    historicalData: 'Historical Data',
+    minutes: 'minutes',
+    
+    // Charts section
+    modelDistributionAndTrend: 'Model Usage Distribution & Token Usage Trends',
+    
+    // Date filter presets
+    today: 'Today',
+    yesterday: 'Yesterday',
+    last7Days: 'Last 7 Days',
+    last30Days: 'Last 30 Days',
+    thisWeek: 'This Week',
+    lastWeek: 'Last Week',
+    thisMonth: 'This Month',
+    lastMonth: 'Last Month',
+    
+    // Granularity buttons
+    byDay: 'By Day',
+    byHour: 'By Hour',
+    
+    // Date picker
+    startDatePlaceholder: 'Start Date',
+    endDatePlaceholder: 'End Date',
+    dateSeparator: 'to',
+    maxHours24: 'Maximum 24 hours',
+    
+    // Auto refresh controls
+    autoRefresh: 'Auto Refresh',
+    refresh: 'Refresh',
+    refreshing: 'Refreshing',
+    refreshDataNow: 'Refresh data now',
+    
+    // Charts
+    tokenUsageDistribution: 'Token Usage Distribution',
+    detailedStatistics: 'Detailed Statistics',
+    noModelUsageData: 'No model usage data available',
+    
+    // Table headers
+    model: 'Model',
+    requestCount: 'Requests',
+    totalTokens: 'Total Tokens',
+    cost: 'Cost',
+    percentage: 'Percentage',
+    
+    // Trend charts
+    tokenUsageTrend: 'Token Usage Trend',
+    apiKeysUsageTrend: 'API Keys Usage Trend',
+    requestsCount: 'Requests Count',
+    tokenCount: 'Token Count',
+    totalApiKeysCount: 'Total {count} API Keys',
+    showingTop10: 'Total {count} API Keys, showing top 10 by usage',
+    
+    // Chart labels
+    inputTokensLabel: 'Input Tokens',
+    outputTokensLabel: 'Output Tokens',
+    cacheCreateTokensLabel: 'Cache Create Tokens',
+    cacheReadTokensLabel: 'Cache Read Tokens',
+    costLabel: 'Cost (USD)',
+    requestsLabel: 'Requests',
+    time: 'Time',
+    date: 'Date',
+    tokenQuantity: 'Token Quantity',
+    requestsQuantity: 'Requests Count'
   }
 }
