@@ -1735,6 +1735,23 @@ const getSchedulableReason = (account) => {
     }
   }
 
+  // OpenAI 账户的错误状态
+  if (account.platform === 'openai') {
+    if (account.status === 'unauthorized') {
+      return '认证失败（401错误）'
+    }
+    // 检查限流状态 - 兼容嵌套的 rateLimitStatus 对象
+    if (
+      (account.rateLimitStatus && account.rateLimitStatus.isRateLimited) ||
+      account.isRateLimited
+    ) {
+      return '触发限流（429错误）'
+    }
+    if (account.status === 'error' && account.errorMessage) {
+      return account.errorMessage
+    }
+  }
+
   // 通用原因
   if (account.stoppedReason) {
     return account.stoppedReason

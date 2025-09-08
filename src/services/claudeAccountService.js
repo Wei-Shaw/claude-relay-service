@@ -1181,25 +1181,6 @@ class ClaudeAccountService {
         `✅ Rate limit removed for account: ${accountData.name} (${accountId}), schedulable restored`
       )
 
-      // 发送 Webhook 通知限流已解除
-      try {
-        const webhookNotifier = require('../utils/webhookNotifier')
-        await webhookNotifier.sendAccountAnomalyNotification({
-          accountId,
-          accountName: accountData.name || 'Claude Account',
-          platform: 'claude-oauth',
-          status: 'recovered',
-          errorCode: 'CLAUDE_OAUTH_RATE_LIMIT_CLEARED',
-          reason: 'Rate limit has been cleared and account is now schedulable',
-          timestamp: getISOStringWithTimezone(new Date())
-        })
-        logger.info(
-          `📢 Webhook notification sent for Claude account ${accountData.name} rate limit cleared`
-        )
-      } catch (webhookError) {
-        logger.error('Failed to send rate limit cleared webhook notification:', webhookError)
-      }
-
       return { success: true }
     } catch (error) {
       logger.error(`❌ Failed to remove rate limit for account: ${accountId}`, error)
