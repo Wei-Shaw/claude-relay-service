@@ -215,5 +215,106 @@ export default {
     passwordPlaceholder: '请输入密码',
     loginButton: '登录',
     loggingIn: '登录中...'
+  },
+  
+  // Dashboard page
+  dashboard: {
+    // Main stats cards
+    totalApiKeys: '总 API Keys',
+    activeApiKeys: '活跃',
+    serviceAccounts: '服务账户',
+    normalAccounts: '正常',
+    abnormalAccounts: '异常',
+    pausedAccounts: '停止调度',
+    rateLimitedAccounts: '限流',
+    todayRequests: '今日请求',
+    totalRequests: '总请求',
+    systemStatus: '系统状态',
+    uptime: '运行时间',
+    
+    // Platform accounts tooltip
+    claudeAccount: 'Claude: {total} 个 (正常: {normal})',
+    consoleAccount: 'Console: {total} 个 (正常: {normal})',
+    geminiAccount: 'Gemini: {total} 个 (正常: {normal})',
+    bedrockAccount: 'Bedrock: {total} 个 (正常: {normal})',
+    openaiAccount: 'OpenAI: {total} 个 (正常: {normal})',
+    azureOpenaiAccount: 'Azure OpenAI: {total} 个 (正常: {normal})',
+    
+    // Token stats cards
+    todayToken: '今日Token',
+    totalTokenConsumption: '总Token消耗',
+    inputTokens: '输入',
+    outputTokens: '输出',
+    cacheCreateTokens: '缓存创建',
+    cacheReadTokens: '缓存读取',
+    
+    // Real-time metrics
+    realtimeRPM: '实时RPM',
+    realtimeTPM: '实时TPM',
+    requestsPerMinute: '每分钟请求数',
+    tokensPerMinute: '每分钟Token数',
+    historicalData: '历史数据',
+    minutes: '分钟',
+    
+    // Charts section
+    modelDistributionAndTrend: '模型使用分布与Token使用趋势',
+    
+    // Date filter presets (would be populated from dateFilter.presetOptions)
+    today: '今日',
+    yesterday: '昨日',
+    last7Days: '迗 7 天',
+    last30Days: '迗 30 天',
+    thisWeek: '本周',
+    lastWeek: '上周',
+    thisMonth: '本月',
+    lastMonth: '上月',
+    
+    // Granularity buttons
+    byDay: '按天',
+    byHour: '按小时',
+    
+    // Date picker
+    startDatePlaceholder: '开始日期',
+    endDatePlaceholder: '结束日期',
+    dateSeparator: '至',
+    maxHours24: '最多24小时',
+    
+    // Auto refresh controls
+    autoRefresh: '自动刷新',
+    refresh: '刷新',
+    refreshing: '刷新中',
+    refreshDataNow: '立即刷新数据',
+    
+    // Charts
+    tokenUsageDistribution: 'Token使用分布',
+    detailedStatistics: '详细统计数据',
+    noModelUsageData: '暂无模型使用数据',
+    
+    // Table headers
+    model: '模型',
+    requestCount: '请求数',
+    totalTokens: '总Token',
+    cost: '费用',
+    percentage: '占比',
+    
+    // Trend charts
+    tokenUsageTrend: 'Token使用趋势',
+    apiKeysUsageTrend: 'API Keys 使用趋势',
+    requestsCount: '请求次数',
+    tokenCount: 'Token 数量',
+    totalApiKeysCount: '共 {count} 个 API Key',
+    showingTop10: '共 {count} 个 API Key，显示使用量前 10 个',
+    
+    // Chart labels
+    inputTokensLabel: '输入Token',
+    outputTokensLabel: '输出Token', 
+    cacheCreateTokensLabel: '缓存创建Token',
+    cacheReadTokensLabel: '缓存读取Token',
+    costLabel: '费用 (USD)',
+    requestsLabel: '请求数',
+    time: '时间',
+    date: '日期',
+    tokenQuantity: 'Token数量',
+    requestsQuantity: '请求次数'
   }
 }

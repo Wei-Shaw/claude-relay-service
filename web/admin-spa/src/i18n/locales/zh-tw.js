@@ -215,5 +215,106 @@ export default {
     passwordPlaceholder: '請輸入密碼',
     loginButton: '登錄',
     loggingIn: '登錄中...'
+  },
+  
+  // Dashboard page
+  dashboard: {
+    // Main stats cards
+    totalApiKeys: '總 API Keys',
+    activeApiKeys: '活躍',
+    serviceAccounts: '服務帳戶',
+    normalAccounts: '正常',
+    abnormalAccounts: '異常',
+    pausedAccounts: '停止調度',
+    rateLimitedAccounts: '限流',
+    todayRequests: '今日請求',
+    totalRequests: '總請求',
+    systemStatus: '系統狀態',
+    uptime: '運行時間',
+    
+    // Platform accounts tooltip
+    claudeAccount: 'Claude: {total} 個 (正常: {normal})',
+    consoleAccount: 'Console: {total} 個 (正常: {normal})',
+    geminiAccount: 'Gemini: {total} 個 (正常: {normal})',
+    bedrockAccount: 'Bedrock: {total} 個 (正常: {normal})',
+    openaiAccount: 'OpenAI: {total} 個 (正常: {normal})',
+    azureOpenaiAccount: 'Azure OpenAI: {total} 個 (正常: {normal})',
+    
+    // Token stats cards
+    todayToken: '今日Token',
+    totalTokenConsumption: '總Token消耗',
+    inputTokens: '輸入',
+    outputTokens: '輸出',
+    cacheCreateTokens: '快取建立',
+    cacheReadTokens: '快取讀取',
+    
+    // Real-time metrics
+    realtimeRPM: '即時RPM',
+    realtimeTPM: '即時TPM',
+    requestsPerMinute: '每分钟請求數',
+    tokensPerMinute: '每分钟Token數',
+    historicalData: '歷史資料',
+    minutes: '分钟',
+    
+    // Charts section
+    modelDistributionAndTrend: '模型使用分佈與Token使用趋勢',
+    
+    // Date filter presets
+    today: '今日',
+    yesterday: '昨日',
+    last7Days: '近 7 天',
+    last30Days: '近 30 天',
+    thisWeek: '本週',
+    lastWeek: '上週',
+    thisMonth: '本月',
+    lastMonth: '上月',
+    
+    // Granularity buttons
+    byDay: '按日',
+    byHour: '按小時',
+    
+    // Date picker
+    startDatePlaceholder: '開始日期',
+    endDatePlaceholder: '結束日期',
+    dateSeparator: '至',
+    maxHours24: '最多24小時',
+    
+    // Auto refresh controls
+    autoRefresh: '自動刷新',
+    refresh: '刷新',
+    refreshing: '刷新中',
+    refreshDataNow: '立即刷新資料',
+    
+    // Charts
+    tokenUsageDistribution: 'Token使用分佈',
+    detailedStatistics: '詳細統計資料',
+    noModelUsageData: '暫無模型使用資料',
+    
+    // Table headers
+    model: '模型',
+    requestCount: '請求數',
+    totalTokens: '總Token',
+    cost: '費用',
+    percentage: '占比',
+    
+    // Trend charts
+    tokenUsageTrend: 'Token使用趋勢',
+    apiKeysUsageTrend: 'API Keys 使用趋勢',
+    requestsCount: '請求次數',
+    tokenCount: 'Token 數量',
+    totalApiKeysCount: '共 {count} 個 API Key',
+    showingTop10: '共 {count} 個 API Key，顯示使用量前 10 個',
+    
+    // Chart labels
+    inputTokensLabel: '輸入Token',
+    outputTokensLabel: '輸出Token',
+    cacheCreateTokensLabel: '快取建立Token',
+    cacheReadTokensLabel: '快取讀取Token',
+    costLabel: '費用 (USD)',
+    requestsLabel: '請求數',
+    time: '時間',
+    date: '日期',
+    tokenQuantity: 'Token數量',
+    requestsQuantity: '請求次數'
   }
 }
