@@ -272,7 +272,12 @@
                       >
                         <i class="fas fa-share-alt mr-1" />共享
                       </span>
-                      <!-- 显示所有分组 -->
+                    </div>
+                    <!-- 显示所有分组 - 换行显示 -->
+                    <div
+                      v-if="account.groupInfos && account.groupInfos.length > 0"
+                      class="flex items-center gap-2"
+                    >
                       <span
                         v-for="group in account.groupInfos"
                         :key="group.id"
