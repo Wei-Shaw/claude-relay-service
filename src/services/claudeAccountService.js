@@ -712,8 +712,12 @@ class ClaudeAccountService {
       }
 
       // 如果没有映射或映射无效，选择新账户
-      // 基于日费用选择账户（费用最少的优先）
-      const sortedAccounts = await this.sortAccountsByCost(activeAccounts)
+      // 优先选择最久未使用的账户（负载均衡）
+      const sortedAccounts = activeAccounts.sort((a, b) => {
+        const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
+        const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
+        return aLastUsed - bLastUsed // 最久未使用的优先
+      })
 
       const selectedAccountId = sortedAccounts[0].id
 
@@ -857,8 +861,12 @@ class ClaudeAccountService {
           return aRateLimitedAt - bRateLimitedAt // 最早限流的优先
         })
       } else {
-        // 非限流账户按日费用排序（费用最少的优先）
-        candidateAccounts = await this.sortAccountsByCost(candidateAccounts)
+        // 非限流账户按最后使用时间排序（最久未使用的优先）
+        candidateAccounts = candidateAccounts.sort((a, b) => {
+          const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
+          const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
+          return aLastUsed - bLastUsed // 最久未使用的优先
+        })
       }
 
       if (candidateAccounts.length === 0) {
@@ -875,10 +883,8 @@ class ClaudeAccountService {
         )
       }
 
-      // 显示选择的账号和其日费用
-      const selectedCost = candidateAccounts[0]._dailyCost || 0
       logger.info(
-        `🎯 Selected shared account: ${candidateAccounts[0].name} (${selectedAccountId}) for API key ${apiKeyData.name} - Daily cost: $${selectedCost.toFixed(4)}`
+        `🎯 Selected shared account: ${candidateAccounts[0].name} (${selectedAccountId}) for API key ${apiKeyData.name}`
       )
       return selectedAccountId
     } catch (error) {
@@ -2106,70 +2112,6 @@ class ClaudeAccountService {
       )
     } catch (error) {
       logger.error(`❌ Failed to update session window status for account ${accountId}:`, error)
-    }
-  }
-
-  // 💰 基于日费用排序账号（费用最少的优先）
-  async sortAccountsByCost(accounts) {
-    try {
-      // 并行获取所有账号的日费用
-      const accountsWithCost = await Promise.all(
-        accounts.map(async (account) => {
-          try {
-            const dailyCost = await redis.getAccountDailyCost(account.id)
-            return {
-              ...account,
-              _dailyCost: dailyCost
-            }
-          } catch (error) {
-            logger.warn(`Failed to get daily cost for account ${account.id}: ${error.message}`)
-            return {
-              ...account,
-              _dailyCost: Number.MAX_SAFE_INTEGER, // 获取费用失败时，设为最高值（最低优先级）
-              _costError: true
-            }
-          }
-        })
-      )
-
-      // 按日费用排序（费用最少的优先）
-      const sortedAccounts = accountsWithCost.sort((a, b) => {
-        // 如果费用相同，按最后使用时间排序（最久未使用的优先）
-        if (Math.abs(a._dailyCost - b._dailyCost) < 0.000001) {
-          const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
-          const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
-          return aLastUsed - bLastUsed
-        }
-        return a._dailyCost - b._dailyCost
-      })
-
-      // 检查是否所有账号的费用获取都失败了
-      const allAccountsHaveErrors = sortedAccounts.every((account) => account._costError)
-
-      if (allAccountsHaveErrors) {
-        logger.warn('⚠️ All accounts failed to get daily cost, falling back to time-based sorting')
-        return accounts.sort((a, b) => {
-          const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
-          const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
-          return aLastUsed - bLastUsed
-        })
-      }
-
-      logger.debug('💰 Account cost ranking:')
-      sortedAccounts.forEach((account, index) => {
-        const costDisplay = account._costError ? 'ERROR' : `$${account._dailyCost.toFixed(4)}`
-        logger.debug(`   ${index + 1}. ${account.name} (${account.id}): ${costDisplay}`)
-      })
-
-      return sortedAccounts
-    } catch (error) {
-      logger.error('❌ Failed to sort accounts by cost:', error)
-      // 回退到原有的按时间排序策略
-      return accounts.sort((a, b) => {
-        const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
-        const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
-        return aLastUsed - bLastUsed
-      })
     }
   }
 }
