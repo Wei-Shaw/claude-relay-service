@@ -534,8 +534,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       weeklyOpusCostLimit,
       tags,
       activationDays, // 新增：激活后有效天数
-      expirationMode, // 新增：过期模式
-      icon // 新增：图标（base64编码）
+      expirationMode // 新增：过期模式
     } = req.body
 
     // 输入验证
@@ -989,8 +988,7 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       dailyCostLimit,
       weeklyOpusCostLimit,
       tags,
-      ownerId, // 新增：所有者ID字段
-      icon // 新增：图标（base64编码）
+      ownerId // 新增：所有者ID字段
     } = req.body
 
     // 只允许更新指定字段
@@ -1162,19 +1160,6 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
         return res.status(400).json({ error: 'All tags must be non-empty strings' })
       }
       updates.tags = tags
-    }
-
-    // 处理图标
-    if (icon !== undefined) {
-      // icon 可以是空字符串（清除图标）或 base64 编码的字符串
-      if (icon !== '' && typeof icon !== 'string') {
-        return res.status(400).json({ error: 'Icon must be a string' })
-      }
-      // 简单验证 base64 格式（如果不为空）
-      if (icon && !icon.startsWith('data:image/')) {
-        return res.status(400).json({ error: 'Icon must be a valid base64 image' })
-      }
-      updates.icon = icon
     }
 
     // 处理活跃/禁用状态状态, 放在过期处理后，以确保后续增加禁用key功能

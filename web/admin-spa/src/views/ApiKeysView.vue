@@ -1046,12 +1046,6 @@
                     :value="key.id"
                     @change="updateSelectAllState"
                   />
-                  <!-- API Key 图标 -->
-                  <IconPicker
-                    v-model="key.icon"
-                    size="medium"
-                    @update:model-value="(val) => updateApiKeyIcon(key.id, val)"
-                  />
                   <div>
                     <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">
                       {{ key.name }}
@@ -1758,7 +1752,6 @@ import { apiClient } from '@/config/api'
 import { useClientsStore } from '@/stores/clients'
 import { useAuthStore } from '@/stores/auth'
 import * as XLSX from 'xlsx-js-style'
-import IconPicker from '@/components/common/IconPicker.vue'
 import CreateApiKeyModal from '@/components/apikeys/CreateApiKeyModal.vue'
 import EditApiKeyModal from '@/components/apikeys/EditApiKeyModal.vue'
 import RenewApiKeyModal from '@/components/apikeys/RenewApiKeyModal.vue'
@@ -2977,28 +2970,6 @@ const toggleApiKeyStatus = async (key) => {
 }
 
 // 更新API Key图标
-const updateApiKeyIcon = async (keyId, icon) => {
-  try {
-    const data = await apiClient.put(`/admin/api-keys/${keyId}`, {
-      icon: icon
-    })
-
-    if (data.success) {
-      // 更新本地数据
-      const localKey = apiKeys.value.find((k) => k.id === keyId)
-      if (localKey) {
-        localKey.icon = icon
-      }
-      showToast('图标已更新', 'success')
-    } else {
-      showToast(data.message || '更新图标失败', 'error')
-    }
-  } catch (error) {
-    console.error('更新图标失败:', error)
-    showToast('更新图标失败，请重试', 'error')
-  }
-}
-
 // 删除API Key
 const deleteApiKey = async (keyId) => {
   let confirmed = false
