@@ -276,12 +276,12 @@
                     <!-- 显示所有分组 - 换行显示 -->
                     <div
                       v-if="account.groupInfos && account.groupInfos.length > 0"
-                      class="flex items-center gap-2"
+                      class="my-2 flex flex-wrap items-center gap-2"
                     >
                       <span
                         v-for="group in account.groupInfos"
                         :key="group.id"
-                        class="ml-1 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+                        class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-400"
                         :title="`所属分组: ${group.name}`"
                       >
                         <i class="fas fa-folder mr-1" />{{ group.name }}
