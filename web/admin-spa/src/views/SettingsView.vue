@@ -1514,6 +1514,15 @@ const testPlatform = async (platform) => {
       testData.level = platform.level
       testData.sound = platform.sound
       testData.group = platform.group
+    } else if (platform.type === 'smtp') {
+      testData.host = platform.host
+      testData.port = platform.port
+      testData.secure = platform.secure
+      testData.user = platform.user
+      testData.pass = platform.pass
+      testData.from = platform.from
+      testData.to = platform.to
+      testData.ignoreTLS = platform.ignoreTLS
     } else {
       testData.url = platform.url
     }
