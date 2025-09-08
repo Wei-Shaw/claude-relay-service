@@ -316,5 +316,179 @@ export default {
     date: '日期',
     tokenQuantity: 'Token数量',
     requestsQuantity: '请求次数'
+  },
+  
+  // Accounts page
+  accounts: {
+    title: '账户管理',
+    description: '管理您的 Claude、Gemini、OpenAI 和 Azure OpenAI 账户及代理配置',
+    
+    // Filters and sorting
+    sortBy: '选择排序',
+    selectPlatform: '选择平台',
+    selectGroup: '选择分组',
+    refresh: '刷新',
+    refreshTooltip: '刷新数据 (Ctrl/⌘+点击强制刷新所有缓存)',
+    addAccount: '添加账户',
+    
+    // Sort options
+    sortByName: '按名称排序',
+    sortByDailyTokens: '按今日Token排序',
+    sortByDailyRequests: '按今日请求数排序',
+    sortByTotalTokens: '按总Token排序',
+    sortByLastUsed: '按最后使用排序',
+    
+    // Platform options
+    allPlatforms: '所有平台',
+    claudePlatform: 'Claude',
+    claudeConsolePlatform: 'Claude Console',
+    geminiPlatform: 'Gemini',
+    openaiPlatform: 'OpenAi',
+    azureOpenaiPlatform: 'Azure OpenAI',
+    bedrockPlatform: 'Bedrock',
+    
+    // Group options
+    allAccounts: '所有账户',
+    ungroupedAccounts: '未分组账户',
+    
+    // Loading states
+    loadingAccounts: '正在加载账户...',
+    noAccounts: '暂无账户',
+    noAccountsHint: '点击上方按钮添加您的第一个账户',
+    
+    // Table headers
+    name: '名称',
+    platformType: '平台/类型',
+    status: '状态',
+    priority: '优先级',
+    proxy: '代理',
+    dailyUsage: '今日使用',
+    sessionWindow: '会话窗口',
+    lastUsed: '最后使用',
+    actions: '操作',
+    
+    // Account types
+    dedicated: '专属',
+    groupScheduling: '分组调度',
+    shared: '共享',
+    belongsToGroup: '所属分组: {name}',
+    
+    // Platform labels
+    unknown: '未知',
+    apiKey: 'API Key',
+    oauth: 'OAuth',
+    setup: 'Setup',
+    aws: 'AWS',
+    
+    // Account status
+    normal: '正常',
+    abnormal: '异常',
+    blocked: '已封锁',
+    tempError: '临时异常',
+    rateLimited: '限流中',
+    notSchedulable: '不可调度',
+    bound: '绑定: {count} 个API Key',
+    
+    // Proxy status
+    noProxy: '无代理',
+    
+    // Usage statistics
+    requests: '次',
+    noData: '暂无数据',
+    averageRpm: '平均 {rpm} RPM',
+    
+    // Session window tooltip
+    sessionWindowTooltip: {
+      title: '会话窗口进度表示5小时窗口的时间进度',
+      normal: '正常：请求正常处理',
+      warning: '警告：接近限制',
+      rejected: '拒绝：达到速率限制'
+    },
+    
+    // Session window status
+    remaining: '剩余 {time}',
+    ended: '已结束',
+    
+    // Console quota
+    quotaProgress: '额度进度',
+    remainingQuota: '剩余 $${amount}',
+    reset: '重置 {time}',
+    
+    // Mobile view labels
+    dailyUsageLabel: '今日使用',
+    sessionWindowLabel: '会话窗口',
+    lastUsedLabel: '最后使用',
+    proxyLabel: '代理',
+    priorityLabel: '优先级',
+    neverUsed: '从未使用',
+    sessionWindowTooltipMobile: '会话窗口进度不代表使用量，仅表示距离下一个5小时窗口的剩余时间',
+    
+    // Action buttons
+    resetStatus: '重置状态',
+    resetting: '重置中...',
+    resetStatusTooltip: '重置所有异常状态',
+    scheduling: '调度',
+    disabled: '停用',
+    enableTooltip: '点击启用调度',
+    disableTooltip: '点击禁用调度',
+    edit: '编辑',
+    editTooltip: '编辑账户',
+    delete: '删除',
+    deleteTooltip: '删除账户',
+    pause: '暂停',
+    enable: '启用',
+    
+    // Time formatting
+    justNow: '刚刚',
+    minutesAgo: '{minutes} 分钟前',
+    hoursAgo: '{hours} 小时前',
+    daysAgo: '{days} 天前',
+    hoursAndMinutes: '{hours}小时{minutes}分钟',
+    hoursOnly: '{hours}小时',
+    minutesOnly: '{minutes}分钟',
+    daysAndHours: '{days}天{hours}小时',
+    daysOnly: '{days}天',
+    
+    // Rate limit time
+    rateLimitTime: '({time})',
+    
+    // Messages and confirmations
+    resetStatusConfirmTitle: '重置账户状态',
+    resetStatusConfirmMessage: '确定要重置此账户的所有异常状态吗？这将清除限流状态、401错误计数等所有异常标记。',
+    resetStatusConfirmButton: '确定重置',
+    resetStatusCancelButton: '取消',
+    statusResetSuccess: '账户状态已重置',
+    statusResetFailed: '状态重置失败',
+    
+    deleteAccountTitle: '删除账户',
+    deleteAccountMessage: '确定要删除账户 "{name}" 吗？\n\n此操作不可恢复。',
+    deleteAccountButton: '删除',
+    deleteAccountCancel: '取消',
+    cannotDeleteBoundAccount: '无法删除此账号，有 {count} 个API Key绑定到此账号，请先解绑所有API Key',
+    accountDeleted: '账户已删除',
+    deleteFailed: '删除失败',
+    
+    enabledScheduling: '已启用调度',
+    disabledScheduling: '已禁用调度',
+    schedulingToggleFailed: '切换调度状态失败',
+    unsupportedAccountType: '该账户类型暂不支持调度控制',
+    operationFailed: '操作失败',
+    
+    accountCreateSuccess: '账户创建成功',
+    accountUpdateSuccess: '账户更新成功',
+    loadAccountsFailed: '加载账户失败',
+    unsupportedAccountTypeReset: '不支持的账户类型',
+    
+    // Schedulable reasons
+    invalidApiKey: 'API Key无效或已过期（401错误）',
+    serviceOverload: '服务过载（529错误）',
+    rateLimitTriggered: '触发限流（429错误）',
+    authFailed: '认证失败（401错误）',
+    manualStop: '手动停止调度',
+    
+    // Account type display
+    claudeMax: 'Claude Max',
+    claudePro: 'Claude Pro',
+    claudeFree: 'Claude Free'
   }
 }

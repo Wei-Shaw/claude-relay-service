@@ -316,5 +316,179 @@ export default {
     date: 'Date',
     tokenQuantity: 'Token Quantity',
     requestsQuantity: 'Requests Count'
+  },
+  
+  // Accounts page
+  accounts: {
+    title: 'Account Management',
+    description: 'Manage your Claude, Gemini, OpenAI and Azure OpenAI accounts and proxy configurations',
+    
+    // Filters and sorting
+    sortBy: 'Select Sort',
+    selectPlatform: 'Select Platform',
+    selectGroup: 'Select Group',
+    refresh: 'Refresh',
+    refreshTooltip: 'Refresh data (Ctrl/⌘+click to force refresh all caches)',
+    addAccount: 'Add Account',
+    
+    // Sort options
+    sortByName: 'Sort by Name',
+    sortByDailyTokens: 'Sort by Daily Tokens',
+    sortByDailyRequests: 'Sort by Daily Requests',
+    sortByTotalTokens: 'Sort by Total Tokens',
+    sortByLastUsed: 'Sort by Last Used',
+    
+    // Platform options
+    allPlatforms: 'All Platforms',
+    claudePlatform: 'Claude',
+    claudeConsolePlatform: 'Claude Console',
+    geminiPlatform: 'Gemini',
+    openaiPlatform: 'OpenAI',
+    azureOpenaiPlatform: 'Azure OpenAI',
+    bedrockPlatform: 'Bedrock',
+    
+    // Group options
+    allAccounts: 'All Accounts',
+    ungroupedAccounts: 'Ungrouped Accounts',
+    
+    // Loading states
+    loadingAccounts: 'Loading accounts...',
+    noAccounts: 'No Accounts',
+    noAccountsHint: 'Click the button above to add your first account',
+    
+    // Table headers
+    name: 'Name',
+    platformType: 'Platform/Type',
+    status: 'Status',
+    priority: 'Priority',
+    proxy: 'Proxy',
+    dailyUsage: 'Daily Usage',
+    sessionWindow: 'Session Window',
+    lastUsed: 'Last Used',
+    actions: 'Actions',
+    
+    // Account types
+    dedicated: 'Dedicated',
+    groupScheduling: 'Group Scheduling',
+    shared: 'Shared',
+    belongsToGroup: 'Belongs to group: {name}',
+    
+    // Platform labels
+    unknown: 'Unknown',
+    apiKey: 'API Key',
+    oauth: 'OAuth',
+    setup: 'Setup',
+    aws: 'AWS',
+    
+    // Account status
+    normal: 'Normal',
+    abnormal: 'Abnormal',
+    blocked: 'Blocked',
+    tempError: 'Temporary Error',
+    rateLimited: 'Rate Limited',
+    notSchedulable: 'Not Schedulable',
+    bound: 'Bound: {count} API Keys',
+    
+    // Proxy status
+    noProxy: 'No Proxy',
+    
+    // Usage statistics
+    requests: ' requests',
+    noData: 'No Data',
+    averageRpm: 'Average {rpm} RPM',
+    
+    // Session window tooltip
+    sessionWindowTooltip: {
+      title: 'Session window progress indicates the time progress of the 5-hour window',
+      normal: 'Normal: Requests processed normally',
+      warning: 'Warning: Approaching limit',
+      rejected: 'Rejected: Rate limit reached'
+    },
+    
+    // Session window status
+    remaining: 'Remaining {time}',
+    ended: 'Ended',
+    
+    // Console quota
+    quotaProgress: 'Quota Progress',
+    remainingQuota: 'Remaining $${amount}',
+    reset: 'Reset {time}',
+    
+    // Mobile view labels
+    dailyUsageLabel: 'Daily Usage',
+    sessionWindowLabel: 'Session Window',
+    lastUsedLabel: 'Last Used',
+    proxyLabel: 'Proxy',
+    priorityLabel: 'Priority',
+    neverUsed: 'Never Used',
+    sessionWindowTooltipMobile: 'Session window progress does not represent usage, it only shows the remaining time until the next 5-hour window',
+    
+    // Action buttons
+    resetStatus: 'Reset Status',
+    resetting: 'Resetting...',
+    resetStatusTooltip: 'Reset all abnormal statuses',
+    scheduling: 'Scheduling',
+    disabled: 'Disabled',
+    enableTooltip: 'Click to enable scheduling',
+    disableTooltip: 'Click to disable scheduling',
+    edit: 'Edit',
+    editTooltip: 'Edit account',
+    delete: 'Delete',
+    deleteTooltip: 'Delete account',
+    pause: 'Pause',
+    enable: 'Enable',
+    
+    // Time formatting
+    justNow: 'Just now',
+    minutesAgo: '{minutes} minutes ago',
+    hoursAgo: '{hours} hours ago',
+    daysAgo: '{days} days ago',
+    hoursAndMinutes: '{hours} hours {minutes} minutes',
+    hoursOnly: '{hours} hours',
+    minutesOnly: '{minutes} minutes',
+    daysAndHours: '{days} days {hours} hours',
+    daysOnly: '{days} days',
+    
+    // Rate limit time
+    rateLimitTime: '({time})',
+    
+    // Messages and confirmations
+    resetStatusConfirmTitle: 'Reset Account Status',
+    resetStatusConfirmMessage: 'Are you sure you want to reset all abnormal statuses for this account? This will clear rate limit status, 401 error counts, and all other abnormal flags.',
+    resetStatusConfirmButton: 'Confirm Reset',
+    resetStatusCancelButton: 'Cancel',
+    statusResetSuccess: 'Account status has been reset',
+    statusResetFailed: 'Status reset failed',
+    
+    deleteAccountTitle: 'Delete Account',
+    deleteAccountMessage: 'Are you sure you want to delete account "{name}"?\n\nThis action cannot be undone.',
+    deleteAccountButton: 'Delete',
+    deleteAccountCancel: 'Cancel',
+    cannotDeleteBoundAccount: 'Cannot delete this account, {count} API Keys are bound to this account, please unbind all API Keys first',
+    accountDeleted: 'Account deleted',
+    deleteFailed: 'Delete failed',
+    
+    enabledScheduling: 'Scheduling enabled',
+    disabledScheduling: 'Scheduling disabled',
+    schedulingToggleFailed: 'Failed to toggle scheduling status',
+    unsupportedAccountType: 'This account type does not support scheduling control',
+    operationFailed: 'Operation failed',
+    
+    accountCreateSuccess: 'Account created successfully',
+    accountUpdateSuccess: 'Account updated successfully',
+    loadAccountsFailed: 'Failed to load accounts',
+    unsupportedAccountTypeReset: 'Unsupported account type',
+    
+    // Schedulable reasons
+    invalidApiKey: 'API Key invalid or expired (401 error)',
+    serviceOverload: 'Service overloaded (529 error)',
+    rateLimitTriggered: 'Rate limit triggered (429 error)',
+    authFailed: 'Authentication failed (401 error)',
+    manualStop: 'Manually stopped scheduling',
+    
+    // Account type display
+    claudeMax: 'Claude Max',
+    claudePro: 'Claude Pro',
+    claudeFree: 'Claude Free'
   }
 }
