@@ -1015,7 +1015,9 @@ class ClaudeRelayService {
             logger.error('❌ Error in stream error handler:', err)
           })
 
-          logger.error(`❌ Claude API returned error status: ${res.statusCode} | Account: ${account?.name || accountId}`)
+          logger.error(
+            `❌ Claude API returned error status: ${res.statusCode} | Account: ${account?.name || accountId}`
+          )
           let errorData = ''
 
           res.on('data', (chunk) => {
@@ -1024,7 +1026,10 @@ class ClaudeRelayService {
 
           res.on('end', () => {
             console.error(': ❌ ', errorData)
-            logger.error(`❌ Claude API error response (Account: ${account?.name || accountId}):`, errorData)
+            logger.error(
+              `❌ Claude API error response (Account: ${account?.name || accountId}):`,
+              errorData
+            )
             if (!responseStream.destroyed) {
               // 发送错误事件
               responseStream.write('event: error\n')
@@ -1343,11 +1348,15 @@ class ClaudeRelayService {
       })
 
       req.on('error', async (error) => {
-        logger.error(`❌ Claude stream request error (Account: ${account?.name || accountId}):`, error.message, {
-          code: error.code,
-          errno: error.errno,
-          syscall: error.syscall
-        })
+        logger.error(
+          `❌ Claude stream request error (Account: ${account?.name || accountId}):`,
+          error.message,
+          {
+            code: error.code,
+            errno: error.errno,
+            syscall: error.syscall
+          }
+        )
 
         // 根据错误类型提供更具体的错误信息
         let errorMessage = 'Upstream request failed'
@@ -1493,11 +1502,15 @@ class ClaudeRelayService {
       })
 
       req.on('error', async (error) => {
-        logger.error(`❌ Claude stream request error (Account: ${account?.name || accountId}):`, error.message, {
-          code: error.code,
-          errno: error.errno,
-          syscall: error.syscall
-        })
+        logger.error(
+          `❌ Claude stream request error (Account: ${account?.name || accountId}):`,
+          error.message,
+          {
+            code: error.code,
+            errno: error.errno,
+            syscall: error.syscall
+          }
+        )
 
         // 根据错误类型提供更具体的错误信息
         let errorMessage = 'Upstream request failed'
