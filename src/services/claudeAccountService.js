@@ -2137,6 +2137,108 @@ class ClaudeAccountService {
       logger.error(`❌ Failed to update session window status for account ${accountId}:`, error)
     }
   }
+
+  // 🚫 标记账号为过载状态（529错误）
+  async markAccountOverloaded(accountId) {
+    try {
+      const accountData = await redis.getClaudeAccount(accountId)
+      if (!accountData) {
+        throw new Error('Account not found')
+      }
+
+      // 获取配置的过载处理时间（分钟）
+      const overloadMinutes = config.overloadHandling?.enabled || 0
+
+      if (overloadMinutes === 0) {
+        logger.info('⏭️ 529 error handling is disabled')
+        return { success: false, error: '529 error handling is disabled' }
+      }
+
+      const overloadKey = `account:overload:${accountId}`
+      const ttl = overloadMinutes * 60 // 转换为秒
+
+      await redis.setex(
+        overloadKey,
+        ttl,
+        JSON.stringify({
+          accountId,
+          accountName: accountData.name,
+          markedAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + ttl * 1000).toISOString()
+        })
+      )
+
+      logger.warn(
+        `🚫 Account ${accountData.name} (${accountId}) marked as overloaded for ${overloadMinutes} minutes`
+      )
+
+      // 在账号上记录最后一次529错误
+      const updates = {
+        lastOverloadAt: new Date().toISOString(),
+        errorMessage: `529错误 - 过载${overloadMinutes}分钟`
+      }
+
+      const updatedAccountData = { ...accountData, ...updates }
+      await redis.setClaudeAccount(accountId, updatedAccountData)
+
+      return { success: true, accountName: accountData.name, duration: overloadMinutes }
+    } catch (error) {
+      logger.error(`❌ Failed to mark account as overloaded: ${accountId}`, error)
+      // 不抛出错误，避免影响主请求流程
+      return { success: false, error: error.message }
+    }
+  }
+
+  // ✅ 检查账号是否过载
+  async isAccountOverloaded(accountId) {
+    try {
+      // 如果529处理未启用，直接返回false
+      const overloadMinutes = config.overloadHandling?.enabled || 0
+      if (overloadMinutes === 0) {
+        return false
+      }
+
+      const overloadKey = `account:overload:${accountId}`
+      const overloadData = await redis.get(overloadKey)
+
+      if (overloadData) {
+        // 账号处于过载状态
+        return true
+      }
+
+      // 账号未过载
+      return false
+    } catch (error) {
+      logger.error(`❌ Failed to check if account is overloaded: ${accountId}`, error)
+      return false
+    }
+  }
+
+  // 🔄 移除账号的过载状态
+  async removeAccountOverload(accountId) {
+    try {
+      const accountData = await redis.getClaudeAccount(accountId)
+      if (!accountData) {
+        throw new Error('Account not found')
+      }
+
+      const overloadKey = `account:overload:${accountId}`
+      await redis.del(overloadKey)
+
+      logger.info(`✅ Account ${accountData.name} (${accountId}) overload status removed`)
+
+      // 清理账号上的错误信息
+      if (accountData.errorMessage && accountData.errorMessage.includes('529错误')) {
+        const updatedAccountData = { ...accountData }
+        delete updatedAccountData.errorMessage
+        delete updatedAccountData.lastOverloadAt
+        await redis.setClaudeAccount(accountId, updatedAccountData)
+      }
+    } catch (error) {
+      logger.error(`❌ Failed to remove overload status for account: ${accountId}`, error)
+      // 不抛出错误，移除过载状态失败不应该影响主流程
+    }
+  }
 }
 
 module.exports = new ClaudeAccountService()

@@ -528,7 +528,10 @@ class UnifiedClaudeScheduler {
           return false
         }
 
-        return !(await claudeAccountService.isAccountRateLimited(accountId))
+        // 检查是否限流或过载
+        const isRateLimited = await claudeAccountService.isAccountRateLimited(accountId)
+        const isOverloaded = await claudeAccountService.isAccountOverloaded(accountId)
+        return !isRateLimited && !isOverloaded
       } else if (accountType === 'claude-console') {
         const account = await claudeConsoleAccountService.getAccount(accountId)
         if (!account || !account.isActive) {
