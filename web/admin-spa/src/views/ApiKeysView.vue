@@ -239,7 +239,9 @@
           <div v-else class="table-wrapper hidden md:block">
             <div class="table-container">
               <table class="w-full table-fixed">
-                <thead class="bg-gray-50/80 backdrop-blur-sm dark:bg-gray-700/80">
+                <thead
+                  class="sticky top-0 z-10 bg-gradient-to-b from-gray-50 to-gray-100/90 backdrop-blur-sm dark:from-gray-700 dark:to-gray-800/90"
+                >
                   <tr>
                     <th v-if="shouldShowCheckboxes" class="w-[50px] px-3 py-4 text-left">
                       <div class="flex items-center">
@@ -394,11 +396,20 @@
                     </th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200/50 dark:divide-gray-600/50">
-                  <template v-for="key in paginatedApiKeys" :key="key.id">
-                    <!-- API Key 主行 -->
-                    <tr class="table-row">
-                      <td v-if="shouldShowCheckboxes" class="px-3 py-1.5">
+                <tbody>
+                  <template v-for="(key, index) in paginatedApiKeys" :key="key.id">
+                    <!-- API Key 主行 - 添加斑马条纹和增强分隔 -->
+                    <tr
+                      :class="[
+                        'table-row transition-all duration-150',
+                        index % 2 === 0
+                          ? 'bg-white dark:bg-gray-800/40'
+                          : 'dark:bg-gray-850/40 bg-gray-50/70',
+                        'border-b-2 border-gray-200/80 dark:border-gray-700/50',
+                        'hover:bg-blue-50/60 hover:shadow-sm dark:hover:bg-blue-900/20'
+                      ]"
+                    >
+                      <td v-if="shouldShowCheckboxes" class="px-3 py-3">
                         <div class="flex items-center">
                           <input
                             v-model="selectedApiKeys"
@@ -409,7 +420,7 @@
                           />
                         </div>
                       </td>
-                      <td class="px-3 py-1.5">
+                      <td class="px-3 py-3">
                         <div class="min-w-0">
                           <!-- 名称 -->
                           <div
@@ -429,7 +440,7 @@
                         </div>
                       </td>
                       <!-- 所属账号列 -->
-                      <td class="px-3 py-1.5">
+                      <td class="px-3 py-3">
                         <div class="space-y-1">
                           <!-- Claude 绑定 -->
                           <div
@@ -499,7 +510,7 @@
                         </div>
                       </td>
                       <!-- 标签列 -->
-                      <td class="px-3 py-1.5">
+                      <td class="px-3 py-3">
                         <div class="flex flex-wrap gap-1">
                           <span
                             v-for="tag in key.tags || []"
@@ -515,7 +526,7 @@
                           >
                         </div>
                       </td>
-                      <td class="whitespace-nowrap px-3 py-1.5">
+                      <td class="whitespace-nowrap px-3 py-3">
                         <span
                           :class="[
                             'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold',
@@ -534,7 +545,7 @@
                         </span>
                       </td>
                       <!-- 费用 -->
-                      <td class="whitespace-nowrap px-3 py-1.5 text-right" style="font-size: 13px">
+                      <td class="whitespace-nowrap px-3 py-3 text-right" style="font-size: 13px">
                         <span
                           class="font-semibold text-blue-600 dark:text-blue-400"
                           style="font-size: 14px"
@@ -543,8 +554,8 @@
                         </span>
                       </td>
                       <!-- 限制 -->
-                      <td class="px-2 py-1.5" style="font-size: 12px">
-                        <div class="flex flex-col gap-1.5">
+                      <td class="px-2 py-2" style="font-size: 12px">
+                        <div class="flex flex-col gap-2">
                           <!-- 每日费用限制进度条 -->
                           <LimitProgressBar
                             v-if="key.dailyCostLimit > 0"
@@ -595,7 +606,7 @@
                         </div>
                       </td>
                       <!-- Token数量 -->
-                      <td class="whitespace-nowrap px-3 py-1.5 text-right" style="font-size: 13px">
+                      <td class="whitespace-nowrap px-3 py-3 text-right" style="font-size: 13px">
                         <div class="flex items-center justify-end gap-1">
                           <span
                             class="font-medium text-purple-600 dark:text-purple-400"
@@ -606,7 +617,7 @@
                         </div>
                       </td>
                       <!-- 请求数 -->
-                      <td class="whitespace-nowrap px-3 py-1.5 text-right" style="font-size: 13px">
+                      <td class="whitespace-nowrap px-3 py-3 text-right" style="font-size: 13px">
                         <div class="flex items-center justify-end gap-1">
                           <span
                             class="font-medium text-gray-900 dark:text-gray-100"
@@ -619,7 +630,7 @@
                       </td>
                       <!-- 最后使用 -->
                       <td
-                        class="whitespace-nowrap px-3 py-1.5 text-gray-700 dark:text-gray-300"
+                        class="whitespace-nowrap px-3 py-3 text-gray-700 dark:text-gray-300"
                         style="font-size: 13px"
                       >
                         <span
@@ -634,13 +645,13 @@
                       </td>
                       <!-- 创建时间 -->
                       <td
-                        class="whitespace-nowrap px-3 py-1.5 text-gray-700 dark:text-gray-300"
+                        class="whitespace-nowrap px-3 py-3 text-gray-700 dark:text-gray-300"
                         style="font-size: 13px"
                       >
                         {{ new Date(key.createdAt).toLocaleDateString() }}
                       </td>
                       <td
-                        class="whitespace-nowrap px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300"
+                        class="whitespace-nowrap px-3 py-3 text-sm text-gray-700 dark:text-gray-300"
                       >
                         <div class="inline-flex items-center gap-1.5">
                           <!-- 未激活状态 -->
@@ -693,7 +704,7 @@
                           </span>
                         </div>
                       </td>
-                      <td class="whitespace-nowrap px-3 py-1.5" style="font-size: 13px">
+                      <td class="whitespace-nowrap px-3 py-3" style="font-size: 13px">
                         <div class="flex gap-1">
                           <button
                             class="rounded px-2 py-1 text-xs font-medium text-purple-600 transition-colors hover:bg-purple-50 hover:text-purple-900 dark:hover:bg-purple-900/20"
@@ -1185,7 +1196,7 @@
                 </div>
 
                 <!-- 限制进度条 -->
-                <div class="space-y-1.5">
+                <div class="space-y-2">
                   <!-- 每日费用限制 -->
                   <LimitProgressBar
                     v-if="key.dailyCostLimit > 0"
@@ -1514,7 +1525,7 @@
                   </thead>
                   <tbody class="divide-y divide-gray-200/50 dark:divide-gray-600/50">
                     <tr v-for="key in deletedApiKeys" :key="key.id" class="table-row">
-                      <td class="px-3 py-1.5">
+                      <td class="px-3 py-3">
                         <div class="flex items-center">
                           <div
                             class="mr-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-red-500 to-red-600"
@@ -1532,7 +1543,7 @@
                         </div>
                       </td>
                       <!-- 所属账号 -->
-                      <td class="px-3 py-1.5">
+                      <td class="px-3 py-3">
                         <div class="space-y-1">
                           <!-- Claude OAuth 绑定 -->
                           <div v-if="key.claudeAccountId" class="flex items-center gap-1 text-xs">
@@ -1575,7 +1586,7 @@
                         </div>
                       </td>
                       <!-- 创建者 -->
-                      <td v-if="isLdapEnabled" class="px-3 py-1.5">
+                      <td v-if="isLdapEnabled" class="px-3 py-3">
                         <div class="text-xs">
                           <span v-if="key.createdBy === 'admin'" class="text-blue-600">
                             <i class="fas fa-user-shield mr-1 text-xs" />
@@ -1593,13 +1604,13 @@
                       </td>
                       <!-- 创建时间 -->
                       <td
-                        class="whitespace-nowrap px-3 py-1.5 text-gray-700 dark:text-gray-300"
+                        class="whitespace-nowrap px-3 py-3 text-gray-700 dark:text-gray-300"
                         style="font-size: 13px"
                       >
                         {{ formatDate(key.createdAt) }}
                       </td>
                       <!-- 删除者 -->
-                      <td class="px-3 py-1.5">
+                      <td class="px-3 py-3">
                         <div class="text-xs">
                           <span v-if="key.deletedByType === 'admin'" class="text-blue-600">
                             <i class="fas fa-user-shield mr-1 text-xs" />
@@ -1617,13 +1628,13 @@
                       </td>
                       <!-- 删除时间 -->
                       <td
-                        class="whitespace-nowrap px-3 py-1.5 text-gray-700 dark:text-gray-300"
+                        class="whitespace-nowrap px-3 py-3 text-gray-700 dark:text-gray-300"
                         style="font-size: 13px"
                       >
                         {{ formatDate(key.deletedAt) }}
                       </td>
                       <!-- 费用 -->
-                      <td class="whitespace-nowrap px-3 py-1.5 text-right" style="font-size: 13px">
+                      <td class="whitespace-nowrap px-3 py-3 text-right" style="font-size: 13px">
                         <span
                           class="font-medium text-blue-600 dark:text-blue-400"
                           style="font-size: 13px"
@@ -1632,7 +1643,7 @@
                         </span>
                       </td>
                       <!-- Token -->
-                      <td class="whitespace-nowrap px-3 py-1.5 text-right" style="font-size: 13px">
+                      <td class="whitespace-nowrap px-3 py-3 text-right" style="font-size: 13px">
                         <span
                           class="font-medium text-purple-600 dark:text-purple-400"
                           style="font-size: 13px"
@@ -1641,7 +1652,7 @@
                         </span>
                       </td>
                       <!-- 请求数 -->
-                      <td class="whitespace-nowrap px-3 py-1.5 text-right" style="font-size: 13px">
+                      <td class="whitespace-nowrap px-3 py-3 text-right" style="font-size: 13px">
                         <div class="flex items-center justify-end gap-1">
                           <span
                             class="font-medium text-gray-900 dark:text-gray-100"
@@ -1654,7 +1665,7 @@
                       </td>
                       <!-- 最后使用 -->
                       <td
-                        class="whitespace-nowrap px-3 py-1.5 text-gray-700 dark:text-gray-300"
+                        class="whitespace-nowrap px-3 py-3 text-gray-700 dark:text-gray-300"
                         style="font-size: 13px"
                       >
                         <span v-if="key.lastUsedAt" style="font-size: 13px">
@@ -1662,7 +1673,7 @@
                         </span>
                         <span v-else class="text-gray-400" style="font-size: 13px">从未使用</span>
                       </td>
-                      <td class="px-3 py-1.5">
+                      <td class="px-3 py-3">
                         <div class="flex items-center gap-2">
                           <button
                             v-if="key.canRestore"

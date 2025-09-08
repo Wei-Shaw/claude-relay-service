@@ -1,6 +1,6 @@
 <template>
   <div class="w-full">
-    <div class="relative h-7 w-full overflow-hidden rounded-md" :class="containerClass">
+    <div class="relative h-8 w-full overflow-hidden rounded-lg shadow-sm" :class="containerClass">
       <!-- 背景层 -->
       <div class="absolute inset-0" :class="backgroundClass"></div>
 
@@ -11,31 +11,29 @@
         :style="{ width: progress + '%' }"
       ></div>
 
-      <!-- 文字层 -->
-      <div class="relative z-10 flex h-full items-center justify-between px-2">
+      <!-- 文字层 - 使用双层文字技术确保可读性 -->
+      <div class="relative z-10 flex h-full items-center justify-between px-3">
         <div class="flex items-center gap-1.5">
-          <i :class="['text-xs', iconClass]" :style="textShadowStyle" />
-          <span class="text-xs font-medium" :class="textClass" :style="textShadowStyle">{{
-            label
-          }}</span>
+          <i :class="['text-xs', iconClass]" />
+          <span class="text-xs font-semibold" :class="labelTextClass">{{ label }}</span>
         </div>
-        <div class="flex items-center gap-1">
-          <span class="text-xs font-bold" :class="valueTextClass" :style="valueShadowStyle">
+        <div class="flex items-center gap-1.5">
+          <span class="text-xs font-bold tabular-nums" :class="currentValueClass">
             ${{ current.toFixed(2) }}
           </span>
-          <span class="text-xs" :class="textClass" :style="textShadowStyle"
-            >/ ${{ limit.toFixed(2) }}</span
-          >
+          <span class="text-xs font-medium" :class="limitTextClass">
+            / ${{ limit.toFixed(2) }}
+          </span>
         </div>
       </div>
 
       <!-- 闪光效果（可选） -->
       <div
         v-if="showShine && progress > 0"
-        class="absolute inset-0 opacity-30"
+        class="absolute inset-0 opacity-20"
         :style="{
           background:
-            'linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.7) 50%, transparent 60%)',
+            'linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.5) 50%, transparent 60%)',
           animation: 'shine 3s infinite'
         }"
       ></div>
@@ -76,85 +74,85 @@ const progress = computed(() => {
   return Math.min(percentage, 100)
 })
 
-// 容器样式
+// 容器样式 - 使用更柔和的边框和阴影
 const containerClass = computed(() => {
-  return 'bg-gradient-to-r border border-opacity-20'
+  return 'border border-gray-200/80 dark:border-gray-600/50 shadow-sm'
 })
 
-// 背景样式（浅色背景）
+// 背景样式 - 使用更浅的背景色提升对比度
 const backgroundClass = computed(() => {
   switch (props.type) {
     case 'daily':
-      return 'bg-gradient-to-r from-green-50 to-green-100 dark:from-green-950/30 dark:to-green-900/30'
+      return 'bg-gray-100/50 dark:bg-gray-800/30'
     case 'opus':
-      return 'bg-gradient-to-r from-purple-50 to-indigo-100 dark:from-purple-950/30 dark:to-indigo-900/30'
+      return 'bg-violet-50/50 dark:bg-violet-950/20'
     case 'window':
-      return 'bg-gradient-to-r from-blue-50 to-cyan-100 dark:from-blue-950/30 dark:to-cyan-900/30'
+      return 'bg-sky-50/50 dark:bg-sky-950/20'
     default:
-      return 'bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700'
+      return 'bg-gray-100/50 dark:bg-gray-800/30'
   }
 })
 
-// 进度条样式（根据进度值动态变化）
+// 进度条样式 - 使用更柔和的颜色配置
 const progressBarClass = computed(() => {
   const p = progress.value
 
   if (props.type === 'daily') {
     if (p >= 90) {
-      return 'bg-gradient-to-r from-red-500 to-red-600'
+      return 'bg-red-400 dark:bg-red-500'
     } else if (p >= 70) {
-      return 'bg-gradient-to-r from-yellow-500 to-orange-500'
+      return 'bg-amber-400 dark:bg-amber-500'
     } else {
-      return 'bg-gradient-to-r from-green-500 to-emerald-500'
+      return 'bg-emerald-400 dark:bg-emerald-500'
     }
   }
 
   if (props.type === 'opus') {
     if (p >= 90) {
-      return 'bg-gradient-to-r from-red-500 to-pink-600'
+      return 'bg-red-400 dark:bg-red-500'
     } else if (p >= 70) {
-      return 'bg-gradient-to-r from-orange-500 to-amber-500'
+      return 'bg-amber-400 dark:bg-amber-500'
     } else {
-      // 使用更亮的紫色渐变，确保与白色文字有良好对比度
-      return 'bg-gradient-to-r from-purple-600 to-indigo-600'
+      return 'bg-violet-400 dark:bg-violet-500'
     }
   }
 
   if (props.type === 'window') {
     if (p >= 90) {
-      return 'bg-gradient-to-r from-red-500 to-rose-600'
+      return 'bg-red-400 dark:bg-red-500'
     } else if (p >= 70) {
-      return 'bg-gradient-to-r from-orange-500 to-yellow-500'
+      return 'bg-amber-400 dark:bg-amber-500'
     } else {
-      return 'bg-gradient-to-r from-blue-500 to-cyan-500'
+      return 'bg-sky-400 dark:bg-sky-500'
     }
   }
 
-  return 'bg-gradient-to-r from-gray-400 to-gray-500'
+  return 'bg-gray-300 dark:bg-gray-400'
 })
 
 // 图标类
 const iconClass = computed(() => {
   const p = progress.value
-  let colorClass = ''
 
+  // 根据进度选择图标颜色
+  let colorClass = ''
   if (p >= 90) {
-    colorClass = 'text-red-600 dark:text-red-400'
+    colorClass = 'text-red-700 dark:text-red-400'
   } else if (p >= 70) {
-    colorClass = 'text-orange-600 dark:text-orange-400'
+    colorClass = 'text-orange-700 dark:text-orange-400'
   } else {
     switch (props.type) {
       case 'daily':
-        colorClass = 'text-green-600 dark:text-green-400'
+        colorClass = 'text-green-700 dark:text-green-400'
         break
       case 'opus':
-        colorClass = 'text-purple-600 dark:text-purple-400'
+        colorClass = 'text-purple-700 dark:text-purple-400'
         break
       case 'window':
-        colorClass = 'text-blue-600 dark:text-blue-400'
+        colorClass = 'text-blue-700 dark:text-blue-400'
         break
       default:
-        colorClass = 'text-gray-500 dark:text-gray-400'
+        colorClass = 'text-gray-600 dark:text-gray-400'
     }
   }
 
@@ -176,100 +174,70 @@ const iconClass = computed(() => {
   return `${iconName} ${colorClass}`
 })
 
-// 文字颜色（根据进度条类型和进度值智能调整）
-const textClass = computed(() => {
+// 标签文字颜色 - 始终保持高对比度
+const labelTextClass = computed(() => {
   const p = progress.value
 
-  // 对于有颜色的进度条，判断是否需要白色文字
-  const needsWhiteText = () => {
-    // Opus类型（紫色系）
-    if (props.type === 'opus') {
-      // 紫色进度条在任何进度下都使用白色文字，确保对比度
-      if (p > 0) return true
-    }
-    // 窗口类型（蓝色系）
-    if (props.type === 'window') {
-      // 蓝色进度条在任何进度下都使用白色文字
-      if (p > 0) return true
-    }
-    // 每日类型（绿色/黄色/红色）
-    if (props.type === 'daily') {
-      // 绿色、黄色、红色进度条都使用白色文字
-      if (p > 0) return true
-    }
-    return false
-  }
-
-  if (needsWhiteText()) {
-    // 增强阴影效果，确保在各种颜色背景上都清晰可见
-    return 'text-white font-medium'
+  // 根据进度条背景色智能选择文字颜色
+  if (p > 40) {
+    // 当进度条覆盖超过40%时，使用白色文字
+    return 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]'
   } else {
     // 在浅色背景上使用深色文字
-    return 'text-gray-700 dark:text-gray-300 font-medium'
+    switch (props.type) {
+      case 'daily':
+        return 'text-gray-900 dark:text-gray-100'
+      case 'opus':
+        return 'text-purple-900 dark:text-purple-100'
+      case 'window':
+        return 'text-blue-900 dark:text-blue-100'
+      default:
+        return 'text-gray-900 dark:text-gray-100'
+    }
   }
 })
 
-// 数值文字颜色（更突出，增强可读性）
-const valueTextClass = computed(() => {
+// 当前值文字颜色 - 最重要的数字，需要最高对比度
+const currentValueClass = computed(() => {
   const p = progress.value
 
-  // 与文字颜色保持一致的逻辑
-  const needsWhiteText = () => {
-    if (props.type === 'opus' && p > 0) return true
-    if (props.type === 'window' && p > 0) return true
-    if (props.type === 'daily' && p > 0) return true
-    return false
-  }
-
-  if (needsWhiteText()) {
-    // 数值文字使用更粗的字重和更强的阴影
-    return 'text-white font-bold'
+  // 判断数值是否在进度条上
+  if (p > 70) {
+    // 在彩色进度条上，使用白色+强阴影
+    return 'text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]'
   } else {
-    // 在浅色背景上使用更深的颜色
-    return 'text-gray-900 dark:text-gray-100 font-bold'
+    // 在浅色背景上，根据进度状态选择颜色
+    if (p >= 90) {
+      return 'text-red-700 dark:text-red-300'
+    } else if (p >= 70) {
+      return 'text-orange-700 dark:text-orange-300'
+    } else {
+      switch (props.type) {
+        case 'daily':
+          return 'text-green-800 dark:text-green-200'
+        case 'opus':
+          return 'text-purple-800 dark:text-purple-200'
+        case 'window':
+          return 'text-blue-800 dark:text-blue-200'
+        default:
+          return 'text-gray-900 dark:text-gray-100'
+      }
+    }
   }
 })
 
-// 文字阴影样式（增强对比度）
-const textShadowStyle = computed(() => {
+// 限制值文字颜色
+const limitTextClass = computed(() => {
   const p = progress.value
 
-  // 判断是否需要强阴影
-  const needsStrongShadow = () => {
-    if (props.type === 'opus' && p > 0) return true
-    if (props.type === 'window' && p > 0) return true
-    if (props.type === 'daily' && p > 0) return true
-    return false
+  // 判断限制值是否在进度条上
+  if (p > 85) {
+    // 在进度条上
+    return 'text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]'
+  } else {
+    // 在背景上
+    return 'text-gray-600 dark:text-gray-400'
   }
-
-  if (needsStrongShadow()) {
-    // 在彩色背景上使用强阴影效果
-    return {
-      textShadow: '0 1px 3px rgba(0, 0, 0, 0.5), 0 0 8px rgba(0, 0, 0, 0.3)'
-    }
-  }
-  return {}
-})
-
-// 数值文字阴影样式（更强的阴影效果）
-const valueShadowStyle = computed(() => {
-  const p = progress.value
-
-  // 判断是否需要强阴影
-  const needsStrongShadow = () => {
-    if (props.type === 'opus' && p > 0) return true
-    if (props.type === 'window' && p > 0) return true
-    if (props.type === 'daily' && p > 0) return true
-    return false
-  }
-
-  if (needsStrongShadow()) {
-    // 数值文字使用更强的阴影，确保清晰可见
-    return {
-      textShadow: '0 1px 4px rgba(0, 0, 0, 0.6), 0 0 10px rgba(0, 0, 0, 0.4)'
-    }
-  }
-  return {}
 })
 </script>
 
@@ -283,12 +251,8 @@ const valueShadowStyle = computed(() => {
   }
 }
 
-/* 添加柔和的边框 */
-.border-opacity-20 {
-  border-color: rgba(0, 0, 0, 0.05);
-}
-
-.dark .border-opacity-20 {
-  border-color: rgba(255, 255, 255, 0.1);
+/* 确保文字清晰 */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
 </style>
