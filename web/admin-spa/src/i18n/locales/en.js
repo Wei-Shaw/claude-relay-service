@@ -789,6 +789,102 @@ export default {
       loadUsersError: 'Failed to load users',
       toggleStatusError: 'Failed to toggleStatus',
       disableKeysError: 'Failed to disableKeys'
+    },
+
+    // User Usage Stats Modal
+    usageStatsModal: {
+      title: 'Usage Statistics',
+      titleWithUser: 'Usage Statistics - {displayName}',
+      
+      // Time period selection
+      periodSelection: {
+        day: 'Last 24 Hours',
+        week: 'Last 7 Days',
+        month: 'Last 30 Days',
+        quarter: 'Last 90 Days'
+      },
+      
+      // Loading state
+      loadingStats: 'Loading usage statistics...',
+      
+      // Summary cards
+      summaryCards: {
+        requests: 'Requests',
+        inputTokens: 'Input Tokens',
+        outputTokens: 'Output Tokens',
+        totalCost: 'Total Cost'
+      },
+      
+      // API Keys table
+      apiKeysTable: {
+        title: 'API Keys Usage',
+        headers: {
+          apiKey: 'API Key',
+          status: 'Status',
+          requests: 'Requests',
+          tokens: 'Tokens',
+          cost: 'Cost',
+          lastUsed: 'Last Used'
+        },
+        status: {
+          active: 'Active',
+          disabled: 'Disabled'
+        },
+        tokensFormat: {
+          input: 'In',
+          output: 'Out'
+        },
+        never: 'Never'
+      },
+      
+      // Usage trend chart
+      usageTrend: {
+        title: 'Usage Trend',
+        chartTitle: 'Usage Chart',
+        dailyTrends: 'Daily usage trends for {period} period',
+        chartNote: '(Chart integration can be added with Chart.js, D3.js, or similar library)'
+      },
+      
+      // No data state
+      noData: {
+        title: 'No usage data',
+        description: 'This user hasn\'t made any API requests in the selected period.'
+      },
+      
+      // Buttons
+      close: 'Close'
+    },
+
+    // Change Role Modal
+    changeRoleModal: {
+      title: 'Change User Role',
+      
+      // User info display
+      currentRole: 'Current: {role}',
+      
+      // Role selection form
+      newRole: 'New Role',
+      roles: {
+        user: 'User',
+        userDesc: 'Regular user with basic permissions',
+        admin: 'Administrator',
+        adminDesc: 'Full access to manage users and system'
+      },
+      
+      // Warning messages
+      roleChangeWarning: {
+        title: 'Role Change Warning',
+        grantAdmin: 'Granting admin privileges will give this user full access to the system, including the ability to manage other users and their API keys.',
+        removeAdmin: 'Removing admin privileges will restrict this user to only managing their own API keys and viewing their own usage statistics.'
+      },
+      
+      // Buttons
+      cancel: 'Cancel',
+      updateRole: 'Update Role',
+      updating: 'Updating...',
+      
+      // Success message
+      roleUpdated: 'User role updated to {role}'
     }
   },
 
