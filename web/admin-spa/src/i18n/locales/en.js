@@ -1285,6 +1285,70 @@ export default {
     // General description text
     allModelsIfEmpty: 'Leave blank to support all models. If models specified, requests with models not in list will not be scheduled to this account',
     systemDefaultIfEmpty: 'Leave blank to use system default model. Supports inference profile ID or ARN',
-    noUpdateIfEmpty: 'Leave blank to not update this field'
+    noUpdateIfEmpty: 'Leave blank to not update this field',
+    
+    // Manual Token Input Section
+    manualTokenInput: 'Manual Token Input',
+    manualTokenClaudeDescription: 'Please enter valid Claude Access Token. If you have Refresh Token, it is recommended to fill both for automatic refresh support.',
+    manualTokenGeminiDescription: 'Please enter valid Gemini Access Token. If you have Refresh Token, it is recommended to fill both for automatic refresh support.',
+    manualTokenOpenAIDescription: 'Please enter valid OpenAI Access Token. If you have Refresh Token, it is recommended to fill both for automatic refresh support.',
+    getAccessTokenMethod: 'Methods to get Access Token:',
+    claudeCredentialsPath: 'Please get from logged-in Claude Code machine',
+    geminiCredentialsPath: 'Please get from logged-in Gemini CLI machine',
+    openaiCredentialsPath: 'Please get authentication credentials from logged-in OpenAI account machine, or obtain Access Token through OAuth authorization flow.',
+    claudeCredentialsWarning: 'credentials from file, do not use keys from Claude official API Keys page.',
+    refreshTokenWarning: '💡 If Refresh Token is not filled, Token needs manual update after expiration.',
+    accessTokenOptional: 'Access Token (Optional)',
+    accessTokenOptionalPlaceholder: 'Optional: If not filled, system will automatically obtain through Refresh Token...',
+    accessTokenOptionalInfo: 'Access Token is optional. If not provided, system will automatically obtain through Refresh Token.',
+    accessTokenRequired: 'Access Token *',
+    accessTokenRequiredPlaceholder: 'Please enter Access Token...',
+    refreshTokenRequired: 'Refresh Token *',
+    refreshTokenRequiredPlaceholder: 'Please enter Refresh Token (required)...',
+    refreshTokenRequiredInfo: 'System will use Refresh Token to automatically obtain Access Token and user information',
+    refreshTokenOptional: 'Refresh Token (Optional)',
+    refreshTokenOptionalPlaceholder: 'Please enter Refresh Token...',
+    
+    // Priority Settings
+    priorityPlaceholder: 'Lower number = higher priority, default 50',
+    priorityDescription: 'Lower number = higher priority, recommended range: 1-100',
+    prioritySchedulingTitle: 'Scheduling Priority (1-100)',
+    priorityEditPlaceholder: 'Lower number = higher priority',
+    
+    // Gemini Project ID
+    projectIdOptional: 'Project ID (Optional)',
+    projectIdPlaceholder: 'e.g., verdant-wares-464411-k9',
+    projectIdDescription: 'Google Cloud/Workspace accounts may require Project ID',
+    
+    // Claude Subscription Type and Advanced Options
+    subscriptionType: 'Subscription Type',
+    claudeMaxSubscription: 'Claude Max',
+    claudeProSubscription: 'Claude Pro',
+    claudeProLimitation: 'Pro accounts do not support Claude Opus 4 model',
+    autoStopOnWarning: 'Auto-stop scheduling when approaching 5-hour limit',
+    autoStopOnWarningDescription: 'When system detects account approaching 5-hour usage limit, automatically pause scheduling for this account. Will resume automatically when entering new time window.',
+    useUnifiedUserAgent: 'Use unified Claude Code version',
+    useUnifiedUserAgentDescription: 'When enabled, will use unified User-Agent captured from real Claude Code client, improving compatibility',
+    currentUnifiedVersion: 'Current unified version:',
+    clearCache: 'Clear Cache',
+    clearing: 'Clearing...',
+    waitingForCapture: 'Waiting to capture User-Agent from Claude Code client',
+    captureHint: '💡 Hint: If unable to capture for long time, please confirm Claude Code client is using this account, or contact developer to check if User-Agent format has changed',
+    useUnifiedClientId: 'Use unified client identifier',
+    useUnifiedClientIdDescription: 'When enabled, will use fixed client identifier, making all requests appear to come from same client, reducing characteristics',
+    clientIdLabel: 'Client Identifier ID',
+    regenerateClientId: 'Regenerate',
+    clientIdDescription: 'This ID will replace user_id client part in requests, preserving session part for sticky sessions',
+    
+    // Edit Mode Fields
+    accountNameEdit: 'Account Name',
+    accountNameEditPlaceholder: 'Set an identifiable name for the account',
+    descriptionOptionalEdit: 'Description (Optional)',
+    descriptionOptionalEditPlaceholder: 'Account usage description...',
+    accountTypeEdit: 'Account Type',
+    selectGroupRequired: 'Select Group *',
+    noAvailableGroups: 'No available groups',
+    membersCount: ' members',
+    createNewGroup: 'Create New Group'
   }
 }

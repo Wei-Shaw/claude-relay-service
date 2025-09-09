@@ -916,7 +916,7 @@
                       >
                         <i v-if="!clearingCache" class="fas fa-trash-alt mr-1"></i>
                         <div v-else class="loading-spinner mr-1"></div>
-                        {{ clearingCache ? '清除中...' : '清除缓存' }}
+                        {{ clearingCache ? t('accountForm.clearing') : t('accountForm.clearCache') }}
                       </button>
                     </div>
                   </div>
@@ -1001,11 +1001,11 @@
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 max="100"
                 min="1"
-                placeholder="数字越小优先级越高，默认50"
+                :placeholder="t('accountForm.priorityPlaceholder')"
                 type="number"
               />
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                数字越小优先级越高，建议范围：1-100
+                {{ t('accountForm.priorityDescription') }}
               </p>
             </div>
 
@@ -1026,51 +1026,48 @@
                 </div>
                 <div>
                   <h5 class="mb-2 font-semibold text-blue-900 dark:text-blue-300">
-                    手动输入 Token
+                    {{ t('accountForm.manualTokenInput') }}
                   </h5>
                   <p
                     v-if="form.platform === 'claude'"
                     class="mb-2 text-sm text-blue-800 dark:text-blue-300"
                   >
-                    请输入有效的 Claude Access Token。如果您有 Refresh
-                    Token，建议也一并填写以支持自动刷新。
+                    {{ t('accountForm.manualTokenClaudeDescription') }}
                   </p>
                   <p
                     v-else-if="form.platform === 'gemini'"
                     class="mb-2 text-sm text-blue-800 dark:text-blue-300"
                   >
-                    请输入有效的 Gemini Access Token。如果您有 Refresh
-                    Token，建议也一并填写以支持自动刷新。
+                    {{ t('accountForm.manualTokenGeminiDescription') }}
                   </p>
                   <p
                     v-else-if="form.platform === 'openai'"
                     class="mb-2 text-sm text-blue-800 dark:text-blue-300"
                   >
-                    请输入有效的 OpenAI Access Token。如果您有 Refresh
-                    Token，建议也一并填写以支持自动刷新。
+                    {{ t('accountForm.manualTokenOpenAIDescription') }}
                   </p>
                   <div
                     class="mb-2 mt-2 rounded-lg border border-blue-300 bg-white/80 p-3 dark:border-blue-600 dark:bg-gray-800/80"
                   >
                     <p class="mb-1 text-sm font-medium text-blue-900 dark:text-blue-300">
                       <i class="fas fa-folder-open mr-1" />
-                      获取 Access Token 的方法：
+                      {{ t('accountForm.getAccessTokenMethod') }}
                     </p>
                     <p
                       v-if="form.platform === 'claude'"
                       class="text-xs text-blue-800 dark:text-blue-300"
                     >
-                      请从已登录 Claude Code 的机器上获取
+                      {{ t('accountForm.claudeCredentialsPath') }}
                       <code class="rounded bg-blue-100 px-1 py-0.5 font-mono dark:bg-blue-900/50"
                         >~/.claude/.credentials.json</code
                       >
-                      文件中的凭证， 请勿使用 Claude 官网 API Keys 页面的密钥。
+                      {{ t('accountForm.claudeCredentialsWarning') }}
                     </p>
                     <p
                       v-else-if="form.platform === 'gemini'"
                       class="text-xs text-blue-800 dark:text-blue-300"
                     >
-                      请从已登录 Gemini CLI 的机器上获取
+                      {{ t('accountForm.geminiCredentialsPath') }}
                       <code class="rounded bg-blue-100 px-1 py-0.5 font-mono dark:bg-blue-900/50"
                         >~/.config/gemini/credentials.json</code
                       >
@@ -1080,41 +1077,40 @@
                       v-else-if="form.platform === 'openai'"
                       class="text-xs text-blue-800 dark:text-blue-300"
                     >
-                      请从已登录 OpenAI 账户的机器上获取认证凭证， 或通过 OAuth 授权流程获取 Access
-                      Token。
+                      {{ t('accountForm.openaiCredentialsPath') }}
                     </p>
                   </div>
                   <p class="text-xs text-blue-600 dark:text-blue-400">
-                    💡 如果未填写 Refresh Token，Token 过期后需要手动更新。
+                    {{ t('accountForm.refreshTokenWarning') }}
                   </p>
                 </div>
               </div>
 
               <div v-if="form.platform === 'openai'">
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >Access Token (可选)</label
+                  >{{ t('accountForm.accessTokenOptional') }}</label
                 >
                 <textarea
                   v-model="form.accessToken"
                   class="form-input w-full resize-none border-gray-300 font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                  placeholder="可选：如果不填写，系统会自动通过 Refresh Token 获取..."
+                  :placeholder="t('accountForm.accessTokenOptionalPlaceholder')"
                   rows="4"
                 />
                 <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                   <i class="fas fa-info-circle mr-1" />
-                  Access Token 可选填。如果不提供，系统会通过 Refresh Token 自动获取。
+                  {{ t('accountForm.accessTokenOptionalInfo') }}
                 </p>
               </div>
 
               <div v-else>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >Access Token *</label
+                  >{{ t('accountForm.accessTokenRequired') }}</label
                 >
                 <textarea
                   v-model="form.accessToken"
                   class="form-input w-full resize-none border-gray-300 font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   :class="{ 'border-red-500': errors.accessToken }"
-                  placeholder="请输入 Access Token..."
+                  :placeholder="t('accountForm.accessTokenRequiredPlaceholder')"
                   required
                   rows="4"
                 />
@@ -1125,13 +1121,13 @@
 
               <div v-if="form.platform === 'openai'">
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >Refresh Token *</label
+                  >{{ t('accountForm.refreshTokenRequired') }}</label
                 >
                 <textarea
                   v-model="form.refreshToken"
                   class="form-input w-full resize-none border-gray-300 font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   :class="{ 'border-red-500': errors.refreshToken }"
-                  placeholder="请输入 Refresh Token（必填）..."
+                  :placeholder="t('accountForm.refreshTokenRequiredPlaceholder')"
                   required
                   rows="4"
                 />
@@ -1140,18 +1136,18 @@
                 </p>
                 <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                   <i class="fas fa-info-circle mr-1" />
-                  系统将使用 Refresh Token 自动获取 Access Token 和用户信息
+                  {{ t('accountForm.refreshTokenRequiredInfo') }}
                 </p>
               </div>
 
               <div v-else>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >Refresh Token (可选)</label
+                  >{{ t('accountForm.refreshTokenOptional') }}</label
                 >
                 <textarea
                   v-model="form.refreshToken"
                   class="form-input w-full resize-none border-gray-300 font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                  placeholder="请输入 Refresh Token..."
+                  :placeholder="t('accountForm.refreshTokenOptionalPlaceholder')"
                   rows="4"
                 />
               </div>
@@ -1382,12 +1378,12 @@
           <!-- 基本信息 -->
           <div>
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >账户名称</label
+              >{{ t('accountForm.accountNameEdit') }}</label
             >
             <input
               v-model="form.name"
               class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-              placeholder="为账户设置一个易识别的名称"
+              :placeholder="t('accountForm.accountNameEditPlaceholder')"
               required
               type="text"
             />
@@ -1395,19 +1391,19 @@
 
           <div>
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >描述 (可选)</label
+              >{{ t('accountForm.descriptionOptionalEdit') }}</label
             >
             <textarea
               v-model="form.description"
               class="form-input w-full resize-none border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-              placeholder="账户用途说明..."
+              :placeholder="t('accountForm.descriptionOptionalEditPlaceholder')"
               rows="3"
             />
           </div>
 
           <div>
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >账户类型</label
+              >{{ t('accountForm.accountTypeEdit') }}</label
             >
             <div class="flex gap-4">
               <label class="flex cursor-pointer items-center">
@@ -1417,7 +1413,7 @@
                   type="radio"
                   value="shared"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">共享账户</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.sharedAccount') }}</span>
               </label>
               <label class="flex cursor-pointer items-center">
                 <input
@@ -1426,7 +1422,7 @@
                   type="radio"
                   value="dedicated"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">专属账户</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.dedicatedAccount') }}</span>
               </label>
               <label class="flex cursor-pointer items-center">
                 <input
@@ -1435,19 +1431,18 @@
                   type="radio"
                   value="group"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">分组调度</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.groupScheduling') }}</span>
               </label>
             </div>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              共享账户：供所有API Key使用；专属账户：仅供特定API
-              Key使用；分组调度：加入分组供分组内调度
+              {{ t('accountForm.accountTypeDescription') }}
             </p>
           </div>
 
           <!-- 分组选择器 -->
           <div v-if="form.accountType === 'group'">
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >选择分组 *</label
+              >{{ t('accountForm.selectGroupRequired') }}</label
             >
             <div class="flex gap-2">
               <div class="flex-1">
@@ -1459,7 +1454,7 @@
                     v-if="filteredGroups.length === 0"
                     class="text-sm text-gray-500 dark:text-gray-400"
                   >
-                    暂无可用分组
+                    {{ t('accountForm.noAvailableGroups') }}
                   </div>
                   <label
                     v-for="group in filteredGroups"
@@ -1473,7 +1468,7 @@
                       :value="group.id"
                     />
                     <span class="text-sm text-gray-700 dark:text-gray-200">
-                      {{ group.name }} ({{ group.memberCount || 0 }} 个成员)
+                      {{ group.name }} ({{ group.memberCount || 0 }}{{ t('accountForm.membersCount') }})
                     </span>
                   </label>
                   <!-- 新建分组选项 -->
@@ -1484,7 +1479,7 @@
                       @click="handleNewGroup"
                     >
                       <i class="fas fa-plus" />
-                      新建分组
+                      {{ t('accountForm.createNewGroup') }}
                     </button>
                   </div>
                 </div>
@@ -1502,23 +1497,23 @@
           <!-- Gemini 项目 ID 字段 -->
           <div v-if="form.platform === 'gemini'">
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >项目 ID (可选)</label
+              >{{ t('accountForm.projectIdOptional') }}</label
             >
             <input
               v-model="form.projectId"
               class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-              placeholder="例如：verdant-wares-464411-k9"
+              :placeholder="t('accountForm.projectIdPlaceholder')"
               type="text"
             />
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              Google Cloud/Workspace 账号可能需要提供项目 ID
+              {{ t('accountForm.projectIdDescription') }}
             </p>
           </div>
 
           <!-- Claude 订阅类型选择（编辑模式） -->
           <div v-if="form.platform === 'claude'">
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >订阅类型</label
+              >{{ t('accountForm.subscriptionType') }}</label
             >
             <div class="flex gap-4">
               <label class="flex cursor-pointer items-center">
@@ -1528,7 +1523,7 @@
                   type="radio"
                   value="claude_max"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">Claude Max</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.claudeMaxSubscription') }}</span>
               </label>
               <label class="flex cursor-pointer items-center">
                 <input
@@ -1537,12 +1532,12 @@
                   type="radio"
                   value="claude_pro"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">Claude Pro</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.claudeProSubscription') }}</span>
               </label>
             </div>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
               <i class="fas fa-info-circle mr-1" />
-              Pro 账号不支持 Claude Opus 4 模型
+              {{ t('accountForm.claudeProLimitation') }}
             </p>
           </div>
 
@@ -1556,10 +1551,10 @@
               />
               <div class="ml-3">
                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  5小时使用量接近限制时自动停止调度
+                  {{ t('accountForm.autoStopOnWarning') }}
                 </span>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  当系统检测到账户接近5小时使用限制时，自动暂停调度该账户。进入新的时间窗口后会自动恢复调度。
+                  {{ t('accountForm.autoStopOnWarningDescription') }}
                 </p>
               </div>
             </label>
@@ -1575,15 +1570,15 @@
               />
               <div class="ml-3">
                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  使用统一 Claude Code 版本
+                  {{ t('accountForm.useUnifiedUserAgent') }}
                 </span>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  开启后将使用从真实 Claude Code 客户端捕获的统一 User-Agent，提高兼容性
+                  {{ t('accountForm.useUnifiedUserAgentDescription') }}
                 </p>
                 <div v-if="unifiedUserAgent" class="mt-1">
                   <div class="flex items-center justify-between">
                     <p class="text-xs text-green-600 dark:text-green-400">
-                      💡 当前统一版本：{{ unifiedUserAgent }}
+                      💡 {{ t('accountForm.currentUnifiedVersion') }}{{ unifiedUserAgent }}
                     </p>
                     <button
                       class="ml-2 text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
@@ -1593,17 +1588,16 @@
                     >
                       <i v-if="!clearingCache" class="fas fa-trash-alt mr-1"></i>
                       <div v-else class="loading-spinner mr-1"></div>
-                      {{ clearingCache ? '清除中...' : '清除缓存' }}
+                      {{ clearingCache ? t('accountForm.clearing') : t('accountForm.clearCache') }}
                     </button>
                   </div>
                 </div>
                 <div v-else class="mt-1">
                   <p class="text-xs text-gray-500 dark:text-gray-400">
-                    ⏳ 等待从 Claude Code 客户端捕获 User-Agent
+                    ⏳ {{ t('accountForm.waitingForCapture') }}
                   </p>
                   <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                    💡 提示：如果长时间未能捕获，请确认有 Claude Code 客户端正在使用此账户，
-                    或联系开发者检查 User-Agent 格式是否发生变化
+                    {{ t('accountForm.captureHint') }}
                   </p>
                 </div>
               </div>
@@ -1621,10 +1615,10 @@
               />
               <div class="ml-3 flex-1">
                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  使用统一的客户端标识
+                  {{ t('accountForm.useUnifiedClientId') }}
                 </span>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  开启后将使用固定的客户端标识，使所有请求看起来来自同一个客户端，减少特征
+                  {{ t('accountForm.useUnifiedClientIdDescription') }}
                 </p>
                 <div v-if="form.useUnifiedClientId" class="mt-3">
                   <div
@@ -1632,7 +1626,7 @@
                   >
                     <div class="mb-2 flex items-center justify-between">
                       <span class="text-xs font-medium text-gray-600 dark:text-gray-400"
-                        >客户端标识 ID</span
+                        >{{ t('accountForm.clientIdLabel') }}</span
                       >
                       <button
                         class="rounded-md bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
@@ -1640,7 +1634,7 @@
                         @click="regenerateClientId"
                       >
                         <i class="fas fa-sync-alt mr-1" />
-                        重新生成
+                        {{ t('accountForm.regenerateClientId') }}
                       </button>
                     </div>
                     <div class="flex items-center gap-2">
@@ -1660,7 +1654,7 @@
                     </div>
                     <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                       <i class="fas fa-info-circle mr-1 text-blue-500" />
-                      此ID将替换请求中的user_id客户端部分，保留session部分用于粘性会话
+                      {{ t('accountForm.clientIdDescription') }}
                     </p>
                   </div>
                 </div>
@@ -1671,18 +1665,18 @@
           <!-- 所有平台的优先级设置（编辑模式） -->
           <div>
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >调度优先级 (1-100)</label
+              >{{ t('accountForm.prioritySchedulingTitle') }}</label
             >
             <input
               v-model.number="form.priority"
               class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
               max="100"
               min="1"
-              placeholder="数字越小优先级越高"
+              :placeholder="t('accountForm.priorityEditPlaceholder')"
               type="number"
             />
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              数字越小优先级越高，建议范围：1-100
+              {{ t('accountForm.priorityDescription') }}
             </p>
           </div>
 
