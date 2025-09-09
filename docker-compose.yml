@@ -70,12 +70,6 @@ services:
       - DEBUG=${DEBUG:-false}
       - ENABLE_CORS=${ENABLE_CORS:-true}
       - TRUST_PROXY=${TRUST_PROXY:-true}
-      
-      # 📢 Telegram 通知配置
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
-      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
-      - TELEGRAM_PARSE_MODE=${TELEGRAM_PARSE_MODE:-HTML}
-      - TELEGRAM_API_URL=${TELEGRAM_API_URL:-https://api.telegram.org}
     depends_on:
       - redis
     networks:

@@ -197,14 +197,7 @@ const config = {
       ? process.env.WEBHOOK_URLS.split(',').map((url) => url.trim())
       : [],
     timeout: parseInt(process.env.WEBHOOK_TIMEOUT) || 10000, // 10秒超时
-    retries: parseInt(process.env.WEBHOOK_RETRIES) || 3, // 重试3次
-    // Telegram配置
-    telegram: {
-      botToken: process.env.TELEGRAM_BOT_TOKEN || '',
-      chatId: process.env.TELEGRAM_CHAT_ID || '',
-      parseMode: process.env.TELEGRAM_PARSE_MODE || 'HTML',
-      apiUrl: process.env.TELEGRAM_API_URL || 'https://api.telegram.org'
-    }
+    retries: parseInt(process.env.WEBHOOK_RETRIES) || 3 // 重试3次
   },
 
   // 🛠️ 开发配置
