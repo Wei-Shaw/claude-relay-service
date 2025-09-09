@@ -6,7 +6,7 @@
     <div class="relative top-20 mx-auto w-96 rounded-md border bg-white p-5 shadow-lg">
       <div class="mt-3">
         <div class="mb-4 flex items-center justify-between">
-          <h3 class="text-lg font-medium text-gray-900">Change User Role</h3>
+          <h3 class="text-lg font-medium text-gray-900">{{ $t('user.changeRoleModal.title') }}</h3>
           <button class="text-gray-400 hover:text-gray-600" @click="$emit('close')">
             <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -54,7 +54,7 @@
                         : 'bg-blue-100 text-blue-800'
                     ]"
                   >
-                    Current: {{ user.role }}
+                    {{ $t('user.changeRoleModal.currentRole', { role: user.role }) }}
                   </span>
                 </div>
               </div>
@@ -64,7 +64,7 @@
           <!-- Role Selection -->
           <form class="space-y-4" @submit.prevent="handleSubmit">
             <div>
-              <label class="mb-2 block text-sm font-medium text-gray-700"> New Role </label>
+              <label class="mb-2 block text-sm font-medium text-gray-700"> {{ $t('user.changeRoleModal.newRole') }} </label>
               <div class="space-y-2">
                 <label class="flex items-center">
                   <input
@@ -75,8 +75,8 @@
                     value="user"
                   />
                   <div class="ml-3">
-                    <div class="text-sm font-medium text-gray-900">User</div>
-                    <div class="text-xs text-gray-500">Regular user with basic permissions</div>
+                    <div class="text-sm font-medium text-gray-900">{{ $t('user.changeRoleModal.roles.user') }}</div>
+                    <div class="text-xs text-gray-500">{{ $t('user.changeRoleModal.roles.userDesc') }}</div>
                   </div>
                 </label>
                 <label class="flex items-center">
@@ -88,8 +88,8 @@
                     value="admin"
                   />
                   <div class="ml-3">
-                    <div class="text-sm font-medium text-gray-900">Administrator</div>
-                    <div class="text-xs text-gray-500">Full access to manage users and system</div>
+                    <div class="text-sm font-medium text-gray-900">{{ $t('user.changeRoleModal.roles.admin') }}</div>
+                    <div class="text-xs text-gray-500">{{ $t('user.changeRoleModal.roles.adminDesc') }}</div>
                   </div>
                 </label>
               </div>
@@ -111,15 +111,13 @@
                   </svg>
                 </div>
                 <div class="ml-3">
-                  <h3 class="text-sm font-medium text-yellow-800">Role Change Warning</h3>
+                  <h3 class="text-sm font-medium text-yellow-800">{{ $t('user.changeRoleModal.roleChangeWarning.title') }}</h3>
                   <div class="mt-2 text-sm text-yellow-700">
                     <p v-if="selectedRole === 'admin'">
-                      Granting admin privileges will give this user full access to the system,
-                      including the ability to manage other users and their API keys.
+                      {{ $t('user.changeRoleModal.roleChangeWarning.grantAdmin') }}
                     </p>
                     <p v-else>
-                      Removing admin privileges will restrict this user to only managing their own
-                      API keys and viewing their own usage statistics.
+                      {{ $t('user.changeRoleModal.roleChangeWarning.removeAdmin') }}
                     </p>
                   </div>
                 </div>
@@ -150,7 +148,7 @@
                 type="button"
                 @click="$emit('close')"
               >
-                Cancel
+                {{ $t('user.changeRoleModal.cancel') }}
               </button>
               <button
                 class="rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -178,9 +176,9 @@
                       fill="currentColor"
                     ></path>
                   </svg>
-                  Updating...
+                  {{ $t('user.changeRoleModal.updating') }}
                 </span>
-                <span v-else>Update Role</span>
+                <span v-else>{{ $t('user.changeRoleModal.updateRole') }}</span>
               </button>
             </div>
           </form>
@@ -194,6 +192,9 @@
 import { ref, watch } from 'vue'
 import { apiClient } from '@/config/api'
 import { showToast } from '@/utils/toast'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps({
   show: {
@@ -226,7 +227,7 @@ const handleSubmit = async () => {
     })
 
     if (response.success) {
-      showToast(`User role updated to ${selectedRole.value}`, 'success')
+      showToast(t('user.changeRoleModal.roleUpdated', { role: selectedRole.value }), 'success')
       emit('updated')
     } else {
       error.value = response.message || 'Failed to update user role'

@@ -789,6 +789,102 @@ export default {
       loadUsersError: 'Failed to load users',
       toggleStatusError: 'Failed to toggleStatus',
       disableKeysError: 'Failed to disableKeys'
+    },
+
+    // User Usage Stats Modal
+    usageStatsModal: {
+      title: '使用统计',
+      titleWithUser: '使用统计 - {displayName}',
+      
+      // Time period selection
+      periodSelection: {
+        day: '最近24小时',
+        week: '最近7天',
+        month: '最近30天',
+        quarter: '最近90天'
+      },
+      
+      // Loading state
+      loadingStats: '正在加载使用统计...',
+      
+      // Summary cards
+      summaryCards: {
+        requests: '请求数',
+        inputTokens: '输入Token',
+        outputTokens: '输出Token',
+        totalCost: '总费用'
+      },
+      
+      // API Keys table
+      apiKeysTable: {
+        title: 'API Keys 使用情况',
+        headers: {
+          apiKey: 'API Key',
+          status: '状态',
+          requests: '请求数',
+          tokens: 'Token数',
+          cost: '费用',
+          lastUsed: '最后使用'
+        },
+        status: {
+          active: '活跃',
+          disabled: '已禁用'
+        },
+        tokensFormat: {
+          input: '输入',
+          output: '输出'
+        },
+        never: '从未使用'
+      },
+      
+      // Usage trend chart
+      usageTrend: {
+        title: '使用趋势',
+        chartTitle: '使用图表',
+        dailyTrends: '最近 {period} 的日使用趋势',
+        chartNote: '(可集成 Chart.js、D3.js 或类似图表库)'
+      },
+      
+      // No data state
+      noData: {
+        title: '暂无使用数据',
+        description: '该用户在所选时间段内尚未发起任何API请求。'
+      },
+      
+      // Buttons
+      close: '关闭'
+    },
+
+    // Change Role Modal
+    changeRoleModal: {
+      title: '修改用户角色',
+      
+      // User info display
+      currentRole: '当前角色：{role}',
+      
+      // Role selection form
+      newRole: '新角色',
+      roles: {
+        user: '用户',
+        userDesc: '具有基本权限的普通用户',
+        admin: '管理员',
+        adminDesc: '拥有管理用户和系统的完整权限'
+      },
+      
+      // Warning messages
+      roleChangeWarning: {
+        title: '角色变更警告',
+        grantAdmin: '授予管理员权限将使该用户拥有系统的完整访问权限，包括管理其他用户及其API密钥的能力。',
+        removeAdmin: '移除管理员权限将限制该用户只能管理自己的API密钥和查看自己的使用统计。'
+      },
+      
+      // Buttons
+      cancel: '取消',
+      updateRole: '更新角色',
+      updating: '更新中...',
+      
+      // Success message
+      roleUpdated: '用户角色已更新为 {role}'
     }
   },
 
