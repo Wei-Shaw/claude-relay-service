@@ -489,6 +489,178 @@ export default {
     // Account type display
     claudeMax: 'Claude Max',
     claudePro: 'Claude Pro',
-    claudeFree: 'Claude Free'
+    claudeFree: 'Claude Free',
+    
+    // Platform display
+    openaiResponsesPlatform: 'OpenAI-Responses',
+    ccrPlatform: 'CCR'
+  },
+  apiKeys: {
+    // Page title and description
+    title: 'API Keys 管理',
+    description: '管理和監控您的 API 密鑰',
+    
+    // Tab navigation
+    activeTab: '活躍 API Keys',
+    deletedTab: '已刪除 API Keys',
+    
+    // Toolbar and actions
+    refresh: '重新整理',
+    refreshTooltip: '重新整理 API Keys 清單（Ctrl+點擊強制重新整理）',
+    createNew: '建立新 Key',
+    bulkEdit: '編輯已選取',
+    bulkDelete: '刪除已選取',
+    
+    // Table headers
+    name: '名稱',
+    tags: '標籤',
+    status: '狀態',
+    usageStats: '使用統計',
+    createdAt: '建立時間',
+    expiresAt: '過期時間',
+    actions: '操作',
+    
+    // Filter options
+    timeRange: {
+      today: '今日',
+      week: '最近7天',
+      month: '本月',
+      all: '全部時間'
+    },
+    
+    // Status
+    active: '活躍',
+    disabled: '停用',
+    expired: '已過期',
+    expiringSoon: '即將過期',
+    neverExpire: '永不過期',
+    notActivated: '未啟用',
+    
+    // Usage statistics
+    dailyCost: '今日費用',
+    totalCost: '總費用',
+    dailyRequests: '今日請求',
+    lastUsed: '最後使用',
+    neverUsed: '從未使用',
+    minutesAgo: '{minutes} 分鐘前',
+    hoursAgo: '{hours} 小時前',
+    daysAgo: '{days} 天前',
+    justNow: '剛剛',
+    requests: '次',
+    
+    // Search and filter
+    searchPlaceholder: '搜尋名稱...',
+    searchPlaceholderWithOwner: '搜尋名稱或擁有者...',
+    allTags: '所有標籤',
+    noTags: '無標籤',
+    
+    // Binding information
+    shared: '使用共享池',
+    dedicated: '專屬',
+    consoleAccount: 'Console賬戶',
+    bindingWarning: '⚠️ 賬戶不存在',
+    
+    // Limits and quotas
+    dailyLimit: '每日費用',
+    weeklyOpusLimit: 'Opus週費用',
+    remainingQuota: '剩餘: ${amount}',
+    reset: '重設於 {time}',
+    quotaProgress: '配額進度',
+    
+    // Model statistics
+    modelStats: '模型使用分佈',
+    modelStatsCount: '{count} 個模型',
+    totalTokens: '總Token',
+    inputTokens: '輸入',
+    outputTokens: '輸出',
+    cacheCreate: '快取建立',
+    cacheRead: '快取讀取',
+    totalRequests: '總請求',
+    noModelData: '暫無模型使用資料',
+    resetFilter: '重新整理',
+    adjustTimeRange: '嘗試調整時間範圍或點擊重新整理重新載入資料',
+    
+    // Date filter
+    dateFilter: {
+      today: '今日',
+      days7: '7天',
+      days30: '30天'
+    },
+    
+    // Actions
+    viewDetails: '查看詳細統計',
+    edit: '編輯',
+    renew: '續期',
+    activate: '啟用',
+    disable: '停用',
+    copy: '複製',
+    copyStatsLink: '複製統計頁面連結',
+    
+    // Pagination
+    totalRecords: '共 {count} 條記錄',
+    pageSize: '每頁顯示',
+    records: '條',
+    
+    // Empty states
+    noApiKeys: '暫無 API Keys',
+    noApiKeysHint: '點擊上方按鈕建立您的第一個 API Key',
+    noDeletedKeys: '暫無已刪除的 API Keys',
+    noDeletedKeysHint: '已刪除的 API Keys 會出現在這裡',
+    loading: '正在載入 API Keys...',
+    loadingDeleted: '正在載入已刪除的 API Keys...',
+    loadingModelStats: '載入模型統計...',
+    
+    // Deleted keys table
+    creator: '建立者',
+    deletedBy: '刪除者',
+    deletedAt: '刪除時間',
+    canRestore: '恢復',
+    permanentDelete: '徹底刪除',
+    clearAllDeleted: '清空所有已刪除',
+    
+    // User types
+    admin: '管理員',
+    user: '用戶',
+    unknown: '未知',
+    system: '系統',
+    
+    // Confirmation dialogs
+    confirmDisable: '確定要停用 API Key "{name}" 嗎？停用後所有使用此 Key 的請求將返回 401 錯誤。',
+    confirmDelete: '確定要刪除這個 API Key 嗎？此操作不可恢復。',
+    confirmBatchDelete: '確定要刪除已選取的 {count} 個 API Key 嗎？此操作不可恢復。',
+    confirmRestore: '確定要恢復這個 API Key 嗎？恢復後可以重新使用。',
+    confirmPermanentDelete: '確定要徹底刪除這個 API Key 嗎？此操作不可恢復，所有相關資料將被永久刪除。',
+    confirmClearAll: '確定要徹底刪除全部 {count} 個已刪除的 API Keys 嗎？此操作不可恢復，所有相關資料將被永久刪除。',
+    
+    // Success messages
+    keyActivated: 'API Key 已啟用',
+    keyDisabled: 'API Key 已停用',
+    keyDeleted: 'API Key 已刪除',
+    keyRestored: 'API Key 已成功恢復',
+    keyPermanentDeleted: 'API Key 已徹底刪除',
+    allDeletedCleared: '已清空所有已刪除的 API Keys',
+    linkCopied: '已複製統計頁面連結',
+    expiryUpdated: '過期時間已更新',
+    
+    // Error messages
+    selectKeysFirst: '請先選擇要編輯的 API Keys',
+    loadFailed: '載入 API Keys 失敗',
+    operationFailed: '操作失敗',
+    copyFailed: '複製失敗，請手動複製',
+    updateFailed: '更新失敗',
+    deleteFailed: '刪除失敗',
+    restoreFailed: '恢復失敗',
+    clearFailed: '清空失敗',
+    
+    // Tooltips and helpers
+    editExpiry: '編輯過期時間',
+    activationDays: '未啟用 ({days}天)',
+    boundTo: '綁定到',
+    belongsToGroup: '所屬分組: {name}',
+    
+    // Batch operations
+    batchSuccess: '成功處理 {count} 個項目',
+    batchPartialFail: '{failed} 個處理失敗',
+    batchAllFailed: '所有項目處理失敗'
   }
 }

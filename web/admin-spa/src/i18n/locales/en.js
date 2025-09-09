@@ -489,6 +489,178 @@ export default {
     // Account type display
     claudeMax: 'Claude Max',
     claudePro: 'Claude Pro',
-    claudeFree: 'Claude Free'
+    claudeFree: 'Claude Free',
+    
+    // Platform display
+    openaiResponsesPlatform: 'OpenAI-Responses',
+    ccrPlatform: 'CCR'
+  },
+  apiKeys: {
+    // Page title and description
+    title: 'API Keys Management',
+    description: 'Manage and monitor your API keys',
+    
+    // Tab navigation
+    activeTab: 'Active API Keys',
+    deletedTab: 'Deleted API Keys',
+    
+    // Toolbar and actions
+    refresh: 'Refresh',
+    refreshTooltip: 'Refresh API Keys list (Ctrl+click for force refresh)',
+    createNew: 'Create New Key',
+    bulkEdit: 'Edit Selected',
+    bulkDelete: 'Delete Selected',
+    
+    // Table headers
+    name: 'Name',
+    tags: 'Tags',
+    status: 'Status',
+    usageStats: 'Usage Statistics',
+    createdAt: 'Created At',
+    expiresAt: 'Expires At',
+    actions: 'Actions',
+    
+    // Filter options
+    timeRange: {
+      today: 'Today',
+      week: 'Last 7 Days',
+      month: 'This Month',
+      all: 'All Time'
+    },
+    
+    // Status
+    active: 'Active',
+    disabled: 'Disabled',
+    expired: 'Expired',
+    expiringSoon: 'Expiring Soon',
+    neverExpire: 'Never Expire',
+    notActivated: 'Not Activated',
+    
+    // Usage statistics
+    dailyCost: 'Daily Cost',
+    totalCost: 'Total Cost',
+    dailyRequests: 'Daily Requests',
+    lastUsed: 'Last Used',
+    neverUsed: 'Never Used',
+    minutesAgo: '{minutes} minutes ago',
+    hoursAgo: '{hours} hours ago',
+    daysAgo: '{days} days ago',
+    justNow: 'Just now',
+    requests: 'requests',
+    
+    // Search and filter
+    searchPlaceholder: 'Search name...',
+    searchPlaceholderWithOwner: 'Search name or owner...',
+    allTags: 'All Tags',
+    noTags: 'No Tags',
+    
+    // Binding information
+    shared: 'Using Shared Pool',
+    dedicated: 'Dedicated',
+    consoleAccount: 'Console Account',
+    bindingWarning: '⚠️ Account not found',
+    
+    // Limits and quotas
+    dailyLimit: 'Daily Cost',
+    weeklyOpusLimit: 'Opus Weekly Cost',
+    remainingQuota: 'Remaining: ${amount}',
+    reset: 'Reset at {time}',
+    quotaProgress: 'Quota Progress',
+    
+    // Model statistics
+    modelStats: 'Model Usage Distribution',
+    modelStatsCount: '{count} models',
+    totalTokens: 'Total Tokens',
+    inputTokens: 'Input',
+    outputTokens: 'Output',
+    cacheCreate: 'Cache Create',
+    cacheRead: 'Cache Read',
+    totalRequests: 'Total Requests',
+    noModelData: 'No model usage data',
+    resetFilter: 'Refresh',
+    adjustTimeRange: 'Try adjusting the time range or click refresh to reload data',
+    
+    // Date filter
+    dateFilter: {
+      today: 'Today',
+      days7: '7 Days',
+      days30: '30 Days'
+    },
+    
+    // Actions
+    viewDetails: 'View Detailed Statistics',
+    edit: 'Edit',
+    renew: 'Renew',
+    activate: 'Activate',
+    disable: 'Disable',
+    copy: 'Copy',
+    copyStatsLink: 'Copy Stats Page Link',
+    
+    // Pagination
+    totalRecords: 'Total {count} records',
+    pageSize: 'Show',
+    records: 'per page',
+    
+    // Empty states
+    noApiKeys: 'No API Keys',
+    noApiKeysHint: 'Click the button above to create your first API Key',
+    noDeletedKeys: 'No deleted API Keys',
+    noDeletedKeysHint: 'Deleted API Keys will appear here',
+    loading: 'Loading API Keys...',
+    loadingDeleted: 'Loading deleted API Keys...',
+    loadingModelStats: 'Loading model statistics...',
+    
+    // Deleted keys table
+    creator: 'Creator',
+    deletedBy: 'Deleted By',
+    deletedAt: 'Deleted At',
+    canRestore: 'Restore',
+    permanentDelete: 'Permanent Delete',
+    clearAllDeleted: 'Clear All Deleted',
+    
+    // User types
+    admin: 'Admin',
+    user: 'User',
+    unknown: 'Unknown',
+    system: 'System',
+    
+    // Confirmation dialogs
+    confirmDisable: 'Are you sure to disable API Key "{name}"? All requests using this key will return 401 errors after disabled.',
+    confirmDelete: 'Are you sure to delete this API Key? This action cannot be undone.',
+    confirmBatchDelete: 'Are you sure to delete selected {count} API Keys? This action cannot be undone.',
+    confirmRestore: 'Are you sure to restore this API Key? It can be used again after restoration.',
+    confirmPermanentDelete: 'Are you sure to permanently delete this API Key? This action cannot be undone and all related data will be permanently deleted.',
+    confirmClearAll: 'Are you sure to permanently delete all {count} deleted API Keys? This action cannot be undone and all related data will be permanently deleted.',
+    
+    // Success messages
+    keyActivated: 'API Key activated',
+    keyDisabled: 'API Key disabled',
+    keyDeleted: 'API Key deleted',
+    keyRestored: 'API Key successfully restored',
+    keyPermanentDeleted: 'API Key permanently deleted',
+    allDeletedCleared: 'All deleted API Keys cleared',
+    linkCopied: 'Stats page link copied',
+    expiryUpdated: 'Expiry time updated',
+    
+    // Error messages
+    selectKeysFirst: 'Please select API Keys to edit first',
+    loadFailed: 'Failed to load API Keys',
+    operationFailed: 'Operation failed',
+    copyFailed: 'Copy failed, please copy manually',
+    updateFailed: 'Update failed',
+    deleteFailed: 'Delete failed',
+    restoreFailed: 'Restore failed',
+    clearFailed: 'Clear failed',
+    
+    // Tooltips and helpers
+    editExpiry: 'Edit expiry time',
+    activationDays: 'Not activated ({days} days)',
+    boundTo: 'Bound to',
+    belongsToGroup: 'Belongs to group: {name}',
+    
+    // Batch operations
+    batchSuccess: 'Successfully processed {count} items',
+    batchPartialFail: '{failed} items failed to process',
+    batchAllFailed: 'All items failed to process'
   }
 }
