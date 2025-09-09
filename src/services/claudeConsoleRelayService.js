@@ -19,10 +19,11 @@ class ClaudeConsoleRelayService {
     options = {}
   ) {
     let abortController = null
+    let account = null
 
     try {
       // 获取账户信息
-      const account = await claudeConsoleAccountService.getAccount(accountId)
+      account = await claudeConsoleAccountService.getAccount(accountId)
       if (!account) {
         throw new Error('Claude Console Claude account not found')
       }
@@ -244,9 +245,10 @@ class ClaudeConsoleRelayService {
     streamTransformer = null,
     options = {}
   ) {
+    let account = null
     try {
       // 获取账户信息
-      const account = await claudeConsoleAccountService.getAccount(accountId)
+      account = await claudeConsoleAccountService.getAccount(accountId)
       if (!account) {
         throw new Error('Claude Console Claude account not found')
       }

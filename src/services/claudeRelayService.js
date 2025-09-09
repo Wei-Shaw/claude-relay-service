@@ -1502,15 +1502,11 @@ class ClaudeRelayService {
       })
 
       req.on('error', async (error) => {
-        logger.error(
-          `❌ Claude stream request error (Account: ${account?.name || accountId}):`,
-          error.message,
-          {
-            code: error.code,
-            errno: error.errno,
-            syscall: error.syscall
-          }
-        )
+        logger.error(`❌ Claude stream request error:`, error.message, {
+          code: error.code,
+          errno: error.errno,
+          syscall: error.syscall
+        })
 
         // 根据错误类型提供更具体的错误信息
         let errorMessage = 'Upstream request failed'
@@ -1554,7 +1550,7 @@ class ClaudeRelayService {
 
       req.on('timeout', async () => {
         req.destroy()
-        logger.error(`❌ Claude stream request timeout | Account: ${account?.name || accountId}`)
+        logger.error(`❌ Claude stream request timeout`)
 
         if (!responseStream.headersSent) {
           responseStream.writeHead(504, {
