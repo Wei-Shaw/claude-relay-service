@@ -664,6 +664,134 @@ export default {
     batchAllFailed: '所有項目處理失敗'
   },
 
+  // User-related translations
+  user: {
+    // User Dashboard
+    dashboard: {
+      title: 'Dashboard Overview',
+      welcomeMessage: 'Welcome to your Claude Relay dashboard',
+      
+      // Navigation tabs
+      overview: 'Overview',
+      apiKeys: 'API Keys',
+      usageStats: 'Usage Stats',
+      
+      // Welcome section
+      welcome: 'Welcome',
+      
+      // Stats cards
+      activeApiKeys: 'Active API Keys',
+      deletedApiKeys: 'Deleted API Keys',
+      totalRequests: 'Total Requests',
+      inputTokens: 'Input Tokens',
+      totalCost: 'Total Cost',
+      
+      // Account information section
+      accountInformation: 'Account Information',
+      username: 'Username',
+      displayName: 'Display Name',
+      email: 'Email',
+      role: 'Role',
+      memberSince: 'Member Since',
+      lastLogin: 'Last Login',
+      notAvailable: 'N/A',
+      
+      // Messages
+      logout: 'Logout',
+      logoutSuccess: 'Logged out successfully',
+      logoutFailed: 'Logout failed',
+      loadProfileFailed: 'Failed to load user profile',
+      loadStatsFailed: 'Failed to load API keys stats'
+    },
+    
+    // User Login
+    login: {
+      title: 'User Sign In',
+      subtitle: 'Sign in to your account to manage your API keys',
+      username: 'Username',
+      password: 'Password',
+      usernamePlaceholder: 'Enter your username',
+      passwordPlaceholder: 'Enter your password',
+      signIn: 'Sign In',
+      signingIn: 'Signing In...',
+      adminLogin: 'Admin Login',
+      
+      // Validation and error messages
+      requiredFields: 'Please enter both username and password',
+      loginSuccess: 'Login successful!',
+      loginFailed: 'Login failed'
+    },
+    
+    // User Management
+    management: {
+      title: 'User Management',
+      description: 'Manage users, their API keys, and view usage statistics',
+      refresh: 'Refresh',
+      
+      // Stats cards
+      totalUsers: 'Total Users',
+      activeUsers: 'Active Users',
+      totalApiKeys: 'Total API Keys',
+      totalCost: 'Total Cost',
+      
+      // Search and filters
+      searchPlaceholder: 'Search users...',
+      allRoles: 'All Roles',
+      user: 'User',
+      admin: 'Admin',
+      allStatus: 'All Status',
+      active: 'Active',
+      disabled: 'Disabled',
+      
+      // User list
+      users: 'Users',
+      loadingUsers: 'Loading users...',
+      noUsersFound: 'No users found',
+      noUsersMatch: 'No users match your search criteria.',
+      noUsersCreated: 'No users have been created yet.',
+      
+      // User info and actions
+      displayName: 'Display Name',
+      email: 'Email',
+      role: 'Role',
+      username: 'Username',
+      apiKeysCount: 'API keys',
+      lastLogin: 'Last login',
+      neverLoggedIn: 'Never logged in',
+      requests: 'requests',
+      totalCostLabel: 'total cost',
+      
+      // Action buttons and tooltips
+      viewUsageStats: 'View Usage Stats',
+      disableAllApiKeys: 'Disable All API Keys',
+      disableUser: 'Disable User',
+      enableUser: 'Enable User',
+      changeRole: 'Change Role',
+      
+      // Confirmation dialogs
+      disableUserTitle: 'Disable User',
+      enableUserTitle: 'Enable User',
+      disableUserMessage: 'Are you sure you want to disable user "{username}"? This will prevent them from logging in.',
+      enableUserMessage: 'Are you sure you want to enable user "{username}"?',
+      disable: 'Disable',
+      enable: 'Enable',
+      
+      disableAllKeysTitle: 'Disable All API Keys',
+      disableAllKeysMessage: 'Are you sure you want to disable all {count} API keys for user "{username}"? This will prevent them from using the service.',
+      disableKeys: 'Disable Keys',
+      
+      // Success messages
+      userDisabledSuccess: 'User disabled successfully',
+      userEnabledSuccess: 'User enabled successfully',
+      keysDisabledSuccess: 'Disabled {count} API keys',
+      
+      // Error messages
+      loadUsersError: 'Failed to load users',
+      toggleStatusError: 'Failed to toggleStatus',
+      disableKeysError: 'Failed to disableKeys'
+    }
+  },
+
   // Settings 設置頁面
   settings: {
     title: '系統設置',
