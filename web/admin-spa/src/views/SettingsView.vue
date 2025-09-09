@@ -4,9 +4,9 @@
       <!-- 页面标题 -->
       <div class="mb-4 sm:mb-6">
         <h3 class="mb-1 text-lg font-bold text-gray-900 dark:text-gray-100 sm:mb-2 sm:text-xl">
-          系统设置
+          {{ t('settings.title') }}
         </h3>
-        <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-base">网站定制和通知配置</p>
+        <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-base">{{ t('settings.description') }}</p>
       </div>
 
       <!-- 设置分类导航 -->
@@ -22,7 +22,7 @@
             @click="activeSection = 'branding'"
           >
             <i class="fas fa-palette mr-2"></i>
-            品牌设置
+            {{ t('settings.branding') }}
           </button>
           <button
             :class="[
@@ -34,7 +34,7 @@
             @click="activeSection = 'webhook'"
           >
             <i class="fas fa-bell mr-2"></i>
-            通知设置
+            {{ t('settings.webhook') }}
           </button>
         </nav>
       </div>
@@ -42,7 +42,7 @@
       <!-- 加载状态 -->
       <div v-if="loading" class="py-12 text-center">
         <div class="loading-spinner mx-auto mb-4"></div>
-        <p class="text-gray-500 dark:text-gray-400">正在加载设置...</p>
+        <p class="text-gray-500 dark:text-gray-400">{{ t('settings.loading') }}</p>
       </div>
 
       <!-- 内容区域 -->
@@ -64,9 +64,9 @@
                       </div>
                       <div>
                         <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                          网站名称
+                          {{ t('settings.siteName') }}
                         </div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400">品牌标识</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">{{ t('settings.siteNameDescription') }}</div>
                       </div>
                     </div>
                   </td>
@@ -75,11 +75,11 @@
                       v-model="oemSettings.siteName"
                       class="form-input w-full max-w-md dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                       maxlength="100"
-                      placeholder="Claude Relay Service"
+:placeholder="t('settings.siteNamePlaceholder')"
                       type="text"
                     />
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      将显示在浏览器标题和页面头部
+                      {{ t('settings.siteNameHint') }}
                     </p>
                   </td>
                 </tr>
@@ -95,9 +95,9 @@
                       </div>
                       <div>
                         <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                          网站图标
+                          {{ t('settings.siteIcon') }}
                         </div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400">Favicon</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">{{ t('settings.siteIconDescription') }}</div>
                       </div>
                     </div>
                   </td>
@@ -109,17 +109,17 @@
                         class="inline-flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-700"
                       >
                         <img
-                          alt="图标预览"
+:alt="t('settings.iconPreview')"
                           class="h-8 w-8"
                           :src="oemSettings.siteIconData || oemSettings.siteIcon"
                           @error="handleIconError"
                         />
-                        <span class="text-sm text-gray-600 dark:text-gray-400">当前图标</span>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">{{ t('settings.currentIcon') }}</span>
                         <button
                           class="rounded-lg px-3 py-1 font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-900"
                           @click="removeIcon"
                         >
-                          <i class="fas fa-trash mr-1" />删除
+                          <i class="fas fa-trash mr-1" />{{ t('settings.removeIcon') }}
                         </button>
                       </div>
 
@@ -137,10 +137,10 @@
                           @click="$refs.iconFileInput.click()"
                         >
                           <i class="fas fa-upload mr-2" />
-                          上传图标
+                          {{ t('settings.uploadIcon') }}
                         </button>
                         <span class="ml-3 text-xs text-gray-500 dark:text-gray-400"
-                          >支持 .ico, .png, .jpg, .svg 格式，最大 350KB</span
+                          >{{ t('settings.iconFormats') }}</span
                         >
                       </div>
                     </div>
@@ -158,9 +158,9 @@
                       </div>
                       <div>
                         <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                          管理入口
+                          {{ t('settings.adminEntry') }}
                         </div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400">登录按钮显示</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">{{ t('settings.adminEntryDescription') }}</div>
                       </div>
                     </div>
                   </td>
@@ -172,12 +172,12 @@
                           class="peer relative h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800"
                         ></div>
                         <span class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300">{{
-                          hideAdminButton ? '隐藏登录按钮' : '显示登录按钮'
+                          hideAdminButton ? t('settings.hideLoginButton') : t('settings.showLoginButton')
                         }}</span>
                       </label>
                     </div>
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      隐藏后，用户需要直接访问 /admin/login 页面登录
+                      {{ t('settings.adminEntryHint') }}
                     </p>
                   </td>
                 </tr>
@@ -195,7 +195,7 @@
                         >
                           <div v-if="saving" class="loading-spinner mr-2"></div>
                           <i v-else class="fas fa-save mr-2" />
-                          {{ saving ? '保存中...' : '保存设置' }}
+                          {{ saving ? t('settings.saving') : t('settings.save') }}
                         </button>
 
                         <button
@@ -204,7 +204,7 @@
                           @click="resetOemSettings"
                         >
                           <i class="fas fa-undo mr-2" />
-                          重置为默认
+                          {{ t('settings.reset') }}
                         </button>
                       </div>
 
@@ -213,7 +213,7 @@
                         class="text-sm text-gray-500 dark:text-gray-400"
                       >
                         <i class="fas fa-clock mr-1" />
-                        最后更新：{{ formatDateTime(oemSettings.updatedAt) }}
+                        {{ t('settings.lastUpdated', { time: formatDateTime(oemSettings.updatedAt) }) }}
                       </div>
                     </div>
                   </td>
@@ -233,15 +233,15 @@
                   <i class="fas fa-tag"></i>
                 </div>
                 <div>
-                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">站点名称</h3>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">自定义您的站点品牌名称</p>
+                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">{{ t('settings.siteNameCard') }}</h3>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('settings.siteNameCardDesc') }}</p>
                 </div>
               </div>
               <input
                 v-model="oemSettings.siteName"
                 class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                 maxlength="100"
-                placeholder="Claude Relay Service"
+:placeholder="t('settings.siteNamePlaceholder')"
                 type="text"
               />
             </div>
@@ -255,9 +255,9 @@
                   <i class="fas fa-image"></i>
                 </div>
                 <div>
-                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">站点图标</h3>
+                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">{{ t('settings.siteIconCard') }}</h3>
                   <p class="text-sm text-gray-500 dark:text-gray-400">
-                    上传自定义图标或输入图标URL
+                    {{ t('settings.siteIconCardDesc') }}
                   </p>
                 </div>
               </div>
@@ -268,17 +268,17 @@
                   class="inline-flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-700"
                 >
                   <img
-                    alt="图标预览"
+:alt="t('settings.iconPreview')"
                     class="h-8 w-8"
                     :src="oemSettings.siteIconData || oemSettings.siteIcon"
                     @error="handleIconError"
                   />
-                  <span class="text-sm text-gray-600 dark:text-gray-400">当前图标</span>
+                  <span class="text-sm text-gray-600 dark:text-gray-400">{{ t('settings.currentIcon') }}</span>
                   <button
                     class="rounded-lg px-3 py-1 font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-900"
                     @click="removeIcon"
                   >
-                    删除
+                    {{ t('settings.removeIcon') }}
                   </button>
                 </div>
 
@@ -296,10 +296,10 @@
                     @click="$refs.iconFileInputMobile.click()"
                   >
                     <i class="fas fa-upload mr-2" />
-                    上传图标
+                    {{ t('settings.uploadIcon') }}
                   </button>
                   <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                    支持 .ico, .png, .jpg, .svg 格式，最大 350KB
+                    {{ t('settings.iconFormats') }}
                   </p>
                 </div>
               </div>
@@ -314,8 +314,8 @@
                   <i class="fas fa-eye-slash"></i>
                 </div>
                 <div>
-                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">管理入口</h3>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">控制登录按钮在首页的显示</p>
+                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">{{ t('settings.adminEntryCard') }}</h3>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('settings.adminEntryCardDesc') }}</p>
                 </div>
               </div>
               <div class="space-y-2">
@@ -325,11 +325,11 @@
                     class="peer relative h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800"
                   ></div>
                   <span class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300">{{
-                    hideAdminButton ? '隐藏登录按钮' : '显示登录按钮'
+                    hideAdminButton ? t('settings.hideLoginButton') : t('settings.showLoginButton')
                   }}</span>
                 </label>
                 <p class="text-xs text-gray-500 dark:text-gray-400">
-                  隐藏后，用户需要直接访问 /admin/login 页面登录
+                  {{ t('settings.adminEntryHint') }}
                 </p>
               </div>
             </div>
@@ -345,7 +345,7 @@
                 >
                   <div v-if="saving" class="loading-spinner mr-2"></div>
                   <i v-else class="fas fa-save mr-2" />
-                  {{ saving ? '保存中...' : '保存设置' }}
+                  {{ saving ? t('settings.saving') : t('settings.save') }}
                 </button>
 
                 <button
@@ -354,7 +354,7 @@
                   @click="resetOemSettings"
                 >
                   <i class="fas fa-undo mr-2" />
-                  重置为默认
+                  {{ t('settings.reset') }}
                 </button>
 
                 <div
@@ -362,7 +362,7 @@
                   class="text-center text-sm text-gray-500 dark:text-gray-400"
                 >
                   <i class="fas fa-clock mr-1" />
-                  上次更新: {{ formatDateTime(oemSettings.updatedAt) }}
+                  {{ t('settings.lastUpdatedMobile', { time: formatDateTime(oemSettings.updatedAt) }) }}
                 </div>
               </div>
             </div>
@@ -377,9 +377,11 @@
           >
             <div class="flex items-center justify-between">
               <div>
-                <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">启用通知</h2>
+                <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                  {{ t('settings.enableWebhook') }}
+                </h2>
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                  开启后，系统将按配置发送通知到指定平台
+                  {{ t('settings.webhookDescription') }}
                 </p>
               </div>
               <label class="relative inline-flex cursor-pointer items-center">
@@ -400,7 +402,7 @@
           <div
             class="mb-6 rounded-lg bg-white/80 p-6 shadow-lg backdrop-blur-sm dark:bg-gray-800/80"
           >
-            <h2 class="mb-4 text-lg font-semibold text-gray-800 dark:text-gray-200">通知类型</h2>
+            <h2 class="mb-4 text-lg font-semibold text-gray-800 dark:text-gray-200">{{ t('settings.notificationTypes') }}</h2>
             <div class="space-y-3">
               <div
                 v-for="(enabled, type) in webhookConfig.notificationTypes"
@@ -469,21 +471,9 @@
                       </div>
                     </div>
                     <div class="mt-3 space-y-1 text-sm">
-                      <div
-                        v-if="platform.type !== 'smtp'"
-                        class="flex items-center text-gray-600 dark:text-gray-400"
-                      >
+                      <div class="flex items-center text-gray-600 dark:text-gray-400">
                         <i class="fas fa-link mr-2"></i>
                         <span class="truncate">{{ platform.url }}</span>
-                      </div>
-                      <div
-                        v-if="platform.type === 'smtp' && platform.to"
-                        class="flex items-center text-gray-600 dark:text-gray-400"
-                      >
-                        <i class="fas fa-envelope mr-2"></i>
-                        <span class="truncate">{{
-                          Array.isArray(platform.to) ? platform.to.join(', ') : platform.to
-                        }}</span>
                       </div>
                       <div
                         v-if="platform.enableSign"
@@ -665,7 +655,6 @@
                 <option value="slack">🟣 Slack</option>
                 <option value="discord">🟪 Discord</option>
                 <option value="bark">🔔 Bark</option>
-                <option value="smtp">📧 邮件通知</option>
                 <option value="custom">⚙️ 自定义</option>
               </select>
               <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
@@ -695,8 +684,8 @@
             />
           </div>
 
-          <!-- Webhook URL (非Bark和SMTP平台) -->
-          <div v-if="platformForm.type !== 'bark' && platformForm.type !== 'smtp'">
+          <!-- Webhook URL (非Bark平台) -->
+          <div v-if="platformForm.type !== 'bark'">
             <label
               class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
             >
@@ -847,141 +836,6 @@
             </div>
           </div>
 
-          <!-- SMTP 平台特有字段 -->
-          <div v-if="platformForm.type === 'smtp'" class="space-y-5">
-            <!-- SMTP 主机 -->
-            <div>
-              <label
-                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                <i class="fas fa-server mr-2 text-gray-400"></i>
-                SMTP 服务器
-                <span class="ml-1 text-xs text-red-500">*</span>
-              </label>
-              <input
-                v-model="platformForm.host"
-                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
-                placeholder="例如: smtp.gmail.com"
-                required
-                type="text"
-              />
-            </div>
-
-            <!-- SMTP 端口和安全设置 -->
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label
-                  class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  <i class="fas fa-plug mr-2 text-gray-400"></i>
-                  端口
-                </label>
-                <input
-                  v-model.number="platformForm.port"
-                  class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  max="65535"
-                  min="1"
-                  placeholder="587"
-                  type="number"
-                />
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  默认: 587 (TLS) 或 465 (SSL)
-                </p>
-              </div>
-
-              <div>
-                <label
-                  class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  <i class="fas fa-shield-alt mr-2 text-gray-400"></i>
-                  加密方式
-                </label>
-                <select
-                  v-model="platformForm.secure"
-                  class="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 text-gray-900 shadow-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                >
-                  <option :value="false">STARTTLS (端口587)</option>
-                  <option :value="true">SSL/TLS (端口465)</option>
-                </select>
-              </div>
-            </div>
-
-            <!-- 用户名 -->
-            <div>
-              <label
-                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                <i class="fas fa-user mr-2 text-gray-400"></i>
-                用户名
-                <span class="ml-1 text-xs text-red-500">*</span>
-              </label>
-              <input
-                v-model="platformForm.user"
-                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
-                placeholder="user@example.com"
-                required
-                type="email"
-              />
-            </div>
-
-            <!-- 密码 -->
-            <div>
-              <label
-                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                <i class="fas fa-lock mr-2 text-gray-400"></i>
-                密码 / 应用密码
-                <span class="ml-1 text-xs text-red-500">*</span>
-              </label>
-              <input
-                v-model="platformForm.pass"
-                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
-                placeholder="邮箱密码或应用专用密码"
-                required
-                type="password"
-              />
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                建议使用应用专用密码，而非邮箱登录密码
-              </p>
-            </div>
-
-            <!-- 发件人邮箱 -->
-            <div>
-              <label
-                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                <i class="fas fa-paper-plane mr-2 text-gray-400"></i>
-                发件人邮箱
-                <span class="ml-2 text-xs text-gray-500">(可选)</span>
-              </label>
-              <input
-                v-model="platformForm.from"
-                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
-                placeholder="默认使用用户名邮箱"
-                type="email"
-              />
-            </div>
-
-            <!-- 收件人邮箱 -->
-            <div>
-              <label
-                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                <i class="fas fa-envelope mr-2 text-gray-400"></i>
-                收件人邮箱
-                <span class="ml-1 text-xs text-red-500">*</span>
-              </label>
-              <input
-                v-model="platformForm.to"
-                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
-                placeholder="admin@example.com"
-                required
-                type="email"
-              />
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">接收通知的邮箱地址</p>
-            </div>
-          </div>
-
           <!-- 签名设置（钉钉/飞书） -->
           <div
             v-if="platformForm.type === 'dingtalk' || platformForm.type === 'feishu'"
@@ -1087,6 +941,7 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { showToast } from '@/utils/toast'
 import { useSettingsStore } from '@/stores/settings'
@@ -1096,6 +951,9 @@ import { apiClient } from '@/config/api'
 defineOptions({
   name: 'SettingsView'
 })
+
+// 使用vue-i18n
+const { t } = useI18n()
 
 // 使用settings store
 const settingsStore = useSettingsStore()
@@ -1154,23 +1012,7 @@ const platformForm = ref({
   name: '',
   url: '',
   enableSign: false,
-  secret: '',
-  // Bark特有字段
-  deviceKey: '',
-  serverUrl: '',
-  level: '',
-  sound: '',
-  group: '',
-  // SMTP特有字段
-  host: '',
-  port: null,
-  secure: false,
-  user: '',
-  pass: '',
-  from: '',
-  to: '',
-  timeout: null,
-  ignoreTLS: false
+  secret: ''
 })
 
 // 监听activeSection变化，加载对应配置
@@ -1192,48 +1034,17 @@ const platformTypeWatcher = watch(
     // 如果不是编辑模式，清空相关字段
     if (!editingPlatform.value) {
       if (newType === 'bark') {
-        // 切换到Bark时，清空URL和SMTP相关字段
+        // 切换到Bark时，清空URL相关字段
         platformForm.value.url = ''
         platformForm.value.enableSign = false
         platformForm.value.secret = ''
-        // 清空SMTP字段
-        platformForm.value.host = ''
-        platformForm.value.port = null
-        platformForm.value.secure = false
-        platformForm.value.user = ''
-        platformForm.value.pass = ''
-        platformForm.value.from = ''
-        platformForm.value.to = ''
-        platformForm.value.timeout = null
-        platformForm.value.ignoreTLS = false
-      } else if (newType === 'smtp') {
-        // 切换到SMTP时，清空URL和Bark相关字段
-        platformForm.value.url = ''
-        platformForm.value.enableSign = false
-        platformForm.value.secret = ''
-        // 清空Bark字段
-        platformForm.value.deviceKey = ''
-        platformForm.value.serverUrl = ''
-        platformForm.value.level = ''
-        platformForm.value.sound = ''
-        platformForm.value.group = ''
       } else {
-        // 切换到其他平台时，清空Bark和SMTP相关字段
+        // 切换到其他平台时，清空Bark相关字段
         platformForm.value.deviceKey = ''
         platformForm.value.serverUrl = ''
         platformForm.value.level = ''
         platformForm.value.sound = ''
         platformForm.value.group = ''
-        // SMTP 字段
-        platformForm.value.host = ''
-        platformForm.value.port = null
-        platformForm.value.secure = false
-        platformForm.value.user = ''
-        platformForm.value.pass = ''
-        platformForm.value.from = ''
-        platformForm.value.to = ''
-        platformForm.value.timeout = null
-        platformForm.value.ignoreTLS = false
       }
     }
   }
@@ -1244,14 +1055,6 @@ const isPlatformFormValid = computed(() => {
   if (platformForm.value.type === 'bark') {
     // Bark平台需要deviceKey
     return !!platformForm.value.deviceKey
-  } else if (platformForm.value.type === 'smtp') {
-    // SMTP平台需要必要的配置
-    return !!(
-      platformForm.value.host &&
-      platformForm.value.user &&
-      platformForm.value.pass &&
-      platformForm.value.to
-    )
   } else {
     // 其他平台需要URL且URL格式正确
     return !!platformForm.value.url && !urlError.value
@@ -1266,7 +1069,7 @@ onMounted(async () => {
       await loadWebhookConfig()
     }
   } catch (error) {
-    showToast('加载设置失败', 'error')
+    showToast(t('settings.loadSettingsFailed'), 'error')
   }
 })
 
@@ -1310,7 +1113,7 @@ const loadWebhookConfig = async () => {
   } catch (error) {
     if (error.name === 'AbortError') return
     if (!isMounted.value) return
-    showToast('获取webhook配置失败', 'error')
+    showToast(t('settings.getWebhookConfigFailed'), 'error')
     console.error(error)
   }
 }
@@ -1323,20 +1126,20 @@ const saveWebhookConfig = async () => {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
-      showToast('配置已保存', 'success')
+      showToast(t('settings.webhookConfigSaved'), 'success')
     }
   } catch (error) {
     if (error.name === 'AbortError') return
     if (!isMounted.value) return
-    showToast('保存配置失败', 'error')
+    showToast(t('settings.webhookConfigSaveFailed'), 'error')
     console.error(error)
   }
 }
 
 // 验证 URL
 const validateUrl = () => {
-  // Bark和SMTP平台不需要验证URL
-  if (platformForm.value.type === 'bark' || platformForm.value.type === 'smtp') {
+  // Bark平台不需要验证URL
+  if (platformForm.value.type === 'bark') {
     urlError.value = false
     urlValid.value = false
     return
@@ -1364,46 +1167,27 @@ const validateUrl = () => {
   }
 }
 
-// 验证平台配置
-const validatePlatformForm = () => {
-  if (platformForm.value.type === 'bark') {
-    if (!platformForm.value.deviceKey) {
-      showToast('请输入Bark设备密钥', 'error')
-      return false
-    }
-  } else if (platformForm.value.type === 'smtp') {
-    const requiredFields = [
-      { field: 'host', message: 'SMTP服务器' },
-      { field: 'user', message: '用户名' },
-      { field: 'pass', message: '密码' },
-      { field: 'to', message: '收件人邮箱' }
-    ]
-
-    for (const { field, message } of requiredFields) {
-      if (!platformForm.value[field]) {
-        showToast(`请输入${message}`, 'error')
-        return false
-      }
-    }
-  } else {
-    if (!platformForm.value.url) {
-      showToast('请输入Webhook URL', 'error')
-      return false
-    }
-    if (urlError.value) {
-      showToast('请输入有效的Webhook URL', 'error')
-      return false
-    }
-  }
-  return true
-}
-
 // 添加/更新平台
 const savePlatform = async () => {
   if (!isMounted.value) return
 
-  // 验证表单
-  if (!validatePlatformForm()) return
+  // Bark平台只需要deviceKey，其他平台需要URL
+  if (platformForm.value.type === 'bark') {
+    if (!platformForm.value.deviceKey) {
+      showToast(t('settings.enterBarkDeviceKey'), 'error')
+      return
+    }
+  } else {
+    if (!platformForm.value.url) {
+      showToast(t('settings.enterWebhookUrl'), 'error')
+      return
+    }
+
+    if (urlError.value) {
+      showToast('请输入有效的Webhook URL', 'error')
+      return
+    }
+  }
 
   savingPlatform.value = true
   try {
@@ -1423,14 +1207,14 @@ const savePlatform = async () => {
     }
 
     if (response.success && isMounted.value) {
-      showToast(editingPlatform.value ? '平台已更新' : '平台已添加', 'success')
+      showToast(editingPlatform.value ? t('settings.platformUpdated') : t('settings.platformAdded'), 'success')
       await loadWebhookConfig()
       closePlatformModal()
     }
   } catch (error) {
     if (error.name === 'AbortError') return
     if (!isMounted.value) return
-    showToast(error.message || '操作失败', 'error')
+    showToast(error.message || t('settings.operationFailed'), 'error')
     console.error(error)
   } finally {
     if (isMounted.value) {
@@ -1450,7 +1234,7 @@ const editPlatform = (platform) => {
 const deletePlatform = async (id) => {
   if (!isMounted.value) return
 
-  if (!confirm('确定要删除这个平台吗？')) {
+  if (!confirm(t('settings.confirmDeletePlatform'))) {
     return
   }
 
@@ -1459,13 +1243,13 @@ const deletePlatform = async (id) => {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
-      showToast('平台已删除', 'success')
+      showToast(t('settings.platformDeleted'), 'success')
       await loadWebhookConfig()
     }
   } catch (error) {
     if (error.name === 'AbortError') return
     if (!isMounted.value) return
-    showToast('删除失败', 'error')
+    showToast(t('settings.platformDeleteFailed'), 'error')
     console.error(error)
   }
 }
@@ -1512,15 +1296,6 @@ const testPlatform = async (platform) => {
       testData.level = platform.level
       testData.sound = platform.sound
       testData.group = platform.group
-    } else if (platform.type === 'smtp') {
-      testData.host = platform.host
-      testData.port = platform.port
-      testData.secure = platform.secure
-      testData.user = platform.user
-      testData.pass = platform.pass
-      testData.from = platform.from
-      testData.to = platform.to
-      testData.ignoreTLS = platform.ignoreTLS
     } else {
       testData.url = platform.url
     }
@@ -1529,7 +1304,7 @@ const testPlatform = async (platform) => {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
-      showToast('测试成功', 'success')
+      showToast(t('settings.testSuccess'), 'success')
     }
   } catch (error) {
     if (error.name === 'AbortError') return
@@ -1543,8 +1318,24 @@ const testPlatform = async (platform) => {
 const testPlatformForm = async () => {
   if (!isMounted.value) return
 
-  // 验证表单
-  if (!validatePlatformForm()) return
+  // Bark平台验证
+  if (platformForm.value.type === 'bark') {
+    if (!platformForm.value.deviceKey) {
+      showToast(t('settings.enterBarkDeviceKeyFirst'), 'error')
+      return
+    }
+  } else {
+    // 其他平台验证URL
+    if (!platformForm.value.url) {
+      showToast(t('settings.enterWebhookUrlFirst'), 'error')
+      return
+    }
+
+    if (urlError.value) {
+      showToast('请输入有效的Webhook URL', 'error')
+      return
+    }
+  }
 
   testingConnection.value = true
   try {
@@ -1552,7 +1343,7 @@ const testPlatformForm = async () => {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
-      showToast('测试成功', 'success')
+      showToast(t('settings.testSuccess'), 'success')
     }
   } catch (error) {
     if (error.name === 'AbortError') return
@@ -1579,12 +1370,12 @@ const sendTestNotification = async () => {
       }
     )
     if (response.success && isMounted.value) {
-      showToast('测试通知已发送', 'success')
+      showToast(t('settings.testNotificationSent'), 'success')
     }
   } catch (error) {
     if (error.name === 'AbortError') return
     if (!isMounted.value) return
-    showToast('发送失败', 'error')
+    showToast(t('settings.testNotificationFailed'), 'error')
     console.error(error)
   }
 }
@@ -1610,17 +1401,7 @@ const closePlatformModal = () => {
       serverUrl: '',
       level: '',
       sound: '',
-      group: '',
-      // SMTP特有字段
-      host: '',
-      port: null,
-      secure: false,
-      user: '',
-      pass: '',
-      from: '',
-      to: '',
-      timeout: null,
-      ignoreTLS: false
+      group: ''
     }
     urlError.value = false
     urlValid.value = false
@@ -1629,17 +1410,16 @@ const closePlatformModal = () => {
   }, 0)
 }
 
-// 辅助函数
+// 辅助函数 - 转换为计算属性以支持响应式翻译
 const getPlatformName = (type) => {
   const names = {
-    wechat_work: '企业微信',
-    dingtalk: '钉钉',
-    feishu: '飞书',
-    slack: 'Slack',
-    discord: 'Discord',
-    bark: 'Bark',
-    smtp: '邮件通知',
-    custom: '自定义'
+    wechat_work: t('settings.platforms.wechatWork'),
+    dingtalk: t('settings.platforms.dingtalk'),
+    feishu: t('settings.platforms.feishu'),
+    slack: t('settings.platforms.slack'),
+    discord: t('settings.platforms.discord'),
+    bark: t('settings.platforms.bark'),
+    custom: t('settings.platforms.custom')
   }
   return names[type] || type
 }
@@ -1652,7 +1432,6 @@ const getPlatformIcon = (type) => {
     slack: 'fab fa-slack text-purple-600',
     discord: 'fab fa-discord text-indigo-600',
     bark: 'fas fa-bell text-orange-500',
-    smtp: 'fas fa-envelope text-blue-600',
     custom: 'fas fa-webhook text-gray-600'
   }
   return icons[type] || 'fas fa-bell'
@@ -1660,36 +1439,33 @@ const getPlatformIcon = (type) => {
 
 const getWebhookHint = (type) => {
   const hints = {
-    wechat_work: '请在企业微信群机器人设置中获取Webhook地址',
-    dingtalk: '请在钉钉群机器人设置中获取Webhook地址',
-    feishu: '请在飞书群机器人设置中获取Webhook地址',
-    slack: '请在Slack应用的Incoming Webhooks中获取地址',
-    discord: '请在Discord服务器的集成设置中创建Webhook',
-    bark: '请在Bark App中查看您的设备密钥',
-    smtp: '请配置SMTP服务器信息，支持Gmail、QQ邮箱等',
-    custom: '请输入完整的Webhook接收地址'
+    wechat_work: t('settings.wechatWorkHint'),
+    dingtalk: t('settings.dingtalkHint'),
+    feishu: t('settings.feishuHint'),
+    slack: t('settings.slackHint'),
+    discord: t('settings.discordHint'),
+    bark: t('settings.barkHint'),
+    custom: t('settings.customHint')
   }
   return hints[type] || ''
 }
 
 const getNotificationTypeName = (type) => {
   const names = {
-    accountAnomaly: '账号异常',
-    quotaWarning: '配额警告',
-    systemError: '系统错误',
-    securityAlert: '安全警报',
-    test: '测试通知'
+    accountAnomaly: t('settings.accountAnomaly'),
+    quotaWarning: t('settings.quotaWarning'),
+    systemError: t('settings.systemError'),
+    securityAlert: t('settings.securityAlert')
   }
   return names[type] || type
 }
 
 const getNotificationTypeDescription = (type) => {
   const descriptions = {
-    accountAnomaly: '账号状态异常、认证失败等',
-    quotaWarning: 'API调用配额不足警告',
-    systemError: '系统运行错误和故障',
-    securityAlert: '安全相关的警报通知',
-    test: '用于测试Webhook连接是否正常'
+    accountAnomaly: t('settings.accountAnomalyDesc'),
+    quotaWarning: t('settings.quotaWarningDesc'),
+    systemError: t('settings.systemErrorDesc'),
+    securityAlert: t('settings.securityAlertDesc')
   }
   return descriptions[type] || ''
 }
@@ -1705,28 +1481,28 @@ const saveOemSettings = async () => {
     }
     const result = await settingsStore.saveOemSettings(settings)
     if (result && result.success) {
-      showToast('OEM设置保存成功', 'success')
+      showToast(t('settings.oemSettingsSaved'), 'success')
     } else {
-      showToast(result?.message || '保存失败', 'error')
+      showToast(result?.message || t('settings.saveSettingsFailed'), 'error')
     }
   } catch (error) {
-    showToast('保存OEM设置失败', 'error')
+    showToast(t('settings.oemSettingsSaveFailed'), 'error')
   }
 }
 
 // 重置OEM设置
 const resetOemSettings = async () => {
-  if (!confirm('确定要重置为默认设置吗？\n\n这将清除所有自定义的网站名称和图标设置。')) return
+  if (!confirm(t('settings.confirmReset'))) return
 
   try {
     const result = await settingsStore.resetOemSettings()
     if (result && result.success) {
-      showToast('已重置为默认设置', 'success')
+      showToast(t('settings.resetToDefault'), 'success')
     } else {
-      showToast('重置失败', 'error')
+      showToast(t('settings.resetFailed'), 'error')
     }
   } catch (error) {
-    showToast('重置失败', 'error')
+    showToast(t('settings.resetFailed'), 'error')
   }
 }
 
@@ -1747,7 +1523,7 @@ const handleIconUpload = async (event) => {
     const base64Data = await settingsStore.fileToBase64(file)
     oemSettings.value.siteIconData = base64Data
   } catch (error) {
-    showToast('文件读取失败', 'error')
+    showToast(t('settings.fileReadFailed'), 'error')
   }
 
   // 清除input的值，允许重复选择同一文件
@@ -1762,7 +1538,7 @@ const removeIcon = () => {
 
 // 处理图标加载错误
 const handleIconError = () => {
-  console.warn('Icon failed to load')
+  console.warn(t('settings.iconLoadFailed'))
 }
 
 // 格式化日期时间

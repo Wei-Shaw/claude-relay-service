@@ -662,5 +662,208 @@ export default {
     batchSuccess: 'Successfully processed {count} items',
     batchPartialFail: '{failed} items failed to process',
     batchAllFailed: 'All items failed to process'
+  },
+
+  // Settings
+  settings: {
+    title: 'System Settings',
+    description: 'Website customization and notification configuration',
+    loading: 'Loading settings...',
+    
+    // Navigation tabs
+    branding: 'Branding Settings',
+    webhook: 'Notification Settings',
+    
+    // Branding settings
+    siteName: 'Site Name',
+    siteNameDescription: 'Brand identity',
+    siteNamePlaceholder: 'Claude Relay Service',
+    siteNameHint: 'Will be displayed in browser title and page header',
+    
+    siteIcon: 'Site Icon',
+    siteIconDescription: 'Favicon',
+    currentIcon: 'Current icon',
+    uploadIcon: 'Upload Icon',
+    removeIcon: 'Remove',
+    iconFormats: 'Supports .ico, .png, .jpg, .svg formats, max 350KB',
+    iconPreview: 'Icon preview',
+    
+    adminEntry: 'Admin Entry',
+    adminEntryDescription: 'Login button display',
+    hideLoginButton: 'Hide login button',
+    showLoginButton: 'Show login button',
+    adminEntryHint: 'When hidden, users need to visit /admin/login directly',
+    
+    // Mobile card titles
+    siteNameCard: 'Site Name',
+    siteNameCardDesc: 'Customize your site brand name',
+    siteIconCard: 'Site Icon',
+    siteIconCardDesc: 'Upload custom icon or enter icon URL',
+    adminEntryCard: 'Admin Entry',
+    adminEntryCardDesc: 'Control login button visibility on homepage',
+    
+    // Action buttons
+    save: 'Save Settings',
+    saving: 'Saving...',
+    reset: 'Reset to Default',
+    lastUpdated: 'Last updated: {time}',
+    lastUpdatedMobile: 'Last updated: {time}',
+    
+    // Webhook settings
+    enableWebhook: 'Enable Webhook Notifications',
+    webhookDescription: 'When enabled, system will send notifications to configured platforms',
+    
+    // Notification types
+    notificationTypes: 'Notification Types',
+    accountAnomaly: 'Account Anomaly',
+    quotaWarning: 'Quota Warning',
+    systemError: 'System Error',
+    securityAlert: 'Security Alert',
+    accountAnomalyDesc: 'Account status anomalies, authentication failures, etc.',
+    quotaWarningDesc: 'API call quota insufficient warnings',
+    systemErrorDesc: 'System runtime errors and failures',
+    securityAlertDesc: 'Security-related alert notifications',
+    
+    // Notification platforms
+    notificationPlatforms: 'Notification Platforms',
+    addPlatform: 'Add Platform',
+    noPlatforms: 'No notification platforms configured, click "Add Platform" to add one',
+    enableSignature: 'Signature verification enabled',
+    testConnection: 'Test Connection',
+    edit: 'Edit',
+    delete: 'Delete',
+    
+    // Advanced settings
+    advancedSettings: 'Advanced Settings',
+    maxRetries: 'Max Retries',
+    retryDelay: 'Retry Delay (ms)',
+    timeout: 'Timeout (ms)',
+    
+    // Test notification
+    sendTestNotification: 'Send Test Notification',
+    
+    // Platform modal
+    addPlatformModal: 'Add Notification Platform',
+    editPlatformModal: 'Edit Notification Platform',
+    configurePlatform: 'Configure new Webhook notification channel',
+    updatePlatform: 'Configure and update Webhook notification channel',
+    
+    platformType: 'Platform Type',
+    platformName: 'Name',
+    platformNameOptional: '(Optional)',
+    platformNamePlaceholder: 'e.g.: Operations team, Dev test group',
+    
+    webhookUrl: 'Webhook URL',
+    webhookUrlRequired: '*',
+    webhookUrlPlaceholder: 'https://...',
+    editModeWarning: 'Platform type cannot be changed in edit mode',
+    
+    // Bark specific settings
+    deviceKey: 'Device Key',
+    deviceKeyPlaceholder: 'e.g.: aBcDeFgHiJkLmNoPqRsTuVwX',
+    deviceKeyHint: 'Check your push key in Bark App',
+    serverAddress: 'Server Address',
+    serverAddressOptional: '(Optional)',
+    serverAddressPlaceholder: 'Default: https://api.day.app/push',
+    notificationLevel: 'Notification Level',
+    notificationSound: 'Notification Sound',
+    notificationGroup: 'Notification Group',
+    notificationGroupOptional: '(Optional)',
+    notificationGroupPlaceholder: 'Default: claude-relay',
+    
+    // Notification level options
+    levelAuto: 'Auto (based on notification type)',
+    levelPassive: 'Passive',
+    levelActive: 'Default',
+    levelTimeSensitive: 'Time Sensitive',
+    levelCritical: 'Critical',
+    
+    // Sound options
+    soundAuto: 'Auto (based on notification type)',
+    soundDefault: 'Default',
+    soundAlarm: 'Alarm',
+    soundBell: 'Bell',
+    soundBirdsong: 'Birdsong',
+    soundElectronic: 'Electronic',
+    soundGlass: 'Glass',
+    soundHorn: 'Horn',
+    soundSilence: 'Silence',
+    
+    // Bark instructions
+    barkInstructions: [
+      '1. Install Bark App on iPhone',
+      '2. Open the app to get your device key',
+      '3. Paste the key into the input box above'
+    ],
+    
+    // Signature settings
+    enableSignatureVerify: 'Enable Signature Verification',
+    signatureEnabled: 'Enabled',
+    signatureSecret: 'Signature Secret',
+    signatureSecretPlaceholder: 'SEC...',
+    
+    // Platform hints
+    wechatWorkHint: 'Get Webhook URL from WeChat Work group bot settings',
+    dingtalkHint: 'Get Webhook URL from DingTalk group bot settings',
+    feishuHint: 'Get Webhook URL from Feishu group bot settings',
+    slackHint: 'Get URL from Slack app Incoming Webhooks',
+    discordHint: 'Create Webhook in Discord server integration settings',
+    barkHint: 'Check your device key in Bark App',
+    customHint: 'Enter complete Webhook receiving URL',
+    
+    // Modal buttons
+    required: 'Required fields',
+    cancel: 'Cancel',
+    testing: 'Testing...',
+    saveChanges: 'Save Changes',
+    addPlatformBtn: 'Add Platform',
+    
+    // Success/error messages
+    loadSettingsFailed: 'Failed to load settings',
+    settingsSaved: 'Settings saved',
+    saveSettingsFailed: 'Failed to save settings',
+    oemSettingsSaved: 'OEM settings saved successfully',
+    oemSettingsSaveFailed: 'Failed to save OEM settings',
+    resetToDefault: 'Reset to default settings',
+    resetFailed: 'Reset failed',
+    confirmReset: 'Are you sure you want to reset to default settings?\n\nThis will clear all custom site name and icon settings.',
+    
+    webhookConfigSaved: 'Configuration saved',
+    webhookConfigSaveFailed: 'Failed to save configuration',
+    getWebhookConfigFailed: 'Failed to get webhook configuration',
+    
+    platformAdded: 'Platform added',
+    platformUpdated: 'Platform updated',
+    platformDeleted: 'Platform deleted',
+    platformDeleteFailed: 'Delete failed',
+    confirmDeletePlatform: 'Are you sure you want to delete this platform?',
+    operationFailed: 'Operation failed',
+    
+    testSuccess: 'Test successful, webhook connection normal',
+    testFailed: 'Test failed',
+    testNotificationSent: 'Test notification sent',
+    testNotificationFailed: 'Send failed',
+    
+    // Form validation messages
+    enterBarkDeviceKey: 'Please enter Bark device key',
+    enterWebhookUrl: 'Please enter Webhook URL',
+    enterValidWebhookUrl: 'Please enter valid Webhook URL',
+    enterWebhookUrlFirst: 'Please enter Webhook URL first',
+    enterBarkDeviceKeyFirst: 'Please enter Bark device key first',
+    
+    // File upload
+    fileReadFailed: 'File read failed',
+    iconLoadFailed: 'Icon failed to load',
+    
+    // Platform names
+    platforms: {
+      wechatWork: 'WeChat Work',
+      dingtalk: 'DingTalk',
+      feishu: 'Feishu',
+      slack: 'Slack',
+      discord: 'Discord',
+      bark: 'Bark',
+      custom: 'Custom'
+    }
   }
 }
