@@ -622,7 +622,7 @@
             <div v-if="form.platform === 'claude-console' && !isEdit" class="space-y-4">
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >API URL *</label
+                  >{{ t('accountForm.apiUrlRequired') }}</label
                 >
                 <input
                   v-model="form.apiUrl"
@@ -639,7 +639,7 @@
 
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >API Key *</label
+                  >{{ t('accountForm.apiKeyRequired') }}</label
                 >
                 <input
                   v-model="form.apiKey"
@@ -848,7 +848,7 @@
                     type="radio"
                     value="claude_max"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">Claude Max</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.claudeMaxDisplay') }}</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -857,7 +857,7 @@
                     type="radio"
                     value="claude_pro"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">Claude Pro</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.claudeProDisplay') }}</span>
                 </label>
               </div>
               <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
@@ -1254,7 +1254,7 @@
                               />
                               <button
                                 class="rounded-lg bg-gray-100 px-3 py-2 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
-                                title="复制链接"
+                                :title="t('accountForm.copyLinkTooltip')"
                                 @click="copySetupTokenAuthUrl"
                               >
                                 <i
@@ -1680,18 +1680,18 @@
           <!-- {{ t('accountForm.claudeConsoleFields') }}（编辑模式）-->
           <div v-if="form.platform === 'claude-console'" class="space-y-4">
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">API URL</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700">{{ t('accountForm.apiUrlLabel') }}</label>
               <input
                 v-model="form.apiUrl"
                 class="form-input w-full"
-                placeholder="例如：https://api.example.com"
+                :placeholder="t('accountForm.apiUrlPlaceholder')"
                 required
                 type="text"
               />
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">API Key</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700">{{ t('accountForm.apiKeyLabel') }}</label>
               <input
                 v-model="form.apiKey"
                 class="form-input w-full"
@@ -1711,7 +1711,7 @@
                   v-model.number="form.dailyQuota"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                   min="0"
-                  placeholder="0 表示不限制"
+                  :placeholder="t('accountForm.quotaZeroUnlimited')"
                   step="0.01"
                   type="number"
                 />
@@ -1866,7 +1866,7 @@
               <input
                 v-model="form.userAgent"
                 class="form-input w-full"
-                placeholder="留空则透传客户端 User-Agent"
+                :placeholder="t('accountForm.userAgentPlaceholder')"
                 type="text"
               />
               <p class="mt-1 text-xs text-gray-500">
@@ -2075,7 +2075,7 @@
 
             <div>
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >API Key</label
+                >{{ t('accountForm.apiKeyLabel') }}</label
               >
               <input
                 v-model="form.apiKey"

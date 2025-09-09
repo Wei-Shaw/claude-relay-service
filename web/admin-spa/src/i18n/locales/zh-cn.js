@@ -1692,6 +1692,19 @@ export default {
     // 表单描述
     modelSupportDesc: '留空表示支持所有模型。如果指定模型，请求中的模型不在列表内将不会调度到此账号',
     modelTypeSelectionDesc: '选择此部署支持的模型类型',
-    userAgentDesc: '留空时将自动使用客户端的 User-Agent，仅在需要固定特定 UA 时填写'
+    userAgentDesc: '留空时将自动使用客户端的 User-Agent，仅在需要固定特定 UA 时填写',
+    
+    // 基础标签
+    apiUrlLabel: 'API URL',
+    apiUrlRequired: 'API URL *',
+    apiKeyLabel: 'API Key',
+    apiKeyRequired: 'API Key *',
+    
+    // 更多缺失的翻译键
+    copyLinkTooltip: '复制链接',
+    
+    // Claude 订阅类型显示
+    claudeMaxDisplay: 'Claude Max',
+    claudeProDisplay: 'Claude Pro'
   }
 }
