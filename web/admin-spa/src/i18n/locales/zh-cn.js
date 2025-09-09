@@ -662,5 +662,208 @@ export default {
     batchSuccess: '成功处理 {count} 个项目',
     batchPartialFail: '{failed} 个处理失败',
     batchAllFailed: '所有项目处理失败'
+  },
+
+  // Settings 设置页面
+  settings: {
+    title: '系统设置',
+    description: '网站定制和通知配置',
+    loading: '正在加载设置...',
+    
+    // 导航标签
+    branding: '品牌设置',
+    webhook: '通知设置',
+    
+    // 品牌设置
+    siteName: '网站名称',
+    siteNameDescription: '品牌标识',
+    siteNamePlaceholder: 'Claude Relay Service',
+    siteNameHint: '将显示在浏览器标题和页面头部',
+    
+    siteIcon: '网站图标',
+    siteIconDescription: 'Favicon',
+    currentIcon: '当前图标',
+    uploadIcon: '上传图标',
+    removeIcon: '删除',
+    iconFormats: '支持 .ico, .png, .jpg, .svg 格式，最大 350KB',
+    iconPreview: '图标预览',
+    
+    adminEntry: '管理入口',
+    adminEntryDescription: '登录按钮显示',
+    hideLoginButton: '隐藏登录按钮',
+    showLoginButton: '显示登录按钮',
+    adminEntryHint: '隐藏后，用户需要直接访问 /admin/login 页面登录',
+    
+    // 移动端卡片标题
+    siteNameCard: '站点名称',
+    siteNameCardDesc: '自定义您的站点品牌名称',
+    siteIconCard: '站点图标',
+    siteIconCardDesc: '上传自定义图标或输入图标URL',
+    adminEntryCard: '管理入口',
+    adminEntryCardDesc: '控制登录按钮在首页的显示',
+    
+    // 操作按钮
+    save: '保存设置',
+    saving: '保存中...',
+    reset: '重置为默认',
+    lastUpdated: '最后更新：{time}',
+    lastUpdatedMobile: '上次更新: {time}',
+    
+    // Webhook 设置
+    enableWebhook: '启用 Webhook 通知',
+    webhookDescription: '开启后，系统将按配置发送通知到指定平台',
+    
+    // 通知类型
+    notificationTypes: '通知类型',
+    accountAnomaly: '账号异常',
+    quotaWarning: '配额警告',
+    systemError: '系统错误',
+    securityAlert: '安全警报',
+    accountAnomalyDesc: '账号状态异常、认证失败等',
+    quotaWarningDesc: 'API调用配额不足警告',
+    systemErrorDesc: '系统运行错误和故障',
+    securityAlertDesc: '安全相关的警报通知',
+    
+    // 通知平台
+    notificationPlatforms: '通知平台',
+    addPlatform: '添加平台',
+    noPlatforms: '暂无配置的通知平台，请点击"添加平台"按钮添加',
+    enableSignature: '已启用签名验证',
+    testConnection: '测试连接',
+    edit: '编辑',
+    delete: '删除',
+    
+    // 高级设置
+    advancedSettings: '高级设置',
+    maxRetries: '最大重试次数',
+    retryDelay: '重试延迟 (毫秒)',
+    timeout: '超时时间 (毫秒)',
+    
+    // 测试通知
+    sendTestNotification: '发送测试通知',
+    
+    // 平台模态框
+    addPlatformModal: '添加通知平台',
+    editPlatformModal: '编辑通知平台',
+    configurePlatform: '配置新的Webhook通知渠道',
+    updatePlatform: '配置并更新Webhook通知渠道',
+    
+    platformType: '平台类型',
+    platformName: '名称',
+    platformNameOptional: '(可选)',
+    platformNamePlaceholder: '例如：运维群通知、开发测试群',
+    
+    webhookUrl: 'Webhook URL',
+    webhookUrlRequired: '*',
+    webhookUrlPlaceholder: 'https://...',
+    editModeWarning: '编辑模式下不能更改平台类型',
+    
+    // Bark 特有设置
+    deviceKey: '设备密钥 (Device Key)',
+    deviceKeyPlaceholder: '例如：aBcDeFgHiJkLmNoPqRsTuVwX',
+    deviceKeyHint: '在Bark App中查看您的推送密钥',
+    serverAddress: '服务器地址',
+    serverAddressOptional: '(可选)',
+    serverAddressPlaceholder: '默认: https://api.day.app/push',
+    notificationLevel: '通知级别',
+    notificationSound: '通知声音',
+    notificationGroup: '通知分组',
+    notificationGroupOptional: '(可选)',
+    notificationGroupPlaceholder: '默认: claude-relay',
+    
+    // 通知级别选项
+    levelAuto: '自动（根据通知类型）',
+    levelPassive: '被动',
+    levelActive: '默认',
+    levelTimeSensitive: '时效性',
+    levelCritical: '紧急',
+    
+    // 声音选项
+    soundAuto: '自动（根据通知类型）',
+    soundDefault: '默认',
+    soundAlarm: '警报',
+    soundBell: '铃声',
+    soundBirdsong: '鸟鸣',
+    soundElectronic: '电子音',
+    soundGlass: '玻璃',
+    soundHorn: '喇叭',
+    soundSilence: '静音',
+    
+    // Bark 提示信息
+    barkInstructions: [
+      '1. 在iPhone上安装Bark App',
+      '2. 打开App获取您的设备密钥',
+      '3. 将密钥粘贴到上方输入框'
+    ],
+    
+    // 签名设置
+    enableSignatureVerify: '启用签名验证',
+    signatureEnabled: '已启用',
+    signatureSecret: '签名密钥',
+    signatureSecretPlaceholder: 'SEC...',
+    
+    // 平台提示信息
+    wechatWorkHint: '请在企业微信群机器人设置中获取Webhook地址',
+    dingtalkHint: '请在钉钉群机器人设置中获取Webhook地址',
+    feishuHint: '请在飞书群机器人设置中获取Webhook地址',
+    slackHint: '请在Slack应用的Incoming Webhooks中获取地址',
+    discordHint: '请在Discord服务器的集成设置中创建Webhook',
+    barkHint: '请在Bark App中查看您的设备密钥',
+    customHint: '请输入完整的Webhook接收地址',
+    
+    // 模态框按钮
+    required: '必填项',
+    cancel: '取消',
+    testing: '测试中...',
+    saveChanges: '保存修改',
+    addPlatformBtn: '添加平台',
+    
+    // 成功/错误消息
+    loadSettingsFailed: '加载设置失败',
+    settingsSaved: '设置已保存',
+    saveSettingsFailed: '保存设置失败',
+    oemSettingsSaved: 'OEM设置保存成功',
+    oemSettingsSaveFailed: '保存OEM设置失败',
+    resetToDefault: '已重置为默认设置',
+    resetFailed: '重置失败',
+    confirmReset: '确定要重置为默认设置吗？\n\n这将清除所有自定义的网站名称和图标设置。',
+    
+    webhookConfigSaved: '配置已保存',
+    webhookConfigSaveFailed: '保存配置失败',
+    getWebhookConfigFailed: '获取webhook配置失败',
+    
+    platformAdded: '平台已添加',
+    platformUpdated: '平台已更新',
+    platformDeleted: '平台已删除',
+    platformDeleteFailed: '删除失败',
+    confirmDeletePlatform: '确定要删除这个平台吗？',
+    operationFailed: '操作失败',
+    
+    testSuccess: '测试成功，webhook连接正常',
+    testFailed: '测试失败',
+    testNotificationSent: '测试通知已发送',
+    testNotificationFailed: '发送失败',
+    
+    // 表单验证消息
+    enterBarkDeviceKey: '请输入Bark设备密钥',
+    enterWebhookUrl: '请输入Webhook URL',
+    enterValidWebhookUrl: '请输入有效的Webhook URL',
+    enterWebhookUrlFirst: '请先输入Webhook URL',
+    enterBarkDeviceKeyFirst: '请先输入Bark设备密钥',
+    
+    // 文件上传
+    fileReadFailed: '文件读取失败',
+    iconLoadFailed: 'Icon failed to load',
+    
+    // 平台名称
+    platforms: {
+      wechatWork: '企业微信',
+      dingtalk: '钉钉',
+      feishu: '飞书',
+      slack: 'Slack',
+      discord: 'Discord',
+      bark: 'Bark',
+      custom: '自定义'
+    }
   }
 }
