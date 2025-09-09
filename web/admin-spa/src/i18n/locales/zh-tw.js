@@ -1285,6 +1285,70 @@ export default {
     // 通用描述文字
     allModelsIfEmpty: '留空表示支援所有模型。如果指定模型，請求中的模型不在列表內將不會排程到此帳號',
     systemDefaultIfEmpty: '留空將使用系統預設模型。支援 inference profile ID 或 ARN',
-    noUpdateIfEmpty: '留空表示不更新該欄位'
+    noUpdateIfEmpty: '留空表示不更新該欄位',
+    
+    // 手動 Token 輸入部分
+    manualTokenInput: '手動輸入 Token',
+    manualTokenClaudeDescription: '請輸入有效的 Claude Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動刷新。',
+    manualTokenGeminiDescription: '請輸入有效的 Gemini Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動刷新。',
+    manualTokenOpenAIDescription: '請輸入有效的 OpenAI Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動刷新。',
+    getAccessTokenMethod: '取得 Access Token 的方法：',
+    claudeCredentialsPath: '請從已登入 Claude Code 的機器上取得',
+    geminiCredentialsPath: '請從已登入 Gemini CLI 的機器上取得',
+    openaiCredentialsPath: '請從已登入 OpenAI 帳戶的機器上取得認證憑證，或透過 OAuth 授權流程取得 Access Token。',
+    claudeCredentialsWarning: '檔案中的憑證，請勿使用 Claude 官網 API Keys 頁面的金鑰。',
+    refreshTokenWarning: '💡 如果未填寫 Refresh Token，Token 過期後需要手動更新。',
+    accessTokenOptional: 'Access Token (可選)',
+    accessTokenOptionalPlaceholder: '可選：如果不填寫，系統會自動透過 Refresh Token 取得...',
+    accessTokenOptionalInfo: 'Access Token 可選填。如果不提供，系統會透過 Refresh Token 自動取得。',
+    accessTokenRequired: 'Access Token *',
+    accessTokenRequiredPlaceholder: '請輸入 Access Token...',
+    refreshTokenRequired: 'Refresh Token *',
+    refreshTokenRequiredPlaceholder: '請輸入 Refresh Token（必填）...',
+    refreshTokenRequiredInfo: '系統將使用 Refresh Token 自動取得 Access Token 和使用者資訊',
+    refreshTokenOptional: 'Refresh Token (可選)',
+    refreshTokenOptionalPlaceholder: '請輸入 Refresh Token...',
+    
+    // 優先級設定
+    priorityPlaceholder: '數字越小優先級越高，預設50',
+    priorityDescription: '數字越小優先級越高，建議範圍：1-100',
+    prioritySchedulingTitle: '排程優先級 (1-100)',
+    priorityEditPlaceholder: '數字越小優先級越高',
+    
+    // Gemini 專案ID
+    projectIdOptional: '專案 ID (可選)',
+    projectIdPlaceholder: '例如：verdant-wares-464411-k9',
+    projectIdDescription: 'Google Cloud/Workspace 帳號可能需要提供專案 ID',
+    
+    // Claude 訂閱類型和進階選項
+    subscriptionType: '訂閱類型',
+    claudeMaxSubscription: 'Claude Max',
+    claudeProSubscription: 'Claude Pro',
+    claudeProLimitation: 'Pro 帳號不支援 Claude Opus 4 模型',
+    autoStopOnWarning: '5小時使用量接近限制時自動停止排程',
+    autoStopOnWarningDescription: '當系統檢測到帳戶接近5小時使用限制時，自動暫停排程該帳戶。進入新的時間視窗後會自動恢復排程。',
+    useUnifiedUserAgent: '使用統一 Claude Code 版本',
+    useUnifiedUserAgentDescription: '開啟後將使用從真實 Claude Code 用戶端捕獲的統一 User-Agent，提高相容性',
+    currentUnifiedVersion: '目前統一版本：',
+    clearCache: '清除快取',
+    clearing: '清除中...',
+    waitingForCapture: '等待從 Claude Code 用戶端捕獲 User-Agent',
+    captureHint: '💡 提示：如果長時間未能捕獲，請確認有 Claude Code 用戶端正在使用此帳戶，或聯絡開發者檢查 User-Agent 格式是否發生變化',
+    useUnifiedClientId: '使用統一的用戶端識別',
+    useUnifiedClientIdDescription: '開啟後將使用固定的用戶端識別，使所有請求看起來來自同一個用戶端，減少特徵',
+    clientIdLabel: '用戶端識別 ID',
+    regenerateClientId: '重新產生',
+    clientIdDescription: '此ID將替換請求中的user_id用戶端部分，保留session部分用於黏性工作階段',
+    
+    // 編輯模式欄位
+    accountNameEdit: '帳戶名稱',
+    accountNameEditPlaceholder: '為帳戶設定一個易識別的名稱',
+    descriptionOptionalEdit: '描述 (可選)',
+    descriptionOptionalEditPlaceholder: '帳戶用途說明...',
+    accountTypeEdit: '帳戶類型',
+    selectGroupRequired: '選擇群組 *',
+    noAvailableGroups: '暫無可用群組',
+    membersCount: ' 個成員',
+    createNewGroup: '新建群組'
   }
 }
