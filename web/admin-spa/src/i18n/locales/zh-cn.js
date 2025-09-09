@@ -993,5 +993,298 @@ export default {
       bark: 'Bark',
       custom: '自定义'
     }
+  },
+
+  // AccountForm 组件
+  accountForm: {
+    // 标题和模态框
+    editAccount: '编辑账户',
+    addAccount: '添加账户',
+    
+    // 步骤指示器
+    stepBasicInfo: '基本信息',
+    stepAuthorization: '授权认证',
+    
+    // 平台选择
+    platform: '平台',
+    platformClaude: 'Claude',
+    platformClaudeConsole: 'Claude Console',
+    platformGemini: 'Gemini',
+    platformOpenAI: 'OpenAI',
+    platformAzureOpenAI: 'Azure OpenAI',
+    platformBedrock: 'Bedrock',
+    
+    // 添加方式
+    addMethod: '添加方式',
+    addTypeSetupToken: 'Setup Token (推荐)',
+    addTypeOAuth: 'OAuth 授权',
+    addTypeManual: '手动输入 Access Token',
+    
+    // 基本信息字段
+    accountName: '账户名称',
+    accountNamePlaceholder: '为账户设置一个易识别的名称',
+    description: '描述',
+    descriptionOptional: '描述 (可选)',
+    descriptionPlaceholder: '账户用途说明...',
+    
+    // 账户类型
+    accountType: '账户类型',
+    accountTypeShared: '共享账户',
+    accountTypeDedicated: '专属账户',
+    accountTypeGroup: '分组调度',
+    accountTypeDescription: '共享账户：供所有API Key使用；专属账户：仅供特定API Key使用；分组调度：加入分组供分组内调度',
+    
+    // 分组选择
+    selectGroup: '选择分组',
+    selectGroupRequired: '选择分组 *',
+    noGroupsAvailable: '暂无可用分组',
+    memberCount: '个成员',
+    newGroup: '新建分组',
+    refreshGroups: '刷新分组',
+    
+    // Gemini 项目 ID
+    projectId: '项目 ID',
+    projectIdOptional: '项目 ID (可选)',
+    projectIdPlaceholder: '例如：verdant-wares-464411-k9',
+    projectIdDescription: 'Google Cloud/Workspace 账号需要提供项目 ID',
+    projectIdInstructions: '如何获取项目 ID：',
+    projectIdStep1: '访问 Google Cloud Console',
+    projectIdStep2: '复制项目 ID（Project ID），通常是字符串格式',
+    projectIdStep3: '⚠️ 注意：要复制项目 ID（Project ID），不要复制项目编号（Project Number）！',
+    projectIdTip: '提示：如果您的账号是普通个人账号（未绑定 Google Cloud），请留空此字段。',
+    projectIdGoogleCloudRequired: 'Google Cloud/Workspace 账号需要提供项目 ID',
+    projectIdGoogleCloudDescription: '某些 Google 账号（特别是绑定了 Google Cloud 的账号）会被识别为 Workspace 账号，需要提供额外的项目 ID。',
+    
+    // Bedrock 字段
+    awsAccessKeyId: 'AWS 访问密钥 ID',
+    awsAccessKeyIdRequired: 'AWS 访问密钥 ID *',
+    awsAccessKeyIdPlaceholder: '请输入 AWS Access Key ID',
+    awsSecretAccessKey: 'AWS 秘密访问密钥',
+    awsSecretAccessKeyRequired: 'AWS 秘密访问密钥 *',
+    awsSecretAccessKeyPlaceholder: '请输入 AWS Secret Access Key',
+    awsRegion: 'AWS 区域',
+    awsRegionRequired: 'AWS 区域 *',
+    awsRegionPlaceholder: '例如：us-east-1',
+    awsRegionReference: '常用 AWS 区域参考：',
+    awsRegionUsEast1: '• us-east-1 (美国东部)',
+    awsRegionUsWest2: '• us-west-2 (美国西部)',
+    awsRegionEuWest1: '• eu-west-1 (欧洲爱尔兰)',
+    awsRegionApSoutheast1: '• ap-southeast-1 (新加坡)',
+    awsRegionApNortheast1: '• ap-northeast-1 (东京)',
+    awsRegionEuCentral1: '• eu-central-1 (法兰克福)',
+    awsRegionTip: '💡 请输入完整的区域代码，如 us-east-1',
+    sessionToken: '会话令牌',
+    sessionTokenOptional: '会话令牌 (可选)',
+    sessionTokenPlaceholder: '如果使用临时凭证，请输入会话令牌',
+    sessionTokenDescription: '仅在使用临时 AWS 凭证时需要填写',
+    defaultModel: '默认主模型',
+    defaultModelOptional: '默认主模型 (可选)',
+    defaultModelPlaceholder: '例如：us.anthropic.claude-sonnet-4-20250514-v1:0',
+    defaultModelDescription: '留空将使用系统默认模型。支持 inference profile ID 或 ARN',
+    bedrockModelConfigTitle: 'Bedrock 模型配置说明：',
+    bedrockModelConfigInferenceProfile: '• 支持 Inference Profile ID（推荐）',
+    bedrockModelConfigArn: '• 支持 Application Inference Profile ARN',
+    bedrockModelConfigCommon: '• 常用模型：us.anthropic.claude-sonnet-4-20250514-v1:0',
+    bedrockModelConfigDefault: '• 留空将使用系统配置的默认模型',
+    smallFastModel: '小快速模型',
+    smallFastModelOptional: '小快速模型 (可选)',
+    smallFastModelPlaceholder: '例如：us.anthropic.claude-3-5-haiku-20241022-v1:0',
+    smallFastModelDescription: '用于快速响应的轻量级模型，留空将使用系统默认',
+    
+    // Azure OpenAI 字段
+    azureEndpoint: 'Azure Endpoint',
+    azureEndpointRequired: 'Azure Endpoint *',
+    azureEndpointPlaceholder: 'https://your-resource.openai.azure.com',
+    azureEndpointDescription: 'Azure OpenAI 资源的终结点 URL，格式：https://your-resource.openai.azure.com',
+    apiVersion: 'API 版本',
+    apiVersionPlaceholder: '2024-02-01',
+    apiVersionDescription: 'Azure OpenAI API 版本，默认使用最新稳定版本 2024-02-01',
+    deploymentName: '部署名称',
+    deploymentNameRequired: '部署名称 *',
+    deploymentNamePlaceholder: 'gpt-4',
+    deploymentNameDescription: '在 Azure OpenAI Studio 中创建的部署名称',
+    apiKey: 'API Key',
+    apiKeyRequired: 'API Key *',
+    apiKeyPlaceholder: '请输入 API Key',
+    apiKeyDescription: '从 Azure 门户获取的 API 密钥',
+    supportedModels: '支持的模型',
+    supportedModelsDescription: '选择此部署支持的模型类型',
+    
+    // Claude Console 字段
+    apiUrl: 'API URL',
+    apiUrlRequired: 'API URL *',
+    apiUrlPlaceholder: '例如：https://api.example.com',
+    apiKeyClaudeConsoleRequired: 'API Key *',
+    apiKeyClaudeConsolePlaceholder: '请输入API Key',
+    dailyQuota: '每日额度限制',
+    dailyQuotaLabel: '每日额度限制 ($)',
+    dailyQuotaPlaceholder: '0 表示不限制',
+    dailyQuotaDescription: '设置每日使用额度，0 表示不限制',
+    quotaResetTime: '额度重置时间',
+    quotaResetTimePlaceholder: '00:00',
+    quotaResetTimeDescription: '每日自动重置额度的时间',
+    todayUsage: '今日使用情况',
+    remaining: '剩余',
+    used: '已使用',
+    modelMapping: '模型映射表',
+    modelMappingOptional: '模型映射表 (可选)',
+    modelMappingDescription: '留空表示支持所有模型且不修改请求。配置映射后，左侧模型会被识别为支持的模型，右侧是实际发送的模型。',
+    originalModel: '原始模型名称',
+    mappedModel: '映射后的模型名称',
+    addModelMapping: '添加模型映射',
+    userAgent: '自定义 User-Agent',
+    userAgentOptional: '自定义 User-Agent (可选)',
+    userAgentPlaceholder: '留空则透传客户端 User-Agent',
+    userAgentDescription: '留空时将自动使用客户端的 User-Agent，仅在需要固定特定 UA 时填写',
+    rateLimitMechanism: '限流机制',
+    enableRateLimit: '启用限流机制',
+    rateLimitDescription: '启用后，当账号返回429错误时将暂停调度一段时间',
+    rateLimitDuration: '限流时间 (分钟)',
+    rateLimitDurationDescription: '账号被限流后暂停调度的时间（分钟）',
+    
+    // Claude 订阅类型
+    subscriptionType: '订阅类型',
+    subscriptionClaudeMax: 'Claude Max',
+    subscriptionClaudePro: 'Claude Pro',
+    claudeProLimitation: 'Pro 账号不支持 Claude Opus 4 模型',
+    
+    // Claude 特殊功能
+    autoStopOnWarning: '5小时使用量接近限制时自动停止调度',
+    autoStopOnWarningDescription: '当系统检测到账户接近5小时使用限制时，自动暂停调度该账户。进入新的时间窗口后会自动恢复调度。',
+    useUnifiedUserAgent: '使用统一 Claude Code 版本',
+    useUnifiedUserAgentDescription: '开启后将使用从真实 Claude Code 客户端捕获的统一 User-Agent，提高兼容性',
+    currentUnifiedVersion: '💡 当前统一版本：',
+    clearCache: '清除缓存',
+    clearing: '清除中...',
+    waitingForCapture: '⏳ 等待从 Claude Code 客户端捕获 User-Agent',
+    captureHint: '💡 提示：如果长时间未能捕获，请确认有 Claude Code 客户端正在使用此账户，或联系开发者检查 User-Agent 格式是否发生变化',
+    useUnifiedClientId: '使用统一的客户端标识',
+    useUnifiedClientIdDescription: '开启后将使用固定的客户端标识，使所有请求看起来来自同一个客户端，减少特征',
+    clientId: '客户端标识 ID',
+    regenerate: '重新生成',
+    clientIdDescription: '此ID将替换请求中的user_id客户端部分，保留session部分用于粘性会话',
+    
+    // 调度优先级
+    schedulePriority: '调度优先级',
+    schedulePriorityRange: '调度优先级 (1-100)',
+    schedulePriorityPlaceholder: '数字越小优先级越高，默认50',
+    schedulePriorityDescription: '数字越小优先级越高，建议范围：1-100',
+    
+    // 手动输入 Token
+    manualTokenTitle: '手动输入 Token',
+    manualTokenDescription: '请输入有效的 Access Token。如果您有 Refresh Token，建议也一并填写以支持自动刷新。',
+    manualTokenClaudeDescription: '请输入有效的 Claude Access Token。如果您有 Refresh Token，建议也一并填写以支持自动刷新。',
+    manualTokenGeminiDescription: '请输入有效的 Gemini Access Token。如果您有 Refresh Token，建议也一并填写以支持自动刷新。',
+    manualTokenOpenAIDescription: '请输入有效的 OpenAI Access Token。如果您有 Refresh Token，建议也一并填写以支持自动刷新。',
+    obtainTokenMethods: '获取 Access Token 的方法：',
+    claudeTokenPath: '请从已登录 Claude Code 的机器上获取 ~/.claude/.credentials.json 文件中的凭证， 请勿使用 Claude 官网 API Keys 页面的密钥。',
+    geminiTokenPath: '请从已登录 Gemini CLI 的机器上获取 ~/.config/gemini/credentials.json 文件中的凭证。',
+    openaiTokenPath: '请从已登录 OpenAI 账户的机器上获取认证凭证， 或通过 OAuth 授权流程获取 Access Token。',
+    accessToken: 'Access Token',
+    accessTokenOptional: 'Access Token (可选)',
+    accessTokenRequired: 'Access Token *',
+    accessTokenPlaceholder: '请输入 Access Token...',
+    accessTokenOptionalPlaceholder: '可选：如果不填写，系统会自动通过 Refresh Token 获取...',
+    accessTokenOptionalDescription: 'Access Token 可选填。如果不提供，系统会通过 Refresh Token 自动获取。',
+    refreshToken: 'Refresh Token',
+    refreshTokenOptional: 'Refresh Token (可选)',
+    refreshTokenRequired: 'Refresh Token *',
+    refreshTokenPlaceholder: '请输入 Refresh Token...',
+    refreshTokenRequiredPlaceholder: '请输入 Refresh Token（必填）...',
+    refreshTokenDescription: '系统将使用 Refresh Token 自动获取 Access Token 和用户信息',
+    refreshTokenTip: '💡 如果未填写 Refresh Token，Token 过期后需要手动更新。',
+    
+    // Setup Token 流程
+    setupTokenTitle: 'Claude Setup Token 授权',
+    setupTokenDescription: '请按照以下步骤通过 Setup Token 完成 Claude 账户的授权：',
+    setupTokenStep1Title: '点击下方按钮生成授权链接',
+    setupTokenStep2Title: '在浏览器中打开链接并完成授权',
+    setupTokenStep2Description: '请在新标签页中打开授权链接，登录您的 Claude 账户并授权 Claude Code。',
+    setupTokenStep2Warning: '注意：如果您设置了代理，请确保浏览器也使用相同的代理访问授权页面。',
+    setupTokenStep3Title: '输入 Authorization Code',
+    setupTokenStep3Description: '授权完成后，从返回页面复制 Authorization Code，并粘贴到下方输入框：',
+    generateSetupTokenUrl: '生成 Setup Token 授权链接',
+    generating: '生成中...',
+    copyLink: '复制链接',
+    regenerateLink: '重新生成',
+    authorizationCode: 'Authorization Code',
+    authorizationCodePlaceholder: '粘贴从Claude Code授权页面获取的Authorization Code...',
+    authorizationCodeDescription: '请粘贴从Claude Code授权页面复制的Authorization Code',
+    verifying: '验证中...',
+    completeAuthorization: '完成授权',
+    
+    // Token 更新（编辑模式）
+    updateTokenTitle: '更新 Token',
+    updateTokenDescription: '可以更新 Access Token 和 Refresh Token。为了安全起见，不会显示当前的 Token 值。',
+    updateTokenTip: '💡 留空表示不更新该字段。',
+    newAccessToken: '新的 Access Token',
+    newRefreshToken: '新的 Refresh Token',
+    leaveBlankNoUpdate: '留空表示不更新...',
+    
+    // 使用情况
+    currentUsage: '当前使用情况',
+    
+    // 按钮
+    cancel: '取消',
+    nextStep: '下一步',
+    previousStep: '上一步',
+    create: '创建',
+    creating: '创建中...',
+    update: '更新',
+    updating: '更新中...',
+    
+    // 错误消息
+    pleaseEnterAccountName: '请填写账户名称',
+    pleaseSelectGroup: '请选择一个分组',
+    pleaseEnterApiUrl: '请填写 API URL',
+    pleaseEnterApiKey: '请填写 API Key',
+    pleaseEnterAccessKeyId: '请填写 AWS 访问密钥 ID',
+    pleaseEnterSecretAccessKey: '请填写 AWS 秘密访问密钥',
+    pleaseEnterRegion: '请选择 AWS 区域',
+    pleaseEnterAzureEndpoint: '请填写 Azure Endpoint',
+    pleaseEnterDeploymentName: '请填写部署名称',
+    pleaseEnterAccessToken: '请填写 Access Token',
+    pleaseEnterRefreshToken: '请填写 Refresh Token',
+    
+    // 成功消息
+    linkCopied: '链接已复制',
+    extractedAuthCode: '成功提取授权码！',
+    cacheClearedSuccess: '统一User-Agent缓存已清除',
+    newClientIdGenerated: '已生成新的客户端标识',
+    groupsRefreshed: '分组列表已刷新',
+    modelMappingAdded: '已添加映射',
+    modelMappingExists: '模型映射已存在',
+    
+    // 警告和提示
+    copyFailed: '复制失败，请手动复制',
+    clearCacheFailed: '清除缓存失败',
+    urlNotFound: 'URL 中未找到授权码参数，请检查链接是否正确',
+    urlFormatError: '链接格式错误，请检查是否为完整的 URL',
+    wrongUrlFormat: '请粘贴以 http://localhost:45462 开头的链接',
+    loadGroupsFailed: '加载分组列表失败',
+    
+    // 确认对话框
+    projectIdNotFilledTitle: '项目 ID 未填写',
+    projectIdNotFilledMessage: '您尚未填写项目 ID。\n\n如果您的Google账号绑定了Google Cloud或被识别为Workspace账号，需要提供项目 ID。\n如果您使用的是普通个人账号，可以继续不填写。',
+    continueButton: '继续',
+    goBackToFill: '返回填写',
+    continueSave: '继续保存',
+    
+    // 快捷模型映射按钮
+    presetSonnet4: '+ Sonnet 4',
+    presetOpus41: '+ Opus 4.1',
+    presetHaiku35: '+ Haiku 3.5',
+    presetOpus41ToSonnet4: '+ Opus 4.1 → Sonnet 4',
+    
+    // 编辑模式特殊提示
+    leaveBlankNoUpdateApiKey: '留空表示不更新 API Key',
+    leaveBlankNoUpdateAwsKey: '留空表示不更新 AWS Access Key ID',
+    leaveBlankNoUpdateAwsSecret: '留空表示不更新 AWS Secret Access Key',
+    leaveBlankNoUpdateSession: '留空表示不更新',
+    
+    // 通用描述文本
+    allModelsIfEmpty: '留空表示支持所有模型。如果指定模型，请求中的模型不在列表内将不会调度到此账号',
+    systemDefaultIfEmpty: '留空将使用系统默认模型。支持 inference profile ID 或 ARN',
+    noUpdateIfEmpty: '留空表示不更新该字段'
   }
 }

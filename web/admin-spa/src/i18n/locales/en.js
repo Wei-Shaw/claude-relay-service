@@ -993,5 +993,298 @@ export default {
       bark: 'Bark',
       custom: 'Custom'
     }
+  },
+
+  // AccountForm Component
+  accountForm: {
+    // Titles and modal
+    editAccount: 'Edit Account',
+    addAccount: 'Add Account',
+    
+    // Step indicators
+    stepBasicInfo: 'Basic Information',
+    stepAuthorization: 'Authorization',
+    
+    // Platform selection
+    platform: 'Platform',
+    platformClaude: 'Claude',
+    platformClaudeConsole: 'Claude Console',
+    platformGemini: 'Gemini',
+    platformOpenAI: 'OpenAI',
+    platformAzureOpenAI: 'Azure OpenAI',
+    platformBedrock: 'Bedrock',
+    
+    // Add methods
+    addMethod: 'Add Method',
+    addTypeSetupToken: 'Setup Token (Recommended)',
+    addTypeOAuth: 'OAuth Authorization',
+    addTypeManual: 'Manual Access Token Input',
+    
+    // Basic information fields
+    accountName: 'Account Name',
+    accountNamePlaceholder: 'Set an easily recognizable name for the account',
+    description: 'Description',
+    descriptionOptional: 'Description (Optional)',
+    descriptionPlaceholder: 'Account usage description...',
+    
+    // Account type
+    accountType: 'Account Type',
+    accountTypeShared: 'Shared Account',
+    accountTypeDedicated: 'Dedicated Account',
+    accountTypeGroup: 'Group Scheduling',
+    accountTypeDescription: 'Shared: Available to all API Keys; Dedicated: Only for specific API Keys; Group: Join group for group scheduling',
+    
+    // Group selection
+    selectGroup: 'Select Group',
+    selectGroupRequired: 'Select Group *',
+    noGroupsAvailable: 'No groups available',
+    memberCount: 'members',
+    newGroup: 'New Group',
+    refreshGroups: 'Refresh Groups',
+    
+    // Gemini Project ID
+    projectId: 'Project ID',
+    projectIdOptional: 'Project ID (Optional)',
+    projectIdPlaceholder: 'e.g.: verdant-wares-464411-k9',
+    projectIdDescription: 'Google Cloud/Workspace accounts need to provide Project ID',
+    projectIdInstructions: 'How to get Project ID:',
+    projectIdStep1: 'Visit Google Cloud Console',
+    projectIdStep2: 'Copy Project ID (Project ID), usually in string format',
+    projectIdStep3: '⚠️ Note: Copy Project ID, not Project Number!',
+    projectIdTip: 'Tip: If your account is a regular personal account (not bound to Google Cloud), leave this field blank.',
+    projectIdGoogleCloudRequired: 'Google Cloud/Workspace accounts require Project ID',
+    projectIdGoogleCloudDescription: 'Some Google accounts (especially those bound to Google Cloud) will be identified as Workspace accounts and require an additional Project ID.',
+    
+    // Bedrock fields
+    awsAccessKeyId: 'AWS Access Key ID',
+    awsAccessKeyIdRequired: 'AWS Access Key ID *',
+    awsAccessKeyIdPlaceholder: 'Please enter AWS Access Key ID',
+    awsSecretAccessKey: 'AWS Secret Access Key',
+    awsSecretAccessKeyRequired: 'AWS Secret Access Key *',
+    awsSecretAccessKeyPlaceholder: 'Please enter AWS Secret Access Key',
+    awsRegion: 'AWS Region',
+    awsRegionRequired: 'AWS Region *',
+    awsRegionPlaceholder: 'e.g.: us-east-1',
+    awsRegionReference: 'Common AWS regions reference:',
+    awsRegionUsEast1: '• us-east-1 (US East)',
+    awsRegionUsWest2: '• us-west-2 (US West)',
+    awsRegionEuWest1: '• eu-west-1 (Europe Ireland)',
+    awsRegionApSoutheast1: '• ap-southeast-1 (Singapore)',
+    awsRegionApNortheast1: '• ap-northeast-1 (Tokyo)',
+    awsRegionEuCentral1: '• eu-central-1 (Frankfurt)',
+    awsRegionTip: '💡 Please enter complete region code, like us-east-1',
+    sessionToken: 'Session Token',
+    sessionTokenOptional: 'Session Token (Optional)',
+    sessionTokenPlaceholder: 'If using temporary credentials, please enter session token',
+    sessionTokenDescription: 'Only required when using temporary AWS credentials',
+    defaultModel: 'Default Primary Model',
+    defaultModelOptional: 'Default Primary Model (Optional)',
+    defaultModelPlaceholder: 'e.g.: us.anthropic.claude-sonnet-4-20250514-v1:0',
+    defaultModelDescription: 'Leave blank to use system default model. Supports inference profile ID or ARN',
+    bedrockModelConfigTitle: 'Bedrock Model Configuration:',
+    bedrockModelConfigInferenceProfile: '• Supports Inference Profile ID (recommended)',
+    bedrockModelConfigArn: '• Supports Application Inference Profile ARN',
+    bedrockModelConfigCommon: '• Common model: us.anthropic.claude-sonnet-4-20250514-v1:0',
+    bedrockModelConfigDefault: '• Leave blank to use system configured default model',
+    smallFastModel: 'Small Fast Model',
+    smallFastModelOptional: 'Small Fast Model (Optional)',
+    smallFastModelPlaceholder: 'e.g.: us.anthropic.claude-3-5-haiku-20241022-v1:0',
+    smallFastModelDescription: 'Lightweight model for fast responses, leave blank to use system default',
+    
+    // Azure OpenAI fields
+    azureEndpoint: 'Azure Endpoint',
+    azureEndpointRequired: 'Azure Endpoint *',
+    azureEndpointPlaceholder: 'https://your-resource.openai.azure.com',
+    azureEndpointDescription: 'Azure OpenAI resource endpoint URL, format: https://your-resource.openai.azure.com',
+    apiVersion: 'API Version',
+    apiVersionPlaceholder: '2024-02-01',
+    apiVersionDescription: 'Azure OpenAI API version, defaults to latest stable version 2024-02-01',
+    deploymentName: 'Deployment Name',
+    deploymentNameRequired: 'Deployment Name *',
+    deploymentNamePlaceholder: 'gpt-4',
+    deploymentNameDescription: 'Deployment name created in Azure OpenAI Studio',
+    apiKey: 'API Key',
+    apiKeyRequired: 'API Key *',
+    apiKeyPlaceholder: 'Please enter API Key',
+    apiKeyDescription: 'API key obtained from Azure portal',
+    supportedModels: 'Supported Models',
+    supportedModelsDescription: 'Select model types supported by this deployment',
+    
+    // Claude Console fields
+    apiUrl: 'API URL',
+    apiUrlRequired: 'API URL *',
+    apiUrlPlaceholder: 'e.g.: https://api.example.com',
+    apiKeyClaudeConsoleRequired: 'API Key *',
+    apiKeyClaudeConsolePlaceholder: 'Please enter API Key',
+    dailyQuota: 'Daily Quota Limit',
+    dailyQuotaLabel: 'Daily Quota Limit ($)',
+    dailyQuotaPlaceholder: '0 means no limit',
+    dailyQuotaDescription: 'Set daily usage quota, 0 means no limit',
+    quotaResetTime: 'Quota Reset Time',
+    quotaResetTimePlaceholder: '00:00',
+    quotaResetTimeDescription: 'Daily automatic quota reset time',
+    todayUsage: "Today's Usage",
+    remaining: 'Remaining',
+    used: 'Used',
+    modelMapping: 'Model Mapping Table',
+    modelMappingOptional: 'Model Mapping Table (Optional)',
+    modelMappingDescription: 'Leave blank to support all models without modification. With mapping configured, left models will be recognized as supported, right models are actually sent.',
+    originalModel: 'Original Model Name',
+    mappedModel: 'Mapped Model Name',
+    addModelMapping: 'Add Model Mapping',
+    userAgent: 'Custom User-Agent',
+    userAgentOptional: 'Custom User-Agent (Optional)',
+    userAgentPlaceholder: 'Leave blank to pass through client User-Agent',
+    userAgentDescription: 'When blank, will automatically use client User-Agent, only fill when need to fix specific UA',
+    rateLimitMechanism: 'Rate Limit Mechanism',
+    enableRateLimit: 'Enable Rate Limiting',
+    rateLimitDescription: 'When enabled, will pause scheduling for a period when account returns 429 errors',
+    rateLimitDuration: 'Rate Limit Duration (minutes)',
+    rateLimitDurationDescription: 'Time to pause scheduling after account is rate limited (minutes)',
+    
+    // Claude subscription types
+    subscriptionType: 'Subscription Type',
+    subscriptionClaudeMax: 'Claude Max',
+    subscriptionClaudePro: 'Claude Pro',
+    claudeProLimitation: 'Pro accounts do not support Claude Opus 4 model',
+    
+    // Claude special features
+    autoStopOnWarning: 'Auto stop scheduling when 5-hour usage approaches limit',
+    autoStopOnWarningDescription: 'When system detects account approaching 5-hour usage limit, automatically pause scheduling this account. Will automatically resume when entering new time window.',
+    useUnifiedUserAgent: 'Use Unified Claude Code Version',
+    useUnifiedUserAgentDescription: 'When enabled, will use unified User-Agent captured from real Claude Code client to improve compatibility',
+    currentUnifiedVersion: '💡 Current unified version: ',
+    clearCache: 'Clear Cache',
+    clearing: 'Clearing...',
+    waitingForCapture: '⏳ Waiting to capture User-Agent from Claude Code client',
+    captureHint: '💡 Tip: If unable to capture for a long time, please confirm Claude Code client is using this account, or contact developer to check if User-Agent format has changed',
+    useUnifiedClientId: 'Use Unified Client Identifier',
+    useUnifiedClientIdDescription: 'When enabled, will use fixed client identifier to make all requests appear from same client, reducing fingerprint',
+    clientId: 'Client Identifier ID',
+    regenerate: 'Regenerate',
+    clientIdDescription: 'This ID will replace user_id client part in requests, keeping session part for sticky sessions',
+    
+    // Schedule priority
+    schedulePriority: 'Schedule Priority',
+    schedulePriorityRange: 'Schedule Priority (1-100)',
+    schedulePriorityPlaceholder: 'Lower number = higher priority, default 50',
+    schedulePriorityDescription: 'Lower number = higher priority, recommended range: 1-100',
+    
+    // Manual token input
+    manualTokenTitle: 'Manual Token Input',
+    manualTokenDescription: 'Please enter valid Access Token. If you have Refresh Token, also recommend filling it to support auto refresh.',
+    manualTokenClaudeDescription: 'Please enter valid Claude Access Token. If you have Refresh Token, also recommend filling it to support auto refresh.',
+    manualTokenGeminiDescription: 'Please enter valid Gemini Access Token. If you have Refresh Token, also recommend filling it to support auto refresh.',
+    manualTokenOpenAIDescription: 'Please enter valid OpenAI Access Token. If you have Refresh Token, also recommend filling it to support auto refresh.',
+    obtainTokenMethods: 'Methods to obtain Access Token:',
+    claudeTokenPath: 'Please get credentials from ~/.claude/.credentials.json file on machine with logged-in Claude Code, do not use keys from Claude official website API Keys page.',
+    geminiTokenPath: 'Please get credentials from ~/.config/gemini/credentials.json file on machine with logged-in Gemini CLI.',
+    openaiTokenPath: 'Please get authentication credentials from machine with logged-in OpenAI account, or get Access Token through OAuth authorization flow.',
+    accessToken: 'Access Token',
+    accessTokenOptional: 'Access Token (Optional)',
+    accessTokenRequired: 'Access Token *',
+    accessTokenPlaceholder: 'Please enter Access Token...',
+    accessTokenOptionalPlaceholder: 'Optional: If not filled, system will automatically get via Refresh Token...',
+    accessTokenOptionalDescription: 'Access Token is optional. If not provided, system will automatically get via Refresh Token.',
+    refreshToken: 'Refresh Token',
+    refreshTokenOptional: 'Refresh Token (Optional)',
+    refreshTokenRequired: 'Refresh Token *',
+    refreshTokenPlaceholder: 'Please enter Refresh Token...',
+    refreshTokenRequiredPlaceholder: 'Please enter Refresh Token (required)...',
+    refreshTokenDescription: 'System will use Refresh Token to automatically get Access Token and user info',
+    refreshTokenTip: '💡 If Refresh Token not filled, token needs manual update after expiry.',
+    
+    // Setup Token flow
+    setupTokenTitle: 'Claude Setup Token Authorization',
+    setupTokenDescription: 'Please follow these steps to complete Claude account authorization via Setup Token:',
+    setupTokenStep1Title: 'Click button below to generate authorization link',
+    setupTokenStep2Title: 'Open link in browser and complete authorization',
+    setupTokenStep2Description: 'Please open authorization link in new tab, login to your Claude account and authorize Claude Code.',
+    setupTokenStep2Warning: 'Note: If you have proxy configured, please ensure browser also uses same proxy to access authorization page.',
+    setupTokenStep3Title: 'Enter Authorization Code',
+    setupTokenStep3Description: 'After authorization completes, copy Authorization Code from return page and paste into input below:',
+    generateSetupTokenUrl: 'Generate Setup Token Authorization Link',
+    generating: 'Generating...',
+    copyLink: 'Copy Link',
+    regenerateLink: 'Regenerate',
+    authorizationCode: 'Authorization Code',
+    authorizationCodePlaceholder: 'Paste Authorization Code obtained from Claude Code authorization page...',
+    authorizationCodeDescription: 'Please paste Authorization Code copied from Claude Code authorization page',
+    verifying: 'Verifying...',
+    completeAuthorization: 'Complete Authorization',
+    
+    // Token update (edit mode)
+    updateTokenTitle: 'Update Token',
+    updateTokenDescription: 'Can update Access Token and Refresh Token. For security, current Token values are not displayed.',
+    updateTokenTip: '💡 Leave blank to not update that field.',
+    newAccessToken: 'New Access Token',
+    newRefreshToken: 'New Refresh Token',
+    leaveBlankNoUpdate: 'Leave blank to not update...',
+    
+    // Usage information
+    currentUsage: 'Current Usage',
+    
+    // Buttons
+    cancel: 'Cancel',
+    nextStep: 'Next Step',
+    previousStep: 'Previous Step',
+    create: 'Create',
+    creating: 'Creating...',
+    update: 'Update',
+    updating: 'Updating...',
+    
+    // Error messages
+    pleaseEnterAccountName: 'Please enter account name',
+    pleaseSelectGroup: 'Please select a group',
+    pleaseEnterApiUrl: 'Please enter API URL',
+    pleaseEnterApiKey: 'Please enter API Key',
+    pleaseEnterAccessKeyId: 'Please enter AWS Access Key ID',
+    pleaseEnterSecretAccessKey: 'Please enter AWS Secret Access Key',
+    pleaseEnterRegion: 'Please select AWS region',
+    pleaseEnterAzureEndpoint: 'Please enter Azure Endpoint',
+    pleaseEnterDeploymentName: 'Please enter deployment name',
+    pleaseEnterAccessToken: 'Please enter Access Token',
+    pleaseEnterRefreshToken: 'Please enter Refresh Token',
+    
+    // Success messages
+    linkCopied: 'Link copied',
+    extractedAuthCode: 'Successfully extracted authorization code!',
+    cacheClearedSuccess: 'Unified User-Agent cache cleared',
+    newClientIdGenerated: 'New client identifier generated',
+    groupsRefreshed: 'Groups list refreshed',
+    modelMappingAdded: 'Mapping added',
+    modelMappingExists: 'Model mapping already exists',
+    
+    // Warnings and hints
+    copyFailed: 'Copy failed, please copy manually',
+    clearCacheFailed: 'Clear cache failed',
+    urlNotFound: 'Authorization code parameter not found in URL, please check if link is correct',
+    urlFormatError: 'Link format error, please check if it is a complete URL',
+    wrongUrlFormat: 'Please paste link starting with http://localhost:45462',
+    loadGroupsFailed: 'Failed to load groups list',
+    
+    // Confirmation dialogs
+    projectIdNotFilledTitle: 'Project ID Not Filled',
+    projectIdNotFilledMessage: 'You have not filled Project ID.\n\nIf your Google account is bound to Google Cloud or identified as Workspace account, Project ID is required.\nIf you are using regular personal account, you can continue without filling.',
+    continueButton: 'Continue',
+    goBackToFill: 'Go Back to Fill',
+    continueSave: 'Continue Save',
+    
+    // Quick model mapping buttons
+    presetSonnet4: '+ Sonnet 4',
+    presetOpus41: '+ Opus 4.1',
+    presetHaiku35: '+ Haiku 3.5',
+    presetOpus41ToSonnet4: '+ Opus 4.1 → Sonnet 4',
+    
+    // Edit mode special hints
+    leaveBlankNoUpdateApiKey: 'Leave blank to not update API Key',
+    leaveBlankNoUpdateAwsKey: 'Leave blank to not update AWS Access Key ID',
+    leaveBlankNoUpdateAwsSecret: 'Leave blank to not update AWS Secret Access Key',
+    leaveBlankNoUpdateSession: 'Leave blank to not update',
+    
+    // General description text
+    allModelsIfEmpty: 'Leave blank to support all models. If models specified, requests with models not in list will not be scheduled to this account',
+    systemDefaultIfEmpty: 'Leave blank to use system default model. Supports inference profile ID or ARN',
+    noUpdateIfEmpty: 'Leave blank to not update this field'
   }
 }
