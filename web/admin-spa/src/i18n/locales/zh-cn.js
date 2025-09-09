@@ -1479,6 +1479,155 @@ export default {
     // 使用情况和统计
     usageStats: '使用统计',
     loadingUsage: '加载使用情况...',
-    usageLoadFailed: '使用情况加载失败'
+    usageLoadFailed: '使用情况加载失败',
+    
+    // Gemini 项目 ID 详细说明
+    geminiProjectIdRequired: 'Google Cloud/Workspace 账号需要提供项目 ID',
+    geminiProjectIdDetail: '某些 Google 账号（特别是绑定了 Google Cloud 的账号）会被识别为 Workspace 账号，需要提供额外的项目 ID。',
+    geminiHowToGetProjectId: '如何获取项目 ID：',
+    geminiVisitConsole: '访问',
+    geminiCopyProjectId: '复制\u9879目 ID（Project ID）\uff0c通常是字符串格式',
+    geminiProjectIdWarning: '⚠️ 注意：要复制项目 ID（Project ID），不要复制项目编号（Project Number）！',
+    geminiPersonalAccountTip: '\u63d0示\uff1a如果您的账号是普通个人账号（未绑定 Google Cloud），请留空此字段。',
+    
+    // AWS 区域参考
+    awsRegionReference: '常用 AWS 区域参考：',
+    awsRegionEastUS: 'us-east-1 (美国东部)',
+    awsRegionWestUS: 'us-west-2 (美国西部)',
+    awsRegionEuropeIreland: 'eu-west-1 (欧洲爱尔兰)',
+    awsRegionAsiaSingapore: 'ap-southeast-1 (新加坡)',
+    awsRegionAsiaTokyo: 'ap-northeast-1 (东京)',
+    awsRegionEuropeFrankfurt: 'eu-central-1 (法兰克福)',
+    awsRegionInputTip: '💡 请输入完整的区域代码，如 us-east-1',
+    
+    // Bedrock 模型说明
+    bedrockModelConfigDesc: 'Bedrock 模型配置说明：',
+    bedrockSupportsInferenceProfile: '支持 Inference Profile ID（推荐）',
+    bedrockSupportsARN: '支持 Application Inference Profile ARN',
+    bedrockCommonModel: '常用模型：us.anthropic.claude-sonnet-4-20250514-v1:0',
+    bedrockEmptyUsesDefault: '留空将使用系统配置的默认模型',
+    
+    // Azure OpenAI 模型选择
+    azureModelSelectionDesc: '选择此部署支持的模型类型',
+    
+    // 限流机制
+    rateLimitMechanism: '限流机制',
+    enableRateLimitMechanism: '启用限流机制',
+    rateLimitDescription2: '启用后，当账号返回429错误时将暂停调度一段时间',
+    
+    // Claude Console 特定字段
+    claudeConsoleFields: 'Claude Console 特定字段',
+    quotaManagement: '额度管理',
+    modelMappingTable: '模型映射表',
+    modelMappingTableOptional: '模型映射表 (可选)',
+    addModelMapping: '添加模型映射',
+    
+    // Claude 订阅类型
+    subscriptionType: '订阅类型',
+    
+    // Setup Token 授权
+    setupTokenAuth: 'Setup Token 授权',
+    claudeSetupTokenAuth: 'Claude Setup Token 授权',
+    setupTokenAuthSteps: '请按照以下步骤通过 Setup Token 完成 Claude 账户的授权：',
+    generateSetupTokenLink: '生成 Setup Token 授权链接',
+    generating: '生成中...',
+    
+    // 按钮和操作
+    verifying: '验证中...',
+    completeAuth: '完成授权',
+    updating: '更新中...',
+    update: '更新',
+    
+    // 错误消息
+    generateSetupTokenFailed: '生成Setup Token授权链接失败',
+    copyFailed: '复制失败，请手动复制',
+    setupTokenAuthFailed: 'Setup Token授权失败，请检查授权码是否正确',
+    accountCreationFailed: '账户创建失败',
+    accountCreationError: '账户创建失败:',
+    
+    // 页面结构注释
+    stepIndicator: '步骤指示器',
+    step1BasicInfo: '步骤1: 基本信息和代理设置',
+    groupSelector: '分组选择器',
+    multiSelectGroup: '多选分组界面',
+    newGroupOption: '新建分组选项',
+    geminiProjectId: 'Gemini 项目 ID 字段',
+    bedrockFields: 'Bedrock 特定字段',
+    azureOpenAIFields: 'Azure OpenAI 特定字段',
+    
+    // 验证消息
+    nameRequired: '请填写账户名称',
+    apiUrlRequired: '请填写 API URL',
+    rateLimitDefault60: '默认60分钟',
+    rateLimitPauseDescription: '账号被限流后暂停调度的时间（分钟）',
+    apiUrlPlaceholder: '例如：https://api.example.com',
+    apiKeyPlaceholder: '请输入API Key',
+    dailyQuotaLimit: '每日额度限制 ($)',
+    quotaZeroUnlimited: '0 表示不限制',
+    dailyQuotaDescription: '设置每日使用额度，0 表示不限制',
+    quotaResetTime: '额度重置时间',
+    quotaResetTimeDescription: '每日自动重置额度的时间',
+    modelMappingDescription: '留空表示支持所有模型且不修改请求。配置映射后，左侧模型会被识别为支持的模型，右侧是实际发送的模型。',
+    rateLimitDurationMinutes: '限流时间 (分钟)',
+    rateLimitDefaultMinutes: '默认60分钟',
+    rateLimitPauseDesc: '账号被限流后暂停调度的时间（分钟）',
+    
+    // 额度管理
+    quotaManagementFields: '额度管理字段',
+    dailyQuotaLimitDollar: '每日额度限制 ($)',
+    quotaZeroUnlimited: '0 表示不限制',
+    dailyQuotaDesc: '设置每日使用额度，0 表示不限制',
+    quotaResetTime: '额度重置时间',
+    quotaResetTimeDesc: '每日自动重置额度的时间',
+    
+    // 模型映射
+    modelMappingOptional: '模型映射表 (可选)',
+    modelMappingDesc: '留空表示支持所有模型且不修改请求。配置映射后，左侧模型会被识别为支持的模型，右侧是实际发送的模型。',
+    originalModelName: '原始模型名称',
+    mappedModelName: '映射后的模型名称',
+    addModelMappingBtn: '添加模型映射',
+    customUserAgentOptional: '自定义 User-Agent (可选)',
+    customUserAgentDesc: '留空时将自动使用客户端的 User-Agent，仅在需要固定特定 UA 时填写',
+    userAgentPassthrough: '留空则透传客户端 User-Agent',
+    
+    // Claude 订阅类型
+    claudeSubscriptionType: '订阅类型',
+    claudeProLimitation: 'Pro 账号不支持 Claude Opus 4 模型',
+    
+    // Claude 高级选项
+    claudeAutoStopScheduling: '5小时使用量接近限制时自动停止调度',
+    claudeAutoStopDesc: '当系统检测到账户接近5小时使用限制时，自动暂停调度该账户。进入新的时间窗口后会自动恢复调度。',
+    claudeUseUnifiedUA: '使用统一 Claude Code 版本',
+    claudeUnifiedUADesc: '开启后将使用从真实 Claude Code 客户端捕获的统一 User-Agent，提高兼容性',
+    claudeCurrentUnifiedVersion: '💡 当前统一版本：',
+    claudeWaitingCapture: '⏳ 等待从 Claude Code 客户端捕获 User-Agent',
+    claudeCaptureHint: '💡 提示：如果长时间未能捕获，请确认有 Claude Code 客户端正在使用此账户， 或联系开发者检查 User-Agent 格式是否发生变化',
+    claudeUseUnifiedClientId: '使用统一的客户端标识',
+    claudeUnifiedClientIdDesc: '开启后将使用固定的客户端标识，使所有请求看起来来自同一个客户端，减少特征',
+    claudeClientIdLabel: '客户端标识 ID',
+    claudeClientIdDesc: '此ID将替换请求中的user_id客户端部分，保留session部分用于粘性会话',
+    
+    // Setup Token 流程
+    setupTokenAuthProcess: 'Claude Setup Token 授权',
+    setupTokenProcessDesc: '请按照以下步骤通过 Setup Token 完成 Claude 账户的授权：',
+    setupTokenStepOneTitle: '步骤 1：生成授权链接',
+    setupTokenStepOneDesc: '点击下方按钮生成授权链接',
+    setupTokenGenerating: '生成中...',
+    setupTokenGenerateBtn: '生成 Setup Token 授权链接',
+    setupTokenCopyTitle: '复制链接',
+    
+    // 步骤指示器
+    stepIndicator: '步骤指示器',
+    step1BasicInfo: '步骤1: 基本信息和代理设置',
+    step2OAuth: '步骤2: OAuth授权',
+    step2SetupToken: '步骤2: Setup Token授权',
+    
+    // 分组选择器
+    groupSelector: '分组选择器',
+    multiGroupInterface: '多选分组界面',
+    createNewGroupOption: '新建分组选项',
+    
+    // 手动输入Token提示
+    credentialsFromFile: '文件中的凭证。'
   }
 }
