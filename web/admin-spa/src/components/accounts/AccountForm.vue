@@ -12,7 +12,7 @@
               <i class="fas fa-user-circle text-sm text-white sm:text-base" />
             </div>
             <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">
-              {{ isEdit ? '编辑账户' : '添加账户' }}
+              {{ isEdit ? t('accountForm.editAccount') : t('accountForm.addAccount') }}
             </h3>
           </div>
           <button
@@ -40,7 +40,7 @@
               </div>
               <span
                 class="ml-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 sm:ml-2 sm:text-sm"
-                >基本信息</span
+                >{{ t('accountForm.stepBasicInfo') }}</span
               >
             </div>
             <div class="h-0.5 w-4 bg-gray-300 sm:w-8" />
@@ -55,7 +55,7 @@
               </div>
               <span
                 class="ml-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 sm:ml-2 sm:text-sm"
-                >授权认证</span
+                >{{ t('accountForm.stepAuthorization') }}</span
               >
             </div>
           </div>
@@ -66,389 +66,63 @@
           <div class="space-y-6">
             <div v-if="!isEdit">
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >选择平台</label
+                >{{ t('accountForm.platform') }}</label
               >
-              <!-- 平台分组选择器 -->
-              <div class="space-y-3">
-                <!-- 分组选择器 -->
-                <div class="grid grid-cols-3 gap-2">
-                  <!-- Claude 分组 -->
-                  <div
-                    class="group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all duration-200"
-                    :class="[
-                      platformGroup === 'claude'
-                        ? 'border-indigo-500 bg-gradient-to-br from-indigo-50 to-purple-50 shadow-md dark:from-indigo-900/20 dark:to-purple-900/20'
-                        : 'border-gray-200 bg-white hover:border-indigo-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-600'
-                    ]"
-                    @click="selectPlatformGroup('claude')"
-                  >
-                    <div class="p-3">
-                      <div class="flex items-center justify-between">
-                        <div
-                          class="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-indigo-500 to-purple-600"
-                        >
-                          <i class="fas fa-brain text-sm text-white"></i>
-                        </div>
-                        <div
-                          v-if="platformGroup === 'claude'"
-                          class="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-500"
-                        >
-                          <i class="fas fa-check text-xs text-white"></i>
-                        </div>
-                      </div>
-                      <h4 class="mt-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
-                        Claude
-                      </h4>
-                      <p class="text-xs text-gray-600 dark:text-gray-400">Anthropic</p>
-                    </div>
-                  </div>
-
-                  <!-- OpenAI 分组 -->
-                  <div
-                    class="group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all duration-200"
-                    :class="[
-                      platformGroup === 'openai'
-                        ? 'border-emerald-500 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-md dark:from-emerald-900/20 dark:to-teal-900/20'
-                        : 'border-gray-200 bg-white hover:border-emerald-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-emerald-600'
-                    ]"
-                    @click="selectPlatformGroup('openai')"
-                  >
-                    <div class="p-3">
-                      <div class="flex items-center justify-between">
-                        <div
-                          class="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-emerald-500 to-teal-600"
-                        >
-                          <svg
-                            class="h-5 w-5 text-white"
-                            fill="currentColor"
-                            viewBox="0 0 24 24"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path
-                              d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.8956zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.4069-.6813zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"
-                            />
-                          </svg>
-                        </div>
-                        <div
-                          v-if="platformGroup === 'openai'"
-                          class="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500"
-                        >
-                          <i class="fas fa-check text-xs text-white"></i>
-                        </div>
-                      </div>
-                      <h4 class="mt-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
-                        OpenAI
-                      </h4>
-                      <p class="text-xs text-gray-600 dark:text-gray-400">GPT 系列</p>
-                    </div>
-                  </div>
-
-                  <!-- Gemini 分组 -->
-                  <div
-                    class="group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all duration-200"
-                    :class="[
-                      platformGroup === 'gemini'
-                        ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-md dark:from-blue-900/20 dark:to-indigo-900/20'
-                        : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-600'
-                    ]"
-                    @click="selectPlatformGroup('gemini')"
-                  >
-                    <div class="p-3">
-                      <div class="flex items-center justify-between">
-                        <div
-                          class="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-blue-500 to-indigo-600"
-                        >
-                          <i class="fab fa-google text-sm text-white"></i>
-                        </div>
-                        <div
-                          v-if="platformGroup === 'gemini'"
-                          class="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500"
-                        >
-                          <i class="fas fa-check text-xs text-white"></i>
-                        </div>
-                      </div>
-                      <h4 class="mt-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
-                        Gemini
-                      </h4>
-                      <p class="text-xs text-gray-600 dark:text-gray-400">Google AI</p>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 子平台选择器 -->
-                <div
-                  v-if="platformGroup"
-                  class="animate-fadeIn rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50"
-                >
-                  <p class="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">
-                    选择具体平台类型：
-                  </p>
-                  <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    <!-- Claude 子选项 -->
-                    <template v-if="platformGroup === 'claude'">
-                      <label
-                        class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
-                        :class="[
-                          form.platform === 'claude'
-                            ? 'border-indigo-500 bg-indigo-50 dark:border-indigo-400 dark:bg-indigo-900/30'
-                            : 'border-gray-300 bg-white hover:border-indigo-400 hover:bg-indigo-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-indigo-500 dark:hover:bg-indigo-900/20'
-                        ]"
-                      >
-                        <input
-                          v-model="form.platform"
-                          class="sr-only"
-                          type="radio"
-                          value="claude"
-                        />
-                        <div class="flex items-center gap-2">
-                          <i class="fas fa-brain text-sm text-indigo-600 dark:text-indigo-400"></i>
-                          <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
-                              >Claude Code</span
-                            >
-                            <span class="text-xs text-gray-500 dark:text-gray-400">官方</span>
-                          </div>
-                        </div>
-                        <div
-                          v-if="form.platform === 'claude'"
-                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500"
-                        >
-                          <i class="fas fa-check text-xs text-white"></i>
-                        </div>
-                      </label>
-
-                      <label
-                        class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
-                        :class="[
-                          form.platform === 'claude-console'
-                            ? 'border-purple-500 bg-purple-50 dark:border-purple-400 dark:bg-purple-900/30'
-                            : 'border-gray-300 bg-white hover:border-purple-400 hover:bg-purple-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-purple-500 dark:hover:bg-purple-900/20'
-                        ]"
-                      >
-                        <input
-                          v-model="form.platform"
-                          class="sr-only"
-                          type="radio"
-                          value="claude-console"
-                        />
-                        <div class="flex items-center gap-2">
-                          <i
-                            class="fas fa-terminal text-sm text-purple-600 dark:text-purple-400"
-                          ></i>
-                          <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
-                              >Claude Console</span
-                            >
-                            <span class="text-xs text-gray-500 dark:text-gray-400">标准API</span>
-                          </div>
-                        </div>
-                        <div
-                          v-if="form.platform === 'claude-console'"
-                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-purple-500"
-                        >
-                          <i class="fas fa-check text-xs text-white"></i>
-                        </div>
-                      </label>
-
-                      <label
-                        class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
-                        :class="[
-                          form.platform === 'bedrock'
-                            ? 'border-orange-500 bg-orange-50 dark:border-orange-400 dark:bg-orange-900/30'
-                            : 'border-gray-300 bg-white hover:border-orange-400 hover:bg-orange-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-orange-500 dark:hover:bg-orange-900/20'
-                        ]"
-                      >
-                        <input
-                          v-model="form.platform"
-                          class="sr-only"
-                          type="radio"
-                          value="bedrock"
-                        />
-                        <div class="flex items-center gap-2">
-                          <i class="fab fa-aws text-sm text-orange-600 dark:text-orange-400"></i>
-                          <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
-                              >Bedrock</span
-                            >
-                            <span class="text-xs text-gray-500 dark:text-gray-400">AWS</span>
-                          </div>
-                        </div>
-                        <div
-                          v-if="form.platform === 'bedrock'"
-                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500"
-                        >
-                          <i class="fas fa-check text-xs text-white"></i>
-                        </div>
-                      </label>
-
-                      <label
-                        class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
-                        :class="[
-                          form.platform === 'ccr'
-                            ? 'border-cyan-500 bg-cyan-50 dark:border-cyan-400 dark:bg-cyan-900/30'
-                            : 'border-gray-300 bg-white hover:border-cyan-400 hover:bg-cyan-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-cyan-500 dark:hover:bg-cyan-900/20'
-                        ]"
-                      >
-                        <input v-model="form.platform" class="sr-only" type="radio" value="ccr" />
-                        <div class="flex items-center gap-2">
-                          <i
-                            class="fas fa-code-branch text-sm text-cyan-600 dark:text-cyan-400"
-                          ></i>
-                          <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
-                              >CCR</span
-                            >
-                            <span class="text-xs text-gray-500 dark:text-gray-400"
-                              >Claude Code Router</span
-                            >
-                          </div>
-                        </div>
-                        <div
-                          v-if="form.platform === 'ccr'"
-                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-cyan-500"
-                        >
-                          <i class="fas fa-check text-xs text-white"></i>
-                        </div>
-                      </label>
-                    </template>
-
-                    <!-- OpenAI 子选项 -->
-                    <template v-if="platformGroup === 'openai'">
-                      <label
-                        class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
-                        :class="[
-                          form.platform === 'openai'
-                            ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-400 dark:bg-emerald-900/30'
-                            : 'border-gray-300 bg-white hover:border-emerald-400 hover:bg-emerald-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-emerald-500 dark:hover:bg-emerald-900/20'
-                        ]"
-                      >
-                        <input
-                          v-model="form.platform"
-                          class="sr-only"
-                          type="radio"
-                          value="openai"
-                        />
-                        <div class="flex items-center gap-2">
-                          <i
-                            class="fas fa-robot text-sm text-emerald-600 dark:text-emerald-400"
-                          ></i>
-                          <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
-                              >Codex Cli</span
-                            >
-                            <span class="text-xs text-gray-500 dark:text-gray-400">官方</span>
-                          </div>
-                        </div>
-                        <div
-                          v-if="form.platform === 'openai'"
-                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500"
-                        >
-                          <i class="fas fa-check text-xs text-white"></i>
-                        </div>
-                      </label>
-
-                      <label
-                        class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
-                        :class="[
-                          form.platform === 'openai-responses'
-                            ? 'border-teal-500 bg-teal-50 dark:border-teal-400 dark:bg-teal-900/30'
-                            : 'border-gray-300 bg-white hover:border-teal-400 hover:bg-teal-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-teal-500 dark:hover:bg-teal-900/20'
-                        ]"
-                      >
-                        <input
-                          v-model="form.platform"
-                          class="sr-only"
-                          type="radio"
-                          value="openai-responses"
-                        />
-                        <div class="flex items-center gap-2">
-                          <i class="fas fa-server text-sm text-teal-600 dark:text-teal-400"></i>
-                          <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
-                              >Responses</span
-                            >
-                            <span class="text-xs text-gray-500 dark:text-gray-400"
-                              >Openai-Responses</span
-                            >
-                          </div>
-                        </div>
-                        <div
-                          v-if="form.platform === 'openai-responses'"
-                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-teal-500"
-                        >
-                          <i class="fas fa-check text-xs text-white"></i>
-                        </div>
-                      </label>
-
-                      <label
-                        class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
-                        :class="[
-                          form.platform === 'azure_openai'
-                            ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30'
-                            : 'border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-blue-500 dark:hover:bg-blue-900/20'
-                        ]"
-                      >
-                        <input
-                          v-model="form.platform"
-                          class="sr-only"
-                          type="radio"
-                          value="azure_openai"
-                        />
-                        <div class="flex items-center gap-2">
-                          <i class="fab fa-microsoft text-sm text-blue-600 dark:text-blue-400"></i>
-                          <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
-                              >Azure</span
-                            >
-                            <span class="text-xs text-gray-500 dark:text-gray-400"
-                              >Azure Openai</span
-                            >
-                          </div>
-                        </div>
-                        <div
-                          v-if="form.platform === 'azure_openai'"
-                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500"
-                        >
-                          <i class="fas fa-check text-xs text-white"></i>
-                        </div>
-                      </label>
-                    </template>
-
-                    <!-- Gemini 子选项 -->
-                    <template v-if="platformGroup === 'gemini'">
-                      <label
-                        class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
-                        :class="[
-                          form.platform === 'gemini'
-                            ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30'
-                            : 'border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-blue-500 dark:hover:bg-blue-900/20'
-                        ]"
-                      >
-                        <input
-                          v-model="form.platform"
-                          class="sr-only"
-                          type="radio"
-                          value="gemini"
-                        />
-                        <div class="flex items-center gap-2">
-                          <i class="fab fa-google text-sm text-blue-600 dark:text-blue-400"></i>
-                          <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
-                              >Gemini Cli</span
-                            >
-                            <span class="text-xs text-gray-500 dark:text-gray-400">官方</span>
-                          </div>
-                        </div>
-                        <div
-                          v-if="form.platform === 'gemini'"
-                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500"
-                        >
-                          <i class="fas fa-check text-xs text-white"></i>
-                        </div>
-                      </label>
-                    </template>
-                  </div>
-                </div>
+              <div class="flex gap-4">
+                <label class="flex cursor-pointer items-center">
+                  <input
+                    v-model="form.platform"
+                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="radio"
+                    value="claude"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.platformClaude') }}</span>
+                </label>
+                <label class="flex cursor-pointer items-center">
+                  <input
+                    v-model="form.platform"
+                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="radio"
+                    value="claude-console"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.platformClaudeConsole') }}</span>
+                </label>
+                <label class="flex cursor-pointer items-center">
+                  <input
+                    v-model="form.platform"
+                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="radio"
+                    value="gemini"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.platformGemini') }}</span>
+                </label>
+                <label class="flex cursor-pointer items-center">
+                  <input
+                    v-model="form.platform"
+                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="radio"
+                    value="openai"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.platformOpenAI') }}</span>
+                </label>
+                <label class="flex cursor-pointer items-center">
+                  <input
+                    v-model="form.platform"
+                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="radio"
+                    value="azure_openai"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.platformAzureOpenAI') }}</span>
+                </label>
+                <label class="flex cursor-pointer items-center">
+                  <input
+                    v-model="form.platform"
+                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="radio"
+                    value="bedrock"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.platformBedrock') }}</span>
+                </label>
               </div>
             </div>
 
@@ -456,14 +130,12 @@
               v-if="
                 !isEdit &&
                 form.platform !== 'claude-console' &&
-                form.platform !== 'ccr' &&
                 form.platform !== 'bedrock' &&
-                form.platform !== 'azure_openai' &&
-                form.platform !== 'openai-responses'
+                form.platform !== 'azure_openai'
               "
             >
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >添加方式</label
+                >{{ t('accountForm.addMethod') }}</label
               >
               <div class="flex flex-wrap gap-4">
                 <label v-if="form.platform === 'claude'" class="flex cursor-pointer items-center">
@@ -473,7 +145,7 @@
                     type="radio"
                     value="setup-token"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">Setup Token (推荐)</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.addTypeSetupToken') }}</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -482,7 +154,7 @@
                     type="radio"
                     value="oauth"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">OAuth 授权</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.addTypeOAuth') }}</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -492,7 +164,7 @@
                     value="manual"
                   />
                   <span class="text-sm text-gray-700 dark:text-gray-300"
-                    >手动输入 Access Token</span
+                    >{{ t('accountForm.addTypeManual') }}</span
                   >
                 </label>
               </div>
@@ -500,13 +172,13 @@
 
             <div>
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >账户名称</label
+                >{{ t('accountForm.accountName') }}</label
               >
               <input
                 v-model="form.name"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 :class="{ 'border-red-500': errors.name }"
-                placeholder="为账户设置一个易识别的名称"
+                :placeholder="t('accountForm.accountNamePlaceholder')"
                 required
                 type="text"
               />
@@ -517,19 +189,19 @@
 
             <div>
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >描述 (可选)</label
+                >{{ t('accountForm.descriptionOptional') }}</label
               >
               <textarea
                 v-model="form.description"
                 class="form-input w-full resize-none border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                placeholder="账户用途说明..."
+                :placeholder="t('accountForm.descriptionPlaceholder')"
                 rows="3"
               />
             </div>
 
             <div>
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >账户类型</label
+                >{{ t('accountForm.accountType') }}</label
               >
               <div class="flex gap-4">
                 <label class="flex cursor-pointer items-center">
@@ -539,7 +211,7 @@
                     type="radio"
                     value="shared"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">共享账户</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.accountTypeShared') }}</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -548,7 +220,7 @@
                     type="radio"
                     value="dedicated"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">专属账户</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.accountTypeDedicated') }}</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -557,19 +229,18 @@
                     type="radio"
                     value="group"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">分组调度</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.accountTypeGroup') }}</span>
                 </label>
               </div>
               <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                共享账户：供所有API Key使用；专属账户：仅供特定API
-                Key使用；分组调度：加入分组供分组内调度
+                {{ t('accountForm.accountTypeDescription') }}
               </p>
             </div>
 
             <!-- 分组选择器 -->
             <div v-if="form.accountType === 'group'">
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >选择分组 *</label
+                >{{ t('accountForm.selectGroupRequired') }}</label
               >
               <div class="flex gap-2">
                 <div class="flex-1">
@@ -581,7 +252,7 @@
                       v-if="filteredGroups.length === 0"
                       class="text-sm text-gray-500 dark:text-gray-400"
                     >
-                      暂无可用分组
+                      {{ t('accountForm.noGroupsAvailable') }}
                     </div>
                     <label
                       v-for="group in filteredGroups"
@@ -595,7 +266,7 @@
                         :value="group.id"
                       />
                       <span class="text-sm text-gray-700 dark:text-gray-200">
-                        {{ group.name }} ({{ group.memberCount || 0 }} 个成员)
+                        {{ group.name }} ({{ group.memberCount || 0 }} {{ t('accountForm.memberCount') }})
                       </span>
                     </label>
                     <!-- 新建分组选项 -->
@@ -606,7 +277,7 @@
                         @click="handleNewGroup"
                       >
                         <i class="fas fa-plus" />
-                        新建分组
+                        {{ t('accountForm.newGroup') }}
                       </button>
                     </div>
                   </div>
@@ -950,11 +621,8 @@
               </div>
             </div>
 
-            <!-- Claude Console 和 CCR 特定字段 -->
-            <div
-              v-if="(form.platform === 'claude-console' || form.platform === 'ccr') && !isEdit"
-              class="space-y-4"
-            >
+            <!-- Claude Console 特定字段 -->
+            <div v-if="form.platform === 'claude-console' && !isEdit" class="space-y-4">
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >API URL *</label
@@ -1170,68 +838,6 @@
               </div>
             </div>
 
-            <!-- OpenAI-Responses 特定字段 -->
-            <div v-if="form.platform === 'openai-responses' && !isEdit" class="space-y-4">
-              <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >API 基础地址 *</label
-                >
-                <input
-                  v-model="form.baseApi"
-                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                  placeholder="https://api.example.com/v1"
-                  required
-                  type="url"
-                />
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  第三方 OpenAI 兼容 API 的基础地址，不要包含具体路径
-                </p>
-              </div>
-
-              <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >API 密钥 *</label
-                >
-                <div class="relative">
-                  <input
-                    v-model="form.apiKey"
-                    class="form-input w-full border-gray-300 pr-10 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                    placeholder="sk-xxxxxxxxxxxx"
-                    required
-                    :type="showApiKey ? 'text' : 'password'"
-                  />
-                  <button
-                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-400"
-                    type="button"
-                    @click="showApiKey = !showApiKey"
-                  >
-                    <i :class="showApiKey ? 'fas fa-eye-slash' : 'fas fa-eye'" />
-                  </button>
-                </div>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  第三方服务提供的 API 密钥
-                </p>
-              </div>
-
-              <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >自定义 User-Agent (可选)</label
-                >
-                <input
-                  v-model="form.userAgent"
-                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                  placeholder="留空则透传原始请求的 User-Agent"
-                  type="text"
-                />
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  可选项。如果设置，所有请求将使用此 User-Agent；否则透传客户端的 User-Agent
-                </p>
-              </div>
-
-              <!-- 限流时长字段 - 隐藏不显示，使用默认值60 -->
-              <input v-model.number="form.rateLimitDuration" type="hidden" value="60" />
-            </div>
-
             <!-- Claude 订阅类型选择 -->
             <div v-if="form.platform === 'claude'">
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -1408,10 +1014,7 @@
               v-if="
                 form.addType === 'manual' &&
                 form.platform !== 'claude-console' &&
-                form.platform !== 'ccr' &&
-                form.platform !== 'bedrock' &&
-                form.platform !== 'azure_openai' &&
-                form.platform !== 'openai-responses'
+                form.platform !== 'bedrock'
               "
               class="space-y-4 rounded-lg border border-blue-200 bg-blue-50 p-4"
             >
@@ -1563,23 +1166,21 @@
                 type="button"
                 @click="$emit('close')"
               >
-                取消
+                {{ t('accountForm.cancel') }}
               </button>
               <button
                 v-if="
                   (form.addType === 'oauth' || form.addType === 'setup-token') &&
                   form.platform !== 'claude-console' &&
-                  form.platform !== 'ccr' &&
                   form.platform !== 'bedrock' &&
-                  form.platform !== 'azure_openai' &&
-                  form.platform !== 'openai-responses'
+                  form.platform !== 'azure_openai'
                 "
                 class="btn btn-primary flex-1 px-6 py-3 font-semibold"
                 :disabled="loading"
                 type="button"
                 @click="nextStep"
               >
-                下一步
+                {{ t('accountForm.nextStep') }}
               </button>
               <button
                 v-else
@@ -1589,7 +1190,7 @@
                 @click="createAccount"
               >
                 <div v-if="loading" class="loading-spinner mr-2" />
-                {{ loading ? '创建中...' : '创建' }}
+                {{ loading ? t('accountForm.creating') : t('accountForm.create') }}
               </button>
             </div>
           </div>
@@ -2085,11 +1686,8 @@
             </p>
           </div>
 
-          <!-- Claude Console 和 CCR 特定字段（编辑模式）-->
-          <div
-            v-if="form.platform === 'claude-console' || form.platform === 'ccr'"
-            class="space-y-4"
-          >
+          <!-- Claude Console 特定字段（编辑模式）-->
+          <div v-if="form.platform === 'claude-console'" class="space-y-4">
             <div>
               <label class="mb-3 block text-sm font-semibold text-gray-700">API URL</label>
               <input
@@ -2316,84 +1914,6 @@
             </div>
           </div>
 
-          <!-- OpenAI-Responses 特定字段（编辑模式）-->
-          <div v-if="form.platform === 'openai-responses'" class="space-y-4">
-            <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">API 基础地址</label>
-              <input
-                v-model="form.baseApi"
-                class="form-input w-full"
-                placeholder="https://api.example.com/v1"
-                type="url"
-              />
-            </div>
-
-            <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">API 密钥</label>
-              <div class="relative">
-                <input
-                  v-model="form.apiKey"
-                  class="form-input w-full pr-10"
-                  placeholder="留空表示不更新"
-                  :type="showApiKey ? 'text' : 'password'"
-                />
-                <button
-                  class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  type="button"
-                  @click="showApiKey = !showApiKey"
-                >
-                  <i :class="showApiKey ? 'fas fa-eye-slash' : 'fas fa-eye'" />
-                </button>
-              </div>
-              <p class="mt-1 text-xs text-gray-500">留空表示不更新 API Key</p>
-            </div>
-
-            <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700"
-                >自定义 User-Agent</label
-              >
-              <input
-                v-model="form.userAgent"
-                class="form-input w-full"
-                placeholder="留空则透传客户端 User-Agent"
-                type="text"
-              />
-              <p class="mt-1 text-xs text-gray-500">
-                留空时将自动使用客户端的 User-Agent，仅在需要固定特定 UA 时填写
-              </p>
-            </div>
-
-            <!-- 限流时长字段 - 隐藏不显示，保持原值 -->
-            <input v-model.number="form.rateLimitDuration" type="hidden" />
-
-            <!-- 额度管理字段 -->
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
-                  每日额度限制 ($)
-                </label>
-                <input
-                  v-model.number="form.dailyQuota"
-                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                  min="0"
-                  placeholder="0 表示不限制"
-                  step="0.01"
-                  type="number"
-                />
-              </div>
-              <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
-                  额度重置时间
-                </label>
-                <input
-                  v-model="form.quotaResetTime"
-                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                  type="time"
-                />
-              </div>
-            </div>
-          </div>
-
           <!-- Bedrock 特定字段（编辑模式）-->
           <div v-if="form.platform === 'bedrock'" class="space-y-4">
             <div>
@@ -2616,10 +2136,8 @@
           <div
             v-if="
               form.platform !== 'claude-console' &&
-              form.platform !== 'ccr' &&
               form.platform !== 'bedrock' &&
-              form.platform !== 'azure_openai' &&
-              form.platform !== 'openai-responses'
+              form.platform !== 'azure_openai'
             "
             class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-900/30"
           >
@@ -2712,6 +2230,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
 import { useAccountsStore } from '@/stores/accounts'
@@ -2721,6 +2240,8 @@ import OAuthFlow from './OAuthFlow.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import GroupManagementModal from './GroupManagementModal.vue'
 
+const { t } = useI18n()
+
 const props = defineProps({
   account: {
     type: Object,
@@ -2728,7 +2249,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'success', 'platform-changed'])
+const emit = defineEmits(['close', 'success'])
 
 const accountsStore = useAccountsStore()
 const { showConfirmModal, confirmOptions, showConfirm, handleConfirm, handleCancel } = useConfirm()
@@ -2740,7 +2261,6 @@ const show = ref(true)
 // OAuth步骤
 const oauthStep = ref(1)
 const loading = ref(false)
-const showApiKey = ref(false)
 
 // Setup Token 相关状态
 const setupTokenLoading = ref(false)
@@ -2755,21 +2275,6 @@ const unifiedUserAgent = ref('')
 const clearingCache = ref(false)
 // 客户端标识编辑状态（已废弃，不再需要编辑功能）
 // const editingClientId = ref(false)
-
-// 平台分组状态
-const platformGroup = ref('')
-
-// 根据现有平台确定分组
-const determinePlatformGroup = (platform) => {
-  if (['claude', 'claude-console', 'ccr', 'bedrock'].includes(platform)) {
-    return 'claude'
-  } else if (['openai', 'openai-responses', 'azure_openai'].includes(platform)) {
-    return 'openai'
-  } else if (platform === 'gemini') {
-    return 'gemini'
-  }
-  return ''
-}
 
 // 初始化代理配置
 const initProxyConfig = () => {
@@ -2820,9 +2325,6 @@ const form = ref({
   apiUrl: props.account?.apiUrl || '',
   apiKey: props.account?.apiKey || '',
   priority: props.account?.priority || 50,
-  // OpenAI-Responses 特定字段
-  baseApi: props.account?.baseApi || '',
-  rateLimitDuration: props.account?.rateLimitDuration || 60,
   supportedModels: (() => {
     const models = props.account?.supportedModels
     if (!models) return []
@@ -2838,6 +2340,7 @@ const form = ref({
   })(),
   userAgent: props.account?.userAgent || '',
   enableRateLimit: props.account ? props.account.rateLimitDuration > 0 : true,
+  rateLimitDuration: props.account?.rateLimitDuration || 60,
   // 额度管理字段
   dailyQuota: props.account?.dailyQuota || 0,
   dailyUsage: props.account?.dailyUsage || 0,
@@ -2939,7 +2442,7 @@ const loadAccountUsage = async () => {
       form.value.dailyUsage = response.dailyUsage || 0
     }
   } catch (error) {
-    // 静默处理使用量加载失败
+    console.warn('Failed to load account usage:', error)
   }
 }
 
@@ -2951,19 +2454,6 @@ const loadAccountUsage = async () => {
 //   return form.value.name?.trim()
 // })
 
-// 选择平台分组
-const selectPlatformGroup = (group) => {
-  platformGroup.value = group
-  // 根据分组自动选择默认平台
-  if (group === 'claude') {
-    form.value.platform = 'claude'
-  } else if (group === 'openai') {
-    form.value.platform = 'openai'
-  } else if (group === 'gemini') {
-    form.value.platform = 'gemini'
-  }
-}
-
 // 下一步
 const nextStep = async () => {
   // 清除之前的错误
@@ -2971,7 +2461,7 @@ const nextStep = async () => {
 
   if (!canProceed.value) {
     if (!form.value.name || form.value.name.trim() === '') {
-      errors.value.name = '请填写账户名称'
+      errors.value.name = t('accountForm.pleaseEnterAccountName')
     }
     return
   }
@@ -2981,7 +2471,7 @@ const nextStep = async () => {
     form.value.accountType === 'group' &&
     (!form.value.groupIds || form.value.groupIds.length === 0)
   ) {
-    showToast('请选择一个分组', 'error')
+    showToast(t('accountForm.pleaseSelectGroup'), 'error')
     return
   }
 
@@ -3052,7 +2542,7 @@ const copySetupTokenAuthUrl = async () => {
   try {
     await navigator.clipboard.writeText(setupTokenAuthUrl.value)
     setupTokenCopied.value = true
-    showToast('链接已复制', 'success')
+    showToast(t('accountForm.linkCopied'), 'success')
     setTimeout(() => {
       setupTokenCopied.value = false
     }, 2000)
@@ -3070,7 +2560,7 @@ const copySetupTokenAuthUrl = async () => {
       const successful = document.execCommand('copy')
       if (successful) {
         setupTokenCopied.value = true
-        showToast('链接已复制', 'success')
+        showToast(t('accountForm.linkCopied'), 'success')
       } else {
         showToast('复制失败，请手动复制', 'error')
       }
@@ -3214,7 +2704,14 @@ const handleOAuthSuccess = async (tokenInfo) => {
 
     showToast(fullMessage, 'error', '', 8000)
 
-    // 错误已通过 toast 显示给用户
+    // 在控制台打印完整的错误信息以便调试
+    console.error('账户创建失败:', {
+      message: errorMessage,
+      suggestion,
+      errorDetails,
+      errorCode: error.response?.data?.errorCode,
+      networkError: error.response?.data?.networkError
+    })
   } finally {
     loading.value = false
   }
@@ -3243,30 +2740,6 @@ const createAccount = async () => {
     }
     if (!form.value.apiKey || form.value.apiKey.trim() === '') {
       errors.value.apiKey = '请填写 API Key'
-      hasError = true
-    }
-  }
-
-  // CCR (Claude Code Router) 验证 - 使用与 Claude Console 相同的字段
-  if (form.value.platform === 'ccr') {
-    if (!form.value.apiUrl || form.value.apiUrl.trim() === '') {
-      errors.value.apiUrl = '请填写 API URL'
-      hasError = true
-    }
-    if (!form.value.apiKey || form.value.apiKey.trim() === '') {
-      errors.value.apiKey = '请填写 API Key'
-      hasError = true
-    }
-  }
-
-  // OpenAI-Responses 验证
-  if (form.value.platform === 'openai-responses') {
-    if (!form.value.baseApi || form.value.baseApi.trim() === '') {
-      errors.value.baseApi = '请填写 API 基础地址'
-      hasError = true
-    }
-    if (!form.value.apiKey || form.value.apiKey.trim() === '') {
-      errors.value.apiKey = '请填写 API 密钥'
       hasError = true
     }
   } else if (form.value.platform === 'bedrock') {
@@ -3298,7 +2771,7 @@ const createAccount = async () => {
       hasError = true
     }
   } else if (form.value.addType === 'manual') {
-    // 手动模式验证 - 只有部分平台需要验证 Token
+    // 手动模式验证
     if (form.value.platform === 'openai') {
       // OpenAI 平台必须有 Refresh Token
       if (!form.value.refreshToken || form.value.refreshToken.trim() === '') {
@@ -3306,20 +2779,13 @@ const createAccount = async () => {
         hasError = true
       }
       // Access Token 可选，如果没有会通过 Refresh Token 获取
-    } else if (form.value.platform === 'gemini') {
-      // Gemini 平台需要 Access Token
-      if (!form.value.accessToken || form.value.accessToken.trim() === '') {
-        errors.value.accessToken = '请填写 Access Token'
-        hasError = true
-      }
-    } else if (form.value.platform === 'claude') {
-      // Claude 平台需要 Access Token
+    } else {
+      // 其他平台（Gemini）需要 Access Token
       if (!form.value.accessToken || form.value.accessToken.trim() === '') {
         errors.value.accessToken = '请填写 Access Token'
         hasError = true
       }
     }
-    // Claude Console、CCR、OpenAI-Responses 等其他平台不需要 Token 验证
   }
 
   // 分组类型验证 - 创建账户流程修复
@@ -3327,7 +2793,7 @@ const createAccount = async () => {
     form.value.accountType === 'group' &&
     (!form.value.groupIds || form.value.groupIds.length === 0)
   ) {
-    showToast('请选择一个分组', 'error')
+    showToast(t('accountForm.pleaseSelectGroup'), 'error')
     hasError = true
   }
 
@@ -3441,8 +2907,8 @@ const createAccount = async () => {
       data.needsImmediateRefresh = true
       data.requireRefreshSuccess = true // 必须刷新成功才能创建账户
       data.priority = form.value.priority || 50
-    } else if (form.value.platform === 'claude-console' || form.value.platform === 'ccr') {
-      // Claude Console 和 CCR 账户特定数据（CCR 使用 Claude Console 的后端逻辑）
+    } else if (form.value.platform === 'claude-console') {
+      // Claude Console 账户特定数据
       data.apiUrl = form.value.apiUrl
       data.apiKey = form.value.apiKey
       data.priority = form.value.priority || 50
@@ -3451,15 +2917,6 @@ const createAccount = async () => {
       // 如果不启用限流，传递 0 表示不限流
       data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
       // 额度管理字段
-      data.dailyQuota = form.value.dailyQuota || 0
-      data.quotaResetTime = form.value.quotaResetTime || '00:00'
-    } else if (form.value.platform === 'openai-responses') {
-      // OpenAI-Responses 账户特定数据
-      data.baseApi = form.value.baseApi
-      data.apiKey = form.value.apiKey
-      data.userAgent = form.value.userAgent || ''
-      data.priority = form.value.priority || 50
-      data.rateLimitDuration = 60 // 默认值60，不从用户输入获取
       data.dailyQuota = form.value.dailyQuota || 0
       data.quotaResetTime = form.value.quotaResetTime || '00:00'
     } else if (form.value.platform === 'bedrock') {
@@ -3492,11 +2949,8 @@ const createAccount = async () => {
     let result
     if (form.value.platform === 'claude') {
       result = await accountsStore.createClaudeAccount(data)
-    } else if (form.value.platform === 'claude-console' || form.value.platform === 'ccr') {
-      // CCR 使用 Claude Console 的后端 API
+    } else if (form.value.platform === 'claude-console') {
       result = await accountsStore.createClaudeConsoleAccount(data)
-    } else if (form.value.platform === 'openai-responses') {
-      result = await accountsStore.createOpenAIResponsesAccount(data)
     } else if (form.value.platform === 'bedrock') {
       result = await accountsStore.createBedrockAccount(data)
     } else if (form.value.platform === 'openai') {
@@ -3532,7 +2986,14 @@ const createAccount = async () => {
 
     showToast(fullMessage, 'error', '', 8000)
 
-    // 错误已通过 toast 显示给用户
+    // 在控制台打印完整的错误信息以便调试
+    console.error('账户创建失败:', {
+      message: errorMessage,
+      suggestion,
+      errorDetails,
+      errorCode: error.response?.data?.errorCode,
+      networkError: error.response?.data?.networkError
+    })
   } finally {
     loading.value = false
   }
@@ -3554,7 +3015,7 @@ const updateAccount = async () => {
     form.value.accountType === 'group' &&
     (!form.value.groupIds || form.value.groupIds.length === 0)
   ) {
-    showToast('请选择一个分组', 'error')
+    showToast(t('accountForm.pleaseSelectGroup'), 'error')
     return
   }
 
@@ -3701,19 +3162,6 @@ const updateAccount = async () => {
       data.quotaResetTime = form.value.quotaResetTime || '00:00'
     }
 
-    // OpenAI-Responses 特定更新
-    if (props.account.platform === 'openai-responses') {
-      data.baseApi = form.value.baseApi
-      if (form.value.apiKey) {
-        data.apiKey = form.value.apiKey
-      }
-      data.userAgent = form.value.userAgent || ''
-      data.priority = form.value.priority || 50
-      // 编辑时不上传 rateLimitDuration，保持原值
-      data.dailyQuota = form.value.dailyQuota || 0
-      data.quotaResetTime = form.value.quotaResetTime || '00:00'
-    }
-
     // Bedrock 特定更新
     if (props.account.platform === 'bedrock') {
       // 只有当有凭证变更时才构造 awsCredentials 对象
@@ -3759,8 +3207,6 @@ const updateAccount = async () => {
       await accountsStore.updateClaudeAccount(props.account.id, data)
     } else if (props.account.platform === 'claude-console') {
       await accountsStore.updateClaudeConsoleAccount(props.account.id, data)
-    } else if (props.account.platform === 'openai-responses') {
-      await accountsStore.updateOpenAIResponsesAccount(props.account.id, data)
     } else if (props.account.platform === 'bedrock') {
       await accountsStore.updateBedrockAccount(props.account.id, data)
     } else if (props.account.platform === 'openai') {
@@ -3796,7 +3242,14 @@ const updateAccount = async () => {
 
     showToast(fullMessage, 'error', '', 8000)
 
-    // 错误已通过 toast 显示给用户
+    // 在控制台打印完整的错误信息以便调试
+    console.error('账户更新失败:', {
+      message: errorMessage,
+      suggestion,
+      errorDetails,
+      errorCode: error.response?.data?.errorCode,
+      networkError: error.response?.data?.networkError
+    })
   } finally {
     loading.value = false
   }
@@ -3869,15 +3322,7 @@ const showGroupManagement = ref(false)
 
 // 根据平台筛选分组
 const filteredGroups = computed(() => {
-  let platformFilter = form.value.platform
-  // Claude Console 和 CCR 使用 Claude 分组
-  if (form.value.platform === 'claude-console' || form.value.platform === 'ccr') {
-    platformFilter = 'claude'
-  }
-  // OpenAI-Responses 使用 OpenAI 分组
-  else if (form.value.platform === 'openai-responses') {
-    platformFilter = 'openai'
-  }
+  const platformFilter = form.value.platform === 'claude-console' ? 'claude' : form.value.platform
   return groups.value.filter((g) => g.platform === platformFilter)
 })
 
@@ -3888,7 +3333,7 @@ const loadGroups = async () => {
     const response = await apiClient.get('/admin/account-groups')
     groups.value = response.data || []
   } catch (error) {
-    showToast('加载分组列表失败', 'error')
+    showToast(t('accountForm.loadGroupsFailed'), 'error')
     groups.value = []
   } finally {
     loadingGroups.value = false
@@ -3898,7 +3343,7 @@ const loadGroups = async () => {
 // 刷新分组列表
 const refreshGroups = async () => {
   await loadGroups()
-  showToast('分组列表已刷新', 'success')
+  showToast(t('accountForm.groupsRefreshed'), 'success')
 }
 
 // 处理新建分组
@@ -3916,13 +3361,8 @@ watch(
   () => form.value.platform,
   (newPlatform) => {
     // 处理添加方式的自动切换
-    if (
-      newPlatform === 'claude-console' ||
-      newPlatform === 'ccr' ||
-      newPlatform === 'bedrock' ||
-      newPlatform === 'openai-responses'
-    ) {
-      form.value.addType = 'manual' // Claude Console、CCR、Bedrock 和 OpenAI-Responses 只支持手动模式
+    if (newPlatform === 'claude-console' || newPlatform === 'bedrock') {
+      form.value.addType = 'manual' // Claude Console 和 Bedrock 只支持手动模式
     } else if (newPlatform === 'claude') {
       // 切换到 Claude 时，使用 Setup Token 作为默认方式
       form.value.addType = 'setup-token'
@@ -3982,35 +3422,24 @@ watch(setupTokenAuthCode, (newValue) => {
         if (code) {
           // 成功提取授权码
           setupTokenAuthCode.value = code
-          showToast('成功提取授权码！', 'success')
-          // Successfully extracted authorization code from URL
+          showToast(t('accountForm.extractedAuthCode'), 'success')
+          console.log('Successfully extracted authorization code from URL')
         } else {
           // URL 中没有 code 参数
-          showToast('URL 中未找到授权码参数，请检查链接是否正确', 'error')
+          showToast(t('accountForm.urlNotFound'), 'error')
         }
       } catch (error) {
         // URL 解析失败
-        // Failed to parse URL
-        showToast('链接格式错误，请检查是否为完整的 URL', 'error')
+        console.error('Failed to parse URL:', error)
+        showToast(t('accountForm.urlFormatError'), 'error')
       }
     } else {
       // 错误的 URL（不是 localhost:45462 开头）
-      showToast('请粘贴以 http://localhost:45462 开头的链接', 'error')
+      showToast(t('accountForm.wrongUrlFormat'), 'error')
     }
   }
   // 如果不是 URL，保持原值（兼容直接输入授权码）
 })
-
-// 监听平台变化
-watch(
-  () => form.value.platform,
-  (newPlatform) => {
-    // 当选择 CCR 平台时，通知父组件
-    if (!isEdit.value) {
-      emit('platform-changed', newPlatform)
-    }
-  }
-)
 
 // 监听账户类型变化
 watch(
@@ -4171,8 +3600,6 @@ watch(
         azureEndpoint: newAccount.azureEndpoint || '',
         apiVersion: newAccount.apiVersion || '',
         deploymentName: newAccount.deploymentName || '',
-        // OpenAI-Responses 特定字段
-        baseApi: newAccount.baseApi || '',
         // 额度管理字段
         dailyQuota: newAccount.dailyQuota || 0,
         dailyUsage: newAccount.dailyUsage || 0,
@@ -4194,18 +3621,6 @@ watch(
           if (newAccount.groupInfo && newAccount.groupInfo.id) {
             form.value.groupId = newAccount.groupInfo.id
             foundGroupIds.push(newAccount.groupInfo.id)
-          } else if (newAccount.groupId) {
-            // 如果账户有 groupId 字段，直接使用（OpenAI-Responses 等账户）
-            form.value.groupId = newAccount.groupId
-            foundGroupIds.push(newAccount.groupId)
-          } else if (
-            newAccount.groupIds &&
-            Array.isArray(newAccount.groupIds) &&
-            newAccount.groupIds.length > 0
-          ) {
-            // 如果账户有 groupIds 数组，使用它
-            form.value.groupId = newAccount.groupIds[0]
-            foundGroupIds.push(...newAccount.groupIds)
           } else {
             // 否则查找账户所属的分组
             const checkPromises = groups.value.map(async (group) => {
@@ -4245,7 +3660,7 @@ const fetchUnifiedUserAgent = async () => {
       unifiedUserAgent.value = ''
     }
   } catch (error) {
-    // Failed to fetch unified User-Agent
+    console.warn('Failed to fetch unified User-Agent:', error)
     unifiedUserAgent.value = ''
   }
 }
@@ -4262,7 +3677,7 @@ const clearUnifiedCache = async () => {
       showToast('清除缓存失败', 'error')
     }
   } catch (error) {
-    // Failed to clear unified User-Agent cache
+    console.error('Failed to clear unified User-Agent cache:', error)
     showToast('清除缓存失败：' + (error.message || '未知错误'), 'error')
   } finally {
     clearingCache.value = false
@@ -4297,9 +3712,6 @@ const handleUnifiedClientIdChange = () => {
 
 // 组件挂载时获取统一 User-Agent 信息
 onMounted(() => {
-  // 初始化平台分组
-  platformGroup.value = determinePlatformGroup(form.value.platform)
-
   // 获取Claude Code统一User-Agent信息
   fetchUnifiedUserAgent()
   // 如果是编辑模式且是Claude Console账户，加载使用情况
@@ -4318,20 +3730,3 @@ watch(
   }
 )
 </script>
-
-<style scoped>
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.3s ease-out;
-}
-</style>

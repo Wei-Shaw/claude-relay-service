@@ -993,5 +993,298 @@ export default {
       bark: 'Bark',
       custom: '自定義'
     }
+  },
+
+  // AccountForm 組件
+  accountForm: {
+    // 標題和模態框
+    editAccount: '編輯帳戶',
+    addAccount: '新增帳戶',
+    
+    // 步驟指示器
+    stepBasicInfo: '基本資訊',
+    stepAuthorization: '授權認證',
+    
+    // 平台選擇
+    platform: '平台',
+    platformClaude: 'Claude',
+    platformClaudeConsole: 'Claude Console',
+    platformGemini: 'Gemini',
+    platformOpenAI: 'OpenAI',
+    platformAzureOpenAI: 'Azure OpenAI',
+    platformBedrock: 'Bedrock',
+    
+    // 新增方式
+    addMethod: '新增方式',
+    addTypeSetupToken: 'Setup Token（推薦）',
+    addTypeOAuth: 'OAuth 授權',
+    addTypeManual: '手動輸入 Access Token',
+    
+    // 基本資訊欄位
+    accountName: '帳戶名稱',
+    accountNamePlaceholder: '為帳戶設置一個易識別的名稱',
+    description: '描述',
+    descriptionOptional: '描述（可選）',
+    descriptionPlaceholder: '帳戶用途說明...',
+    
+    // 帳戶類型
+    accountType: '帳戶類型',
+    accountTypeShared: '共用帳戶',
+    accountTypeDedicated: '專屬帳戶',
+    accountTypeGroup: '群組排程',
+    accountTypeDescription: '共用帳戶：供所有API Key使用；專屬帳戶：僅供特定API Key使用；群組排程：加入群組供群組內排程',
+    
+    // 群組選擇
+    selectGroup: '選擇群組',
+    selectGroupRequired: '選擇群組 *',
+    noGroupsAvailable: '暫無可用群組',
+    memberCount: '個成員',
+    newGroup: '新建群組',
+    refreshGroups: '刷新群組',
+    
+    // Gemini 專案 ID
+    projectId: '專案 ID',
+    projectIdOptional: '專案 ID（可選）',
+    projectIdPlaceholder: '例如：verdant-wares-464411-k9',
+    projectIdDescription: 'Google Cloud/Workspace 帳號需要提供專案 ID',
+    projectIdInstructions: '如何獲取專案 ID：',
+    projectIdStep1: '訪問 Google Cloud Console',
+    projectIdStep2: '複製專案 ID（Project ID），通常是字串格式',
+    projectIdStep3: '⚠️ 注意：要複製專案 ID（Project ID），不要複製專案編號（Project Number）！',
+    projectIdTip: '提示：如果您的帳號是普通個人帳號（未綁定 Google Cloud），請留空此欄位。',
+    projectIdGoogleCloudRequired: 'Google Cloud/Workspace 帳號需要提供專案 ID',
+    projectIdGoogleCloudDescription: '某些 Google 帳號（特別是綁定了 Google Cloud 的帳號）會被識別為 Workspace 帳號，需要提供額外的專案 ID。',
+    
+    // Bedrock 欄位
+    awsAccessKeyId: 'AWS 存取金鑰 ID',
+    awsAccessKeyIdRequired: 'AWS 存取金鑰 ID *',
+    awsAccessKeyIdPlaceholder: '請輸入 AWS Access Key ID',
+    awsSecretAccessKey: 'AWS 秘密存取金鑰',
+    awsSecretAccessKeyRequired: 'AWS 秘密存取金鑰 *',
+    awsSecretAccessKeyPlaceholder: '請輸入 AWS Secret Access Key',
+    awsRegion: 'AWS 區域',
+    awsRegionRequired: 'AWS 區域 *',
+    awsRegionPlaceholder: '例如：us-east-1',
+    awsRegionReference: '常用 AWS 區域參考：',
+    awsRegionUsEast1: '• us-east-1（美國東部）',
+    awsRegionUsWest2: '• us-west-2（美國西部）',
+    awsRegionEuWest1: '• eu-west-1（歐洲愛爾蘭）',
+    awsRegionApSoutheast1: '• ap-southeast-1（新加坡）',
+    awsRegionApNortheast1: '• ap-northeast-1（東京）',
+    awsRegionEuCentral1: '• eu-central-1（法蘭克福）',
+    awsRegionTip: '💡 請輸入完整的區域代碼，如 us-east-1',
+    sessionToken: '會話權杖',
+    sessionTokenOptional: '會話權杖（可選）',
+    sessionTokenPlaceholder: '如果使用臨時憑證，請輸入會話權杖',
+    sessionTokenDescription: '僅在使用臨時 AWS 憑證時需要填寫',
+    defaultModel: '預設主模型',
+    defaultModelOptional: '預設主模型（可選）',
+    defaultModelPlaceholder: '例如：us.anthropic.claude-sonnet-4-20250514-v1:0',
+    defaultModelDescription: '留空將使用系統預設模型。支援 inference profile ID 或 ARN',
+    bedrockModelConfigTitle: 'Bedrock 模型配置說明：',
+    bedrockModelConfigInferenceProfile: '• 支援 Inference Profile ID（推薦）',
+    bedrockModelConfigArn: '• 支援 Application Inference Profile ARN',
+    bedrockModelConfigCommon: '• 常用模型：us.anthropic.claude-sonnet-4-20250514-v1:0',
+    bedrockModelConfigDefault: '• 留空將使用系統配置的預設模型',
+    smallFastModel: '小快速模型',
+    smallFastModelOptional: '小快速模型（可選）',
+    smallFastModelPlaceholder: '例如：us.anthropic.claude-3-5-haiku-20241022-v1:0',
+    smallFastModelDescription: '用於快速回應的輕量級模型，留空將使用系統預設',
+    
+    // Azure OpenAI 欄位
+    azureEndpoint: 'Azure Endpoint',
+    azureEndpointRequired: 'Azure Endpoint *',
+    azureEndpointPlaceholder: 'https://your-resource.openai.azure.com',
+    azureEndpointDescription: 'Azure OpenAI 資源的終結點 URL，格式：https://your-resource.openai.azure.com',
+    apiVersion: 'API 版本',
+    apiVersionPlaceholder: '2024-02-01',
+    apiVersionDescription: 'Azure OpenAI API 版本，預設使用最新穩定版本 2024-02-01',
+    deploymentName: '部署名稱',
+    deploymentNameRequired: '部署名稱 *',
+    deploymentNamePlaceholder: 'gpt-4',
+    deploymentNameDescription: '在 Azure OpenAI Studio 中建立的部署名稱',
+    apiKey: 'API Key',
+    apiKeyRequired: 'API Key *',
+    apiKeyPlaceholder: '請輸入 API Key',
+    apiKeyDescription: '從 Azure 入口網站取得的 API 金鑰',
+    supportedModels: '支援的模型',
+    supportedModelsDescription: '選擇此部署支援的模型類型',
+    
+    // Claude Console 欄位
+    apiUrl: 'API URL',
+    apiUrlRequired: 'API URL *',
+    apiUrlPlaceholder: '例如：https://api.example.com',
+    apiKeyClaudeConsoleRequired: 'API Key *',
+    apiKeyClaudeConsolePlaceholder: '請輸入API Key',
+    dailyQuota: '每日額度限制',
+    dailyQuotaLabel: '每日額度限制（$）',
+    dailyQuotaPlaceholder: '0 表示不限制',
+    dailyQuotaDescription: '設置每日使用額度，0 表示不限制',
+    quotaResetTime: '額度重置時間',
+    quotaResetTimePlaceholder: '00:00',
+    quotaResetTimeDescription: '每日自動重置額度的時間',
+    todayUsage: '今日使用情況',
+    remaining: '剩餘',
+    used: '已使用',
+    modelMapping: '模型映射表',
+    modelMappingOptional: '模型映射表（可選）',
+    modelMappingDescription: '留空表示支援所有模型且不修改請求。配置映射後，左側模型會被識別為支援的模型，右側是實際發送的模型。',
+    originalModel: '原始模型名稱',
+    mappedModel: '映射後的模型名稱',
+    addModelMapping: '新增模型映射',
+    userAgent: '自定義 User-Agent',
+    userAgentOptional: '自定義 User-Agent（可選）',
+    userAgentPlaceholder: '留空則透傳用戶端 User-Agent',
+    userAgentDescription: '留空時將自動使用用戶端的 User-Agent，僅在需要固定特定 UA 時填寫',
+    rateLimitMechanism: '限流機制',
+    enableRateLimit: '啟用限流機制',
+    rateLimitDescription: '啟用後，當帳號返回429錯誤時將暫停排程一段時間',
+    rateLimitDuration: '限流時間（分鐘）',
+    rateLimitDurationDescription: '帳號被限流後暫停排程的時間（分鐘）',
+    
+    // Claude 訂閱類型
+    subscriptionType: '訂閱類型',
+    subscriptionClaudeMax: 'Claude Max',
+    subscriptionClaudePro: 'Claude Pro',
+    claudeProLimitation: 'Pro 帳號不支援 Claude Opus 4 模型',
+    
+    // Claude 特殊功能
+    autoStopOnWarning: '5小時使用量接近限制時自動停止排程',
+    autoStopOnWarningDescription: '當系統偵測到帳戶接近5小時使用限制時，自動暫停排程該帳戶。進入新的時間視窗後會自動恢復排程。',
+    useUnifiedUserAgent: '使用統一 Claude Code 版本',
+    useUnifiedUserAgentDescription: '開啟後將使用從真實 Claude Code 用戶端擷取的統一 User-Agent，提高相容性',
+    currentUnifiedVersion: '💡 目前統一版本：',
+    clearCache: '清除快取',
+    clearing: '清除中...',
+    waitingForCapture: '⏳ 等待從 Claude Code 用戶端擷取 User-Agent',
+    captureHint: '💡 提示：如果長時間未能擷取，請確認有 Claude Code 用戶端正在使用此帳戶，或聯繫開發者檢查 User-Agent 格式是否發生變化',
+    useUnifiedClientId: '使用統一的用戶端識別',
+    useUnifiedClientIdDescription: '開啟後將使用固定的用戶端識別，使所有請求看起來來自同一個用戶端，減少特徵',
+    clientId: '用戶端識別 ID',
+    regenerate: '重新產生',
+    clientIdDescription: '此ID將替換請求中的user_id用戶端部分，保留session部分用於黏性會話',
+    
+    // 排程優先順序
+    schedulePriority: '排程優先順序',
+    schedulePriorityRange: '排程優先順序（1-100）',
+    schedulePriorityPlaceholder: '數字越小優先順序越高，預設50',
+    schedulePriorityDescription: '數字越小優先順序越高，建議範圍：1-100',
+    
+    // 手動輸入 Token
+    manualTokenTitle: '手動輸入 Token',
+    manualTokenDescription: '請輸入有效的 Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動重新整理。',
+    manualTokenClaudeDescription: '請輸入有效的 Claude Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動重新整理。',
+    manualTokenGeminiDescription: '請輸入有效的 Gemini Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動重新整理。',
+    manualTokenOpenAIDescription: '請輸入有效的 OpenAI Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動重新整理。',
+    obtainTokenMethods: '取得 Access Token 的方法：',
+    claudeTokenPath: '請從已登入 Claude Code 的機器上取得 ~/.claude/.credentials.json 檔案中的憑證，請勿使用 Claude 官網 API Keys 頁面的金鑰。',
+    geminiTokenPath: '請從已登入 Gemini CLI 的機器上取得 ~/.config/gemini/credentials.json 檔案中的憑證。',
+    openaiTokenPath: '請從已登入 OpenAI 帳戶的機器上取得認證憑證，或透過 OAuth 授權流程取得 Access Token。',
+    accessToken: 'Access Token',
+    accessTokenOptional: 'Access Token（可選）',
+    accessTokenRequired: 'Access Token *',
+    accessTokenPlaceholder: '請輸入 Access Token...',
+    accessTokenOptionalPlaceholder: '可選：如果不填寫，系統會自動透過 Refresh Token 取得...',
+    accessTokenOptionalDescription: 'Access Token 可選填。如果不提供，系統會透過 Refresh Token 自動取得。',
+    refreshToken: 'Refresh Token',
+    refreshTokenOptional: 'Refresh Token（可選）',
+    refreshTokenRequired: 'Refresh Token *',
+    refreshTokenPlaceholder: '請輸入 Refresh Token...',
+    refreshTokenRequiredPlaceholder: '請輸入 Refresh Token（必填）...',
+    refreshTokenDescription: '系統將使用 Refresh Token 自動取得 Access Token 和使用者資訊',
+    refreshTokenTip: '💡 如果未填寫 Refresh Token，Token 過期後需要手動更新。',
+    
+    // Setup Token 流程
+    setupTokenTitle: 'Claude Setup Token 授權',
+    setupTokenDescription: '請按照以下步驟透過 Setup Token 完成 Claude 帳戶的授權：',
+    setupTokenStep1Title: '點擊下方按鈕產生授權連結',
+    setupTokenStep2Title: '在瀏覽器中開啟連結並完成授權',
+    setupTokenStep2Description: '請在新分頁中開啟授權連結，登入您的 Claude 帳戶並授權 Claude Code。',
+    setupTokenStep2Warning: '注意：如果您設置了代理，請確保瀏覽器也使用相同的代理訪問授權頁面。',
+    setupTokenStep3Title: '輸入 Authorization Code',
+    setupTokenStep3Description: '授權完成後，從返回頁面複製 Authorization Code，並貼上到下方輸入框：',
+    generateSetupTokenUrl: '產生 Setup Token 授權連結',
+    generating: '產生中...',
+    copyLink: '複製連結',
+    regenerateLink: '重新產生',
+    authorizationCode: 'Authorization Code',
+    authorizationCodePlaceholder: '貼上從Claude Code授權頁面取得的Authorization Code...',
+    authorizationCodeDescription: '請貼上從Claude Code授權頁面複製的Authorization Code',
+    verifying: '驗證中...',
+    completeAuthorization: '完成授權',
+    
+    // Token 更新（編輯模式）
+    updateTokenTitle: '更新 Token',
+    updateTokenDescription: '可以更新 Access Token 和 Refresh Token。為了安全起見，不會顯示目前的 Token 值。',
+    updateTokenTip: '💡 留空表示不更新該欄位。',
+    newAccessToken: '新的 Access Token',
+    newRefreshToken: '新的 Refresh Token',
+    leaveBlankNoUpdate: '留空表示不更新...',
+    
+    // 使用情況
+    currentUsage: '目前使用情況',
+    
+    // 按鈕
+    cancel: '取消',
+    nextStep: '下一步',
+    previousStep: '上一步',
+    create: '建立',
+    creating: '建立中...',
+    update: '更新',
+    updating: '更新中...',
+    
+    // 錯誤訊息
+    pleaseEnterAccountName: '請填寫帳戶名稱',
+    pleaseSelectGroup: '請選擇一個群組',
+    pleaseEnterApiUrl: '請填寫 API URL',
+    pleaseEnterApiKey: '請填寫 API Key',
+    pleaseEnterAccessKeyId: '請填寫 AWS 存取金鑰 ID',
+    pleaseEnterSecretAccessKey: '請填寫 AWS 秘密存取金鑰',
+    pleaseEnterRegion: '請選擇 AWS 區域',
+    pleaseEnterAzureEndpoint: '請填寫 Azure Endpoint',
+    pleaseEnterDeploymentName: '請填寫部署名稱',
+    pleaseEnterAccessToken: '請填寫 Access Token',
+    pleaseEnterRefreshToken: '請填寫 Refresh Token',
+    
+    // 成功訊息
+    linkCopied: '連結已複製',
+    extractedAuthCode: '成功提取授權碼！',
+    cacheClearedSuccess: '統一User-Agent快取已清除',
+    newClientIdGenerated: '已產生新的用戶端識別',
+    groupsRefreshed: '群組列表已重新整理',
+    modelMappingAdded: '已新增映射',
+    modelMappingExists: '模型映射已存在',
+    
+    // 警告和提示
+    copyFailed: '複製失敗，請手動複製',
+    clearCacheFailed: '清除快取失敗',
+    urlNotFound: 'URL 中未找到授權碼參數，請檢查連結是否正確',
+    urlFormatError: '連結格式錯誤，請檢查是否為完整的 URL',
+    wrongUrlFormat: '請貼上以 http://localhost:45462 開頭的連結',
+    loadGroupsFailed: '載入群組列表失敗',
+    
+    // 確認對話框
+    projectIdNotFilledTitle: '專案 ID 未填寫',
+    projectIdNotFilledMessage: '您尚未填寫專案 ID。\n\n如果您的Google帳號綁定了Google Cloud或被識別為Workspace帳號，需要提供專案 ID。\n如果您使用的是普通個人帳號，可以繼續不填寫。',
+    continueButton: '繼續',
+    goBackToFill: '返回填寫',
+    continueSave: '繼續保存',
+    
+    // 快捷模型映射按鈕
+    presetSonnet4: '+ Sonnet 4',
+    presetOpus41: '+ Opus 4.1',
+    presetHaiku35: '+ Haiku 3.5',
+    presetOpus41ToSonnet4: '+ Opus 4.1 → Sonnet 4',
+    
+    // 編輯模式特殊提示
+    leaveBlankNoUpdateApiKey: '留空表示不更新 API Key',
+    leaveBlankNoUpdateAwsKey: '留空表示不更新 AWS Access Key ID',
+    leaveBlankNoUpdateAwsSecret: '留空表示不更新 AWS Secret Access Key',
+    leaveBlankNoUpdateSession: '留空表示不更新',
+    
+    // 通用描述文字
+    allModelsIfEmpty: '留空表示支援所有模型。如果指定模型，請求中的模型不在列表內將不會排程到此帳號',
+    systemDefaultIfEmpty: '留空將使用系統預設模型。支援 inference profile ID 或 ARN',
+    noUpdateIfEmpty: '留空表示不更新該欄位'
   }
 }
