@@ -489,6 +489,178 @@ export default {
     // Account type display
     claudeMax: 'Claude Max',
     claudePro: 'Claude Pro',
-    claudeFree: 'Claude Free'
+    claudeFree: 'Claude Free',
+    
+    // Platform display
+    openaiResponsesPlatform: 'OpenAI-Responses',
+    ccrPlatform: 'CCR'
+  },
+  apiKeys: {
+    // Page title and description
+    title: 'API Keys 管理',
+    description: '管理和监控您的 API 密钥',
+    
+    // Tab navigation
+    activeTab: '活跃 API Keys',
+    deletedTab: '已删除 API Keys',
+    
+    // Toolbar and actions
+    refresh: '刷新',
+    refreshTooltip: '刷新 API Keys 列表（Ctrl+点击强制刷新）',
+    createNew: '创建新 Key',
+    bulkEdit: '编辑选中',
+    bulkDelete: '删除选中',
+    
+    // Table headers
+    name: '名称',
+    tags: '标签',
+    status: '状态',
+    usageStats: '使用统计',
+    createdAt: '创建时间',
+    expiresAt: '过期时间',
+    actions: '操作',
+    
+    // Filter options
+    timeRange: {
+      today: '今日',
+      week: '最近7天',
+      month: '本月',
+      all: '全部时间'
+    },
+    
+    // Status
+    active: '活跃',
+    disabled: '禁用',
+    expired: '已过期',
+    expiringSoon: '即将过期',
+    neverExpire: '永不过期',
+    notActivated: '未激活',
+    
+    // Usage statistics
+    dailyCost: '今日费用',
+    totalCost: '总费用',
+    dailyRequests: '今日请求',
+    lastUsed: '最后使用',
+    neverUsed: '从未使用',
+    minutesAgo: '{minutes} 分钟前',
+    hoursAgo: '{hours} 小时前',
+    daysAgo: '{days} 天前',
+    justNow: '刚刚',
+    requests: '次',
+    
+    // Search and filter
+    searchPlaceholder: '搜索名称...',
+    searchPlaceholderWithOwner: '搜索名称或所有者...',
+    allTags: '所有标签',
+    noTags: '无标签',
+    
+    // Binding information
+    shared: '使用共享池',
+    dedicated: '专属',
+    consoleAccount: 'Console账户',
+    bindingWarning: '⚠️ 账户不存在',
+    
+    // Limits and quotas
+    dailyLimit: '每日费用',
+    weeklyOpusLimit: 'Opus周费用',
+    remainingQuota: '剩余: ${amount}',
+    reset: '重置于 {time}',
+    quotaProgress: '额度进度',
+    
+    // Model statistics
+    modelStats: '模型使用分布',
+    modelStatsCount: '{count} 个模型',
+    totalTokens: '总Token',
+    inputTokens: '输入',
+    outputTokens: '输出',
+    cacheCreate: '缓存创建',
+    cacheRead: '缓存读取',
+    totalRequests: '总请求',
+    noModelData: '暂无模型使用数据',
+    resetFilter: '刷新',
+    adjustTimeRange: '尝试调整时间范围或点击刷新重新加载数据',
+    
+    // Date filter
+    dateFilter: {
+      today: '今日',
+      days7: '7天',
+      days30: '30天'
+    },
+    
+    // Actions
+    viewDetails: '查看详细统计',
+    edit: '编辑',
+    renew: '续期',
+    activate: '激活',
+    disable: '禁用',
+    copy: '复制',
+    copyStatsLink: '复制统计页面链接',
+    
+    // Pagination
+    totalRecords: '共 {count} 条记录',
+    pageSize: '每页显示',
+    records: '条',
+    
+    // Empty states
+    noApiKeys: '暂无 API Keys',
+    noApiKeysHint: '点击上方按钮创建您的第一个 API Key',
+    noDeletedKeys: '暂无已删除的 API Keys',
+    noDeletedKeysHint: '已删除的 API Keys 会出现在这里',
+    loading: '正在加载 API Keys...',
+    loadingDeleted: '正在加载已删除的 API Keys...',
+    loadingModelStats: '加载模型统计...',
+    
+    // Deleted keys table
+    creator: '创建者',
+    deletedBy: '删除者',
+    deletedAt: '删除时��',
+    canRestore: '恢复',
+    permanentDelete: '彻底删除',
+    clearAllDeleted: '清空所有已删除',
+    
+    // User types
+    admin: '管理员',
+    user: '用户',
+    unknown: '未知',
+    system: '系统',
+    
+    // Confirmation dialogs
+    confirmDisable: '确定要禁用 API Key "{name}" 吗？禁用后所有使用此 Key 的请求将返回 401 错误。',
+    confirmDelete: '确定要删除这个 API Key 吗？此操作不可恢复。',
+    confirmBatchDelete: '确定要删除选中的 {count} 个 API Key 吗？此操作不可恢复。',
+    confirmRestore: '确定要恢复这个 API Key 吗？恢复后可以重新使用。',
+    confirmPermanentDelete: '确定要彻底删除这个 API Key 吗？此操作不可恢复，所有相关数据将被永久删除。',
+    confirmClearAll: '确定要彻底删除全部 {count} 个已删除的 API Keys 吗？此操作不可恢复，所有相关数据将被永久删除。',
+    
+    // Success messages
+    keyActivated: 'API Key 已激活',
+    keyDisabled: 'API Key 已禁用',
+    keyDeleted: 'API Key 已删除',
+    keyRestored: 'API Key 已成功恢复',
+    keyPermanentDeleted: 'API Key 已彻底删除',
+    allDeletedCleared: '已清空所有已删除的 API Keys',
+    linkCopied: '已复制统计页面链接',
+    expiryUpdated: '过期时间已更新',
+    
+    // Error messages
+    selectKeysFirst: '请先选择要编辑的 API Keys',
+    loadFailed: '加载 API Keys 失败',
+    operationFailed: '操作失败',
+    copyFailed: '复制失败，请手动复制',
+    updateFailed: '更新失败',
+    deleteFailed: '删除失败',
+    restoreFailed: '恢复失败',
+    clearFailed: '清空失败',
+    
+    // Tooltips and helpers
+    editExpiry: '编辑过期时间',
+    activationDays: '未激活 ({days}天)',
+    boundTo: '绑定到',
+    belongsToGroup: '所属分组: {name}',
+    
+    // Batch operations
+    batchSuccess: '成功处理 {count} 个项目',
+    batchPartialFail: '{failed} 个处理失败',
+    batchAllFailed: '所有项目处理失败'
   }
 }
