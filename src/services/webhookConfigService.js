@@ -63,7 +63,8 @@ class WebhookConfigService {
         'slack',
         'discord',
         'custom',
-        'bark'
+        'bark',
+        'telegram'
       ]
 
       for (const platform of config.platforms) {
@@ -71,8 +72,8 @@ class WebhookConfigService {
           throw new Error(`不支持的平台类型: ${platform.type}`)
         }
 
-        // Bark平台使用deviceKey而不是url
-        if (platform.type !== 'bark') {
+        // Bark和Telegram平台有特殊的验证规则
+        if (platform.type !== 'bark' && platform.type !== 'telegram') {
           if (!platform.url || !this.isValidUrl(platform.url)) {
             throw new Error(`无效的webhook URL: ${platform.url}`)
           }
@@ -199,6 +200,47 @@ class WebhookConfigService {
         // 验证点击跳转URL（如果提供）
         if (platform.clickUrl && !this.isValidUrl(platform.clickUrl)) {
           logger.warn('⚠️ Bark点击跳转URL格式可能不正确')
+        }
+        break
+      case 'telegram':
+        // 验证Bot Token
+        if (!platform.botToken) {
+          throw new Error('Telegram平台必须提供Bot Token')
+        }
+
+        // 验证Bot Token格式（通常是数字:字符串格式）
+        if (!/^\d+:[A-Za-z0-9_-]+$/.test(platform.botToken)) {
+          logger.warn('⚠️ Telegram Bot Token格式可能不正确，应该类似：123456789:ABCdefGHIjklMNOpqrsTUVwxyz')
+        }
+
+        // 验证Chat ID
+        if (!platform.chatId) {
+          throw new Error('Telegram平台必须提供Chat ID')
+        }
+
+        // Chat ID可以是数字或@username格式
+        if (typeof platform.chatId === 'string') {
+          // @username格式或数字字符串
+          if (!platform.chatId.startsWith('@') && !/^-?\d+$/.test(platform.chatId)) {
+            throw new Error('Telegram Chat ID格式无效，应该是数字或@username格式')
+          }
+        } else if (typeof platform.chatId === 'number') {
+          // 数字格式OK
+        } else {
+          throw new Error('Telegram Chat ID必须是字符串或数字')
+        }
+
+        // 验证解析模式（如果提供）
+        if (platform.parseMode) {
+          const validParseModes = ['HTML', 'Markdown', 'MarkdownV2']
+          if (!validParseModes.includes(platform.parseMode)) {
+            throw new Error(`无效的Telegram解析模式: ${platform.parseMode}，支持的模式: ${validParseModes.join(', ')}`)
+          }
+        }
+        
+        // 验证自定义API URL（如果提供）
+        if (platform.apiUrl && !this.isValidUrl(platform.apiUrl)) {
+          throw new Error('Telegram API URL格式无效')
         }
         break
     }
