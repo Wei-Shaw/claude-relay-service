@@ -346,13 +346,13 @@
             <div v-if="form.platform === 'bedrock' && !isEdit" class="space-y-4">
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >AWS 访问密钥 ID *</label
+                  >{{ t('accountForm.awsAccessKeyId') }}</label
                 >
                 <input
                   v-model="form.accessKeyId"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   :class="{ 'border-red-500': errors.accessKeyId }"
-                  placeholder="请输入 AWS Access Key ID"
+                  :placeholder="t('accountForm.awsAccessKeyIdPlaceholder')"
                   required
                   type="text"
                 />
@@ -363,13 +363,13 @@
 
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >AWS 秘密访问密钥 *</label
+                  >{{ t('accountForm.awsSecretAccessKey') }}</label
                 >
                 <input
                   v-model="form.secretAccessKey"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   :class="{ 'border-red-500': errors.secretAccessKey }"
-                  placeholder="请输入 AWS Secret Access Key"
+                  :placeholder="t('accountForm.awsSecretAccessKeyPlaceholder')"
                   required
                   type="password"
                 />
@@ -380,13 +380,13 @@
 
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >AWS 区域 *</label
+                  >{{ t('accountForm.awsRegion') }}</label
                 >
                 <input
                   v-model="form.region"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   :class="{ 'border-red-500': errors.region }"
-                  placeholder="例如：us-east-1"
+                  :placeholder="t('accountForm.awsRegionPlaceholder')"
                   required
                   type="text"
                 />
@@ -414,31 +414,31 @@
 
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >会话令牌 (可选)</label
+                  >{{ t('accountForm.sessionTokenOptional') }}</label
                 >
                 <input
                   v-model="form.sessionToken"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                  placeholder="如果使用临时凭证，请输入会话令牌"
+                  :placeholder="t('accountForm.sessionTokenOptionalPlaceholder')"
                   type="password"
                 />
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  仅在使用临时 AWS 凭证时需要填写
+                  {{ t('accountForm.sessionTokenDescription') }}
                 </p>
               </div>
 
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >默认主模型 (可选)</label
+                  >{{ t('accountForm.defaultModelLabel') }}</label
                 >
                 <input
                   v-model="form.defaultModel"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                  placeholder="例如：us.anthropic.claude-sonnet-4-20250514-v1:0"
+                  :placeholder="t('accountForm.defaultModelPlaceholder')"
                   type="text"
                 />
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  留空将使用系统默认模型。支持 inference profile ID 或 ARN
+                  {{ t('accountForm.defaultModelDescription') }}
                 </p>
                 <div class="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
                   <div class="flex items-start gap-2">
@@ -458,16 +458,16 @@
 
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >小快速模型 (可选)</label
+                  >{{ t('accountForm.smallFastModelLabel') }}</label
                 >
                 <input
                   v-model="form.smallFastModel"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                  placeholder="例如：us.anthropic.claude-3-5-haiku-20241022-v1:0"
+                  :placeholder="t('accountForm.smallFastModelPlaceholder')"
                   type="text"
                 />
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  用于快速响应的轻量级模型，留空将使用系统默认
+                  {{ t('accountForm.smallFastModelDescription') }}
                 </p>
               </div>
             </div>
@@ -476,13 +476,13 @@
             <div v-if="form.platform === 'azure_openai' && !isEdit" class="space-y-4">
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >Azure Endpoint *</label
+                  >{{ t('accountForm.azureEndpoint') }}</label
                 >
                 <input
                   v-model="form.azureEndpoint"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   :class="{ 'border-red-500': errors.azureEndpoint }"
-                  placeholder="https://your-resource.openai.azure.com"
+                  :placeholder="t('accountForm.azureEndpointPlaceholder')"
                   required
                   type="url"
                 />
@@ -490,13 +490,13 @@
                   {{ errors.azureEndpoint }}
                 </p>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Azure OpenAI 资源的终结点 URL，格式：https://your-resource.openai.azure.com
+                  {{ t('accountForm.azureEndpointDescription') }}
                 </p>
               </div>
 
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >API 版本</label
+                  >{{ t('accountForm.azureApiVersion') }}</label
                 >
                 <input
                   v-model="form.apiVersion"
@@ -505,19 +505,19 @@
                   type="text"
                 />
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Azure OpenAI API 版本，默认使用最新稳定版本 2024-02-01
+                  {{ t('accountForm.azureApiVersionDescription') }}
                 </p>
               </div>
 
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >部署名称 *</label
+                  >{{ t('accountForm.azureDeploymentName') }}</label
                 >
                 <input
                   v-model="form.deploymentName"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   :class="{ 'border-red-500': errors.deploymentName }"
-                  placeholder="gpt-4"
+                  :placeholder="t('accountForm.azureDeploymentNamePlaceholder')"
                   required
                   type="text"
                 />
@@ -525,19 +525,19 @@
                   {{ errors.deploymentName }}
                 </p>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  在 Azure OpenAI Studio 中创建的部署名称
+                  {{ t('accountForm.azureDeploymentDescription') }}
                 </p>
               </div>
 
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >API Key *</label
+                  >{{ t('accountForm.azureApiKey') }}</label
                 >
                 <input
                   v-model="form.apiKey"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   :class="{ 'border-red-500': errors.apiKey }"
-                  placeholder="请输入 Azure OpenAI API Key"
+                  :placeholder="t('accountForm.azureApiKeyPlaceholder')"
                   required
                   type="password"
                 />
@@ -545,13 +545,13 @@
                   {{ errors.apiKey }}
                 </p>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  从 Azure 门户获取的 API 密钥
+                  {{ t('accountForm.azureEndpointDescription') }}
                 </p>
               </div>
 
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >支持的模型</label
+                  >{{ t('accountForm.azureSupportedModels') }}</label
                 >
                 <div class="flex flex-wrap gap-2">
                   <label
@@ -1911,33 +1911,33 @@
           <!-- Bedrock 特定字段（编辑模式）-->
           <div v-if="form.platform === 'bedrock'" class="space-y-4">
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">AWS 访问密钥 ID</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700">{{ t('accountForm.awsAccessKeyId') }}</label>
               <input
                 v-model="form.accessKeyId"
                 class="form-input w-full"
-                placeholder="留空表示不更新"
+                :placeholder="t('accountForm.leaveBlankNoUpdate')"
                 type="text"
               />
-              <p class="mt-1 text-xs text-gray-500">留空表示不更新 AWS Access Key ID</p>
+              <p class="mt-1 text-xs text-gray-500">{{ t('accountForm.leaveBlankNoUpdateAwsKey') }}</p>
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">AWS 秘密访问密钥</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700">{{ t('accountForm.awsSecretAccessKey') }}</label>
               <input
                 v-model="form.secretAccessKey"
                 class="form-input w-full"
-                placeholder="留空表示不更新"
+                :placeholder="t('accountForm.leaveBlankNoUpdate')"
                 type="password"
               />
-              <p class="mt-1 text-xs text-gray-500">留空表示不更新 AWS Secret Access Key</p>
+              <p class="mt-1 text-xs text-gray-500">{{ t('accountForm.leaveBlankNoUpdateAwsSecret') }}</p>
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">AWS 区域</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700">{{ t('accountForm.awsRegion') }}</label>
               <input
                 v-model="form.region"
                 class="form-input w-full"
-                placeholder="例如：us-east-1"
+                :placeholder="t('accountForm.awsRegionPlaceholder')"
                 type="text"
               />
               <div class="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
@@ -1959,41 +1959,41 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">会话令牌 (可选)</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700">{{ t('accountForm.sessionTokenOptional') }}</label>
               <input
                 v-model="form.sessionToken"
                 class="form-input w-full"
-                placeholder="留空表示不更新"
+                :placeholder="t('accountForm.leaveBlankNoUpdateSession')"
                 type="password"
               />
             </div>
 
             <div>
               <label class="mb-3 block text-sm font-semibold text-gray-700"
-                >默认主模型 (可选)</label
+                >{{ t('accountForm.defaultModelLabel') }}</label
               >
               <input
                 v-model="form.defaultModel"
                 class="form-input w-full"
-                placeholder="例如：us.anthropic.claude-sonnet-4-20250514-v1:0"
+                :placeholder="t('accountForm.defaultModelPlaceholder')"
                 type="text"
               />
               <p class="mt-1 text-xs text-gray-500">
-                留空将使用系统默认模型。支持 inference profile ID 或 ARN
+                {{ t('accountForm.systemDefaultIfEmpty') }}
               </p>
             </div>
 
             <div>
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >小快速模型 (可选)</label
+                >{{ t('accountForm.smallFastModelLabel') }}</label
               >
               <input
                 v-model="form.smallFastModel"
                 class="form-input w-full"
-                placeholder="例如：us.anthropic.claude-3-5-haiku-20241022-v1:0"
+                :placeholder="t('accountForm.smallFastModelPlaceholder')"
                 type="text"
               />
-              <p class="mt-1 text-xs text-gray-500">用于快速响应的轻量级模型，留空将使用系统默认</p>
+              <p class="mt-1 text-xs text-gray-500">{{ t('accountForm.smallFastModelDescription') }}</p>
             </div>
 
             <div>
@@ -2031,13 +2031,13 @@
           <div v-if="form.platform === 'azure_openai'" class="space-y-4">
             <div>
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >Azure Endpoint</label
+                >{{ t('accountForm.azureEndpoint') }}</label
               >
               <input
                 v-model="form.azureEndpoint"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 :class="{ 'border-red-500': errors.azureEndpoint }"
-                placeholder="https://your-resource.openai.azure.com"
+                :placeholder="t('accountForm.azureEndpointPlaceholder')"
                 type="url"
               />
               <p v-if="errors.azureEndpoint" class="mt-1 text-xs text-red-500">
@@ -2047,7 +2047,7 @@
 
             <div>
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >API 版本</label
+                >{{ t('accountForm.azureApiVersion') }}</label
               >
               <input
                 v-model="form.apiVersion"
@@ -2056,19 +2056,19 @@
                 type="text"
               />
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Azure OpenAI API 版本，默认使用最新稳定版本 2024-02-01
+                {{ t('accountForm.azureApiVersionDescription') }}
               </p>
             </div>
 
             <div>
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >部署名称</label
+                >{{ t('accountForm.azureDeploymentName') }}</label
               >
               <input
                 v-model="form.deploymentName"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 :class="{ 'border-red-500': errors.deploymentName }"
-                placeholder="gpt-4"
+                :placeholder="t('accountForm.azureDeploymentNamePlaceholder')"
                 type="text"
               />
               <p v-if="errors.deploymentName" class="mt-1 text-xs text-red-500">
@@ -2483,10 +2483,10 @@ const nextStep = async () => {
     if (!form.value.projectId || form.value.projectId.trim() === '') {
       // 使用自定义确认弹窗
       const confirmed = await showConfirm(
-        '项目 ID 未填写',
-        '您尚未填写项目 ID。\n\n如果您的Google账号绑定了Google Cloud或被识别为Workspace账号，需要提供项目 ID。\n如果您使用的是普通个人账号，可以继续不填写。',
-        '继续',
-        '返回填写'
+        t('accountForm.projectIdNotFilledTitle'),
+        t('accountForm.projectIdNotFilledMessage'),
+        t('accountForm.continueButton'),
+        t('accountForm.goBackToFill')
       )
       if (!confirmed) {
         return
@@ -2739,25 +2739,25 @@ const createAccount = async () => {
   } else if (form.value.platform === 'bedrock') {
     // Bedrock 验证
     if (!form.value.accessKeyId || form.value.accessKeyId.trim() === '') {
-      errors.value.accessKeyId = '请填写 AWS 访问密钥 ID'
+      errors.value.accessKeyId = t('accountForm.pleaseEnterAccessKeyId')
       hasError = true
     }
     if (!form.value.secretAccessKey || form.value.secretAccessKey.trim() === '') {
-      errors.value.secretAccessKey = '请填写 AWS 秘密访问密钥'
+      errors.value.secretAccessKey = t('accountForm.pleaseEnterSecretAccessKey')
       hasError = true
     }
     if (!form.value.region || form.value.region.trim() === '') {
-      errors.value.region = '请选择 AWS 区域'
+      errors.value.region = t('accountForm.pleaseEnterRegion')
       hasError = true
     }
   } else if (form.value.platform === 'azure_openai') {
     // Azure OpenAI 验证
     if (!form.value.azureEndpoint || form.value.azureEndpoint.trim() === '') {
-      errors.value.azureEndpoint = '请填写 Azure Endpoint'
+      errors.value.azureEndpoint = t('accountForm.pleaseEnterAzureEndpoint')
       hasError = true
     }
     if (!form.value.deploymentName || form.value.deploymentName.trim() === '') {
-      errors.value.deploymentName = '请填写部署名称'
+      errors.value.deploymentName = t('accountForm.pleaseEnterDeploymentName')
       hasError = true
     }
     if (!form.value.apiKey || form.value.apiKey.trim() === '') {
@@ -2954,13 +2954,13 @@ const createAccount = async () => {
     } else if (form.value.platform === 'gemini') {
       result = await accountsStore.createGeminiAccount(data)
     } else {
-      throw new Error(`不支持的平台: ${form.value.platform}`)
+      throw new Error(`${t('accountForm.unsupportedPlatform')}: ${form.value.platform}`)
     }
 
     emit('success', result)
   } catch (error) {
     // 显示详细的错误信息
-    const errorMessage = error.response?.data?.error || error.message || '账户创建失败'
+    const errorMessage = error.response?.data?.error || error.message || t('accountForm.accountCreationFailed')
     const suggestion = error.response?.data?.suggestion || ''
     const errorDetails = error.response?.data?.errorDetails || null
 
@@ -2972,16 +2972,16 @@ const createAccount = async () => {
 
     // 如果有详细的 OAuth 错误信息，也显示出来
     if (errorDetails && errorDetails.error_description) {
-      fullMessage += `\n详细信息: ${errorDetails.error_description}`
+      fullMessage += `\n${t('accountForm.detailsInfo')}: ${errorDetails.error_description}`
     } else if (errorDetails && errorDetails.error && errorDetails.error.message) {
       // 处理 OpenAI 格式的错误
-      fullMessage += `\n详细信息: ${errorDetails.error.message}`
+      fullMessage += `\n${t('accountForm.detailsInfo')}: ${errorDetails.error.message}`
     }
 
     showToast(fullMessage, 'error', '', 8000)
 
     // 在控制台打印完整的错误信息以便调试
-    console.error('账户创建失败:', {
+    console.error(t('accountForm.accountCreationFailedConsole'), {
       message: errorMessage,
       suggestion,
       errorDetails,
@@ -3000,7 +3000,7 @@ const updateAccount = async () => {
 
   // 验证账户名称
   if (!form.value.name || form.value.name.trim() === '') {
-    errors.value.name = '请填写账户名称'
+    errors.value.name = t('accountForm.pleaseEnterAccountName')
     return
   }
 
@@ -3027,10 +3027,10 @@ const updateAccount = async () => {
     if (!form.value.projectId || form.value.projectId.trim() === '') {
       // 使用自定义确认弹窗
       const confirmed = await showConfirm(
-        '项目 ID 未填写',
-        '您尚未填写项目 ID。\n\n如果您的Google账号绑定了Google Cloud或被识别为Workspace账号，需要提供项目 ID。\n如果您使用的是普通个人账号，可以继续不填写。',
-        '继续保存',
-        '返回填写'
+        t('accountForm.projectIdNotFilledTitle'),
+        t('accountForm.projectIdNotFilledMessage'),
+        t('accountForm.continueSave'),
+        t('accountForm.goBackToFill')
       )
       if (!confirmed) {
         return
@@ -3210,13 +3210,13 @@ const updateAccount = async () => {
     } else if (props.account.platform === 'gemini') {
       await accountsStore.updateGeminiAccount(props.account.id, data)
     } else {
-      throw new Error(`不支持的平台: ${props.account.platform}`)
+      throw new Error(`${t('accountForm.unsupportedPlatform')}: ${props.account.platform}`)
     }
 
     emit('success')
   } catch (error) {
     // 显示详细的错误信息
-    const errorMessage = error.response?.data?.error || error.message || '账户更新失败'
+    const errorMessage = error.response?.data?.error || error.message || t('accountForm.accountUpdateFailed')
     const suggestion = error.response?.data?.suggestion || ''
     const errorDetails = error.response?.data?.errorDetails || null
 
@@ -3228,16 +3228,16 @@ const updateAccount = async () => {
 
     // 如果有详细的 OAuth 错误信息，也显示出来
     if (errorDetails && errorDetails.error_description) {
-      fullMessage += `\n详细信息: ${errorDetails.error_description}`
+      fullMessage += `\n${t('accountForm.detailsInfo')}: ${errorDetails.error_description}`
     } else if (errorDetails && errorDetails.error && errorDetails.error.message) {
       // 处理 OpenAI 格式的错误
-      fullMessage += `\n详细信息: ${errorDetails.error.message}`
+      fullMessage += `\n${t('accountForm.detailsInfo')}: ${errorDetails.error.message}`
     }
 
     showToast(fullMessage, 'error', '', 8000)
 
     // 在控制台打印完整的错误信息以便调试
-    console.error('账户更新失败:', {
+    console.error(t('accountForm.accountUpdateFailedConsole'), {
       message: errorMessage,
       suggestion,
       errorDetails,
@@ -3475,12 +3475,12 @@ const addPresetMapping = (from, to) => {
   // 检查是否已存在相同的映射
   const exists = modelMappings.value.some((mapping) => mapping.from === from)
   if (exists) {
-    showToast(`模型 ${from} 的映射已存在`, 'info')
+    showToast(`${t('accountForm.modelMappingExistsInfo')} ${from}`, 'info')
     return
   }
 
   modelMappings.value.push({ from, to })
-  showToast(`已添加映射: ${from} → ${to}`, 'success')
+  showToast(`${t('accountForm.modelAddedMapping')}: ${from} → ${to}`, 'success')
 }
 
 // 将模型映射表转换为对象格式
@@ -3666,13 +3666,13 @@ const clearUnifiedCache = async () => {
     const response = await apiClient.post('/admin/claude-code-version/clear')
     if (response.success) {
       unifiedUserAgent.value = ''
-      showToast('统一User-Agent缓存已清除', 'success')
+      showToast(t('accountForm.cacheClearedSuccess'), 'success')
     } else {
-      showToast('清除缓存失败', 'error')
+      showToast(t('accountForm.clearCacheFailed'), 'error')
     }
   } catch (error) {
     console.error('Failed to clear unified User-Agent cache:', error)
-    showToast('清除缓存失败：' + (error.message || '未知错误'), 'error')
+    showToast(t('accountForm.clearCacheFailedWithError') + (error.message || t('accountForm.unknownError')), 'error')
   } finally {
     clearingCache.value = false
   }
@@ -3689,7 +3689,7 @@ const generateClientId = () => {
 // 重新生成客户端标识
 const regenerateClientId = () => {
   form.value.unifiedClientId = generateClientId()
-  showToast('已生成新的客户端标识', 'success')
+  showToast(t('accountForm.newClientIdGenerated'), 'success')
 }
 
 // 处理统一客户端标识复选框变化
