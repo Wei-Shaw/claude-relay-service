@@ -1706,5 +1706,139 @@ export default {
     // Claude 訂閱類型顯示
     claudeMaxDisplay: 'Claude Max',
     claudeProDisplay: 'Claude Pro'
+  },
+
+  // OAuth Flow Component
+  oauthFlow: {
+    // 平台標題
+    claudeAccountAuth: 'Claude 帳戶授權',
+    geminiAccountAuth: 'Gemini 帳戶授權',
+    openaiAccountAuth: 'OpenAI 帳戶授權',
+    
+    // 流程說明
+    claudeAuthDescription: '請按照以下步驟完成 Claude 帳戶的授權：',
+    geminiAuthDescription: '請按照以下步驟完成 Gemini 帳戶的授權：',
+    openaiAuthDescription: '請按照以下步驟完成 OpenAI 帳戶的授權：',
+    
+    // 步驟標題
+    step1Title: '點擊下方按銮產生授權連結',
+    step2Title: '在瀏覽器中打開連結並完成授權',
+    step3Title: '輸入 Authorization Code',
+    step3TitleOpenAI: '輸入授權連結或 Code',
+    
+    // 步驟描述
+    step2Description: '請在新分頁中打開授權連結，登入您的 Claude 帳戶並授權。',
+    step2DescriptionGemini: '請在新分頁中打開授權連結，登入您的 Gemini 帳戶並授權。',
+    step2DescriptionOpenAI: '請在新分頁中打開授權連結，登入您的 OpenAI 帳戶並授權。',
+    
+    step3Description: '授權完成後，頁面會顯示一個',
+    step3DescriptionMiddle: '，請將其複製並貼上到下方輸入框：',
+    step3DescriptionGemini: '授權完成後，頁面會顯示一個 Authorization Code，請將其複製並貼上到下方輸入框：',
+    step3DescriptionOpenAI: '授權完成後，當頁面地址變為',
+    step3DescriptionOpenAIMiddle: '時：',
+    
+    // 按銮文字
+    generating: '產生中...',
+    generateAuthLink: '產生授權連結',
+    regenerate: '重新產生',
+    previousStep: '上一步',
+    completeAuth: '完成授權',
+    verifying: '驗證中...',
+    
+    // 占位符
+    authCodePlaceholder: '貼上Claude頁面獲取的Authorization Code...',
+    authCodePlaceholderGemini: '貼上Gemini頁面獲取的Authorization Code...',
+    authCodePlaceholderOpenAI: '方式1：複製完整的連結（http://localhost:1455/auth/callback?code=...)\n方式2：僅複製 code 參數的值\n系統會自動識別並提取所需資訊',
+    
+    // 標籤
+    authorizationCode: 'Authorization Code',
+    authLinkOrCode: '授權連結或 Code',
+    
+    // 提示資訊
+    copyLinkTooltip: '複製連結',
+    authCodeHint: '請貼上Claude頁面複製的Authorization Code',
+    authCodeHintGemini: '請貼上Gemini頁面複製的Authorization Code',
+    
+    // 注意事項
+    proxyNotice: '注意：',
+    proxyNoticeText: '如果您設定了代理，請確保瀏覽器也使用相同的代理訪問授權頁面。',
+    
+    // OpenAI 特有提示
+    openaiImportantNote: '重要提示：',
+    openaiLoadingNote: '授權後頁面可能會加載較長時間，請耐心等待。',
+    openaiAddressNote: '當瀏覽器地址欄變為',
+    openaiAddressNoteMiddle: '開頭時，表示授權已完成。',
+    
+    openaiTip: '提示：',
+    openaiTipText: '您可以直接複製整個連結或僅複製 code 參數值，系統會自動識別。',
+    openaiLinkExample: '• 完整連結示例：',
+    openaiCodeExample: '• 僅 Code 示例：',
+    
+    // 成功和錯誤消息
+    successExtractCode: '成功提取授權碼！',
+    errorCodeNotFound: 'URL 中未找到授權碼參數，請檢查連結是否正確',
+    errorLinkFormat: '連結格式錯誤，請檢查是否為完整的 URL',
+    errorWrongUrlFormat: '請貼上以 http://localhost:1455 或 http://localhost:45462 開頭的連結',
+    linkCopied: '連結已複製',
+    authFailed: '授權失敗，請檢查授權碼是否正確',
+    generateAuthFailed: '產生授權連結失敗'
+  },
+
+  // Group Management Modal
+  groupManagement: {
+    title: '帳戶分組管理',
+    createNewGroup: '創建新分組',
+    createGroup: '創建新分組',
+    groupNameRequired: '分組名稱 *',
+    groupNamePlaceholder: '輸入分組名稱',
+    platformTypeRequired: '平台類型 *',
+    descriptionOptional: '描述 (可選)',
+    descriptionPlaceholder: '分組描述...',
+    creating: '創建中...',
+    create: '創建',
+    cancel: '取消',
+    loading: '加載中...',
+    noGroups: '暫無分組',
+    noDescription: '暫無描述',
+    membersCount: ' 個成員',
+    edit: '編輯',
+    delete: '刪除',
+    editGroup: '編輯分組',
+    platformTypeLabel: '平台類型',
+    cannotModify: '(不可修改)',
+    updating: '更新中...',
+    update: '更新',
+    // Toast messages
+    loadGroupsFailed: '加載分組列表失敗',
+    fillRequiredFields: '請填寫必填項',
+    groupCreated: '分組創建成功',
+    createGroupFailed: '創建分組失敗',
+    fillGroupName: '請填寫分組名稱',
+    groupUpdated: '分組更新成功',
+    updateGroupFailed: '更新分組失敗',
+    groupHasMembers: '分組內還有成員，無法刪除',
+    confirmDelete: '確定要刪除分組 "{name}" 嗎？',
+    groupDeleted: '分組刪除成功',
+    deleteGroupFailed: '刪除分組失敗'
+  },
+
+  // Proxy Configuration
+  proxyConfig: {
+    title: '代理設置 (可選)',
+    enableProxy: '啟用代理',
+    configDescription: '配置代理以訪問受限的網路資源。支持 SOCKS5 和 HTTP 代理。',
+    stabilityNotice: '請確保代理伺服器穩定可用，否則會影響帳戶的正常使用。',
+    proxyType: '代理類型',
+    hostAddress: '主機地址',
+    hostPlaceholder: '例如: 192.168.1.100',
+    port: '端口',
+    portPlaceholder: '例如: 1080',
+    needsAuth: '需要身份驗證',
+    username: '用戶名',
+    usernamePlaceholder: '代理用戶名',
+    password: '密碼',
+    passwordPlaceholder: '代理密碼',
+    tip: '提示：',
+    apiRequestNotice: '代理設置將用於所有與此帳戶相關的API請求。請確保代理伺服器支持HTTPS流量轉發。'
   }
 }

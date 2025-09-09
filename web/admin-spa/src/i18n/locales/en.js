@@ -1706,5 +1706,139 @@ export default {
     // Claude subscription type display
     claudeMaxDisplay: 'Claude Max',
     claudeProDisplay: 'Claude Pro'
+  },
+
+  // OAuth Flow Component
+  oauthFlow: {
+    // Platform titles
+    claudeAccountAuth: 'Claude Account Authorization',
+    geminiAccountAuth: 'Gemini Account Authorization',
+    openaiAccountAuth: 'OpenAI Account Authorization',
+    
+    // Flow descriptions
+    claudeAuthDescription: 'Please follow these steps to complete Claude account authorization:',
+    geminiAuthDescription: 'Please follow these steps to complete Gemini account authorization:',
+    openaiAuthDescription: 'Please follow these steps to complete OpenAI account authorization:',
+    
+    // Step titles
+    step1Title: 'Click the button below to generate authorization link',
+    step2Title: 'Open the link in browser and complete authorization',
+    step3Title: 'Input Authorization Code',
+    step3TitleOpenAI: 'Input authorization link or Code',
+    
+    // Step descriptions
+    step2Description: 'Please open the authorization link in a new tab, log in to your Claude account and authorize.',
+    step2DescriptionGemini: 'Please open the authorization link in a new tab, log in to your Gemini account and authorize.',
+    step2DescriptionOpenAI: 'Please open the authorization link in a new tab, log in to your OpenAI account and authorize.',
+    
+    step3Description: 'After authorization is complete, the page will display a',
+    step3DescriptionMiddle: ', please copy and paste it into the input box below:',
+    step3DescriptionGemini: 'After authorization is complete, the page will display an Authorization Code, please copy and paste it into the input box below:',
+    step3DescriptionOpenAI: 'After authorization is complete, when the page address changes to',
+    step3DescriptionOpenAIMiddle: ':',
+    
+    // Button text
+    generating: 'Generating...',
+    generateAuthLink: 'Generate Authorization Link',
+    regenerate: 'Regenerate',
+    previousStep: 'Previous Step',
+    completeAuth: 'Complete Authorization',
+    verifying: 'Verifying...',
+    
+    // Placeholders
+    authCodePlaceholder: 'Paste the Authorization Code obtained from Claude page...',
+    authCodePlaceholderGemini: 'Paste the Authorization Code obtained from Gemini page...',
+    authCodePlaceholderOpenAI: 'Method 1: Copy the complete link (http://localhost:1455/auth/callback?code=...)\nMethod 2: Copy only the code parameter value\nThe system will automatically recognize and extract the required information',
+    
+    // Labels
+    authorizationCode: 'Authorization Code',
+    authLinkOrCode: 'Authorization Link or Code',
+    
+    // Hints
+    copyLinkTooltip: 'Copy Link',
+    authCodeHint: 'Please paste the Authorization Code copied from Claude page',
+    authCodeHintGemini: 'Please paste the Authorization Code copied from Gemini page',
+    
+    // Notices
+    proxyNotice: 'Note:',
+    proxyNoticeText: 'If you have set up a proxy, please ensure the browser also uses the same proxy to access the authorization page.',
+    
+    // OpenAI specific hints
+    openaiImportantNote: 'Important Notice:',
+    openaiLoadingNote: 'The page may take a long time to load after authorization, please wait patiently.',
+    openaiAddressNote: 'When the browser address bar changes to',
+    openaiAddressNoteMiddle: 'at the beginning, it means authorization is complete.',
+    
+    openaiTip: 'Tip:',
+    openaiTipText: 'You can directly copy the entire link or just copy the code parameter value, the system will automatically recognize.',
+    openaiLinkExample: '• Complete link example:',
+    openaiCodeExample: '• Code only example:',
+    
+    // Success and error messages
+    successExtractCode: 'Successfully extracted authorization code!',
+    errorCodeNotFound: 'Authorization code parameter not found in URL, please check if the link is correct',
+    errorLinkFormat: 'Link format error, please check if it is a complete URL',
+    errorWrongUrlFormat: 'Please paste links starting with http://localhost:1455 or http://localhost:45462',
+    linkCopied: 'Link copied',
+    authFailed: 'Authorization failed, please check if the authorization code is correct',
+    generateAuthFailed: 'Failed to generate authorization link'
+  },
+
+  // Group Management Modal
+  groupManagement: {
+    title: 'Account Group Management',
+    createNewGroup: 'Create New Group',
+    createGroup: 'Create New Group',
+    groupNameRequired: 'Group Name *',
+    groupNamePlaceholder: 'Enter group name',
+    platformTypeRequired: 'Platform Type *',
+    descriptionOptional: 'Description (Optional)',
+    descriptionPlaceholder: 'Group description...',
+    creating: 'Creating...',
+    create: 'Create',
+    cancel: 'Cancel',
+    loading: 'Loading...',
+    noGroups: 'No groups',
+    noDescription: 'No description',
+    membersCount: ' members',
+    edit: 'Edit',
+    delete: 'Delete',
+    editGroup: 'Edit Group',
+    platformTypeLabel: 'Platform Type',
+    cannotModify: '(Cannot modify)',
+    updating: 'Updating...',
+    update: 'Update',
+    // Toast messages
+    loadGroupsFailed: 'Failed to load group list',
+    fillRequiredFields: 'Please fill in required fields',
+    groupCreated: 'Group created successfully',
+    createGroupFailed: 'Failed to create group',
+    fillGroupName: 'Please fill in group name',
+    groupUpdated: 'Group updated successfully',
+    updateGroupFailed: 'Failed to update group',
+    groupHasMembers: 'Group has members, cannot delete',
+    confirmDelete: 'Are you sure you want to delete group "{name}"?',
+    groupDeleted: 'Group deleted successfully',
+    deleteGroupFailed: 'Failed to delete group'
+  },
+
+  // Proxy Configuration
+  proxyConfig: {
+    title: 'Proxy Settings (Optional)',
+    enableProxy: 'Enable Proxy',
+    configDescription: 'Configure proxy to access restricted network resources. Supports SOCKS5 and HTTP proxy.',
+    stabilityNotice: 'Please ensure the proxy server is stable and available, otherwise it will affect normal account usage.',
+    proxyType: 'Proxy Type',
+    hostAddress: 'Host Address',
+    hostPlaceholder: 'e.g., 192.168.1.100',
+    port: 'Port',
+    portPlaceholder: 'e.g., 1080',
+    needsAuth: 'Requires Authentication',
+    username: 'Username',
+    usernamePlaceholder: 'Proxy username',
+    password: 'Password',
+    passwordPlaceholder: 'Proxy password',
+    tip: 'Tip:',
+    apiRequestNotice: 'Proxy settings will be used for all API requests related to this account. Please ensure the proxy server supports HTTPS traffic forwarding.'
   }
 }

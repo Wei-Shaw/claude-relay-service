@@ -1706,5 +1706,139 @@ export default {
     // Claude 订阅类型显示
     claudeMaxDisplay: 'Claude Max',
     claudeProDisplay: 'Claude Pro'
+  },
+
+  // OAuth Flow Component
+  oauthFlow: {
+    // 平台标题
+    claudeAccountAuth: 'Claude 账户授权',
+    geminiAccountAuth: 'Gemini 账户授权',
+    openaiAccountAuth: 'OpenAI 账户授权',
+    
+    // 流程说明
+    claudeAuthDescription: '请按照以下步骤完成 Claude 账户的授权：',
+    geminiAuthDescription: '请按照以下步骤完成 Gemini 账户的授权：',
+    openaiAuthDescription: '请按照以下步骤完成 OpenAI 账户的授权：',
+    
+    // 步骤标题
+    step1Title: '点击下方按钮生成授权链接',
+    step2Title: '在浏览器中打开链接并完成授权',
+    step3Title: '输入 Authorization Code',
+    step3TitleOpenAI: '输入授权链接或 Code',
+    
+    // 步骤描述
+    step2Description: '请在新标签页中打开授权链接，登录您的 Claude 账户并授权。',
+    step2DescriptionGemini: '请在新标签页中打开授权链接，登录您的 Gemini 账户并授权。',
+    step2DescriptionOpenAI: '请在新标签页中打开授权链接，登录您的 OpenAI 账户并授权。',
+    
+    step3Description: '授权完成后，页面会显示一个',
+    step3DescriptionMiddle: '，请将其复制并粘贴到下方输入框：',
+    step3DescriptionGemini: '授权完成后，页面会显示一个 Authorization Code，请将其复制并粘贴到下方输入框：',
+    step3DescriptionOpenAI: '授权完成后，当页面地址变为',
+    step3DescriptionOpenAIMiddle: '时：',
+    
+    // 按钮文本
+    generating: '生成中...',
+    generateAuthLink: '生成授权链接',
+    regenerate: '重新生成',
+    previousStep: '上一步',
+    completeAuth: '完成授权',
+    verifying: '验证中...',
+    
+    // 占位符
+    authCodePlaceholder: '粘贴从Claude页面获取的Authorization Code...',
+    authCodePlaceholderGemini: '粘贴从Gemini页面获取的Authorization Code...',
+    authCodePlaceholderOpenAI: '方式1：复制完整的链接（http://localhost:1455/auth/callback?code=...)\n方式2：仅复制 code 参数的值\n系统会自动识别并提取所需信息',
+    
+    // 标签
+    authorizationCode: 'Authorization Code',
+    authLinkOrCode: '授权链接或 Code',
+    
+    // 提示信息
+    copyLinkTooltip: '复制链接',
+    authCodeHint: '请粘贴从Claude页面复制的Authorization Code',
+    authCodeHintGemini: '请粘贴从Gemini页面复制的Authorization Code',
+    
+    // 注意事项
+    proxyNotice: '注意：',
+    proxyNoticeText: '如果您设置了代理，请确保浏览器也使用相同的代理访问授权页面。',
+    
+    // OpenAI 特有提示
+    openaiImportantNote: '重要提示：',
+    openaiLoadingNote: '授权后页面可能会加载较长时间，请耐心等待。',
+    openaiAddressNote: '当浏览器地址栏变为',
+    openaiAddressNoteMiddle: '开头时，表示授权已完成。',
+    
+    openaiTip: '提示：',
+    openaiTipText: '您可以直接复制整个链接或仅复制 code 参数值，系统会自动识别。',
+    openaiLinkExample: '• 完整链接示例：',
+    openaiCodeExample: '• 仅 Code 示例：',
+    
+    // 成功和错误消息
+    successExtractCode: '成功提取授权码！',
+    errorCodeNotFound: 'URL 中未找到授权码参数，请检查链接是否正确',
+    errorLinkFormat: '链接格式错误，请检查是否为完整的 URL',
+    errorWrongUrlFormat: '请粘贴以 http://localhost:1455 或 http://localhost:45462 开头的链接',
+    linkCopied: '链接已复制',
+    authFailed: '授权失败，请检查授权码是否正确',
+    generateAuthFailed: '生成授权链接失败'
+  },
+
+  // Group Management Modal
+  groupManagement: {
+    title: '账户分组管理',
+    createNewGroup: '创建新分组',
+    createGroup: '创建新分组',
+    groupNameRequired: '分组名称 *',
+    groupNamePlaceholder: '输入分组名称',
+    platformTypeRequired: '平台类型 *',
+    descriptionOptional: '描述 (可选)',
+    descriptionPlaceholder: '分组描述...',
+    creating: '创建中...',
+    create: '创建',
+    cancel: '取消',
+    loading: '加载中...',
+    noGroups: '暂无分组',
+    noDescription: '暂无描述',
+    membersCount: ' 个成员',
+    edit: '编辑',
+    delete: '删除',
+    editGroup: '编辑分组',
+    platformTypeLabel: '平台类型',
+    cannotModify: '(不可修改)',
+    updating: '更新中...',
+    update: '更新',
+    // Toast messages
+    loadGroupsFailed: '加载分组列表失败',
+    fillRequiredFields: '请填写必填项',
+    groupCreated: '分组创建成功',
+    createGroupFailed: '创建分组失败',
+    fillGroupName: '请填写分组名称',
+    groupUpdated: '分组更新成功',
+    updateGroupFailed: '更新分组失败',
+    groupHasMembers: '分组内还有成员，无法删除',
+    confirmDelete: '确定要删除分组 "{name}" 吗？',
+    groupDeleted: '分组删除成功',
+    deleteGroupFailed: '删除分组失败'
+  },
+
+  // Proxy Configuration
+  proxyConfig: {
+    title: '代理设置 (可选)',
+    enableProxy: '启用代理',
+    configDescription: '配置代理以访问受限的网络资源。支持 SOCKS5 和 HTTP 代理。',
+    stabilityNotice: '请确保代理服务器稳定可用，否则会影响账户的正常使用。',
+    proxyType: '代理类型',
+    hostAddress: '主机地址',
+    hostPlaceholder: '例如: 192.168.1.100',
+    port: '端口',
+    portPlaceholder: '例如: 1080',
+    needsAuth: '需要身份验证',
+    username: '用户名',
+    usernamePlaceholder: '代理用户名',
+    password: '密码',
+    passwordPlaceholder: '代理密码',
+    tip: '提示：',
+    apiRequestNotice: '代理设置将用于所有与此账户相关的API请求。请确保代理服务器支持HTTPS流量转发。'
   }
 }
