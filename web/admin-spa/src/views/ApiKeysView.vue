@@ -404,7 +404,7 @@
                         'table-row transition-all duration-150',
                         index % 2 === 0
                           ? 'bg-white dark:bg-gray-800/40'
-                          : 'dark:bg-gray-850/40 bg-gray-50/70',
+                          : 'bg-gray-50/70 dark:bg-gray-700/30',
                         'border-b-2 border-gray-200/80 dark:border-gray-700/50',
                         'hover:bg-blue-50/60 hover:shadow-sm dark:hover:bg-blue-900/20'
                       ]"
