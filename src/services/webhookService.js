@@ -249,7 +249,7 @@ class WebhookService {
    */
   async sendToTelegram(platform, type, data) {
     const text = this.formatMessageForTelegram(type, data)
-    
+
     const payload = {
       chat_id: platform.chatId,
       text,
@@ -265,7 +265,7 @@ class WebhookService {
 
     const apiUrl = platform.apiUrl || 'https://api.telegram.org'
     const url = `${apiUrl}/bot${platform.botToken}/sendMessage`
-    
+
     await this.sendHttpRequest(url, payload, platform.timeout || 10000)
   }
 
@@ -507,7 +507,7 @@ class WebhookService {
     }
 
     if (data.platforms) {
-      lines.push(`<b>涉及平台:</b> ${data.platforms.map(p => this.escapeHtml(p)).join(', ')}`)
+      lines.push(`<b>涉及平台:</b> ${data.platforms.map((p) => this.escapeHtml(p)).join(', ')}`)
     }
 
     if (data.totalAccounts) {
@@ -550,7 +550,9 @@ class WebhookService {
    * HTML实体转义
    */
   escapeHtml(text) {
-    if (typeof text !== 'string') return text
+    if (typeof text !== 'string') {
+      return text
+    }
     return text
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')

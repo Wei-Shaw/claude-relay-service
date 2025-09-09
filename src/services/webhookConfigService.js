@@ -210,7 +210,9 @@ class WebhookConfigService {
 
         // 验证Bot Token格式（通常是数字:字符串格式）
         if (!/^\d+:[A-Za-z0-9_-]+$/.test(platform.botToken)) {
-          logger.warn('⚠️ Telegram Bot Token格式可能不正确，应该类似：123456789:ABCdefGHIjklMNOpqrsTUVwxyz')
+          logger.warn(
+            '⚠️ Telegram Bot Token格式可能不正确，应该类似：123456789:ABCdefGHIjklMNOpqrsTUVwxyz'
+          )
         }
 
         // 验证Chat ID
@@ -234,10 +236,12 @@ class WebhookConfigService {
         if (platform.parseMode) {
           const validParseModes = ['HTML', 'Markdown', 'MarkdownV2']
           if (!validParseModes.includes(platform.parseMode)) {
-            throw new Error(`无效的Telegram解析模式: ${platform.parseMode}，支持的模式: ${validParseModes.join(', ')}`)
+            throw new Error(
+              `无效的Telegram解析模式: ${platform.parseMode}，支持的模式: ${validParseModes.join(', ')}`
+            )
           }
         }
-        
+
         // 验证自定义API URL（如果提供）
         if (platform.apiUrl && !this.isValidUrl(platform.apiUrl)) {
           throw new Error('Telegram API URL格式无效')

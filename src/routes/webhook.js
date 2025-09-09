@@ -192,7 +192,9 @@ router.post('/test', authenticateAdmin, async (req, res) => {
         })
       }
 
-      logger.info(`🧪 测试webhook: ${type} - Chat ID: ${typeof chatId === 'string' && chatId.startsWith('@') ? chatId : `${chatId}`.substring(0, 8)}...`)
+      logger.info(
+        `🧪 测试webhook: ${type} - Chat ID: ${typeof chatId === 'string' && chatId.startsWith('@') ? chatId : `${chatId}`.substring(0, 8)}...`
+      )
     } else {
       // 其他平台验证URL
       if (!url) {
@@ -253,14 +255,19 @@ router.post('/test', authenticateAdmin, async (req, res) => {
       } else {
         identifier = url
       }
-      
+
       logger.info(`✅ Webhook测试成功: ${identifier}`)
       res.json({
         success: true,
         message: 'Webhook测试成功',
-        url: (type === 'bark' || type === 'telegram') ? undefined : url,
+        url: type === 'bark' || type === 'telegram' ? undefined : url,
         deviceKey: type === 'bark' ? `${deviceKey.substring(0, 8)}...` : undefined,
-        chatId: type === 'telegram' ? (typeof chatId === 'string' && chatId.startsWith('@') ? chatId : `${chatId}`.substring(0, 8) + '...') : undefined
+        chatId:
+          type === 'telegram'
+            ? typeof chatId === 'string' && chatId.startsWith('@')
+              ? chatId
+              : `${`${chatId}`.substring(0, 8)}...`
+            : undefined
       })
     } else {
       let identifier
@@ -271,14 +278,19 @@ router.post('/test', authenticateAdmin, async (req, res) => {
       } else {
         identifier = url
       }
-      
+
       logger.warn(`❌ Webhook测试失败: ${identifier} - ${result.error}`)
       res.status(400).json({
         success: false,
         message: 'Webhook测试失败',
-        url: (type === 'bark' || type === 'telegram') ? undefined : url,
+        url: type === 'bark' || type === 'telegram' ? undefined : url,
         deviceKey: type === 'bark' ? `${deviceKey.substring(0, 8)}...` : undefined,
-        chatId: type === 'telegram' ? (typeof chatId === 'string' && chatId.startsWith('@') ? chatId : `${chatId}`.substring(0, 8) + '...') : undefined,
+        chatId:
+          type === 'telegram'
+            ? typeof chatId === 'string' && chatId.startsWith('@')
+              ? chatId
+              : `${`${chatId}`.substring(0, 8)}...`
+            : undefined,
         error: result.error
       })
     }
