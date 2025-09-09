@@ -772,7 +772,7 @@ class ClaudeRelayService {
 
             resolve(response)
           } catch (error) {
-            logger.error('❌ Failed to parse Claude API response:', error)
+            logger.error(`❌ Failed to parse Claude API response (Account: ${accountId}):`, error)
             reject(error)
           }
         })
@@ -785,7 +785,7 @@ class ClaudeRelayService {
 
       req.on('error', async (error) => {
         console.error(': ❌ ', error)
-        logger.error('❌ Claude API request error:', error.message, {
+        logger.error(`❌ Claude API request error (Account: ${accountId}):`, error.message, {
           code: error.code,
           errno: error.errno,
           syscall: error.syscall,
@@ -812,7 +812,7 @@ class ClaudeRelayService {
 
       req.on('timeout', async () => {
         req.destroy()
-        logger.error('❌ Claude API request timeout')
+        logger.error(`❌ Claude API request timeout (Account: ${accountId})`)
 
         await this._handleServerError(accountId, 504, null, 'Request')
 
@@ -920,7 +920,7 @@ class ClaudeRelayService {
         options
       )
     } catch (error) {
-      logger.error('❌ Claude stream relay with usage capture failed:', error)
+      logger.error(`❌ Claude stream relay with usage capture failed:`, error)
       throw error
     }
   }
@@ -1067,7 +1067,9 @@ class ClaudeRelayService {
             logger.error('❌ Error in stream error handler:', err)
           })
 
-          logger.error(`❌ Claude API returned error status: ${res.statusCode}`)
+          logger.error(
+            `❌ Claude API returned error status: ${res.statusCode} | Account: ${account?.name || accountId}`
+          )
           let errorData = ''
 
           res.on('data', (chunk) => {
@@ -1076,7 +1078,10 @@ class ClaudeRelayService {
 
           res.on('end', () => {
             console.error(': ❌ ', errorData)
-            logger.error('❌ Claude API error response:', errorData)
+            logger.error(
+              `❌ Claude API error response (Account: ${account?.name || accountId}):`,
+              errorData
+            )
             if (!responseStream.destroyed) {
               // 发送错误事件
               responseStream.write('event: error\n')
@@ -1408,11 +1413,15 @@ class ClaudeRelayService {
       })
 
       req.on('error', async (error) => {
-        logger.error('❌ Claude stream request error:', error.message, {
-          code: error.code,
-          errno: error.errno,
-          syscall: error.syscall
-        })
+        logger.error(
+          `❌ Claude stream request error (Account: ${account?.name || accountId}):`,
+          error.message,
+          {
+            code: error.code,
+            errno: error.errno,
+            syscall: error.syscall
+          }
+        )
 
         // 根据错误类型提供更具体的错误信息
         let errorMessage = 'Upstream request failed'
@@ -1456,7 +1465,7 @@ class ClaudeRelayService {
 
       req.on('timeout', async () => {
         req.destroy()
-        logger.error('❌ Claude stream request timeout')
+        logger.error(`❌ Claude stream request timeout | Account: ${account?.name || accountId}`)
 
         if (!responseStream.headersSent) {
           responseStream.writeHead(504, {
@@ -1558,7 +1567,7 @@ class ClaudeRelayService {
       })
 
       req.on('error', async (error) => {
-        logger.error('❌ Claude stream request error:', error.message, {
+        logger.error(`❌ Claude stream request error:`, error.message, {
           code: error.code,
           errno: error.errno,
           syscall: error.syscall
@@ -1606,7 +1615,7 @@ class ClaudeRelayService {
 
       req.on('timeout', async () => {
         req.destroy()
-        logger.error('❌ Claude stream request timeout')
+        logger.error(`❌ Claude stream request timeout`)
 
         if (!responseStream.headersSent) {
           responseStream.writeHead(504, {
