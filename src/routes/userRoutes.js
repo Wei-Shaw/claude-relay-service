@@ -315,7 +315,8 @@ router.post('/api-keys', authenticateUser, async (req, res) => {
       expiresAt: expiresAt || null,
       dailyCostLimit: dailyCostLimit || null,
       createdBy: 'user',
-      permissions: ['messages'] // 用户创建的API Key默认只有messages权限
+      // 设置服务权限为全部服务，确保前端显示“服务权限”为“全部服务”且具备完整访问权限
+      permissions: 'all'
     }
 
     const newApiKey = await apiKeyService.createApiKey(apiKeyData)
