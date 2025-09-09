@@ -1692,6 +1692,19 @@ export default {
     // Form descriptions
     modelSupportDesc: 'Leave empty to support all models. If models are specified, requests with models not in the list will not be scheduled to this account',
     modelTypeSelectionDesc: 'Select model types supported by this deployment',
-    userAgentDesc: 'When empty, will automatically use client User-Agent, only fill when need to fix specific UA'
+    userAgentDesc: 'When empty, will automatically use client User-Agent, only fill when need to fix specific UA',
+    
+    // Basic labels
+    apiUrlLabel: 'API URL',
+    apiUrlRequired: 'API URL *',
+    apiKeyLabel: 'API Key',
+    apiKeyRequired: 'API Key *',
+    
+    // More missing keys
+    copyLinkTooltip: 'Copy Link',
+    
+    // Claude subscription type display
+    claudeMaxDisplay: 'Claude Max',
+    claudeProDisplay: 'Claude Pro'
   }
 }
