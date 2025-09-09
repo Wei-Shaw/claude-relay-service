@@ -1479,6 +1479,155 @@ export default {
     // Usage Statistics
     usageStats: 'Usage Statistics',
     loadingUsage: 'Loading usage...',
-    usageLoadFailed: 'Failed to load usage'
+    usageLoadFailed: 'Failed to load usage',
+    
+    // Gemini Project ID Details
+    geminiProjectIdRequired: 'Google Cloud/Workspace accounts require Project ID',
+    geminiProjectIdDetail: 'Some Google accounts (especially those bound to Google Cloud) will be identified as Workspace accounts and require additional Project ID.',
+    geminiHowToGetProjectId: 'How to get Project ID:',
+    geminiVisitConsole: 'Visit',
+    geminiCopyProjectId: 'Copy Project ID (Project ID), usually in string format',
+    geminiProjectIdWarning: '⚠️ Note: Copy Project ID (Project ID), not Project Number (Project Number)!',
+    geminiPersonalAccountTip: 'Tip: If your account is a regular personal account (not bound to Google Cloud), please leave this field empty.',
+    
+    // AWS Region Reference
+    awsRegionReference: 'Common AWS regions reference:',
+    awsRegionEastUS: 'us-east-1 (US East)',
+    awsRegionWestUS: 'us-west-2 (US West)',
+    awsRegionEuropeIreland: 'eu-west-1 (Europe Ireland)',
+    awsRegionAsiaSingapore: 'ap-southeast-1 (Singapore)',
+    awsRegionAsiaTokyo: 'ap-northeast-1 (Tokyo)',
+    awsRegionEuropeFrankfurt: 'eu-central-1 (Frankfurt)',
+    awsRegionInputTip: '💡 Please enter complete region code, e.g. us-east-1',
+    
+    // Bedrock Model Description
+    bedrockModelConfigDesc: 'Bedrock model configuration description:',
+    bedrockSupportsInferenceProfile: 'Supports Inference Profile ID (recommended)',
+    bedrockSupportsARN: 'Supports Application Inference Profile ARN',
+    bedrockCommonModel: 'Common model: us.anthropic.claude-sonnet-4-20250514-v1:0',
+    bedrockEmptyUsesDefault: 'Leave empty to use system configured default model',
+    
+    // Azure OpenAI Model Selection
+    azureModelSelectionDesc: 'Select model types supported by this deployment',
+    
+    // Rate Limiting
+    rateLimitMechanism: 'Rate limiting mechanism',
+    enableRateLimitMechanism: 'Enable rate limiting mechanism',
+    rateLimitDescription2: 'When enabled, will pause scheduling for some time when account returns 429 error',
+    rateLimitDurationMinutes: 'Rate limit duration (minutes)',
+    rateLimitDefaultMinutes: 'Default 60 minutes',
+    rateLimitPauseDesc: 'Time to pause scheduling after account is rate limited (minutes)',
+    
+    // Claude Console Specific Fields
+    claudeConsoleFields: 'Claude Console specific fields',
+    quotaManagement: 'Quota management',
+    modelMappingTable: 'Model mapping table',
+    modelMappingTableOptional: 'Model mapping table (optional)',
+    addModelMapping: 'Add model mapping',
+    
+    // Claude Subscription Type
+    subscriptionType: 'Subscription type',
+    
+    // Setup Token Auth
+    setupTokenAuth: 'Setup Token authorization',
+    claudeSetupTokenAuth: 'Claude Setup Token authorization',
+    setupTokenAuthSteps: 'Please follow these steps to complete Claude account authorization through Setup Token:',
+    generateSetupTokenLink: 'Generate Setup Token auth link',
+    generating: 'Generating...',
+    
+    // Buttons and actions
+    verifying: 'Verifying...',
+    completeAuth: 'Complete authorization',
+    updating: 'Updating...',
+    update: 'Update',
+    
+    // Error messages
+    generateSetupTokenFailed: 'Failed to generate Setup Token auth link',
+    copyFailed: 'Copy failed, please copy manually',
+    setupTokenAuthFailed: 'Setup Token authorization failed, please check if the authorization code is correct',
+    accountCreationFailed: 'Account creation failed',
+    accountCreationError: 'Account creation failed:',
+    
+    // Page structure comments
+    stepIndicator: 'Step indicator',
+    step1BasicInfo: 'Step 1: Basic information and proxy settings',
+    groupSelector: 'Group selector',
+    multiSelectGroup: 'Multi-select group interface',
+    newGroupOption: 'New group option',
+    geminiProjectId: 'Gemini project ID field',
+    bedrockFields: 'Bedrock specific fields',
+    azureOpenAIFields: 'Azure OpenAI specific fields',
+    
+    // Validation messages
+    nameRequired: 'Please enter account name',
+    apiUrlRequired: 'Please enter API URL',
+    rateLimitDefault60: 'Default 60 minutes',
+    rateLimitPauseDescription: 'Time to pause scheduling after account is rate limited (minutes)',
+    apiUrlPlaceholder: 'e.g., https://api.example.com',
+    apiKeyPlaceholder: 'Please enter API Key',
+    dailyQuotaLimit: 'Daily quota limit ($)',
+    quotaZeroUnlimited: '0 means unlimited',
+    dailyQuotaDescription: 'Set daily usage quota, 0 means unlimited',
+    quotaResetTime: 'Quota reset time',
+    quotaResetTimeDescription: 'Time to automatically reset quota daily',
+    modelMappingDescription: 'Leave empty to support all models without modifying requests. After configuring mapping, left model will be recognized as supported model, right is the actual model sent.',
+    
+    // Quota Management
+    quotaManagementFields: 'Quota management fields',
+    dailyQuotaLimitDollar: 'Daily quota limit ($)',
+    quotaZeroUnlimited: '0 means unlimited',
+    dailyQuotaDesc: 'Set daily usage quota, 0 means unlimited',
+    quotaResetTime: 'Quota reset time',
+    quotaResetTimeDesc: 'Time to automatically reset quota daily',
+    
+    // Model Mapping
+    modelMappingOptional: 'Model mapping table (optional)',
+    modelMappingDesc: 'Leave empty to support all models without modifying requests. After configuring mapping, left model will be recognized as supported model, right is the actual model sent.',
+    originalModelName: 'Original model name',
+    mappedModelName: 'Mapped model name',
+    addModelMappingBtn: 'Add model mapping',
+    customUserAgentOptional: 'Custom User-Agent (optional)',
+    customUserAgentDesc: 'When empty, will automatically use client User-Agent, only fill when need to fix specific UA',
+    userAgentPassthrough: 'Leave empty to pass through client User-Agent',
+    
+    // Claude Subscription Type
+    claudeSubscriptionType: 'Subscription type',
+    claudeProLimitation: 'Pro accounts do not support Claude Opus 4 model',
+    
+    // Claude Advanced Options
+    claudeAutoStopScheduling: 'Auto-stop scheduling when approaching 5-hour limit',
+    claudeAutoStopDesc: 'When system detects account approaching 5-hour usage limit, automatically pause scheduling for this account. Will resume automatically when entering new time window.',
+    claudeUseUnifiedUA: 'Use unified Claude Code version',
+    claudeUnifiedUADesc: 'When enabled, will use unified User-Agent captured from real Claude Code client, improving compatibility',
+    claudeCurrentUnifiedVersion: '💡 Current unified version:',
+    claudeWaitingCapture: '⏳ Waiting to capture User-Agent from Claude Code client',
+    claudeCaptureHint: '💡 Hint: If unable to capture for long time, please confirm Claude Code client is using this account, or contact developer to check if User-Agent format has changed',
+    claudeUseUnifiedClientId: 'Use unified client identifier',
+    claudeUnifiedClientIdDesc: 'When enabled, will use fixed client identifier, making all requests appear to come from same client, reducing characteristics',
+    claudeClientIdLabel: 'Client identifier ID',
+    claudeClientIdDesc: 'This ID will replace user_id client part in requests, preserving session part for sticky sessions',
+    
+    // Setup Token Process
+    setupTokenAuthProcess: 'Claude Setup Token Authorization',
+    setupTokenProcessDesc: 'Please follow these steps to complete Claude account authorization through Setup Token:',
+    setupTokenStepOneTitle: 'Step 1: Generate authorization link',
+    setupTokenStepOneDesc: 'Click button below to generate authorization link',
+    setupTokenGenerating: 'Generating...',
+    setupTokenGenerateBtn: 'Generate Setup Token authorization link',
+    setupTokenCopyTitle: 'Copy link',
+    
+    // Step Indicators
+    stepIndicator: 'Step indicator',
+    step1BasicInfo: 'Step 1: Basic information and proxy settings',
+    step2OAuth: 'Step 2: OAuth authorization',
+    step2SetupToken: 'Step 2: Setup Token authorization',
+    
+    // Group Selector
+    groupSelector: 'Group selector',
+    multiGroupInterface: 'Multi-group interface',
+    createNewGroupOption: 'Create new group option',
+    
+    // Manual Token Input Tips
+    credentialsFromFile: 'credentials from file.'
   }
 }
