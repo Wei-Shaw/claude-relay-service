@@ -1628,6 +1628,70 @@ export default {
     createNewGroupOption: 'Create new group option',
     
     // Manual Token Input Tips
-    credentialsFromFile: 'credentials from file.'
+    credentialsFromFile: 'credentials from file.',
+    
+    // Placeholder texts
+    originalModelNamePlaceholder: 'Original model name',
+    mappedModelNamePlaceholder: 'Mapped model name',
+    userAgentPlaceholder: 'Leave empty to pass through client User-Agent',
+    authCodePlaceholder: 'Paste Authorization Code obtained from Claude Code auth page...',
+    leaveEmptyNoUpdate: 'Leave empty for no update',
+    leaveEmptyNoUpdateKey: 'Leave empty for no API Key update',
+    leaveEmptyNoUpdateToken: 'Leave empty for no update...',
+    
+    // Labels and descriptions
+    customUserAgentOptional: 'Custom User-Agent (optional)',
+    clientIdLabel: 'Client ID',
+    schedulePriorityLabel: 'Schedule Priority (1-100)',
+    attentionLabel: 'Attention:',
+    supportedModelsLabel: 'Supported Models',
+    newAccessTokenLabel: 'New Access Token',
+    newRefreshTokenLabel: 'New Refresh Token',
+    updateTokenLabel: 'Update Token',
+    
+    // Button texts
+    regenerateBtn: 'Regenerate',
+    previousStepBtn: 'Previous Step',
+    
+    // Descriptive texts
+    claudeProLimitation: 'Pro accounts do not support Claude Opus 4 model',
+    claude5HourLimitDesc: 'Auto-stop scheduling when approaching 5-hour usage limit',
+    claude5HourLimitExplanation: 'When system detects account approaching 5-hour usage limit, automatically pause scheduling for this account. Will resume automatically when entering new time window.',
+    useUnifiedClaudeVersion: 'Use unified Claude Code version',
+    unifiedVersionDesc: 'When enabled, will use unified User-Agent captured from real Claude Code client, improving compatibility',
+    currentUnifiedVersion: '💡 Current unified version:',
+    waitingUserAgent: '⏳ Waiting to capture User-Agent from Claude Code client',
+    userAgentTip: '💡 Tip: If unable to capture for a long time, please confirm that Claude Code client is using this account,',
+    contactDeveloper: 'or contact developer to check if User-Agent format has changed',
+    useUnifiedClientId: 'Use unified client identifier',
+    unifiedClientIdDesc: 'When enabled, will use fixed client identifier, making all requests appear from same client, reducing fingerprinting',
+    clientIdReplaceDesc: 'This ID will replace the user_id client part in requests, retaining session part for sticky sessions',
+    
+    // OAuth step texts
+    step1GenerateAuthLink: 'Step 1: Generate Authorization Link',
+    clickButtonGenerate: 'Click button below to generate authorization link',
+    copyLinkTitle: 'Copy Link',
+    step2AccessAndAuth: 'Step 2: Access Link and Authorize',
+    openInBrowser: 'Open link in browser and complete authorization',
+    browserAuthDesc: 'Please open the authorization link in a new tab, login to your Claude account and authorize Claude Code.',
+    proxyNotice: 'If you have set up a proxy, please ensure your browser also uses the same proxy to access the authorization page.',
+    step3InputAuthCode: 'Step 3: Input Authorization Code',
+    inputAuthCodeTitle: 'Input Authorization Code',
+    authCompleteDesc: 'After authorization is complete, copy Authorization Code from the return page and paste it into the input box below:',
+    pasteAuthCodeDesc: 'Please paste the Authorization Code copied from Claude Code authorization page',
+    
+    // AWS region reference
+    awsRegionRef: 'Common AWS regions reference:',
+    
+    // Error messages
+    apiKeyRequired: 'Please enter API Key',
+    refreshTokenRequired: 'Please enter Refresh Token',
+    accessTokenRequired: 'Please enter Access Token',
+    copyFailedManual: 'Copy failed, please copy manually',
+    
+    // Form descriptions
+    modelSupportDesc: 'Leave empty to support all models. If models are specified, requests with models not in the list will not be scheduled to this account',
+    modelTypeSelectionDesc: 'Select model types supported by this deployment',
+    userAgentDesc: 'When empty, will automatically use client User-Agent, only fill when need to fix specific UA'
   }
 }

@@ -1628,6 +1628,70 @@ export default {
     createNewGroupOption: '新建群組選項',
     
     // 手動輸入Token提示
-    credentialsFromFile: '檔案中的憑證。'
+    credentialsFromFile: '檔案中的憑證。',
+    
+    // Placeholder 文字
+    originalModelNamePlaceholder: '原始模型名稱',
+    mappedModelNamePlaceholder: '映射後的模型名稱',
+    userAgentPlaceholder: '留空則透傳用戶端 User-Agent',
+    authCodePlaceholder: '貼上Claude Code授權頁面獲取的Authorization Code...',
+    leaveEmptyNoUpdate: '留空表示不更新',
+    leaveEmptyNoUpdateKey: '留空表示不更新 API Key',
+    leaveEmptyNoUpdateToken: '留空表示不更新...',
+    
+    // 標籤和描述
+    customUserAgentOptional: '自定義 User-Agent (可選)',
+    clientIdLabel: '用戶端標識 ID',
+    schedulePriorityLabel: '調度優先級 (1-100)',
+    attentionLabel: '注意：',
+    supportedModelsLabel: '支援的模型',
+    newAccessTokenLabel: '新的 Access Token',
+    newRefreshTokenLabel: '新的 Refresh Token',
+    updateTokenLabel: '更新 Token',
+    
+    // 按鈕文字
+    regenerateBtn: '重新產生',
+    previousStepBtn: '上一步',
+    
+    // 描述性文字
+    claudeProLimitation: 'Pro 帳戶不支援 Claude Opus 4 模型',
+    claude5HourLimitDesc: '5小時使用量接近限制時自動停止調度',
+    claude5HourLimitExplanation: '當系統檢測到帳戶接近5小時使用限制時，自動暫停調度該帳戶。進入新的時間視窗後會自動恢復調度。',
+    useUnifiedClaudeVersion: '使用統一 Claude Code 版本',
+    unifiedVersionDesc: '開啟後將使用從真實 Claude Code 用戶端捕獲的統一 User-Agent，提高相容性',
+    currentUnifiedVersion: '💡 目前統一版本：',
+    waitingUserAgent: '⏳ 等待從 Claude Code 用戶端捕獲 User-Agent',
+    userAgentTip: '💡 提示：如果長時間未能捕獲，請確認有 Claude Code 用戶端正在使用此帳戶，',
+    contactDeveloper: '或聯繫開發者檢查 User-Agent 格式是否發生變化',
+    useUnifiedClientId: '使用統一的用戶端標識',
+    unifiedClientIdDesc: '開啟後將使用固定的用戶端標識，使所有請求看起來來自同一個用戶端，減少特徵',
+    clientIdReplaceDesc: '此ID將替換請求中的user_id用戶端部分，保留session部分用於黏性工作階段',
+    
+    // OAuth 步驟文字
+    step1GenerateAuthLink: '步驟1: 產生授權連結',
+    clickButtonGenerate: '點擊下方按鈕產生授權連結',
+    copyLinkTitle: '複製連結',
+    step2AccessAndAuth: '步驟2: 訪問連結並授權',
+    openInBrowser: '在瀏覽器中開啟連結並完成授權',
+    browserAuthDesc: '請在新分頁中開啟授權連結，登錄您的 Claude 帳戶並授權 Claude Code。',
+    proxyNotice: '如果您設定了代理，請確保瀏覽器也使用相同的代理訪問授權頁面。',
+    step3InputAuthCode: '步驟3: 輸入授權碼',
+    inputAuthCodeTitle: '輸入 Authorization Code',
+    authCompleteDesc: '授權完成後，從返回頁面複製 Authorization Code，並貼上到下方輸入框：',
+    pasteAuthCodeDesc: '請貼上從 Claude Code 授權頁面複製的 Authorization Code',
+    
+    // AWS 區域參考
+    awsRegionRef: '常用 AWS 區域參考：',
+    
+    // 錯誤訊息
+    apiKeyRequired: '請填寫 API Key',
+    refreshTokenRequired: '請填寫 Refresh Token',
+    accessTokenRequired: '請填寫 Access Token',
+    copyFailedManual: '複製失敗，請手動複製',
+    
+    // 表單描述
+    modelSupportDesc: '留空表示支援所有模型。如果指定模型，請求中的模型不在列表內將不會調度到此帳戶',
+    modelTypeSelectionDesc: '選擇此部署支援的模型類型',
+    userAgentDesc: '留空時將自動使用用戶端的 User-Agent，僅在需要固定特定 UA 時填寫'
   }
 }
