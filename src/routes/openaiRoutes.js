@@ -2,31 +2,13 @@ const express = require('express')
 const axios = require('axios')
 const router = express.Router()
 const logger = require('../utils/logger')
+const config = require('../../config/config')
 const { authenticateApiKey } = require('../middleware/auth')
 const unifiedOpenAIScheduler = require('../services/unifiedOpenAIScheduler')
 const openaiAccountService = require('../services/openaiAccountService')
 const apiKeyService = require('../services/apiKeyService')
 const crypto = require('crypto')
 const ProxyHelper = require('../utils/proxyHelper')
-const redis = require('../models/redis') // 新增：用于GPT-5 High费用记录
-
-// 🔥 计算GPT-5 High推理级别的额外费用
-function calculateGPT5HighCost(usageData) {
-  if (!usageData) return 0
-
-  // GPT-5 High推理级别费用（示例费率，实际需要根据OpenAI官方定价调整）
-  const inputTokens = usageData.prompt_tokens || 0
-  const outputTokens = usageData.completion_tokens || 0
-
-  // High推理级别的额外费用（美元）
-  const inputCostPerToken = 0.00002 // $0.02 per 1K tokens for input
-  const outputCostPerToken = 0.0001 // $0.10 per 1K tokens for output
-
-  const inputCost = (inputTokens / 1000) * inputCostPerToken
-  const outputCost = (outputTokens / 1000) * outputCostPerToken
-
-  return inputCost + outputCost
-}
 
 // 创建代理 Agent（使用统一的代理工具）
 function createProxyAgent(proxy) {
@@ -122,103 +104,7 @@ const handleResponses = async (req, res) => {
       null
 
     // 从请求体中提取模型和流式标志
-    const originalModel = req.body?.model || null // 保存原始模型名称用于限制检查
-    let requestedModel = originalModel
-
-    // 🔍 详细分析 Codex CLI 请求格式（用于推理级别识别）
-    logger.info(`🔍 Codex CLI request analysis:`, {
-      model: req.body?.model,
-      temperature: req.body?.temperature,
-      max_tokens: req.body?.max_tokens,
-      reasoning_effort: req.body?.reasoning_effort,
-      model_reasoning_effort: req.body?.model_reasoning_effort,
-      stream: req.body?.stream,
-      allHeaders: Object.keys(req.headers),
-      allBodyKeys: Object.keys(req.body || {})
-    })
-
-    // 🎯 尝试从请求中识别推理级别
-    let effectiveModel = originalModel
-
-    // 检查所有可能的推理级别字段
-    const reasoningEffort =
-      req.body?.reasoning_effort ||
-      req.body?.model_reasoning_effort ||
-      req.headers['reasoning-effort']
-
-    // 🔥 检查 reasoning 字段（可能包含推理级别信息）
-    const reasoningField = req.body?.reasoning
-
-    logger.info(`🔥 Detailed reasoning analysis:`, {
-      reasoningField,
-      reasoningEffort,
-      reasoningType: typeof reasoningField
-    })
-
-    // 如果是 GPT-5，尝试从各种字段中提取推理级别
-    if (originalModel === 'gpt-5') {
-      let detectedLevel = null
-
-      // 方法1: 直接从 reasoning_effort 获取
-      if (reasoningEffort) {
-        detectedLevel = reasoningEffort
-      }
-      // 方法2: 从 reasoning 字段分析（可能是对象或字符串）
-      else if (reasoningField) {
-        if (typeof reasoningField === 'string') {
-          // 如果是字符串，查找级别关键词
-          if (reasoningField.includes('high') || reasoningField.includes('maximum')) {
-            detectedLevel = 'high'
-          } else if (reasoningField.includes('medium') || reasoningField.includes('balanced')) {
-            detectedLevel = 'medium'
-          } else if (reasoningField.includes('low') || reasoningField.includes('fast')) {
-            detectedLevel = 'low'
-          } else if (reasoningField.includes('minimal') || reasoningField.includes('quick')) {
-            detectedLevel = 'minimal'
-          }
-        } else if (typeof reasoningField === 'object') {
-          // 检查 effort 字段 (Codex CLI 使用这种格式)
-          if (reasoningField.effort) {
-            detectedLevel = reasoningField.effort
-          } else if (reasoningField.level) {
-            detectedLevel = reasoningField.level
-          }
-        }
-      }
-
-      if (detectedLevel) {
-        effectiveModel = `gpt-5 ${detectedLevel}`
-        logger.info(
-          `🎯 Detected GPT-5 with reasoning level: ${detectedLevel} → Effective model for restriction: ${effectiveModel}`
-        )
-      }
-    }
-
-    // 🚀 检查模型限制（使用有效模型名称）
-    if (
-      apiKeyData.enableModelRestriction &&
-      apiKeyData.restrictedModels &&
-      apiKeyData.restrictedModels.length > 0
-    ) {
-      logger.info(
-        `🔒 OpenAI Model restriction check - Original: ${originalModel}, Effective: ${effectiveModel}, Restricted: ${JSON.stringify(apiKeyData.restrictedModels)}`
-      )
-
-      if (effectiveModel && apiKeyData.restrictedModels.includes(effectiveModel)) {
-        logger.warn(
-          `🚫 OpenAI Model restriction violation for key ${apiKeyData.name}: Attempted to use restricted model ${effectiveModel}`
-        )
-        return res.status(403).json({
-          error: {
-            type: 'forbidden',
-            message: '暂无该模型访问权限',
-            code: 'model_restricted'
-          }
-        })
-      }
-    }
-
-    // 如果通过限制检查，再进行模型规范化
+    let requestedModel = req.body?.model || null
 
     // 如果模型是 gpt-5 开头且后面还有内容（如 gpt-5-2025-08-07），则覆盖为 gpt-5
     if (requestedModel && requestedModel.startsWith('gpt-5-') && requestedModel !== 'gpt-5') {
@@ -294,7 +180,7 @@ const handleResponses = async (req, res) => {
     // 配置请求选项
     const axiosConfig = {
       headers,
-      timeout: 60 * 1000 * 10,
+      timeout: config.requestTimeout || 600000,
       validateStatus: () => true
     }
 
@@ -482,61 +368,6 @@ const handleResponses = async (req, res) => {
           logger.info(
             `📊 Recorded OpenAI non-stream usage - Input: ${inputTokens}, Output: ${outputTokens}, Total: ${usageData.total_tokens || inputTokens + outputTokens}, Model: ${actualModel}`
           )
-
-          // 🔥 安全记录 GPT-5 High 推理级别费用（非流式响应）
-          try {
-            if (actualModel && String(actualModel).toLowerCase().includes('gpt-5')) {
-              // 安全提取推理级别
-              const originalRequestBody = req.body || {}
-              let detectedLevel = 'medium' // 安全默认值
-
-              try {
-                detectedLevel =
-                  originalRequestBody.reasoning_effort ||
-                  originalRequestBody.model_reasoning_effort ||
-                  'medium'
-
-                // 检查 reasoning 字段
-                const reasoningField = originalRequestBody.reasoning
-                if (reasoningField) {
-                  if (typeof reasoningField === 'string') {
-                    if (reasoningField.includes('high') || reasoningField.includes('maximum')) {
-                      detectedLevel = 'high'
-                    }
-                  } else if (typeof reasoningField === 'object' && reasoningField.effort) {
-                    detectedLevel = reasoningField.effort
-                  }
-                }
-              } catch (levelError) {
-                logger.debug(
-                  'Error extracting reasoning level for cost recording (non-stream):',
-                  levelError
-                )
-              }
-
-              // 如果是 High 级别，记录额外的费用
-              if (String(detectedLevel).toLowerCase() === 'high') {
-                const gpt5HighCost = calculateGPT5HighCost(usageData)
-
-                if (gpt5HighCost > 0) {
-                  // 记录GPT-5 High专门的费用统计（用于周限制）
-                  await redis.incrementWeeklyGPT5HighCost(apiKeyData.id, gpt5HighCost)
-                  logger.info(
-                    `💰 Recorded GPT-5 High weekly cost (non-stream): $${gpt5HighCost.toFixed(4)} for key ${apiKeyData.id} (${apiKeyData.name})`
-                  )
-
-                  // 🔧 关键修复：同时记录到常规费用统计中
-                  await redis.incrementDailyCost(apiKeyData.id, gpt5HighCost)
-                  logger.info(
-                    `💰 Recorded GPT-5 High to daily cost (non-stream): $${gpt5HighCost.toFixed(4)} for key ${apiKeyData.id} (${apiKeyData.name})`
-                  )
-                }
-              }
-            }
-          } catch (gpt5CostError) {
-            logger.warn('Error in GPT-5 High cost recording (non-stream):', gpt5CostError)
-            // 不影响主流程
-          }
         }
 
         // 返回响应
@@ -656,58 +487,6 @@ const handleResponses = async (req, res) => {
           logger.info(
             `📊 Recorded OpenAI usage - Input: ${inputTokens}, Output: ${outputTokens}, Total: ${usageData.total_tokens || inputTokens + outputTokens}, Model: ${modelToRecord} (actual: ${actualModel}, requested: ${requestedModel})`
           )
-
-          // 🔥 安全记录 GPT-5 High 推理级别费用
-          try {
-            if (actualModel && String(actualModel).toLowerCase().includes('gpt-5')) {
-              // 安全提取推理级别
-              const originalRequestBody = req.body || {}
-              let detectedLevel = 'medium' // 安全默认值
-
-              try {
-                detectedLevel =
-                  originalRequestBody.reasoning_effort ||
-                  originalRequestBody.model_reasoning_effort ||
-                  'medium'
-
-                // 检查 reasoning 字段
-                const reasoningField = originalRequestBody.reasoning
-                if (reasoningField) {
-                  if (typeof reasoningField === 'string') {
-                    if (reasoningField.includes('high') || reasoningField.includes('maximum')) {
-                      detectedLevel = 'high'
-                    }
-                  } else if (typeof reasoningField === 'object' && reasoningField.effort) {
-                    detectedLevel = reasoningField.effort
-                  }
-                }
-              } catch (levelError) {
-                logger.debug('Error extracting reasoning level for cost recording:', levelError)
-              }
-
-              // 如果是 High 级别，记录额外的费用
-              if (String(detectedLevel).toLowerCase() === 'high') {
-                const gpt5HighCost = calculateGPT5HighCost(usageData)
-
-                if (gpt5HighCost > 0) {
-                  // 记录GPT-5 High专门的费用统计（用于周限制）
-                  await redis.incrementWeeklyGPT5HighCost(apiKeyData.id, gpt5HighCost)
-                  logger.info(
-                    `💰 Recorded GPT-5 High weekly cost: $${gpt5HighCost.toFixed(4)} for key ${apiKeyData.id} (${apiKeyData.name})`
-                  )
-
-                  // 🔧 关键修复：同时记录到常规费用统计中
-                  await redis.incrementDailyCost(apiKeyData.id, gpt5HighCost)
-                  logger.info(
-                    `💰 Recorded GPT-5 High to daily cost: $${gpt5HighCost.toFixed(4)} for key ${apiKeyData.id} (${apiKeyData.name})`
-                  )
-                }
-              }
-            }
-          } catch (gpt5CostError) {
-            logger.warn('Error in GPT-5 High cost recording:', gpt5CostError)
-            // 不影响主流程
-          }
           usageReported = true
         } catch (error) {
           logger.error('Failed to record OpenAI usage:', error)

@@ -110,68 +110,24 @@
               class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-2 sm:text-sm"
               >名称 <span class="text-red-500">*</span></label
             >
-            <input
-              v-model="form.name"
-              class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-              :class="{ 'border-red-500': errors.name }"
-              :placeholder="
-                form.createType === 'batch'
-                  ? '输入基础名称（将自动添加序号）'
-                  : '为您的 API Key 取一个名称'
-              "
-              required
-              type="text"
-              @input="errors.name = ''"
-            />
+            <div>
+              <input
+                v-model="form.name"
+                class="form-input flex-1 border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                :class="{ 'border-red-500': errors.name }"
+                :placeholder="
+                  form.createType === 'batch'
+                    ? '输入基础名称（将自动添加序号）'
+                    : '为您的 API Key 取一个名称'
+                "
+                required
+                type="text"
+                @input="errors.name = ''"
+              />
+            </div>
             <p v-if="errors.name" class="mt-1 text-xs text-red-500 dark:text-red-400">
               {{ errors.name }}
             </p>
-          </div>
-
-          <!-- 图标上传 -->
-          <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
-              图标 (可选)
-            </label>
-            <div class="space-y-3">
-              <!-- 当前图标预览 -->
-              <div v-if="form.icon" class="flex items-center gap-3">
-                <div
-                  class="h-12 w-12 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-600"
-                >
-                  <img alt="API Key图标" class="h-full w-full object-cover" :src="form.icon" />
-                </div>
-                <button
-                  class="text-sm text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                  type="button"
-                  @click="form.icon = ''"
-                >
-                  移除图标
-                </button>
-              </div>
-
-              <!-- 图标上传按钮 -->
-              <div class="flex items-center gap-3">
-                <input
-                  ref="iconInput"
-                  accept="image/*"
-                  class="hidden"
-                  type="file"
-                  @change="handleIconUpload"
-                />
-                <button
-                  class="flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-                  type="button"
-                  @click="$refs.iconInput.click()"
-                >
-                  <i class="fas fa-upload" />
-                  选择图标
-                </button>
-                <p class="text-xs text-gray-500 dark:text-gray-400">
-                  支持 PNG、JPG 格式，建议尺寸 64x64px
-                </p>
-              </div>
-            </div>
           </div>
 
           <!-- 标签 -->
@@ -424,56 +380,6 @@
               />
               <p class="text-xs text-gray-500 dark:text-gray-400">
                 设置 Opus 模型的周费用限制（周一到周日），仅限 Claude 官方账户，0 或留空表示无限制
-              </p>
-            </div>
-          </div>
-
-          <!-- GPT-5 High推理级别周费用限制 -->
-          <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >GPT-5 High推理级别周费用限制 (美元)</label
-            >
-            <div class="space-y-2">
-              <div class="flex gap-2">
-                <button
-                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                  type="button"
-                  @click="form.weeklyGPT5HighCostLimit = '5'"
-                >
-                  $5
-                </button>
-                <button
-                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                  type="button"
-                  @click="form.weeklyGPT5HighCostLimit = '20'"
-                >
-                  $20
-                </button>
-                <button
-                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                  type="button"
-                  @click="form.weeklyGPT5HighCostLimit = '50'"
-                >
-                  $50
-                </button>
-                <button
-                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                  type="button"
-                  @click="form.weeklyGPT5HighCostLimit = ''"
-                >
-                  自定义
-                </button>
-              </div>
-              <input
-                v-model="form.weeklyGPT5HighCostLimit"
-                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                min="0"
-                placeholder="0 表示无限制"
-                step="0.01"
-                type="number"
-              />
-              <p class="text-xs text-gray-500 dark:text-gray-400">
-                设置 GPT-5 High推理级别的周费用限制（周一到周日），0 或留空表示无限制
               </p>
             </div>
           </div>
@@ -898,7 +804,6 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
 import { showToast } from '@/utils/toast'
 import { useClientsStore } from '@/stores/clients'
 import { useApiKeysStore } from '@/stores/apiKeys'
@@ -957,7 +862,6 @@ const form = reactive({
   concurrencyLimit: '',
   dailyCostLimit: '',
   weeklyOpusCostLimit: '',
-  weeklyGPT5HighCostLimit: '', // 新增：GPT-5 High推理级别周费用限制
   expireDuration: '',
   customExpireDate: '',
   expiresAt: null,
@@ -973,8 +877,7 @@ const form = reactive({
   modelInput: '',
   enableClientRestriction: false,
   allowedClients: [],
-  tags: [],
-  icon: '' // 新增：图标（base64编码）
+  tags: []
 })
 
 // 加载支持的客户端和已存在的标签
@@ -994,35 +897,6 @@ onMounted(async () => {
     }
   }
 })
-
-// 处理图标上传
-const handleIconUpload = (event) => {
-  const file = event.target.files?.[0]
-  if (!file) return
-
-  // 检查文件类型
-  if (!file.type.startsWith('image/')) {
-    ElMessage.error('请选择图片文件')
-    return
-  }
-
-  // 检查文件大小 (限制为 2MB)
-  if (file.size > 2 * 1024 * 1024) {
-    ElMessage.error('图片大小不能超过 2MB')
-    return
-  }
-
-  // 读取文件并转换为 base64
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    form.icon = e.target.result
-    ElMessage.success('图标上传成功')
-  }
-  reader.onerror = () => {
-    ElMessage.error('图标上传失败')
-  }
-  reader.readAsDataURL(file)
-}
 
 // 刷新账号列表
 const refreshAccounts = async () => {
@@ -1178,22 +1052,7 @@ const removeRestrictedModel = (index) => {
 }
 
 // 常用模型列表
-const commonModels = ref([
-  // Claude 模型
-  'claude-opus-4-20250514',
-  'claude-opus-4-1-20250805',
-  // OpenAI 模型
-  'gpt-5',
-  'gpt-5 minimal',
-  'gpt-5 low',
-  'gpt-5 medium',
-  'gpt-5 high',
-  'gpt-4o',
-  'gpt-4o-mini',
-  'o1',
-  'o1-mini',
-  'o1-preview'
-])
+const commonModels = ref(['claude-opus-4-20250514', 'claude-opus-4-1-20250805'])
 
 // 可用的快捷模型（过滤掉已在限制列表中的）
 const availableQuickModels = computed(() => {
@@ -1296,11 +1155,6 @@ const createApiKey = async () => {
         form.weeklyOpusCostLimit !== '' && form.weeklyOpusCostLimit !== null
           ? parseFloat(form.weeklyOpusCostLimit)
           : 0,
-      // 新增：GPT-5 High推理级别周费用限制
-      weeklyGPT5HighCostLimit:
-        form.weeklyGPT5HighCostLimit !== '' && form.weeklyGPT5HighCostLimit !== null
-          ? parseFloat(form.weeklyGPT5HighCostLimit)
-          : 0,
       expiresAt: form.expirationMode === 'fixed' ? form.expiresAt || undefined : undefined,
       expirationMode: form.expirationMode,
       activationDays: form.expirationMode === 'activation' ? form.activationDays : undefined,
@@ -1309,8 +1163,7 @@ const createApiKey = async () => {
       enableModelRestriction: form.enableModelRestriction,
       restrictedModels: form.restrictedModels,
       enableClientRestriction: form.enableClientRestriction,
-      allowedClients: form.allowedClients,
-      icon: form.icon || undefined // 新增：图标
+      allowedClients: form.allowedClients
     }
 
     // 处理Claude账户绑定（区分OAuth和Console）
