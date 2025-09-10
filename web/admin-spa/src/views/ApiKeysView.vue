@@ -403,8 +403,8 @@
                       :class="[
                         'table-row transition-all duration-150',
                         index % 2 === 0
-                          ? 'bg-white dark:bg-gray-800/40'
-                          : 'dark:bg-gray-850/40 bg-gray-50/70',
+                          ? 'bg-white dark:bg-gray-800/30'
+                          : 'bg-gray-50/70 dark:bg-gray-800/50',
                         'border-b-2 border-gray-200/80 dark:border-gray-700/50',
                         'hover:bg-blue-50/60 hover:shadow-sm dark:hover:bg-blue-900/20'
                       ]"
@@ -432,7 +432,7 @@
                           <!-- 显示所有者信息 -->
                           <div
                             v-if="isLdapEnabled && key.ownerDisplayName"
-                            class="mt-1 text-xs text-red-600"
+                            class="mt-1 text-xs text-red-600 dark:text-red-400"
                           >
                             <i class="fas fa-user mr-1" />
                             {{ key.ownerDisplayName }}
@@ -521,7 +521,7 @@
                           </span>
                           <span
                             v-if="!key.tags || key.tags.length === 0"
-                            class="text-xs text-gray-400"
+                            class="text-xs text-gray-400 dark:text-gray-500"
                             >无标签</span
                           >
                         </div>
@@ -555,7 +555,7 @@
                       </td>
                       <!-- 限制 -->
                       <td class="px-2 py-2" style="font-size: 12px">
-                        <div class="flex flex-col gap-2">
+                        <div class="flex flex-col gap-1">
                           <!-- 每日费用限制进度条 -->
                           <LimitProgressBar
                             v-if="key.dailyCostLimit > 0"
@@ -572,6 +572,15 @@
                             label="Opus"
                             :limit="key.weeklyOpusCostLimit"
                             type="opus"
+                          />
+
+                          <!-- GPT-5 High 周费用限制进度条 -->
+                          <LimitProgressBar
+                            v-if="key.weeklyGPT5HighCostLimit > 0"
+                            :current="key.weeklyGPT5HighCost || 0"
+                            label="GPT-5H"
+                            :limit="key.weeklyGPT5HighCostLimit"
+                            type="gpt5-high"
                           />
 
                           <!-- 时间窗口限制进度条 -->
@@ -592,16 +601,17 @@
                             v-if="
                               !key.dailyCostLimit &&
                               !key.weeklyOpusCostLimit &&
+                              !key.weeklyGPT5HighCostLimit &&
                               !key.rateLimitWindow
                             "
-                            class="dark:to-gray-750 relative h-7 w-full overflow-hidden rounded-md border border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 dark:border-gray-700 dark:from-gray-800"
+                            class="text-center"
                           >
-                            <div class="flex h-full items-center justify-center gap-1.5">
-                              <i class="fas fa-infinity text-xs text-gray-400 dark:text-gray-500" />
-                              <span class="text-xs font-medium text-gray-400 dark:text-gray-500">
-                                无限制
-                              </span>
-                            </div>
+                            <span
+                              class="inline-flex items-center gap-1 rounded-full bg-gray-200 px-2 py-1 text-xs text-gray-600 dark:bg-gray-600 dark:text-gray-300"
+                            >
+                              <i class="fas fa-infinity" />
+                              <span>无限制</span>
+                            </span>
                           </div>
                         </div>
                       </td>
@@ -667,7 +677,7 @@
                           <span v-else-if="key.expiresAt">
                             <span
                               v-if="isApiKeyExpired(key.expiresAt)"
-                              class="inline-flex cursor-pointer items-center text-red-600 hover:underline"
+                              class="inline-flex cursor-pointer items-center text-red-600 hover:underline dark:text-red-400"
                               style="font-size: 13px"
                               @click.stop="startEditExpiry(key)"
                             >
@@ -676,7 +686,7 @@
                             </span>
                             <span
                               v-else-if="isApiKeyExpiringSoon(key.expiresAt)"
-                              class="inline-flex cursor-pointer items-center text-orange-600 hover:underline"
+                              class="inline-flex cursor-pointer items-center text-orange-600 hover:underline dark:text-orange-400"
                               style="font-size: 13px"
                               @click.stop="startEditExpiry(key)"
                             >
@@ -707,7 +717,7 @@
                       <td class="whitespace-nowrap px-3 py-3" style="font-size: 13px">
                         <div class="flex gap-1">
                           <button
-                            class="rounded px-2 py-1 text-xs font-medium text-purple-600 transition-colors hover:bg-purple-50 hover:text-purple-900 dark:hover:bg-purple-900/20"
+                            class="rounded px-2 py-1 text-xs font-medium text-purple-600 transition-colors hover:bg-purple-50 hover:text-purple-900 dark:text-purple-400 dark:hover:bg-purple-900/20"
                             title="查看详细统计"
                             @click="showUsageDetails(key)"
                           >
@@ -716,7 +726,7 @@
                           </button>
                           <button
                             v-if="key && key.id"
-                            class="rounded px-2 py-1 text-xs font-medium text-indigo-600 transition-colors hover:bg-indigo-50 hover:text-indigo-900 dark:hover:bg-indigo-900/20"
+                            class="rounded px-2 py-1 text-xs font-medium text-indigo-600 transition-colors hover:bg-indigo-50 hover:text-indigo-900 dark:text-indigo-400 dark:hover:bg-indigo-900/20"
                             title="模型使用分布"
                             @click="toggleApiKeyModelStats(key.id)"
                           >
@@ -729,7 +739,7 @@
                             <span class="ml-1 hidden xl:inline">模型</span>
                           </button>
                           <button
-                            class="rounded px-2 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-900 dark:hover:bg-blue-900/20"
+                            class="rounded px-2 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-900 dark:text-blue-400 dark:hover:bg-blue-900/20"
                             title="编辑"
                             @click="openEditApiKeyModal(key)"
                           >
@@ -742,7 +752,7 @@
                               (isApiKeyExpired(key.expiresAt) ||
                                 isApiKeyExpiringSoon(key.expiresAt))
                             "
-                            class="rounded px-2 py-1 text-xs font-medium text-green-600 transition-colors hover:bg-green-50 hover:text-green-900 dark:hover:bg-green-900/20"
+                            class="rounded px-2 py-1 text-xs font-medium text-green-600 transition-colors hover:bg-green-50 hover:text-green-900 dark:text-green-400 dark:hover:bg-green-900/20"
                             title="续期"
                             @click="openRenewApiKeyModal(key)"
                           >
@@ -752,8 +762,8 @@
                           <button
                             :class="[
                               key.isActive
-                                ? 'text-orange-600 hover:bg-orange-50 hover:text-orange-900 dark:hover:bg-orange-900/20'
-                                : 'text-green-600 hover:bg-green-50 hover:text-green-900 dark:hover:bg-green-900/20',
+                                ? 'text-orange-600 hover:bg-orange-50 hover:text-orange-900 dark:text-orange-400 dark:hover:bg-orange-900/20'
+                                : 'text-green-600 hover:bg-green-50 hover:text-green-900 dark:text-green-400 dark:hover:bg-green-900/20',
                               'rounded px-2 py-1 text-xs font-medium transition-colors'
                             ]"
                             :title="key.isActive ? '禁用' : '激活'"
@@ -765,7 +775,7 @@
                             }}</span>
                           </button>
                           <button
-                            class="rounded px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-900 dark:hover:bg-red-900/20"
+                            class="rounded px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-900 dark:text-red-400 dark:hover:bg-red-900/20"
                             title="删除"
                             @click="deleteApiKey(key.id)"
                           >
@@ -910,7 +920,7 @@
                                     <i class="fas fa-dollar-sign mr-1 text-xs text-green-500" />
                                     费用:
                                   </span>
-                                  <span class="font-semibold text-green-600">{{
+                                  <span class="font-semibold text-green-600 dark:text-green-400">{{
                                     calculateModelCost(stat)
                                   }}</span>
                                 </div>
@@ -941,7 +951,7 @@
                                   </div>
                                   <div
                                     v-if="stat.cacheCreateTokens > 0"
-                                    class="flex items-center justify-between text-xs text-purple-600"
+                                    class="flex items-center justify-between text-xs text-purple-600 dark:text-purple-400"
                                   >
                                     <span class="flex items-center">
                                       <i class="fas fa-save mr-1" />
@@ -953,7 +963,7 @@
                                   </div>
                                   <div
                                     v-if="stat.cacheReadTokens > 0"
-                                    class="flex items-center justify-between text-xs text-purple-600"
+                                    class="flex items-center justify-between text-xs text-purple-600 dark:text-purple-400"
                                   >
                                     <span class="flex items-center">
                                       <i class="fas fa-download mr-1" />
@@ -982,7 +992,9 @@
                                 />
                               </div>
                               <div class="mt-1 text-right">
-                                <span class="text-xs font-medium text-indigo-600">
+                                <span
+                                  class="text-xs font-medium text-indigo-600 dark:text-indigo-400"
+                                >
                                   {{
                                     calculateApiKeyModelPercentage(
                                       stat.allTokens,
@@ -1152,7 +1164,10 @@
                   使用共享池
                 </div>
                 <!-- 显示所有者信息 -->
-                <div v-if="isLdapEnabled && key.ownerDisplayName" class="text-xs text-red-600">
+                <div
+                  v-if="isLdapEnabled && key.ownerDisplayName"
+                  class="text-xs text-red-600 dark:text-red-400"
+                >
                   <i class="fas fa-user mr-1" />
                   {{ key.ownerDisplayName }}
                 </div>
@@ -1167,7 +1182,7 @@
                       globalDateFilter.type === 'custom' ? '累计统计' : '今日使用'
                     }}</span>
                     <button
-                      class="text-xs text-blue-600 hover:text-blue-800"
+                      class="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400"
                       @click="showUsageDetails(key)"
                     >
                       <i class="fas fa-chart-line mr-1" />详情
@@ -1181,7 +1196,7 @@
                       <p class="text-xs text-gray-500 dark:text-gray-400">请求</p>
                     </div>
                     <div>
-                      <p class="text-sm font-semibold text-green-600">
+                      <p class="text-sm font-semibold text-green-600 dark:text-green-400">
                         ${{ (key.dailyCost || 0).toFixed(2) }}
                       </p>
                       <p class="text-xs text-gray-500 dark:text-gray-400">费用</p>
@@ -1254,7 +1269,9 @@
                   <div class="flex items-center gap-1">
                     <span
                       :class="
-                        isApiKeyExpiringSoon(key.expiresAt) ? 'font-semibold text-orange-600' : ''
+                        isApiKeyExpiringSoon(key.expiresAt)
+                          ? 'font-semibold text-orange-600 dark:text-orange-400'
+                          : ''
                       "
                     >
                       {{ key.expiresAt ? formatDate(key.expiresAt) : '永不过期' }}
@@ -1291,7 +1308,7 @@
               <!-- 操作按钮 -->
               <div class="mt-3 flex gap-2 border-t border-gray-100 pt-3 dark:border-gray-600">
                 <button
-                  class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-blue-50 px-3 py-1.5 text-xs text-blue-600 transition-colors hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50"
+                  class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-blue-50 px-3 py-1.5 text-xs text-blue-600 transition-colors hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
                   @click="showUsageDetails(key)"
                 >
                   <i class="fas fa-chart-line" />
@@ -1309,7 +1326,7 @@
                     key.expiresAt &&
                     (isApiKeyExpired(key.expiresAt) || isApiKeyExpiringSoon(key.expiresAt))
                   "
-                  class="flex-1 rounded-lg bg-orange-50 px-3 py-1.5 text-xs text-orange-600 transition-colors hover:bg-orange-100 dark:bg-orange-900/30 dark:hover:bg-orange-900/50"
+                  class="flex-1 rounded-lg bg-orange-50 px-3 py-1.5 text-xs text-orange-600 transition-colors hover:bg-orange-100 dark:bg-orange-900/30 dark:text-orange-400 dark:hover:bg-orange-900/50"
                   @click="openRenewApiKeyModal(key)"
                 >
                   <i class="fas fa-clock mr-1" />
@@ -1318,8 +1335,8 @@
                 <button
                   :class="[
                     key.isActive
-                      ? 'bg-orange-50 text-orange-600 hover:bg-orange-100 dark:bg-orange-900/30 dark:hover:bg-orange-900/50'
-                      : 'bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/30 dark:hover:bg-green-900/50',
+                      ? 'bg-orange-50 text-orange-600 hover:bg-orange-100 dark:bg-orange-900/30 dark:text-orange-400 dark:hover:bg-orange-900/50'
+                      : 'bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50',
                     'rounded-lg px-3 py-1.5 text-xs transition-colors'
                   ]"
                   @click="toggleApiKeyStatus(key)"
@@ -1328,7 +1345,7 @@
                   {{ key.isActive ? '禁用' : '激活' }}
                 </button>
                 <button
-                  class="rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600 transition-colors hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50"
+                  class="rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600 transition-colors hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
                   @click="deleteApiKey(key.id)"
                 >
                   <i class="fas fa-trash" />
@@ -1588,11 +1605,17 @@
                       <!-- 创建者 -->
                       <td v-if="isLdapEnabled" class="px-3 py-3">
                         <div class="text-xs">
-                          <span v-if="key.createdBy === 'admin'" class="text-blue-600">
+                          <span
+                            v-if="key.createdBy === 'admin'"
+                            class="text-blue-600 dark:text-blue-400"
+                          >
                             <i class="fas fa-user-shield mr-1 text-xs" />
                             管理员
                           </span>
-                          <span v-else-if="key.userUsername" class="text-green-600">
+                          <span
+                            v-else-if="key.userUsername"
+                            class="text-green-600 dark:text-green-400"
+                          >
                             <i class="fas fa-user mr-1 text-xs" />
                             {{ key.userUsername }}
                           </span>
@@ -1612,11 +1635,17 @@
                       <!-- 删除者 -->
                       <td class="px-3 py-3">
                         <div class="text-xs">
-                          <span v-if="key.deletedByType === 'admin'" class="text-blue-600">
+                          <span
+                            v-if="key.deletedByType === 'admin'"
+                            class="text-blue-600 dark:text-blue-400"
+                          >
                             <i class="fas fa-user-shield mr-1 text-xs" />
                             {{ key.deletedBy }}
                           </span>
-                          <span v-else-if="key.deletedByType === 'user'" class="text-green-600">
+                          <span
+                            v-else-if="key.deletedByType === 'user'"
+                            class="text-green-600 dark:text-green-400"
+                          >
                             <i class="fas fa-user mr-1 text-xs" />
                             {{ key.deletedBy }}
                           </span>
@@ -3311,6 +3340,7 @@ const formatDate = (dateString) => {
 //   if (progress >= 100) return 'bg-red-500'
 //   if (progress >= 80) return 'bg-yellow-500'
 //   return 'bg-green-500'
+
 // }
 
 // 获取 Opus 周费用进度 - 已移到 LimitBadge 组件中

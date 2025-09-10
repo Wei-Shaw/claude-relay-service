@@ -733,6 +733,62 @@ class RedisClient {
     logger.debug(`💰 Opus cost incremented successfully, new weekly total: $${results[0][1]}`)
   }
 
+  // 💰 获取本周 GPT-5 High 费用
+  async getWeeklyGPT5HighCost(keyId) {
+    try {
+      if (!keyId) {
+        logger.warn('getWeeklyGPT5HighCost: keyId is required')
+        return 0
+      }
+      
+      const currentWeek = getWeekStringInTimezone()
+      const costKey = `usage:gpt5-high:weekly:${keyId}:${currentWeek}`
+      const cost = await this.client.get(costKey)
+      const result = parseFloat(cost || 0)
+      
+      logger.debug(
+        `💰 Getting weekly GPT-5 High cost for ${keyId}, week: ${currentWeek}, result: $${result.toFixed(4)}`
+      )
+      return result
+    } catch (error) {
+      logger.error('Error getting weekly GPT-5 High cost:', error)
+      return 0 // 发生错误时返回0，不影响正常流程
+    }
+  }
+
+  // 💰 增加本周 GPT-5 High 费用
+  async incrementWeeklyGPT5HighCost(keyId, amount) {
+    try {
+      if (!keyId || !amount || amount <= 0) {
+        logger.warn('incrementWeeklyGPT5HighCost: invalid parameters', { keyId, amount })
+        return
+      }
+      
+      const currentWeek = getWeekStringInTimezone()
+      const weeklyKey = `usage:gpt5-high:weekly:${keyId}:${currentWeek}`
+      const totalKey = `usage:gpt5-high:total:${keyId}`
+      
+      logger.debug(
+        `💰 Incrementing weekly GPT-5 High cost for ${keyId}, week: ${currentWeek}, amount: $${amount.toFixed(4)}`
+      )
+      
+      // 使用 pipeline 批量执行，提高性能和一致性
+      const pipeline = this.client.pipeline()
+      pipeline.incrbyfloat(weeklyKey, amount)
+      pipeline.incrbyfloat(totalKey, amount)
+      pipeline.expire(weeklyKey, 60 * 60 * 24 * 14) // 2周后过期
+      
+      await pipeline.exec()
+      
+      logger.debug(
+        `💰 Weekly GPT-5 High cost updated successfully for ${keyId}`
+      )
+    } catch (error) {
+      logger.error('Error incrementing weekly GPT-5 High cost:', error)
+      // 不抛出错误，避免影响主流程
+    }
+  }
+
   // 💰 计算账户的每日费用（基于模型使用）
   async getAccountDailyCost(accountId) {
     const CostCalculator = require('../utils/costCalculator')
@@ -1356,68 +1412,14 @@ class RedisClient {
   }
 
   // 🔗 会话sticky映射管理
-  async setSessionAccountMapping(sessionHash, accountId, ttl = null) {
-    const appConfig = require('../../config/config')
-    // 从配置读取TTL（小时），转换为秒，默认1小时
-    const defaultTTL = ttl !== null ? ttl : (appConfig.session?.stickyTtlHours || 1) * 60 * 60
+  async setSessionAccountMapping(sessionHash, accountId, ttl = 3600) {
     const key = `sticky_session:${sessionHash}`
-    await this.client.set(key, accountId, 'EX', defaultTTL)
+    await this.client.set(key, accountId, 'EX', ttl)
   }
 
   async getSessionAccountMapping(sessionHash) {
     const key = `sticky_session:${sessionHash}`
     return await this.client.get(key)
-  }
-
-  // 🚀 智能会话TTL续期：剩余时间少于阈值时自动续期
-  async extendSessionAccountMappingTTL(sessionHash) {
-    const appConfig = require('../../config/config')
-    const key = `sticky_session:${sessionHash}`
-
-    // 📊 从配置获取参数
-    const ttlHours = appConfig.session?.stickyTtlHours || 1 // 小时，默认1小时
-    const thresholdMinutes = appConfig.session?.renewalThresholdMinutes || 0 // 分钟，默认0（不续期）
-
-    // 如果阈值为0，不执行续期
-    if (thresholdMinutes === 0) {
-      return true
-    }
-
-    const fullTTL = ttlHours * 60 * 60 // 转换为秒
-    const renewalThreshold = thresholdMinutes * 60 // 转换为秒
-
-    try {
-      // 获取当前剩余TTL（秒）
-      const remainingTTL = await this.client.ttl(key)
-
-      // 键不存在或已过期
-      if (remainingTTL === -2) {
-        return false
-      }
-
-      // 键存在但没有TTL（永不过期，不需要处理）
-      if (remainingTTL === -1) {
-        return true
-      }
-
-      // 🎯 智能续期策略：仅在剩余时间少于阈值时才续期
-      if (remainingTTL < renewalThreshold) {
-        await this.client.expire(key, fullTTL)
-        logger.debug(
-          `🔄 Renewed sticky session TTL: ${sessionHash} (was ${Math.round(remainingTTL / 60)}min, renewed to ${ttlHours}h)`
-        )
-        return true
-      }
-
-      // 剩余时间充足，无需续期
-      logger.debug(
-        `✅ Sticky session TTL sufficient: ${sessionHash} (remaining ${Math.round(remainingTTL / 60)}min)`
-      )
-      return true
-    } catch (error) {
-      logger.error('❌ Failed to extend session TTL:', error)
-      return false
-    }
   }
 
   async deleteSessionAccountMapping(sessionHash) {
