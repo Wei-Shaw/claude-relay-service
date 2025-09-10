@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { apiClient } from '@/config/api'
+import i18n from '@/i18n'
 
 export const useClientsStore = defineStore('clients', {
   state: () => ({
@@ -24,13 +25,13 @@ export const useClientsStore = defineStore('clients', {
         if (response.success) {
           this.supportedClients = response.data || []
         } else {
-          this.error = response.message || '加载支持的客户端失败'
+          this.error = response.message || i18n.global.t('common.errors.loadSupportedClientsFailed')
           console.error('Failed to load supported clients:', this.error)
         }
 
         return this.supportedClients
       } catch (error) {
-        this.error = error.message || '加载支持的客户端失败'
+        this.error = error.message || i18n.global.t('common.errors.loadSupportedClientsFailed')
         console.error('Error loading supported clients:', error)
         return []
       } finally {
