@@ -208,6 +208,24 @@ class ClaudeRelayService {
           )
           await unifiedClaudeScheduler.markAccountBlocked(accountId, accountType, sessionHash)
         }
+        // 检查是否为529状态码（服务过载）
+        else if (response.statusCode === 529) {
+          logger.warn(`🚫 Overload error (529) detected for account ${accountId}`)
+
+          // 检查是否启用了529错误处理
+          if (config.claude.overloadHandling.enabled > 0) {
+            try {
+              await claudeAccountService.markAccountOverloaded(accountId)
+              logger.info(
+                `🚫 Account ${accountId} marked as overloaded for ${config.claude.overloadHandling.enabled} minutes`
+              )
+            } catch (overloadError) {
+              logger.error(`❌ Failed to mark account as overloaded: ${accountId}`, overloadError)
+            }
+          } else {
+            logger.info(`🚫 529 error handling is disabled, skipping account overload marking`)
+          }
+        }
         // 检查是否为5xx状态码
         else if (response.statusCode >= 500 && response.statusCode < 600) {
           logger.warn(`🔥 Server error (${response.statusCode}) detected for account ${accountId}`)
@@ -294,6 +312,19 @@ class ClaudeRelayService {
         )
         if (isRateLimited) {
           await unifiedClaudeScheduler.removeAccountRateLimit(accountId, accountType)
+        }
+
+        // 如果请求成功，检查并移除过载状态
+        try {
+          const isOverloaded = await claudeAccountService.isAccountOverloaded(accountId)
+          if (isOverloaded) {
+            await claudeAccountService.removeAccountOverload(accountId)
+          }
+        } catch (overloadError) {
+          logger.error(
+            `❌ Failed to check/remove overload status for account ${accountId}:`,
+            overloadError
+          )
         }
 
         // 只有真实的 Claude Code 请求才更新 headers
@@ -741,7 +772,7 @@ class ClaudeRelayService {
 
             resolve(response)
           } catch (error) {
-            logger.error('❌ Failed to parse Claude API response:', error)
+            logger.error(`❌ Failed to parse Claude API response (Account: ${accountId}):`, error)
             reject(error)
           }
         })
@@ -754,7 +785,7 @@ class ClaudeRelayService {
 
       req.on('error', async (error) => {
         console.error(': ❌ ', error)
-        logger.error('❌ Claude API request error:', error.message, {
+        logger.error(`❌ Claude API request error (Account: ${accountId}):`, error.message, {
           code: error.code,
           errno: error.errno,
           syscall: error.syscall,
@@ -781,7 +812,7 @@ class ClaudeRelayService {
 
       req.on('timeout', async () => {
         req.destroy()
-        logger.error('❌ Claude API request timeout')
+        logger.error(`❌ Claude API request timeout (Account: ${accountId})`)
 
         await this._handleServerError(accountId, 504, null, 'Request')
 
@@ -889,7 +920,7 @@ class ClaudeRelayService {
         options
       )
     } catch (error) {
-      logger.error('❌ Claude stream relay with usage capture failed:', error)
+      logger.error(`❌ Claude stream relay with usage capture failed:`, error)
       throw error
     }
   }
@@ -1002,6 +1033,27 @@ class ClaudeRelayService {
                 `🚫 [Stream] Forbidden error (403) detected for account ${accountId}, marking as blocked`
               )
               await unifiedClaudeScheduler.markAccountBlocked(accountId, accountType, sessionHash)
+            } else if (res.statusCode === 529) {
+              logger.warn(`🚫 [Stream] Overload error (529) detected for account ${accountId}`)
+
+              // 检查是否启用了529错误处理
+              if (config.claude.overloadHandling.enabled > 0) {
+                try {
+                  await claudeAccountService.markAccountOverloaded(accountId)
+                  logger.info(
+                    `🚫 [Stream] Account ${accountId} marked as overloaded for ${config.claude.overloadHandling.enabled} minutes`
+                  )
+                } catch (overloadError) {
+                  logger.error(
+                    `❌ [Stream] Failed to mark account as overloaded: ${accountId}`,
+                    overloadError
+                  )
+                }
+              } else {
+                logger.info(
+                  `🚫 [Stream] 529 error handling is disabled, skipping account overload marking`
+                )
+              }
             } else if (res.statusCode >= 500 && res.statusCode < 600) {
               logger.warn(
                 `🔥 [Stream] Server error (${res.statusCode}) detected for account ${accountId}`
@@ -1015,7 +1067,9 @@ class ClaudeRelayService {
             logger.error('❌ Error in stream error handler:', err)
           })
 
-          logger.error(`❌ Claude API returned error status: ${res.statusCode}`)
+          logger.error(
+            `❌ Claude API returned error status: ${res.statusCode} | Account: ${account?.name || accountId}`
+          )
           let errorData = ''
 
           res.on('data', (chunk) => {
@@ -1024,7 +1078,10 @@ class ClaudeRelayService {
 
           res.on('end', () => {
             console.error(': ❌ ', errorData)
-            logger.error('❌ Claude API error response:', errorData)
+            logger.error(
+              `❌ Claude API error response (Account: ${account?.name || accountId}):`,
+              errorData
+            )
             if (!responseStream.destroyed) {
               // 发送错误事件
               responseStream.write('event: error\n')
@@ -1327,6 +1384,19 @@ class ClaudeRelayService {
               await unifiedClaudeScheduler.removeAccountRateLimit(accountId, accountType)
             }
 
+            // 如果流式请求成功，检查并移除过载状态
+            try {
+              const isOverloaded = await claudeAccountService.isAccountOverloaded(accountId)
+              if (isOverloaded) {
+                await claudeAccountService.removeAccountOverload(accountId)
+              }
+            } catch (overloadError) {
+              logger.error(
+                `❌ [Stream] Failed to check/remove overload status for account ${accountId}:`,
+                overloadError
+              )
+            }
+
             // 只有真实的 Claude Code 请求才更新 headers（流式请求）
             if (
               clientHeaders &&
@@ -1343,11 +1413,15 @@ class ClaudeRelayService {
       })
 
       req.on('error', async (error) => {
-        logger.error('❌ Claude stream request error:', error.message, {
-          code: error.code,
-          errno: error.errno,
-          syscall: error.syscall
-        })
+        logger.error(
+          `❌ Claude stream request error (Account: ${account?.name || accountId}):`,
+          error.message,
+          {
+            code: error.code,
+            errno: error.errno,
+            syscall: error.syscall
+          }
+        )
 
         // 根据错误类型提供更具体的错误信息
         let errorMessage = 'Upstream request failed'
@@ -1391,7 +1465,7 @@ class ClaudeRelayService {
 
       req.on('timeout', async () => {
         req.destroy()
-        logger.error('❌ Claude stream request timeout')
+        logger.error(`❌ Claude stream request timeout | Account: ${account?.name || accountId}`)
 
         if (!responseStream.headersSent) {
           responseStream.writeHead(504, {
@@ -1493,7 +1567,7 @@ class ClaudeRelayService {
       })
 
       req.on('error', async (error) => {
-        logger.error('❌ Claude stream request error:', error.message, {
+        logger.error(`❌ Claude stream request error:`, error.message, {
           code: error.code,
           errno: error.errno,
           syscall: error.syscall
@@ -1541,7 +1615,7 @@ class ClaudeRelayService {
 
       req.on('timeout', async () => {
         req.destroy()
-        logger.error('❌ Claude stream request timeout')
+        logger.error(`❌ Claude stream request timeout`)
 
         if (!responseStream.headersSent) {
           responseStream.writeHead(504, {

@@ -107,7 +107,12 @@ class UnifiedClaudeScheduler {
 
         // 普通专属账户
         const boundAccount = await redis.getClaudeAccount(apiKeyData.claudeAccountId)
-        if (boundAccount && boundAccount.isActive === 'true' && boundAccount.status !== 'error') {
+        if (
+          boundAccount &&
+          boundAccount.isActive === 'true' &&
+          boundAccount.status !== 'error' &&
+          this._isSchedulable(boundAccount.schedulable)
+        ) {
           logger.info(
             `🎯 Using bound dedicated Claude OAuth account: ${boundAccount.name} (${apiKeyData.claudeAccountId}) for API key ${apiKeyData.name}`
           )
@@ -117,7 +122,7 @@ class UnifiedClaudeScheduler {
           }
         } else {
           logger.warn(
-            `⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not available, falling back to pool`
+            `⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not available (isActive: ${boundAccount?.isActive}, status: ${boundAccount?.status}, schedulable: ${boundAccount?.schedulable}), falling back to pool`
           )
         }
       }
@@ -130,7 +135,8 @@ class UnifiedClaudeScheduler {
         if (
           boundConsoleAccount &&
           boundConsoleAccount.isActive === true &&
-          boundConsoleAccount.status === 'active'
+          boundConsoleAccount.status === 'active' &&
+          this._isSchedulable(boundConsoleAccount.schedulable)
         ) {
           logger.info(
             `🎯 Using bound dedicated Claude Console account: ${boundConsoleAccount.name} (${apiKeyData.claudeConsoleAccountId}) for API key ${apiKeyData.name}`
@@ -141,7 +147,7 @@ class UnifiedClaudeScheduler {
           }
         } else {
           logger.warn(
-            `⚠️ Bound Claude Console account ${apiKeyData.claudeConsoleAccountId} is not available, falling back to pool`
+            `⚠️ Bound Claude Console account ${apiKeyData.claudeConsoleAccountId} is not available (isActive: ${boundConsoleAccount?.isActive}, status: ${boundConsoleAccount?.status}, schedulable: ${boundConsoleAccount?.schedulable}), falling back to pool`
           )
         }
       }
@@ -151,7 +157,11 @@ class UnifiedClaudeScheduler {
         const boundBedrockAccountResult = await bedrockAccountService.getAccount(
           apiKeyData.bedrockAccountId
         )
-        if (boundBedrockAccountResult.success && boundBedrockAccountResult.data.isActive === true) {
+        if (
+          boundBedrockAccountResult.success &&
+          boundBedrockAccountResult.data.isActive === true &&
+          this._isSchedulable(boundBedrockAccountResult.data.schedulable)
+        ) {
           logger.info(
             `🎯 Using bound dedicated Bedrock account: ${boundBedrockAccountResult.data.name} (${apiKeyData.bedrockAccountId}) for API key ${apiKeyData.name}`
           )
@@ -161,7 +171,7 @@ class UnifiedClaudeScheduler {
           }
         } else {
           logger.warn(
-            `⚠️ Bound Bedrock account ${apiKeyData.bedrockAccountId} is not available, falling back to pool`
+            `⚠️ Bound Bedrock account ${apiKeyData.bedrockAccountId} is not available (isActive: ${boundBedrockAccountResult?.data?.isActive}, schedulable: ${boundBedrockAccountResult?.data?.schedulable}), falling back to pool`
           )
         }
       }
@@ -251,7 +261,8 @@ class UnifiedClaudeScheduler {
         boundAccount.isActive === 'true' &&
         boundAccount.status !== 'error' &&
         boundAccount.status !== 'blocked' &&
-        boundAccount.status !== 'temp_error'
+        boundAccount.status !== 'temp_error' &&
+        this._isSchedulable(boundAccount.schedulable)
       ) {
         const isRateLimited = await claudeAccountService.isAccountRateLimited(boundAccount.id)
         if (!isRateLimited) {
@@ -269,7 +280,9 @@ class UnifiedClaudeScheduler {
           ]
         }
       } else {
-        logger.warn(`⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not available`)
+        logger.warn(
+          `⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not available (isActive: ${boundAccount?.isActive}, status: ${boundAccount?.status}, schedulable: ${boundAccount?.schedulable})`
+        )
       }
     }
 
@@ -281,7 +294,8 @@ class UnifiedClaudeScheduler {
       if (
         boundConsoleAccount &&
         boundConsoleAccount.isActive === true &&
-        boundConsoleAccount.status === 'active'
+        boundConsoleAccount.status === 'active' &&
+        this._isSchedulable(boundConsoleAccount.schedulable)
       ) {
         // 主动触发一次额度检查
         try {
@@ -317,7 +331,7 @@ class UnifiedClaudeScheduler {
         }
       } else {
         logger.warn(
-          `⚠️ Bound Claude Console account ${apiKeyData.claudeConsoleAccountId} is not available`
+          `⚠️ Bound Claude Console account ${apiKeyData.claudeConsoleAccountId} is not available (isActive: ${boundConsoleAccount?.isActive}, status: ${boundConsoleAccount?.status}, schedulable: ${boundConsoleAccount?.schedulable})`
         )
       }
     }
@@ -327,7 +341,11 @@ class UnifiedClaudeScheduler {
       const boundBedrockAccountResult = await bedrockAccountService.getAccount(
         apiKeyData.bedrockAccountId
       )
-      if (boundBedrockAccountResult.success && boundBedrockAccountResult.data.isActive === true) {
+      if (
+        boundBedrockAccountResult.success &&
+        boundBedrockAccountResult.data.isActive === true &&
+        this._isSchedulable(boundBedrockAccountResult.data.schedulable)
+      ) {
         logger.info(
           `🎯 Using bound dedicated Bedrock account: ${boundBedrockAccountResult.data.name} (${apiKeyData.bedrockAccountId})`
         )
@@ -341,7 +359,9 @@ class UnifiedClaudeScheduler {
           }
         ]
       } else {
-        logger.warn(`⚠️ Bound Bedrock account ${apiKeyData.bedrockAccountId} is not available`)
+        logger.warn(
+          `⚠️ Bound Bedrock account ${apiKeyData.bedrockAccountId} is not available (isActive: ${boundBedrockAccountResult?.data?.isActive}, schedulable: ${boundBedrockAccountResult?.data?.schedulable})`
+        )
       }
     }
 
@@ -528,7 +548,10 @@ class UnifiedClaudeScheduler {
           return false
         }
 
-        return !(await claudeAccountService.isAccountRateLimited(accountId))
+        // 检查是否限流或过载
+        const isRateLimited = await claudeAccountService.isAccountRateLimited(accountId)
+        const isOverloaded = await claudeAccountService.isAccountOverloaded(accountId)
+        return !isRateLimited && !isOverloaded
       } else if (accountType === 'claude-console') {
         const account = await claudeConsoleAccountService.getAccount(accountId)
         if (!account || !account.isActive) {

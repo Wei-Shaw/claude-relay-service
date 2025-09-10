@@ -377,9 +377,7 @@
           >
             <div class="flex items-center justify-between">
               <div>
-                <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                  启用 Webhook 通知
-                </h2>
+                <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">启用通知</h2>
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
                   开启后，系统将按配置发送通知到指定平台
                 </p>
@@ -471,9 +469,21 @@
                       </div>
                     </div>
                     <div class="mt-3 space-y-1 text-sm">
-                      <div class="flex items-center text-gray-600 dark:text-gray-400">
+                      <div
+                        v-if="platform.type !== 'smtp'"
+                        class="flex items-center text-gray-600 dark:text-gray-400"
+                      >
                         <i class="fas fa-link mr-2"></i>
                         <span class="truncate">{{ platform.url }}</span>
+                      </div>
+                      <div
+                        v-if="platform.type === 'smtp' && platform.to"
+                        class="flex items-center text-gray-600 dark:text-gray-400"
+                      >
+                        <i class="fas fa-envelope mr-2"></i>
+                        <span class="truncate">{{
+                          Array.isArray(platform.to) ? platform.to.join(', ') : platform.to
+                        }}</span>
                       </div>
                       <div
                         v-if="platform.enableSign"
@@ -655,6 +665,7 @@
                 <option value="slack">🟣 Slack</option>
                 <option value="discord">🟪 Discord</option>
                 <option value="bark">🔔 Bark</option>
+                <option value="smtp">📧 邮件通知</option>
                 <option value="custom">⚙️ 自定义</option>
               </select>
               <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
@@ -684,8 +695,8 @@
             />
           </div>
 
-          <!-- Webhook URL (非Bark平台) -->
-          <div v-if="platformForm.type !== 'bark'">
+          <!-- Webhook URL (非Bark和SMTP平台) -->
+          <div v-if="platformForm.type !== 'bark' && platformForm.type !== 'smtp'">
             <label
               class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
             >
@@ -833,6 +844,141 @@
                 <p>2. 打开App获取您的设备密钥</p>
                 <p>3. 将密钥粘贴到上方输入框</p>
               </div>
+            </div>
+          </div>
+
+          <!-- SMTP 平台特有字段 -->
+          <div v-if="platformForm.type === 'smtp'" class="space-y-5">
+            <!-- SMTP 主机 -->
+            <div>
+              <label
+                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                <i class="fas fa-server mr-2 text-gray-400"></i>
+                SMTP 服务器
+                <span class="ml-1 text-xs text-red-500">*</span>
+              </label>
+              <input
+                v-model="platformForm.host"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                placeholder="例如: smtp.gmail.com"
+                required
+                type="text"
+              />
+            </div>
+
+            <!-- SMTP 端口和安全设置 -->
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label
+                  class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  <i class="fas fa-plug mr-2 text-gray-400"></i>
+                  端口
+                </label>
+                <input
+                  v-model.number="platformForm.port"
+                  class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  max="65535"
+                  min="1"
+                  placeholder="587"
+                  type="number"
+                />
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  默认: 587 (TLS) 或 465 (SSL)
+                </p>
+              </div>
+
+              <div>
+                <label
+                  class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  <i class="fas fa-shield-alt mr-2 text-gray-400"></i>
+                  加密方式
+                </label>
+                <select
+                  v-model="platformForm.secure"
+                  class="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 text-gray-900 shadow-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                >
+                  <option :value="false">STARTTLS (端口587)</option>
+                  <option :value="true">SSL/TLS (端口465)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- 用户名 -->
+            <div>
+              <label
+                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                <i class="fas fa-user mr-2 text-gray-400"></i>
+                用户名
+                <span class="ml-1 text-xs text-red-500">*</span>
+              </label>
+              <input
+                v-model="platformForm.user"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                placeholder="user@example.com"
+                required
+                type="email"
+              />
+            </div>
+
+            <!-- 密码 -->
+            <div>
+              <label
+                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                <i class="fas fa-lock mr-2 text-gray-400"></i>
+                密码 / 应用密码
+                <span class="ml-1 text-xs text-red-500">*</span>
+              </label>
+              <input
+                v-model="platformForm.pass"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                placeholder="邮箱密码或应用专用密码"
+                required
+                type="password"
+              />
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                建议使用应用专用密码，而非邮箱登录密码
+              </p>
+            </div>
+
+            <!-- 发件人邮箱 -->
+            <div>
+              <label
+                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                <i class="fas fa-paper-plane mr-2 text-gray-400"></i>
+                发件人邮箱
+                <span class="ml-2 text-xs text-gray-500">(可选)</span>
+              </label>
+              <input
+                v-model="platformForm.from"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                placeholder="默认使用用户名邮箱"
+                type="email"
+              />
+            </div>
+
+            <!-- 收件人邮箱 -->
+            <div>
+              <label
+                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                <i class="fas fa-envelope mr-2 text-gray-400"></i>
+                收件人邮箱
+                <span class="ml-1 text-xs text-red-500">*</span>
+              </label>
+              <input
+                v-model="platformForm.to"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                placeholder="admin@example.com"
+                required
+                type="email"
+              />
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">接收通知的邮箱地址</p>
             </div>
           </div>
 
@@ -1008,7 +1154,23 @@ const platformForm = ref({
   name: '',
   url: '',
   enableSign: false,
-  secret: ''
+  secret: '',
+  // Bark特有字段
+  deviceKey: '',
+  serverUrl: '',
+  level: '',
+  sound: '',
+  group: '',
+  // SMTP特有字段
+  host: '',
+  port: null,
+  secure: false,
+  user: '',
+  pass: '',
+  from: '',
+  to: '',
+  timeout: null,
+  ignoreTLS: false
 })
 
 // 监听activeSection变化，加载对应配置
@@ -1030,17 +1192,48 @@ const platformTypeWatcher = watch(
     // 如果不是编辑模式，清空相关字段
     if (!editingPlatform.value) {
       if (newType === 'bark') {
-        // 切换到Bark时，清空URL相关字段
+        // 切换到Bark时，清空URL和SMTP相关字段
         platformForm.value.url = ''
         platformForm.value.enableSign = false
         platformForm.value.secret = ''
-      } else {
-        // 切换到其他平台时，清空Bark相关字段
+        // 清空SMTP字段
+        platformForm.value.host = ''
+        platformForm.value.port = null
+        platformForm.value.secure = false
+        platformForm.value.user = ''
+        platformForm.value.pass = ''
+        platformForm.value.from = ''
+        platformForm.value.to = ''
+        platformForm.value.timeout = null
+        platformForm.value.ignoreTLS = false
+      } else if (newType === 'smtp') {
+        // 切换到SMTP时，清空URL和Bark相关字段
+        platformForm.value.url = ''
+        platformForm.value.enableSign = false
+        platformForm.value.secret = ''
+        // 清空Bark字段
         platformForm.value.deviceKey = ''
         platformForm.value.serverUrl = ''
         platformForm.value.level = ''
         platformForm.value.sound = ''
         platformForm.value.group = ''
+      } else {
+        // 切换到其他平台时，清空Bark和SMTP相关字段
+        platformForm.value.deviceKey = ''
+        platformForm.value.serverUrl = ''
+        platformForm.value.level = ''
+        platformForm.value.sound = ''
+        platformForm.value.group = ''
+        // SMTP 字段
+        platformForm.value.host = ''
+        platformForm.value.port = null
+        platformForm.value.secure = false
+        platformForm.value.user = ''
+        platformForm.value.pass = ''
+        platformForm.value.from = ''
+        platformForm.value.to = ''
+        platformForm.value.timeout = null
+        platformForm.value.ignoreTLS = false
       }
     }
   }
@@ -1051,6 +1244,14 @@ const isPlatformFormValid = computed(() => {
   if (platformForm.value.type === 'bark') {
     // Bark平台需要deviceKey
     return !!platformForm.value.deviceKey
+  } else if (platformForm.value.type === 'smtp') {
+    // SMTP平台需要必要的配置
+    return !!(
+      platformForm.value.host &&
+      platformForm.value.user &&
+      platformForm.value.pass &&
+      platformForm.value.to
+    )
   } else {
     // 其他平台需要URL且URL格式正确
     return !!platformForm.value.url && !urlError.value
@@ -1134,8 +1335,8 @@ const saveWebhookConfig = async () => {
 
 // 验证 URL
 const validateUrl = () => {
-  // Bark平台不需要验证URL
-  if (platformForm.value.type === 'bark') {
+  // Bark和SMTP平台不需要验证URL
+  if (platformForm.value.type === 'bark' || platformForm.value.type === 'smtp') {
     urlError.value = false
     urlValid.value = false
     return
@@ -1163,27 +1364,46 @@ const validateUrl = () => {
   }
 }
 
-// 添加/更新平台
-const savePlatform = async () => {
-  if (!isMounted.value) return
-
-  // Bark平台只需要deviceKey，其他平台需要URL
+// 验证平台配置
+const validatePlatformForm = () => {
   if (platformForm.value.type === 'bark') {
     if (!platformForm.value.deviceKey) {
       showToast('请输入Bark设备密钥', 'error')
-      return
+      return false
+    }
+  } else if (platformForm.value.type === 'smtp') {
+    const requiredFields = [
+      { field: 'host', message: 'SMTP服务器' },
+      { field: 'user', message: '用户名' },
+      { field: 'pass', message: '密码' },
+      { field: 'to', message: '收件人邮箱' }
+    ]
+
+    for (const { field, message } of requiredFields) {
+      if (!platformForm.value[field]) {
+        showToast(`请输入${message}`, 'error')
+        return false
+      }
     }
   } else {
     if (!platformForm.value.url) {
       showToast('请输入Webhook URL', 'error')
-      return
+      return false
     }
-
     if (urlError.value) {
       showToast('请输入有效的Webhook URL', 'error')
-      return
+      return false
     }
   }
+  return true
+}
+
+// 添加/更新平台
+const savePlatform = async () => {
+  if (!isMounted.value) return
+
+  // 验证表单
+  if (!validatePlatformForm()) return
 
   savingPlatform.value = true
   try {
@@ -1292,6 +1512,15 @@ const testPlatform = async (platform) => {
       testData.level = platform.level
       testData.sound = platform.sound
       testData.group = platform.group
+    } else if (platform.type === 'smtp') {
+      testData.host = platform.host
+      testData.port = platform.port
+      testData.secure = platform.secure
+      testData.user = platform.user
+      testData.pass = platform.pass
+      testData.from = platform.from
+      testData.to = platform.to
+      testData.ignoreTLS = platform.ignoreTLS
     } else {
       testData.url = platform.url
     }
@@ -1300,7 +1529,7 @@ const testPlatform = async (platform) => {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
-      showToast('测试成功，webhook连接正常', 'success')
+      showToast('测试成功', 'success')
     }
   } catch (error) {
     if (error.name === 'AbortError') return
@@ -1314,24 +1543,8 @@ const testPlatform = async (platform) => {
 const testPlatformForm = async () => {
   if (!isMounted.value) return
 
-  // Bark平台验证
-  if (platformForm.value.type === 'bark') {
-    if (!platformForm.value.deviceKey) {
-      showToast('请先输入Bark设备密钥', 'error')
-      return
-    }
-  } else {
-    // 其他平台验证URL
-    if (!platformForm.value.url) {
-      showToast('请先输入Webhook URL', 'error')
-      return
-    }
-
-    if (urlError.value) {
-      showToast('请输入有效的Webhook URL', 'error')
-      return
-    }
-  }
+  // 验证表单
+  if (!validatePlatformForm()) return
 
   testingConnection.value = true
   try {
@@ -1339,7 +1552,7 @@ const testPlatformForm = async () => {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
-      showToast('测试成功，webhook连接正常', 'success')
+      showToast('测试成功', 'success')
     }
   } catch (error) {
     if (error.name === 'AbortError') return
@@ -1397,7 +1610,17 @@ const closePlatformModal = () => {
       serverUrl: '',
       level: '',
       sound: '',
-      group: ''
+      group: '',
+      // SMTP特有字段
+      host: '',
+      port: null,
+      secure: false,
+      user: '',
+      pass: '',
+      from: '',
+      to: '',
+      timeout: null,
+      ignoreTLS: false
     }
     urlError.value = false
     urlValid.value = false
@@ -1415,6 +1638,7 @@ const getPlatformName = (type) => {
     slack: 'Slack',
     discord: 'Discord',
     bark: 'Bark',
+    smtp: '邮件通知',
     custom: '自定义'
   }
   return names[type] || type
@@ -1428,6 +1652,7 @@ const getPlatformIcon = (type) => {
     slack: 'fab fa-slack text-purple-600',
     discord: 'fab fa-discord text-indigo-600',
     bark: 'fas fa-bell text-orange-500',
+    smtp: 'fas fa-envelope text-blue-600',
     custom: 'fas fa-webhook text-gray-600'
   }
   return icons[type] || 'fas fa-bell'
@@ -1441,6 +1666,7 @@ const getWebhookHint = (type) => {
     slack: '请在Slack应用的Incoming Webhooks中获取地址',
     discord: '请在Discord服务器的集成设置中创建Webhook',
     bark: '请在Bark App中查看您的设备密钥',
+    smtp: '请配置SMTP服务器信息，支持Gmail、QQ邮箱等',
     custom: '请输入完整的Webhook接收地址'
   }
   return hints[type] || ''
@@ -1451,7 +1677,8 @@ const getNotificationTypeName = (type) => {
     accountAnomaly: '账号异常',
     quotaWarning: '配额警告',
     systemError: '系统错误',
-    securityAlert: '安全警报'
+    securityAlert: '安全警报',
+    test: '测试通知'
   }
   return names[type] || type
 }
@@ -1461,7 +1688,8 @@ const getNotificationTypeDescription = (type) => {
     accountAnomaly: '账号状态异常、认证失败等',
     quotaWarning: 'API调用配额不足警告',
     systemError: '系统运行错误和故障',
-    securityAlert: '安全相关的警报通知'
+    securityAlert: '安全相关的警报通知',
+    test: '用于测试Webhook连接是否正常'
   }
   return descriptions[type] || ''
 }
