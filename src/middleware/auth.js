@@ -757,7 +757,7 @@ const requireAdmin = (req, res, next) => {
 // 注意：使用统计现在直接在/api/v1/messages路由中处理，
 // 以便从Claude API响应中提取真实的usage数据
 
-// 🚦 CORS中间件（优化版）
+// 🚦 CORS中间件（优化版，支持Chrome插件）
 const corsMiddleware = (req, res, next) => {
   const { origin } = req.headers
 
@@ -769,8 +769,11 @@ const corsMiddleware = (req, res, next) => {
     'https://127.0.0.1:3000'
   ]
 
+  // 🆕 检查是否为Chrome插件请求
+  const isChromeExtension = origin && origin.startsWith('chrome-extension://')
+
   // 设置CORS头
-  if (allowedOrigins.includes(origin) || !origin) {
+  if (allowedOrigins.includes(origin) || !origin || isChromeExtension) {
     res.header('Access-Control-Allow-Origin', origin || '*')
   }
 
@@ -785,7 +788,9 @@ const corsMiddleware = (req, res, next) => {
       'Authorization',
       'x-api-key',
       'api-key',
-      'x-admin-token'
+      'x-admin-token',
+      'anthropic-version',
+      'anthropic-dangerous-direct-browser-access'
     ].join(', ')
   )
 

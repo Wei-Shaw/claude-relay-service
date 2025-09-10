@@ -629,8 +629,30 @@ class ClaudeRelayService {
       'transfer-encoding'
     ]
 
+    // 🆕 需要移除的浏览器相关 headers（避免CORS问题）
+    const browserHeaders = [
+      'origin',
+      'referer',
+      'sec-fetch-mode',
+      'sec-fetch-site',
+      'sec-fetch-dest',
+      'sec-ch-ua',
+      'sec-ch-ua-mobile',
+      'sec-ch-ua-platform',
+      'accept-language',
+      'accept-encoding',
+      'accept',
+      'cache-control',
+      'pragma',
+      'anthropic-dangerous-direct-browser-access' // 这个头可能触发CORS检查
+    ]
+
     // 应该保留的 headers（用于会话一致性和追踪）
-    const allowedHeaders = ['x-request-id']
+    const allowedHeaders = [
+      'x-request-id',
+      'anthropic-version', // 保留API版本
+      'anthropic-beta' // 保留beta功能
+    ]
 
     const filteredHeaders = {}
 
@@ -641,8 +663,8 @@ class ClaudeRelayService {
       if (allowedHeaders.includes(lowerKey)) {
         filteredHeaders[key] = clientHeaders[key]
       }
-      // 如果不在敏感列表中，也保留
-      else if (!sensitiveHeaders.includes(lowerKey)) {
+      // 如果不在敏感列表和浏览器列表中，也保留
+      else if (!sensitiveHeaders.includes(lowerKey) && !browserHeaders.includes(lowerKey)) {
         filteredHeaders[key] = clientHeaders[key]
       }
     })
