@@ -37,7 +37,9 @@ export function formatDate(date, format = 'YYYY-MM-DD HH:mm:ss') {
     .replace('ss', seconds)
 }
 
-// 相对时间格式化
+// 相对时间格式化（使用 i18n）
+import i18n from '@/i18n'
+
 export function formatRelativeTime(date) {
   if (!date) return ''
 
@@ -50,13 +52,13 @@ export function formatRelativeTime(date) {
   const diffDays = Math.floor(diffHours / 24)
 
   if (diffDays > 0) {
-    return `${diffDays}天前`
+    return i18n.global.t('common.time.daysAgo', { days: diffDays })
   } else if (diffHours > 0) {
-    return `${diffHours}小时前`
+    return i18n.global.t('common.time.hoursAgo', { hours: diffHours })
   } else if (diffMins > 0) {
-    return `${diffMins}分钟前`
+    return i18n.global.t('common.time.minutesAgo', { minutes: diffMins })
   } else {
-    return '刚刚'
+    return i18n.global.t('common.time.justNow')
   }
 }
 
