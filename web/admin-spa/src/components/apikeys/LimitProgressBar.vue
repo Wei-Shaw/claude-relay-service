@@ -1,6 +1,6 @@
 <template>
   <div class="w-full">
-    <div class="relative h-8 w-full overflow-hidden rounded-md shadow-sm" :class="containerClass">
+    <div class="relative h-8 w-full overflow-hidden rounded-lg shadow-sm" :class="containerClass">
       <!-- 背景层 -->
       <div class="absolute inset-0" :class="backgroundClass"></div>
 
@@ -12,17 +12,17 @@
       ></div>
 
       <!-- 文字层 - 使用双层文字技术确保可读性 -->
-      <div class="relative z-10 flex h-full items-center justify-between px-2.5">
+      <div class="relative z-10 flex h-full items-center justify-between px-3">
         <div class="flex items-center gap-1.5">
-          <i :class="['text-[10px]', iconClass]" />
-          <span class="text-[10px] font-semibold" :class="labelTextClass">{{ label }}</span>
+          <i :class="['text-xs', iconClass]" />
+          <span class="text-xs font-semibold" :class="labelTextClass">{{ label }}</span>
         </div>
-        <div class="mr-1 flex items-center gap-0.5">
-          <span class="text-[10px] font-bold tabular-nums" :class="currentValueClass">
+        <div class="flex items-center gap-1.5">
+          <span class="text-xs font-bold tabular-nums" :class="currentValueClass">
             ${{ current.toFixed(2) }}
           </span>
-          <span class="text-[9px] font-medium" :class="limitTextClass">
-            /${{ limit.toFixed(2) }}
+          <span class="text-xs font-medium" :class="limitTextClass">
+            / ${{ limit.toFixed(2) }}
           </span>
         </div>
       </div>
@@ -48,7 +48,7 @@ const props = defineProps({
   type: {
     type: String,
     required: true,
-    validator: (value) => ['daily', 'opus', 'window', 'gpt5-high'].includes(value)
+    validator: (value) => ['daily', 'opus', 'window'].includes(value)
   },
   label: {
     type: String,
@@ -88,8 +88,6 @@ const backgroundClass = computed(() => {
       return 'bg-violet-50/50 dark:bg-violet-950/20'
     case 'window':
       return 'bg-sky-50/50 dark:bg-sky-950/20'
-    case 'gpt5-high':
-      return 'bg-orange-50/50 dark:bg-orange-950/20'
     default:
       return 'bg-gray-100/50 dark:bg-gray-800/30'
   }
@@ -129,16 +127,6 @@ const progressBarClass = computed(() => {
     }
   }
 
-  if (props.type === 'gpt5-high') {
-    if (p >= 90) {
-      return 'bg-red-400 dark:bg-red-500'
-    } else if (p >= 70) {
-      return 'bg-amber-400 dark:bg-amber-500'
-    } else {
-      return 'bg-orange-400 dark:bg-orange-500'
-    }
-  }
-
   return 'bg-gray-300 dark:bg-gray-400'
 })
 
@@ -163,9 +151,6 @@ const iconClass = computed(() => {
       case 'window':
         colorClass = 'text-blue-700 dark:text-blue-400'
         break
-      case 'gpt5-high':
-        colorClass = 'text-orange-700 dark:text-orange-400'
-        break
       default:
         colorClass = 'text-gray-600 dark:text-gray-400'
     }
@@ -181,9 +166,6 @@ const iconClass = computed(() => {
       break
     case 'window':
       iconName = 'fas fa-clock'
-      break
-    case 'gpt5-high':
-      iconName = 'fas fa-brain'
       break
     default:
       iconName = 'fas fa-infinity'
@@ -209,8 +191,6 @@ const labelTextClass = computed(() => {
         return 'text-purple-900 dark:text-purple-100'
       case 'window':
         return 'text-blue-900 dark:text-blue-100'
-      case 'gpt5-high':
-        return 'text-orange-900 dark:text-orange-100'
       default:
         return 'text-gray-900 dark:text-gray-100'
     }
@@ -239,8 +219,6 @@ const currentValueClass = computed(() => {
           return 'text-purple-800 dark:text-purple-200'
         case 'window':
           return 'text-blue-800 dark:text-blue-200'
-        case 'gpt5-high':
-          return 'text-orange-800 dark:text-orange-200'
         default:
           return 'text-gray-900 dark:text-gray-100'
       }

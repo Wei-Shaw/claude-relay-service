@@ -32,14 +32,16 @@
               class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-3 sm:text-sm"
               >名称</label
             >
-            <input
-              v-model="form.name"
-              class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-              maxlength="100"
-              placeholder="请输入API Key名称"
-              required
-              type="text"
-            />
+            <div>
+              <input
+                v-model="form.name"
+                class="form-input flex-1 border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                maxlength="100"
+                placeholder="请输入API Key名称"
+                required
+                type="text"
+              />
+            </div>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 sm:mt-2">
               用于识别此 API Key 的用途
             </p>
@@ -316,56 +318,6 @@
               />
               <p class="text-xs text-gray-500 dark:text-gray-400">
                 设置 Opus 模型的周费用限制（周一到周日），仅限 Claude 官方账户，0 或留空表示无限制
-              </p>
-            </div>
-          </div>
-
-          <!-- GPT-5 High推理级别周费用限制 -->
-          <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >GPT-5 High推理级别周费用限制 (美元)</label
-            >
-            <div class="space-y-2">
-              <div class="flex gap-2">
-                <button
-                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                  type="button"
-                  @click="form.weeklyGPT5HighCostLimit = '5'"
-                >
-                  $5
-                </button>
-                <button
-                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                  type="button"
-                  @click="form.weeklyGPT5HighCostLimit = '20'"
-                >
-                  $20
-                </button>
-                <button
-                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                  type="button"
-                  @click="form.weeklyGPT5HighCostLimit = '50'"
-                >
-                  $50
-                </button>
-                <button
-                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                  type="button"
-                  @click="form.weeklyGPT5HighCostLimit = ''"
-                >
-                  自定义
-                </button>
-              </div>
-              <input
-                v-model="form.weeklyGPT5HighCostLimit"
-                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                min="0"
-                placeholder="0 表示无限制"
-                step="0.01"
-                type="number"
-              />
-              <p class="text-xs text-gray-500 dark:text-gray-400">
-                设置 GPT-5 High推理级别的周费用限制（周一到周日），0 或留空表示无限制
               </p>
             </div>
           </div>
@@ -762,7 +714,6 @@ const form = reactive({
   concurrencyLimit: '',
   dailyCostLimit: '',
   weeklyOpusCostLimit: '',
-  weeklyGPT5HighCostLimit: '', // 新增：GPT-5 High推理级别周费用限制
   permissions: 'all',
   claudeAccountId: '',
   geminiAccountId: '',
@@ -792,22 +743,7 @@ const removeRestrictedModel = (index) => {
 }
 
 // 常用模型列表
-const commonModels = ref([
-  // Claude 模型
-  'claude-opus-4-20250514',
-  'claude-opus-4-1-20250805',
-  // OpenAI 模型
-  'gpt-5',
-  'gpt-5 minimal',
-  'gpt-5 low',
-  'gpt-5 medium',
-  'gpt-5 high',
-  'gpt-4o',
-  'gpt-4o-mini',
-  'o1',
-  'o1-mini',
-  'o1-preview'
-])
+const commonModels = ref(['claude-opus-4-20250514', 'claude-opus-4-1-20250805'])
 
 // 可用的快捷模型（过滤掉已在限制列表中的）
 const availableQuickModels = computed(() => {
@@ -893,11 +829,6 @@ const updateApiKey = async () => {
       weeklyOpusCostLimit:
         form.weeklyOpusCostLimit !== '' && form.weeklyOpusCostLimit !== null
           ? parseFloat(form.weeklyOpusCostLimit)
-          : 0,
-      // 新增：GPT-5 High推理级别周费用限制
-      weeklyGPT5HighCostLimit:
-        form.weeklyGPT5HighCostLimit !== '' && form.weeklyGPT5HighCostLimit !== null
-          ? parseFloat(form.weeklyGPT5HighCostLimit)
           : 0,
       permissions: form.permissions,
       tags: form.tags
@@ -1122,7 +1053,6 @@ onMounted(async () => {
   form.concurrencyLimit = props.apiKey.concurrencyLimit || ''
   form.dailyCostLimit = props.apiKey.dailyCostLimit || ''
   form.weeklyOpusCostLimit = props.apiKey.weeklyOpusCostLimit || ''
-  form.weeklyGPT5HighCostLimit = props.apiKey.weeklyGPT5HighCostLimit || '' // 新增
   form.permissions = props.apiKey.permissions || 'all'
   // 处理 Claude 账号（区分 OAuth 和 Console）
   if (props.apiKey.claudeConsoleAccountId) {
