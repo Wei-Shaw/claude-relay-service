@@ -34,7 +34,6 @@ class ApiKeyService {
       allowedClients = [],
       dailyCostLimit = 0,
       weeklyOpusCostLimit = 0,
-      weeklyGPT5HighCostLimit = 0, // 新增：GPT-5 High推理级别周费用限制
       tags = [],
       activationDays = 0, // 新增：激活后有效天数（0表示不使用此功能）
       expirationMode = 'fixed', // 新增：过期模式 'fixed'(固定时间) 或 'activation'(首次使用后激活)
@@ -70,7 +69,6 @@ class ApiKeyService {
       allowedClients: JSON.stringify(allowedClients || []),
       dailyCostLimit: String(dailyCostLimit || 0),
       weeklyOpusCostLimit: String(weeklyOpusCostLimit || 0),
-      weeklyGPT5HighCostLimit: String(weeklyGPT5HighCostLimit || 0), // 新增：GPT-5 High周费用限制
       tags: JSON.stringify(tags || []),
       activationDays: String(activationDays || 0), // 新增：激活后有效天数
       expirationMode: expirationMode || 'fixed', // 新增：过期模式
@@ -114,7 +112,6 @@ class ApiKeyService {
       allowedClients: JSON.parse(keyData.allowedClients || '[]'),
       dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
       weeklyOpusCostLimit: parseFloat(keyData.weeklyOpusCostLimit || 0),
-      weeklyGPT5HighCostLimit: parseFloat(keyData.weeklyGPT5HighCostLimit || 0), // 新增：GPT-5 High周费用限制
       tags: JSON.parse(keyData.tags || '[]'),
       activationDays: parseInt(keyData.activationDays || 0),
       expirationMode: keyData.expirationMode || 'fixed',
@@ -122,8 +119,7 @@ class ApiKeyService {
       activatedAt: keyData.activatedAt,
       createdAt: keyData.createdAt,
       expiresAt: keyData.expiresAt,
-      createdBy: keyData.createdBy,
-      icon: keyData.icon || '' // 新增：图标
+      createdBy: keyData.createdBy
     }
   }
 
@@ -416,10 +412,8 @@ class ApiKeyService {
         key.permissions = key.permissions || 'all' // 兼容旧数据
         key.dailyCostLimit = parseFloat(key.dailyCostLimit || 0)
         key.weeklyOpusCostLimit = parseFloat(key.weeklyOpusCostLimit || 0)
-        key.weeklyGPT5HighCostLimit = parseFloat(key.weeklyGPT5HighCostLimit || 0) // 新增：GPT-5 High周费用限制
         key.dailyCost = (await redis.getDailyCost(key.id)) || 0
         key.weeklyOpusCost = (await redis.getWeeklyOpusCost(key.id)) || 0
-        key.weeklyGPT5HighCost = (await redis.getWeeklyGPT5HighCost(key.id)) || 0 // 新增：GPT-5 High当前周费用
         key.activationDays = parseInt(key.activationDays || 0)
         key.expirationMode = key.expirationMode || 'fixed'
         key.isActivated = key.isActivated === 'true'
