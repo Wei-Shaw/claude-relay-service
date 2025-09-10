@@ -123,6 +123,15 @@
                   />
                   <span class="text-sm text-gray-700 dark:text-gray-300">Bedrock</span>
                 </label>
+                <label class="flex cursor-pointer items-center">
+                  <input
+                    v-model="form.platform"
+                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="radio"
+                    value="ccr"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">CCR</span>
+                </label>
               </div>
             </div>
 
@@ -131,7 +140,8 @@
                 !isEdit &&
                 form.platform !== 'claude-console' &&
                 form.platform !== 'bedrock' &&
-                form.platform !== 'azure_openai'
+                form.platform !== 'azure_openai' &&
+                form.platform !== 'ccr'
               "
             >
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -2247,7 +2257,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'success'])
+const emit = defineEmits(['close', 'success', 'platform-changed'])
 
 const accountsStore = useAccountsStore()
 const { showConfirmModal, confirmOptions, showConfirm, handleConfirm, handleCancel } = useConfirm()
@@ -3438,6 +3448,17 @@ watch(setupTokenAuthCode, (newValue) => {
   }
   // 如果不是 URL，保持原值（兼容直接输入授权码）
 })
+
+// 监听平台变化
+watch(
+  () => form.value.platform,
+  (newPlatform) => {
+    // 当选择 CCR 平台时，通知父组件
+    if (!isEdit.value) {
+      emit('platform-changed', newPlatform)
+    }
+  }
+)
 
 // 监听账户类型变化
 watch(
