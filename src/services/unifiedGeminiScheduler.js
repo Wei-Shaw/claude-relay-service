@@ -61,8 +61,8 @@ class UnifiedGeminiScheduler {
             mappedAccount.accountType
           )
           if (isAvailable) {
-            // 🚀 智能会话续期：剩余时间少于14天时自动续期到15天
-            await redis.extendSessionAccountMappingTTL(sessionHash)
+            // 🚀 智能会话续期（续期 unified 映射键，按配置）
+            await this._extendSessionMappingTTL(sessionHash)
             logger.info(
               `🎯 Using sticky session account: ${mappedAccount.accountId} (${mappedAccount.accountType}) for session ${sessionHash}`
             )
@@ -285,15 +285,58 @@ class UnifiedGeminiScheduler {
   async _setSessionMapping(sessionHash, accountId, accountType) {
     const client = redis.getClientSafe()
     const mappingData = JSON.stringify({ accountId, accountType })
-
-    // 设置1小时过期
-    await client.setex(`${this.SESSION_MAPPING_PREFIX}${sessionHash}`, 3600, mappingData)
+    // 依据配置设置TTL（小时）
+    const appConfig = require('../../config/config')
+    const ttlHours = appConfig.session?.stickyTtlHours || 1
+    const ttlSeconds = Math.max(1, Math.floor(ttlHours * 60 * 60))
+    await client.setex(`${this.SESSION_MAPPING_PREFIX}${sessionHash}`, ttlSeconds, mappingData)
   }
 
   // 🗑️ 删除会话映射
   async _deleteSessionMapping(sessionHash) {
     const client = redis.getClientSafe()
     await client.del(`${this.SESSION_MAPPING_PREFIX}${sessionHash}`)
+  }
+
+  // 🔁 续期统一调度会话映射TTL（针对 unified_gemini_session_mapping:* 键），遵循会话配置
+  async _extendSessionMappingTTL(sessionHash) {
+    try {
+      const client = redis.getClientSafe()
+      const key = `${this.SESSION_MAPPING_PREFIX}${sessionHash}`
+      const remainingTTL = await client.ttl(key)
+
+      if (remainingTTL === -2) {
+        return false
+      }
+      if (remainingTTL === -1) {
+        return true
+      }
+
+      const appConfig = require('../../config/config')
+      const ttlHours = appConfig.session?.stickyTtlHours || 1
+      const renewalThresholdMinutes = appConfig.session?.renewalThresholdMinutes || 0
+      if (!renewalThresholdMinutes) {
+        return true
+      }
+
+      const fullTTL = Math.max(1, Math.floor(ttlHours * 60 * 60))
+      const threshold = Math.max(0, Math.floor(renewalThresholdMinutes * 60))
+
+      if (remainingTTL < threshold) {
+        await client.expire(key, fullTTL)
+        logger.debug(
+          `🔄 Renewed unified Gemini session TTL: ${sessionHash} (was ${Math.round(remainingTTL / 60)}m, renewed to ${ttlHours}h)`
+        )
+      } else {
+        logger.debug(
+          `✅ Unified Gemini session TTL sufficient: ${sessionHash} (remaining ${Math.round(remainingTTL / 60)}m)`
+        )
+      }
+      return true
+    } catch (error) {
+      logger.error('❌ Failed to extend unified Gemini session TTL:', error)
+      return false
+    }
   }
 
   // 🚫 标记账户为限流状态
@@ -384,8 +427,8 @@ class UnifiedGeminiScheduler {
               mappedAccount.accountType
             )
             if (isAvailable) {
-              // 🚀 智能会话续期：剩余时间少于14天时自动续期到15天
-              await redis.extendSessionAccountMappingTTL(sessionHash)
+              // 🚀 智能会话续期（续期 unified 映射键，按配置）
+              await this._extendSessionMappingTTL(sessionHash)
               logger.info(
                 `🎯 Using sticky session account from group: ${mappedAccount.accountId} (${mappedAccount.accountType}) for session ${sessionHash}`
               )
