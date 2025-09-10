@@ -184,11 +184,22 @@ class ClaudeRelayService {
           // 记录401错误
           await this.recordUnauthorizedError(accountId)
 
-          // 记录401错误但不停用账号（根据用户要求，401错误永远不会导致账号不可用）
+          // 检查是否需要标记为异常（遇到1次401就停止调度）
           const errorCount = await this.getUnauthorizedErrorCount(accountId)
-          logger.warn(
-            `🔐 Account ${accountId} has ${errorCount} consecutive 401 errors in the last 5 minutes - account remains active`
+          logger.info(
+            `🔐 Account ${accountId} has ${errorCount} consecutive 401 errors in the last 5 minutes`
           )
+
+          if (errorCount >= 1) {
+            logger.error(
+              `❌ Account ${accountId} encountered 401 error (${errorCount} errors), marking as unauthorized`
+            )
+            await unifiedClaudeScheduler.markAccountUnauthorized(
+              accountId,
+              accountType,
+              sessionHash
+            )
+          }
         }
         // 检查是否为403状态码（禁止访问）
         else if (response.statusCode === 403) {
@@ -994,9 +1005,20 @@ class ClaudeRelayService {
               await this.recordUnauthorizedError(accountId)
 
               const errorCount = await this.getUnauthorizedErrorCount(accountId)
-              logger.warn(
-                `🔐 [Stream] Account ${accountId} has ${errorCount} consecutive 401 errors in the last 5 minutes - account remains active`
+              logger.info(
+                `🔐 [Stream] Account ${accountId} has ${errorCount} consecutive 401 errors in the last 5 minutes`
               )
+
+              if (errorCount >= 1) {
+                logger.error(
+                  `❌ [Stream] Account ${accountId} encountered 401 error (${errorCount} errors), marking as unauthorized`
+                )
+                await unifiedClaudeScheduler.markAccountUnauthorized(
+                  accountId,
+                  accountType,
+                  sessionHash
+                )
+              }
             } else if (res.statusCode === 403) {
               logger.error(
                 `🚫 [Stream] Forbidden error (403) detected for account ${accountId}, marking as blocked`
