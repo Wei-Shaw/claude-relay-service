@@ -311,13 +311,19 @@ class UnifiedOpenAIScheduler {
       const key = `${this.SESSION_MAPPING_PREFIX}${sessionHash}`
       const remainingTTL = await client.ttl(key)
 
-      if (remainingTTL === -2) return false
-      if (remainingTTL === -1) return true
+      if (remainingTTL === -2) {
+        return false
+      }
+      if (remainingTTL === -1) {
+        return true
+      }
 
       const appConfig = require('../../config/config')
       const ttlHours = appConfig.session?.stickyTtlHours || 1
       const renewalThresholdMinutes = appConfig.session?.renewalThresholdMinutes || 0
-      if (!renewalThresholdMinutes) return true
+      if (!renewalThresholdMinutes) {
+        return true
+      }
 
       const fullTTL = Math.max(1, Math.floor(ttlHours * 60 * 60))
       const threshold = Math.max(0, Math.floor(renewalThresholdMinutes * 60))
