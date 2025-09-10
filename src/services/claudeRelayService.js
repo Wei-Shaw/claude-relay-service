@@ -79,7 +79,7 @@ class ClaudeRelayService {
         requestedModel: requestBody.model
       })
 
-      // 检查模型限制
+      // 检查模型限制（restrictedModels 作为允许列表）
       if (
         apiKeyData.enableModelRestriction &&
         apiKeyData.restrictedModels &&
@@ -87,12 +87,12 @@ class ClaudeRelayService {
       ) {
         const requestedModel = requestBody.model
         logger.info(
-          `🔒 Model restriction check - Requested model: ${requestedModel}, Restricted models: ${JSON.stringify(apiKeyData.restrictedModels)}`
+          `🔒 Model restriction check - Requested model: ${requestedModel}, Allowed models: ${JSON.stringify(apiKeyData.restrictedModels)}`
         )
 
-        if (requestedModel && apiKeyData.restrictedModels.includes(requestedModel)) {
+        if (requestedModel && !apiKeyData.restrictedModels.includes(requestedModel)) {
           logger.warn(
-            `🚫 Model restriction violation for key ${apiKeyData.name}: Attempted to use restricted model ${requestedModel}`
+            `🚫 Model restriction violation for key ${apiKeyData.name}: Attempted model ${requestedModel} not in allowed list`
           )
           return {
             statusCode: 403,
@@ -844,7 +844,7 @@ class ClaudeRelayService {
         requestedModel: requestBody.model
       })
 
-      // 检查模型限制
+      // 检查模型限制（restrictedModels 作为允许列表）
       if (
         apiKeyData.enableModelRestriction &&
         apiKeyData.restrictedModels &&
@@ -852,12 +852,12 @@ class ClaudeRelayService {
       ) {
         const requestedModel = requestBody.model
         logger.info(
-          `🔒 [Stream] Model restriction check - Requested model: ${requestedModel}, Restricted models: ${JSON.stringify(apiKeyData.restrictedModels)}`
+          `🔒 [Stream] Model restriction check - Requested model: ${requestedModel}, Allowed models: ${JSON.stringify(apiKeyData.restrictedModels)}`
         )
 
-        if (requestedModel && apiKeyData.restrictedModels.includes(requestedModel)) {
+        if (requestedModel && !apiKeyData.restrictedModels.includes(requestedModel)) {
           logger.warn(
-            `🚫 Model restriction violation for key ${apiKeyData.name}: Attempted to use restricted model ${requestedModel}`
+            `🚫 Model restriction violation for key ${apiKeyData.name}: Attempted model ${requestedModel} not in allowed list`
           )
 
           // 对于流式响应，需要写入错误并结束流

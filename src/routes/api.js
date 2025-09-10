@@ -2,6 +2,7 @@ const express = require('express')
 const claudeRelayService = require('../services/claudeRelayService')
 const claudeConsoleRelayService = require('../services/claudeConsoleRelayService')
 const bedrockRelayService = require('../services/bedrockRelayService')
+const ccrRelayService = require('../services/ccrRelayService')
 const bedrockAccountService = require('../services/bedrockAccountService')
 const unifiedClaudeScheduler = require('../services/unifiedClaudeScheduler')
 const apiKeyService = require('../services/apiKeyService')
@@ -9,6 +10,7 @@ const pricingService = require('../services/pricingService')
 const { authenticateApiKey } = require('../middleware/auth')
 const logger = require('../utils/logger')
 const redis = require('../models/redis')
+const { getEffectiveModel, parseVendorPrefixedModel } = require('../utils/modelHelper')
 const sessionHelper = require('../utils/sessionHelper')
 
 const router = express.Router()
@@ -38,6 +40,23 @@ async function handleMessagesRequest(req, res) {
         error: 'Invalid request',
         message: 'Messages array cannot be empty'
       })
+    }
+
+    // 模型限制（允许列表）校验：统一在此处处理（去除供应商前缀）
+    if (
+      req.apiKey.enableModelRestriction &&
+      Array.isArray(req.apiKey.restrictedModels) &&
+      req.apiKey.restrictedModels.length > 0
+    ) {
+      const effectiveModel = getEffectiveModel(req.body.model || '')
+      if (!req.apiKey.restrictedModels.includes(effectiveModel)) {
+        return res.status(403).json({
+          error: {
+            type: 'forbidden',
+            message: '暂无该模型访问权限'
+          }
+        })
+      }
     }
 
     // 检查是否为流式请求
@@ -354,6 +373,110 @@ async function handleMessagesRequest(req, res) {
           }
           return undefined
         }
+      } else if (accountType === 'ccr') {
+        // CCR账号使用CCR转发服务（需要传递accountId）
+        await ccrRelayService.relayStreamRequestWithUsageCapture(
+          req.body,
+          req.apiKey,
+          res,
+          req.headers,
+          (usageData) => {
+            // 回调函数：当检测到完整usage数据时记录真实token使用量
+            logger.info(
+              '🎯 CCR usage callback triggered with complete data:',
+              JSON.stringify(usageData, null, 2)
+            )
+
+            if (
+              usageData &&
+              usageData.input_tokens !== undefined &&
+              usageData.output_tokens !== undefined
+            ) {
+              const inputTokens = usageData.input_tokens || 0
+              const outputTokens = usageData.output_tokens || 0
+              // 兼容处理：如果有详细的 cache_creation 对象，使用它；否则使用总的 cache_creation_input_tokens
+              let cacheCreateTokens = usageData.cache_creation_input_tokens || 0
+              let ephemeral5mTokens = 0
+              let ephemeral1hTokens = 0
+
+              if (usageData.cache_creation && typeof usageData.cache_creation === 'object') {
+                ephemeral5mTokens = usageData.cache_creation.ephemeral_5m_input_tokens || 0
+                ephemeral1hTokens = usageData.cache_creation.ephemeral_1h_input_tokens || 0
+                // 总的缓存创建 tokens 是两者之和
+                cacheCreateTokens = ephemeral5mTokens + ephemeral1hTokens
+              }
+
+              const cacheReadTokens = usageData.cache_read_input_tokens || 0
+              const model = usageData.model || 'unknown'
+
+              // 记录真实的token使用量（包含模型信息和所有4种token以及账户ID）
+              const usageAccountId = usageData.accountId
+
+              // 构建 usage 对象以传递给 recordUsage
+              const usageObject = {
+                input_tokens: inputTokens,
+                output_tokens: outputTokens,
+                cache_creation_input_tokens: cacheCreateTokens,
+                cache_read_input_tokens: cacheReadTokens
+              }
+
+              // 如果有详细的缓存创建数据，添加到 usage 对象中
+              if (ephemeral5mTokens > 0 || ephemeral1hTokens > 0) {
+                usageObject.cache_creation = {
+                  ephemeral_5m_input_tokens: ephemeral5mTokens,
+                  ephemeral_1h_input_tokens: ephemeral1hTokens
+                }
+              }
+
+              apiKeyService
+                .recordUsageWithDetails(req.apiKey.id, usageObject, model, usageAccountId, 'ccr')
+                .catch((error) => {
+                  logger.error('❌ Failed to record CCR stream usage:', error)
+                })
+
+              // 更新时间窗口内的token计数和费用
+              if (req.rateLimitInfo) {
+                const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
+
+                // 更新Token计数（向后兼容）
+                redis
+                  .getClient()
+                  .incrby(req.rateLimitInfo.tokenCountKey, totalTokens)
+                  .catch((error) => {
+                    logger.error('❌ Failed to update rate limit token count:', error)
+                  })
+                logger.api(`📊 Updated rate limit token count: +${totalTokens} tokens`)
+
+                // 计算并更新费用计数（新功能）
+                if (req.rateLimitInfo.costCountKey) {
+                  const costInfo = pricingService.calculateCost(usageData, model)
+                  if (costInfo.totalCost > 0) {
+                    redis
+                      .getClient()
+                      .incrbyfloat(req.rateLimitInfo.costCountKey, costInfo.totalCost)
+                      .catch((error) => {
+                        logger.error('❌ Failed to update rate limit cost count:', error)
+                      })
+                    logger.api(
+                      `💰 Updated rate limit cost count: +$${costInfo.totalCost.toFixed(6)}`
+                    )
+                  }
+                }
+              }
+
+              usageDataCaptured = true
+              logger.api(
+                `📊 CCR stream usage recorded (real) - Model: ${model}, Input: ${inputTokens}, Output: ${outputTokens}, Cache Create: ${cacheCreateTokens}, Cache Read: ${cacheReadTokens}, Total: ${inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens} tokens`
+              )
+            } else {
+              logger.warn(
+                '⚠️ CCR usage callback triggered but data is incomplete:',
+                JSON.stringify(usageData)
+              )
+            }
+          },
+          accountId
+        )
       }
 
       // 流式请求完成后 - 如果没有捕获到usage数据，记录警告但不进行估算
@@ -447,6 +570,17 @@ async function handleMessagesRequest(req, res) {
             accountId
           }
         }
+      } else if (accountType === 'ccr') {
+        // CCR账号使用CCR转发服务
+        logger.debug(`[DEBUG] Calling ccrRelayService.relayRequest with accountId: ${accountId}`)
+        response = await ccrRelayService.relayRequest(
+          req.body,
+          req.apiKey,
+          req,
+          res,
+          req.headers,
+          accountId
+        )
       }
 
       logger.info('📡 Claude API response received', {
@@ -483,7 +617,10 @@ async function handleMessagesRequest(req, res) {
           const outputTokens = jsonData.usage.output_tokens || 0
           const cacheCreateTokens = jsonData.usage.cache_creation_input_tokens || 0
           const cacheReadTokens = jsonData.usage.cache_read_input_tokens || 0
-          const model = jsonData.model || req.body.model || 'unknown'
+          // Parse the model to remove vendor prefix if present (e.g., "ccr,gemini-2.5-pro" -> "gemini-2.5-pro")
+          const rawModel = jsonData.model || req.body.model || 'unknown'
+          const { baseModel } = parseVendorPrefixedModel(rawModel)
+          const model = baseModel || rawModel
 
           // 记录真实的token使用量（包含模型信息和所有4种token以及账户ID）
           const { accountId: responseAccountId } = response
@@ -762,6 +899,23 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
 
     logger.info(`🔢 Processing token count request for key: ${req.apiKey.name}`)
 
+    // 模型限制（允许列表）校验：统一在此处处理（去除供应商前缀）
+    if (
+      req.apiKey.enableModelRestriction &&
+      Array.isArray(req.apiKey.restrictedModels) &&
+      req.apiKey.restrictedModels.length > 0
+    ) {
+      const effectiveModel = getEffectiveModel(req.body.model || '')
+      if (!req.apiKey.restrictedModels.includes(effectiveModel)) {
+        return res.status(403).json({
+          error: {
+            type: 'forbidden',
+            message: '暂无该模型访问权限'
+          }
+        })
+      }
+    }
+
     // 生成会话哈希用于sticky会话
     const sessionHash = sessionHelper.generateSessionHash(req.body)
 
@@ -801,6 +955,14 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
           customPath: '/v1/messages/count_tokens' // 指定count_tokens路径
         }
       )
+    } else if (accountType === 'ccr') {
+      // CCR不支持count_tokens
+      return res.status(501).json({
+        error: {
+          type: 'not_supported',
+          message: 'Token counting is not supported for CCR accounts'
+        }
+      })
     } else {
       // Bedrock不支持count_tokens
       return res.status(501).json({

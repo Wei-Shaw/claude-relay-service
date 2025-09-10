@@ -483,6 +483,10 @@ class ApiKeyService {
         } catch (e) {
           key.tags = []
         }
+        // 不暴露已弃用字段
+        if (Object.prototype.hasOwnProperty.call(key, 'ccrAccountId')) {
+          delete key.ccrAccountId
+        }
         delete key.apiKey // 不返回哈希后的key
       }
 
@@ -846,8 +850,11 @@ class ApiKeyService {
         return // 不是 Opus 模型，直接返回
       }
 
-      // 判断是否为 claude 或 claude-console 账户
-      if (!accountType || (accountType !== 'claude' && accountType !== 'claude-console')) {
+      // 判断是否为 claude、claude-console 或 ccr 账户
+      if (
+        !accountType ||
+        (accountType !== 'claude' && accountType !== 'claude-console' && accountType !== 'ccr')
+      ) {
         logger.debug(`⚠️ Skipping Opus cost recording for non-Claude account type: ${accountType}`)
         return // 不是 claude 账户，直接返回
       }

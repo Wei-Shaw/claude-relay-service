@@ -7,7 +7,7 @@
             账户管理
           </h3>
           <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-base">
-            管理您的 Claude、Gemini、OpenAI 和 Azure OpenAI 账户及代理配置
+            管理您的 Claude、Gemini、OpenAI、Azure OpenAI 与 CCR 账户及代理配置
           </p>
         </div>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -364,6 +364,15 @@
                     </span>
                   </div>
                   <div
+                    v-else-if="account.platform === 'ccr'"
+                    class="flex items-center gap-1.5 rounded-lg border border-teal-200 bg-gradient-to-r from-teal-100 to-emerald-100 px-2.5 py-1 dark:border-teal-700 dark:from-teal-900/20 dark:to-emerald-900/20"
+                  >
+                    <i class="fas fa-code-branch text-xs text-teal-700 dark:text-teal-400" />
+                    <span class="text-xs font-semibold text-teal-800 dark:text-teal-300">CCR</span>
+                    <span class="mx-1 h-4 w-px bg-teal-300 dark:bg-teal-600" />
+                    <span class="text-xs font-medium text-teal-700 dark:text-teal-300">Relay</span>
+                  </div>
+                  <div
                     v-else
                     class="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gradient-to-r from-gray-100 to-gray-200 px-2.5 py-1"
                   >
@@ -470,7 +479,8 @@
                     account.platform === 'bedrock' ||
                     account.platform === 'gemini' ||
                     account.platform === 'openai' ||
-                    account.platform === 'azure_openai'
+                    account.platform === 'azure_openai' ||
+                    account.platform === 'ccr'
                   "
                   class="flex items-center gap-2"
                 >
@@ -723,7 +733,9 @@
                         ? 'bg-gradient-to-br from-blue-500 to-cyan-600'
                         : account.platform === 'openai'
                           ? 'bg-gradient-to-br from-gray-600 to-gray-700'
-                          : 'bg-gradient-to-br from-blue-500 to-blue-600'
+                          : account.platform === 'ccr'
+                            ? 'bg-gradient-to-br from-teal-500 to-emerald-600'
+                            : 'bg-gradient-to-br from-blue-500 to-blue-600'
                 ]"
               >
                 <i
@@ -737,7 +749,9 @@
                           ? 'fab fa-microsoft'
                           : account.platform === 'openai'
                             ? 'fas fa-openai'
-                            : 'fas fa-robot'
+                            : account.platform === 'ccr'
+                              ? 'fas fa-code-branch'
+                              : 'fas fa-robot'
                   ]"
                 />
               </div>
@@ -932,14 +946,26 @@
 
     <!-- 添加账户模态框 -->
     <AccountForm
-      v-if="showCreateAccountModal"
-      @close="showCreateAccountModal = false"
+      v-if="showCreateAccountModal && (!newAccountPlatform || newAccountPlatform !== 'ccr')"
+      @close="closeCreateAccountModal"
+      @platform-changed="newAccountPlatform = $event"
+      @success="handleCreateSuccess"
+    />
+    <CcrAccountForm
+      v-else-if="showCreateAccountModal && newAccountPlatform === 'ccr'"
+      @close="closeCreateAccountModal"
       @success="handleCreateSuccess"
     />
 
     <!-- 编辑账户模态框 -->
+    <CcrAccountForm
+      v-if="showEditAccountModal && editingAccount && editingAccount.platform === 'ccr'"
+      :account="editingAccount"
+      @close="showEditAccountModal = false"
+      @success="handleEditSuccess"
+    />
     <AccountForm
-      v-if="showEditAccountModal"
+      v-else-if="showEditAccountModal"
       :account="editingAccount"
       @close="showEditAccountModal = false"
       @success="handleEditSuccess"
@@ -964,6 +990,7 @@ import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
 import { useConfirm } from '@/composables/useConfirm'
 import AccountForm from '@/components/accounts/AccountForm.vue'
+import CcrAccountForm from '@/components/accounts/CcrAccountForm.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 
@@ -1003,7 +1030,8 @@ const platformOptions = ref([
   { value: 'gemini', label: 'Gemini', icon: 'fa-google' },
   { value: 'openai', label: 'OpenAi', icon: 'fa-openai' },
   { value: 'azure_openai', label: 'Azure OpenAI', icon: 'fab fa-microsoft' },
-  { value: 'bedrock', label: 'Bedrock', icon: 'fab fa-aws' }
+  { value: 'bedrock', label: 'Bedrock', icon: 'fab fa-aws' },
+  { value: 'ccr', label: 'CCR', icon: 'fa-code-branch' }
 ])
 
 const groupOptions = computed(() => {
@@ -1028,6 +1056,7 @@ const groupOptions = computed(() => {
 
 // 模态框状态
 const showCreateAccountModal = ref(false)
+const newAccountPlatform = ref(null) // 跟踪新建账户选择的平台
 const showEditAccountModal = ref(false)
 const editingAccount = ref(null)
 
@@ -1108,7 +1137,8 @@ const loadAccounts = async (forceReload = false) => {
         apiClient.get('/admin/bedrock-accounts', { params }),
         apiClient.get('/admin/gemini-accounts', { params }),
         apiClient.get('/admin/openai-accounts', { params }),
-        apiClient.get('/admin/azure-openai-accounts', { params })
+        apiClient.get('/admin/azure-openai-accounts', { params }),
+        apiClient.get('/admin/ccr-accounts', { params })
       )
     } else {
       // 只请求指定平台，其他平台设为null占位
@@ -1173,9 +1203,21 @@ const loadAccounts = async (forceReload = false) => {
             apiClient.get('/admin/azure-openai-accounts', { params })
           )
           break
+        case 'ccr':
+          requests.push(
+            Promise.resolve({ success: true, data: [] }), // claude 占位
+            Promise.resolve({ success: true, data: [] }), // claude-console 占位
+            Promise.resolve({ success: true, data: [] }), // bedrock 占位
+            Promise.resolve({ success: true, data: [] }), // gemini 占位
+            Promise.resolve({ success: true, data: [] }), // openai 占位
+            Promise.resolve({ success: true, data: [] }), // azure 占位
+            apiClient.get('/admin/ccr-accounts', { params })
+          )
+          break
         default:
           // 默认情况下返回空数组
           requests.push(
+            Promise.resolve({ success: true, data: [] }),
             Promise.resolve({ success: true, data: [] }),
             Promise.resolve({ success: true, data: [] }),
             Promise.resolve({ success: true, data: [] }),
@@ -1193,8 +1235,15 @@ const loadAccounts = async (forceReload = false) => {
     // 后端账户API已经包含分组信息，不需要单独加载分组成员关系
     // await loadGroupMembers(forceReload)
 
-    const [claudeData, claudeConsoleData, bedrockData, geminiData, openaiData, azureOpenaiData] =
-      await Promise.all(requests)
+    const [
+      claudeData,
+      claudeConsoleData,
+      bedrockData,
+      geminiData,
+      openaiData,
+      azureOpenaiData,
+      ccrData
+    ] = await Promise.all(requests)
 
     const allAccounts = []
 
@@ -1260,6 +1309,15 @@ const loadAccounts = async (forceReload = false) => {
         return { ...acc, platform: 'azure_openai', boundApiKeysCount }
       })
       allAccounts.push(...azureOpenaiAccounts)
+    }
+
+    // CCR 账户
+    if (ccrData && ccrData.success) {
+      const ccrAccounts = (ccrData.data || []).map((acc) => {
+        // CCR 不支持 API Key 绑定，固定为 0
+        return { ...acc, platform: 'ccr', boundApiKeysCount: 0 }
+      })
+      allAccounts.push(...ccrAccounts)
     }
 
     // 根据分组筛选器过滤账户
@@ -1467,7 +1525,14 @@ const formatRateLimitTime = (minutes) => {
 
 // 打开创建账户模态框
 const openCreateAccountModal = () => {
+  newAccountPlatform.value = null // 重置选择的平台
   showCreateAccountModal.value = true
+}
+
+// 关闭创建账户模态框
+const closeCreateAccountModal = () => {
+  showCreateAccountModal.value = false
+  newAccountPlatform.value = null
 }
 
 // 编辑账户
@@ -1515,6 +1580,8 @@ const deleteAccount = async (account) => {
       endpoint = `/admin/openai-accounts/${account.id}`
     } else if (account.platform === 'azure_openai') {
       endpoint = `/admin/azure-openai-accounts/${account.id}`
+    } else if (account.platform === 'ccr') {
+      endpoint = `/admin/ccr-accounts/${account.id}`
     } else {
       endpoint = `/admin/gemini-accounts/${account.id}`
     }
@@ -1563,6 +1630,8 @@ const resetAccountStatus = async (account) => {
       endpoint = `/admin/claude-accounts/${account.id}/reset-status`
     } else if (account.platform === 'claude-console') {
       endpoint = `/admin/claude-console-accounts/${account.id}/reset-status`
+    } else if (account.platform === 'ccr') {
+      endpoint = `/admin/ccr-accounts/${account.id}/reset-status`
     } else {
       showToast('不支持的账户类型', 'error')
       account.isResetting = false
@@ -1605,6 +1674,8 @@ const toggleSchedulable = async (account) => {
       endpoint = `/admin/openai-accounts/${account.id}/toggle-schedulable`
     } else if (account.platform === 'azure_openai') {
       endpoint = `/admin/azure-openai-accounts/${account.id}/toggle-schedulable`
+    } else if (account.platform === 'ccr') {
+      endpoint = `/admin/ccr-accounts/${account.id}/toggle-schedulable`
     } else {
       showToast('该账户类型暂不支持调度控制', 'warning')
       return
