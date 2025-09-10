@@ -2,9 +2,11 @@
   <div class="space-y-6">
     <div class="sm:flex sm:items-center">
       <div class="sm:flex-auto">
-        <h1 class="text-2xl font-semibold text-gray-900">My API Keys</h1>
+        <h1 class="text-2xl font-semibold text-gray-900">
+          {{ t('user.userApiKeysManager.title') }}
+        </h1>
         <p class="mt-2 text-sm text-gray-700">
-          Manage your API keys to access Claude Relay services
+          {{ t('user.userApiKeysManager.description') }}
         </p>
       </div>
       <div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
@@ -21,7 +23,7 @@
               stroke-width="2"
             />
           </svg>
-          Create API Key
+          {{ t('user.userApiKeysManager.buttons.createApiKey') }}
         </button>
       </div>
     </div>
@@ -43,8 +45,7 @@
         </div>
         <div class="ml-3">
           <p class="text-sm text-yellow-700">
-            You have reached the maximum number of API keys ({{ maxApiKeys }}). Please delete an
-            existing key to create a new one.
+            {{ t('user.userApiKeysManager.warnings.maxKeysReached', { maxApiKeys }) }}
           </p>
         </div>
       </div>
@@ -72,7 +73,7 @@
           fill="currentColor"
         ></path>
       </svg>
-      <p class="mt-2 text-sm text-gray-500">Loading API keys...</p>
+      <p class="mt-2 text-sm text-gray-500">{{ t('user.userApiKeysManager.loading') }}</p>
     </div>
 
     <!-- API Keys List -->
@@ -100,29 +101,37 @@
                     v-if="apiKey.isDeleted === 'true' || apiKey.deletedAt"
                     class="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800"
                   >
-                    Deleted
+                    {{ t('user.userApiKeysManager.status.deleted') }}
                   </span>
                   <span
                     v-else-if="!apiKey.isActive"
                     class="ml-2 inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800"
                   >
-                    Deleted
+                    {{ t('user.userApiKeysManager.status.deleted') }}
                   </span>
                 </div>
                 <div class="mt-1">
-                  <p class="text-sm text-gray-500">{{ apiKey.description || 'No description' }}</p>
+                  <p class="text-sm text-gray-500">
+                    {{ apiKey.description || t('user.userApiKeysManager.status.noDescription') }}
+                  </p>
                   <div class="mt-1 flex items-center space-x-4 text-xs text-gray-400">
-                    <span>Created: {{ formatDate(apiKey.createdAt) }}</span>
+                    <span
+                      >{{ t('user.userApiKeysManager.dateLabels.created') }}:
+                      {{ formatDate(apiKey.createdAt) }}</span
+                    >
                     <span v-if="apiKey.isDeleted === 'true' || apiKey.deletedAt"
-                      >Deleted: {{ formatDate(apiKey.deletedAt) }}</span
+                      >{{ t('user.userApiKeysManager.dateLabels.deleted') }}:
+                      {{ formatDate(apiKey.deletedAt) }}</span
                     >
                     <span v-else-if="apiKey.lastUsedAt"
-                      >Last used: {{ formatDate(apiKey.lastUsedAt) }}</span
+                      >{{ t('user.userApiKeysManager.dateLabels.lastUsed') }}:
+                      {{ formatDate(apiKey.lastUsedAt) }}</span
                     >
-                    <span v-else>Never used</span>
+                    <span v-else>{{ t('user.userApiKeysManager.status.neverUsed') }}</span>
                     <span
                       v-if="apiKey.expiresAt && !(apiKey.isDeleted === 'true' || apiKey.deletedAt)"
-                      >Expires: {{ formatDate(apiKey.expiresAt) }}</span
+                      >{{ t('user.userApiKeysManager.dateLabels.expires') }}:
+                      {{ formatDate(apiKey.expiresAt) }}</span
                     >
                   </div>
                 </div>
@@ -131,7 +140,10 @@
             <div class="flex items-center space-x-2">
               <!-- Usage Stats -->
               <div class="text-right text-xs text-gray-500">
-                <div>{{ formatNumber(apiKey.usage?.requests || 0) }} requests</div>
+                <div>
+                  {{ formatNumber(apiKey.usage?.requests || 0) }}
+                  {{ t('user.userApiKeysManager.usage.requests') }}
+                </div>
                 <div v-if="apiKey.usage?.totalCost">${{ apiKey.usage.totalCost.toFixed(4) }}</div>
               </div>
 
@@ -139,7 +151,7 @@
               <div class="flex items-center space-x-1">
                 <button
                   class="inline-flex items-center rounded border border-transparent p-1 text-gray-400 hover:text-gray-600"
-                  title="View API Key"
+                  :title="t('user.userApiKeysManager.actions.viewApiKey')"
                   @click="showApiKey(apiKey)"
                 >
                   <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -165,7 +177,7 @@
                     allowUserDeleteApiKeys
                   "
                   class="inline-flex items-center rounded border border-transparent p-1 text-red-400 hover:text-red-600"
-                  title="Delete API Key"
+                  :title="t('user.userApiKeysManager.actions.deleteApiKey')"
                   @click="deleteApiKey(apiKey)"
                 >
                   <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -199,8 +211,12 @@
           stroke-width="2"
         />
       </svg>
-      <h3 class="mt-2 text-sm font-medium text-gray-900">No API keys</h3>
-      <p class="mt-1 text-sm text-gray-500">Get started by creating your first API key.</p>
+      <h3 class="mt-2 text-sm font-medium text-gray-900">
+        {{ t('user.userApiKeysManager.emptyState.title') }}
+      </h3>
+      <p class="mt-1 text-sm text-gray-500">
+        {{ t('user.userApiKeysManager.emptyState.description') }}
+      </p>
       <div class="mt-6">
         <button
           class="inline-flex items-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -214,7 +230,7 @@
               stroke-width="2"
             />
           </svg>
-          Create API Key
+          {{ t('user.userApiKeysManager.buttons.createApiKey') }}
         </button>
       </div>
     </div>
@@ -236,10 +252,10 @@
     <!-- Confirm Delete Modal -->
     <ConfirmModal
       confirm-class="bg-red-600 hover:bg-red-700"
-      confirm-text="Delete"
-      :message="`Are you sure you want to delete '${selectedApiKey?.name}'? This action cannot be undone.`"
+      :confirm-text="t('user.userApiKeysManager.buttons.delete')"
+      :message="t('user.userApiKeysManager.confirmDelete.message', { name: selectedApiKey?.name })"
       :show="showDeleteModal"
-      title="Delete API Key"
+      :title="t('user.userApiKeysManager.confirmDelete.title')"
       @cancel="showDeleteModal = false"
       @confirm="handleDeleteConfirm"
     />
@@ -248,11 +264,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { showToast } from '@/utils/toast'
 import CreateApiKeyModal from './CreateApiKeyModal.vue'
 import ViewApiKeyModal from './ViewApiKeyModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
+
+const { t, locale } = useI18n()
 
 const userStore = useUserStore()
 
@@ -291,7 +310,12 @@ const formatNumber = (num) => {
 
 const formatDate = (dateString) => {
   if (!dateString) return null
-  return new Date(dateString).toLocaleDateString('en-US', {
+  const localeMap = {
+    'zh-cn': 'zh-CN',
+    'zh-tw': 'zh-TW',
+    en: 'en-US'
+  }
+  return new Date(dateString).toLocaleDateString(localeMap[locale.value] || 'en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -306,7 +330,7 @@ const loadApiKeys = async () => {
     apiKeys.value = await userStore.getUserApiKeys(true) // Include deleted keys
   } catch (error) {
     console.error('Failed to load API keys:', error)
-    showToast('Failed to load API keys', 'error')
+    showToast(t('user.userApiKeysManager.messages.loadFailed'), 'error')
   } finally {
     loading.value = false
   }
@@ -327,12 +351,12 @@ const handleDeleteConfirm = async () => {
     const result = await userStore.deleteApiKey(selectedApiKey.value.id)
 
     if (result.success) {
-      showToast('API key deleted successfully', 'success')
+      showToast(t('user.userApiKeysManager.messages.deleteSuccess'), 'success')
       await loadApiKeys()
     }
   } catch (error) {
     console.error('Failed to delete API key:', error)
-    showToast('Failed to delete API key', 'error')
+    showToast(t('user.userApiKeysManager.messages.deleteFailed'), 'error')
   } finally {
     showDeleteModal.value = false
     selectedApiKey.value = null

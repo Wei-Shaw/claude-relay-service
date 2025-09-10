@@ -60,7 +60,7 @@
             @click="userMenuOpen = !userMenuOpen"
           >
             <i class="fas fa-user-circle text-sm sm:text-base" />
-            <span class="hidden sm:inline">{{ currentUser.username || 'Admin' }}</span>
+            <span class="hidden sm:inline">{{ currentUser.username || t('common.admin') }}</span>
             <i
               class="fas fa-chevron-down ml-1 text-xs transition-transform duration-200"
               :class="{ 'rotate-180': userMenuOpen }"
@@ -191,7 +191,7 @@
             class="form-input w-full cursor-not-allowed bg-gray-100 dark:bg-gray-700 dark:text-gray-300"
             disabled
             type="text"
-            :value="currentUser.username || 'Admin'"
+            :value="currentUser.username || t('common.admin')"
           />
           <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
             {{ t('header.changePasswordModal.currentUsernameHint') }}
@@ -298,7 +298,7 @@ const authStore = useAuthStore()
 const { t } = useI18n()
 
 // 当前用户信息
-const currentUser = computed(() => authStore.user || { username: 'Admin' })
+const currentUser = computed(() => authStore.user || {})
 
 // OEM设置
 const oemSettings = computed(() => authStore.oemSettings || {})

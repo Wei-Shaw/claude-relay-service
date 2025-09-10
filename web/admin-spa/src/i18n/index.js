@@ -35,6 +35,28 @@ function getBrowserLocale() {
 const savedLocale = localStorage.getItem('app-locale')
 const defaultLocale = savedLocale || getBrowserLocale()
 
+// 创建一个函数来获取本地化的语言信息
+export function getSupportedLocalesWithI18n(t) {
+  return {
+    'zh-cn': {
+      name: t('common.languageSwitch.zhCnName'),
+      flag: t('common.languageSwitch.zhCnFlag'),
+      shortName: t('common.languageSwitch.zhCnFlag')
+    },
+    'zh-tw': {
+      name: t('common.languageSwitch.zhTwName'),
+      flag: t('common.languageSwitch.zhTwFlag'),
+      shortName: t('common.languageSwitch.zhTwFlag')
+    },
+    en: {
+      name: t('common.languageSwitch.enName'),
+      flag: t('common.languageSwitch.enFlag'),
+      shortName: t('common.languageSwitch.enFlag')
+    }
+  }
+}
+
+// 保持原有的SUPPORTED_LOCALES作为默认值，用于不依赖i18n的场景
 export const SUPPORTED_LOCALES = {
   'zh-cn': {
     name: '简体中文',

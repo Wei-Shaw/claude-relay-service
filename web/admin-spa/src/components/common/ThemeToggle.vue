@@ -69,6 +69,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useThemeStore } from '@/stores/theme'
+import { useI18n } from 'vue-i18n'
 
 // Props
 defineProps({
@@ -88,32 +89,37 @@ defineProps({
 // Store
 const themeStore = useThemeStore()
 
+// i18n
+const { t } = useI18n()
+
 // 主题选项配置
-const themeOptions = [
+const themeOptions = computed(() => [
   {
     value: 'light',
-    label: '浅色模式',
-    shortLabel: '浅色',
+    label: t('common.themeToggle.light.label'),
+    shortLabel: t('common.themeToggle.light.shortLabel'),
     icon: 'fas fa-sun'
   },
   {
     value: 'dark',
-    label: '深色模式',
-    shortLabel: '深色',
+    label: t('common.themeToggle.dark.label'),
+    shortLabel: t('common.themeToggle.dark.shortLabel'),
     icon: 'fas fa-moon'
   },
   {
     value: 'auto',
-    label: '跟随系统',
-    shortLabel: '自动',
+    label: t('common.themeToggle.auto.label'),
+    shortLabel: t('common.themeToggle.auto.shortLabel'),
     icon: 'fas fa-circle-half-stroke'
   }
-]
+])
 
 // 计算属性
 const themeTooltip = computed(() => {
-  const current = themeOptions.find((opt) => opt.value === themeStore.themeMode)
-  return current ? `点击切换主题 - ${current.label}` : '切换主题'
+  const current = themeOptions.value.find((opt) => opt.value === themeStore.themeMode)
+  return current
+    ? `${t('common.themeToggle.clickToSwitch')} - ${current.label}`
+    : t('common.themeToggle.toggleTheme')
 })
 
 // 方法
@@ -171,6 +177,7 @@ const selectTheme = (mode) => {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -348,6 +355,7 @@ const selectTheme = (mode) => {
     opacity: 0;
     transform: scale(0.5);
   }
+
   50% {
     opacity: 1;
     transform: scale(1);
@@ -395,6 +403,7 @@ const selectTheme = (mode) => {
   100% {
     transform: translateX(0);
   }
+
   50% {
     transform: translateX(5px);
   }
@@ -481,6 +490,7 @@ const selectTheme = (mode) => {
   100% {
     transform: translateY(-50%) translateX(var(--handle-x, 0));
   }
+
   50% {
     transform: translateY(calc(-50% - 3px)) translateX(var(--handle-x, 0));
   }

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { i18n, SUPPORTED_LOCALES } from '@/i18n'
+import { i18n, SUPPORTED_LOCALES, getSupportedLocalesWithI18n } from '@/i18n'
 
 export const useLocaleStore = defineStore('locale', () => {
   const currentLocale = ref(i18n.global.locale.value)
@@ -20,14 +20,19 @@ export const useLocaleStore = defineStore('locale', () => {
     document.documentElement.setAttribute('lang', locale)
   }
 
-  // 获取当前语言信息
-  const getCurrentLocaleInfo = () => {
+  // 获取当前语言信息（兼容i18n）
+  const getCurrentLocaleInfo = (t = null) => {
+    if (t) {
+      const supportedLocales = getSupportedLocalesWithI18n(t)
+      return supportedLocales[currentLocale.value] || supportedLocales['zh-cn']
+    }
     return SUPPORTED_LOCALES[currentLocale.value] || SUPPORTED_LOCALES['zh-cn']
   }
 
-  // 获取所有支持的语言
-  const getSupportedLocales = () => {
-    return Object.entries(SUPPORTED_LOCALES).map(([key, value]) => ({
+  // 获取所有支持的语言（兼容i18n）
+  const getSupportedLocales = (t = null) => {
+    const supportedLocales = t ? getSupportedLocalesWithI18n(t) : SUPPORTED_LOCALES
+    return Object.entries(supportedLocales).map(([key, value]) => ({
       code: key,
       ...value
     }))
