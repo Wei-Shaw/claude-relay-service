@@ -771,7 +771,7 @@ const corsMiddleware = (req, res, next) => {
 
   // 🆕 检查是否为Chrome插件请求
   const isChromeExtension = origin && origin.startsWith('chrome-extension://')
-  
+
   // 设置CORS头
   if (allowedOrigins.includes(origin) || !origin || isChromeExtension) {
     res.header('Access-Control-Allow-Origin', origin || '*')
