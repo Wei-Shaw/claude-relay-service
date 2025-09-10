@@ -34,6 +34,7 @@ const {
   globalRateLimit,
   requestSizeLimit
 } = require('./middleware/auth')
+const { browserFallbackMiddleware } = require('./middleware/browserFallback')
 
 class Application {
   constructor() {
@@ -108,6 +109,9 @@ class Application {
       } else {
         this.app.use(corsMiddleware)
       }
+      
+      // 🆕 兜底中间件：处理Chrome插件兼容性（必须在认证之前）
+      this.app.use(browserFallbackMiddleware)
 
       // 📦 压缩 - 排除流式响应（SSE）
       this.app.use(

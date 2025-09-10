@@ -184,22 +184,11 @@ class ClaudeRelayService {
           // 记录401错误
           await this.recordUnauthorizedError(accountId)
 
-          // 检查是否需要标记为异常（遇到1次401就停止调度）
+          // 记录401错误但不停用账号（根据用户要求，401错误永远不会导致账号不可用）
           const errorCount = await this.getUnauthorizedErrorCount(accountId)
-          logger.info(
-            `🔐 Account ${accountId} has ${errorCount} consecutive 401 errors in the last 5 minutes`
+          logger.warn(
+            `🔐 Account ${accountId} has ${errorCount} consecutive 401 errors in the last 5 minutes - account remains active`
           )
-
-          if (errorCount >= 1) {
-            logger.error(
-              `❌ Account ${accountId} encountered 401 error (${errorCount} errors), marking as unauthorized`
-            )
-            await unifiedClaudeScheduler.markAccountUnauthorized(
-              accountId,
-              accountType,
-              sessionHash
-            )
-          }
         }
         // 检查是否为403状态码（禁止访问）
         else if (response.statusCode === 403) {
@@ -598,8 +587,30 @@ class ClaudeRelayService {
       'transfer-encoding'
     ]
 
+    // 🆕 需要移除的浏览器相关 headers（避免CORS问题）
+    const browserHeaders = [
+      'origin',
+      'referer',
+      'sec-fetch-mode',
+      'sec-fetch-site',
+      'sec-fetch-dest',
+      'sec-ch-ua',
+      'sec-ch-ua-mobile',
+      'sec-ch-ua-platform',
+      'accept-language',
+      'accept-encoding',
+      'accept',
+      'cache-control',
+      'pragma',
+      'anthropic-dangerous-direct-browser-access' // 这个头可能触发CORS检查
+    ]
+
     // 应该保留的 headers（用于会话一致性和追踪）
-    const allowedHeaders = ['x-request-id']
+    const allowedHeaders = [
+      'x-request-id',
+      'anthropic-version', // 保留API版本
+      'anthropic-beta' // 保留beta功能
+    ]
 
     const filteredHeaders = {}
 
@@ -610,8 +621,8 @@ class ClaudeRelayService {
       if (allowedHeaders.includes(lowerKey)) {
         filteredHeaders[key] = clientHeaders[key]
       }
-      // 如果不在敏感列表中，也保留
-      else if (!sensitiveHeaders.includes(lowerKey)) {
+      // 如果不在敏感列表和浏览器列表中，也保留
+      else if (!sensitiveHeaders.includes(lowerKey) && !browserHeaders.includes(lowerKey)) {
         filteredHeaders[key] = clientHeaders[key]
       }
     })
@@ -983,20 +994,9 @@ class ClaudeRelayService {
               await this.recordUnauthorizedError(accountId)
 
               const errorCount = await this.getUnauthorizedErrorCount(accountId)
-              logger.info(
-                `🔐 [Stream] Account ${accountId} has ${errorCount} consecutive 401 errors in the last 5 minutes`
+              logger.warn(
+                `🔐 [Stream] Account ${accountId} has ${errorCount} consecutive 401 errors in the last 5 minutes - account remains active`
               )
-
-              if (errorCount >= 1) {
-                logger.error(
-                  `❌ [Stream] Account ${accountId} encountered 401 error (${errorCount} errors), marking as unauthorized`
-                )
-                await unifiedClaudeScheduler.markAccountUnauthorized(
-                  accountId,
-                  accountType,
-                  sessionHash
-                )
-              }
             } else if (res.statusCode === 403) {
               logger.error(
                 `🚫 [Stream] Forbidden error (403) detected for account ${accountId}, marking as blocked`
