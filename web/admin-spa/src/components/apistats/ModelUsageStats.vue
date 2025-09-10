@@ -19,7 +19,9 @@
       <i
         class="fas fa-spinner loading-spinner mb-2 text-xl text-gray-600 dark:text-gray-400 md:text-2xl"
       />
-      <p class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{ t('apiStats.loadingModelStats') }}</p>
+      <p class="text-sm text-gray-600 dark:text-gray-400 md:text-base">
+        {{ t('apiStats.loadingModelStats') }}
+      </p>
     </div>
 
     <!-- 模型统计数据 -->
@@ -38,7 +40,9 @@
             <div class="text-base font-bold text-green-600 md:text-lg">
               {{ model.formatted?.total || '$0.000000' }}
             </div>
-            <div class="text-xs text-gray-600 dark:text-gray-400 md:text-sm">{{ t('apiStats.totalCost') }}</div>
+            <div class="text-xs text-gray-600 dark:text-gray-400 md:text-sm">
+              {{ t('apiStats.totalCost') }}
+            </div>
           </div>
         </div>
 
@@ -56,7 +60,9 @@
             </div>
           </div>
           <div class="rounded bg-gray-50 p-2 dark:bg-gray-700">
-            <div class="text-gray-600 dark:text-gray-400">{{ t('apiStats.cacheCreateTokens') }}</div>
+            <div class="text-gray-600 dark:text-gray-400">
+              {{ t('apiStats.cacheCreateTokens') }}
+            </div>
             <div class="font-medium text-gray-900 dark:text-gray-100">
               {{ formatNumber(model.cacheCreateTokens) }}
             </div>
@@ -75,7 +81,11 @@
     <div v-else class="py-6 text-center text-gray-500 dark:text-gray-400 md:py-8">
       <i class="fas fa-chart-pie mb-3 text-2xl md:text-3xl" />
       <p class="text-sm md:text-base">
-        {{ t('apiStats.noModelData', { period: statsPeriod === 'daily' ? t('apiStats.today') : t('apiStats.thisMonth') }) }}
+        {{
+          t('apiStats.noModelData', {
+            period: statsPeriod === 'daily' ? t('apiStats.today') : t('apiStats.thisMonth')
+          })
+        }}
       </p>
     </div>
   </div>

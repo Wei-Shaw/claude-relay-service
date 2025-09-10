@@ -6,7 +6,9 @@
         <h3 class="mb-1 text-lg font-bold text-gray-900 dark:text-gray-100 sm:mb-2 sm:text-xl">
           {{ t('settings.title') }}
         </h3>
-        <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-base">{{ t('settings.description') }}</p>
+        <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-base">
+          {{ t('settings.description') }}
+        </p>
       </div>
 
       <!-- 设置分类导航 -->
@@ -66,7 +68,9 @@
                         <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
                           {{ t('settings.siteName') }}
                         </div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400">{{ t('settings.siteNameDescription') }}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">
+                          {{ t('settings.siteNameDescription') }}
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -75,7 +79,7 @@
                       v-model="oemSettings.siteName"
                       class="form-input w-full max-w-md dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                       maxlength="100"
-:placeholder="t('settings.siteNamePlaceholder')"
+                      :placeholder="t('settings.siteNamePlaceholder')"
                       type="text"
                     />
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -97,7 +101,9 @@
                         <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
                           {{ t('settings.siteIcon') }}
                         </div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400">{{ t('settings.siteIconDescription') }}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">
+                          {{ t('settings.siteIconDescription') }}
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -109,12 +115,14 @@
                         class="inline-flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-700"
                       >
                         <img
-:alt="t('settings.iconPreview')"
+                          :alt="t('settings.iconPreview')"
                           class="h-8 w-8"
                           :src="oemSettings.siteIconData || oemSettings.siteIcon"
                           @error="handleIconError"
                         />
-                        <span class="text-sm text-gray-600 dark:text-gray-400">{{ t('settings.currentIcon') }}</span>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">{{
+                          t('settings.currentIcon')
+                        }}</span>
                         <button
                           class="rounded-lg px-3 py-1 font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-900"
                           @click="removeIcon"
@@ -139,9 +147,9 @@
                           <i class="fas fa-upload mr-2" />
                           {{ t('settings.uploadIcon') }}
                         </button>
-                        <span class="ml-3 text-xs text-gray-500 dark:text-gray-400"
-                          >{{ t('settings.iconFormats') }}</span
-                        >
+                        <span class="ml-3 text-xs text-gray-500 dark:text-gray-400">{{
+                          t('settings.iconFormats')
+                        }}</span>
                       </div>
                     </div>
                   </td>
@@ -160,7 +168,9 @@
                         <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
                           {{ t('settings.adminEntry') }}
                         </div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400">{{ t('settings.adminEntryDescription') }}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">
+                          {{ t('settings.adminEntryDescription') }}
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -172,7 +182,9 @@
                           class="peer relative h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800"
                         ></div>
                         <span class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300">{{
-                          hideAdminButton ? t('settings.hideLoginButton') : t('settings.showLoginButton')
+                          hideAdminButton
+                            ? t('settings.hideLoginButton')
+                            : t('settings.showLoginButton')
                         }}</span>
                       </label>
                     </div>
@@ -213,7 +225,9 @@
                         class="text-sm text-gray-500 dark:text-gray-400"
                       >
                         <i class="fas fa-clock mr-1" />
-                        {{ t('settings.lastUpdated', { time: formatDateTime(oemSettings.updatedAt) }) }}
+                        {{
+                          t('settings.lastUpdated', { time: formatDateTime(oemSettings.updatedAt) })
+                        }}
                       </div>
                     </div>
                   </td>
@@ -233,15 +247,19 @@
                   <i class="fas fa-tag"></i>
                 </div>
                 <div>
-                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">{{ t('settings.siteNameCard') }}</h3>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('settings.siteNameCardDesc') }}</p>
+                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">
+                    {{ t('settings.siteNameCard') }}
+                  </h3>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ t('settings.siteNameCardDesc') }}
+                  </p>
                 </div>
               </div>
               <input
                 v-model="oemSettings.siteName"
                 class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                 maxlength="100"
-:placeholder="t('settings.siteNamePlaceholder')"
+                :placeholder="t('settings.siteNamePlaceholder')"
                 type="text"
               />
             </div>
@@ -255,7 +273,9 @@
                   <i class="fas fa-image"></i>
                 </div>
                 <div>
-                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">{{ t('settings.siteIconCard') }}</h3>
+                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">
+                    {{ t('settings.siteIconCard') }}
+                  </h3>
                   <p class="text-sm text-gray-500 dark:text-gray-400">
                     {{ t('settings.siteIconCardDesc') }}
                   </p>
@@ -268,12 +288,14 @@
                   class="inline-flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-700"
                 >
                   <img
-:alt="t('settings.iconPreview')"
+                    :alt="t('settings.iconPreview')"
                     class="h-8 w-8"
                     :src="oemSettings.siteIconData || oemSettings.siteIcon"
                     @error="handleIconError"
                   />
-                  <span class="text-sm text-gray-600 dark:text-gray-400">{{ t('settings.currentIcon') }}</span>
+                  <span class="text-sm text-gray-600 dark:text-gray-400">{{
+                    t('settings.currentIcon')
+                  }}</span>
                   <button
                     class="rounded-lg px-3 py-1 font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-900"
                     @click="removeIcon"
@@ -314,8 +336,12 @@
                   <i class="fas fa-eye-slash"></i>
                 </div>
                 <div>
-                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">{{ t('settings.adminEntryCard') }}</h3>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('settings.adminEntryCardDesc') }}</p>
+                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">
+                    {{ t('settings.adminEntryCard') }}
+                  </h3>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ t('settings.adminEntryCardDesc') }}
+                  </p>
                 </div>
               </div>
               <div class="space-y-2">
@@ -362,7 +388,9 @@
                   class="text-center text-sm text-gray-500 dark:text-gray-400"
                 >
                   <i class="fas fa-clock mr-1" />
-                  {{ t('settings.lastUpdatedMobile', { time: formatDateTime(oemSettings.updatedAt) }) }}
+                  {{
+                    t('settings.lastUpdatedMobile', { time: formatDateTime(oemSettings.updatedAt) })
+                  }}
                 </div>
               </div>
             </div>
@@ -402,7 +430,9 @@
           <div
             class="mb-6 rounded-lg bg-white/80 p-6 shadow-lg backdrop-blur-sm dark:bg-gray-800/80"
           >
-            <h2 class="mb-4 text-lg font-semibold text-gray-800 dark:text-gray-200">{{ t('settings.notificationTypes') }}</h2>
+            <h2 class="mb-4 text-lg font-semibold text-gray-800 dark:text-gray-200">
+              {{ t('settings.notificationTypes') }}
+            </h2>
             <div class="space-y-3">
               <div
                 v-for="(enabled, type) in webhookConfig.notificationTypes"
@@ -1207,7 +1237,10 @@ const savePlatform = async () => {
     }
 
     if (response.success && isMounted.value) {
-      showToast(editingPlatform.value ? t('settings.platformUpdated') : t('settings.platformAdded'), 'success')
+      showToast(
+        editingPlatform.value ? t('settings.platformUpdated') : t('settings.platformAdded'),
+        'success'
+      )
       await loadWebhookConfig()
       closePlatformModal()
     }

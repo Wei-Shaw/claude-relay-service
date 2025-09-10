@@ -31,13 +31,17 @@
               <div class="text-lg font-bold text-gray-900 dark:text-gray-100">
                 {{ aggregatedStats.totalKeys }}
               </div>
-              <div class="text-xs text-gray-600 dark:text-gray-400">{{ t('apiStats.totalKeys') }}</div>
+              <div class="text-xs text-gray-600 dark:text-gray-400">
+                {{ t('apiStats.totalKeys') }}
+              </div>
             </div>
             <div class="text-center">
               <div class="text-lg font-bold text-green-600">
                 {{ aggregatedStats.activeKeys }}
               </div>
-              <div class="text-xs text-gray-600 dark:text-gray-400">{{ t('apiStats.activeKeys') }}</div>
+              <div class="text-xs text-gray-600 dark:text-gray-400">
+                {{ t('apiStats.activeKeys') }}
+              </div>
             </div>
           </div>
         </div>
@@ -48,7 +52,9 @@
         >
           <div class="mb-3 flex items-center">
             <i class="fas fa-chart-pie mr-2 text-purple-500" />
-            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('apiStats.aggregateStatsSummary') }}</span>
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
+              t('apiStats.aggregateStatsSummary')
+            }}</span>
           </div>
           <div class="space-y-2">
             <div class="flex items-center justify-between">
@@ -106,9 +112,9 @@
         <!-- 每日费用限制 -->
         <div>
           <div class="mb-2 flex items-center justify-between">
-            <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base"
-              >{{ t('apiStats.dailyCostLimit') }}</span
-            >
+            <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base">{{
+              t('apiStats.dailyCostLimit')
+            }}</span>
             <span class="text-xs text-gray-500 dark:text-gray-400 md:text-sm">
               <span v-if="statsData.limits.dailyCostLimit > 0">
                 ${{ statsData.limits.currentDailyCost.toFixed(4) }} / ${{
@@ -175,7 +181,9 @@
         <!-- 其他限制信息 -->
         <div class="space-y-2 border-t border-gray-100 pt-2 dark:border-gray-700">
           <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{ t('apiStats.concurrencyLimit') }}</span>
+            <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{
+              t('apiStats.concurrencyLimit')
+            }}</span>
             <span class="text-sm font-medium text-gray-900 md:text-base">
               <span v-if="statsData.limits.concurrencyLimit > 0">
                 {{ statsData.limits.concurrencyLimit }}
@@ -186,7 +194,9 @@
             </span>
           </div>
           <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{ t('apiStats.modelLimit') }}</span>
+            <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{
+              t('apiStats.modelLimit')
+            }}</span>
             <span class="text-sm font-medium text-gray-900 md:text-base">
               <span
                 v-if="
@@ -196,7 +206,11 @@
                 class="text-orange-600"
               >
                 <i class="fas fa-exclamation-triangle mr-1 text-xs md:text-sm" />
-                {{ t('apiStats.restrictedModelsCount', { count: statsData.restrictions.restrictedModels.length }) }}
+                {{
+                  t('apiStats.restrictedModelsCount', {
+                    count: statsData.restrictions.restrictedModels.length
+                  })
+                }}
               </span>
               <span v-else class="text-green-600">
                 <i class="fas fa-check-circle mr-1 text-xs md:text-sm" />
@@ -205,7 +219,9 @@
             </span>
           </div>
           <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{ t('apiStats.clientLimit') }}</span>
+            <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{
+              t('apiStats.clientLimit')
+            }}</span>
             <span class="text-sm font-medium text-gray-900 md:text-base">
               <span
                 v-if="
@@ -215,7 +231,11 @@
                 class="text-orange-600"
               >
                 <i class="fas fa-exclamation-triangle mr-1 text-xs md:text-sm" />
-                {{ t('apiStats.restrictedClientsCount', { count: statsData.restrictions.allowedClients.length }) }}
+                {{
+                  t('apiStats.restrictedClientsCount', {
+                    count: statsData.restrictions.allowedClients.length
+                  })
+                }}
               </span>
               <span v-else class="text-green-600">
                 <i class="fas fa-check-circle mr-1 text-xs md:text-sm" />

@@ -42,7 +42,8 @@
 
       <form class="space-y-4 sm:space-y-6" @submit.prevent="handleLogin">
         <div>
-          <label class="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100 sm:mb-3"
+          <label
+            class="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100 sm:mb-3"
             >{{ t('login.username') }}</label
           >
           <input
@@ -55,7 +56,8 @@
         </div>
 
         <div>
-          <label class="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100 sm:mb-3"
+          <label
+            class="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100 sm:mb-3"
             >{{ t('login.password') }}</label
           >
           <input

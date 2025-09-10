@@ -33,7 +33,9 @@
             to="/user-login"
           >
             <i class="fas fa-user text-sm md:text-base" />
-            <span class="text-xs font-semibold tracking-wide md:text-sm">{{ t('apiStats.userLogin') }}</span>
+            <span class="text-xs font-semibold tracking-wide md:text-sm">{{
+              t('apiStats.userLogin')
+            }}</span>
           </router-link>
           <!-- 管理后台按钮 -->
           <router-link
@@ -42,7 +44,9 @@
             to="/dashboard"
           >
             <i class="fas fa-shield-alt text-sm md:text-base" />
-            <span class="text-xs font-semibold tracking-wide md:text-sm">{{ t('apiStats.adminPanel') }}</span>
+            <span class="text-xs font-semibold tracking-wide md:text-sm">{{
+              t('apiStats.adminPanel')
+            }}</span>
           </router-link>
         </div>
       </div>
@@ -97,9 +101,9 @@
             >
               <div class="flex items-center gap-2 md:gap-3">
                 <i class="fas fa-clock text-base text-blue-500 md:text-lg" />
-                <span class="text-base font-medium text-gray-700 dark:text-gray-200 md:text-lg"
-                  >{{ t('apiStats.timeRange') }}</span
-                >
+                <span class="text-base font-medium text-gray-700 dark:text-gray-200 md:text-lg">{{
+                  t('apiStats.timeRange')
+                }}</span>
               </div>
               <div class="flex w-full gap-2 md:w-auto">
                 <button
@@ -190,7 +194,7 @@ const currentTutorialComponent = computed(() => {
   const components = {
     'zh-cn': TutorialViewZhCn,
     'zh-tw': TutorialViewZhTw,
-    'en': TutorialViewEn
+    en: TutorialViewEn
   }
   return components[locale] || TutorialViewZhCn
 })

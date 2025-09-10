@@ -10,7 +10,7 @@
               <i class="fas fa-key text-sm text-white sm:text-base" />
             </div>
             <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">
-              创建新的 API Key
+              {{ $t('apiKeys.createApiKeyModal.title') }}
             </h3>
           </div>
           <button
@@ -37,7 +37,7 @@
             >
               <label
                 class="flex h-full items-center text-xs font-semibold text-gray-700 dark:text-gray-300 sm:text-sm"
-                >创建类型</label
+                >{{ $t('apiKeys.createApiKeyModal.createType') }}</label
               >
               <div class="flex items-center gap-3 sm:gap-4">
                 <label class="flex cursor-pointer items-center">
@@ -51,7 +51,7 @@
                     class="flex items-center text-xs text-gray-700 dark:text-gray-300 sm:text-sm"
                   >
                     <i class="fas fa-key mr-1 text-xs" />
-                    单个创建
+                    {{ $t('apiKeys.createApiKeyModal.singleCreate') }}
                   </span>
                 </label>
                 <label class="flex cursor-pointer items-center">
@@ -65,7 +65,7 @@
                     class="flex items-center text-xs text-gray-700 dark:text-gray-300 sm:text-sm"
                   >
                     <i class="fas fa-layer-group mr-1 text-xs" />
-                    批量创建
+                    {{ $t('apiKeys.createApiKeyModal.batchCreate') }}
                   </span>
                 </label>
               </div>
@@ -75,32 +75,30 @@
             <div v-if="form.createType === 'batch'" class="mt-3">
               <div class="flex items-center gap-4">
                 <div class="flex-1">
-                  <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
-                    >创建数量</label
-                  >
+                  <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{
+                    $t('apiKeys.createApiKeyModal.batchCount')
+                  }}</label>
                   <div class="flex items-center gap-2">
                     <input
                       v-model.number="form.batchCount"
                       class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                       max="500"
                       min="2"
-                      placeholder="输入数量 (2-500)"
+                      :placeholder="$t('apiKeys.createApiKeyModal.batchCountPlaceholder')"
                       required
                       type="number"
                     />
                     <div class="whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
-                      最大支持 500 个
+                      {{ $t('apiKeys.createApiKeyModal.maxSupported') }}
                     </div>
                   </div>
                 </div>
               </div>
               <p class="mt-2 flex items-start text-xs text-amber-600 dark:text-amber-400">
                 <i class="fas fa-info-circle mr-1 mt-0.5 flex-shrink-0" />
-                <span
-                  >批量创建时，每个 Key 的名称会自动添加序号后缀，例如：{{
-                    form.name || 'MyKey'
-                  }}_1, {{ form.name || 'MyKey' }}_2 ...</span
-                >
+                <span>{{
+                  $t('apiKeys.createApiKeyModal.batchHint', { name: form.name || 'MyKey' })
+                }}</span>
               </p>
             </div>
           </div>
@@ -108,23 +106,24 @@
           <div>
             <label
               class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-2 sm:text-sm"
-              >名称 <span class="text-red-500">*</span></label
+              >{{ $t('apiKeys.createApiKeyModal.name') }}
+              <span class="text-red-500">{{
+                $t('apiKeys.createApiKeyModal.nameRequired')
+              }}</span></label
             >
-            <div>
-              <input
-                v-model="form.name"
-                class="form-input flex-1 border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                :class="{ 'border-red-500': errors.name }"
-                :placeholder="
-                  form.createType === 'batch'
-                    ? '输入基础名称（将自动添加序号）'
-                    : '为您的 API Key 取一个名称'
-                "
-                required
-                type="text"
-                @input="errors.name = ''"
-              />
-            </div>
+            <input
+              v-model="form.name"
+              class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+              :class="{ 'border-red-500': errors.name }"
+              :placeholder="
+                form.createType === 'batch'
+                  ? $t('apiKeys.createApiKeyModal.batchNamePlaceholder')
+                  : $t('apiKeys.createApiKeyModal.singleNamePlaceholder')
+              "
+              required
+              type="text"
+              @input="errors.name = ''"
+            />
             <p v-if="errors.name" class="mt-1 text-xs text-red-500 dark:text-red-400">
               {{ errors.name }}
             </p>
@@ -132,14 +131,14 @@
 
           <!-- 标签 -->
           <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >标签</label
-            >
+            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              $t('apiKeys.createApiKeyModal.tags')
+            }}</label>
             <div class="space-y-4">
               <!-- 已选择的标签 -->
               <div v-if="form.tags.length > 0">
                 <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">
-                  已选择的标签:
+                  {{ $t('apiKeys.createApiKeyModal.selectedTags') }}
                 </div>
                 <div class="flex flex-wrap gap-2">
                   <span
@@ -162,7 +161,7 @@
               <!-- 可选择的已有标签 -->
               <div v-if="unselectedTags.length > 0">
                 <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">
-                  点击选择已有标签:
+                  {{ $t('apiKeys.createApiKeyModal.clickToSelectTags') }}
                 </div>
                 <div class="flex flex-wrap gap-2">
                   <button
@@ -181,13 +180,13 @@
               <!-- 创建新标签 -->
               <div>
                 <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">
-                  创建新标签:
+                  {{ $t('apiKeys.createApiKeyModal.createNewTag') }}
                 </div>
                 <div class="flex gap-2">
                   <input
                     v-model="newTag"
                     class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                    placeholder="输入新标签名称"
+                    :placeholder="$t('apiKeys.createApiKeyModal.newTagPlaceholder')"
                     type="text"
                     @keypress.enter.prevent="addTag"
                   />
@@ -202,7 +201,7 @@
               </div>
 
               <p class="text-xs text-gray-500 dark:text-gray-400">
-                用于标记不同团队或用途，方便筛选管理
+                {{ $t('apiKeys.createApiKeyModal.tagHint') }}
               </p>
             </div>
           </div>
@@ -218,68 +217,76 @@
                 <i class="fas fa-tachometer-alt text-xs text-white" />
               </div>
               <h4 class="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                速率限制设置 (可选)
+                {{ $t('apiKeys.createApiKeyModal.rateLimitTitle') }}
               </h4>
             </div>
 
             <div class="space-y-2">
               <div class="grid grid-cols-1 gap-2 lg:grid-cols-3">
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300"
-                    >时间窗口 (分钟)</label
-                  >
+                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">{{
+                    $t('apiKeys.createApiKeyModal.rateLimitWindow')
+                  }}</label>
                   <input
                     v-model="form.rateLimitWindow"
                     class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                     min="1"
-                    placeholder="无限制"
+                    :placeholder="$t('apiKeys.createApiKeyModal.rateLimitWindowPlaceholder')"
                     type="number"
                   />
-                  <p class="ml-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">时间段单位</p>
+                  <p class="ml-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    {{ $t('apiKeys.createApiKeyModal.rateLimitWindowHint') }}
+                  </p>
                 </div>
 
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300"
-                    >请求次数限制</label
-                  >
+                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">{{
+                    $t('apiKeys.createApiKeyModal.rateLimitRequests')
+                  }}</label>
                   <input
                     v-model="form.rateLimitRequests"
                     class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                     min="1"
-                    placeholder="无限制"
+                    :placeholder="$t('apiKeys.createApiKeyModal.rateLimitRequestsPlaceholder')"
                     type="number"
                   />
-                  <p class="ml-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">窗口内最大请求</p>
+                  <p class="ml-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    {{ $t('apiKeys.createApiKeyModal.rateLimitRequestsHint') }}
+                  </p>
                 </div>
 
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300"
-                    >费用限制 (美元)</label
-                  >
+                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">{{
+                    $t('apiKeys.createApiKeyModal.rateLimitCost')
+                  }}</label>
                   <input
                     v-model="form.rateLimitCost"
                     class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                     min="0"
-                    placeholder="无限制"
+                    :placeholder="$t('apiKeys.createApiKeyModal.rateLimitCostPlaceholder')"
                     step="0.01"
                     type="number"
                   />
-                  <p class="ml-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">窗口内最大费用</p>
+                  <p class="ml-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    {{ $t('apiKeys.createApiKeyModal.rateLimitCostHint') }}
+                  </p>
                 </div>
               </div>
 
               <!-- 示例说明 -->
               <div class="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
                 <h5 class="mb-1 text-xs font-semibold text-blue-800 dark:text-blue-400">
-                  💡 使用示例
+                  {{ $t('apiKeys.createApiKeyModal.exampleTitle') }}
                 </h5>
                 <div class="space-y-0.5 text-xs text-blue-700 dark:text-blue-300">
                   <div>
-                    <strong>示例1:</strong> 时间窗口=60，请求次数=1000 → 每60分钟最多1000次请求
+                    <strong>{{ $t('apiKeys.createApiKeyModal.example1') }}</strong>
                   </div>
-                  <div><strong>示例2:</strong> 时间窗口=1，费用=0.1 → 每分钟最多$0.1费用</div>
                   <div>
-                    <strong>示例3:</strong> 窗口=30，请求=50，费用=5 → 每30分钟50次请求且不超$5费用
+                    <strong>{{ $t('apiKeys.createApiKeyModal.example2') }}</strong>
+                  </div>
+                  <div>
+                    <strong>{{ $t('apiKeys.createApiKeyModal.example3') }}</strong>
                   </div>
                 </div>
               </div>
@@ -287,9 +294,9 @@
           </div>
 
           <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >每日费用限制 (美元)</label
-            >
+            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              $t('apiKeys.createApiKeyModal.dailyCostLimit')
+            }}</label>
             <div class="space-y-2">
               <div class="flex gap-2">
                 <button
@@ -318,27 +325,27 @@
                   type="button"
                   @click="form.dailyCostLimit = ''"
                 >
-                  自定义
+                  {{ $t('apiKeys.createApiKeyModal.custom') }}
                 </button>
               </div>
               <input
                 v-model="form.dailyCostLimit"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 min="0"
-                placeholder="0 表示无限制"
+                :placeholder="$t('apiKeys.createApiKeyModal.dailyCostLimitPlaceholder')"
                 step="0.01"
                 type="number"
               />
               <p class="text-xs text-gray-500 dark:text-gray-400">
-                设置此 API Key 每日的费用限制，超过限制将拒绝请求，0 或留空表示无限制
+                {{ $t('apiKeys.createApiKeyModal.dailyCostHint') }}
               </p>
             </div>
           </div>
 
           <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >Opus 模型周费用限制 (美元)</label
-            >
+            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              $t('apiKeys.createApiKeyModal.weeklyOpusCostLimit')
+            }}</label>
             <div class="space-y-2">
               <div class="flex gap-2">
                 <button
@@ -367,55 +374,55 @@
                   type="button"
                   @click="form.weeklyOpusCostLimit = ''"
                 >
-                  自定义
+                  {{ $t('apiKeys.createApiKeyModal.custom') }}
                 </button>
               </div>
               <input
                 v-model="form.weeklyOpusCostLimit"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 min="0"
-                placeholder="0 表示无限制"
+                :placeholder="$t('apiKeys.createApiKeyModal.weeklyOpusCostLimitPlaceholder')"
                 step="0.01"
                 type="number"
               />
               <p class="text-xs text-gray-500 dark:text-gray-400">
-                设置 Opus 模型的周费用限制（周一到周日），仅限 Claude 官方账户，0 或留空表示无限制
+                {{ $t('apiKeys.createApiKeyModal.weeklyOpusHint') }}
               </p>
             </div>
           </div>
 
           <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >并发限制 (可选)</label
-            >
+            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              $t('apiKeys.createApiKeyModal.concurrencyLimit')
+            }}</label>
             <input
               v-model="form.concurrencyLimit"
               class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
               min="0"
-              placeholder="0 表示无限制"
+              :placeholder="$t('apiKeys.createApiKeyModal.concurrencyLimitPlaceholder')"
               type="number"
             />
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              设置此 API Key 可同时处理的最大请求数，0 或留空表示无限制
+              {{ $t('apiKeys.createApiKeyModal.concurrencyHint') }}
             </p>
           </div>
 
           <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >备注 (可选)</label
-            >
+            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              $t('apiKeys.createApiKeyModal.description')
+            }}</label>
             <textarea
               v-model="form.description"
               class="form-input w-full resize-none border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-              placeholder="描述此 API Key 的用途..."
+              :placeholder="$t('apiKeys.createApiKeyModal.descriptionPlaceholder')"
               rows="2"
             />
           </div>
 
           <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >过期设置</label
-            >
+            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              $t('apiKeys.createApiKeyModal.expirationSettings')
+            }}</label>
             <!-- 过期模式选择 -->
             <div
               class="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800"
@@ -428,7 +435,9 @@
                     type="radio"
                     value="fixed"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">固定时间过期</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    $t('apiKeys.createApiKeyModal.fixedTimeExpiry')
+                  }}</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -437,17 +446,19 @@
                     type="radio"
                     value="activation"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">首次使用后激活</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    $t('apiKeys.createApiKeyModal.activationExpiry')
+                  }}</span>
                 </label>
               </div>
               <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 <span v-if="form.expirationMode === 'fixed'">
                   <i class="fas fa-info-circle mr-1" />
-                  固定时间模式：Key 创建后立即生效，按设定时间过期
+                  {{ $t('apiKeys.createApiKeyModal.fixedModeHint') }}
                 </span>
                 <span v-else>
                   <i class="fas fa-info-circle mr-1" />
-                  激活模式：Key 首次使用时激活，激活后按设定天数过期（适合批量销售）
+                  {{ $t('apiKeys.createApiKeyModal.activationModeHint') }}
                 </span>
               </p>
             </div>
@@ -459,14 +470,14 @@
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                 @change="updateExpireAt"
               >
-                <option value="">永不过期</option>
-                <option value="1d">1 天</option>
-                <option value="7d">7 天</option>
-                <option value="30d">30 天</option>
-                <option value="90d">90 天</option>
-                <option value="180d">180 天</option>
-                <option value="365d">365 天</option>
-                <option value="custom">自定义日期</option>
+                <option value="">{{ $t('apiKeys.createApiKeyModal.neverExpire') }}</option>
+                <option value="1d">{{ $t('apiKeys.createApiKeyModal.1d') }}</option>
+                <option value="7d">{{ $t('apiKeys.createApiKeyModal.7d') }}</option>
+                <option value="30d">{{ $t('apiKeys.createApiKeyModal.30d') }}</option>
+                <option value="90d">{{ $t('apiKeys.createApiKeyModal.90d') }}</option>
+                <option value="180d">{{ $t('apiKeys.createApiKeyModal.180d') }}</option>
+                <option value="365d">{{ $t('apiKeys.createApiKeyModal.365d') }}</option>
+                <option value="custom">{{ $t('apiKeys.createApiKeyModal.customDate') }}</option>
               </select>
               <div v-if="form.expireDuration === 'custom'" class="mt-3">
                 <input
@@ -478,7 +489,11 @@
                 />
               </div>
               <p v-if="form.expiresAt" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                将于 {{ formatExpireDate(form.expiresAt) }} 过期
+                {{
+                  $t('apiKeys.createApiKeyModal.willExpireOn', {
+                    date: formatExpireDate(form.expiresAt)
+                  })
+                }}
               </p>
             </div>
 
@@ -490,10 +505,12 @@
                   class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                   max="3650"
                   min="1"
-                  placeholder="输入天数"
+                  :placeholder="$t('apiKeys.createApiKeyModal.activationDays')"
                   type="number"
                 />
-                <span class="text-sm text-gray-600 dark:text-gray-400">天</span>
+                <span class="text-sm text-gray-600 dark:text-gray-400">{{
+                  $t('apiKeys.createApiKeyModal.daysUnit')
+                }}</span>
               </div>
               <div class="mt-2 flex flex-wrap gap-2">
                 <button
@@ -503,20 +520,24 @@
                   type="button"
                   @click="form.activationDays = days"
                 >
-                  {{ days }}天
+                  {{ days }}{{ $t('apiKeys.createApiKeyModal.daysUnit') }}
                 </button>
               </div>
               <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 <i class="fas fa-clock mr-1" />
-                Key 将在首次使用后激活，激活后 {{ form.activationDays || 30 }} 天过期
+                {{
+                  $t('apiKeys.createApiKeyModal.activationHint', {
+                    days: form.activationDays || 30
+                  })
+                }}
               </p>
             </div>
           </div>
 
           <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >服务权限</label
-            >
+            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              $t('apiKeys.createApiKeyModal.servicePermissions')
+            }}</label>
             <div class="flex gap-4">
               <label class="flex cursor-pointer items-center">
                 <input
@@ -525,7 +546,9 @@
                   type="radio"
                   value="all"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">全部服务</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                  $t('apiKeys.createApiKeyModal.allServices')
+                }}</span>
               </label>
               <label class="flex cursor-pointer items-center">
                 <input
@@ -534,7 +557,9 @@
                   type="radio"
                   value="claude"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">仅 Claude</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                  $t('apiKeys.createApiKeyModal.claudeOnly')
+                }}</span>
               </label>
               <label class="flex cursor-pointer items-center">
                 <input
@@ -543,7 +568,9 @@
                   type="radio"
                   value="gemini"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">仅 Gemini</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                  $t('apiKeys.createApiKeyModal.geminiOnly')
+                }}</span>
               </label>
               <label class="flex cursor-pointer items-center">
                 <input
@@ -552,23 +579,25 @@
                   type="radio"
                   value="openai"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">仅 OpenAI</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                  $t('apiKeys.createApiKeyModal.openaiOnly')
+                }}</span>
               </label>
             </div>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              控制此 API Key 可以访问哪些服务
+              {{ $t('apiKeys.createApiKeyModal.permissionHint') }}
             </p>
           </div>
 
           <div>
             <div class="mb-2 flex items-center justify-between">
-              <label class="text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >专属账号绑定 (可选)</label
-              >
+              <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                $t('apiKeys.createApiKeyModal.dedicatedAccountBinding')
+              }}</label>
               <button
                 class="flex items-center gap-1 text-sm text-blue-600 transition-colors hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
                 :disabled="accountsLoading"
-                title="刷新账号列表"
+                title="{{ $t('apiKeys.createApiKeyModal.refreshAccounts') }}"
                 type="button"
                 @click="refreshAccounts"
               >
@@ -579,69 +608,73 @@
                     'text-xs'
                   ]"
                 />
-                <span>{{ accountsLoading ? '刷新中...' : '刷新账号' }}</span>
+                <span>{{
+                  accountsLoading
+                    ? $t('apiKeys.createApiKeyModal.refreshing')
+                    : $t('apiKeys.createApiKeyModal.refreshAccounts')
+                }}</span>
               </button>
             </div>
             <div class="grid grid-cols-1 gap-3">
               <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >Claude 专属账号</label
-                >
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400">{{
+                  $t('apiKeys.createApiKeyModal.claudeDedicatedAccount')
+                }}</label>
                 <AccountSelector
                   v-model="form.claudeAccountId"
                   :accounts="localAccounts.claude"
-                  default-option-text="使用共享账号池"
+                  :default-option-text="$t('apiKeys.createApiKeyModal.useSharedPool')"
                   :disabled="form.permissions === 'gemini' || form.permissions === 'openai'"
                   :groups="localAccounts.claudeGroups"
-                  placeholder="请选择Claude账号"
+                  :placeholder="$t('apiKeys.createApiKeyModal.selectClaudeAccount')"
                   platform="claude"
                 />
               </div>
               <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >Gemini 专属账号</label
-                >
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400">{{
+                  $t('apiKeys.createApiKeyModal.geminiDedicatedAccount')
+                }}</label>
                 <AccountSelector
                   v-model="form.geminiAccountId"
                   :accounts="localAccounts.gemini"
-                  default-option-text="使用共享账号池"
+                  :default-option-text="$t('apiKeys.createApiKeyModal.useSharedPool')"
                   :disabled="form.permissions === 'claude' || form.permissions === 'openai'"
                   :groups="localAccounts.geminiGroups"
-                  placeholder="请选择Gemini账号"
+                  :placeholder="$t('apiKeys.createApiKeyModal.selectGeminiAccount')"
                   platform="gemini"
                 />
               </div>
               <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >OpenAI 专属账号</label
-                >
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400">{{
+                  $t('apiKeys.createApiKeyModal.openaiDedicatedAccount')
+                }}</label>
                 <AccountSelector
                   v-model="form.openaiAccountId"
                   :accounts="localAccounts.openai"
-                  default-option-text="使用共享账号池"
+                  :default-option-text="$t('apiKeys.createApiKeyModal.useSharedPool')"
                   :disabled="form.permissions === 'claude' || form.permissions === 'gemini'"
                   :groups="localAccounts.openaiGroups"
-                  placeholder="请选择OpenAI账号"
+                  :placeholder="$t('apiKeys.createApiKeyModal.selectOpenaiAccount')"
                   platform="openai"
                 />
               </div>
               <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >Bedrock 专属账号</label
-                >
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400">{{
+                  $t('apiKeys.createApiKeyModal.bedrockDedicatedAccount')
+                }}</label>
                 <AccountSelector
                   v-model="form.bedrockAccountId"
                   :accounts="localAccounts.bedrock"
-                  default-option-text="使用共享账号池"
+                  :default-option-text="$t('apiKeys.createApiKeyModal.useSharedPool')"
                   :disabled="form.permissions === 'gemini' || form.permissions === 'openai'"
                   :groups="[]"
-                  placeholder="请选择Bedrock账号"
+                  :placeholder="$t('apiKeys.createApiKeyModal.selectBedrockAccount')"
                   platform="bedrock"
                 />
               </div>
             </div>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              选择专属账号后，此API Key将只使用该账号，不选择则使用共享账号池
+              {{ $t('apiKeys.createApiKeyModal.accountBindingHint') }}
             </p>
           </div>
 
@@ -657,13 +690,15 @@
                 class="ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300"
                 for="enableModelRestriction"
               >
-                启用模型限制
+                {{ $t('apiKeys.createApiKeyModal.enableModelRestriction') }}
               </label>
             </div>
 
             <div v-if="form.enableModelRestriction" class="space-y-3">
               <div>
-                <label class="mb-2 block text-sm font-medium text-gray-600">限制的模型列表</label>
+                <label class="mb-2 block text-sm font-medium text-gray-600">{{
+                  $t('apiKeys.createApiKeyModal.restrictedModelsList')
+                }}</label>
                 <div
                   class="mb-3 flex min-h-[32px] flex-wrap gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2"
                 >
@@ -682,7 +717,7 @@
                     </button>
                   </span>
                   <span v-if="form.restrictedModels.length === 0" class="text-sm text-gray-400">
-                    暂无限制的模型
+                    {{ $t('apiKeys.createApiKeyModal.noRestrictedModels') }}
                   </span>
                 </div>
                 <div class="space-y-3">
@@ -701,7 +736,7 @@
                       v-if="availableQuickModels.length === 0"
                       class="text-sm italic text-gray-400"
                     >
-                      所有常用模型已在限制列表中
+                      {{ $t('apiKeys.createApiKeyModal.allCommonModelsRestricted') }}
                     </span>
                   </div>
 
@@ -710,7 +745,7 @@
                     <input
                       v-model="form.modelInput"
                       class="form-input flex-1"
-                      placeholder="输入模型名称，按回车添加"
+                      :placeholder="$t('apiKeys.createApiKeyModal.addRestrictedModelPlaceholder')"
                       type="text"
                       @keydown.enter.prevent="addRestrictedModel"
                     />
@@ -724,7 +759,7 @@
                   </div>
                 </div>
                 <p class="mt-2 text-xs text-gray-500">
-                  设置此API Key无法访问的模型，例如：claude-opus-4-20250514
+                  {{ $t('apiKeys.createApiKeyModal.modelRestrictionHint') }}
                 </p>
               </div>
             </div>
@@ -743,7 +778,7 @@
                 class="ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300"
                 for="enableClientRestriction"
               >
-                启用客户端限制
+                {{ $t('apiKeys.createApiKeyModal.enableClientRestriction') }}
               </label>
             </div>
 
@@ -752,9 +787,9 @@
               class="rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-700 dark:bg-green-900/20"
             >
               <div>
-                <label class="mb-2 block text-xs font-medium text-gray-700 dark:text-gray-300"
-                  >允许的客户端</label
-                >
+                <label class="mb-2 block text-xs font-medium text-gray-700 dark:text-gray-300">{{
+                  $t('apiKeys.createApiKeyModal.allowedClients')
+                }}</label>
                 <div class="space-y-1">
                   <div v-for="client in supportedClients" :key="client.id" class="flex items-start">
                     <input
@@ -784,7 +819,7 @@
               type="button"
               @click="$emit('close')"
             >
-              取消
+              {{ $t('apiKeys.createApiKeyModal.cancel') }}
             </button>
             <button
               class="btn btn-primary flex-1 px-4 py-2.5 text-sm font-semibold"
@@ -793,7 +828,11 @@
             >
               <div v-if="loading" class="loading-spinner mr-2" />
               <i v-else class="fas fa-plus mr-2" />
-              {{ loading ? '创建中...' : '创建' }}
+              {{
+                loading
+                  ? $t('apiKeys.createApiKeyModal.creating')
+                  : $t('apiKeys.createApiKeyModal.create')
+              }}
             </button>
           </div>
         </form>
@@ -804,11 +843,14 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { showToast } from '@/utils/toast'
 import { useClientsStore } from '@/stores/clients'
 import { useApiKeysStore } from '@/stores/apiKeys'
 import { apiClient } from '@/config/api'
 import AccountSelector from '@/components/common/AccountSelector.vue'
+
+const { t } = useI18n()
 
 const props = defineProps({
   accounts: {
@@ -886,61 +928,31 @@ onMounted(async () => {
   availableTags.value = await apiKeysStore.fetchTags()
   // 初始化账号数据
   if (props.accounts) {
-    // 合并 OpenAI 和 OpenAI-Responses 账号
-    const openaiAccounts = []
-    if (props.accounts.openai) {
-      props.accounts.openai.forEach((account) => {
-        openaiAccounts.push({
-          ...account,
-          platform: 'openai'
-        })
-      })
-    }
-    if (props.accounts.openaiResponses) {
-      props.accounts.openaiResponses.forEach((account) => {
-        openaiAccounts.push({
-          ...account,
-          platform: 'openai-responses'
-        })
-      })
-    }
-
     localAccounts.value = {
       claude: props.accounts.claude || [],
       gemini: props.accounts.gemini || [],
-      openai: openaiAccounts,
+      openai: props.accounts.openai || [],
       bedrock: props.accounts.bedrock || [], // 添加 Bedrock 账号
       claudeGroups: props.accounts.claudeGroups || [],
       geminiGroups: props.accounts.geminiGroups || [],
       openaiGroups: props.accounts.openaiGroups || []
     }
   }
-
-  // 自动加载账号数据
-  await refreshAccounts()
 })
 
 // 刷新账号列表
 const refreshAccounts = async () => {
   accountsLoading.value = true
   try {
-    const [
-      claudeData,
-      claudeConsoleData,
-      geminiData,
-      openaiData,
-      openaiResponsesData,
-      bedrockData,
-      groupsData
-    ] = await Promise.all([
-      apiClient.get('/admin/claude-accounts'),
-      apiClient.get('/admin/claude-console-accounts'),
-      apiClient.get('/admin/gemini-accounts'),
-      apiClient.get('/admin/openai-accounts'),
-      apiClient.get('/admin/openai-responses-accounts'), // 获取 OpenAI-Responses 账号
-      apiClient.get('/admin/bedrock-accounts'), // 添加 Bedrock 账号获取
-      apiClient.get('/admin/account-groups')
-    ])
+    const [claudeData, claudeConsoleData, geminiData, openaiData, bedrockData, groupsData] =
+      await Promise.all([
+        apiClient.get('/admin/claude-accounts'),
+        apiClient.get('/admin/claude-console-accounts'),
+        apiClient.get('/admin/gemini-accounts'),
+        apiClient.get('/admin/openai-accounts'),
+        apiClient.get('/admin/bedrock-accounts'), // 添加 Bedrock 账号获取
+        apiClient.get('/admin/account-groups')
+      ])
 
     // 合并Claude OAuth账户和Claude Console账户
     const claudeAccounts = []
@@ -974,30 +986,12 @@ const refreshAccounts = async () => {
       }))
     }
 
-    // 合并 OpenAI 和 OpenAI-Responses 账号
-    const openaiAccounts = []
-
     if (openaiData.success) {
-      ;(openaiData.data || []).forEach((account) => {
-        openaiAccounts.push({
-          ...account,
-          platform: 'openai',
-          isDedicated: account.accountType === 'dedicated' // 保留以便向后兼容
-        })
-      })
+      localAccounts.value.openai = (openaiData.data || []).map((account) => ({
+        ...account,
+        isDedicated: account.accountType === 'dedicated' // 保留以便向后兼容
+      }))
     }
-
-    if (openaiResponsesData.success) {
-      ;(openaiResponsesData.data || []).forEach((account) => {
-        openaiAccounts.push({
-          ...account,
-          platform: 'openai-responses',
-          isDedicated: account.accountType === 'dedicated' // 保留以便向后兼容
-        })
-      })
-    }
-
-    localAccounts.value.openai = openaiAccounts
 
     if (bedrockData.success) {
       localAccounts.value.bedrock = (bedrockData.data || []).map((account) => ({
@@ -1014,9 +1008,9 @@ const refreshAccounts = async () => {
       localAccounts.value.openaiGroups = allGroups.filter((g) => g.platform === 'openai')
     }
 
-    showToast('账号列表已刷新', 'success')
+    showToast(t('apiKeys.createApiKeyModal.refreshAccountsSuccess'), 'success')
   } catch (error) {
-    showToast('刷新账号列表失败', 'error')
+    showToast(t('apiKeys.createApiKeyModal.refreshAccountsFailed'), 'error')
   } finally {
     accountsLoading.value = false
   }
@@ -1077,13 +1071,17 @@ const updateCustomExpireAt = () => {
 // 格式化过期日期
 const formatExpireDate = (dateString) => {
   const date = new Date(dateString)
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  const { locale } = useI18n()
+  return date.toLocaleString(
+    locale.value === 'zh-cn' ? 'zh-CN' : locale.value === 'zh-tw' ? 'zh-TW' : 'en-US',
+    {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    }
+  )
 }
 
 // 添加限制的模型
@@ -1141,14 +1139,14 @@ const createApiKey = async () => {
   errors.value.name = ''
 
   if (!form.name || !form.name.trim()) {
-    errors.value.name = '请输入API Key名称'
+    errors.value.name = t('apiKeys.createApiKeyModal.nameError')
     return
   }
 
   // 批量创建时验证数量
   if (form.createType === 'batch') {
     if (!form.batchCount || form.batchCount < 2 || form.batchCount > 500) {
-      showToast('批量创建数量必须在 2-500 之间', 'error')
+      showToast(t('apiKeys.createApiKeyModal.batchCountError'), 'error')
       return
     }
   }
@@ -1158,14 +1156,14 @@ const createApiKey = async () => {
     let confirmed = false
     if (window.showConfirm) {
       confirmed = await window.showConfirm(
-        '费用限制提醒',
-        '您设置了时间窗口但费用限制为0，这意味着不会有费用限制。\n\n是否继续？',
-        '继续创建',
-        '返回修改'
+        t('apiKeys.createApiKeyModal.costLimitConfirmTitle'),
+        t('apiKeys.createApiKeyModal.costLimitConfirmMessage'),
+        t('apiKeys.createApiKeyModal.costLimitConfirmContinue'),
+        t('apiKeys.createApiKeyModal.costLimitConfirmBack')
       )
     } else {
       // 降级方案
-      confirmed = confirm('您设置了时间窗口但费用限制为0，这意味着不会有费用限制。\n是否继续？')
+      confirmed = confirm(t('apiKeys.createApiKeyModal.costLimitFallbackMessage'))
     }
     if (!confirmed) {
       return
@@ -1254,11 +1252,11 @@ const createApiKey = async () => {
       const result = await apiClient.post('/admin/api-keys', data)
 
       if (result.success) {
-        showToast('API Key 创建成功', 'success')
+        showToast(t('apiKeys.createApiKeyModal.createSuccess'), 'success')
         emit('success', result.data)
         emit('close')
       } else {
-        showToast(result.message || '创建失败', 'error')
+        showToast(result.message || t('apiKeys.createApiKeyModal.createFailed'), 'error')
       }
     } else {
       // 批量创建
@@ -1272,15 +1270,18 @@ const createApiKey = async () => {
       const result = await apiClient.post('/admin/api-keys/batch', data)
 
       if (result.success) {
-        showToast(`成功创建 ${result.data.length} 个 API Key`, 'success')
+        showToast(
+          t('apiKeys.createApiKeyModal.batchCreateSuccess', { count: result.data.length }),
+          'success'
+        )
         emit('batch-success', result.data)
         emit('close')
       } else {
-        showToast(result.message || '批量创建失败', 'error')
+        showToast(result.message || t('apiKeys.createApiKeyModal.batchCreateFailed'), 'error')
       }
     }
   } catch (error) {
-    showToast('创建失败', 'error')
+    showToast(t('apiKeys.createApiKeyModal.createFailed'), 'error')
   } finally {
     loading.value = false
   }

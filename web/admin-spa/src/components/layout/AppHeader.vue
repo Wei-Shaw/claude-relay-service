@@ -77,7 +77,9 @@
             <!-- 版本信息 -->
             <div class="border-b border-gray-100 px-4 py-3 dark:border-gray-700">
               <div class="flex items-center justify-between text-sm">
-                <span class="text-gray-500 dark:text-gray-400">{{ t('header.currentVersion') }}</span>
+                <span class="text-gray-500 dark:text-gray-400">{{
+                  t('header.currentVersion')
+                }}</span>
                 <span class="font-mono text-gray-700 dark:text-gray-300"
                   >v{{ versionInfo.current || '...' }}</span
                 >
@@ -165,7 +167,9 @@
           >
             <i class="fas fa-key text-white" />
           </div>
-          <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">{{ t('header.changePasswordModal.title') }}</h3>
+          <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">
+            {{ t('header.changePasswordModal.title') }}
+          </h3>
         </div>
         <button
           class="text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
@@ -180,9 +184,9 @@
         @submit.prevent="changePassword"
       >
         <div>
-          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-            >{{ t('header.changePasswordModal.currentUsername') }}</label
-          >
+          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+            t('header.changePasswordModal.currentUsername')
+          }}</label>
           <input
             class="form-input w-full cursor-not-allowed bg-gray-100 dark:bg-gray-700 dark:text-gray-300"
             disabled
@@ -195,22 +199,24 @@
         </div>
 
         <div>
-          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-            >{{ t('header.changePasswordModal.newUsername') }}</label
-          >
+          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+            t('header.changePasswordModal.newUsername')
+          }}</label>
           <input
             v-model="changePasswordForm.newUsername"
             class="form-input w-full"
             :placeholder="t('header.changePasswordModal.newUsernamePlaceholder')"
             type="text"
           />
-          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ t('header.changePasswordModal.newUsernameHint') }}</p>
+          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('header.changePasswordModal.newUsernameHint') }}
+          </p>
         </div>
 
         <div>
-          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-            >{{ t('header.changePasswordModal.currentPassword') }}</label
-          >
+          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+            t('header.changePasswordModal.currentPassword')
+          }}</label>
           <input
             v-model="changePasswordForm.currentPassword"
             class="form-input w-full"
@@ -221,9 +227,9 @@
         </div>
 
         <div>
-          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-            >{{ t('header.changePasswordModal.newPassword') }}</label
-          >
+          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+            t('header.changePasswordModal.newPassword')
+          }}</label>
           <input
             v-model="changePasswordForm.newPassword"
             class="form-input w-full"
@@ -231,13 +237,15 @@
             required
             type="password"
           />
-          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ t('header.changePasswordModal.newPasswordHint') }}</p>
+          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('header.changePasswordModal.newPasswordHint') }}
+          </p>
         </div>
 
         <div>
-          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-            >{{ t('header.changePasswordModal.confirmPassword') }}</label
-          >
+          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+            t('header.changePasswordModal.confirmPassword')
+          }}</label>
           <input
             v-model="changePasswordForm.confirmPassword"
             class="form-input w-full"
@@ -262,7 +270,11 @@
           >
             <div v-if="changePasswordLoading" class="loading-spinner mr-2" />
             <i v-else class="fas fa-save mr-2" />
-            {{ changePasswordLoading ? t('header.changePasswordModal.saving') : t('header.changePasswordModal.save') }}
+            {{
+              changePasswordLoading
+                ? t('header.changePasswordModal.saving')
+                : t('header.changePasswordModal.save')
+            }}
           </button>
         </div>
       </form>

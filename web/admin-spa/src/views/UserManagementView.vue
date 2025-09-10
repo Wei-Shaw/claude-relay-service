@@ -3,7 +3,9 @@
     <!-- Header -->
     <div class="sm:flex sm:items-center">
       <div class="sm:flex-auto">
-        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">{{ t('user.management.title') }}</h1>
+        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
+          {{ t('user.management.title') }}
+        </h1>
         <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">
           {{ t('user.management.description') }}
         </p>
@@ -254,7 +256,9 @@
             fill="currentColor"
           ></path>
         </svg>
-        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t('user.management.loadingUsers') }}</p>
+        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+          {{ t('user.management.loadingUsers') }}
+        </p>
       </div>
 
       <!-- Users List -->
@@ -299,7 +303,9 @@
                           : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                       ]"
                     >
-                      {{ user.isActive ? t('user.management.active') : t('user.management.disabled') }}
+                      {{
+                        user.isActive ? t('user.management.active') : t('user.management.disabled')
+                      }}
                     </span>
                     <span
                       :class="[
@@ -328,8 +334,14 @@
                   v-if="user.totalUsage"
                   class="mt-1 flex items-center space-x-4 text-xs text-gray-400 dark:text-gray-500"
                 >
-                  <span>{{ formatNumber(user.totalUsage.requests || 0) }} {{ t('user.management.requests') }}</span>
-                  <span>${{ (user.totalUsage.totalCost || 0).toFixed(4) }} {{ t('user.management.totalCostLabel') }}</span>
+                  <span
+                    >{{ formatNumber(user.totalUsage.requests || 0) }}
+                    {{ t('user.management.requests') }}</span
+                  >
+                  <span
+                    >${{ (user.totalUsage.totalCost || 0).toFixed(4) }}
+                    {{ t('user.management.totalCostLabel') }}</span
+                  >
                 </div>
               </div>
             </div>
@@ -337,7 +349,7 @@
               <!-- View Usage Stats -->
               <button
                 class="inline-flex items-center rounded border border-transparent p-1 text-gray-400 hover:text-blue-600"
-:title="t('user.management.viewUsageStats')"
+                :title="t('user.management.viewUsageStats')"
                 @click="viewUserStats(user)"
               >
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -354,7 +366,7 @@
               <button
                 class="inline-flex items-center rounded border border-transparent p-1 text-gray-400 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
                 :disabled="user.apiKeyCount === 0"
-:title="t('user.management.disableAllApiKeys')"
+                :title="t('user.management.disableAllApiKeys')"
                 @click="disableUserApiKeys(user)"
               >
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -375,7 +387,9 @@
                     ? 'text-gray-400 hover:text-red-600'
                     : 'text-gray-400 hover:text-green-600'
                 ]"
-                :title="user.isActive ? t('user.management.disableUser') : t('user.management.enableUser')"
+                :title="
+                  user.isActive ? t('user.management.disableUser') : t('user.management.enableUser')
+                "
                 @click="toggleUserStatus(user)"
               >
                 <svg
@@ -405,7 +419,7 @@
               <!-- Change Role -->
               <button
                 class="inline-flex items-center rounded border border-transparent p-1 text-gray-400 hover:text-purple-600"
-:title="t('user.management.changeRole')"
+                :title="t('user.management.changeRole')"
                 @click="changeUserRole(user)"
               >
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -437,7 +451,9 @@
             stroke-width="2"
           />
         </svg>
-        <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">{{ t('user.management.noUsersFound') }}</h3>
+        <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">
+          {{ t('user.management.noUsersFound') }}
+        </h3>
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
           {{
             searchQuery ? t('user.management.noUsersMatch') : t('user.management.noUsersCreated')
@@ -597,7 +613,9 @@ const viewUserStats = (user) => {
 const toggleUserStatus = (user) => {
   selectedUser.value = user
   confirmAction.value = {
-    title: user.isActive ? t('user.management.disableUserTitle') : t('user.management.enableUserTitle'),
+    title: user.isActive
+      ? t('user.management.disableUserTitle')
+      : t('user.management.enableUserTitle'),
     message: user.isActive
       ? t('user.management.disableUserMessage', { username: user.username })
       : t('user.management.enableUserMessage', { username: user.username }),
@@ -614,7 +632,10 @@ const disableUserApiKeys = (user) => {
   selectedUser.value = user
   confirmAction.value = {
     title: t('user.management.disableAllKeysTitle'),
-    message: t('user.management.disableAllKeysMessage', { count: user.apiKeyCount, username: user.username }),
+    message: t('user.management.disableAllKeysMessage', {
+      count: user.apiKeyCount,
+      username: user.username
+    }),
     confirmText: t('user.management.disableKeys'),
     confirmClass: 'bg-red-600 hover:bg-red-700',
     action: 'disableKeys'
@@ -642,13 +663,21 @@ const handleConfirmAction = async () => {
         if (userIndex !== -1) {
           users.value[userIndex].isActive = !user.isActive
         }
-        showToast(user.isActive ? t('user.management.userDisabledSuccess') : t('user.management.userEnabledSuccess'), 'success')
+        showToast(
+          user.isActive
+            ? t('user.management.userDisabledSuccess')
+            : t('user.management.userEnabledSuccess'),
+          'success'
+        )
       }
     } else if (action === 'disableKeys') {
       const response = await apiClient.post(`/users/${user.id}/disable-keys`)
 
       if (response.success) {
-        showToast(t('user.management.keysDisabledSuccess', { count: response.disabledCount }), 'success')
+        showToast(
+          t('user.management.keysDisabledSuccess', { count: response.disabledCount }),
+          'success'
+        )
         await loadUsers() // Refresh to get updated counts
       }
     }

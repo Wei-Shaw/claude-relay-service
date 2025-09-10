@@ -17,7 +17,7 @@ const currentTutorialComponent = computed(() => {
   const components = {
     'zh-cn': TutorialViewZhCn,
     'zh-tw': TutorialViewZhTw,
-    'en': TutorialViewEn
+    en: TutorialViewEn
   }
   return components[locale] || TutorialViewZhCn
 })

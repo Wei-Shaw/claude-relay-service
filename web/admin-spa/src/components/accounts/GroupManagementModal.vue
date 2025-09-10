@@ -11,7 +11,9 @@
             >
               <i class="fas fa-layer-group text-sm text-white sm:text-base" />
             </div>
-            <h3 class="text-lg font-bold text-gray-900 sm:text-xl">{{ t('groupManagement.title') }}</h3>
+            <h3 class="text-lg font-bold text-gray-900 sm:text-xl">
+              {{ t('groupManagement.title') }}
+            </h3>
           </div>
           <button
             class="p-1 text-gray-400 transition-colors hover:text-gray-600"
@@ -31,10 +33,14 @@
 
         <!-- 创建分组表单 -->
         <div v-if="showCreateForm" class="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
-          <h4 class="mb-4 text-lg font-semibold text-gray-900">{{ t('groupManagement.createGroup') }}</h4>
+          <h4 class="mb-4 text-lg font-semibold text-gray-900">
+            {{ t('groupManagement.createGroup') }}
+          </h4>
           <div class="space-y-4">
             <div>
-              <label class="mb-2 block text-sm font-semibold text-gray-700">{{ t('groupManagement.groupNameRequired') }}</label>
+              <label class="mb-2 block text-sm font-semibold text-gray-700">{{
+                t('groupManagement.groupNameRequired')
+              }}</label>
               <input
                 v-model="createForm.name"
                 class="form-input w-full"
@@ -44,7 +50,9 @@
             </div>
 
             <div>
-              <label class="mb-2 block text-sm font-semibold text-gray-700">{{ t('groupManagement.platformTypeRequired') }}</label>
+              <label class="mb-2 block text-sm font-semibold text-gray-700">{{
+                t('groupManagement.platformTypeRequired')
+              }}</label>
               <div class="flex gap-4">
                 <label class="flex cursor-pointer items-center">
                   <input v-model="createForm.platform" class="mr-2" type="radio" value="claude" />
@@ -62,7 +70,9 @@
             </div>
 
             <div>
-              <label class="mb-2 block text-sm font-semibold text-gray-700">{{ t('groupManagement.descriptionOptional') }}</label>
+              <label class="mb-2 block text-sm font-semibold text-gray-700">{{
+                t('groupManagement.descriptionOptional')
+              }}</label>
               <textarea
                 v-model="createForm.description"
                 class="form-input w-full resize-none"
@@ -80,7 +90,9 @@
                 <div v-if="creating" class="loading-spinner mr-2" />
                 {{ creating ? t('groupManagement.creating') : t('groupManagement.create') }}
               </button>
-              <button class="btn btn-secondary px-4 py-2" @click="cancelCreate">{{ t('groupManagement.cancel') }}</button>
+              <button class="btn btn-secondary px-4 py-2" @click="cancelCreate">
+                {{ t('groupManagement.cancel') }}
+              </button>
             </div>
           </div>
         </div>
@@ -184,7 +196,9 @@
 
         <div class="space-y-4">
           <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700">{{ t('groupManagement.groupNameRequired') }}</label>
+            <label class="mb-2 block text-sm font-semibold text-gray-700">{{
+              t('groupManagement.groupNameRequired')
+            }}</label>
             <input
               v-model="editForm.name"
               class="form-input w-full"
@@ -194,7 +208,9 @@
           </div>
 
           <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700">{{ t('groupManagement.platformTypeLabel') }}</label>
+            <label class="mb-2 block text-sm font-semibold text-gray-700">{{
+              t('groupManagement.platformTypeLabel')
+            }}</label>
             <div class="rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-600">
               {{
                 editForm.platform === 'claude'
@@ -203,12 +219,16 @@
                     ? 'Gemini'
                     : 'OpenAI'
               }}
-              <span class="ml-2 text-xs text-gray-500">{{ t('groupManagement.cannotModify') }}</span>
+              <span class="ml-2 text-xs text-gray-500">{{
+                t('groupManagement.cannotModify')
+              }}</span>
             </div>
           </div>
 
           <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700">{{ t('groupManagement.descriptionOptional') }}</label>
+            <label class="mb-2 block text-sm font-semibold text-gray-700">{{
+              t('groupManagement.descriptionOptional')
+            }}</label>
             <textarea
               v-model="editForm.description"
               class="form-input w-full resize-none"
@@ -226,7 +246,9 @@
               <div v-if="updating" class="loading-spinner mr-2" />
               {{ updating ? t('groupManagement.updating') : t('groupManagement.update') }}
             </button>
-            <button class="btn btn-secondary flex-1 px-4 py-2" @click="cancelEdit">{{ t('groupManagement.cancel') }}</button>
+            <button class="btn btn-secondary flex-1 px-4 py-2" @click="cancelEdit">
+              {{ t('groupManagement.cancel') }}
+            </button>
           </div>
         </div>
       </div>

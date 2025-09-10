@@ -24,7 +24,7 @@ export default {
     userMenu: '用戶選單',
     logout: '退出登錄',
     settings: '系統設置',
-    
+
     // Version related
     currentVersion: '當前版本',
     newVersionAvailable: '有新版本可用',
@@ -34,10 +34,10 @@ export default {
     checkingUpdate: '檢查更新中...',
     alreadyLatest: '當前已是最新版本',
     checkUpdate: '檢查更新',
-    
+
     // User menu items
     changeAccountInfo: '修改帳戶資訊',
-    
+
     // Change password modal
     changePasswordModal: {
       title: '修改帳戶資訊',
@@ -55,7 +55,7 @@ export default {
       confirmPasswordPlaceholder: '請再次輸入新密碼',
       saving: '保存中...',
       save: '保存修改',
-      
+
       // Messages
       passwordMismatch: '兩次輸入的密碼不一致',
       passwordTooShort: '新密碼長度至少8位',
@@ -64,7 +64,7 @@ export default {
       changeFailed: '修改失敗',
       changePasswordFailed: '修改密碼失敗'
     },
-    
+
     // Logout
     logoutConfirm: '確定要退出登錄嗎？',
     logoutSuccess: '已安全退出'
@@ -79,7 +79,7 @@ export default {
     timeRange: '統計時間範圍',
     today: '今日',
     thisMonth: '本月',
-    
+
     // API Key Input
     usageStatsQuery: '使用統計查詢',
     apiKeyDescription: '查詢您的 API Key 使用情況和統計資料',
@@ -90,7 +90,7 @@ export default {
     singleModeTitle: '單一模式',
     aggregateModeTitle: '彙整模式',
     queryButton: '查詢',
-    
+
     // Stats Overview
     batchQuerySummary: '批次查詢概要',
     apiKeyInfo: 'API Key 資訊',
@@ -101,13 +101,13 @@ export default {
     totalTokens: '總 Token 數',
     totalCost: '總費用',
     individual: '個',
-    
+
     // Aggregated Stats Card
     usageRatio: '使用占比',
     requests: '次',
     otherKeys: '其他',
     keys: 'Keys',
-    
+
     // Model Usage Stats
     modelUsageStats: '模型使用統計',
     loadingModelStats: '載入模型統計資料中...',
@@ -118,14 +118,14 @@ export default {
     cacheCreateTokens: '快取建立',
     cacheReadTokens: '快取讀取',
     noModelData: '暫無{period}模型使用資料',
-    
+
     // Token Distribution
     tokenDistribution: 'Token 使用分佈',
     inputToken: '輸入 Token',
     outputToken: '輸出 Token',
     cacheCreateToken: '快取建立 Token',
     cacheReadToken: '快取讀取 Token',
-    
+
     // Limit Config
     limitConfig: '限制設定',
     limitConfigAggregate: '限制設定（彙整查詢模式）',
@@ -138,7 +138,7 @@ export default {
     usageToday: '今日使用',
     usageThisMonth: '本月使用',
     remaining: '剩餘',
-    
+
     // Stats Overview - Additional keys
     name: '名稱',
     status: '狀態',
@@ -165,7 +165,7 @@ export default {
     monthlyTokens: '本月Token數',
     monthlyCost: '本月費用',
     monthlyInputTokens: '本月輸入Token',
-    
+
     // Limit Config - Additional keys
     dailyCostLimit: '每日費用限制',
     concurrencyLimit: '並發限制',
@@ -187,25 +187,26 @@ export default {
     orRelationshipRequests: '請求次數和費用限制為「或」的關係，任一達到限制即觸發限流',
     orRelationshipTokens: '請求次數和Token使用量為「或」的關係，任一達到限制即觸發限流',
     onlyRequestsLimit: '僅限制請求次數',
-    
+
     // Token Distribution - Additional keys
     totalAmount: '總計',
     todayTotal: '今日總計',
     monthlyTotal: '本月總計',
-    
+
     // Additional missing keys
     usageRatioOnlyInMultiMode: '使用占比僅在多Key查詢時顯示',
     noData: '暫無資料',
-    
+
     // ApiKeyInput placeholders and texts
     apiKeyPlaceholder: '請輸入您的 API Key (cr_...)',
     apiKeysPlaceholder: '請輸入您的 API Keys，支援以下格式：\ncr_xxx\ncr_yyy\n或\ncr_xxx, cr_yyy',
     clearInput: '清空輸入',
     securityNoticeSingle: '您的 API Key 僅用於查詢自己的統計資料，不會被儲存或用於其他用途',
-    securityNoticeMulti: '您的 API Keys 僅用於查詢統計資料，不會被儲存。彙整模式下部分個體化資訊將不顯示。',
+    securityNoticeMulti:
+      '您的 API Keys 僅用於查詢統計資料，不會被儲存。彙整模式下部分個體化資訊將不顯示。',
     multiKeyTip: '提示：最多支援同時查詢 30 個 API Keys。使用 Ctrl+Enter 快速查詢。'
   },
-  
+
   // Login page
   login: {
     title: '管理後台',
@@ -216,7 +217,7 @@ export default {
     loginButton: '登錄',
     loggingIn: '登錄中...'
   },
-  
+
   // Dashboard page
   dashboard: {
     // Main stats cards
@@ -231,7 +232,7 @@ export default {
     totalRequests: '總請求',
     systemStatus: '系統狀態',
     uptime: '運行時間',
-    
+
     // Platform accounts tooltip
     claudeAccount: 'Claude: {total} 個 (正常: {normal})',
     consoleAccount: 'Console: {total} 個 (正常: {normal})',
@@ -239,7 +240,7 @@ export default {
     bedrockAccount: 'Bedrock: {total} 個 (正常: {normal})',
     openaiAccount: 'OpenAI: {total} 個 (正常: {normal})',
     azureOpenaiAccount: 'Azure OpenAI: {total} 個 (正常: {normal})',
-    
+
     // Token stats cards
     todayToken: '今日Token',
     totalTokenConsumption: '總Token消耗',
@@ -247,7 +248,7 @@ export default {
     outputTokens: '輸出',
     cacheCreateTokens: '快取建立',
     cacheReadTokens: '快取讀取',
-    
+
     // Real-time metrics
     realtimeRPM: '即時RPM',
     realtimeTPM: '即時TPM',
@@ -255,10 +256,10 @@ export default {
     tokensPerMinute: '每分钟Token數',
     historicalData: '歷史資料',
     minutes: '分钟',
-    
+
     // Charts section
     modelDistributionAndTrend: '模型使用分佈與Token使用趋勢',
-    
+
     // Date filter presets
     today: '今日',
     yesterday: '昨日',
@@ -268,35 +269,35 @@ export default {
     lastWeek: '上週',
     thisMonth: '本月',
     lastMonth: '上月',
-    
+
     // Granularity buttons
     byDay: '按日',
     byHour: '按小時',
-    
+
     // Date picker
     startDatePlaceholder: '開始日期',
     endDatePlaceholder: '結束日期',
     dateSeparator: '至',
     maxHours24: '最多24小時',
-    
+
     // Auto refresh controls
     autoRefresh: '自動刷新',
     refresh: '刷新',
     refreshing: '刷新中',
     refreshDataNow: '立即刷新資料',
-    
+
     // Charts
     tokenUsageDistribution: 'Token使用分佈',
     detailedStatistics: '詳細統計資料',
     noModelUsageData: '暫無模型使用資料',
-    
+
     // Table headers
     model: '模型',
     requestCount: '請求數',
     totalTokens: '總Token',
     cost: '費用',
     percentage: '占比',
-    
+
     // Trend charts
     tokenUsageTrend: 'Token使用趋勢',
     apiKeysUsageTrend: 'API Keys 使用趋勢',
@@ -304,7 +305,7 @@ export default {
     tokenCount: 'Token 數量',
     totalApiKeysCount: '共 {count} 個 API Key',
     showingTop10: '共 {count} 個 API Key，顯示使用量前 10 個',
-    
+
     // Chart labels
     inputTokensLabel: '輸入Token',
     outputTokensLabel: '輸出Token',
@@ -317,12 +318,12 @@ export default {
     tokenQuantity: 'Token數量',
     requestsQuantity: '請求次數'
   },
-  
+
   // Accounts page
   accounts: {
     title: '帳戶管理',
     description: '管理您的 Claude、Gemini、OpenAI 和 Azure OpenAI 帳戶及代理配置',
-    
+
     // Filters and sorting
     sortBy: '選擇排序',
     selectPlatform: '選擇平台',
@@ -330,14 +331,14 @@ export default {
     refresh: '刷新',
     refreshTooltip: '刷新資料 (Ctrl/⌘+點擊強制刷新所有快取)',
     addAccount: '添加帳戶',
-    
+
     // Sort options
     sortByName: '按名稱排序',
     sortByDailyTokens: '按今日Token排序',
     sortByDailyRequests: '按今日請求數排序',
     sortByTotalTokens: '按總Token排序',
     sortByLastUsed: '按最後使用排序',
-    
+
     // Platform options
     allPlatforms: '所有平台',
     claudePlatform: 'Claude',
@@ -346,16 +347,16 @@ export default {
     openaiPlatform: 'OpenAi',
     azureOpenaiPlatform: 'Azure OpenAI',
     bedrockPlatform: 'Bedrock',
-    
+
     // Group options
     allAccounts: '所有帳戶',
     ungroupedAccounts: '未分組帳戶',
-    
+
     // Loading states
     loadingAccounts: '正在載入帳戶...',
     noAccounts: '暫無帳戶',
     noAccountsHint: '點擊上方按鈕添加您的第一個帳戶',
-    
+
     // Table headers
     name: '名稱',
     platformType: '平台/類型',
@@ -366,20 +367,20 @@ export default {
     sessionWindow: '會話窗口',
     lastUsed: '最後使用',
     actions: '操作',
-    
+
     // Account types
     dedicated: '專屬',
     groupScheduling: '分組調度',
     shared: '共享',
     belongsToGroup: '所屬分組: {name}',
-    
+
     // Platform labels
     unknown: '未知',
     apiKey: 'API Key',
     oauth: 'OAuth',
     setup: 'Setup',
     aws: 'AWS',
-    
+
     // Account status
     normal: '正常',
     abnormal: '異常',
@@ -388,15 +389,15 @@ export default {
     rateLimited: '限流中',
     notSchedulable: '不可調度',
     bound: '綁定: {count} 個API Key',
-    
+
     // Proxy status
     noProxy: '無代理',
-    
+
     // Usage statistics
     requests: '次',
     noData: '暫無資料',
     averageRpm: '平均 {rpm} RPM',
-    
+
     // Session window tooltip
     sessionWindowTooltip: {
       title: '會話窗口進度表示5小時窗口的時間進度',
@@ -404,16 +405,16 @@ export default {
       warning: '警告：接近限制',
       rejected: '拒絕：達到速率限制'
     },
-    
+
     // Session window status
     remaining: '剩餘 {time}',
     ended: '已結束',
-    
+
     // Console quota
     quotaProgress: '額度進度',
     remainingQuota: '剩餘 $${amount}',
     reset: '重置 {time}',
-    
+
     // Mobile view labels
     dailyUsageLabel: '今日使用',
     sessionWindowLabel: '會話窗口',
@@ -422,7 +423,7 @@ export default {
     priorityLabel: '優先級',
     neverUsed: '從未使用',
     sessionWindowTooltipMobile: '會話窗口進度不代表使用量，僅表示距離下一個5小時窗口的剩餘時間',
-    
+
     // Action buttons
     resetStatus: '重置狀態',
     resetting: '重置中...',
@@ -437,7 +438,7 @@ export default {
     deleteTooltip: '刪除帳戶',
     pause: '暫停',
     enable: '啟用',
-    
+
     // Time formatting
     justNow: '剛剛',
     minutesAgo: '{minutes} 分鐘前',
@@ -448,44 +449,46 @@ export default {
     minutesOnly: '{minutes}分鐘',
     daysAndHours: '{days}天{hours}小時',
     daysOnly: '{days}天',
-    
+
     // Rate limit time
     rateLimitTime: '({time})',
-    
+
     // Messages and confirmations
     resetStatusConfirmTitle: '重置帳戶狀態',
-    resetStatusConfirmMessage: '確定要重置此帳戶的所有異常狀態嗎？這將清除限流狀態、401錯誤計數等所有異常標記。',
+    resetStatusConfirmMessage:
+      '確定要重置此帳戶的所有異常狀態嗎？這將清除限流狀態、401錯誤計數等所有異常標記。',
     resetStatusConfirmButton: '確定重置',
     resetStatusCancelButton: '取消',
     statusResetSuccess: '帳戶狀態已重置',
     statusResetFailed: '狀態重置失敗',
-    
+
     deleteAccountTitle: '刪除帳戶',
     deleteAccountMessage: '確定要刪除帳戶 "{name}" 嗎？\n\n此操作不可恢復。',
     deleteAccountButton: '刪除',
     deleteAccountCancel: '取消',
-    cannotDeleteBoundAccount: '無法刪除此帳號，有 {count} 個API Key綁定到此帳號，請先解綁所有API Key',
+    cannotDeleteBoundAccount:
+      '無法刪除此帳號，有 {count} 個API Key綁定到此帳號，請先解綁所有API Key',
     accountDeleted: '帳戶已刪除',
     deleteFailed: '刪除失敗',
-    
+
     enabledScheduling: '已啟用調度',
     disabledScheduling: '已禁用調度',
     schedulingToggleFailed: '切換調度狀態失敗',
     unsupportedAccountType: '該帳戶類型暫不支持調度控制',
     operationFailed: '操作失敗',
-    
+
     accountCreateSuccess: '帳戶創建成功',
     accountUpdateSuccess: '帳戶更新成功',
     loadAccountsFailed: '載入帳戶失敗',
     unsupportedAccountTypeReset: '不支持的帳戶類型',
-    
+
     // Schedulable reasons
     invalidApiKey: 'API Key無效或已過期（401錯誤）',
     serviceOverload: '服務過載（529錯誤）',
     rateLimitTriggered: '觸發限流（429錯誤）',
     authFailed: '認證失敗（401錯誤）',
     manualStop: '手動停止調度',
-    
+
     // Account type display
     claudeMax: 'Claude Max',
     claudePro: 'Claude Pro',
@@ -499,18 +502,18 @@ export default {
     // Page title and description
     title: 'API Keys 管理',
     description: '管理和監控您的 API 密鑰',
-    
+
     // Tab navigation
     activeTab: '活躍 API Keys',
     deletedTab: '已刪除 API Keys',
-    
+
     // Toolbar and actions
     refresh: '重新整理',
     refreshTooltip: '重新整理 API Keys 清單（Ctrl+點擊強制重新整理）',
     createNew: '建立新 Key',
     bulkEdit: '編輯已選取',
     bulkDelete: '刪除已選取',
-    
+
     // Table headers
     name: '名稱',
     tags: '標籤',
@@ -519,7 +522,7 @@ export default {
     createdAt: '建立時間',
     expiresAt: '過期時間',
     actions: '操作',
-    
+
     // Filter options
     timeRange: {
       today: '今日',
@@ -527,7 +530,7 @@ export default {
       month: '本月',
       all: '全部時間'
     },
-    
+
     // Status
     active: '活躍',
     disabled: '停用',
@@ -535,7 +538,7 @@ export default {
     expiringSoon: '即將過期',
     neverExpire: '永不過期',
     notActivated: '未啟用',
-    
+
     // Usage statistics
     dailyCost: '今日費用',
     totalCost: '總費用',
@@ -547,26 +550,26 @@ export default {
     daysAgo: '{days} 天前',
     justNow: '剛剛',
     requests: '次',
-    
+
     // Search and filter
     searchPlaceholder: '搜尋名稱...',
     searchPlaceholderWithOwner: '搜尋名稱或擁有者...',
     allTags: '所有標籤',
     noTags: '無標籤',
-    
+
     // Binding information
     shared: '使用共享池',
     dedicated: '專屬',
     consoleAccount: 'Console賬戶',
     bindingWarning: '⚠️ 賬戶不存在',
-    
+
     // Limits and quotas
     dailyLimit: '每日費用',
     weeklyOpusLimit: 'Opus週費用',
     remainingQuota: '剩餘: ${amount}',
     reset: '重設於 {time}',
     quotaProgress: '配額進度',
-    
+
     // Model statistics
     modelStats: '模型使用分佈',
     modelStatsCount: '{count} 個模型',
@@ -579,14 +582,14 @@ export default {
     noModelData: '暫無模型使用資料',
     resetFilter: '重新整理',
     adjustTimeRange: '嘗試調整時間範圍或點擊重新整理重新載入資料',
-    
+
     // Date filter
     dateFilter: {
       today: '今日',
       days7: '7天',
       days30: '30天'
     },
-    
+
     // Actions
     viewDetails: '查看詳細統計',
     edit: '編輯',
@@ -595,12 +598,12 @@ export default {
     disable: '停用',
     copy: '複製',
     copyStatsLink: '複製統計頁面連結',
-    
+
     // Pagination
     totalRecords: '共 {count} 條記錄',
     pageSize: '每頁顯示',
     records: '條',
-    
+
     // Empty states
     noApiKeys: '暫無 API Keys',
     noApiKeysHint: '點擊上方按鈕建立您的第一個 API Key',
@@ -609,7 +612,7 @@ export default {
     loading: '正在載入 API Keys...',
     loadingDeleted: '正在載入已刪除的 API Keys...',
     loadingModelStats: '載入模型統計...',
-    
+
     // Deleted keys table
     creator: '建立者',
     deletedBy: '刪除者',
@@ -617,21 +620,23 @@ export default {
     canRestore: '恢復',
     permanentDelete: '徹底刪除',
     clearAllDeleted: '清空所有已刪除',
-    
+
     // User types
     admin: '管理員',
     user: '用戶',
     unknown: '未知',
     system: '系統',
-    
+
     // Confirmation dialogs
     confirmDisable: '確定要停用 API Key "{name}" 嗎？停用後所有使用此 Key 的請求將返回 401 錯誤。',
     confirmDelete: '確定要刪除這個 API Key 嗎？此操作不可恢復。',
     confirmBatchDelete: '確定要刪除已選取的 {count} 個 API Key 嗎？此操作不可恢復。',
     confirmRestore: '確定要恢復這個 API Key 嗎？恢復後可以重新使用。',
-    confirmPermanentDelete: '確定要徹底刪除這個 API Key 嗎？此操作不可恢復，所有相關資料將被永久刪除。',
-    confirmClearAll: '確定要徹底刪除全部 {count} 個已刪除的 API Keys 嗎？此操作不可恢復，所有相關資料將被永久刪除。',
-    
+    confirmPermanentDelete:
+      '確定要徹底刪除這個 API Key 嗎？此操作不可恢復，所有相關資料將被永久刪除。',
+    confirmClearAll:
+      '確定要徹底刪除全部 {count} 個已刪除的 API Keys 嗎？此操作不可恢復，所有相關資料將被永久刪除。',
+
     // Success messages
     keyActivated: 'API Key 已啟用',
     keyDisabled: 'API Key 已停用',
@@ -641,7 +646,7 @@ export default {
     allDeletedCleared: '已清空所有已刪除的 API Keys',
     linkCopied: '已複製統計頁面連結',
     expiryUpdated: '過期時間已更新',
-    
+
     // Error messages
     selectKeysFirst: '請先選擇要編輯的 API Keys',
     loadFailed: '載入 API Keys 失敗',
@@ -651,17 +656,554 @@ export default {
     deleteFailed: '刪除失敗',
     restoreFailed: '恢復失敗',
     clearFailed: '清空失敗',
-    
+
     // Tooltips and helpers
     editExpiry: '編輯過期時間',
     activationDays: '未啟用 ({days}天)',
     boundTo: '綁定到',
     belongsToGroup: '所屬分組: {name}',
-    
+
     // Batch operations
     batchSuccess: '成功處理 {count} 個項目',
     batchPartialFail: '{failed} 個處理失敗',
-    batchAllFailed: '所有項目處理失敗'
+    batchAllFailed: '所有項目處理失敗',
+
+    // Batch API Key Modal
+    batchApiKeyModal: {
+      title: '批量建立成功',
+      successMessage: '成功建立 {count} 個 API Key',
+      importantReminder: '重要提醒',
+      warningMessage:
+        '這是您唯一能看到所有 API Key 的機會。關閉此視窗後，系統將不再顯示完整的 API Key。請立即下載並妥善保存。',
+
+      // Statistics cards
+      createdCount: '建立數量',
+      baseName: '基礎名稱',
+      permissionScope: '權限範圍',
+      expiryTime: '過期時間',
+
+      // Permission texts
+      permissions: {
+        all: '全部服務',
+        claude: '僅 Claude',
+        gemini: '僅 Gemini',
+        unknown: '未知'
+      },
+
+      // Expiry time texts
+      neverExpire: '永不過期',
+      daysFormat: '{days}天',
+      weeksFormat: '{weeks}週',
+      monthsFormat: '{months}個月',
+      yearsFormat: '{years}年',
+
+      // Preview section
+      previewTitle: 'API Keys 預覽',
+      hide: '隱藏',
+      show: '顯示',
+      preview: '預覽',
+      maxDisplayNote: '（最多顯示前10個）',
+      moreKeysNote: '... 還有 {count} 個 API Key',
+
+      // Action buttons
+      downloadAll: '下載所有 API Keys',
+      alreadySaved: '我已保存',
+      directCloseTooltip: '直接關閉（不推薦）',
+
+      // File info
+      fileFormatInfo:
+        '下載的檔案格式為文字檔案（.txt），每行包含一個 API Key。請將檔案保存在安全的位置，避免洩露。',
+
+      // Confirmation dialogs
+      closeReminderTitle: '關閉提醒',
+      closeReminderMessage:
+        '關閉後將無法再次查看這些 API Key，請確保已經下載並妥善保存。\n\n確定要關閉嗎？',
+      confirmCloseButton: '確定關閉',
+      goBackDownloadButton: '返回下載',
+
+      directCloseTitle: '確定要關閉嗎？',
+      directCloseMessage: '您還沒有下載 API Keys，關閉後將無法再次查看。\n\n強烈建議您先下載保存。',
+      stillCloseButton: '仍然關閉',
+
+      directCloseFallbackMessage: '您還沒有下載 API Keys，關閉後將無法再次查看。\n\n確定要關閉嗎？',
+
+      // Success messages
+      downloadSuccess: 'API Keys 檔案已下載'
+    },
+
+    // Expiry Edit Modal
+    expiryEditModal: {
+      title: '修改過期時間',
+      subtitle: '為 "{name}" 設定新的過期時間',
+      currentStatus: '目前狀態',
+      notActivated: '未啟動',
+      activationDaysHint: '(啟動後 {days} 天過期)',
+      neverExpire: '永不過期',
+      expired: '已過期',
+      daysToExpire: '{days} 天後過期',
+      monthsToExpire: '{months} 個月後過期',
+      activateNow: '立即啟動',
+      activateButton: '立即啟動 (啟動後 {days} 天過期)',
+      activationInfo: '點選立即啟動此 API Key，啟動後將在 {days} 天後過期',
+      selectNewDuration: '選擇新的期限',
+      neverExpireOption: '永不過期',
+      oneDay: '1 天',
+      sevenDays: '7 天',
+      thirtyDays: '30 天',
+      ninetyDays: '90 天',
+      oneHundredEightyDays: '180 天',
+      threeSixtyFiveDays: '1 年',
+      twoYears: '2 年',
+      custom: '自訂',
+      selectDateAndTime: '選擇日期和時間',
+      selectFutureDateTime: '選擇一個未來的日期和時間作為過期時間',
+      newExpiryTime: '新的過期時間',
+      cancel: '取消',
+      saving: '儲存中...',
+      saveChanges: '儲存變更',
+      activateConfirmTitle: '啟動 API Key',
+      activateConfirmMessage: '確定要立即啟動此 API Key 嗎？啟動後將在 {days} 天後自動過期。',
+      confirmActivate: '確定啟動',
+      confirmCancel: '取消'
+    },
+
+    // Edit API Key Modal
+    editApiKeyModal: {
+      title: '編輯 API Key',
+
+      // Basic Info
+      name: '名稱',
+      namePlaceholder: '請輸入API Key名稱',
+      nameHint: '用於識別此 API Key 的用途',
+
+      // Owner
+      owner: '所有者',
+      adminLabel: '- 管理員',
+      ownerHint: '分配此 API Key 給指定使用者或管理員，管理員分配時不受使用者 API Key 數量限制',
+
+      // Tags
+      tags: '標籤',
+      selectedTags: '已選擇的標籤:',
+      clickToSelectTags: '點擊選擇已有標籤:',
+      createNewTag: '建立新標籤:',
+      newTagPlaceholder: '輸入新標籤名稱',
+      tagsHint: '用於標記不同團隊或用途，方便篩選管理',
+
+      // Rate Limit Settings
+      rateLimitTitle: '速率限制設定 (可選)',
+      rateLimitWindow: '時間視窗 (分鐘)',
+      rateLimitRequests: '請求次數限制',
+      rateLimitCost: '費用限制 (美元)',
+      rateLimitWindowHint: '時間段單位',
+      rateLimitRequestsHint: '視窗內最大請求',
+      rateLimitCostHint: '視窗內最大費用',
+      noLimit: '無限制',
+
+      // Usage Examples
+      usageExamples: '💡 使用範例',
+      example1: '範例1: 時間視窗=60，請求次數=1000 → 每60分鐘最多1000次請求',
+      example2: '範例2: 時間視窗=1，費用=0.1 → 每分鐘最多$0.1費用',
+      example3: '範例3: 視窗=30，請求=50，費用=5 → 每30分鐘50次請求且不超$5費用',
+
+      // Cost Limits
+      dailyCostLimit: '每日費用限制 (美元)',
+      dailyCostLimitPlaceholder: '0 表示無限制',
+      dailyCostHint: '設定此 API Key 每日的費用限制，超過限制將拒絕請求，0 或留空表示無限制',
+      weeklyOpusCostLimit: 'Opus 模型週費用限制 (美元)',
+      weeklyOpusHint:
+        '設定 Opus 模型的週費用限制（週一到週日），僅限 Claude 官方帳戶，0 或留空表示無限制',
+      custom: '自訂',
+
+      // Concurrency
+      concurrencyLimit: '並發限制',
+      concurrencyLimitPlaceholder: '0 表示無限制',
+      concurrencyHint: '設定此 API Key 可同時處理的最大請求數',
+
+      // Active Status
+      activeStatus: '啟動帳號',
+      activeStatusHint: '取消勾選將停用此 API Key，暫停所有請求，客戶端回傳 401 錯誤',
+
+      // Service Permissions
+      servicePermissions: '服務權限',
+      allServices: '全部服務',
+      claudeOnly: '僅 Claude',
+      geminiOnly: '僅 Gemini',
+      openaiOnly: '僅 OpenAI',
+      permissionsHint: '控制此 API Key 可以存取哪些服務',
+
+      // Account Binding
+      accountBinding: '專屬帳號綁定',
+      refreshAccounts: '重新整理帳號',
+      refreshing: '重新整理中...',
+      claudeAccount: 'Claude 專屬帳號',
+      geminiAccount: 'Gemini 專屬帳號',
+      openaiAccount: 'OpenAI 專屬帳號',
+      bedrockAccount: 'Bedrock 專屬帳號',
+      useSharedPool: '使用共享帳號池',
+      selectClaudeAccount: '請選擇Claude帳號',
+      selectGeminiAccount: '請選擇Gemini帳號',
+      selectOpenaiAccount: '請選擇OpenAI帳號',
+      selectBedrockAccount: '請選擇Bedrock帳號',
+      accountBindingHint: '修改綁定帳號將影響此API Key的請求路由',
+
+      // Model Restrictions
+      enableModelRestriction: '啟用模型限制',
+      restrictedModels: '限制的模型清單',
+      noRestrictedModels: '暫無限制的模型',
+      allCommonModelsRestricted: '所有常用模型已在限制清單中',
+      addRestrictedModelPlaceholder: '輸入模型名稱，按回車新增',
+      modelRestrictionHint: '設定此API Key無法存取的模型，例如：claude-opus-4-20250514',
+
+      // Client Restrictions
+      enableClientRestriction: '啟用客戶端限制',
+      allowedClients: '允許的客戶端',
+      clientRestrictionHint: '勾選允許使用此API Key的客戶端',
+
+      // Buttons
+      cancel: '取消',
+      save: '儲存修改',
+      saving: '儲存中...',
+
+      // Messages
+      costLimitConfirmTitle: '費用限制提醒',
+      costLimitConfirmMessage:
+        '您設定了時間視窗但費用限制為0，這意味著不會有費用限制。\n\n是否繼續？',
+      costLimitConfirmContinue: '繼續儲存',
+      costLimitConfirmBack: '返回修改',
+      refreshAccountsSuccess: '帳號清單已重新整理',
+      refreshAccountsFailed: '重新整理帳號清單失敗',
+      updateFailed: '更新失敗'
+    },
+
+    // Batch Edit API Key Modal
+    batchEditApiKeyModal: {
+      title: '批次編輯 API Keys ({count} 個)',
+
+      // Info section
+      infoTitle: '批次編輯說明',
+      infoContent:
+        '以下設定將套用到所選的 {count} 個 API Key。僅填寫或修改的欄位會被更新，空白欄位將保持原值不變。',
+
+      // Tag operations
+      tagLabel: '標籤 (批次操作)',
+      tagOperations: {
+        replace: '替換標籤',
+        add: '新增標籤',
+        remove: '移除標籤',
+        none: '不修改標籤'
+      },
+
+      // Tag status texts
+      newTagsList: '新標籤清單:',
+      tagsToAdd: '要新增的標籤:',
+      tagsToRemove: '要移除的標籤:',
+      clickToSelectTags: '點擊選擇已有標籤:',
+      createNewTag: '建立新標籤:',
+      inputNewTagPlaceholder: '輸入新標籤名稱',
+
+      // Rate limit settings
+      rateLimitTitle: '速率限制設定',
+      rateLimitWindow: '時間視窗 (分鐘)',
+      rateLimitRequests: '請求次數限制',
+      rateLimitCost: '費用限制 (美元)',
+      noModifyPlaceholder: '不修改',
+
+      // Daily cost limit
+      dailyCostLimit: '每日費用限制 (美元)',
+      dailyCostLimitPlaceholder: '不修改 (0 表示無限制)',
+
+      // Weekly Opus cost limit
+      weeklyOpusCostLimit: 'Opus 模型週費用限制 (美元)',
+      weeklyOpusCostLimitPlaceholder: '不修改 (0 表示無限制)',
+      opusLimitDescription: '設定 Opus 模型的週費用限制（週一到週日），僅限 Claude 官方帳戶',
+
+      // Concurrency limit
+      concurrencyLimit: '並發限制',
+      concurrencyLimitPlaceholder: '不修改 (0 表示無限制)',
+
+      // Active status
+      activeStatus: '啟用狀態',
+      statusOptions: {
+        active: '啟用',
+        disabled: '停用',
+        noChange: '不修改'
+      },
+
+      // Service permissions
+      servicePermissions: '服務權限',
+      permissionOptions: {
+        noChange: '不修改',
+        all: '全部服務',
+        claude: '僅 Claude',
+        gemini: '僅 Gemini',
+        openai: '僅 OpenAI'
+      },
+
+      // Account binding
+      accountBinding: '專屬帳號綁定',
+      refreshAccounts: '重新整理帳號',
+      refreshing: '重新整理中...',
+
+      claudeAccount: 'Claude 專屬帳號',
+      geminiAccount: 'Gemini 專屬帳號',
+      openaiAccount: 'OpenAI 專屬帳號',
+      bedrockAccount: 'Bedrock 專屬帳號',
+
+      accountOptions: {
+        noChange: '不修改',
+        sharedPool: '使用共享帳號池',
+        groupPrefix: '分組 - '
+      },
+
+      // Optgroup labels
+      optgroupLabels: {
+        accountGroups: '帳號分組',
+        dedicatedAccounts: '專屬帳號'
+      },
+
+      // Buttons
+      cancel: '取消',
+      saving: '儲存中...',
+      batchSave: '批次儲存',
+
+      // Messages
+      refreshAccountsSuccess: '帳號清單已重新整理',
+      refreshAccountsFailed: '重新整理帳號清單失敗',
+      batchEditSuccess: '成功批次編輯 {count} 個 API Keys',
+      batchEditPartialFail: '{failedCount} 個編輯失敗:\n{errors}',
+      batchEditAllFailed: '所有 API Keys 編輯失敗',
+      batchEditFailed: '批次編輯失敗',
+      batchEditErrorLog: '批次編輯 API Keys 失敗:'
+    },
+
+    // Renew API Key Modal
+    renewApiKeyModal: {
+      title: '續期 API Key',
+      apiKeyInfo: 'API Key 資訊',
+      currentExpiry: '當前到期時間：',
+      neverExpires: '永不到期',
+      renewDuration: '續期時長',
+      extend7Days: '延長 7 天',
+      extend30Days: '延長 30 天',
+      extend90Days: '延長 90 天',
+      extend180Days: '延長 180 天',
+      extend365Days: '延長 365 天',
+      customDate: '自訂日期',
+      setPermanent: '設為永不到期',
+      newExpiry: '新的到期時間：',
+      cancel: '取消',
+      renewing: '續期中...',
+      confirmRenew: '確認續期',
+      renewSuccess: 'API Key 續期成功',
+      renewFailed: '續期失敗'
+    },
+
+    // New API Key Modal
+    newApiKeyModal: {
+      title: 'API Key 建立成功',
+      subtitle: '請妥善保存您的 API Key',
+      directCloseTooltip: '直接關閉（不推薦）',
+
+      // 警告提示
+      warningTitle: '重要提醒',
+      warningMessage:
+        '這是您唯一能看到完整 API Key 的機會。關閉此視窗後，系統將不再顯示完整的 API Key。請立即複製並妥善保存。',
+
+      // 欄位標籤
+      apiKeyName: 'API Key 名稱',
+      remarks: '備註',
+      noDescription: '無描述',
+      apiKey: 'API Key',
+
+      // 可見性切換
+      hideApiKey: '隱藏 API Key',
+      showFullApiKey: '顯示完整 API Key',
+      visibilityHint: '點擊眼睛圖示切換顯示模式，使用下方按鈕複製完整 API Key',
+
+      // 按鈕
+      copyApiKey: '複製 API Key',
+      alreadySaved: '我已保存',
+
+      // 確認對話框
+      closeReminderTitle: '關閉提醒',
+      closeReminderMessage:
+        '關閉後將無法再次查看完整的 API Key，請確保已經妥善保存。\n\n確定要關閉嗎？',
+      confirmClose: '確定關閉',
+      cancel: '取消',
+
+      directCloseTitle: '確定要關閉嗎？',
+      directCloseMessage:
+        '您還沒有保存 API Key，關閉後將無法再次查看。\n\n建議您先複製 API Key 再關閉。',
+      stillClose: '仍然關閉',
+      goBack: '返回複製',
+
+      directCloseFallback: '您還沒有保存 API Key，關閉後將無法再次查看。\n\n確定要關閉嗎？',
+
+      // 成功訊息
+      apiKeyNotFound: 'API Key 不存在',
+      copySuccess: 'API Key 已複製到剪貼簿',
+      copyFailed: '複製失敗，請手動複製'
+    },
+
+    // Create API Key Modal
+    createApiKeyModal: {
+      title: '建立新的 API Key',
+
+      // Create type section
+      createType: '建立類型',
+      singleCreate: '單一建立',
+      batchCreate: '批次建立',
+      batchCount: '建立數量',
+      batchCountPlaceholder: '輸入數量 (2-500)',
+      maxSupported: '最大支援 500 個',
+      batchHint: '批次建立時，每個 Key 的名稱會自動添加序號後綴，例如：{name}_1, {name}_2 ...',
+
+      // Basic form fields
+      name: '名稱',
+      nameRequired: '*',
+      nameError: '請輸入API Key名稱',
+      singleNamePlaceholder: '為您的 API Key 取一個名稱',
+      batchNamePlaceholder: '輸入基礎名稱（將自動添加序號）',
+      description: '備註 (選填)',
+      descriptionPlaceholder: '描述此 API Key 的用途...',
+
+      // Tags section
+      tags: '標籤',
+      selectedTags: '已選擇的標籤:',
+      clickToSelectTags: '點擊選擇已有標籤:',
+      createNewTag: '建立新標籤:',
+      newTagPlaceholder: '輸入新標籤名稱',
+      tagHint: '用於標記不同團隊或用途，方便篩選管理',
+
+      // Rate limit section
+      rateLimitTitle: '速率限制設定 (選填)',
+      rateLimitWindow: '時間視窗 (分鐘)',
+      rateLimitRequests: '請求次數限制',
+      rateLimitCost: '費用限制 (美元)',
+      rateLimitWindowPlaceholder: '無限制',
+      rateLimitRequestsPlaceholder: '無限制',
+      rateLimitCostPlaceholder: '無限制',
+      rateLimitWindowHint: '時間段單位',
+      rateLimitRequestsHint: '視窗內最大請求',
+      rateLimitCostHint: '視窗內最大費用',
+
+      // Rate limit examples
+      exampleTitle: '💡 使用範例',
+      example1: '範例1: 時間視窗=60，請求次數=1000 → 每60分鐘最多1000次請求',
+      example2: '範例2: 時間視窗=1，費用=0.1 → 每分鐘最多$0.1費用',
+      example3: '範例3: 視窗=30，請求=50，費用=5 → 每30分鐘50次請求且不超$5費用',
+
+      // Cost limits
+      dailyCostLimit: '每日費用限制 (美元)',
+      dailyCostLimitPlaceholder: '0 表示無限制',
+      dailyCostHint: '設定此 API Key 每日的費用限制，超過限制將拒絶請求，0 或留空表示無限制',
+      weeklyOpusCostLimit: 'Opus 模型週費用限制 (美元)',
+      weeklyOpusCostLimitPlaceholder: '0 表示無限制',
+      weeklyOpusHint:
+        '設定 Opus 模型的週費用限制（週一到週日），僅限 Claude 官方帳戶，0 或留空表示無限制',
+      custom: '自訂',
+
+      // Concurrency limit
+      concurrencyLimit: '並發限制 (選填)',
+      concurrencyLimitPlaceholder: '0 表示無限制',
+      concurrencyHint: '設定此 API Key 可同時處理的最大請求數，0 或留空表示無限制',
+
+      // Expiration settings
+      expirationSettings: '過期設定',
+      fixedTimeExpiry: '固定時間過期',
+      activationExpiry: '首次使用後啟用',
+      fixedModeHint: '固定時間模式：Key 建立後立即生效，按設定時間過期',
+      activationModeHint: 'Key 首次使用時啟用，啟用後按設定天數過期（適合批次銷售）',
+
+      // Expiration duration options
+      neverExpire: '永不過期',
+      '1d': '1 天',
+      '7d': '7 天',
+      '30d': '30 天',
+      '90d': '90 天',
+      '180d': '180 天',
+      '365d': '365 天',
+      customDate: '自訂日期',
+
+      // Activation mode
+      activationDays: '輸入天數',
+      daysUnit: '天',
+      activationHint: 'Key 將在首次使用後啟用，啟用後 {days} 天過期',
+
+      // Expiry status
+      willExpireOn: '將於 {date} 過期',
+
+      // Service permissions
+      servicePermissions: '服務權限',
+      allServices: '全部服務',
+      claudeOnly: '僅 Claude',
+      geminiOnly: '僅 Gemini',
+      openaiOnly: '僅 OpenAI',
+      permissionHint: '控制此 API Key 可以存取哪些服務',
+
+      // Account binding
+      dedicatedAccountBinding: '專屬帳號綁定 (選填)',
+      refreshAccounts: '重新整理帳號',
+      refreshing: '重新整理中...',
+      claudeDedicatedAccount: 'Claude 專屬帳號',
+      geminiDedicatedAccount: 'Gemini 專屬帳號',
+      openaiDedicatedAccount: 'OpenAI 專屬帳號',
+      bedrockDedicatedAccount: 'Bedrock 專屬帳號',
+      useSharedPool: '使用共用帳號池',
+      accountBindingHint: '選擇專屬帳號後，此API Key將僅使用該帳號，不選擇則使用共用帳號池',
+      selectClaudeAccount: '請選擇Claude帳號',
+      selectGeminiAccount: '請選擇Gemini帳號',
+      selectOpenaiAccount: '請選擇OpenAI帳號',
+      selectBedrockAccount: '請選擇Bedrock帳號',
+
+      // Model restrictions
+      enableModelRestriction: '啟用模型限制',
+      restrictedModelsList: '限制的模型清單',
+      noRestrictedModels: '暫無限制的模型',
+      allCommonModelsRestricted: '所有常用模型已在限制清單中',
+      addRestrictedModelPlaceholder: '輸入模型名稱，按 Enter 添加',
+      modelRestrictionHint: '設定此API Key無法存取的模型，例如：claude-opus-4-20250514',
+
+      // Client restrictions
+      enableClientRestriction: '啟用用戶端限制',
+      allowedClients: '允許的用戶端',
+
+      // Buttons
+      cancel: '取消',
+      create: '建立',
+      creating: '建立中...',
+
+      // Messages
+      batchCountError: '批次建立數量必須在 2-500 之間',
+      costLimitConfirmTitle: '費用限制提醒',
+      costLimitConfirmMessage:
+        '您設定了時間視窗但費用限制為0，這意味著不會有費用限制。\n\n是否繼續？',
+      costLimitConfirmContinue: '繼續建立',
+      costLimitConfirmBack: '返回修改',
+      costLimitFallbackMessage:
+        '您設定了時間視窗但費用限制為0，這意味著不會有費用限制。\n是否繼續？',
+      createSuccess: 'API Key 建立成功',
+      batchCreateSuccess: '成功建立 {count} 個 API Key',
+      createFailed: '建立失敗',
+      batchCreateFailed: '批次建立失敗',
+      refreshAccountsSuccess: '帳號清單已重新整理',
+      refreshAccountsFailed: '重新整理帳號清單失敗'
+    },
+
+    // Window Countdown
+    windowCountdown: {
+      expired: '視窗已過期',
+      notStarted: '視窗未啟動',
+      minutes: '分鐘',
+      requests: '請求',
+      tokens: 'Token',
+      cost: '費用',
+      aboutToReset: '即將重置',
+      minutesUntilReset: '分鐘後重置',
+      untilReset: '後重置',
+      windowLimit: '視窗限制',
+      hours: '小時'
+    }
   },
 
   // User-related translations
@@ -670,22 +1212,22 @@ export default {
     dashboard: {
       title: 'Dashboard Overview',
       welcomeMessage: 'Welcome to your Claude Relay dashboard',
-      
+
       // Navigation tabs
       overview: 'Overview',
       apiKeys: 'API Keys',
       usageStats: 'Usage Stats',
-      
+
       // Welcome section
       welcome: 'Welcome',
-      
+
       // Stats cards
       activeApiKeys: 'Active API Keys',
       deletedApiKeys: 'Deleted API Keys',
       totalRequests: 'Total Requests',
       inputTokens: 'Input Tokens',
       totalCost: 'Total Cost',
-      
+
       // Account information section
       accountInformation: 'Account Information',
       username: 'Username',
@@ -695,7 +1237,7 @@ export default {
       memberSince: 'Member Since',
       lastLogin: 'Last Login',
       notAvailable: 'N/A',
-      
+
       // Messages
       logout: 'Logout',
       logoutSuccess: 'Logged out successfully',
@@ -703,7 +1245,7 @@ export default {
       loadProfileFailed: 'Failed to load user profile',
       loadStatsFailed: 'Failed to load API keys stats'
     },
-    
+
     // User Login
     login: {
       title: 'User Sign In',
@@ -715,25 +1257,25 @@ export default {
       signIn: 'Sign In',
       signingIn: 'Signing In...',
       adminLogin: 'Admin Login',
-      
+
       // Validation and error messages
       requiredFields: 'Please enter both username and password',
       loginSuccess: 'Login successful!',
       loginFailed: 'Login failed'
     },
-    
+
     // User Management
     management: {
       title: 'User Management',
       description: 'Manage users, their API keys, and view usage statistics',
       refresh: 'Refresh',
-      
+
       // Stats cards
       totalUsers: 'Total Users',
       activeUsers: 'Active Users',
       totalApiKeys: 'Total API Keys',
       totalCost: 'Total Cost',
-      
+
       // Search and filters
       searchPlaceholder: 'Search users...',
       allRoles: 'All Roles',
@@ -742,14 +1284,14 @@ export default {
       allStatus: 'All Status',
       active: 'Active',
       disabled: 'Disabled',
-      
+
       // User list
       users: 'Users',
       loadingUsers: 'Loading users...',
       noUsersFound: 'No users found',
       noUsersMatch: 'No users match your search criteria.',
       noUsersCreated: 'No users have been created yet.',
-      
+
       // User info and actions
       displayName: 'Display Name',
       email: 'Email',
@@ -760,31 +1302,33 @@ export default {
       neverLoggedIn: 'Never logged in',
       requests: 'requests',
       totalCostLabel: 'total cost',
-      
+
       // Action buttons and tooltips
       viewUsageStats: 'View Usage Stats',
       disableAllApiKeys: 'Disable All API Keys',
       disableUser: 'Disable User',
       enableUser: 'Enable User',
       changeRole: 'Change Role',
-      
+
       // Confirmation dialogs
       disableUserTitle: 'Disable User',
       enableUserTitle: 'Enable User',
-      disableUserMessage: 'Are you sure you want to disable user "{username}"? This will prevent them from logging in.',
+      disableUserMessage:
+        'Are you sure you want to disable user "{username}"? This will prevent them from logging in.',
       enableUserMessage: 'Are you sure you want to enable user "{username}"?',
       disable: 'Disable',
       enable: 'Enable',
-      
+
       disableAllKeysTitle: 'Disable All API Keys',
-      disableAllKeysMessage: 'Are you sure you want to disable all {count} API keys for user "{username}"? This will prevent them from using the service.',
+      disableAllKeysMessage:
+        'Are you sure you want to disable all {count} API keys for user "{username}"? This will prevent them from using the service.',
       disableKeys: 'Disable Keys',
-      
+
       // Success messages
       userDisabledSuccess: 'User disabled successfully',
       userEnabledSuccess: 'User enabled successfully',
       keysDisabledSuccess: 'Disabled {count} API keys',
-      
+
       // Error messages
       loadUsersError: 'Failed to load users',
       toggleStatusError: 'Failed to toggleStatus',
@@ -795,7 +1339,7 @@ export default {
     usageStatsModal: {
       title: '使用統計',
       titleWithUser: '使用統計 - {displayName}',
-      
+
       // Time period selection
       periodSelection: {
         day: '最近24小時',
@@ -803,10 +1347,10 @@ export default {
         month: '最近30天',
         quarter: '最近90天'
       },
-      
+
       // Loading state
       loadingStats: '正在載入使用統計...',
-      
+
       // Summary cards
       summaryCards: {
         requests: '請求數',
@@ -814,7 +1358,7 @@ export default {
         outputTokens: '輸出Token',
         totalCost: '總費用'
       },
-      
+
       // API Keys table
       apiKeysTable: {
         title: 'API Keys 使用情況',
@@ -836,7 +1380,7 @@ export default {
         },
         never: '從未使用'
       },
-      
+
       // Usage trend chart
       usageTrend: {
         title: '使用趨勢',
@@ -844,13 +1388,13 @@ export default {
         dailyTrends: '最近 {period} 的日使用趨勢',
         chartNote: '(可整合 Chart.js、D3.js 或類似圖表庫)'
       },
-      
+
       // No data state
       noData: {
         title: '暫無使用資料',
         description: '該使用者在所選時間段內尚未發起任何API請求。'
       },
-      
+
       // Buttons
       close: '關閉'
     },
@@ -858,10 +1402,10 @@ export default {
     // Change Role Modal
     changeRoleModal: {
       title: '修改使用者角色',
-      
+
       // User info display
       currentRole: '當前角色：{role}',
-      
+
       // Role selection form
       newRole: '新角色',
       roles: {
@@ -870,21 +1414,62 @@ export default {
         admin: '管理員',
         adminDesc: '擁有管理使用者和系統的完整權限'
       },
-      
+
       // Warning messages
       roleChangeWarning: {
         title: '角色變更警告',
-        grantAdmin: '授予管理員權限將使該使用者擁有系統的完整存取權限，包括管理其他使用者及其API密鑰的能力。',
+        grantAdmin:
+          '授予管理員權限將使該使用者擁有系統的完整存取權限，包括管理其他使用者及其API密鑰的能力。',
         removeAdmin: '移除管理員權限將限制該使用者只能管理自己的API密鑰和檢視自己的使用統計。'
       },
-      
+
       // Buttons
       cancel: '取消',
       updateRole: '更新角色',
       updating: '更新中...',
-      
+
       // Success message
       roleUpdated: '使用者角色已更新為 {role}'
+    },
+
+    // Usage Detail Modal
+    usageDetailModal: {
+      title: '使用統計詳情',
+      close: '關閉',
+
+      // Statistics cards
+      totalRequests: '總請求數',
+      totalTokens: '總Token數',
+      totalCost: '總費用',
+      averageRate: '平均速率',
+
+      // Today stats
+      today: '今日',
+      todayRequests: '{count} 次',
+      todayTokens: '{count}',
+      todayCost: '${amount}',
+
+      // Usage labels
+      times: '次',
+
+      // Token distribution
+      tokenDistribution: 'Token 使用分佈',
+      inputTokens: '輸入 Token',
+      outputTokens: '輸出 Token',
+      cacheCreateTokens: '快取建立 Token',
+      cacheReadTokens: '快取讀取 Token',
+
+      // Limits section
+      limitSettings: '限制設置',
+      dailyCostLimit: '每日費用限制',
+      concurrencyLimit: '並行限制',
+      timeWindowLimit: '時間窗口限制',
+      windowStatus: '窗口狀態',
+      used: '已使用',
+      remainingQuota: '剩餘: ${amount}',
+
+      // Progress indicators
+      usedPercentage: '已使用 {percentage}%'
     }
   },
 
@@ -893,17 +1478,17 @@ export default {
     title: '系統設置',
     description: '網站定制和通知配置',
     loading: '正在載入設置...',
-    
+
     // 導航標籤
     branding: '品牌設置',
     webhook: '通知設置',
-    
+
     // 品牌設置
     siteName: '網站名稱',
     siteNameDescription: '品牌標識',
     siteNamePlaceholder: 'Claude Relay Service',
     siteNameHint: '將顯示在瀏覽器標題和頁面頭部',
-    
+
     siteIcon: '網站圖標',
     siteIconDescription: 'Favicon',
     currentIcon: '當前圖標',
@@ -911,13 +1496,13 @@ export default {
     removeIcon: '刪除',
     iconFormats: '支援 .ico, .png, .jpg, .svg 格式，最大 350KB',
     iconPreview: '圖標預覽',
-    
+
     adminEntry: '管理入口',
     adminEntryDescription: '登入按鈕顯示',
     hideLoginButton: '隱藏登入按鈕',
     showLoginButton: '顯示登入按鈕',
     adminEntryHint: '隱藏後，用戶需要直接訪問 /admin/login 頁面登入',
-    
+
     // 移動端卡片標題
     siteNameCard: '站點名稱',
     siteNameCardDesc: '自定義您的站點品牌名稱',
@@ -925,18 +1510,18 @@ export default {
     siteIconCardDesc: '上傳自定義圖標或輸入圖標URL',
     adminEntryCard: '管理入口',
     adminEntryCardDesc: '控制登入按鈕在首頁的顯示',
-    
+
     // 操作按鈕
     save: '保存設置',
     saving: '保存中...',
     reset: '重置為預設',
     lastUpdated: '最後更新：{time}',
     lastUpdatedMobile: '上次更新: {time}',
-    
+
     // Webhook 設置
     enableWebhook: '啟用 Webhook 通知',
     webhookDescription: '開啟後，系統將按配置發送通知到指定平台',
-    
+
     // 通知類型
     notificationTypes: '通知類型',
     accountAnomaly: '帳號異常',
@@ -947,7 +1532,7 @@ export default {
     quotaWarningDesc: 'API調用配額不足警告',
     systemErrorDesc: '系統運行錯誤和故障',
     securityAlertDesc: '安全相關的警報通知',
-    
+
     // 通知平台
     notificationPlatforms: '通知平台',
     addPlatform: '新增平台',
@@ -956,32 +1541,32 @@ export default {
     testConnection: '測試連線',
     edit: '編輯',
     delete: '刪除',
-    
+
     // 高級設置
     advancedSettings: '進階設置',
     maxRetries: '最大重試次數',
     retryDelay: '重試延遲 (毫秒)',
     timeout: '逾時時間 (毫秒)',
-    
+
     // 測試通知
     sendTestNotification: '發送測試通知',
-    
+
     // 平台模態框
     addPlatformModal: '新增通知平台',
     editPlatformModal: '編輯通知平台',
     configurePlatform: '配置新的Webhook通知渠道',
     updatePlatform: '配置並更新Webhook通知渠道',
-    
+
     platformType: '平台類型',
     platformName: '名稱',
     platformNameOptional: '(可選)',
     platformNamePlaceholder: '例如：運維群通知、開發測試群',
-    
+
     webhookUrl: 'Webhook URL',
     webhookUrlRequired: '*',
     webhookUrlPlaceholder: 'https://...',
     editModeWarning: '編輯模式下不能更改平台類型',
-    
+
     // Bark 特有設置
     deviceKey: '設備密鑰 (Device Key)',
     deviceKeyPlaceholder: '例如：aBcDeFgHiJkLmNoPqRsTuVwX',
@@ -994,14 +1579,14 @@ export default {
     notificationGroup: '通知分組',
     notificationGroupOptional: '(可選)',
     notificationGroupPlaceholder: '預設: claude-relay',
-    
+
     // 通知級別選項
     levelAuto: '自動（根據通知類型）',
     levelPassive: '被動',
     levelActive: '預設',
     levelTimeSensitive: '時效性',
     levelCritical: '緊急',
-    
+
     // 聲音選項
     soundAuto: '自動（根據通知類型）',
     soundDefault: '預設',
@@ -1012,20 +1597,20 @@ export default {
     soundGlass: '玻璃',
     soundHorn: '喇叭',
     soundSilence: '靜音',
-    
+
     // Bark 提示信息
     barkInstructions: [
       '1. 在iPhone上安裝Bark App',
       '2. 打開App獲取您的設備密鑰',
       '3. 將密鑰貼上到上方輸入框'
     ],
-    
+
     // 簽名設置
     enableSignatureVerify: '啟用簽名驗證',
     signatureEnabled: '已啟用',
     signatureSecret: '簽名密鑰',
     signatureSecretPlaceholder: 'SEC...',
-    
+
     // 平台提示信息
     wechatWorkHint: '請在企業微信群機器人設置中獲取Webhook地址',
     dingtalkHint: '請在釘釘群機器人設置中獲取Webhook地址',
@@ -1034,14 +1619,14 @@ export default {
     discordHint: '請在Discord伺服器的整合設置中建立Webhook',
     barkHint: '請在Bark App中查看您的設備密鑰',
     customHint: '請輸入完整的Webhook接收地址',
-    
+
     // 模態框按鈕
     required: '必填項',
     cancel: '取消',
     testing: '測試中...',
     saveChanges: '保存修改',
     addPlatformBtn: '新增平台',
-    
+
     // 成功/錯誤消息
     loadSettingsFailed: '載入設置失敗',
     settingsSaved: '設置已保存',
@@ -1051,34 +1636,34 @@ export default {
     resetToDefault: '已重置為預設設置',
     resetFailed: '重置失敗',
     confirmReset: '確定要重置為預設設置嗎？\n\n這將清除所有自定義的網站名稱和圖標設置。',
-    
+
     webhookConfigSaved: '配置已保存',
     webhookConfigSaveFailed: '保存配置失敗',
     getWebhookConfigFailed: '獲取webhook配置失敗',
-    
+
     platformAdded: '平台已新增',
     platformUpdated: '平台已更新',
     platformDeleted: '平台已刪除',
     platformDeleteFailed: '刪除失敗',
     confirmDeletePlatform: '確定要刪除這個平台嗎？',
     operationFailed: '操作失敗',
-    
+
     testSuccess: '測試成功，webhook連線正常',
     testFailed: '測試失敗',
     testNotificationSent: '測試通知已發送',
     testNotificationFailed: '發送失敗',
-    
+
     // 表單驗證消息
     enterBarkDeviceKey: '請輸入Bark設備密鑰',
     enterWebhookUrl: '請輸入Webhook URL',
     enterValidWebhookUrl: '請輸入有效的Webhook URL',
     enterWebhookUrlFirst: '請先輸入Webhook URL',
     enterBarkDeviceKeyFirst: '請先輸入Bark設備密鑰',
-    
+
     // 檔案上傳
     fileReadFailed: '檔案讀取失敗',
     iconLoadFailed: 'Icon failed to load',
-    
+
     // 平台名稱
     platforms: {
       wechatWork: '企業微信',
@@ -1096,11 +1681,11 @@ export default {
     // 標題和模態框
     editAccount: '編輯帳戶',
     addAccount: '新增帳戶',
-    
+
     // 步驟指示器
     stepBasicInfo: '基本資訊',
     stepAuthorization: '授權認證',
-    
+
     // 平台選擇
     platform: '平台',
     platformClaude: 'Claude',
@@ -1109,27 +1694,28 @@ export default {
     platformOpenAI: 'OpenAI',
     platformAzureOpenAI: 'Azure OpenAI',
     platformBedrock: 'Bedrock',
-    
+
     // 新增方式
     addMethod: '新增方式',
     addTypeSetupToken: 'Setup Token（推薦）',
     addTypeOAuth: 'OAuth 授權',
     addTypeManual: '手動輸入 Access Token',
-    
+
     // 基本資訊欄位
     accountName: '帳戶名稱',
     accountNamePlaceholder: '為帳戶設置一個易識別的名稱',
     description: '描述',
     descriptionOptional: '描述（可選）',
     descriptionPlaceholder: '帳戶用途說明...',
-    
+
     // 帳戶類型
     accountType: '帳戶類型',
     accountTypeShared: '共用帳戶',
     accountTypeDedicated: '專屬帳戶',
     accountTypeGroup: '群組排程',
-    accountTypeDescription: '共用帳戶：供所有API Key使用；專屬帳戶：僅供特定API Key使用；群組排程：加入群組供群組內排程',
-    
+    accountTypeDescription:
+      '共用帳戶：供所有API Key使用；專屬帳戶：僅供特定API Key使用；群組排程：加入群組供群組內排程',
+
     // 群組選擇
     selectGroup: '選擇群組',
     selectGroupRequired: '選擇群組 *',
@@ -1137,7 +1723,7 @@ export default {
     memberCount: '個成員',
     newGroup: '新建群組',
     refreshGroups: '刷新群組',
-    
+
     // Gemini 專案 ID
     projectId: '專案 ID',
     projectIdOptional: '專案 ID（可選）',
@@ -1149,8 +1735,9 @@ export default {
     projectIdStep3: '⚠️ 注意：要複製專案 ID（Project ID），不要複製專案編號（Project Number）！',
     projectIdTip: '提示：如果您的帳號是普通個人帳號（未綁定 Google Cloud），請留空此欄位。',
     projectIdGoogleCloudRequired: 'Google Cloud/Workspace 帳號需要提供專案 ID',
-    projectIdGoogleCloudDescription: '某些 Google 帳號（特別是綁定了 Google Cloud 的帳號）會被識別為 Workspace 帳號，需要提供額外的專案 ID。',
-    
+    projectIdGoogleCloudDescription:
+      '某些 Google 帳號（特別是綁定了 Google Cloud 的帳號）會被識別為 Workspace 帳號，需要提供額外的專案 ID。',
+
     // Bedrock 欄位
     awsAccessKeyId: 'AWS 存取金鑰 ID',
     awsAccessKeyIdRequired: 'AWS 存取金鑰 ID *',
@@ -1186,12 +1773,13 @@ export default {
     smallFastModelOptional: '小快速模型（可選）',
     smallFastModelPlaceholder: '例如：us.anthropic.claude-3-5-haiku-20241022-v1:0',
     smallFastModelDescription: '用於快速回應的輕量級模型，留空將使用系統預設',
-    
+
     // Azure OpenAI 欄位
     azureEndpoint: 'Azure Endpoint',
     azureEndpointRequired: 'Azure Endpoint *',
     azureEndpointPlaceholder: 'https://your-resource.openai.azure.com',
-    azureEndpointDescription: 'Azure OpenAI 資源的終結點 URL，格式：https://your-resource.openai.azure.com',
+    azureEndpointDescription:
+      'Azure OpenAI 資源的終結點 URL，格式：https://your-resource.openai.azure.com',
     apiVersion: 'API 版本',
     apiVersionPlaceholder: '2024-02-01',
     apiVersionDescription: 'Azure OpenAI API 版本，預設使用最新穩定版本 2024-02-01',
@@ -1205,7 +1793,7 @@ export default {
     apiKeyDescription: '從 Azure 入口網站取得的 API 金鑰',
     supportedModels: '支援的模型',
     supportedModelsDescription: '選擇此部署支援的模型類型',
-    
+
     // Claude Console 欄位
     apiUrl: 'API URL',
     apiUrlRequired: 'API URL *',
@@ -1224,7 +1812,8 @@ export default {
     used: '已使用',
     modelMapping: '模型映射表',
     modelMappingOptional: '模型映射表（可選）',
-    modelMappingDescription: '留空表示支援所有模型且不修改請求。配置映射後，左側模型會被識別為支援的模型，右側是實際發送的模型。',
+    modelMappingDescription:
+      '留空表示支援所有模型且不修改請求。配置映射後，左側模型會被識別為支援的模型，右側是實際發送的模型。',
     originalModel: '原始模型名稱',
     mappedModel: '映射後的模型名稱',
     addModelMapping: '新增模型映射',
@@ -1237,51 +1826,63 @@ export default {
     rateLimitDescription: '啟用後，當帳號返回429錯誤時將暫停排程一段時間',
     rateLimitDuration: '限流時間（分鐘）',
     rateLimitDurationDescription: '帳號被限流後暫停排程的時間（分鐘）',
-    
+
     // Claude 訂閱類型
     subscriptionType: '訂閱類型',
     subscriptionClaudeMax: 'Claude Max',
     subscriptionClaudePro: 'Claude Pro',
     claudeProLimitation: 'Pro 帳號不支援 Claude Opus 4 模型',
-    
+
     // Claude 特殊功能
     autoStopOnWarning: '5小時使用量接近限制時自動停止排程',
-    autoStopOnWarningDescription: '當系統偵測到帳戶接近5小時使用限制時，自動暫停排程該帳戶。進入新的時間視窗後會自動恢復排程。',
+    autoStopOnWarningDescription:
+      '當系統偵測到帳戶接近5小時使用限制時，自動暫停排程該帳戶。進入新的時間視窗後會自動恢復排程。',
     useUnifiedUserAgent: '使用統一 Claude Code 版本',
-    useUnifiedUserAgentDescription: '開啟後將使用從真實 Claude Code 用戶端擷取的統一 User-Agent，提高相容性',
+    useUnifiedUserAgentDescription:
+      '開啟後將使用從真實 Claude Code 用戶端擷取的統一 User-Agent，提高相容性',
     currentUnifiedVersion: '💡 目前統一版本：',
     clearCache: '清除快取',
     clearing: '清除中...',
     waitingForCapture: '⏳ 等待從 Claude Code 用戶端擷取 User-Agent',
-    captureHint: '💡 提示：如果長時間未能擷取，請確認有 Claude Code 用戶端正在使用此帳戶，或聯繫開發者檢查 User-Agent 格式是否發生變化',
+    captureHint:
+      '💡 提示：如果長時間未能擷取，請確認有 Claude Code 用戶端正在使用此帳戶，或聯繫開發者檢查 User-Agent 格式是否發生變化',
     useUnifiedClientId: '使用統一的用戶端識別',
-    useUnifiedClientIdDescription: '開啟後將使用固定的用戶端識別，使所有請求看起來來自同一個用戶端，減少特徵',
+    useUnifiedClientIdDescription:
+      '開啟後將使用固定的用戶端識別，使所有請求看起來來自同一個用戶端，減少特徵',
     clientId: '用戶端識別 ID',
     regenerate: '重新產生',
     clientIdDescription: '此ID將替換請求中的user_id用戶端部分，保留session部分用於黏性會話',
-    
+
     // 排程優先順序
     schedulePriority: '排程優先順序',
     schedulePriorityRange: '排程優先順序（1-100）',
     schedulePriorityPlaceholder: '數字越小優先順序越高，預設50',
     schedulePriorityDescription: '數字越小優先順序越高，建議範圍：1-100',
-    
+
     // 手動輸入 Token
     manualTokenTitle: '手動輸入 Token',
-    manualTokenDescription: '請輸入有效的 Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動重新整理。',
-    manualTokenClaudeDescription: '請輸入有效的 Claude Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動重新整理。',
-    manualTokenGeminiDescription: '請輸入有效的 Gemini Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動重新整理。',
-    manualTokenOpenAIDescription: '請輸入有效的 OpenAI Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動重新整理。',
+    manualTokenDescription:
+      '請輸入有效的 Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動重新整理。',
+    manualTokenClaudeDescription:
+      '請輸入有效的 Claude Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動重新整理。',
+    manualTokenGeminiDescription:
+      '請輸入有效的 Gemini Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動重新整理。',
+    manualTokenOpenAIDescription:
+      '請輸入有效的 OpenAI Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動重新整理。',
     obtainTokenMethods: '取得 Access Token 的方法：',
-    claudeTokenPath: '請從已登入 Claude Code 的機器上取得 ~/.claude/.credentials.json 檔案中的憑證，請勿使用 Claude 官網 API Keys 頁面的金鑰。',
-    geminiTokenPath: '請從已登入 Gemini CLI 的機器上取得 ~/.config/gemini/credentials.json 檔案中的憑證。',
-    openaiTokenPath: '請從已登入 OpenAI 帳戶的機器上取得認證憑證，或透過 OAuth 授權流程取得 Access Token。',
+    claudeTokenPath:
+      '請從已登入 Claude Code 的機器上取得 ~/.claude/.credentials.json 檔案中的憑證，請勿使用 Claude 官網 API Keys 頁面的金鑰。',
+    geminiTokenPath:
+      '請從已登入 Gemini CLI 的機器上取得 ~/.config/gemini/credentials.json 檔案中的憑證。',
+    openaiTokenPath:
+      '請從已登入 OpenAI 帳戶的機器上取得認證憑證，或透過 OAuth 授權流程取得 Access Token。',
     accessToken: 'Access Token',
     accessTokenOptional: 'Access Token（可選）',
     accessTokenRequired: 'Access Token *',
     accessTokenPlaceholder: '請輸入 Access Token...',
     accessTokenOptionalPlaceholder: '可選：如果不填寫，系統會自動透過 Refresh Token 取得...',
-    accessTokenOptionalDescription: 'Access Token 可選填。如果不提供，系統會透過 Refresh Token 自動取得。',
+    accessTokenOptionalDescription:
+      'Access Token 可選填。如果不提供，系統會透過 Refresh Token 自動取得。',
     refreshToken: 'Refresh Token',
     refreshTokenOptional: 'Refresh Token（可選）',
     refreshTokenRequired: 'Refresh Token *',
@@ -1289,16 +1890,18 @@ export default {
     refreshTokenRequiredPlaceholder: '請輸入 Refresh Token（必填）...',
     refreshTokenDescription: '系統將使用 Refresh Token 自動取得 Access Token 和使用者資訊',
     refreshTokenTip: '💡 如果未填寫 Refresh Token，Token 過期後需要手動更新。',
-    
+
     // Setup Token 流程
     setupTokenTitle: 'Claude Setup Token 授權',
     setupTokenDescription: '請按照以下步驟透過 Setup Token 完成 Claude 帳戶的授權：',
     setupTokenStep1Title: '點擊下方按鈕產生授權連結',
     setupTokenStep2Title: '在瀏覽器中開啟連結並完成授權',
-    setupTokenStep2Description: '請在新分頁中開啟授權連結，登入您的 Claude 帳戶並授權 Claude Code。',
+    setupTokenStep2Description:
+      '請在新分頁中開啟授權連結，登入您的 Claude 帳戶並授權 Claude Code。',
     setupTokenStep2Warning: '注意：如果您設置了代理，請確保瀏覽器也使用相同的代理訪問授權頁面。',
     setupTokenStep3Title: '輸入 Authorization Code',
-    setupTokenStep3Description: '授權完成後，從返回頁面複製 Authorization Code，並貼上到下方輸入框：',
+    setupTokenStep3Description:
+      '授權完成後，從返回頁面複製 Authorization Code，並貼上到下方輸入框：',
     generateSetupTokenUrl: '產生 Setup Token 授權連結',
     generating: '產生中...',
     copyLink: '複製連結',
@@ -1308,18 +1911,19 @@ export default {
     authorizationCodeDescription: '請貼上從Claude Code授權頁面複製的Authorization Code',
     verifying: '驗證中...',
     completeAuthorization: '完成授權',
-    
+
     // Token 更新（編輯模式）
     updateTokenTitle: '更新 Token',
-    updateTokenDescription: '可以更新 Access Token 和 Refresh Token。為了安全起見，不會顯示目前的 Token 值。',
+    updateTokenDescription:
+      '可以更新 Access Token 和 Refresh Token。為了安全起見，不會顯示目前的 Token 值。',
     updateTokenTip: '💡 留空表示不更新該欄位。',
     newAccessToken: '新的 Access Token',
     newRefreshToken: '新的 Refresh Token',
     leaveBlankNoUpdate: '留空表示不更新...',
-    
+
     // 使用情況
     currentUsage: '目前使用情況',
-    
+
     // 按鈕
     cancel: '取消',
     nextStep: '下一步',
@@ -1328,7 +1932,7 @@ export default {
     creating: '建立中...',
     update: '更新',
     updating: '更新中...',
-    
+
     // 錯誤訊息
     pleaseEnterAccountName: '請填寫帳戶名稱',
     pleaseSelectGroup: '請選擇一個群組',
@@ -1341,7 +1945,7 @@ export default {
     pleaseEnterDeploymentName: '請填寫部署名稱',
     pleaseEnterAccessToken: '請填寫 Access Token',
     pleaseEnterRefreshToken: '請填寫 Refresh Token',
-    
+
     // 成功訊息
     linkCopied: '連結已複製',
     extractedAuthCode: '成功提取授權碼！',
@@ -1350,7 +1954,7 @@ export default {
     groupsRefreshed: '群組列表已重新整理',
     modelMappingAdded: '已新增映射',
     modelMappingExists: '模型映射已存在',
-    
+
     // 警告和提示
     copyFailed: '複製失敗，請手動複製',
     clearCacheFailed: '清除快取失敗',
@@ -1358,40 +1962,46 @@ export default {
     urlFormatError: '連結格式錯誤，請檢查是否為完整的 URL',
     wrongUrlFormat: '請貼上以 http://localhost:45462 開頭的連結',
     loadGroupsFailed: '載入群組列表失敗',
-    
+
     // 確認對話框
     projectIdNotFilledTitle: '專案 ID 未填寫',
-    projectIdNotFilledMessage: '您尚未填寫專案 ID。\n\n如果您的Google帳號綁定了Google Cloud或被識別為Workspace帳號，需要提供專案 ID。\n如果您使用的是普通個人帳號，可以繼續不填寫。',
+    projectIdNotFilledMessage:
+      '您尚未填寫專案 ID。\n\n如果您的Google帳號綁定了Google Cloud或被識別為Workspace帳號，需要提供專案 ID。\n如果您使用的是普通個人帳號，可以繼續不填寫。',
     continueButton: '繼續',
     goBackToFill: '返回填寫',
     continueSave: '繼續保存',
-    
+
     // 快捷模型映射按鈕
     presetSonnet4: '+ Sonnet 4',
     presetOpus41: '+ Opus 4.1',
     presetHaiku35: '+ Haiku 3.5',
     presetOpus41ToSonnet4: '+ Opus 4.1 → Sonnet 4',
-    
+
     // 編輯模式特殊提示
     leaveBlankNoUpdateApiKey: '留空表示不更新 API Key',
     leaveBlankNoUpdateAwsKey: '留空表示不更新 AWS Access Key ID',
     leaveBlankNoUpdateAwsSecret: '留空表示不更新 AWS Secret Access Key',
     leaveBlankNoUpdateSession: '留空表示不更新',
-    
+
     // 通用描述文字
-    allModelsIfEmpty: '留空表示支援所有模型。如果指定模型，請求中的模型不在列表內將不會排程到此帳號',
+    allModelsIfEmpty:
+      '留空表示支援所有模型。如果指定模型，請求中的模型不在列表內將不會排程到此帳號',
     systemDefaultIfEmpty: '留空將使用系統預設模型。支援 inference profile ID 或 ARN',
     noUpdateIfEmpty: '留空表示不更新該欄位',
-    
+
     // 手動 Token 輸入部分
     manualTokenInput: '手動輸入 Token',
-    manualTokenClaudeDescription: '請輸入有效的 Claude Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動刷新。',
-    manualTokenGeminiDescription: '請輸入有效的 Gemini Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動刷新。',
-    manualTokenOpenAIDescription: '請輸入有效的 OpenAI Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動刷新。',
+    manualTokenClaudeDescription:
+      '請輸入有效的 Claude Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動刷新。',
+    manualTokenGeminiDescription:
+      '請輸入有效的 Gemini Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動刷新。',
+    manualTokenOpenAIDescription:
+      '請輸入有效的 OpenAI Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動刷新。',
     getAccessTokenMethod: '取得 Access Token 的方法：',
     claudeCredentialsPath: '請從已登入 Claude Code 的機器上取得',
     geminiCredentialsPath: '請從已登入 Gemini CLI 的機器上取得',
-    openaiCredentialsPath: '請從已登入 OpenAI 帳戶的機器上取得認證憑證，或透過 OAuth 授權流程取得 Access Token。',
+    openaiCredentialsPath:
+      '請從已登入 OpenAI 帳戶的機器上取得認證憑證，或透過 OAuth 授權流程取得 Access Token。',
     claudeCredentialsWarning: '檔案中的憑證，請勿使用 Claude 官網 API Keys 頁面的金鑰。',
     refreshTokenWarning: '💡 如果未填寫 Refresh Token，Token 過期後需要手動更新。',
     accessTokenOptional: 'Access Token (可選)',
@@ -1404,38 +2014,42 @@ export default {
     refreshTokenRequiredInfo: '系統將使用 Refresh Token 自動取得 Access Token 和使用者資訊',
     refreshTokenOptional: 'Refresh Token (可選)',
     refreshTokenOptionalPlaceholder: '請輸入 Refresh Token...',
-    
+
     // 優先級設定
     priorityPlaceholder: '數字越小優先級越高，預設50',
     priorityDescription: '數字越小優先級越高，建議範圍：1-100',
     prioritySchedulingTitle: '排程優先級 (1-100)',
     priorityEditPlaceholder: '數字越小優先級越高',
-    
+
     // Gemini 專案ID
     projectIdOptional: '專案 ID (可選)',
     projectIdPlaceholder: '例如：verdant-wares-464411-k9',
     projectIdDescription: 'Google Cloud/Workspace 帳號可能需要提供專案 ID',
-    
+
     // Claude 訂閱類型和進階選項
     subscriptionType: '訂閱類型',
     claudeMaxSubscription: 'Claude Max',
     claudeProSubscription: 'Claude Pro',
     claudeProLimitation: 'Pro 帳號不支援 Claude Opus 4 模型',
     autoStopOnWarning: '5小時使用量接近限制時自動停止排程',
-    autoStopOnWarningDescription: '當系統檢測到帳戶接近5小時使用限制時，自動暫停排程該帳戶。進入新的時間視窗後會自動恢復排程。',
+    autoStopOnWarningDescription:
+      '當系統檢測到帳戶接近5小時使用限制時，自動暫停排程該帳戶。進入新的時間視窗後會自動恢復排程。',
     useUnifiedUserAgent: '使用統一 Claude Code 版本',
-    useUnifiedUserAgentDescription: '開啟後將使用從真實 Claude Code 用戶端捕獲的統一 User-Agent，提高相容性',
+    useUnifiedUserAgentDescription:
+      '開啟後將使用從真實 Claude Code 用戶端捕獲的統一 User-Agent，提高相容性',
     currentUnifiedVersion: '目前統一版本：',
     clearCache: '清除快取',
     clearing: '清除中...',
     waitingForCapture: '等待從 Claude Code 用戶端捕獲 User-Agent',
-    captureHint: '💡 提示：如果長時間未能捕獲，請確認有 Claude Code 用戶端正在使用此帳戶，或聯絡開發者檢查 User-Agent 格式是否發生變化',
+    captureHint:
+      '💡 提示：如果長時間未能捕獲，請確認有 Claude Code 用戶端正在使用此帳戶，或聯絡開發者檢查 User-Agent 格式是否發生變化',
     useUnifiedClientId: '使用統一的用戶端識別',
-    useUnifiedClientIdDescription: '開啟後將使用固定的用戶端識別，使所有請求看起來來自同一個用戶端，減少特徵',
+    useUnifiedClientIdDescription:
+      '開啟後將使用固定的用戶端識別，使所有請求看起來來自同一個用戶端，減少特徵',
     clientIdLabel: '用戶端識別 ID',
     regenerateClientId: '重新產生',
     clientIdDescription: '此ID將替換請求中的user_id用戶端部分，保留session部分用於黏性工作階段',
-    
+
     // 編輯模式欄位
     accountNameEdit: '帳戶名稱',
     accountNameEditPlaceholder: '為帳戶設定一個易識別的名稱',
@@ -1446,7 +2060,7 @@ export default {
     noAvailableGroups: '暫無可用群組',
     membersCount: ' 個成員',
     createNewGroup: '新建群組',
-    
+
     // AWS Bedrock 設定
     bedrockCredentials: '憑證設定',
     bedrockCredentialsDescription: '請填寫 AWS 存取憑證，用於呼叫 Amazon Bedrock 服務。',
@@ -1466,7 +2080,7 @@ export default {
     smallFastModelLabel: '小型快速模型',
     smallFastModelPlaceholder: '例如：anthropic.claude-3-haiku-20240307-v1:0',
     smallFastModelDescription: '用於簡單任務的快速模型，支援 inference profile ID 或 ARN',
-    
+
     // Azure OpenAI 設定
     azureOpenAIConfig: 'Azure OpenAI 設定',
     azureOpenAIDescription: '請設定 Azure OpenAI 服務的連線資訊和部署詳情。',
@@ -1486,10 +2100,11 @@ export default {
     azureAccountSettings: '帳戶設定',
     azureIsActive: '啟用此帳戶',
     azureSchedulable: '允許調度',
-    
+
     // Claude Console 模型映射
     claudeConsoleModels: '模型映射',
-    claudeConsoleModelsDescription: '設定模型請求的映射關係，將客戶端請求的模型名映射為實際呼叫的模型。',
+    claudeConsoleModelsDescription:
+      '設定模型請求的映射關係，將客戶端請求的模型名映射為實際呼叫的模型。',
     modelMappingFrom: '請求模型',
     modelMappingFromPlaceholder: '例如：claude-3-5-sonnet-20241022',
     modelMappingTo: '實際模型',
@@ -1499,7 +2114,7 @@ export default {
     presetMappings: '預設映射',
     modelMappingExample: '示例：claude-3-5-sonnet-20241022 → claude-3-5-sonnet-latest',
     noMappingsConfigured: '暫未設定映射，將直接使用原模型名',
-    
+
     // Setup Token 授權流程詳細步驟
     setupTokenAuth: 'Setup Token 授權',
     setupTokenAuthDescription: 'Setup Token 是安全的授權方式，透過臨時授權碼完成帳戶驗證。',
@@ -1518,7 +2133,7 @@ export default {
     setupTokenAuthCodeDescription: '完成授權後，將顯示類似 "auth_code_xxx" 格式的授權碼',
     setupTokenSmartDetection: '智能檢測',
     setupTokenSmartDetectionDesc: '支援直接貼上完整的回調 URL，系統會自動提取授權碼',
-    
+
     // 更多錯誤訊息和驗證文字
     unsupportedPlatform: '不支援的平台',
     accountCreationFailed: '帳戶建立失敗',
@@ -1530,7 +2145,7 @@ export default {
     unknownError: '未知錯誤',
     modelMappingExistsInfo: '模型映射已存在',
     modelAddedMapping: '已新增映射',
-    
+
     // 限流和配額管理
     rateLimitSettings: '限流設定',
     enableRateLimit: '啟用速率限制',
@@ -1544,13 +2159,13 @@ export default {
     quotaResetTimePlaceholder: '例如：00:00',
     quotaResetDescription: '每天配額重設的時間點',
     currentDailyUsage: '今日已用',
-    
+
     // 進階設定
     advancedSettings: '進階設定',
     customUserAgent: '自定義 User-Agent',
     customUserAgentPlaceholder: '留空使用預設 User-Agent...',
     userAgentDescription: '用於請求時的 User-Agent 識別',
-    
+
     // 通用提示和狀態
     notSet: '未設定',
     unlimited: '無限制',
@@ -1561,7 +2176,7 @@ export default {
     optional: '可選',
     required: '必填',
     recommended: '推薦',
-    
+
     // 額外的操作按鈕
     testConnection: '測試連線',
     testing: '測試中...',
@@ -1571,21 +2186,24 @@ export default {
     validating: '驗證中...',
     save: '儲存',
     saving: '儲存中...',
-    
+
     // 使用情況和統計
     usageStats: '使用統計',
     loadingUsage: '載入使用情況...',
     usageLoadFailed: '使用情況載入失敗',
-    
+
     // Gemini 專案 ID 詳細說明
     geminiProjectIdRequired: 'Google Cloud/Workspace 帳戶需要提供專案 ID',
-    geminiProjectIdDetail: '某些 Google 帳戶（特別是綁定了 Google Cloud 的帳戶）會被識別為 Workspace 帳戶，需要提供額外的專案 ID。',
+    geminiProjectIdDetail:
+      '某些 Google 帳戶（特別是綁定了 Google Cloud 的帳戶）會被識別為 Workspace 帳戶，需要提供額外的專案 ID。',
     geminiHowToGetProjectId: '如何取得專案 ID：',
     geminiVisitConsole: '造訪',
     geminiCopyProjectId: '複製專案 ID（Project ID），通常是字串格式',
-    geminiProjectIdWarning: '⚠️ 注意：要複製專案 ID（Project ID），不要複製專案編號（Project Number）！',
-    geminiPersonalAccountTip: '提示：如果您的帳戶是普通個人帳戶（未綁定 Google Cloud），請留空此欄位。',
-    
+    geminiProjectIdWarning:
+      '⚠️ 注意：要複製專案 ID（Project ID），不要複製專案編號（Project Number）！',
+    geminiPersonalAccountTip:
+      '提示：如果您的帳戶是普通個人帳戶（未綁定 Google Cloud），請留空此欄位。',
+
     // AWS 區域參考
     awsRegionReference: '常用 AWS 區域參考：',
     awsRegionEastUS: 'us-east-1 (美國東部)',
@@ -1595,17 +2213,17 @@ export default {
     awsRegionAsiaTokyo: 'ap-northeast-1 (東京)',
     awsRegionEuropeFrankfurt: 'eu-central-1 (法蘭克福)',
     awsRegionInputTip: '💡 請輸入完整的區域代碼，如 us-east-1',
-    
+
     // Bedrock 模型說明
     bedrockModelConfigDesc: 'Bedrock 模型設定說明：',
     bedrockSupportsInferenceProfile: '支援 Inference Profile ID（推薦）',
     bedrockSupportsARN: '支援 Application Inference Profile ARN',
     bedrockCommonModel: '常用模型：us.anthropic.claude-sonnet-4-20250514-v1:0',
     bedrockEmptyUsesDefault: '留空將使用系統設定的預設模型',
-    
+
     // Azure OpenAI 模型選擇
     azureModelSelectionDesc: '選擇此部署支援的模型類型',
-    
+
     // 限流機制
     rateLimitMechanism: '限流機制',
     enableRateLimitMechanism: '啟用限流機制',
@@ -1613,37 +2231,37 @@ export default {
     rateLimitDurationMinutes: '限流時間 (分鐘)',
     rateLimitDefaultMinutes: '預設60分鐘',
     rateLimitPauseDesc: '帳戶被限流後暫停調度的時間（分鐘）',
-    
+
     // Claude Console 特定欄位
     claudeConsoleFields: 'Claude Console 特定欄位',
     quotaManagement: '額度管理',
     modelMappingTable: '模型映射表',
     modelMappingTableOptional: '模型映射表 (可選)',
     addModelMapping: '新增模型映射',
-    
+
     // Claude 訂閱類型
     subscriptionType: '訂閱類型',
-    
+
     // Setup Token 授權
     setupTokenAuth: 'Setup Token 授權',
     claudeSetupTokenAuth: 'Claude Setup Token 授權',
     setupTokenAuthSteps: '請按照以下步驟透過 Setup Token 完成 Claude 帳戶的授權：',
     generateSetupTokenLink: '產生 Setup Token 授權連結',
     generating: '產生中...',
-    
+
     // 按鈕和操作
     verifying: '驗證中...',
     completeAuth: '完成授權',
     updating: '更新中...',
     update: '更新',
-    
+
     // 錯誤訊息
     generateSetupTokenFailed: '產生Setup Token授權連結失敗',
     copyFailed: '複製失敗，請手動複製',
     setupTokenAuthFailed: 'Setup Token授權失敗，請檢查授權碼是否正確',
     accountCreationFailed: '帳戶建立失敗',
     accountCreationError: '帳戶建立失敗:',
-    
+
     // 頁面結構註釋
     stepIndicator: '步驟指示器',
     step1BasicInfo: '步驟1: 基本資訊和代理設定',
@@ -1653,7 +2271,7 @@ export default {
     geminiProjectId: 'Gemini 專案 ID 欄位',
     bedrockFields: 'Bedrock 特定欄位',
     azureOpenAIFields: 'Azure OpenAI 特定欄位',
-    
+
     // 驗證訊息
     nameRequired: '請填寫帳戶名稱',
     apiUrlRequired: '請填寫 API URL',
@@ -1666,8 +2284,9 @@ export default {
     dailyQuotaDescription: '設定每日使用額度，0 表示不限制',
     quotaResetTime: '額度重設時間',
     quotaResetTimeDescription: '每日自動重設額度的時間',
-    modelMappingDescription: '留空表示支援所有模型且不修改請求。設定映射後，左側模型會被識別為支援的模型，右側是實際傳送的模型。',
-    
+    modelMappingDescription:
+      '留空表示支援所有模型且不修改請求。設定映射後，左側模型會被識別為支援的模型，右側是實際傳送的模型。',
+
     // 額度管理
     quotaManagementFields: '配額管理欄位',
     dailyQuotaLimitDollar: '每日配額限制 ($)',
@@ -1675,34 +2294,38 @@ export default {
     dailyQuotaDesc: '設定每日使用配額，0 表示不限制',
     quotaResetTime: '配額重設時間',
     quotaResetTimeDesc: '每日自動重設配額的時間',
-    
+
     // 模型映射
     modelMappingOptional: '模型映射表 (可選)',
-    modelMappingDesc: '留空表示支援所有模型且不修改請求。設定映射後，左側模型會被識別為支援的模型，右側是實際發送的模型。',
+    modelMappingDesc:
+      '留空表示支援所有模型且不修改請求。設定映射後，左側模型會被識別為支援的模型，右側是實際發送的模型。',
     originalModelName: '原始模型名稱',
     mappedModelName: '映射後的模型名稱',
     addModelMappingBtn: '新增模型映射',
     customUserAgentOptional: '自定義 User-Agent (可選)',
     customUserAgentDesc: '留空時將自動使用客戶端的 User-Agent，僅在需要固定特定 UA 時填寫',
     userAgentPassthrough: '留空則透傳客戶端 User-Agent',
-    
+
     // Claude 訂閱類型
     claudeSubscriptionType: '訂閱類型',
     claudeProLimitation: 'Pro 帳戶不支援 Claude Opus 4 模型',
-    
+
     // Claude 進階選項
     claudeAutoStopScheduling: '5小時使用量接近限制時自動停止調度',
-    claudeAutoStopDesc: '當系統檢測到帳戶接近5小時使用限制時，自動暫停調度該帳戶。進入新的時間視窗後會自動恢復調度。',
+    claudeAutoStopDesc:
+      '當系統檢測到帳戶接近5小時使用限制時，自動暫停調度該帳戶。進入新的時間視窗後會自動恢復調度。',
     claudeUseUnifiedUA: '使用統一 Claude Code 版本',
     claudeUnifiedUADesc: '開啟後將使用從真實 Claude Code 客戶端捕獲的統一 User-Agent，提高相容性',
     claudeCurrentUnifiedVersion: '💡 目前統一版本：',
     claudeWaitingCapture: '⏳ 等待從 Claude Code 客戶端捕獲 User-Agent',
-    claudeCaptureHint: '💡 提示：如果長時間未能捕獲，請確認有 Claude Code 客戶端正在使用此帳戶， 或聯繫開發者檢查 User-Agent 格式是否發生變化',
+    claudeCaptureHint:
+      '💡 提示：如果長時間未能捕獲，請確認有 Claude Code 客戶端正在使用此帳戶， 或聯繫開發者檢查 User-Agent 格式是否發生變化',
     claudeUseUnifiedClientId: '使用統一的客戶端標識',
-    claudeUnifiedClientIdDesc: '開啟後將使用固定的客戶端標識，使所有請求看起來來自同一個客戶端，減少特徵',
+    claudeUnifiedClientIdDesc:
+      '開啟後將使用固定的客戶端標識，使所有請求看起來來自同一個客戶端，減少特徵',
     claudeClientIdLabel: '客戶端標識 ID',
     claudeClientIdDesc: '此ID將替換請求中的user_id客戶端部分，保留session部分用於黏性工作階段',
-    
+
     // Setup Token 流程
     setupTokenAuthProcess: 'Claude Setup Token 授權',
     setupTokenProcessDesc: '請按照以下步驟透過 Setup Token 完成 Claude 帳戶的授權：',
@@ -1711,21 +2334,21 @@ export default {
     setupTokenGenerating: '產生中...',
     setupTokenGenerateBtn: '產生 Setup Token 授權連結',
     setupTokenCopyTitle: '複製連結',
-    
+
     // 步驟指示器
     stepIndicator: '步驟指示器',
     step1BasicInfo: '步驟1: 基本資訊和代理設定',
     step2OAuth: '步驟2: OAuth授權',
     step2SetupToken: '步驟2: Setup Token授權',
-    
+
     // 群組選擇器
     groupSelector: '群組選擇器',
     multiGroupInterface: '多選群組介面',
     createNewGroupOption: '新建群組選項',
-    
+
     // 手動輸入Token提示
     credentialsFromFile: '檔案中的憑證。',
-    
+
     // Placeholder 文字
     originalModelNamePlaceholder: '原始模型名稱',
     mappedModelNamePlaceholder: '映射後的模型名稱',
@@ -1734,7 +2357,7 @@ export default {
     leaveEmptyNoUpdate: '留空表示不更新',
     leaveEmptyNoUpdateKey: '留空表示不更新 API Key',
     leaveEmptyNoUpdateToken: '留空表示不更新...',
-    
+
     // 標籤和描述
     customUserAgentOptional: '自定義 User-Agent (可選)',
     clientIdLabel: '用戶端標識 ID',
@@ -1744,15 +2367,16 @@ export default {
     newAccessTokenLabel: '新的 Access Token',
     newRefreshTokenLabel: '新的 Refresh Token',
     updateTokenLabel: '更新 Token',
-    
+
     // 按鈕文字
     regenerateBtn: '重新產生',
     previousStepBtn: '上一步',
-    
+
     // 描述性文字
     claudeProLimitation: 'Pro 帳戶不支援 Claude Opus 4 模型',
     claude5HourLimitDesc: '5小時使用量接近限制時自動停止調度',
-    claude5HourLimitExplanation: '當系統檢測到帳戶接近5小時使用限制時，自動暫停調度該帳戶。進入新的時間視窗後會自動恢復調度。',
+    claude5HourLimitExplanation:
+      '當系統檢測到帳戶接近5小時使用限制時，自動暫停調度該帳戶。進入新的時間視窗後會自動恢復調度。',
     useUnifiedClaudeVersion: '使用統一 Claude Code 版本',
     unifiedVersionDesc: '開啟後將使用從真實 Claude Code 用戶端捕獲的統一 User-Agent，提高相容性',
     currentUnifiedVersion: '💡 目前統一版本：',
@@ -1762,7 +2386,7 @@ export default {
     useUnifiedClientId: '使用統一的用戶端標識',
     unifiedClientIdDesc: '開啟後將使用固定的用戶端標識，使所有請求看起來來自同一個用戶端，減少特徵',
     clientIdReplaceDesc: '此ID將替換請求中的user_id用戶端部分，保留session部分用於黏性工作階段',
-    
+
     // OAuth 步驟文字
     step1GenerateAuthLink: '步驟1: 產生授權連結',
     clickButtonGenerate: '點擊下方按鈕產生授權連結',
@@ -1775,30 +2399,31 @@ export default {
     inputAuthCodeTitle: '輸入 Authorization Code',
     authCompleteDesc: '授權完成後，從返回頁面複製 Authorization Code，並貼上到下方輸入框：',
     pasteAuthCodeDesc: '請貼上從 Claude Code 授權頁面複製的 Authorization Code',
-    
+
     // AWS 區域參考
     awsRegionRef: '常用 AWS 區域參考：',
-    
+
     // 錯誤訊息
     apiKeyRequired: '請填寫 API Key',
     refreshTokenRequired: '請填寫 Refresh Token',
     accessTokenRequired: '請填寫 Access Token',
     copyFailedManual: '複製失敗，請手動複製',
-    
+
     // 表單描述
-    modelSupportDesc: '留空表示支援所有模型。如果指定模型，請求中的模型不在列表內將不會調度到此帳戶',
+    modelSupportDesc:
+      '留空表示支援所有模型。如果指定模型，請求中的模型不在列表內將不會調度到此帳戶',
     modelTypeSelectionDesc: '選擇此部署支援的模型類型',
     userAgentDesc: '留空時將自動使用用戶端的 User-Agent，僅在需要固定特定 UA 時填寫',
-    
+
     // 基础標籤
     apiUrlLabel: 'API URL',
     apiUrlRequired: 'API URL *',
     apiKeyLabel: 'API Key',
     apiKeyRequired: 'API Key *',
-    
+
     // 更多缺失的翻譯鍵
     copyLinkTooltip: '複製連結',
-    
+
     // Claude 訂閱類型顯示
     claudeMaxDisplay: 'Claude Max',
     claudeProDisplay: 'Claude Pro'
@@ -1810,29 +2435,30 @@ export default {
     claudeAccountAuth: 'Claude 帳戶授權',
     geminiAccountAuth: 'Gemini 帳戶授權',
     openaiAccountAuth: 'OpenAI 帳戶授權',
-    
+
     // 流程說明
     claudeAuthDescription: '請按照以下步驟完成 Claude 帳戶的授權：',
     geminiAuthDescription: '請按照以下步驟完成 Gemini 帳戶的授權：',
     openaiAuthDescription: '請按照以下步驟完成 OpenAI 帳戶的授權：',
-    
+
     // 步驟標題
     step1Title: '點擊下方按銮產生授權連結',
     step2Title: '在瀏覽器中打開連結並完成授權',
     step3Title: '輸入 Authorization Code',
     step3TitleOpenAI: '輸入授權連結或 Code',
-    
+
     // 步驟描述
     step2Description: '請在新分頁中打開授權連結，登入您的 Claude 帳戶並授權。',
     step2DescriptionGemini: '請在新分頁中打開授權連結，登入您的 Gemini 帳戶並授權。',
     step2DescriptionOpenAI: '請在新分頁中打開授權連結，登入您的 OpenAI 帳戶並授權。',
-    
+
     step3Description: '授權完成後，頁面會顯示一個',
     step3DescriptionMiddle: '，請將其複製並貼上到下方輸入框：',
-    step3DescriptionGemini: '授權完成後，頁面會顯示一個 Authorization Code，請將其複製並貼上到下方輸入框：',
+    step3DescriptionGemini:
+      '授權完成後，頁面會顯示一個 Authorization Code，請將其複製並貼上到下方輸入框：',
     step3DescriptionOpenAI: '授權完成後，當頁面地址變為',
     step3DescriptionOpenAIMiddle: '時：',
-    
+
     // 按銮文字
     generating: '產生中...',
     generateAuthLink: '產生授權連結',
@@ -1840,36 +2466,37 @@ export default {
     previousStep: '上一步',
     completeAuth: '完成授權',
     verifying: '驗證中...',
-    
+
     // 占位符
     authCodePlaceholder: '貼上Claude頁面獲取的Authorization Code...',
     authCodePlaceholderGemini: '貼上Gemini頁面獲取的Authorization Code...',
-    authCodePlaceholderOpenAI: '方式1：複製完整的連結（http://localhost:1455/auth/callback?code=...)\n方式2：僅複製 code 參數的值\n系統會自動識別並提取所需資訊',
-    
+    authCodePlaceholderOpenAI:
+      '方式1：複製完整的連結（http://localhost:1455/auth/callback?code=...)\n方式2：僅複製 code 參數的值\n系統會自動識別並提取所需資訊',
+
     // 標籤
     authorizationCode: 'Authorization Code',
     authLinkOrCode: '授權連結或 Code',
-    
+
     // 提示資訊
     copyLinkTooltip: '複製連結',
     authCodeHint: '請貼上Claude頁面複製的Authorization Code',
     authCodeHintGemini: '請貼上Gemini頁面複製的Authorization Code',
-    
+
     // 注意事項
     proxyNotice: '注意：',
     proxyNoticeText: '如果您設定了代理，請確保瀏覽器也使用相同的代理訪問授權頁面。',
-    
+
     // OpenAI 特有提示
     openaiImportantNote: '重要提示：',
     openaiLoadingNote: '授權後頁面可能會加載較長時間，請耐心等待。',
     openaiAddressNote: '當瀏覽器地址欄變為',
     openaiAddressNoteMiddle: '開頭時，表示授權已完成。',
-    
+
     openaiTip: '提示：',
     openaiTipText: '您可以直接複製整個連結或僅複製 code 參數值，系統會自動識別。',
     openaiLinkExample: '• 完整連結示例：',
     openaiCodeExample: '• 僅 Code 示例：',
-    
+
     // 成功和錯誤消息
     successExtractCode: '成功提取授權碼！',
     errorCodeNotFound: 'URL 中未找到授權碼參數，請檢查連結是否正確',
