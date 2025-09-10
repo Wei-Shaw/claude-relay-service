@@ -237,25 +237,25 @@ class UnifiedClaudeScheduler {
             )
             await this._deleteSessionMapping(sessionHash)
           } else {
-          // 验证映射的账户是否仍然可用
-          const isAvailable = await this._isAccountAvailable(
-            mappedAccount.accountId,
-            mappedAccount.accountType,
-            effectiveModel
-          )
-          if (isAvailable) {
-            // 🚀 智能会话续期：剩余时间少于14天时自动续期到15天
-            await redis.extendSessionAccountMappingTTL(sessionHash)
-            logger.info(
-              `🎯 Using sticky session account: ${mappedAccount.accountId} (${mappedAccount.accountType}) for session ${sessionHash}`
+            // 验证映射的账户是否仍然可用
+            const isAvailable = await this._isAccountAvailable(
+              mappedAccount.accountId,
+              mappedAccount.accountType,
+              effectiveModel
             )
-            return mappedAccount
-          } else {
-            logger.warn(
-              `⚠️ Mapped account ${mappedAccount.accountId} is no longer available, selecting new account`
-            )
-            await this._deleteSessionMapping(sessionHash)
-          }
+            if (isAvailable) {
+              // 🚀 智能会话续期：剩余时间少于14天时自动续期到15天
+              await redis.extendSessionAccountMappingTTL(sessionHash)
+              logger.info(
+                `🎯 Using sticky session account: ${mappedAccount.accountId} (${mappedAccount.accountType}) for session ${sessionHash}`
+              )
+              return mappedAccount
+            } else {
+              logger.warn(
+                `⚠️ Mapped account ${mappedAccount.accountId} is no longer available, selecting new account`
+              )
+              await this._deleteSessionMapping(sessionHash)
+            }
           }
         }
       }
