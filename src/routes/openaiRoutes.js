@@ -6,6 +6,8 @@ const config = require('../../config/config')
 const { authenticateApiKey } = require('../middleware/auth')
 const unifiedOpenAIScheduler = require('../services/unifiedOpenAIScheduler')
 const openaiAccountService = require('../services/openaiAccountService')
+const openaiResponsesAccountService = require('../services/openaiResponsesAccountService')
+const openaiResponsesRelayService = require('../services/openaiResponsesRelayService')
 const apiKeyService = require('../services/apiKeyService')
 const crypto = require('crypto')
 const ProxyHelper = require('../utils/proxyHelper')
@@ -34,51 +36,81 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
       throw new Error('No available OpenAI account found')
     }
 
-    // 获取账户详情
-    let account = await openaiAccountService.getAccount(result.accountId)
-    if (!account || !account.accessToken) {
-      throw new Error(`OpenAI account ${result.accountId} has no valid accessToken`)
-    }
+    // 根据账户类型获取账户详情
+    let account,
+      accessToken,
+      proxy = null
 
-    // 检查 token 是否过期并自动刷新（双重保护）
-    if (openaiAccountService.isTokenExpired(account)) {
-      if (account.refreshToken) {
-        logger.info(`🔄 Token expired, auto-refreshing for account ${account.name} (fallback)`)
+    if (result.accountType === 'openai-responses') {
+      // 处理 OpenAI-Responses 账户
+      account = await openaiResponsesAccountService.getAccount(result.accountId)
+      if (!account || !account.apiKey) {
+        throw new Error(`OpenAI-Responses account ${result.accountId} has no valid apiKey`)
+      }
+
+      // OpenAI-Responses 账户不需要 accessToken，直接返回账户信息
+      accessToken = null // OpenAI-Responses 使用账户内的 apiKey
+
+      // 解析代理配置
+      if (account.proxy) {
         try {
-          await openaiAccountService.refreshAccountToken(result.accountId)
-          // 重新获取更新后的账户
-          account = await openaiAccountService.getAccount(result.accountId)
-          logger.info(`✅ Token refreshed successfully in route handler`)
-        } catch (refreshError) {
-          logger.error(`Failed to refresh token for ${account.name}:`, refreshError)
-          throw new Error(`Token expired and refresh failed: ${refreshError.message}`)
+          proxy = typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
+        } catch (e) {
+          logger.warn('Failed to parse proxy configuration:', e)
         }
-      } else {
-        throw new Error(`Token expired and no refresh token available for account ${account.name}`)
       }
-    }
 
-    // 解密 accessToken（account.accessToken 是加密的）
-    const accessToken = openaiAccountService.decrypt(account.accessToken)
-    if (!accessToken) {
-      throw new Error('Failed to decrypt OpenAI accessToken')
-    }
-
-    // 解析代理配置
-    let proxy = null
-    if (account.proxy) {
-      try {
-        proxy = typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
-      } catch (e) {
-        logger.warn('Failed to parse proxy configuration:', e)
+      logger.info(`Selected OpenAI-Responses account: ${account.name} (${result.accountId})`)
+    } else {
+      // 处理普通 OpenAI 账户
+      account = await openaiAccountService.getAccount(result.accountId)
+      if (!account || !account.accessToken) {
+        throw new Error(`OpenAI account ${result.accountId} has no valid accessToken`)
       }
+
+      // 检查 token 是否过期并自动刷新（双重保护）
+      if (openaiAccountService.isTokenExpired(account)) {
+        if (account.refreshToken) {
+          logger.info(`🔄 Token expired, auto-refreshing for account ${account.name} (fallback)`)
+          try {
+            await openaiAccountService.refreshAccountToken(result.accountId)
+            // 重新获取更新后的账户
+            account = await openaiAccountService.getAccount(result.accountId)
+            logger.info(`✅ Token refreshed successfully in route handler`)
+          } catch (refreshError) {
+            logger.error(`Failed to refresh token for ${account.name}:`, refreshError)
+            throw new Error(`Token expired and refresh failed: ${refreshError.message}`)
+          }
+        } else {
+          throw new Error(
+            `Token expired and no refresh token available for account ${account.name}`
+          )
+        }
+      }
+
+      // 解密 accessToken（account.accessToken 是加密的）
+      accessToken = openaiAccountService.decrypt(account.accessToken)
+      if (!accessToken) {
+        throw new Error('Failed to decrypt OpenAI accessToken')
+      }
+
+      // 解析代理配置
+      if (account.proxy) {
+        try {
+          proxy = typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
+        } catch (e) {
+          logger.warn('Failed to parse proxy configuration:', e)
+        }
+      }
+
+      logger.info(`Selected OpenAI account: ${account.name} (${result.accountId})`)
     }
 
-    logger.info(`Selected OpenAI account: ${account.name} (${result.accountId})`)
     return {
       accessToken,
       accountId: result.accountId,
       accountName: account.name,
+      accountType: result.accountType,
       proxy,
       account
     }
@@ -151,9 +183,16 @@ const handleResponses = async (req, res) => {
       accessToken,
       accountId,
       accountName: _accountName,
+      accountType,
       proxy,
       account
     } = await getOpenAIAuthToken(apiKeyData, sessionId, requestedModel)
+
+    // 如果是 OpenAI-Responses 账户，使用专门的中继服务处理
+    if (accountType === 'openai-responses') {
+      logger.info(`🔀 Using OpenAI-Responses relay service for account: ${account.name}`)
+      return await openaiResponsesRelayService.handleRequest(req, res, account, apiKeyData)
+    }
     // 基于白名单构造上游所需的请求头，确保键为小写且值受控
     const incoming = req.headers || {}
 

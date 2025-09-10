@@ -5,6 +5,7 @@ const claudeConsoleAccountService = require('../services/claudeConsoleAccountSer
 const bedrockAccountService = require('../services/bedrockAccountService')
 const geminiAccountService = require('../services/geminiAccountService')
 const openaiAccountService = require('../services/openaiAccountService')
+const openaiResponsesAccountService = require('../services/openaiResponsesAccountService')
 const azureOpenaiAccountService = require('../services/azureOpenaiAccountService')
 const accountGroupService = require('../services/accountGroupService')
 const redis = require('../models/redis')
@@ -1946,7 +1947,7 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
         try {
-          const usageStats = await redis.getAccountUsageStats(account.id)
+          const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
           // 获取会话窗口使用统计（仅对有活跃窗口的账户）
@@ -2381,7 +2382,7 @@ router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
         try {
-          const usageStats = await redis.getAccountUsageStats(account.id)
+          const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
           return {
@@ -2784,7 +2785,7 @@ router.get('/bedrock-accounts', authenticateAdmin, async (req, res) => {
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
         try {
-          const usageStats = await redis.getAccountUsageStats(account.id)
+          const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
           return {
@@ -3234,7 +3235,7 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
         try {
-          const usageStats = await redis.getAccountUsageStats(account.id)
+          const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
           return {
@@ -5762,7 +5763,7 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
         try {
-          const usageStats = await redis.getAccountUsageStats(account.id)
+          const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           return {
             ...account,
             usage: {
@@ -6309,7 +6310,7 @@ router.get('/azure-openai-accounts', authenticateAdmin, async (req, res) => {
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
         try {
-          const usageStats = await redis.getAccountUsageStats(account.id)
+          const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
           return {
             ...account,
@@ -6704,6 +6705,336 @@ router.post('/claude-code-version/clear', authenticateAdmin, async (req, res) =>
     res.status(500).json({
       success: false,
       message: 'Failed to clear cache',
+      error: error.message
+    })
+  }
+})
+
+// ==================== OpenAI-Responses 账户管理 API ====================
+
+// 获取所有 OpenAI-Responses 账户
+router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => {
+  try {
+    const { platform, groupId } = req.query
+    let accounts = await openaiResponsesAccountService.getAllAccounts(true)
+
+    // 根据查询参数进行筛选
+    if (platform && platform !== 'openai-responses') {
+      accounts = []
+    }
+
+    // 根据分组ID筛选
+    if (groupId) {
+      const group = await accountGroupService.getGroup(groupId)
+      if (group && group.platform === 'openai' && group.memberIds && group.memberIds.length > 0) {
+        accounts = accounts.filter((account) => group.memberIds.includes(account.id))
+      } else {
+        accounts = []
+      }
+    }
+
+    // 处理额度信息、使用统计和绑定的 API Key 数量
+    const accountsWithStats = await Promise.all(
+      accounts.map(async (account) => {
+        try {
+          // 检查是否需要重置额度
+          const today = redis.getDateStringInTimezone()
+          if (account.lastResetDate !== today) {
+            // 今天还没重置过，需要重置
+            await openaiResponsesAccountService.updateAccount(account.id, {
+              dailyUsage: '0',
+              lastResetDate: today,
+              quotaStoppedAt: ''
+            })
+            account.dailyUsage = '0'
+            account.lastResetDate = today
+            account.quotaStoppedAt = ''
+          }
+
+          // 检查并清除过期的限流状态
+          await openaiResponsesAccountService.checkAndClearRateLimit(account.id)
+
+          // 获取使用统计信息
+          let usageStats
+          try {
+            usageStats = await redis.getAccountUsageStats(account.id, 'openai-responses')
+          } catch (error) {
+            logger.debug(
+              `Failed to get usage stats for OpenAI-Responses account ${account.id}:`,
+              error
+            )
+            usageStats = {
+              daily: { requests: 0, tokens: 0, allTokens: 0 },
+              total: { requests: 0, tokens: 0, allTokens: 0 },
+              monthly: { requests: 0, tokens: 0, allTokens: 0 }
+            }
+          }
+
+          // 计算绑定的API Key数量（支持 responses: 前缀）
+          const allKeys = await redis.getAllApiKeys()
+          let boundCount = 0
+
+          for (const key of allKeys) {
+            // 检查是否绑定了该账户（包括 responses: 前缀）
+            if (
+              key.openaiAccountId === account.id ||
+              key.openaiAccountId === `responses:${account.id}`
+            ) {
+              boundCount++
+            }
+          }
+
+          // 调试日志：检查绑定计数
+          if (boundCount > 0) {
+            logger.info(`OpenAI-Responses account ${account.id} has ${boundCount} bound API keys`)
+          }
+
+          return {
+            ...account,
+            boundApiKeysCount: boundCount,
+            usage: {
+              daily: usageStats.daily,
+              total: usageStats.total,
+              monthly: usageStats.monthly
+            }
+          }
+        } catch (error) {
+          logger.error(`Failed to process OpenAI-Responses account ${account.id}:`, error)
+          return {
+            ...account,
+            boundApiKeysCount: 0,
+            usage: {
+              daily: { requests: 0, tokens: 0, allTokens: 0 },
+              total: { requests: 0, tokens: 0, allTokens: 0 },
+              monthly: { requests: 0, tokens: 0, allTokens: 0 }
+            }
+          }
+        }
+      })
+    )
+
+    res.json({ success: true, data: accountsWithStats })
+  } catch (error) {
+    logger.error('Failed to get OpenAI-Responses accounts:', error)
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// 创建 OpenAI-Responses 账户
+router.post('/openai-responses-accounts', authenticateAdmin, async (req, res) => {
+  try {
+    const account = await openaiResponsesAccountService.createAccount(req.body)
+    res.json({ success: true, account })
+  } catch (error) {
+    logger.error('Failed to create OpenAI-Responses account:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// 更新 OpenAI-Responses 账户
+router.put('/openai-responses-accounts/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+    const updates = req.body
+
+    // 验证priority的有效性（1-100）
+    if (updates.priority !== undefined) {
+      const priority = parseInt(updates.priority)
+      if (isNaN(priority) || priority < 1 || priority > 100) {
+        return res.status(400).json({
+          success: false,
+          message: 'Priority must be a number between 1 and 100'
+        })
+      }
+      updates.priority = priority.toString()
+    }
+
+    const result = await openaiResponsesAccountService.updateAccount(id, updates)
+
+    if (!result.success) {
+      return res.status(400).json(result)
+    }
+
+    res.json({ success: true, ...result })
+  } catch (error) {
+    logger.error('Failed to update OpenAI-Responses account:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// 删除 OpenAI-Responses 账户
+router.delete('/openai-responses-accounts/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const account = await openaiResponsesAccountService.getAccount(id)
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        message: 'Account not found'
+      })
+    }
+
+    // 检查是否在分组中
+    const groups = await accountGroupService.getAllGroups()
+    for (const group of groups) {
+      if (group.platform === 'openai' && group.memberIds && group.memberIds.includes(id)) {
+        await accountGroupService.removeMemberFromGroup(group.id, id)
+        logger.info(`Removed OpenAI-Responses account ${id} from group ${group.id}`)
+      }
+    }
+
+    const result = await openaiResponsesAccountService.deleteAccount(id)
+    res.json({ success: true, ...result })
+  } catch (error) {
+    logger.error('Failed to delete OpenAI-Responses account:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// 切换 OpenAI-Responses 账户调度状态
+router.put(
+  '/openai-responses-accounts/:id/toggle-schedulable',
+  authenticateAdmin,
+  async (req, res) => {
+    try {
+      const { id } = req.params
+
+      const result = await openaiResponsesAccountService.toggleSchedulable(id)
+
+      if (!result.success) {
+        return res.status(400).json(result)
+      }
+
+      // 仅在停止调度时发送通知
+      if (!result.schedulable) {
+        await webhookNotifier.sendAccountEvent('account.status_changed', {
+          accountId: id,
+          platform: 'openai-responses',
+          schedulable: result.schedulable,
+          changedBy: 'admin',
+          action: 'stopped_scheduling'
+        })
+      }
+
+      res.json(result)
+    } catch (error) {
+      logger.error('Failed to toggle OpenAI-Responses account schedulable status:', error)
+      res.status(500).json({
+        success: false,
+        error: error.message
+      })
+    }
+  }
+)
+
+// 切换 OpenAI-Responses 账户激活状态
+router.put('/openai-responses-accounts/:id/toggle', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const account = await openaiResponsesAccountService.getAccount(id)
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        message: 'Account not found'
+      })
+    }
+
+    const newActiveStatus = account.isActive === 'true' ? 'false' : 'true'
+    await openaiResponsesAccountService.updateAccount(id, {
+      isActive: newActiveStatus
+    })
+
+    res.json({
+      success: true,
+      isActive: newActiveStatus === 'true'
+    })
+  } catch (error) {
+    logger.error('Failed to toggle OpenAI-Responses account status:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// 重置 OpenAI-Responses 账户限流状态
+router.post(
+  '/openai-responses-accounts/:id/reset-rate-limit',
+  authenticateAdmin,
+  async (req, res) => {
+    try {
+      const { id } = req.params
+
+      await openaiResponsesAccountService.updateAccount(id, {
+        rateLimitedAt: '',
+        rateLimitStatus: '',
+        status: 'active',
+        errorMessage: ''
+      })
+
+      logger.info(`🔄 Admin manually reset rate limit for OpenAI-Responses account ${id}`)
+
+      res.json({
+        success: true,
+        message: 'Rate limit reset successfully'
+      })
+    } catch (error) {
+      logger.error('Failed to reset OpenAI-Responses account rate limit:', error)
+      res.status(500).json({
+        success: false,
+        error: error.message
+      })
+    }
+  }
+)
+
+// 重置 OpenAI-Responses 账户状态（清除所有异常状态）
+router.post('/openai-responses-accounts/:id/reset-status', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const result = await openaiResponsesAccountService.resetAccountStatus(id)
+
+    logger.success(`✅ Admin reset status for OpenAI-Responses account: ${id}`)
+    return res.json({ success: true, data: result })
+  } catch (error) {
+    logger.error('❌ Failed to reset OpenAI-Responses account status:', error)
+    return res.status(500).json({ error: 'Failed to reset status', message: error.message })
+  }
+})
+
+// 手动重置 OpenAI-Responses 账户的每日使用量
+router.post('/openai-responses-accounts/:id/reset-usage', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    await openaiResponsesAccountService.updateAccount(id, {
+      dailyUsage: '0',
+      lastResetDate: redis.getDateStringInTimezone(),
+      quotaStoppedAt: ''
+    })
+
+    logger.success(`✅ Admin manually reset daily usage for OpenAI-Responses account ${id}`)
+
+    res.json({
+      success: true,
+      message: 'Daily usage reset successfully'
+    })
+  } catch (error) {
+    logger.error('Failed to reset OpenAI-Responses account usage:', error)
+    res.status(500).json({
+      success: false,
       error: error.message
     })
   }

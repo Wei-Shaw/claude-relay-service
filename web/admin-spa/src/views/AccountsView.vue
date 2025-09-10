@@ -7,7 +7,7 @@
             账户管理
           </h3>
           <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-base">
-            管理您的 Claude、Gemini、OpenAI 和 Azure OpenAI 账户及代理配置
+            管理您的 Claude、Gemini、OpenAI、Azure OpenAI 和 OpenAI-Responses 账户及代理配置
           </p>
         </div>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -351,6 +351,19 @@
                     >
                   </div>
                   <div
+                    v-else-if="account.platform === 'openai-responses'"
+                    class="flex items-center gap-1.5 rounded-lg border border-teal-200 bg-gradient-to-r from-teal-100 to-green-100 px-2.5 py-1 dark:border-teal-700 dark:from-teal-900/20 dark:to-green-900/20"
+                  >
+                    <i class="fas fa-server text-xs text-teal-700 dark:text-teal-400" />
+                    <span class="text-xs font-semibold text-teal-800 dark:text-teal-300"
+                      >OpenAI-Responses</span
+                    >
+                    <span class="mx-1 h-4 w-px bg-teal-300 dark:bg-teal-600" />
+                    <span class="text-xs font-medium text-teal-700 dark:text-teal-400"
+                      >API Key</span
+                    >
+                  </div>
+                  <div
                     v-else-if="account.platform === 'claude' || account.platform === 'claude-oauth'"
                     class="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-gradient-to-r from-indigo-100 to-blue-100 px-2.5 py-1"
                   >
@@ -643,7 +656,8 @@
                     v-if="
                       (account.platform === 'claude' ||
                         account.platform === 'claude-console' ||
-                        account.platform === 'openai') &&
+                        account.platform === 'openai' ||
+                        account.platform === 'openai-responses') &&
                       (account.status === 'unauthorized' ||
                         account.status !== 'active' ||
                         account.rateLimitStatus?.isRateLimited ||
@@ -1003,7 +1017,8 @@ const platformOptions = ref([
   { value: 'gemini', label: 'Gemini', icon: 'fa-google' },
   { value: 'openai', label: 'OpenAi', icon: 'fa-openai' },
   { value: 'azure_openai', label: 'Azure OpenAI', icon: 'fab fa-microsoft' },
-  { value: 'bedrock', label: 'Bedrock', icon: 'fab fa-aws' }
+  { value: 'bedrock', label: 'Bedrock', icon: 'fab fa-aws' },
+  { value: 'openai-responses', label: 'OpenAI-Responses', icon: 'fa-server' }
 ])
 
 const groupOptions = computed(() => {
@@ -1108,7 +1123,8 @@ const loadAccounts = async (forceReload = false) => {
         apiClient.get('/admin/bedrock-accounts', { params }),
         apiClient.get('/admin/gemini-accounts', { params }),
         apiClient.get('/admin/openai-accounts', { params }),
-        apiClient.get('/admin/azure-openai-accounts', { params })
+        apiClient.get('/admin/azure-openai-accounts', { params }),
+        apiClient.get('/admin/openai-responses-accounts', { params })
       )
     } else {
       // 只请求指定平台，其他平台设为null占位
@@ -1120,7 +1136,8 @@ const loadAccounts = async (forceReload = false) => {
             Promise.resolve({ success: true, data: [] }), // bedrock 占位
             Promise.resolve({ success: true, data: [] }), // gemini 占位
             Promise.resolve({ success: true, data: [] }), // openai 占位
-            Promise.resolve({ success: true, data: [] }) // azure-openai 占位
+            Promise.resolve({ success: true, data: [] }), // azure-openai 占位
+            Promise.resolve({ success: true, data: [] }) // openai-responses 占位
           )
           break
         case 'claude-console':
@@ -1130,7 +1147,8 @@ const loadAccounts = async (forceReload = false) => {
             Promise.resolve({ success: true, data: [] }), // bedrock 占位
             Promise.resolve({ success: true, data: [] }), // gemini 占位
             Promise.resolve({ success: true, data: [] }), // openai 占位
-            Promise.resolve({ success: true, data: [] }) // azure-openai 占位
+            Promise.resolve({ success: true, data: [] }), // azure-openai 占位
+            Promise.resolve({ success: true, data: [] }) // openai-responses 占位
           )
           break
         case 'bedrock':
@@ -1140,7 +1158,8 @@ const loadAccounts = async (forceReload = false) => {
             apiClient.get('/admin/bedrock-accounts', { params }),
             Promise.resolve({ success: true, data: [] }), // gemini 占位
             Promise.resolve({ success: true, data: [] }), // openai 占位
-            Promise.resolve({ success: true, data: [] }) // azure-openai 占位
+            Promise.resolve({ success: true, data: [] }), // azure-openai 占位
+            Promise.resolve({ success: true, data: [] }) // openai-responses 占位
           )
           break
         case 'gemini':
@@ -1150,7 +1169,8 @@ const loadAccounts = async (forceReload = false) => {
             Promise.resolve({ success: true, data: [] }), // bedrock 占位
             apiClient.get('/admin/gemini-accounts', { params }),
             Promise.resolve({ success: true, data: [] }), // openai 占位
-            Promise.resolve({ success: true, data: [] }) // azure-openai 占位
+            Promise.resolve({ success: true, data: [] }), // azure-openai 占位
+            Promise.resolve({ success: true, data: [] }) // openai-responses 占位
           )
           break
         case 'openai':
@@ -1160,7 +1180,8 @@ const loadAccounts = async (forceReload = false) => {
             Promise.resolve({ success: true, data: [] }), // bedrock 占位
             Promise.resolve({ success: true, data: [] }), // gemini 占位
             apiClient.get('/admin/openai-accounts', { params }),
-            Promise.resolve({ success: true, data: [] }) // azure-openai 占位
+            Promise.resolve({ success: true, data: [] }), // azure-openai 占位
+            Promise.resolve({ success: true, data: [] }) // openai-responses 占位
           )
           break
         case 'azure_openai':
@@ -1170,12 +1191,25 @@ const loadAccounts = async (forceReload = false) => {
             Promise.resolve({ success: true, data: [] }), // bedrock 占位
             Promise.resolve({ success: true, data: [] }), // gemini 占位
             Promise.resolve({ success: true, data: [] }), // openai 占位
-            apiClient.get('/admin/azure-openai-accounts', { params })
+            apiClient.get('/admin/azure-openai-accounts', { params }),
+            Promise.resolve({ success: true, data: [] }) // openai-responses 占位
+          )
+          break
+        case 'openai-responses':
+          requests.push(
+            Promise.resolve({ success: true, data: [] }), // claude 占位
+            Promise.resolve({ success: true, data: [] }), // claude-console 占位
+            Promise.resolve({ success: true, data: [] }), // bedrock 占位
+            Promise.resolve({ success: true, data: [] }), // gemini 占位
+            Promise.resolve({ success: true, data: [] }), // openai 占位
+            Promise.resolve({ success: true, data: [] }), // azure-openai 占位
+            apiClient.get('/admin/openai-responses-accounts', { params })
           )
           break
         default:
           // 默认情况下返回空数组
           requests.push(
+            Promise.resolve({ success: true, data: [] }),
             Promise.resolve({ success: true, data: [] }),
             Promise.resolve({ success: true, data: [] }),
             Promise.resolve({ success: true, data: [] }),
@@ -1193,8 +1227,15 @@ const loadAccounts = async (forceReload = false) => {
     // 后端账户API已经包含分组信息，不需要单独加载分组成员关系
     // await loadGroupMembers(forceReload)
 
-    const [claudeData, claudeConsoleData, bedrockData, geminiData, openaiData, azureOpenaiData] =
-      await Promise.all(requests)
+    const [
+      claudeData,
+      claudeConsoleData,
+      bedrockData,
+      geminiData,
+      openaiData,
+      azureOpenaiData,
+      openaiResponsesData
+    ] = await Promise.all(requests)
 
     const allAccounts = []
 
@@ -1260,6 +1301,19 @@ const loadAccounts = async (forceReload = false) => {
         return { ...acc, platform: 'azure_openai', boundApiKeysCount }
       })
       allAccounts.push(...azureOpenaiAccounts)
+    }
+
+    if (openaiResponsesData && openaiResponsesData.success) {
+      const openaiResponsesAccounts = (openaiResponsesData.data || []).map((acc) => {
+        // 计算每个OpenAI-Responses账户绑定的API Key数量
+        // OpenAI-Responses账户使用 responses: 前缀
+        const boundApiKeysCount = apiKeys.value.filter(
+          (key) => key.openaiAccountId === `responses:${acc.id}`
+        ).length
+        // 后端已经包含了groupInfos，直接使用
+        return { ...acc, platform: 'openai-responses', boundApiKeysCount }
+      })
+      allAccounts.push(...openaiResponsesAccounts)
     }
 
     // 根据分组筛选器过滤账户
@@ -1515,6 +1569,8 @@ const deleteAccount = async (account) => {
       endpoint = `/admin/openai-accounts/${account.id}`
     } else if (account.platform === 'azure_openai') {
       endpoint = `/admin/azure-openai-accounts/${account.id}`
+    } else if (account.platform === 'openai-responses') {
+      endpoint = `/admin/openai-responses-accounts/${account.id}`
     } else {
       endpoint = `/admin/gemini-accounts/${account.id}`
     }
@@ -1559,6 +1615,8 @@ const resetAccountStatus = async (account) => {
     let endpoint = ''
     if (account.platform === 'openai') {
       endpoint = `/admin/openai-accounts/${account.id}/reset-status`
+    } else if (account.platform === 'openai-responses') {
+      endpoint = `/admin/openai-responses-accounts/${account.id}/reset-status`
     } else if (account.platform === 'claude') {
       endpoint = `/admin/claude-accounts/${account.id}/reset-status`
     } else if (account.platform === 'claude-console') {
@@ -1605,6 +1663,8 @@ const toggleSchedulable = async (account) => {
       endpoint = `/admin/openai-accounts/${account.id}/toggle-schedulable`
     } else if (account.platform === 'azure_openai') {
       endpoint = `/admin/azure-openai-accounts/${account.id}/toggle-schedulable`
+    } else if (account.platform === 'openai-responses') {
+      endpoint = `/admin/openai-responses-accounts/${account.id}/toggle-schedulable`
     } else {
       showToast('该账户类型暂不支持调度控制', 'warning')
       return
@@ -1749,6 +1809,26 @@ const getSchedulableReason = (account) => {
     }
     if (account.status === 'error' && account.errorMessage) {
       return account.errorMessage
+    }
+  }
+
+  // OpenAI-Responses 账户的错误状态
+  if (account.platform === 'openai-responses') {
+    if (account.status === 'unauthorized') {
+      return '认证失败（401错误）'
+    }
+    // 检查限流状态 - 兼容嵌套的 rateLimitStatus 对象
+    if (
+      (account.rateLimitStatus && account.rateLimitStatus.isRateLimited) ||
+      account.isRateLimited
+    ) {
+      return '触发限流（429错误）'
+    }
+    if (account.status === 'error' && account.errorMessage) {
+      return account.errorMessage
+    }
+    if (account.status === 'rateLimited') {
+      return '触发限流（429错误）'
     }
   }
 

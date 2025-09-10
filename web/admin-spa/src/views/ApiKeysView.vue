@@ -1849,6 +1849,7 @@ const accounts = ref({
   claude: [],
   gemini: [],
   openai: [],
+  openaiResponses: [], // 添加 OpenAI-Responses 账号列表
   bedrock: [],
   claudeGroups: [],
   geminiGroups: [],
@@ -2016,15 +2017,23 @@ const paginatedApiKeys = computed(() => {
 // 加载账户列表
 const loadAccounts = async () => {
   try {
-    const [claudeData, claudeConsoleData, geminiData, openaiData, bedrockData, groupsData] =
-      await Promise.all([
-        apiClient.get('/admin/claude-accounts'),
-        apiClient.get('/admin/claude-console-accounts'),
-        apiClient.get('/admin/gemini-accounts'),
-        apiClient.get('/admin/openai-accounts'),
-        apiClient.get('/admin/bedrock-accounts'),
-        apiClient.get('/admin/account-groups')
-      ])
+    const [
+      claudeData,
+      claudeConsoleData,
+      geminiData,
+      openaiData,
+      openaiResponsesData,
+      bedrockData,
+      groupsData
+    ] = await Promise.all([
+      apiClient.get('/admin/claude-accounts'),
+      apiClient.get('/admin/claude-console-accounts'),
+      apiClient.get('/admin/gemini-accounts'),
+      apiClient.get('/admin/openai-accounts'),
+      apiClient.get('/admin/openai-responses-accounts'), // 加载 OpenAI-Responses 账号
+      apiClient.get('/admin/bedrock-accounts'),
+      apiClient.get('/admin/account-groups')
+    ])
 
     // 合并Claude OAuth账户和Claude Console账户
     const claudeAccounts = []
@@ -2060,6 +2069,13 @@ const loadAccounts = async () => {
 
     if (openaiData.success) {
       accounts.value.openai = (openaiData.data || []).map((account) => ({
+        ...account,
+        isDedicated: account.accountType === 'dedicated'
+      }))
+    }
+
+    if (openaiResponsesData.success) {
+      accounts.value.openaiResponses = (openaiResponsesData.data || []).map((account) => ({
         ...account,
         isDedicated: account.accountType === 'dedicated'
       }))
@@ -2209,10 +2225,29 @@ const getBoundAccountName = (accountId) => {
     return `${geminiAccount.name}`
   }
 
+  // 处理 responses: 前缀的 OpenAI-Responses 账户
+  if (accountId.startsWith('responses:')) {
+    const realAccountId = accountId.replace('responses:', '')
+    const openaiResponsesAccount = accounts.value.openaiResponses.find(
+      (acc) => acc.id === realAccountId
+    )
+    if (openaiResponsesAccount) {
+      return `${openaiResponsesAccount.name}`
+    }
+    // 如果找不到，返回ID的前8位
+    return `${realAccountId.substring(0, 8)}`
+  }
+
   // 从OpenAI账户列表中查找
   const openaiAccount = accounts.value.openai.find((acc) => acc.id === accountId)
   if (openaiAccount) {
     return `${openaiAccount.name}`
+  }
+
+  // 从 OpenAI-Responses 账户列表中查找（兼容没有前缀的情况）
+  const openaiResponsesAccount = accounts.value.openaiResponses.find((acc) => acc.id === accountId)
+  if (openaiResponsesAccount) {
+    return `${openaiResponsesAccount.name}`
   }
 
   // 从Bedrock账户列表中查找
@@ -2281,8 +2316,17 @@ const getOpenAIBindingInfo = (key) => {
     if (key.openaiAccountId.startsWith('group:')) {
       return info
     }
-    // 检查账户是否存在
-    const account = accounts.value.openai.find((acc) => acc.id === key.openaiAccountId)
+
+    // 处理 responses: 前缀的 OpenAI-Responses 账户
+    let account = null
+    if (key.openaiAccountId.startsWith('responses:')) {
+      const realAccountId = key.openaiAccountId.replace('responses:', '')
+      account = accounts.value.openaiResponses.find((acc) => acc.id === realAccountId)
+    } else {
+      // 查找普通 OpenAI 账户
+      account = accounts.value.openai.find((acc) => acc.id === key.openaiAccountId)
+    }
+
     if (!account) {
       return `⚠️ ${info} (账户不存在)`
     }
