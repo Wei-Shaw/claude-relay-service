@@ -20,6 +20,7 @@ declare module 'vue' {
     CreateApiKeyModal: typeof import('./src/components/apikeys/CreateApiKeyModal.vue')['default']
     CustomDropdown: typeof import('./src/components/common/CustomDropdown.vue')['default']
     EditApiKeyModal: typeof import('./src/components/apikeys/EditApiKeyModal.vue')['default']
+    ElConfigProvider: typeof import('element-plus/es')['ElConfigProvider']
     ElDatePicker: typeof import('element-plus/es')['ElDatePicker']
     ElTooltip: typeof import('element-plus/es')['ElTooltip']
     ExpiryEditModal: typeof import('./src/components/apikeys/ExpiryEditModal.vue')['default']

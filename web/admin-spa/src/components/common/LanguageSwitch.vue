@@ -110,6 +110,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useLocaleStore } from '@/stores/locale'
 
 // 定义组件属性
@@ -130,13 +131,14 @@ const props = defineProps({
 const emit = defineEmits(['change'])
 
 // 存储和响应式数据
+const { t } = useI18n()
 const localeStore = useLocaleStore()
 const showDropdown = ref(false)
 const dropdownTrigger = ref(null)
 
 // 计算属性
-const currentLocaleInfo = computed(() => localeStore.getCurrentLocaleInfo())
-const supportedLocales = computed(() => localeStore.getSupportedLocales())
+const currentLocaleInfo = computed(() => localeStore.getCurrentLocaleInfo(t))
+const supportedLocales = computed(() => localeStore.getSupportedLocales(t))
 
 const containerClass = computed(() => {
   const classes = []
