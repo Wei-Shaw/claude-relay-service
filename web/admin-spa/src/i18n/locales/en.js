@@ -1,4 +1,47 @@
 export default {
+  layout: {
+    mainLayout: {
+      comments: {
+        topNavigation: 'Top Navigation',
+        mainContentArea: 'Main Content Area',
+        tabBar: 'Tab Bar',
+        contentArea: 'Content Area'
+      },
+      routing: {
+        routeChangeError: 'Route change failed:',
+        routeNotFound: 'Route not found',
+        defaultToTab: 'Default to dashboard'
+      }
+    },
+    tabBar: {
+      tabs: {
+        dashboard: {
+          name: 'Dashboard',
+          shortName: 'Dashboard'
+        },
+        apiKeys: {
+          name: 'API Keys',
+          shortName: 'API'
+        },
+        accounts: {
+          name: 'Account Management',
+          shortName: 'Accounts'
+        },
+        userManagement: {
+          name: 'User Management',
+          shortName: 'Users'
+        },
+        tutorial: {
+          name: 'Tutorial',
+          shortName: 'Tutorial'
+        },
+        settings: {
+          name: 'System Settings',
+          shortName: 'Settings'
+        }
+      }
+    }
+  },
   common: {
     save: 'Save',
     cancel: 'Cancel',
@@ -10,7 +53,89 @@ export default {
     update: 'Update',
     search: 'Search',
     reset: 'Reset',
-    locale: 'en'
+    locale: 'en',
+    toastNotification: {
+      defaultTitles: {
+        success: 'Success',
+        error: 'Error',
+        warning: 'Warning',
+        info: 'Information'
+      }
+    },
+    confirmDialog: {
+      confirm: 'Confirm',
+      cancel: 'Cancel'
+    },
+    confirmModal: {
+      continue: 'Continue',
+      cancel: 'Cancel'
+    },
+    themeToggle: {
+      light: {
+        label: 'Light Mode',
+        shortLabel: 'Light'
+      },
+      dark: {
+        label: 'Dark Mode',
+        shortLabel: 'Dark'
+      },
+      auto: {
+        label: 'Follow System',
+        shortLabel: 'Auto'
+      },
+      toggleTheme: 'Toggle Theme',
+      clickToSwitch: 'Click to switch theme'
+    },
+    logoTitle: {
+      logoAlt: 'Logo'
+    },
+    languageSwitch: {
+      zhCnName: 'Simplified Chinese',
+      zhTwName: 'Traditional Chinese',
+      enName: 'English',
+      zhCnFlag: 'CN',
+      zhTwFlag: 'TW',
+      enFlag: 'EN'
+    },
+    accountSelector: {
+      searchPlaceholder: 'Search account name...',
+      schedulingGroups: 'Scheduling Groups',
+      membersUnit: ' members',
+      claudeOAuthAccounts: 'Claude OAuth Dedicated Accounts',
+      oauthAccounts: 'OAuth Dedicated Accounts',
+      claudeConsoleAccounts: 'Claude Console Dedicated Accounts',
+      noResultsFound: 'No matching accounts found',
+      selectAccount: 'Please select an account',
+      useSharedPool: 'Use shared account pool',
+      accountStatus: {
+        unknown: 'Unknown',
+        unauthorized: 'Unauthorized',
+        tokenError: 'Token Error',
+        pending: 'Pending',
+        rateLimited: 'Rate Limited',
+        error: 'Error',
+        active: 'Active'
+      },
+      dateFormat: {
+        today: 'Created today',
+        yesterday: 'Created yesterday',
+        daysAgo: ' days ago'
+      }
+    },
+    customDropdown: {
+      placeholder: 'Please select'
+    },
+    // Common time and errors
+    time: {
+      justNow: 'Just now',
+      minutesAgo: '{minutes} minutes ago',
+      hoursAgo: '{hours} hours ago',
+      daysAgo: '{days} days ago'
+    },
+    errors: {
+      requestFailed: 'Request failed: {status}',
+      loadSupportedClientsFailed: 'Failed to load supported clients'
+    }
   },
   language: {
     zh: '简体中文',
@@ -210,7 +335,15 @@ export default {
     securityNoticeMulti:
       'Your API Keys are only used to query statistical data and will not be stored. Some individual information will not be displayed in aggregate mode.',
     multiKeyTip:
-      'Tip: Supports querying up to 30 API Keys simultaneously. Use Ctrl+Enter for quick query.'
+      'Tip: Supports querying up to 30 API Keys simultaneously. Use Ctrl+Enter for quick query.',
+    errors: {
+      queryStatsFailed: 'Failed to query statistics, please check your API Key',
+      enterAtLeastOneKey: 'Please enter at least one valid API Key',
+      batchQueryFailed: 'Batch query failed',
+      batchModelStatsFailed: 'Failed to load batch model statistics',
+      loadModelStatsFailed: 'Failed to load model statistics',
+      allInvalidKeys: 'All API Keys are invalid'
+    }
   },
 
   // Login page
@@ -221,7 +354,9 @@ export default {
     password: 'Password',
     passwordPlaceholder: 'Please enter password',
     loginButton: 'Login',
-    loggingIn: 'Logging in...'
+    loggingIn: 'Logging in...',
+    loginFailed: 'Login failed',
+    loginFailedCheck: 'Login failed, please check username and password'
   },
 
   // Dashboard page
@@ -262,6 +397,12 @@ export default {
     tokensPerMinute: 'Tokens per Minute',
     historicalData: 'Historical Data',
     minutes: 'minutes',
+    // Uptime display formats
+    uptimeFormat: {
+      daysHours: '{days} days {hours} hours',
+      hoursMinutes: '{hours} hours {minutes} minutes',
+      minutes: '{minutes} minutes'
+    },
 
     // Charts section
     modelDistributionAndTrend: 'Model Usage Distribution & Token Usage Trends',
@@ -269,6 +410,7 @@ export default {
     // Date filter presets
     today: 'Today',
     yesterday: 'Yesterday',
+    dayBefore: 'Day before yesterday',
     last7Days: 'Last 7 Days',
     last30Days: 'Last 30 Days',
     thisWeek: 'This Week',
@@ -322,7 +464,53 @@ export default {
     time: 'Time',
     date: 'Date',
     tokenQuantity: 'Token Quantity',
-    requestsQuantity: 'Requests Count'
+    requestsQuantity: 'Requests Count',
+
+    // Usage Trend component
+    usageTrend: {
+      title: 'Usage Trend',
+      granularity: {
+        byDay: 'By Day',
+        byHour: 'By Hour'
+      },
+      periodOptions: {
+        last24Hours: '24 Hours',
+        last7Days: '7 Days',
+        last30Days: '30 Days',
+        recentDays: 'Last {days} Days'
+      },
+      chartLabels: {
+        requests: 'Request Count',
+        tokens: 'Token Usage',
+        requestsAxis: 'Request Count',
+        tokensAxis: 'Token Usage'
+      }
+    },
+
+    // Model Distribution component
+    modelDistribution: {
+      title: 'Model Usage Distribution',
+      periods: {
+        daily: 'Today',
+        total: 'Total'
+      },
+      noData: 'No model usage data available',
+      units: {
+        requests: 'requests',
+        tokens: 'tokens'
+      },
+      chart: {
+        tooltip: {
+          requests: 'Requests',
+          tokens: 'Tokens'
+        }
+      }
+    },
+    errors: {
+      rangeTooLongHour: 'For hourly granularity, date range cannot exceed 24 hours',
+      rangeTooLongDay: 'Date range cannot exceed 31 days',
+      rangeTooLongHourSwitched: 'Hourly range cannot exceed 24 hours, switched to last 24 hours'
+    }
   },
 
   // Accounts page
@@ -1316,6 +1504,52 @@ export default {
       loadStatsFailed: 'Failed to load API keys stats'
     },
 
+    // User API Keys Manager
+    userApiKeysManager: {
+      title: 'My API Keys',
+      description: 'Manage your API keys to access Claude Relay services',
+      loading: 'Loading API keys...',
+      warnings: {
+        maxKeysReached:
+          'You have reached the maximum number of API keys ({maxApiKeys}). Please delete an existing key to create a new one.'
+      },
+      status: {
+        deleted: 'Deleted',
+        noDescription: 'No description',
+        neverUsed: 'Never used'
+      },
+      dateLabels: {
+        created: 'Created',
+        deleted: 'Deleted',
+        lastUsed: 'Last used',
+        expires: 'Expires'
+      },
+      usage: {
+        requests: 'requests'
+      },
+      actions: {
+        viewApiKey: 'View API Key',
+        deleteApiKey: 'Delete API Key'
+      },
+      buttons: {
+        createApiKey: 'Create API Key',
+        delete: 'Delete'
+      },
+      emptyState: {
+        title: 'No API keys',
+        description: 'Get started by creating your first API key.'
+      },
+      confirmDelete: {
+        title: 'Delete API Key',
+        message: "Are you sure you want to delete '{name}'? This action cannot be undone."
+      },
+      messages: {
+        loadFailed: 'Failed to load API keys',
+        deleteSuccess: 'API key deleted successfully',
+        deleteFailed: 'Failed to delete API key'
+      }
+    },
+
     // User Login
     login: {
       title: 'User Sign In',
@@ -1331,7 +1565,50 @@ export default {
       // Validation and error messages
       requiredFields: 'Please enter both username and password',
       loginSuccess: 'Login successful!',
-      loginFailed: 'Login failed'
+      loginFailed: 'Login failed',
+      accountDisabled: 'Your account has been disabled'
+    },
+
+    // View API Key Modal
+    viewApiKeyModal: {
+      title: 'API Key Details',
+      fields: {
+        name: 'Name',
+        description: 'Description',
+        apiKey: 'API Key',
+        status: 'Status',
+        usageStatistics: 'Usage Statistics'
+      },
+      apiKeyDisplay: {
+        notAvailable: 'Not available',
+        keyPreview: 'cr_****',
+        fullKeyNotice: 'Full API key is only shown when first created or regenerated'
+      },
+      buttons: {
+        hide: 'Hide',
+        show: 'Show',
+        copy: 'Copy',
+        close: 'Close'
+      },
+      status: {
+        active: 'Active',
+        disabled: 'Disabled'
+      },
+      usageStats: {
+        requests: 'Requests',
+        inputTokens: 'Input Tokens',
+        outputTokens: 'Output Tokens',
+        totalCost: 'Total Cost'
+      },
+      timestamps: {
+        created: 'Created',
+        lastUsed: 'Last Used',
+        expires: 'Expires'
+      },
+      messages: {
+        copySuccess: 'Copied to clipboard!',
+        copyFailed: 'Failed to copy to clipboard'
+      }
     },
 
     // User Management
@@ -1501,6 +1778,124 @@ export default {
 
       // Success message
       roleUpdated: 'User role updated to {role}'
+    },
+
+    // User Usage Statistics
+    userUsageStats: {
+      // Page header
+      title: 'Usage Statistics',
+      subtitle: 'View your API usage statistics and costs',
+
+      // Time period selection
+      periodSelection: {
+        day: 'Last 24 Hours',
+        week: 'Last 7 Days',
+        month: 'Last 30 Days',
+        quarter: 'Last 90 Days'
+      },
+
+      // Loading state
+      loadingStats: 'Loading usage statistics...',
+
+      // Statistics cards
+      statsCards: {
+        totalRequests: 'Total Requests',
+        inputTokens: 'Input Tokens',
+        outputTokens: 'Output Tokens',
+        totalCost: 'Total Cost'
+      },
+
+      // Daily usage trend chart
+      usageTrend: {
+        title: 'Daily Usage Trend',
+        chartTitle: 'Usage Chart',
+        dailyTrendsDescription: 'Daily usage trends would be displayed here',
+        chartIntegrationNote:
+          '(Chart integration can be added with Chart.js, D3.js, or similar library)'
+      },
+
+      // Usage by model section
+      modelUsage: {
+        title: 'Usage by Model',
+        requests: 'requests',
+        requestsCount: '{count} requests'
+      },
+
+      // Usage by API key table
+      apiKeyUsage: {
+        title: 'Usage by API Key',
+        headers: {
+          apiKey: 'API Key',
+          requests: 'Requests',
+          inputTokens: 'Input Tokens',
+          outputTokens: 'Output Tokens',
+          cost: 'Cost',
+          status: 'Status'
+        },
+        status: {
+          active: 'Active',
+          disabled: 'Disabled',
+          deleted: 'Deleted'
+        }
+      },
+
+      // No data state
+      noData: {
+        title: 'No usage data',
+        description:
+          "You haven't made any API requests yet. Create an API key and start using the service to see usage statistics."
+      },
+
+      // Error messages
+      loadFailed: 'Failed to load usage statistics'
+    },
+
+    // Create API Key Modal
+    createApiKeyModal: {
+      title: 'Create New API Key',
+
+      // Form labels and placeholders
+      form: {
+        nameLabel: 'Name',
+        nameRequired: '*',
+        namePlaceholder: 'Enter API key name',
+        descriptionLabel: 'Description',
+        descriptionPlaceholder: 'Optional description'
+      },
+
+      // Button text
+      buttons: {
+        cancel: 'Cancel',
+        creating: 'Creating...',
+        createApiKey: 'Create API Key',
+        copy: 'Copy',
+        done: 'Done'
+      },
+
+      // Success state
+      success: {
+        title: 'API Key Created Successfully!',
+        warning: {
+          important: 'Important:',
+          message: "Copy your API key now. You won't be able to see it again!"
+        }
+      },
+
+      // Error and validation messages
+      validation: {
+        nameRequired: 'API key name is required'
+      },
+
+      errors: {
+        createFailed: 'Failed to create API key'
+      },
+
+      // Toast messages
+      messages: {
+        createSuccess: 'API key created successfully!',
+        copySuccess: 'API key copied to clipboard!',
+        copyFailed: 'Failed to copy to clipboard'
+      }
     }
   },
 
@@ -1527,6 +1922,10 @@ export default {
     removeIcon: 'Remove',
     iconFormats: 'Supports .ico, .png, .jpg, .svg formats, max 350KB',
     iconPreview: 'Icon preview',
+    validation: {
+      iconTooLarge: 'Icon file size must not exceed 350KB',
+      iconTypeNotSupported: 'Unsupported file type, please choose .ico, .png, .jpg or .svg'
+    },
 
     adminEntry: 'Admin Entry',
     adminEntryDescription: 'Login button display',

@@ -1,4 +1,47 @@
 export default {
+  layout: {
+    mainLayout: {
+      comments: {
+        topNavigation: '顶部导航',
+        mainContentArea: '主内容区域',
+        tabBar: '标签栏',
+        contentArea: '内容区域'
+      },
+      routing: {
+        routeChangeError: '路由切换失败:',
+        routeNotFound: '路由未找到',
+        defaultToTab: '默认选中仪表板'
+      }
+    },
+    tabBar: {
+      tabs: {
+        dashboard: {
+          name: '仪表板',
+          shortName: '仪表板'
+        },
+        apiKeys: {
+          name: 'API Keys',
+          shortName: 'API'
+        },
+        accounts: {
+          name: '账户管理',
+          shortName: '账户'
+        },
+        userManagement: {
+          name: '用户管理',
+          shortName: '用户'
+        },
+        tutorial: {
+          name: '使用教程',
+          shortName: '教程'
+        },
+        settings: {
+          name: '系统设置',
+          shortName: '设置'
+        }
+      }
+    }
+  },
   common: {
     save: '保存',
     cancel: '取消',
@@ -10,7 +53,89 @@ export default {
     update: '更新',
     search: '搜索',
     reset: '重置',
-    locale: 'zh-CN'
+    locale: 'zh-CN',
+    toastNotification: {
+      defaultTitles: {
+        success: '成功',
+        error: '错误',
+        warning: '警告',
+        info: '信息'
+      }
+    },
+    confirmDialog: {
+      confirm: '确认',
+      cancel: '取消'
+    },
+    confirmModal: {
+      continue: '继续',
+      cancel: '取消'
+    },
+    themeToggle: {
+      light: {
+        label: '浅色模式',
+        shortLabel: '浅色'
+      },
+      dark: {
+        label: '深色模式',
+        shortLabel: '深色'
+      },
+      auto: {
+        label: '跟随系统',
+        shortLabel: '自动'
+      },
+      toggleTheme: '切换主题',
+      clickToSwitch: '点击切换主题'
+    },
+    logoTitle: {
+      logoAlt: '标志'
+    },
+    languageSwitch: {
+      zhCnName: '简体中文',
+      zhTwName: '繁体中文',
+      enName: '英语',
+      zhCnFlag: '简',
+      zhTwFlag: '繁',
+      enFlag: 'EN'
+    },
+    accountSelector: {
+      searchPlaceholder: '搜索账号名称...',
+      schedulingGroups: '调度分组',
+      membersUnit: '个成员',
+      claudeOAuthAccounts: 'Claude OAuth 专属账号',
+      oauthAccounts: 'OAuth 专属账号',
+      claudeConsoleAccounts: 'Claude Console 专属账号',
+      noResultsFound: '没有找到匹配的账号',
+      selectAccount: '请选择账号',
+      useSharedPool: '使用共享账号池',
+      accountStatus: {
+        unknown: '未知',
+        unauthorized: '未授权',
+        tokenError: 'Token错误',
+        pending: '待验证',
+        rateLimited: '限流中',
+        error: '异常',
+        active: '正常'
+      },
+      dateFormat: {
+        today: '今天创建',
+        yesterday: '昨天创建',
+        daysAgo: '天前'
+      }
+    },
+    customDropdown: {
+      placeholder: '请选择'
+    },
+    // 通用时间与错误
+    time: {
+      justNow: '刚刚',
+      minutesAgo: '{minutes}分钟前',
+      hoursAgo: '{hours}小时前',
+      daysAgo: '{days}天前'
+    },
+    errors: {
+      requestFailed: '请求失败: {status}',
+      loadSupportedClientsFailed: '加载支持的客户端失败'
+    }
   },
   language: {
     zh: '简体中文',
@@ -19,6 +144,38 @@ export default {
     current: '当前语言',
     switch: '切换语言'
   },
+
+  layout: {
+    tabBar: {
+      tabs: {
+        dashboard: {
+          name: '仪表板',
+          shortName: '仪表板'
+        },
+        apiKeys: {
+          name: 'API Keys',
+          shortName: 'API'
+        },
+        accounts: {
+          name: '账户管理',
+          shortName: '账户'
+        },
+        userManagement: {
+          name: '用户管理',
+          shortName: '用户'
+        },
+        tutorial: {
+          name: '使用教程',
+          shortName: '教程'
+        },
+        settings: {
+          name: '系统设置',
+          shortName: '设置'
+        }
+      }
+    }
+  },
+
   header: {
     adminPanel: '管理后台',
     userMenu: '用户菜单',
@@ -204,7 +361,15 @@ export default {
     securityNoticeSingle: '您的 API Key 仅用于查询自己的统计数据，不会被存储或用于其他用途',
     securityNoticeMulti:
       '您的 API Keys 仅用于查询统计数据，不会被存储。聚合模式下部分个体化信息将不显示。',
-    multiKeyTip: '提示：最多支持同时查询 30 个 API Keys。使用 Ctrl+Enter 快速查询。'
+    multiKeyTip: '提示：最多支持同时查询 30 个 API Keys。使用 Ctrl+Enter 快速查询。',
+    errors: {
+      queryStatsFailed: '查询统计数据失败，请检查您的 API Key 是否正确',
+      enterAtLeastOneKey: '请输入至少一个有效的 API Key',
+      batchQueryFailed: '批量查询失败',
+      batchModelStatsFailed: '加载批量模型统计失败',
+      loadModelStatsFailed: '加载模型统计失败',
+      allInvalidKeys: '所有 API Key 都无效'
+    }
   },
 
   // Login page
@@ -215,7 +380,9 @@ export default {
     password: '密码',
     passwordPlaceholder: '请输入密码',
     loginButton: '登录',
-    loggingIn: '登录中...'
+    loggingIn: '登录中...',
+    loginFailed: '登录失败',
+    loginFailedCheck: '登录失败，请检查用户名和密码'
   },
 
   // Dashboard page
@@ -256,6 +423,12 @@ export default {
     tokensPerMinute: '每分钟Token数',
     historicalData: '历史数据',
     minutes: '分钟',
+    // Uptime display formats
+    uptimeFormat: {
+      daysHours: '{days}天 {hours}小时',
+      hoursMinutes: '{hours}小时 {minutes}分钟',
+      minutes: '{minutes}分钟'
+    },
 
     // Charts section
     modelDistributionAndTrend: '模型使用分布与Token使用趋势',
@@ -263,8 +436,9 @@ export default {
     // Date filter presets (would be populated from dateFilter.presetOptions)
     today: '今日',
     yesterday: '昨日',
-    last7Days: '迗 7 天',
-    last30Days: '迗 30 天',
+    dayBefore: '前天',
+    last7Days: '近7天',
+    last30Days: '近30天',
     thisWeek: '本周',
     lastWeek: '上周',
     thisMonth: '本月',
@@ -316,7 +490,53 @@ export default {
     time: '时间',
     date: '日期',
     tokenQuantity: 'Token数量',
-    requestsQuantity: '请求次数'
+    requestsQuantity: '请求次数',
+
+    // Usage Trend component
+    usageTrend: {
+      title: '使用趋势',
+      granularity: {
+        byDay: '按天',
+        byHour: '按小时'
+      },
+      periodOptions: {
+        last24Hours: '24小时',
+        last7Days: '7天',
+        last30Days: '30天',
+        recentDays: '最近{days}天'
+      },
+      chartLabels: {
+        requests: '请求次数',
+        tokens: 'Token使用量',
+        requestsAxis: '请求次数',
+        tokensAxis: 'Token使用量'
+      }
+    },
+
+    // Model Distribution component
+    modelDistribution: {
+      title: '模型使用分布',
+      periods: {
+        daily: '今日',
+        total: '累计'
+      },
+      noData: '暂无模型使用数据',
+      units: {
+        requests: '请求',
+        tokens: 'tokens'
+      },
+      chart: {
+        tooltip: {
+          requests: '请求',
+          tokens: 'Tokens'
+        }
+      }
+    },
+    errors: {
+      rangeTooLongHour: '小时粒度下日期范围不能超过24小时',
+      rangeTooLongDay: '日期范围不能超过 31 天',
+      rangeTooLongHourSwitched: '小时粒度下日期范围不能超过24小时，已切换到近24小时'
+    }
   },
 
   // Accounts page
@@ -1285,6 +1505,52 @@ export default {
       loadStatsFailed: 'Failed to load API keys stats'
     },
 
+    // User API Keys Manager
+    userApiKeysManager: {
+      title: '我的 API Keys',
+      description: '管理您的 API Keys 以访问 Claude Relay 服务',
+      loading: '正在加载 API Keys...',
+      warnings: {
+        maxKeysReached:
+          '您已达到 API Keys 的最大数量限制（{maxApiKeys} 个）。请删除现有的 Key 以创建新的。'
+      },
+      status: {
+        deleted: '已删除',
+        noDescription: '无描述',
+        neverUsed: '从未使用'
+      },
+      dateLabels: {
+        created: '创建时间',
+        deleted: '删除时间',
+        lastUsed: '最后使用',
+        expires: '到期时间'
+      },
+      usage: {
+        requests: '次请求'
+      },
+      actions: {
+        viewApiKey: '查看 API Key',
+        deleteApiKey: '删除 API Key'
+      },
+      buttons: {
+        createApiKey: '创建 API Key',
+        delete: '删除'
+      },
+      emptyState: {
+        title: '无 API Keys',
+        description: '创建您的第一个 API Key 开始使用。'
+      },
+      confirmDelete: {
+        title: '删除 API Key',
+        message: "确定要删除 '{name}' 吗？此操作无法撤销。"
+      },
+      messages: {
+        loadFailed: '加载 API Keys 失败',
+        deleteSuccess: 'API Key 删除成功',
+        deleteFailed: '删除 API Key 失败'
+      }
+    },
+
     // User Login
     login: {
       title: 'User Sign In',
@@ -1300,7 +1566,50 @@ export default {
       // Validation and error messages
       requiredFields: 'Please enter both username and password',
       loginSuccess: 'Login successful!',
-      loginFailed: 'Login failed'
+      loginFailed: 'Login failed',
+      accountDisabled: '您的账号已被禁用'
+    },
+
+    // View API Key Modal
+    viewApiKeyModal: {
+      title: 'API Key 详情',
+      fields: {
+        name: '名称',
+        description: '描述',
+        apiKey: 'API Key',
+        status: '状态',
+        usageStatistics: '使用统计'
+      },
+      apiKeyDisplay: {
+        notAvailable: '不可用',
+        keyPreview: 'cr_****',
+        fullKeyNotice: '完整 API Key 仅在首次创建或重新生成时显示'
+      },
+      buttons: {
+        hide: '隐藏',
+        show: '显示',
+        copy: '复制',
+        close: '关闭'
+      },
+      status: {
+        active: '启用',
+        disabled: '禁用'
+      },
+      usageStats: {
+        requests: '请求次数',
+        inputTokens: '输入令牌',
+        outputTokens: '输出令牌',
+        totalCost: '总费用'
+      },
+      timestamps: {
+        created: '创建时间',
+        lastUsed: '最后使用',
+        expires: '过期时间'
+      },
+      messages: {
+        copySuccess: '已复制到剪贴板！',
+        copyFailed: '复制到剪贴板失败'
+      }
     },
 
     // User Management
@@ -1469,6 +1778,123 @@ export default {
 
       // Success message
       roleUpdated: '用户角色已更新为 {role}'
+    },
+
+    // User Usage Statistics
+    userUsageStats: {
+      // Page header
+      title: '使用统计',
+      subtitle: '查看您的 API 使用统计和费用',
+
+      // Time period selection
+      periodSelection: {
+        day: '最近24小时',
+        week: '最近7天',
+        month: '最近30天',
+        quarter: '最近90天'
+      },
+
+      // Loading state
+      loadingStats: '正在加载使用统计...',
+
+      // Statistics cards
+      statsCards: {
+        totalRequests: '总请求数',
+        inputTokens: '输入Token',
+        outputTokens: '输出Token',
+        totalCost: '总费用'
+      },
+
+      // Daily usage trend chart
+      usageTrend: {
+        title: '日使用趋势',
+        chartTitle: '使用图表',
+        dailyTrendsDescription: '这里将显示日使用趋势',
+        chartIntegrationNote: '(可集成 Chart.js、D3.js 或类似图表库)'
+      },
+
+      // Usage by model section
+      modelUsage: {
+        title: '按模型使用情况',
+        requests: '请求',
+        requestsCount: '{count} 请求'
+      },
+
+      // Usage by API key table
+      apiKeyUsage: {
+        title: '按 API Key 使用情况',
+        headers: {
+          apiKey: 'API Key',
+          requests: '请求数',
+          inputTokens: '输入Token',
+          outputTokens: '输出Token',
+          cost: '费用',
+          status: '状态'
+        },
+        status: {
+          active: '活跃',
+          disabled: '已禁用',
+          deleted: '已删除'
+        }
+      },
+
+      // No data state
+      noData: {
+        title: '暂无使用数据',
+        description:
+          '您还没有发起任何 API 请求。创建一个 API Key 并开始使用服务后，就能看到使用统计了。'
+      },
+
+      // Error messages
+      loadFailed: '加载使用统计失败'
+    },
+
+    // Create API Key Modal
+    createApiKeyModal: {
+      title: '创建新的 API Key',
+
+      // 表单标签和占位符
+      form: {
+        nameLabel: '名称',
+        nameRequired: '*',
+        namePlaceholder: '为您的 API Key 取一个名称',
+        descriptionLabel: '备注',
+        descriptionPlaceholder: '可选的备注信息'
+      },
+
+      // 按钮文本
+      buttons: {
+        cancel: '取消',
+        creating: '创建中...',
+        createApiKey: '创建 API Key',
+        copy: '复制',
+        done: '完成'
+      },
+
+      // 成功状态
+      success: {
+        title: 'API Key 创建成功！',
+        warning: {
+          important: '重要提示：',
+          message: '请立即复制您的 API Key，您将无法再次查看！'
+        }
+      },
+
+      // 错误和验证消息
+      validation: {
+        nameRequired: 'API Key 名称是必填项'
+      },
+
+      errors: {
+        createFailed: '创建 API Key 失败'
+      },
+
+      // Toast 消息
+      messages: {
+        createSuccess: 'API Key 创建成功！',
+        copySuccess: 'API Key 已复制到剪贴板！',
+        copyFailed: '复制到剪贴板失败'
+      }
     }
   },
 
@@ -1495,6 +1921,10 @@ export default {
     removeIcon: '删除',
     iconFormats: '支持 .ico, .png, .jpg, .svg 格式，最大 350KB',
     iconPreview: '图标预览',
+    validation: {
+      iconTooLarge: '图标文件大小不能超过 350KB',
+      iconTypeNotSupported: '不支持的文件类型，请选择 .ico, .png, .jpg 或 .svg 文件'
+    },
 
     adminEntry: '管理入口',
     adminEntryDescription: '登录按钮显示',

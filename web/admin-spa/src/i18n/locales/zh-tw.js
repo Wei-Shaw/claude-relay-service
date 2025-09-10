@@ -1,4 +1,47 @@
 export default {
+  layout: {
+    mainLayout: {
+      comments: {
+        topNavigation: '頂部導航',
+        mainContentArea: '主內容區域',
+        tabBar: '標籤欄',
+        contentArea: '內容區域'
+      },
+      routing: {
+        routeChangeError: '路由切換失敗:',
+        routeNotFound: '路由未找到',
+        defaultToTab: '預設選中儀表板'
+      }
+    },
+    tabBar: {
+      tabs: {
+        dashboard: {
+          name: '儀表板',
+          shortName: '儀表板'
+        },
+        apiKeys: {
+          name: 'API Keys',
+          shortName: 'API'
+        },
+        accounts: {
+          name: '帳戶管理',
+          shortName: '帳戶'
+        },
+        userManagement: {
+          name: '用戶管理',
+          shortName: '用戶'
+        },
+        tutorial: {
+          name: '使用教程',
+          shortName: '教程'
+        },
+        settings: {
+          name: '系統設置',
+          shortName: '設置'
+        }
+      }
+    }
+  },
   common: {
     save: '保存',
     cancel: '取消',
@@ -10,7 +53,89 @@ export default {
     update: '更新',
     search: '搜尋',
     reset: '重置',
-    locale: 'zh-TW'
+    locale: 'zh-TW',
+    toastNotification: {
+      defaultTitles: {
+        success: '成功',
+        error: '錯誤',
+        warning: '警告',
+        info: '資訊'
+      }
+    },
+    confirmDialog: {
+      confirm: '確認',
+      cancel: '取消'
+    },
+    confirmModal: {
+      continue: '繼續',
+      cancel: '取消'
+    },
+    themeToggle: {
+      light: {
+        label: '淺色模式',
+        shortLabel: '淺色'
+      },
+      dark: {
+        label: '深色模式',
+        shortLabel: '深色'
+      },
+      auto: {
+        label: '跟隨系統',
+        shortLabel: '自動'
+      },
+      toggleTheme: '切換主題',
+      clickToSwitch: '點擊切換主題'
+    },
+    logoTitle: {
+      logoAlt: '標誌'
+    },
+    languageSwitch: {
+      zhCnName: '簡體中文',
+      zhTwName: '繁體中文',
+      enName: '英語',
+      zhCnFlag: '簡',
+      zhTwFlag: '繁',
+      enFlag: 'EN'
+    },
+    accountSelector: {
+      searchPlaceholder: '搜尋帳號名稱...',
+      schedulingGroups: '調度分組',
+      membersUnit: '個成員',
+      claudeOAuthAccounts: 'Claude OAuth 專屬帳號',
+      oauthAccounts: 'OAuth 專屬帳號',
+      claudeConsoleAccounts: 'Claude Console 專屬帳號',
+      noResultsFound: '沒有找到匹配的帳號',
+      selectAccount: '請選擇帳號',
+      useSharedPool: '使用共享帳號池',
+      accountStatus: {
+        unknown: '未知',
+        unauthorized: '未授權',
+        tokenError: 'Token錯誤',
+        pending: '待驗證',
+        rateLimited: '限流中',
+        error: '異常',
+        active: '正常'
+      },
+      dateFormat: {
+        today: '今天建立',
+        yesterday: '昨天建立',
+        daysAgo: '天前'
+      }
+    },
+    customDropdown: {
+      placeholder: '請選擇'
+    },
+    // 通用時間與錯誤
+    time: {
+      justNow: '剛剛',
+      minutesAgo: '{minutes}分鐘前',
+      hoursAgo: '{hours}小時前',
+      daysAgo: '{days}天前'
+    },
+    errors: {
+      requestFailed: '請求失敗: {status}',
+      loadSupportedClientsFailed: '載入支援的客戶端失敗'
+    }
   },
   language: {
     zh: '簡體中文',
@@ -204,7 +329,15 @@ export default {
     securityNoticeSingle: '您的 API Key 僅用於查詢自己的統計資料，不會被儲存或用於其他用途',
     securityNoticeMulti:
       '您的 API Keys 僅用於查詢統計資料，不會被儲存。彙整模式下部分個體化資訊將不顯示。',
-    multiKeyTip: '提示：最多支援同時查詢 30 個 API Keys。使用 Ctrl+Enter 快速查詢。'
+    multiKeyTip: '提示：最多支援同時查詢 30 個 API Keys。使用 Ctrl+Enter 快速查詢。',
+    errors: {
+      queryStatsFailed: '查詢統計資料失敗，請檢查您的 API Key 是否正確',
+      enterAtLeastOneKey: '請輸入至少一個有效的 API Key',
+      batchQueryFailed: '批次查詢失敗',
+      batchModelStatsFailed: '載入批次模型統計失敗',
+      loadModelStatsFailed: '載入模型統計失敗',
+      allInvalidKeys: '所有 API Key 都無效'
+    }
   },
 
   // Login page
@@ -215,7 +348,9 @@ export default {
     password: '密碼',
     passwordPlaceholder: '請輸入密碼',
     loginButton: '登錄',
-    loggingIn: '登錄中...'
+    loggingIn: '登錄中...',
+    loginFailed: '登入失敗',
+    loginFailedCheck: '登入失敗，請檢查使用者名稱與密碼'
   },
 
   // Dashboard page
@@ -255,7 +390,13 @@ export default {
     requestsPerMinute: '每分钟請求數',
     tokensPerMinute: '每分钟Token數',
     historicalData: '歷史資料',
-    minutes: '分钟',
+    minutes: '分鐘',
+    // Uptime display formats
+    uptimeFormat: {
+      daysHours: '{days}天 {hours}小時',
+      hoursMinutes: '{hours}小時 {minutes}分鐘',
+      minutes: '{minutes}分鐘'
+    },
 
     // Charts section
     modelDistributionAndTrend: '模型使用分佈與Token使用趋勢',
@@ -263,8 +404,9 @@ export default {
     // Date filter presets
     today: '今日',
     yesterday: '昨日',
-    last7Days: '近 7 天',
-    last30Days: '近 30 天',
+    dayBefore: '前天',
+    last7Days: '近7天',
+    last30Days: '近30天',
     thisWeek: '本週',
     lastWeek: '上週',
     thisMonth: '本月',
@@ -279,6 +421,13 @@ export default {
     endDatePlaceholder: '結束日期',
     dateSeparator: '至',
     maxHours24: '最多24小時',
+
+    // Errors
+    errors: {
+      rangeTooLongHour: '小時粒度下日期範圍不能超過24小時',
+      rangeTooLongDay: '日期範圍不能超過 31 天',
+      rangeTooLongHourSwitched: '小時粒度超過24小時，已切換為近24小時'
+    },
 
     // Auto refresh controls
     autoRefresh: '自動刷新',
@@ -316,7 +465,48 @@ export default {
     time: '時間',
     date: '日期',
     tokenQuantity: 'Token數量',
-    requestsQuantity: '請求次數'
+    requestsQuantity: '請求次數',
+
+    // Usage Trend component
+    usageTrend: {
+      title: '使用趨勢',
+      granularity: {
+        byDay: '按天',
+        byHour: '按小時'
+      },
+      periodOptions: {
+        last24Hours: '24小時',
+        last7Days: '7天',
+        last30Days: '30天',
+        recentDays: '最近{days}天'
+      },
+      chartLabels: {
+        requests: '請求次數',
+        tokens: 'Token使用量',
+        requestsAxis: '請求次數',
+        tokensAxis: 'Token使用量'
+      }
+    },
+
+    // Model Distribution component
+    modelDistribution: {
+      title: '模型使用分佈',
+      periods: {
+        daily: '今日',
+        total: '累計'
+      },
+      noData: '暫無模型使用資料',
+      units: {
+        requests: '請求',
+        tokens: 'tokens'
+      },
+      chart: {
+        tooltip: {
+          requests: '請求',
+          tokens: 'Tokens'
+        }
+      }
+    }
   },
 
   // Accounts page
@@ -1246,6 +1436,52 @@ export default {
       loadStatsFailed: 'Failed to load API keys stats'
     },
 
+    // User API Keys Manager
+    userApiKeysManager: {
+      title: '我的 API Keys',
+      description: '管理您的 API Keys 以存取 Claude Relay 服務',
+      loading: '正在載入 API Keys...',
+      warnings: {
+        maxKeysReached:
+          '您已達到 API Keys 的最大數量限制（{maxApiKeys} 個）。請刪除現有的 Key 以建立新的。'
+      },
+      status: {
+        deleted: '已刪除',
+        noDescription: '無描述',
+        neverUsed: '從未使用'
+      },
+      dateLabels: {
+        created: '建立時間',
+        deleted: '刪除時間',
+        lastUsed: '最後使用',
+        expires: '到期時間'
+      },
+      usage: {
+        requests: '次請求'
+      },
+      actions: {
+        viewApiKey: '檢視 API Key',
+        deleteApiKey: '刪除 API Key'
+      },
+      buttons: {
+        createApiKey: '建立 API Key',
+        delete: '刪除'
+      },
+      emptyState: {
+        title: '無 API Keys',
+        description: '建立您的第一個 API Key 開始使用。'
+      },
+      confirmDelete: {
+        title: '刪除 API Key',
+        message: "確定要刪除 '{name}' 嗎？此操作無法撤銷。"
+      },
+      messages: {
+        loadFailed: '載入 API Keys 失败',
+        deleteSuccess: 'API Key 刪除成功',
+        deleteFailed: '刪除 API Key 失败'
+      }
+    },
+
     // User Login
     login: {
       title: 'User Sign In',
@@ -1261,7 +1497,50 @@ export default {
       // Validation and error messages
       requiredFields: 'Please enter both username and password',
       loginSuccess: 'Login successful!',
-      loginFailed: 'Login failed'
+      loginFailed: 'Login failed',
+      accountDisabled: '您的帳號已被停用'
+    },
+
+    // View API Key Modal
+    viewApiKeyModal: {
+      title: 'API Key 詳情',
+      fields: {
+        name: '名稱',
+        description: '描述',
+        apiKey: 'API Key',
+        status: '狀態',
+        usageStatistics: '使用統計'
+      },
+      apiKeyDisplay: {
+        notAvailable: '不可用',
+        keyPreview: 'cr_****',
+        fullKeyNotice: '完整 API Key 僅在首次建立或重新產生時顯示'
+      },
+      buttons: {
+        hide: '隱藏',
+        show: '顯示',
+        copy: '複製',
+        close: '關閉'
+      },
+      status: {
+        active: '啟用',
+        disabled: '停用'
+      },
+      usageStats: {
+        requests: '請求次數',
+        inputTokens: '輸入權杖',
+        outputTokens: '輸出權杖',
+        totalCost: '總費用'
+      },
+      timestamps: {
+        created: '建立時間',
+        lastUsed: '最後使用',
+        expires: '過期時間'
+      },
+      messages: {
+        copySuccess: '已複製到剪貼簿！',
+        copyFailed: '複製到剪貼簿失敗'
+      }
     },
 
     // User Management
@@ -1432,6 +1711,75 @@ export default {
       roleUpdated: '使用者角色已更新為 {role}'
     },
 
+    // User Usage Statistics
+    userUsageStats: {
+      // Page header
+      title: '使用統計',
+      subtitle: '檢視您的 API 使用統計和費用',
+
+      // Time period selection
+      periodSelection: {
+        day: '最近24小時',
+        week: '最近7天',
+        month: '最近30天',
+        quarter: '最近90天'
+      },
+
+      // Loading state
+      loadingStats: '正在載入使用統計...',
+
+      // Statistics cards
+      statsCards: {
+        totalRequests: '總請求數',
+        inputTokens: '輸入Token',
+        outputTokens: '輸出Token',
+        totalCost: '總費用'
+      },
+
+      // Daily usage trend chart
+      usageTrend: {
+        title: '日使用趨勢',
+        chartTitle: '使用圖表',
+        dailyTrendsDescription: '這裡將顯示日使用趨勢',
+        chartIntegrationNote: '(可整合 Chart.js、D3.js 或類似圖表庫)'
+      },
+
+      // Usage by model section
+      modelUsage: {
+        title: '按模型使用情況',
+        requests: '請求',
+        requestsCount: '{count} 請求'
+      },
+
+      // Usage by API key table
+      apiKeyUsage: {
+        title: '按 API Key 使用情況',
+        headers: {
+          apiKey: 'API Key',
+          requests: '請求數',
+          inputTokens: '輸入Token',
+          outputTokens: '輸出Token',
+          cost: '費用',
+          status: '狀態'
+        },
+        status: {
+          active: '活躍',
+          disabled: '已停用',
+          deleted: '已刪除'
+        }
+      },
+
+      // No data state
+      noData: {
+        title: '暫無使用資料',
+        description:
+          '您還沒有發起任何 API 請求。建立一個 API Key 並開始使用服務後，就能看到使用統計了。'
+      },
+
+      // Error messages
+      loadFailed: '載入使用統計失敗'
+    },
+
     // Usage Detail Modal
     usageDetailModal: {
       title: '使用統計詳情',
@@ -1470,6 +1818,54 @@ export default {
 
       // Progress indicators
       usedPercentage: '已使用 {percentage}%'
+    },
+
+    // Create API Key Modal
+    createApiKeyModal: {
+      title: '建立新的 API Key',
+
+      // 表單標籤和占位符
+      form: {
+        nameLabel: '名稱',
+        nameRequired: '*',
+        namePlaceholder: '為您的 API Key 取一個名稱',
+        descriptionLabel: '備註',
+        descriptionPlaceholder: '可選的備註資訊'
+      },
+
+      // 按鈕文本
+      buttons: {
+        cancel: '取消',
+        creating: '建立中...',
+        createApiKey: '建立 API Key',
+        copy: '複製',
+        done: '完成'
+      },
+
+      // 成功狀態
+      success: {
+        title: 'API Key 建立成功！',
+        warning: {
+          important: '重要提示：',
+          message: '請立即複製您的 API Key，您將無法再次查看！'
+        }
+      },
+
+      // 錯誤和驗證訊息
+      validation: {
+        nameRequired: 'API Key 名稱是必填項'
+      },
+
+      errors: {
+        createFailed: '建立 API Key 失敗'
+      },
+
+      // Toast 訊息
+      messages: {
+        createSuccess: 'API Key 建立成功！',
+        copySuccess: 'API Key 已複製到剪貼簿！',
+        copyFailed: '複製到剪貼簿失敗'
+      }
     }
   },
 
@@ -1496,6 +1892,10 @@ export default {
     removeIcon: '刪除',
     iconFormats: '支援 .ico, .png, .jpg, .svg 格式，最大 350KB',
     iconPreview: '圖標預覽',
+    validation: {
+      iconTooLarge: '圖標文件大小不能超過 350KB',
+      iconTypeNotSupported: '不支援的文件類型，請選擇 .ico, .png, .jpg 或 .svg 文件'
+    },
 
     adminEntry: '管理入口',
     adminEntryDescription: '登入按鈕顯示',
