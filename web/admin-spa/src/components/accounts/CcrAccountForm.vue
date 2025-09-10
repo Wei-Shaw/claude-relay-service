@@ -229,9 +229,6 @@
 
           <!-- 代理配置 -->
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >代理设置 (可选)</label
-            >
             <ProxyConfig v-model="form.proxy" />
           </div>
 

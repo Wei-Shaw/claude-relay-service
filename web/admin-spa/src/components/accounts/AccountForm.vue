@@ -289,19 +289,18 @@
                             : 'border-gray-300 bg-white hover:border-cyan-400 hover:bg-cyan-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-cyan-500 dark:hover:bg-cyan-900/20'
                         ]"
                       >
-                        <input
-                          v-model="form.platform"
-                          class="sr-only"
-                          type="radio"
-                          value="ccr"
-                        />
+                        <input v-model="form.platform" class="sr-only" type="radio" value="ccr" />
                         <div class="flex items-center gap-2">
-                          <i class="fas fa-code-branch text-sm text-cyan-600 dark:text-cyan-400"></i>
+                          <i
+                            class="fas fa-code-branch text-sm text-cyan-600 dark:text-cyan-400"
+                          ></i>
                           <div>
                             <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
                               >CCR</span
                             >
-                            <span class="text-xs text-gray-500 dark:text-gray-400">Claude Connector</span>
+                            <span class="text-xs text-gray-500 dark:text-gray-400"
+                              >Claude Code Router</span
+                            >
                           </div>
                         </div>
                         <div
@@ -1226,21 +1225,8 @@
                 </p>
               </div>
 
-              <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >限流时长（分钟）</label
-                >
-                <input
-                  v-model.number="form.rateLimitDuration"
-                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                  min="1"
-                  placeholder="60"
-                  type="number"
-                />
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  遇到 429 错误时的限流等待时间，默认 60 分钟
-                </p>
-              </div>
+              <!-- 限流时长字段 - 隐藏不显示，使用默认值60 -->
+              <input v-model.number="form.rateLimitDuration" type="hidden" value="60" />
             </div>
 
             <!-- Claude 订阅类型选择 -->
@@ -2369,17 +2355,8 @@
               </p>
             </div>
 
-            <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">限流时长（分钟）</label>
-              <input
-                v-model.number="form.rateLimitDuration"
-                class="form-input w-full"
-                min="1"
-                placeholder="60"
-                type="number"
-              />
-              <p class="mt-1 text-xs text-gray-500">遇到 429 错误时的限流等待时间，默认 60 分钟</p>
-            </div>
+            <!-- 限流时长字段 - 隐藏不显示，保持原值 -->
+            <input v-model.number="form.rateLimitDuration" type="hidden" />
 
             <!-- 额度管理字段 -->
             <div class="grid grid-cols-2 gap-4">
@@ -2632,7 +2609,8 @@
             v-if="
               form.platform !== 'claude-console' &&
               form.platform !== 'bedrock' &&
-              form.platform !== 'azure_openai'
+              form.platform !== 'azure_openai' &&
+              form.platform !== 'openai-responses'
             "
             class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-900/30"
           >
@@ -3453,7 +3431,7 @@ const createAccount = async () => {
       data.apiKey = form.value.apiKey
       data.userAgent = form.value.userAgent || ''
       data.priority = form.value.priority || 50
-      data.rateLimitDuration = form.value.rateLimitDuration || 60
+      data.rateLimitDuration = 60 // 默认值60，不从用户输入获取
       data.dailyQuota = form.value.dailyQuota || 0
       data.quotaResetTime = form.value.quotaResetTime || '00:00'
     } else if (form.value.platform === 'bedrock') {
@@ -3702,7 +3680,7 @@ const updateAccount = async () => {
       }
       data.userAgent = form.value.userAgent || ''
       data.priority = form.value.priority || 50
-      data.rateLimitDuration = form.value.rateLimitDuration || 60
+      // 编辑时不上传 rateLimitDuration，保持原值
       data.dailyQuota = form.value.dailyQuota || 0
       data.quotaResetTime = form.value.quotaResetTime || '00:00'
     }
@@ -3862,7 +3840,15 @@ const showGroupManagement = ref(false)
 
 // 根据平台筛选分组
 const filteredGroups = computed(() => {
-  const platformFilter = form.value.platform === 'claude-console' ? 'claude' : form.value.platform
+  let platformFilter = form.value.platform
+  // Claude Console 使用 Claude 分组
+  if (form.value.platform === 'claude-console') {
+    platformFilter = 'claude'
+  }
+  // OpenAI-Responses 使用 OpenAI 分组
+  else if (form.value.platform === 'openai-responses') {
+    platformFilter = 'openai'
+  }
   return groups.value.filter((g) => g.platform === platformFilter)
 })
 
@@ -4155,6 +4141,8 @@ watch(
         azureEndpoint: newAccount.azureEndpoint || '',
         apiVersion: newAccount.apiVersion || '',
         deploymentName: newAccount.deploymentName || '',
+        // OpenAI-Responses 特定字段
+        baseApi: newAccount.baseApi || '',
         // 额度管理字段
         dailyQuota: newAccount.dailyQuota || 0,
         dailyUsage: newAccount.dailyUsage || 0,
@@ -4176,6 +4164,18 @@ watch(
           if (newAccount.groupInfo && newAccount.groupInfo.id) {
             form.value.groupId = newAccount.groupInfo.id
             foundGroupIds.push(newAccount.groupInfo.id)
+          } else if (newAccount.groupId) {
+            // 如果账户有 groupId 字段，直接使用（OpenAI-Responses 等账户）
+            form.value.groupId = newAccount.groupId
+            foundGroupIds.push(newAccount.groupId)
+          } else if (
+            newAccount.groupIds &&
+            Array.isArray(newAccount.groupIds) &&
+            newAccount.groupIds.length > 0
+          ) {
+            // 如果账户有 groupIds 数组，使用它
+            form.value.groupId = newAccount.groupIds[0]
+            foundGroupIds.push(...newAccount.groupIds)
           } else {
             // 否则查找账户所属的分组
             const checkPromises = groups.value.map(async (group) => {
