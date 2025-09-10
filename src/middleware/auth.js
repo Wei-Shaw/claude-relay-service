@@ -373,6 +373,92 @@ const authenticateApiKey = async (req, res, next) => {
       }
     }
 
+    // 🔒 安全检查 GPT-5 High 推理级别周费用限制
+    const weeklyGPT5HighCostLimit = parseFloat(validation.keyData.weeklyGPT5HighCostLimit) || 0
+    
+    if (weeklyGPT5HighCostLimit > 0) {
+      try {
+        // 从请求中获取模型和推理级别信息
+        const requestBody = req.body || {}
+        const model = String(requestBody.model || '').toLowerCase()
+        
+        // 只对 GPT-5 模型进行检查
+        if (model.includes('gpt-5')) {
+          // 安全提取推理级别
+          let detectedLevel = 'medium' // 默认值
+          
+          try {
+            // 多种方式提取推理级别
+            detectedLevel = requestBody.reasoning_effort || 
+                           requestBody.model_reasoning_effort ||
+                           req.headers['reasoning-effort'] ||
+                           'medium'
+            
+            // 检查 reasoning 字段
+            const reasoningField = requestBody.reasoning
+            if (reasoningField) {
+              if (typeof reasoningField === 'string') {
+                if (reasoningField.includes('high') || reasoningField.includes('maximum')) {
+                  detectedLevel = 'high'
+                }
+              } else if (typeof reasoningField === 'object' && reasoningField.effort) {
+                detectedLevel = reasoningField.effort
+              }
+            }
+            
+            // 确保级别值是字符串
+            detectedLevel = String(detectedLevel).toLowerCase()
+          } catch (levelError) {
+            logger.warn('Error extracting reasoning level, using default:', levelError)
+            detectedLevel = 'medium'
+          }
+          
+          // 只对 High 级别进行限制检查
+          if (detectedLevel === 'high') {
+            const weeklyGPT5HighCost = parseFloat(validation.keyData.weeklyGPT5HighCost) || 0
+            
+            if (weeklyGPT5HighCost >= weeklyGPT5HighCostLimit) {
+              logger.security(
+                `💰 Weekly GPT-5 High cost limit exceeded for key: ${validation.keyData.id} (${validation.keyData.name}), cost: $${weeklyGPT5HighCost.toFixed(2)}/$${weeklyGPT5HighCostLimit}`
+              )
+              
+              // 安全计算下周一的重置时间
+              let resetDate
+              try {
+                const now = new Date()
+                const nextMonday = new Date(now)
+                nextMonday.setDate(now.getDate() + (7 - now.getDay() + 1) % 7 || 7)
+                nextMonday.setHours(0, 0, 0, 0)
+                resetDate = nextMonday
+              } catch (dateError) {
+                logger.warn('Error calculating reset date:', dateError)
+                resetDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7天后
+              }
+              
+              return res.status(429).json({
+                error: 'Weekly GPT-5 High cost limit exceeded',
+                message: `已达到 GPT-5 High推理级别周费用限制 ($${weeklyGPT5HighCostLimit})`,
+                currentCost: weeklyGPT5HighCost,
+                costLimit: weeklyGPT5HighCostLimit,
+                reasoningLevel: 'high',
+                resetAt: resetDate.toISOString()
+              })
+            }
+            
+            // 记录使用情况（不影响性能）
+            if (weeklyGPT5HighCostLimit > 0) {
+              logger.api(
+                `💰 GPT-5 High weekly cost usage for key: ${validation.keyData.id} (${validation.keyData.name}), current: $${weeklyGPT5HighCost.toFixed(2)}/$${weeklyGPT5HighCostLimit} (${((weeklyGPT5HighCost / weeklyGPT5HighCostLimit) * 100).toFixed(1)}%)`
+              )
+            }
+          }
+        }
+      } catch (gpt5Error) {
+        logger.warn('Error in GPT-5 High cost check, continuing with request:', gpt5Error)
+        // 发生错误时不阻止请求，确保服务可用性
+      }
+    }
+
     // 将验证信息添加到请求对象（只包含必要信息）
     req.apiKey = {
       id: validation.keyData.id,
