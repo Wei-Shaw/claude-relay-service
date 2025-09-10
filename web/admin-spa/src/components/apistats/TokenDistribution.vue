@@ -51,9 +51,9 @@
     </div>
     <div class="mt-3 border-t border-gray-200 pt-3 dark:border-gray-700 md:mt-4 md:pt-4">
       <div class="flex items-center justify-between font-bold text-gray-900 dark:text-gray-100">
-        <span class="text-sm md:text-base"
-          >{{ statsPeriod === 'daily' ? t('apiStats.todayTotal') : t('apiStats.monthlyTotal') }}</span
-        >
+        <span class="text-sm md:text-base">{{
+          statsPeriod === 'daily' ? t('apiStats.todayTotal') : t('apiStats.monthlyTotal')
+        }}</span>
         <span class="text-lg md:text-xl">{{ formatNumber(currentPeriodData.allTokens) }}</span>
       </div>
     </div>

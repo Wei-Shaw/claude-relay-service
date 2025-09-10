@@ -6,7 +6,9 @@
         <i class="fas fa-chart-line mr-3" />
         {{ t('apiStats.usageStatsQuery') }}
       </h2>
-      <p class="text-base text-gray-600 dark:text-gray-400">{{ t('apiStats.apiKeyDescription') }}</p>
+      <p class="text-base text-gray-600 dark:text-gray-400">
+        {{ t('apiStats.apiKeyDescription') }}
+      </p>
     </div>
 
     <!-- 输入区域 -->

@@ -1,14 +1,18 @@
 <template>
   <div class="space-y-4">
     <div class="flex items-center justify-between">
-      <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('proxyConfig.title') }}</h4>
+      <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+        {{ t('proxyConfig.title') }}
+      </h4>
       <label class="flex cursor-pointer items-center">
         <input
           v-model="proxy.enabled"
           class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-blue-600 focus:ring-blue-500"
           type="checkbox"
         />
-        <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">{{ t('proxyConfig.enableProxy') }}</span>
+        <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">{{
+          t('proxyConfig.enableProxy')
+        }}</span>
       </label>
     </div>
 
@@ -70,9 +74,9 @@
       <div class="my-3 border-t border-gray-200 dark:border-gray-600"></div>
 
       <div>
-        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-          >{{ t('proxyConfig.proxyType') }}</label
-        >
+        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{
+          t('proxyConfig.proxyType')
+        }}</label>
         <select
           v-model="proxy.type"
           class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
@@ -85,9 +89,9 @@
 
       <div class="grid grid-cols-2 gap-4">
         <div>
-          <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-            >{{ t('proxyConfig.hostAddress') }}</label
-          >
+          <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{
+            t('proxyConfig.hostAddress')
+          }}</label>
           <input
             v-model="proxy.host"
             class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -96,9 +100,9 @@
           />
         </div>
         <div>
-          <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-            >{{ t('proxyConfig.port') }}</label
-          >
+          <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{
+            t('proxyConfig.port')
+          }}</label>
           <input
             v-model="proxy.port"
             class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -126,9 +130,9 @@
 
         <div v-if="showAuth" class="grid grid-cols-2 gap-4">
           <div>
-            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-              >{{ t('proxyConfig.username') }}</label
-            >
+            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{
+              t('proxyConfig.username')
+            }}</label>
             <input
               v-model="proxy.username"
               class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -137,9 +141,9 @@
             />
           </div>
           <div>
-            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-              >{{ t('proxyConfig.password') }}</label
-            >
+            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{
+              t('proxyConfig.password')
+            }}</label>
             <div class="relative">
               <input
                 v-model="proxy.password"

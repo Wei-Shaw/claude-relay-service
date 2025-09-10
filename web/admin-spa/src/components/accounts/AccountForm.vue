@@ -65,9 +65,9 @@
         <div v-if="oauthStep === 1 && !isEdit">
           <div class="space-y-6">
             <div v-if="!isEdit">
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >{{ t('accountForm.platform') }}</label
-              >
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                t('accountForm.platform')
+              }}</label>
               <div class="flex gap-4">
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -76,7 +76,9 @@
                     type="radio"
                     value="claude"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.platformClaude') }}</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    t('accountForm.platformClaude')
+                  }}</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -85,7 +87,9 @@
                     type="radio"
                     value="claude-console"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.platformClaudeConsole') }}</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    t('accountForm.platformClaudeConsole')
+                  }}</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -94,7 +98,9 @@
                     type="radio"
                     value="gemini"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.platformGemini') }}</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    t('accountForm.platformGemini')
+                  }}</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -103,7 +109,9 @@
                     type="radio"
                     value="openai"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.platformOpenAI') }}</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    t('accountForm.platformOpenAI')
+                  }}</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -112,7 +120,9 @@
                     type="radio"
                     value="azure_openai"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.platformAzureOpenAI') }}</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    t('accountForm.platformAzureOpenAI')
+                  }}</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -121,7 +131,9 @@
                     type="radio"
                     value="bedrock"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.platformBedrock') }}</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    t('accountForm.platformBedrock')
+                  }}</span>
                 </label>
               </div>
             </div>
@@ -134,9 +146,9 @@
                 form.platform !== 'azure_openai'
               "
             >
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >{{ t('accountForm.addMethod') }}</label
-              >
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                t('accountForm.addMethod')
+              }}</label>
               <div class="flex flex-wrap gap-4">
                 <label v-if="form.platform === 'claude'" class="flex cursor-pointer items-center">
                   <input
@@ -145,7 +157,9 @@
                     type="radio"
                     value="setup-token"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.addTypeSetupToken') }}</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    t('accountForm.addTypeSetupToken')
+                  }}</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -154,7 +168,9 @@
                     type="radio"
                     value="oauth"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.addTypeOAuth') }}</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    t('accountForm.addTypeOAuth')
+                  }}</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -163,17 +179,17 @@
                     type="radio"
                     value="manual"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300"
-                    >{{ t('accountForm.addTypeManual') }}</span
-                  >
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    t('accountForm.addTypeManual')
+                  }}</span>
                 </label>
               </div>
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >{{ t('accountForm.accountName') }}</label
-              >
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                t('accountForm.accountName')
+              }}</label>
               <input
                 v-model="form.name"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -188,9 +204,9 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >{{ t('accountForm.descriptionOptional') }}</label
-              >
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                t('accountForm.descriptionOptional')
+              }}</label>
               <textarea
                 v-model="form.description"
                 class="form-input w-full resize-none border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -200,9 +216,9 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >{{ t('accountForm.accountType') }}</label
-              >
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                t('accountForm.accountType')
+              }}</label>
               <div class="flex gap-4">
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -211,7 +227,9 @@
                     type="radio"
                     value="shared"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.accountTypeShared') }}</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    t('accountForm.accountTypeShared')
+                  }}</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -220,7 +238,9 @@
                     type="radio"
                     value="dedicated"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.accountTypeDedicated') }}</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    t('accountForm.accountTypeDedicated')
+                  }}</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -229,7 +249,9 @@
                     type="radio"
                     value="group"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.accountTypeGroup') }}</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    t('accountForm.accountTypeGroup')
+                  }}</span>
                 </label>
               </div>
               <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
@@ -239,9 +261,9 @@
 
             <!-- {{ t('accountForm.groupSelector') }} -->
             <div v-if="form.accountType === 'group'">
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >{{ t('accountForm.selectGroupRequired') }}</label
-              >
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                t('accountForm.selectGroupRequired')
+              }}</label>
               <div class="flex gap-2">
                 <div class="flex-1">
                   <!-- {{ t('accountForm.multiSelectGroup') }} -->
@@ -266,7 +288,8 @@
                         :value="group.id"
                       />
                       <span class="text-sm text-gray-700 dark:text-gray-200">
-                        {{ group.name }} ({{ group.memberCount || 0 }} {{ t('accountForm.memberCount') }})
+                        {{ group.name }} ({{ group.memberCount || 0 }}
+                        {{ t('accountForm.memberCount') }})
                       </span>
                     </label>
                     <!-- {{ t('accountForm.newGroupOption') }} -->
@@ -294,9 +317,9 @@
 
             <!-- {{ t('accountForm.geminiProjectId') }} -->
             <div v-if="form.platform === 'gemini'">
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >{{ t('accountForm.projectIdOptional') }}</label
-              >
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                t('accountForm.projectIdOptional')
+              }}</label>
               <input
                 v-model="form.projectId"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -342,9 +365,9 @@
             <!-- {{ t('accountForm.bedrockFields') }} -->
             <div v-if="form.platform === 'bedrock' && !isEdit" class="space-y-4">
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >{{ t('accountForm.awsAccessKeyId') }}</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.awsAccessKeyId')
+                }}</label>
                 <input
                   v-model="form.accessKeyId"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -359,9 +382,9 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >{{ t('accountForm.awsSecretAccessKey') }}</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.awsSecretAccessKey')
+                }}</label>
                 <input
                   v-model="form.secretAccessKey"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -376,9 +399,9 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >{{ t('accountForm.awsRegion') }}</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.awsRegion')
+                }}</label>
                 <input
                   v-model="form.region"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -410,9 +433,9 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >{{ t('accountForm.sessionTokenOptional') }}</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.sessionTokenOptional')
+                }}</label>
                 <input
                   v-model="form.sessionToken"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -425,9 +448,9 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >{{ t('accountForm.defaultModelLabel') }}</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.defaultModelLabel')
+                }}</label>
                 <input
                   v-model="form.defaultModel"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -454,9 +477,9 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >{{ t('accountForm.smallFastModelLabel') }}</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.smallFastModelLabel')
+                }}</label>
                 <input
                   v-model="form.smallFastModel"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -472,9 +495,9 @@
             <!-- {{ t('accountForm.azureOpenAIFields') }} -->
             <div v-if="form.platform === 'azure_openai' && !isEdit" class="space-y-4">
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >{{ t('accountForm.azureEndpoint') }}</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.azureEndpoint')
+                }}</label>
                 <input
                   v-model="form.azureEndpoint"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -492,9 +515,9 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >{{ t('accountForm.azureApiVersion') }}</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.azureApiVersion')
+                }}</label>
                 <input
                   v-model="form.apiVersion"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -507,9 +530,9 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >{{ t('accountForm.azureDeploymentName') }}</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.azureDeploymentName')
+                }}</label>
                 <input
                   v-model="form.deploymentName"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -527,9 +550,9 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >{{ t('accountForm.azureApiKey') }}</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.azureApiKey')
+                }}</label>
                 <input
                   v-model="form.apiKey"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -547,9 +570,9 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >{{ t('accountForm.azureSupportedModels') }}</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.azureSupportedModels')
+                }}</label>
                 <div class="flex flex-wrap gap-2">
                   <label
                     v-for="model in [
@@ -583,9 +606,9 @@
 
             <div v-if="form.platform === 'bedrock' && !isEdit">
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >{{ t('accountForm.rateLimitMechanism') }}</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.rateLimitMechanism')
+                }}</label>
                 <div class="mb-3">
                   <label class="inline-flex cursor-pointer items-center">
                     <input
@@ -593,7 +616,9 @@
                       class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700"
                       type="checkbox"
                     />
-                    <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.enableRateLimitMechanism') }}</span>
+                    <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                      t('accountForm.enableRateLimitMechanism')
+                    }}</span>
                   </label>
                   <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     {{ t('accountForm.rateLimitDescription2') }}
@@ -601,7 +626,8 @@
                 </div>
 
                 <div v-if="form.enableRateLimit">
-                  <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  <label
+                    class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                     >{{ t('accountForm.rateLimitDurationMinutes') }}</label
                   >
                   <input
@@ -621,9 +647,9 @@
             <!-- {{ t('accountForm.claudeConsoleFields') }} -->
             <div v-if="form.platform === 'claude-console' && !isEdit" class="space-y-4">
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >{{ t('accountForm.apiUrlRequired') }}</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.apiUrlRequired')
+                }}</label>
                 <input
                   v-model="form.apiUrl"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -638,9 +664,9 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >{{ t('accountForm.apiKeyRequired') }}</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.apiKeyRequired')
+                }}</label>
                 <input
                   v-model="form.apiKey"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -690,9 +716,9 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >{{ t('accountForm.modelMappingTableOptional') }}</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.modelMappingTableOptional')
+                }}</label>
                 <div class="mb-3 rounded-lg bg-blue-50 p-3 dark:bg-blue-900/30">
                   <p class="text-xs text-blue-700 dark:text-blue-400">
                     <i class="fas fa-info-circle mr-1" />
@@ -785,9 +811,9 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >{{ t('accountForm.customUserAgentOptional') }}</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.customUserAgentOptional')
+                }}</label>
                 <input
                   v-model="form.userAgent"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -800,9 +826,9 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >{{ t('accountForm.rateLimitMechanism') }}</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.rateLimitMechanism')
+                }}</label>
                 <div class="mb-3">
                   <label class="inline-flex cursor-pointer items-center">
                     <input
@@ -810,7 +836,9 @@
                       class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700"
                       type="checkbox"
                     />
-                    <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.enableRateLimitMechanism') }}</span>
+                    <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                      t('accountForm.enableRateLimitMechanism')
+                    }}</span>
                   </label>
                   <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     {{ t('accountForm.rateLimitDescription2') }}
@@ -818,7 +846,8 @@
                 </div>
 
                 <div v-if="form.enableRateLimit">
-                  <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  <label
+                    class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                     >{{ t('accountForm.rateLimitDurationMinutes') }}</label
                   >
                   <input
@@ -837,9 +866,9 @@
 
             <!-- {{ t('accountForm.subscriptionType') }} -->
             <div v-if="form.platform === 'claude'">
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >{{ t('accountForm.subscriptionType') }}</label
-              >
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                t('accountForm.subscriptionType')
+              }}</label>
               <div class="flex gap-4">
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -848,7 +877,9 @@
                     type="radio"
                     value="claude_max"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.claudeMaxDisplay') }}</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    t('accountForm.claudeMaxDisplay')
+                  }}</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -857,7 +888,9 @@
                     type="radio"
                     value="claude_pro"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.claudeProDisplay') }}</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    t('accountForm.claudeProDisplay')
+                  }}</span>
                 </label>
               </div>
               <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
@@ -913,7 +946,9 @@
                       >
                         <i v-if="!clearingCache" class="fas fa-trash-alt mr-1"></i>
                         <div v-else class="loading-spinner mr-1"></div>
-                        {{ clearingCache ? t('accountForm.clearing') : t('accountForm.clearCache') }}
+                        {{
+                          clearingCache ? t('accountForm.clearing') : t('accountForm.clearCache')
+                        }}
                       </button>
                     </div>
                   </div>
@@ -951,9 +986,9 @@
                       class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50"
                     >
                       <div class="mb-2 flex items-center justify-between">
-                        <span class="text-xs font-medium text-gray-600 dark:text-gray-400"
-                          >{{ t('accountForm.clientIdLabel') }}</span
-                        >
+                        <span class="text-xs font-medium text-gray-600 dark:text-gray-400">{{
+                          t('accountForm.clientIdLabel')
+                        }}</span>
                         <button
                           class="rounded-md bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
                           type="button"
@@ -990,9 +1025,9 @@
 
             <!-- 所有平台的优先级设置 -->
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >{{ t('accountForm.schedulePriorityLabel') }}</label
-              >
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                t('accountForm.schedulePriorityLabel')
+              }}</label>
               <input
                 v-model.number="form.priority"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -1084,9 +1119,9 @@
               </div>
 
               <div v-if="form.platform === 'openai'">
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >{{ t('accountForm.accessTokenOptional') }}</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.accessTokenOptional')
+                }}</label>
                 <textarea
                   v-model="form.accessToken"
                   class="form-input w-full resize-none border-gray-300 font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -1100,9 +1135,9 @@
               </div>
 
               <div v-else>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >{{ t('accountForm.accessTokenRequired') }}</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.accessTokenRequired')
+                }}</label>
                 <textarea
                   v-model="form.accessToken"
                   class="form-input w-full resize-none border-gray-300 font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -1117,9 +1152,9 @@
               </div>
 
               <div v-if="form.platform === 'openai'">
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >{{ t('accountForm.refreshTokenRequired') }}</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.refreshTokenRequired')
+                }}</label>
                 <textarea
                   v-model="form.refreshToken"
                   class="form-input w-full resize-none border-gray-300 font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -1138,9 +1173,9 @@
               </div>
 
               <div v-else>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >{{ t('accountForm.refreshTokenOptional') }}</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.refreshTokenOptional')
+                }}</label>
                 <textarea
                   v-model="form.refreshToken"
                   class="form-input w-full resize-none border-gray-300 font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -1242,7 +1277,11 @@
                           >
                             <i v-if="!setupTokenLoading" class="fas fa-link mr-2" />
                             <div v-else class="loading-spinner mr-2" />
-                            {{ setupTokenLoading ? t('accountForm.generating') : t('accountForm.generateSetupTokenLink') }}
+                            {{
+                              setupTokenLoading
+                                ? t('accountForm.generating')
+                                : t('accountForm.generateSetupTokenLink')
+                            }}
                           </button>
                           <div v-else class="space-y-3">
                             <div class="flex items-center gap-2">
@@ -1365,7 +1404,9 @@
               @click="exchangeSetupTokenCode"
             >
               <div v-if="setupTokenExchanging" class="loading-spinner mr-2" />
-              {{ setupTokenExchanging ? t('accountForm.verifying') : t('accountForm.completeAuth') }}
+              {{
+                setupTokenExchanging ? t('accountForm.verifying') : t('accountForm.completeAuth')
+              }}
             </button>
           </div>
         </div>
@@ -1374,9 +1415,9 @@
         <div v-if="isEdit" class="space-y-6">
           <!-- 基本信息 -->
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >{{ t('accountForm.accountNameEdit') }}</label
-            >
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              t('accountForm.accountNameEdit')
+            }}</label>
             <input
               v-model="form.name"
               class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -1387,9 +1428,9 @@
           </div>
 
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >{{ t('accountForm.descriptionOptionalEdit') }}</label
-            >
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              t('accountForm.descriptionOptionalEdit')
+            }}</label>
             <textarea
               v-model="form.description"
               class="form-input w-full resize-none border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -1399,9 +1440,9 @@
           </div>
 
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >{{ t('accountForm.accountTypeEdit') }}</label
-            >
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              t('accountForm.accountTypeEdit')
+            }}</label>
             <div class="flex gap-4">
               <label class="flex cursor-pointer items-center">
                 <input
@@ -1410,7 +1451,9 @@
                   type="radio"
                   value="shared"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.sharedAccount') }}</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.sharedAccount')
+                }}</span>
               </label>
               <label class="flex cursor-pointer items-center">
                 <input
@@ -1419,7 +1462,9 @@
                   type="radio"
                   value="dedicated"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.dedicatedAccount') }}</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.dedicatedAccount')
+                }}</span>
               </label>
               <label class="flex cursor-pointer items-center">
                 <input
@@ -1428,7 +1473,9 @@
                   type="radio"
                   value="group"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.groupScheduling') }}</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.groupScheduling')
+                }}</span>
               </label>
             </div>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
@@ -1438,9 +1485,9 @@
 
           <!-- 分组选择器 -->
           <div v-if="form.accountType === 'group'">
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >{{ t('accountForm.selectGroupRequired') }}</label
-            >
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              t('accountForm.selectGroupRequired')
+            }}</label>
             <div class="flex gap-2">
               <div class="flex-1">
                 <!-- 多选分组界面 -->
@@ -1465,7 +1512,8 @@
                       :value="group.id"
                     />
                     <span class="text-sm text-gray-700 dark:text-gray-200">
-                      {{ group.name }} ({{ group.memberCount || 0 }}{{ t('accountForm.membersCount') }})
+                      {{ group.name }} ({{ group.memberCount || 0
+                      }}{{ t('accountForm.membersCount') }})
                     </span>
                   </label>
                   <!-- 新建分组选项 -->
@@ -1493,9 +1541,9 @@
 
           <!-- Gemini 项目 ID 字段 -->
           <div v-if="form.platform === 'gemini'">
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >{{ t('accountForm.projectIdOptional') }}</label
-            >
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              t('accountForm.projectIdOptional')
+            }}</label>
             <input
               v-model="form.projectId"
               class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -1509,9 +1557,9 @@
 
           <!-- Claude {{ t('accountForm.subscriptionType') }}（编辑模式） -->
           <div v-if="form.platform === 'claude'">
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >{{ t('accountForm.subscriptionType') }}</label
-            >
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              t('accountForm.subscriptionType')
+            }}</label>
             <div class="flex gap-4">
               <label class="flex cursor-pointer items-center">
                 <input
@@ -1520,7 +1568,9 @@
                   type="radio"
                   value="claude_max"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.claudeMaxSubscription') }}</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.claudeMaxSubscription')
+                }}</span>
               </label>
               <label class="flex cursor-pointer items-center">
                 <input
@@ -1529,7 +1579,9 @@
                   type="radio"
                   value="claude_pro"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('accountForm.claudeProSubscription') }}</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.claudeProSubscription')
+                }}</span>
               </label>
             </div>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
@@ -1622,9 +1674,9 @@
                     class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50"
                   >
                     <div class="mb-2 flex items-center justify-between">
-                      <span class="text-xs font-medium text-gray-600 dark:text-gray-400"
-                        >{{ t('accountForm.clientIdLabel') }}</span
-                      >
+                      <span class="text-xs font-medium text-gray-600 dark:text-gray-400">{{
+                        t('accountForm.clientIdLabel')
+                      }}</span>
                       <button
                         class="rounded-md bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
                         type="button"
@@ -1661,9 +1713,9 @@
 
           <!-- 所有平台的优先级设置（编辑模式） -->
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >{{ t('accountForm.prioritySchedulingTitle') }}</label
-            >
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              t('accountForm.prioritySchedulingTitle')
+            }}</label>
             <input
               v-model.number="form.priority"
               class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -1680,7 +1732,9 @@
           <!-- {{ t('accountForm.claudeConsoleFields') }}（编辑模式）-->
           <div v-if="form.platform === 'claude-console'" class="space-y-4">
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">{{ t('accountForm.apiUrlLabel') }}</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700">{{
+                t('accountForm.apiUrlLabel')
+              }}</label>
               <input
                 v-model="form.apiUrl"
                 class="form-input w-full"
@@ -1691,7 +1745,9 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">{{ t('accountForm.apiKeyLabel') }}</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700">{{
+                t('accountForm.apiKeyLabel')
+              }}</label>
               <input
                 v-model="form.apiKey"
                 class="form-input w-full"
@@ -1875,7 +1931,9 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">{{ t('accountForm.rateLimitMechanism') }}</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700">{{
+                t('accountForm.rateLimitMechanism')
+              }}</label>
               <div class="mb-3">
                 <label class="inline-flex cursor-pointer items-center">
                   <input
@@ -1883,7 +1941,9 @@
                     class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200"
                     type="checkbox"
                   />
-                  <span class="text-sm text-gray-700">{{ t('accountForm.enableRateLimitMechanism') }}</span>
+                  <span class="text-sm text-gray-700">{{
+                    t('accountForm.enableRateLimitMechanism')
+                  }}</span>
                 </label>
                 <p class="mt-1 text-xs text-gray-500">
                   启用后，当账号返回429错误时将暂停调度一段时间
@@ -1908,29 +1968,39 @@
           <!-- Bedrock 特定字段（编辑模式）-->
           <div v-if="form.platform === 'bedrock'" class="space-y-4">
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">{{ t('accountForm.awsAccessKeyId') }}</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700">{{
+                t('accountForm.awsAccessKeyId')
+              }}</label>
               <input
                 v-model="form.accessKeyId"
                 class="form-input w-full"
                 :placeholder="t('accountForm.leaveBlankNoUpdate')"
                 type="text"
               />
-              <p class="mt-1 text-xs text-gray-500">{{ t('accountForm.leaveBlankNoUpdateAwsKey') }}</p>
+              <p class="mt-1 text-xs text-gray-500">
+                {{ t('accountForm.leaveBlankNoUpdateAwsKey') }}
+              </p>
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">{{ t('accountForm.awsSecretAccessKey') }}</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700">{{
+                t('accountForm.awsSecretAccessKey')
+              }}</label>
               <input
                 v-model="form.secretAccessKey"
                 class="form-input w-full"
                 :placeholder="t('accountForm.leaveBlankNoUpdate')"
                 type="password"
               />
-              <p class="mt-1 text-xs text-gray-500">{{ t('accountForm.leaveBlankNoUpdateAwsSecret') }}</p>
+              <p class="mt-1 text-xs text-gray-500">
+                {{ t('accountForm.leaveBlankNoUpdateAwsSecret') }}
+              </p>
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">{{ t('accountForm.awsRegion') }}</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700">{{
+                t('accountForm.awsRegion')
+              }}</label>
               <input
                 v-model="form.region"
                 class="form-input w-full"
@@ -1956,7 +2026,9 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">{{ t('accountForm.sessionTokenOptional') }}</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700">{{
+                t('accountForm.sessionTokenOptional')
+              }}</label>
               <input
                 v-model="form.sessionToken"
                 class="form-input w-full"
@@ -1966,9 +2038,9 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700"
-                >{{ t('accountForm.defaultModelLabel') }}</label
-              >
+              <label class="mb-3 block text-sm font-semibold text-gray-700">{{
+                t('accountForm.defaultModelLabel')
+              }}</label>
               <input
                 v-model="form.defaultModel"
                 class="form-input w-full"
@@ -1981,20 +2053,24 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >{{ t('accountForm.smallFastModelLabel') }}</label
-              >
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                t('accountForm.smallFastModelLabel')
+              }}</label>
               <input
                 v-model="form.smallFastModel"
                 class="form-input w-full"
                 :placeholder="t('accountForm.smallFastModelPlaceholder')"
                 type="text"
               />
-              <p class="mt-1 text-xs text-gray-500">{{ t('accountForm.smallFastModelDescription') }}</p>
+              <p class="mt-1 text-xs text-gray-500">
+                {{ t('accountForm.smallFastModelDescription') }}
+              </p>
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">{{ t('accountForm.rateLimitMechanism') }}</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700">{{
+                t('accountForm.rateLimitMechanism')
+              }}</label>
               <div class="mb-3">
                 <label class="inline-flex cursor-pointer items-center">
                   <input
@@ -2002,7 +2078,9 @@
                     class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200"
                     type="checkbox"
                   />
-                  <span class="text-sm text-gray-700">{{ t('accountForm.enableRateLimitMechanism') }}</span>
+                  <span class="text-sm text-gray-700">{{
+                    t('accountForm.enableRateLimitMechanism')
+                  }}</span>
                 </label>
                 <p class="mt-1 text-xs text-gray-500">
                   启用后，当账号返回429错误时将暂停调度一段时间
@@ -2027,9 +2105,9 @@
           <!-- Azure OpenAI 特定字段（编辑模式）-->
           <div v-if="form.platform === 'azure_openai'" class="space-y-4">
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >{{ t('accountForm.azureEndpoint') }}</label
-              >
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                t('accountForm.azureEndpoint')
+              }}</label>
               <input
                 v-model="form.azureEndpoint"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -2043,9 +2121,9 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >{{ t('accountForm.azureApiVersion') }}</label
-              >
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                t('accountForm.azureApiVersion')
+              }}</label>
               <input
                 v-model="form.apiVersion"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -2058,9 +2136,9 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >{{ t('accountForm.azureDeploymentName') }}</label
-              >
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                t('accountForm.azureDeploymentName')
+              }}</label>
               <input
                 v-model="form.deploymentName"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -2074,9 +2152,9 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >{{ t('accountForm.apiKeyLabel') }}</label
-              >
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                t('accountForm.apiKeyLabel')
+              }}</label>
               <input
                 v-model="form.apiKey"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -2087,13 +2165,15 @@
               <p v-if="errors.apiKey" class="mt-1 text-xs text-red-500">
                 {{ errors.apiKey }}
               </p>
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('accountForm.leaveEmptyNoUpdateKey') }}</p>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {{ t('accountForm.leaveEmptyNoUpdateKey') }}
+              </p>
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >{{ t('accountForm.supportedModelsLabel') }}</label
-              >
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                t('accountForm.supportedModelsLabel')
+              }}</label>
               <div class="flex flex-wrap gap-2">
                 <label
                   v-for="model in [
@@ -2139,7 +2219,9 @@
                 <i class="fas fa-key text-sm text-white" />
               </div>
               <div>
-                <h5 class="mb-2 font-semibold text-amber-900 dark:text-amber-300">{{ t('accountForm.updateTokenLabel') }}</h5>
+                <h5 class="mb-2 font-semibold text-amber-900 dark:text-amber-300">
+                  {{ t('accountForm.updateTokenLabel') }}
+                </h5>
                 <p class="mb-2 text-sm text-amber-800 dark:text-amber-300">
                   可以更新 Access Token 和 Refresh Token。为了安全起见，不会显示当前的 Token 值。
                 </p>
@@ -2149,9 +2231,9 @@
 
             <div class="space-y-4">
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >{{ t('accountForm.newAccessTokenLabel') }}</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.newAccessTokenLabel')
+                }}</label>
                 <textarea
                   v-model="form.accessToken"
                   class="form-input w-full resize-none border-gray-300 font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -2161,9 +2243,9 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >{{ t('accountForm.newRefreshTokenLabel') }}</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.newRefreshTokenLabel')
+                }}</label>
                 <textarea
                   v-model="form.refreshToken"
                   class="form-input w-full resize-none border-gray-300 font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -2556,7 +2638,7 @@ const copySetupTokenAuthUrl = async () => {
         showToast(t('accountForm.copyFailed'), 'error')
       }
     } catch (err) {
-    showToast(t('accountForm.copyFailedManual'), 'error')
+      showToast(t('accountForm.copyFailedManual'), 'error')
     }
 
     document.body.removeChild(textarea)
@@ -2675,7 +2757,8 @@ const handleOAuthSuccess = async (tokenInfo) => {
     emit('success', result)
   } catch (error) {
     // 显示详细的错误信息
-    const errorMessage = error.response?.data?.error || error.message || t('accountForm.accountCreationFailed')
+    const errorMessage =
+      error.response?.data?.error || error.message || t('accountForm.accountCreationFailed')
     const suggestion = error.response?.data?.suggestion || ''
     const errorDetails = error.response?.data?.errorDetails || null
 
@@ -2957,7 +3040,8 @@ const createAccount = async () => {
     emit('success', result)
   } catch (error) {
     // 显示详细的错误信息
-    const errorMessage = error.response?.data?.error || error.message || t('accountForm.accountCreationFailed')
+    const errorMessage =
+      error.response?.data?.error || error.message || t('accountForm.accountCreationFailed')
     const suggestion = error.response?.data?.suggestion || ''
     const errorDetails = error.response?.data?.errorDetails || null
 
@@ -3213,7 +3297,8 @@ const updateAccount = async () => {
     emit('success')
   } catch (error) {
     // 显示详细的错误信息
-    const errorMessage = error.response?.data?.error || error.message || t('accountForm.accountUpdateFailed')
+    const errorMessage =
+      error.response?.data?.error || error.message || t('accountForm.accountUpdateFailed')
     const suggestion = error.response?.data?.suggestion || ''
     const errorDetails = error.response?.data?.errorDetails || null
 
@@ -3669,7 +3754,10 @@ const clearUnifiedCache = async () => {
     }
   } catch (error) {
     console.error('Failed to clear unified User-Agent cache:', error)
-    showToast(t('accountForm.clearCacheFailedWithError') + (error.message || t('accountForm.unknownError')), 'error')
+    showToast(
+      t('accountForm.clearCacheFailedWithError') + (error.message || t('accountForm.unknownError')),
+      'error'
+    )
   } finally {
     clearingCache.value = false
   }

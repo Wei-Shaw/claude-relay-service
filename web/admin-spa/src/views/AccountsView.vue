@@ -60,11 +60,7 @@
 
             <!-- 刷新按钮 -->
             <div class="relative">
-              <el-tooltip
-                :content="t('accounts.refreshTooltip')"
-                effect="dark"
-                placement="bottom"
-              >
+              <el-tooltip :content="t('accounts.refreshTooltip')" effect="dark" placement="bottom">
                 <button
                   class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 sm:w-auto"
                   :disabled="accountsLoading"
@@ -110,7 +106,9 @@
           <i class="fas fa-user-circle text-xl text-gray-400" />
         </div>
         <p class="text-lg text-gray-500 dark:text-gray-400">{{ t('accounts.noAccounts') }}</p>
-        <p class="mt-2 text-sm text-gray-400 dark:text-gray-500">{{ t('accounts.noAccountsHint') }}</p>
+        <p class="mt-2 text-sm text-gray-400 dark:text-gray-500">
+          {{ t('accounts.noAccountsHint') }}
+        </p>
       </div>
 
       <!-- 桌面端表格视图 -->
@@ -390,7 +388,9 @@
                     class="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gradient-to-r from-gray-100 to-gray-200 px-2.5 py-1"
                   >
                     <i class="fas fa-question text-xs text-gray-700" />
-                    <span class="text-xs font-semibold text-gray-800">{{ t('accounts.unknown') }}</span>
+                    <span class="text-xs font-semibold text-gray-800">{{
+                      t('accounts.unknown')
+                    }}</span>
                   </div>
                 </div>
               </td>
@@ -451,7 +451,11 @@
                         typeof account.rateLimitStatus === 'object' &&
                         account.rateLimitStatus.minutesRemaining > 0
                       "
-                      >({{ t('accounts.rateLimitTime', { time: formatRateLimitTime(account.rateLimitStatus.minutesRemaining) }) }})</span
+                      >({{
+                        t('accounts.rateLimitTime', {
+                          time: formatRateLimitTime(account.rateLimitStatus.minutesRemaining)
+                        })
+                      }})</span
                     >
                   </span>
                   <span
@@ -609,7 +613,11 @@
                       v-if="account.sessionWindow.remainingTime > 0"
                       class="font-medium text-indigo-600 dark:text-indigo-400"
                     >
-                      {{ t('accounts.remaining', { time: formatRemainingTime(account.sessionWindow.remainingTime) }) }}
+                      {{
+                        t('accounts.remaining', {
+                          time: formatRemainingTime(account.sessionWindow.remainingTime)
+                        })
+                      }}
                     </div>
                   </div>
                 </div>
@@ -617,7 +625,9 @@
                 <div v-else-if="account.platform === 'claude-console'" class="space-y-2">
                   <div v-if="Number(account.dailyQuota) > 0">
                     <div class="flex items-center justify-between text-xs">
-                      <span class="text-gray-600 dark:text-gray-300">{{ t('accounts.quotaProgress') }}</span>
+                      <span class="text-gray-600 dark:text-gray-300">{{
+                        t('accounts.quotaProgress')
+                      }}</span>
                       <span class="font-medium text-gray-700 dark:text-gray-200">
                         {{ getQuotaUsagePercent(account).toFixed(1) }}%
                       </span>
@@ -642,9 +652,9 @@
                     </div>
                     <div class="text-xs text-gray-600 dark:text-gray-400">
                       {{ t('accounts.remainingQuota', { amount: formatRemainingQuota(account) }) }}
-                      <span class="ml-2 text-gray-400"
-                        >{{ t('accounts.reset', { time: account.quotaResetTime || '00:00' }) }}</span
-                      >
+                      <span class="ml-2 text-gray-400">{{
+                        t('accounts.reset', { time: account.quotaResetTime || '00:00' })
+                      }}</span>
                     </div>
                   </div>
                   <div v-else class="text-sm text-gray-400">
@@ -682,7 +692,11 @@
                         : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
                     ]"
                     :disabled="account.isResetting"
-                    :title="account.isResetting ? t('accounts.resetting') : t('accounts.resetStatusTooltip')"
+                    :title="
+                      account.isResetting
+                        ? t('accounts.resetting')
+                        : t('accounts.resetStatusTooltip')
+                    "
                     @click="resetAccountStatus(account)"
                   >
                     <i :class="['fas fa-redo', account.isResetting ? 'animate-spin' : '']" />
@@ -698,11 +712,17 @@
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     ]"
                     :disabled="account.isTogglingSchedulable"
-                    :title="account.schedulable ? t('accounts.disableTooltip') : t('accounts.enableTooltip')"
+                    :title="
+                      account.schedulable
+                        ? t('accounts.disableTooltip')
+                        : t('accounts.enableTooltip')
+                    "
                     @click="toggleSchedulable(account)"
                   >
                     <i :class="['fas', account.schedulable ? 'fa-toggle-on' : 'fa-toggle-off']" />
-                    <span class="ml-1">{{ account.schedulable ? t('accounts.scheduling') : t('accounts.disabled') }}</span>
+                    <span class="ml-1">{{
+                      account.schedulable ? t('accounts.scheduling') : t('accounts.disabled')
+                    }}</span>
                   </button>
                   <button
                     class="rounded bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200"
@@ -799,7 +819,9 @@
           <!-- 使用统计 -->
           <div class="mb-3 grid grid-cols-2 gap-3">
             <div>
-              <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('accounts.dailyUsageLabel') }}</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                {{ t('accounts.dailyUsageLabel') }}
+              </p>
               <div class="space-y-1">
                 <div class="flex items-center gap-1.5">
                   <div class="h-1.5 w-1.5 rounded-full bg-blue-500" />
@@ -822,7 +844,9 @@
               </div>
             </div>
             <div>
-              <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('accounts.sessionWindowLabel') }}</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                {{ t('accounts.sessionWindowLabel') }}
+              </p>
               <div v-if="account.usage && account.usage.sessionWindow" class="space-y-1">
                 <div class="flex items-center gap-1.5">
                   <div class="h-1.5 w-1.5 rounded-full bg-purple-500" />
@@ -854,11 +878,10 @@
             >
               <div class="flex items-center justify-between text-xs">
                 <div class="flex items-center gap-1">
-                  <span class="font-medium text-gray-600 dark:text-gray-300">{{ t('accounts.sessionWindowLabel') }}</span>
-                  <el-tooltip
-                    :content="t('accounts.sessionWindowTooltipMobile')"
-                    placement="top"
-                  >
+                  <span class="font-medium text-gray-600 dark:text-gray-300">{{
+                    t('accounts.sessionWindowLabel')
+                  }}</span>
+                  <el-tooltip :content="t('accounts.sessionWindowTooltipMobile')" placement="top">
                     <i
                       class="fas fa-question-circle cursor-help text-xs text-gray-400 hover:text-gray-600"
                     />
@@ -890,7 +913,11 @@
                   v-if="account.sessionWindow.remainingTime > 0"
                   class="font-medium text-indigo-600"
                 >
-                  {{ t('accounts.remaining', { time: formatRemainingTime(account.sessionWindow.remainingTime) }) }}
+                  {{
+                    t('accounts.remaining', {
+                      time: formatRemainingTime(account.sessionWindow.remainingTime)
+                    })
+                  }}
                 </span>
                 <span v-else class="text-gray-500"> {{ t('accounts.ended') }} </span>
               </div>
@@ -898,9 +925,15 @@
 
             <!-- 最后使用时间 -->
             <div class="flex items-center justify-between text-xs">
-              <span class="text-gray-500 dark:text-gray-400">{{ t('accounts.lastUsedLabel') }}</span>
+              <span class="text-gray-500 dark:text-gray-400">{{
+                t('accounts.lastUsedLabel')
+              }}</span>
               <span class="text-gray-700 dark:text-gray-200">
-                {{ account.lastUsedAt ? formatRelativeTime(account.lastUsedAt) : t('accounts.neverUsed') }}
+                {{
+                  account.lastUsedAt
+                    ? formatRelativeTime(account.lastUsedAt)
+                    : t('accounts.neverUsed')
+                }}
               </span>
             </div>
 
@@ -917,7 +950,9 @@
 
             <!-- 调度优先级 -->
             <div class="flex items-center justify-between text-xs">
-              <span class="text-gray-500 dark:text-gray-400">{{ t('accounts.priorityLabel') }}</span>
+              <span class="text-gray-500 dark:text-gray-400">{{
+                t('accounts.priorityLabel')
+              }}</span>
               <span class="font-medium text-gray-700 dark:text-gray-200">
                 {{ account.priority || 50 }}
               </span>
@@ -1610,10 +1645,7 @@ const deleteAccount = async (account) => {
   ).length
 
   if (boundKeysCount > 0) {
-    showToast(
-      t('accounts.cannotDeleteBoundAccount', { count: boundKeysCount }),
-      'error'
-    )
+    showToast(t('accounts.cannotDeleteBoundAccount', { count: boundKeysCount }), 'error')
     return
   }
 
@@ -1749,7 +1781,10 @@ const toggleSchedulable = async (account) => {
 
     if (data.success) {
       account.schedulable = data.schedulable
-      showToast(data.schedulable ? t('accounts.enabledScheduling') : t('accounts.disabledScheduling'), 'success')
+      showToast(
+        data.schedulable ? t('accounts.enabledScheduling') : t('accounts.disabledScheduling'),
+        'success'
+      )
     } else {
       showToast(data.message || t('accounts.operationFailed'), 'error')
     }

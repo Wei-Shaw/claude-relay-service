@@ -12,13 +12,17 @@
               <i class="fas fa-layer-group text-lg text-white" />
             </div>
             <div>
-              <h3 class="text-xl font-bold text-gray-900">批量创建成功</h3>
-              <p class="text-sm text-gray-600">成功创建 {{ apiKeys.length }} 个 API Key</p>
+              <h3 class="text-xl font-bold text-gray-900">
+                {{ $t('apiKeys.batchApiKeyModal.title') }}
+              </h3>
+              <p class="text-sm text-gray-600">
+                {{ $t('apiKeys.batchApiKeyModal.successMessage', { count: apiKeys.length }) }}
+              </p>
             </div>
           </div>
           <button
             class="text-gray-400 transition-colors hover:text-gray-600"
-            title="直接关闭（不推荐）"
+            :title="$t('apiKeys.batchApiKeyModal.directCloseTooltip')"
             @click="handleDirectClose"
           >
             <i class="fas fa-times text-xl" />
@@ -34,10 +38,11 @@
               <i class="fas fa-exclamation-triangle text-sm text-white" />
             </div>
             <div class="ml-3">
-              <h5 class="mb-1 font-semibold text-amber-900">重要提醒</h5>
+              <h5 class="mb-1 font-semibold text-amber-900">
+                {{ $t('apiKeys.batchApiKeyModal.importantReminder') }}
+              </h5>
               <p class="text-sm text-amber-800">
-                这是您唯一能看到所有 API Key 的机会。关闭此窗口后，系统将不再显示完整的 API
-                Key。请立即下载并妥善保存。
+                {{ $t('apiKeys.batchApiKeyModal.warningMessage') }}
               </p>
             </div>
           </div>
@@ -50,7 +55,9 @@
           >
             <div class="flex items-center justify-between">
               <div>
-                <p class="text-xs font-medium text-blue-600">创建数量</p>
+                <p class="text-xs font-medium text-blue-600">
+                  {{ $t('apiKeys.batchApiKeyModal.createdCount') }}
+                </p>
                 <p class="mt-1 text-2xl font-bold text-blue-900">
                   {{ apiKeys.length }}
                 </p>
@@ -68,7 +75,9 @@
           >
             <div class="flex items-center justify-between">
               <div>
-                <p class="text-xs font-medium text-green-600">基础名称</p>
+                <p class="text-xs font-medium text-green-600">
+                  {{ $t('apiKeys.batchApiKeyModal.baseName') }}
+                </p>
                 <p class="mt-1 truncate text-lg font-bold text-green-900">
                   {{ baseName }}
                 </p>
@@ -86,7 +95,9 @@
           >
             <div class="flex items-center justify-between">
               <div>
-                <p class="text-xs font-medium text-purple-600">权限范围</p>
+                <p class="text-xs font-medium text-purple-600">
+                  {{ $t('apiKeys.batchApiKeyModal.permissionScope') }}
+                </p>
                 <p class="mt-1 text-lg font-bold text-purple-900">
                   {{ getPermissionText() }}
                 </p>
@@ -104,7 +115,9 @@
           >
             <div class="flex items-center justify-between">
               <div>
-                <p class="text-xs font-medium text-orange-600">过期时间</p>
+                <p class="text-xs font-medium text-orange-600">
+                  {{ $t('apiKeys.batchApiKeyModal.expiryTime') }}
+                </p>
                 <p class="mt-1 text-lg font-bold text-orange-900">
                   {{ getExpiryText() }}
                 </p>
@@ -121,7 +134,9 @@
         <!-- API Keys 预览 -->
         <div class="mb-6">
           <div class="mb-3 flex items-center justify-between">
-            <label class="text-sm font-semibold text-gray-700">API Keys 预览</label>
+            <label class="text-sm font-semibold text-gray-700">{{
+              $t('apiKeys.batchApiKeyModal.previewTitle')
+            }}</label>
             <div class="flex items-center gap-2">
               <button
                 class="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
@@ -129,9 +144,15 @@
                 @click="togglePreview"
               >
                 <i :class="['fas', showPreview ? 'fa-eye-slash' : 'fa-eye']" />
-                {{ showPreview ? '隐藏' : '显示' }}预览
+                {{
+                  showPreview
+                    ? $t('apiKeys.batchApiKeyModal.hide')
+                    : $t('apiKeys.batchApiKeyModal.show')
+                }}{{ $t('apiKeys.batchApiKeyModal.preview') }}
               </button>
-              <span class="text-xs text-gray-500">（最多显示前10个）</span>
+              <span class="text-xs text-gray-500">{{
+                $t('apiKeys.batchApiKeyModal.maxDisplayNote')
+              }}</span>
             </div>
           </div>
 
@@ -150,13 +171,13 @@
             @click="downloadApiKeys"
           >
             <i class="fas fa-download" />
-            下载所有 API Keys
+            {{ $t('apiKeys.batchApiKeyModal.downloadAll') }}
           </button>
           <button
             class="rounded-xl border border-gray-300 bg-gray-200 px-6 py-3 font-semibold text-gray-800 transition-colors hover:bg-gray-300"
             @click="handleClose"
           >
-            我已保存
+            {{ $t('apiKeys.batchApiKeyModal.alreadySaved') }}
           </button>
         </div>
 
@@ -165,8 +186,7 @@
           <p class="flex items-start text-xs text-blue-700">
             <i class="fas fa-info-circle mr-2 mt-0.5 flex-shrink-0" />
             <span>
-              下载的文件格式为文本文件（.txt），每行包含一个 API Key。
-              请将文件保存在安全的位置，避免泄露。
+              {{ $t('apiKeys.batchApiKeyModal.fileFormatInfo') }}
             </span>
           </p>
         </div>
@@ -177,7 +197,10 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { showToast } from '@/utils/toast'
+
+const { t } = useI18n()
 
 const props = defineProps({
   apiKeys: {
@@ -203,30 +226,28 @@ const baseName = computed(() => {
 
 // 获取权限文本
 const getPermissionText = () => {
-  if (props.apiKeys.length === 0) return '未知'
+  if (props.apiKeys.length === 0) return t('apiKeys.batchApiKeyModal.permissions.unknown')
   const permissions = props.apiKeys[0].permissions
-  const permissionMap = {
-    all: '全部服务',
-    claude: '仅 Claude',
-    gemini: '仅 Gemini'
-  }
-  return permissionMap[permissions] || permissions
+  const permissionKey = `apiKeys.batchApiKeyModal.permissions.${permissions}`
+  return t(permissionKey, t('apiKeys.batchApiKeyModal.permissions.unknown'))
 }
 
 // 获取过期时间文本
 const getExpiryText = () => {
-  if (props.apiKeys.length === 0) return '未知'
+  if (props.apiKeys.length === 0) return t('apiKeys.batchApiKeyModal.permissions.unknown')
   const expiresAt = props.apiKeys[0].expiresAt
-  if (!expiresAt) return '永不过期'
+  if (!expiresAt) return t('apiKeys.batchApiKeyModal.neverExpire')
 
   const expiryDate = new Date(expiresAt)
   const now = new Date()
   const diffDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24))
 
-  if (diffDays <= 7) return `${diffDays}天`
-  if (diffDays <= 30) return `${Math.ceil(diffDays / 7)}周`
-  if (diffDays <= 365) return `${Math.ceil(diffDays / 30)}个月`
-  return `${Math.ceil(diffDays / 365)}年`
+  if (diffDays <= 7) return t('apiKeys.batchApiKeyModal.daysFormat', { days: diffDays })
+  if (diffDays <= 30)
+    return t('apiKeys.batchApiKeyModal.weeksFormat', { weeks: Math.ceil(diffDays / 7) })
+  if (diffDays <= 365)
+    return t('apiKeys.batchApiKeyModal.monthsFormat', { months: Math.ceil(diffDays / 30) })
+  return t('apiKeys.batchApiKeyModal.yearsFormat', { years: Math.ceil(diffDays / 365) })
 }
 
 // 切换预览显示
@@ -242,7 +263,7 @@ const getPreviewText = () => {
   })
 
   if (props.apiKeys.length > 10) {
-    lines.push(`... 还有 ${props.apiKeys.length - 10} 个 API Key`)
+    lines.push(t('apiKeys.batchApiKeyModal.moreKeysNote', { count: props.apiKeys.length - 10 }))
   }
 
   return lines.join('\n')
@@ -277,26 +298,24 @@ const downloadApiKeys = () => {
   // 释放 URL 对象
   URL.revokeObjectURL(url)
 
-  showToast('API Keys 文件已下载', 'success')
+  showToast(t('apiKeys.batchApiKeyModal.downloadSuccess'), 'success')
 }
 
 // 关闭弹窗（带确认）
 const handleClose = async () => {
   if (window.showConfirm) {
     const confirmed = await window.showConfirm(
-      '关闭提醒',
-      '关闭后将无法再次查看这些 API Key，请确保已经下载并妥善保存。\n\n确定要关闭吗？',
-      '确定关闭',
-      '返回下载'
+      t('apiKeys.batchApiKeyModal.closeReminderTitle'),
+      t('apiKeys.batchApiKeyModal.closeReminderMessage'),
+      t('apiKeys.batchApiKeyModal.confirmCloseButton'),
+      t('apiKeys.batchApiKeyModal.goBackDownloadButton')
     )
     if (confirmed) {
       emit('close')
     }
   } else {
     // 降级方案
-    const confirmed = confirm(
-      '关闭后将无法再次查看这些 API Key，请确保已经下载并妥善保存。\n\n确定要关闭吗？'
-    )
+    const confirmed = confirm(t('apiKeys.batchApiKeyModal.closeReminderMessage'))
     if (confirmed) {
       emit('close')
     }
@@ -307,17 +326,17 @@ const handleClose = async () => {
 const handleDirectClose = async () => {
   if (window.showConfirm) {
     const confirmed = await window.showConfirm(
-      '确定要关闭吗？',
-      '您还没有下载 API Keys，关闭后将无法再次查看。\n\n强烈建议您先下载保存。',
-      '仍然关闭',
-      '返回下载'
+      t('apiKeys.batchApiKeyModal.directCloseTitle'),
+      t('apiKeys.batchApiKeyModal.directCloseMessage'),
+      t('apiKeys.batchApiKeyModal.stillCloseButton'),
+      t('apiKeys.batchApiKeyModal.goBackDownloadButton')
     )
     if (confirmed) {
       emit('close')
     }
   } else {
     // 降级方案
-    const confirmed = confirm('您还没有下载 API Keys，关闭后将无法再次查看。\n\n确定要关闭吗？')
+    const confirmed = confirm(t('apiKeys.batchApiKeyModal.directCloseFallbackMessage'))
     if (confirmed) {
       emit('close')
     }

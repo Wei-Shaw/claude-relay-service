@@ -33,7 +33,9 @@
         <div
           class="mt-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
         >
-          <span>{{ formatNumber(getStatUsage(stat)?.requests || 0) }}{{ t('apiStats.requests') }}</span>
+          <span
+            >{{ formatNumber(getStatUsage(stat)?.requests || 0) }}{{ t('apiStats.requests') }}</span
+          >
           <span>{{ getStatUsage(stat)?.formattedCost || '$0.00' }}</span>
         </div>
       </div>
@@ -41,7 +43,10 @@
       <!-- 其他Keys汇总 -->
       <div v-if="otherKeysCount > 0" class="border-t border-gray-200 pt-2 dark:border-gray-700">
         <div class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-          <span>{{ t('apiStats.otherKeys') }} {{ otherKeysCount }} {{ t('apiStats.individual') }}{{ t('apiStats.keys') }}</span>
+          <span
+            >{{ t('apiStats.otherKeys') }} {{ otherKeysCount }} {{ t('apiStats.individual')
+            }}{{ t('apiStats.keys') }}</span
+          >
           <span>{{ otherPercentage }}%</span>
         </div>
       </div>

@@ -17,39 +17,51 @@
       <!-- 多 Key 模式下的概要信息 -->
       <div v-if="multiKeyMode && aggregatedStats" class="space-y-2 md:space-y-3">
         <div class="flex items-center justify-between">
-          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{ t('apiStats.queryKeysCount') }}</span>
+          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{
+            t('apiStats.queryKeysCount')
+          }}</span>
           <span class="text-sm font-medium text-gray-900 dark:text-gray-100 md:text-base">
             {{ aggregatedStats.totalKeys }} {{ t('apiStats.individual') }}
           </span>
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{ t('apiStats.activeKeysCount') }}</span>
+          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{
+            t('apiStats.activeKeysCount')
+          }}</span>
           <span class="text-sm font-medium text-green-600 md:text-base">
             <i class="fas fa-check-circle mr-1 text-xs md:text-sm" />
             {{ aggregatedStats.activeKeys }} {{ t('apiStats.individual') }}
           </span>
         </div>
         <div v-if="invalidKeys.length > 0" class="flex items-center justify-between">
-          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{ t('apiStats.invalidKeysCount') }}</span>
+          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{
+            t('apiStats.invalidKeysCount')
+          }}</span>
           <span class="text-sm font-medium text-red-600 md:text-base">
             <i class="fas fa-times-circle mr-1 text-xs md:text-sm" />
             {{ invalidKeys.length }} {{ t('apiStats.individual') }}
           </span>
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{ t('apiStats.totalRequests') }}</span>
+          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{
+            t('apiStats.totalRequests')
+          }}</span>
           <span class="text-sm font-medium text-gray-900 dark:text-gray-100 md:text-base">
             {{ formatNumber(aggregatedStats.usage.requests) }}
           </span>
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{ t('apiStats.totalTokens') }}</span>
+          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{
+            t('apiStats.totalTokens')
+          }}</span>
           <span class="text-sm font-medium text-gray-900 dark:text-gray-100 md:text-base">
             {{ formatNumber(aggregatedStats.usage.allTokens) }}
           </span>
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{ t('apiStats.totalCost') }}</span>
+          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{
+            t('apiStats.totalCost')
+          }}</span>
           <span class="text-sm font-medium text-indigo-600 md:text-base">
             {{ aggregatedStats.usage.formattedCost }}
           </span>
@@ -60,7 +72,9 @@
           v-if="individualStats.length > 1"
           class="border-t border-gray-200 pt-2 dark:border-gray-700"
         >
-          <div class="mb-2 text-xs text-gray-500 dark:text-gray-400">{{ t('apiStats.keyContribution') }}</div>
+          <div class="mb-2 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('apiStats.keyContribution') }}
+          </div>
           <div class="space-y-1">
             <div
               v-for="stat in topContributors"
@@ -79,14 +93,18 @@
       <!-- 单 Key 模式下的详细信息 -->
       <div v-else class="space-y-2 md:space-y-3">
         <div class="flex items-center justify-between">
-          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{ t('apiStats.name') }}</span>
+          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{
+            t('apiStats.name')
+          }}</span>
           <span
             class="break-all text-sm font-medium text-gray-900 dark:text-gray-100 md:text-base"
             >{{ statsData.name }}</span
           >
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{ t('apiStats.status') }}</span>
+          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{
+            t('apiStats.status')
+          }}</span>
           <span
             class="text-sm font-medium md:text-base"
             :class="statsData.isActive ? 'text-green-600' : 'text-red-600'"
@@ -99,22 +117,26 @@
           </span>
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{ t('apiStats.permissions') }}</span>
+          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{
+            t('apiStats.permissions')
+          }}</span>
           <span class="text-sm font-medium text-gray-900 dark:text-gray-100 md:text-base">{{
             formatPermissions(statsData.permissions)
           }}</span>
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{ t('apiStats.createdAt') }}</span>
+          <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{
+            t('apiStats.createdAt')
+          }}</span>
           <span
             class="break-all text-xs font-medium text-gray-900 dark:text-gray-100 md:text-base"
             >{{ formatDate(statsData.createdAt) }}</span
           >
         </div>
         <div class="flex items-start justify-between">
-          <span class="mt-1 flex-shrink-0 text-sm text-gray-600 dark:text-gray-400 md:text-base"
-            >{{ t('apiStats.expiresAt') }}</span
-          >
+          <span class="mt-1 flex-shrink-0 text-sm text-gray-600 dark:text-gray-400 md:text-base">{{
+            t('apiStats.expiresAt')
+          }}</span>
           <!-- 未激活状态 -->
           <div
             v-if="statsData.expirationMode === 'activation' && !statsData.isActivated"
@@ -177,7 +199,9 @@
             {{ formatNumber(currentPeriodData.requests) }}
           </div>
           <div class="text-xs text-gray-600 dark:text-gray-400 md:text-sm">
-            {{ statsPeriod === 'daily' ? t('apiStats.todayRequests') : t('apiStats.monthlyRequests') }}
+            {{
+              statsPeriod === 'daily' ? t('apiStats.todayRequests') : t('apiStats.monthlyRequests')
+            }}
           </div>
         </div>
         <div class="stat-card text-center">
@@ -201,7 +225,11 @@
             {{ formatNumber(currentPeriodData.inputTokens) }}
           </div>
           <div class="text-xs text-gray-600 dark:text-gray-400 md:text-sm">
-            {{ statsPeriod === 'daily' ? t('apiStats.todayInputTokens') : t('apiStats.monthlyInputTokens') }}
+            {{
+              statsPeriod === 'daily'
+                ? t('apiStats.todayInputTokens')
+                : t('apiStats.monthlyInputTokens')
+            }}
           </div>
         </div>
       </div>

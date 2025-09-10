@@ -64,7 +64,9 @@
           <!-- Role Selection -->
           <form class="space-y-4" @submit.prevent="handleSubmit">
             <div>
-              <label class="mb-2 block text-sm font-medium text-gray-700"> {{ $t('user.changeRoleModal.newRole') }} </label>
+              <label class="mb-2 block text-sm font-medium text-gray-700">
+                {{ $t('user.changeRoleModal.newRole') }}
+              </label>
               <div class="space-y-2">
                 <label class="flex items-center">
                   <input
@@ -75,8 +77,12 @@
                     value="user"
                   />
                   <div class="ml-3">
-                    <div class="text-sm font-medium text-gray-900">{{ $t('user.changeRoleModal.roles.user') }}</div>
-                    <div class="text-xs text-gray-500">{{ $t('user.changeRoleModal.roles.userDesc') }}</div>
+                    <div class="text-sm font-medium text-gray-900">
+                      {{ $t('user.changeRoleModal.roles.user') }}
+                    </div>
+                    <div class="text-xs text-gray-500">
+                      {{ $t('user.changeRoleModal.roles.userDesc') }}
+                    </div>
                   </div>
                 </label>
                 <label class="flex items-center">
@@ -88,8 +94,12 @@
                     value="admin"
                   />
                   <div class="ml-3">
-                    <div class="text-sm font-medium text-gray-900">{{ $t('user.changeRoleModal.roles.admin') }}</div>
-                    <div class="text-xs text-gray-500">{{ $t('user.changeRoleModal.roles.adminDesc') }}</div>
+                    <div class="text-sm font-medium text-gray-900">
+                      {{ $t('user.changeRoleModal.roles.admin') }}
+                    </div>
+                    <div class="text-xs text-gray-500">
+                      {{ $t('user.changeRoleModal.roles.adminDesc') }}
+                    </div>
                   </div>
                 </label>
               </div>
@@ -111,7 +121,9 @@
                   </svg>
                 </div>
                 <div class="ml-3">
-                  <h3 class="text-sm font-medium text-yellow-800">{{ $t('user.changeRoleModal.roleChangeWarning.title') }}</h3>
+                  <h3 class="text-sm font-medium text-yellow-800">
+                    {{ $t('user.changeRoleModal.roleChangeWarning.title') }}
+                  </h3>
                   <div class="mt-2 text-sm text-yellow-700">
                     <p v-if="selectedRole === 'admin'">
                       {{ $t('user.changeRoleModal.roleChangeWarning.grantAdmin') }}

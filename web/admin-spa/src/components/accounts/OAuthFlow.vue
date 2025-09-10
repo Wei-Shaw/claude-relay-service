@@ -12,7 +12,9 @@
             <i class="fas fa-link text-white" />
           </div>
           <div class="flex-1">
-            <h4 class="mb-3 font-semibold text-blue-900 dark:text-blue-200">{{ t('oauthFlow.claudeAccountAuth') }}</h4>
+            <h4 class="mb-3 font-semibold text-blue-900 dark:text-blue-200">
+              {{ t('oauthFlow.claudeAccountAuth') }}
+            </h4>
             <p class="mb-4 text-sm text-blue-800 dark:text-blue-300">
               {{ t('oauthFlow.claudeAuthDescription') }}
             </p>
@@ -115,14 +117,17 @@
                     </p>
                     <p class="mb-3 text-sm text-blue-700 dark:text-blue-300">
                       {{ t('oauthFlow.step3Description') }}
-                      <strong>{{ t('oauthFlow.authorizationCode') }}</strong>{{ t('oauthFlow.step3DescriptionMiddle') }}
+                      <strong>{{ t('oauthFlow.authorizationCode') }}</strong
+                      >{{ t('oauthFlow.step3DescriptionMiddle') }}
                     </p>
                     <div class="space-y-3">
                       <div>
                         <label
                           class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                         >
-                          <i class="fas fa-key mr-2 text-blue-500" />{{ t('oauthFlow.authorizationCode') }}
+                          <i class="fas fa-key mr-2 text-blue-500" />{{
+                            t('oauthFlow.authorizationCode')
+                          }}
                         </label>
                         <textarea
                           v-model="authCode"
@@ -157,7 +162,9 @@
             <i class="fas fa-robot text-white" />
           </div>
           <div class="flex-1">
-            <h4 class="mb-3 font-semibold text-green-900 dark:text-green-200">{{ t('oauthFlow.geminiAccountAuth') }}</h4>
+            <h4 class="mb-3 font-semibold text-green-900 dark:text-green-200">
+              {{ t('oauthFlow.geminiAccountAuth') }}
+            </h4>
             <p class="mb-4 text-sm text-green-800 dark:text-green-300">
               {{ t('oauthFlow.geminiAuthDescription') }}
             </p>
@@ -266,7 +273,9 @@
                         <label
                           class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                         >
-                          <i class="fas fa-key mr-2 text-green-500" />{{ t('oauthFlow.authorizationCode') }}
+                          <i class="fas fa-key mr-2 text-green-500" />{{
+                            t('oauthFlow.authorizationCode')
+                          }}
                         </label>
                         <textarea
                           v-model="authCode"
@@ -303,7 +312,9 @@
             <i class="fas fa-brain text-white" />
           </div>
           <div class="flex-1">
-            <h4 class="mb-3 font-semibold text-orange-900 dark:text-orange-200">{{ t('oauthFlow.openaiAccountAuth') }}</h4>
+            <h4 class="mb-3 font-semibold text-orange-900 dark:text-orange-200">
+              {{ t('oauthFlow.openaiAccountAuth') }}
+            </h4>
             <p class="mb-4 text-sm text-orange-800 dark:text-orange-300">
               {{ t('oauthFlow.openaiAuthDescription') }}
             </p>
@@ -382,7 +393,8 @@
                     >
                       <p class="text-xs text-amber-800 dark:text-amber-300">
                         <i class="fas fa-clock mr-1" />
-                        <strong>{{ t('oauthFlow.openaiImportantNote') }}</strong>{{ t('oauthFlow.openaiLoadingNote') }}
+                        <strong>{{ t('oauthFlow.openaiImportantNote') }}</strong
+                        >{{ t('oauthFlow.openaiLoadingNote') }}
                       </p>
                       <p class="mt-2 text-xs text-amber-700 dark:text-amber-400">
                         {{ t('oauthFlow.openaiAddressNote') }}
@@ -419,14 +431,17 @@
                     </p>
                     <p class="mb-3 text-sm text-orange-700 dark:text-orange-300">
                       {{ t('oauthFlow.step3DescriptionOpenAI') }}
-                      <strong class="font-mono">http://localhost:1455/...</strong> {{ t('oauthFlow.step3DescriptionOpenAIMiddle') }}
+                      <strong class="font-mono">http://localhost:1455/...</strong>
+                      {{ t('oauthFlow.step3DescriptionOpenAIMiddle') }}
                     </p>
                     <div class="space-y-3">
                       <div>
                         <label
                           class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                         >
-                          <i class="fas fa-link mr-2 text-orange-500" />{{ t('oauthFlow.authLinkOrCode') }}
+                          <i class="fas fa-link mr-2 text-orange-500" />{{
+                            t('oauthFlow.authLinkOrCode')
+                          }}
                         </label>
                         <textarea
                           v-model="authCode"
@@ -440,17 +455,18 @@
                       >
                         <p class="text-xs text-blue-700 dark:text-blue-300">
                           <i class="fas fa-lightbulb mr-1" />
-                          <strong>{{ t('oauthFlow.openaiTip') }}</strong>{{ t('oauthFlow.openaiTipText') }}
+                          <strong>{{ t('oauthFlow.openaiTip') }}</strong
+                          >{{ t('oauthFlow.openaiTipText') }}
                         </p>
                         <p class="mt-1 text-xs text-blue-600 dark:text-blue-400">
-                          {{ t('oauthFlow.openaiLinkExample') }}<span class="font-mono"
+                          {{ t('oauthFlow.openaiLinkExample')
+                          }}<span class="font-mono"
                             >http://localhost:1455/auth/callback?code=ac_4hm8...</span
                           >
                         </p>
                         <p class="text-xs text-blue-600">
-                          {{ t('oauthFlow.openaiCodeExample') }}<span class="font-mono"
-                            >ac_4hm8iqmx9A2fzMy_cwye7U3W7...</span
-                          >
+                          {{ t('oauthFlow.openaiCodeExample')
+                          }}<span class="font-mono">ac_4hm8iqmx9A2fzMy_cwye7U3W7...</span>
                         </p>
                       </div>
                     </div>

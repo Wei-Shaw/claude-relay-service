@@ -72,7 +72,8 @@
           </div>
           <div class="flex items-center space-x-4">
             <div class="text-sm text-gray-700 dark:text-gray-300">
-              {{ t('user.dashboard.welcome') }}, <span class="font-medium">{{ userStore.userName }}</span>
+              {{ t('user.dashboard.welcome') }},
+              <span class="font-medium">{{ userStore.userName }}</span>
             </div>
 
             <!-- 主题切换按钮 -->
@@ -94,7 +95,9 @@
       <!-- Overview Tab -->
       <div v-if="activeTab === 'overview'" class="space-y-6">
         <div>
-          <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">{{ t('user.dashboard.title') }}</h1>
+          <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
+            {{ t('user.dashboard.title') }}
+          </h1>
           <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
             {{ t('user.dashboard.welcomeMessage') }}
           </p>
@@ -272,25 +275,33 @@
             <div class="mt-5 border-t border-gray-200 dark:border-gray-700">
               <dl class="divide-y divide-gray-200 dark:divide-gray-700">
                 <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ t('user.dashboard.username') }}</dt>
+                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {{ t('user.dashboard.username') }}
+                  </dt>
                   <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
                     {{ userProfile?.username }}
                   </dd>
                 </div>
                 <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ t('user.dashboard.displayName') }}</dt>
+                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {{ t('user.dashboard.displayName') }}
+                  </dt>
                   <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
                     {{ userProfile?.displayName || t('user.dashboard.notAvailable') }}
                   </dd>
                 </div>
                 <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ t('user.dashboard.email') }}</dt>
+                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {{ t('user.dashboard.email') }}
+                  </dt>
                   <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
                     {{ userProfile?.email || t('user.dashboard.notAvailable') }}
                   </dd>
                 </div>
                 <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ t('user.dashboard.role') }}</dt>
+                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {{ t('user.dashboard.role') }}
+                  </dt>
                   <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
                     <span
                       class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200"
@@ -300,13 +311,17 @@
                   </dd>
                 </div>
                 <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ t('user.dashboard.memberSince') }}</dt>
+                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {{ t('user.dashboard.memberSince') }}
+                  </dt>
                   <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
                     {{ formatDate(userProfile?.createdAt) }}
                   </dd>
                 </div>
                 <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ t('user.dashboard.lastLogin') }}</dt>
+                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {{ t('user.dashboard.lastLogin') }}
+                  </dt>
                   <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
                     {{ formatDate(userProfile?.lastLoginAt) || t('user.dashboard.notAvailable') }}
                   </dd>

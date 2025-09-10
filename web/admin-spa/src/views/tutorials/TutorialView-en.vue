@@ -81,7 +81,9 @@
                 >
                 file
               </li>
-              <li>Follow the installation wizard to complete installation, keep default settings</li>
+              <li>
+                Follow the installation wizard to complete installation, keep default settings
+              </li>
             </ol>
           </div>
           <div class="mb-3 sm:mb-4">
@@ -105,14 +107,18 @@
             <ul class="space-y-1 text-xs text-blue-700 sm:text-sm sm:text-xs">
               <li>• Recommend using PowerShell instead of CMD</li>
               <li>• If you encounter permission issues, try running as administrator</li>
-              <li>• Some antivirus software may flag as false positive, need to add to whitelist</li>
+              <li>
+                • Some antivirus software may flag as false positive, need to add to whitelist
+              </li>
             </ul>
           </div>
         </div>
 
         <!-- Verify Installation -->
         <div class="rounded-lg border border-green-200 bg-green-50 p-3 sm:p-4">
-          <h6 class="mb-2 text-sm font-medium text-green-800 sm:text-base">Verify Installation Success</h6>
+          <h6 class="mb-2 text-sm font-medium text-green-800 sm:text-base">
+            Verify Installation Success
+          </h6>
           <p class="mb-2 text-xs text-green-700 sm:mb-3 sm:text-sm">
             After installation completes, open PowerShell or CMD and enter the following commands:
           </p>
@@ -122,7 +128,9 @@
             <div class="whitespace-nowrap text-gray-300">node --version</div>
             <div class="whitespace-nowrap text-gray-300">npm --version</div>
           </div>
-          <p class="mt-2 text-xs text-green-700 sm:text-sm">If version numbers are displayed, installation was successful!</p>
+          <p class="mt-2 text-xs text-green-700 sm:text-sm">
+            If version numbers are displayed, installation was successful!
+          </p>
         </div>
       </div>
 
@@ -159,7 +167,8 @@
             </div>
           </div>
           <p class="text-sm text-gray-600 dark:text-gray-400">
-            This command will download and install the latest version of Claude Code from the official npm repository.
+            This command will download and install the latest version of Claude Code from the
+            official npm repository.
           </p>
 
           <div class="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 sm:p-4">
@@ -173,15 +182,21 @@
 
         <!-- Verify Installation -->
         <div class="rounded-lg border border-green-200 bg-green-50 p-3 sm:p-4">
-          <h6 class="mb-2 font-medium text-green-800 dark:text-green-300">Verify Claude Code Installation</h6>
-          <p class="mb-3 text-sm text-green-700">After installation completes, enter the following command to check if installation was successful:</p>
+          <h6 class="mb-2 font-medium text-green-800 dark:text-green-300">
+            Verify Claude Code Installation
+          </h6>
+          <p class="mb-3 text-sm text-green-700">
+            After installation completes, enter the following command to check if installation was
+            successful:
+          </p>
           <div
             class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
           >
             <div class="whitespace-nowrap text-gray-300">claude --version</div>
           </div>
           <p class="mt-2 text-sm text-green-700">
-            If version number is displayed, congratulations! Claude Code has been successfully installed.
+            If version number is displayed, congratulations! Claude Code has been successfully
+            installed.
           </p>
         </div>
       </div>
@@ -230,7 +245,8 @@
                 </div>
               </div>
               <p class="mt-2 text-xs text-yellow-700">
-                💡 Remember to replace "your-api-key" with the actual key created in the "API Keys" tab above.
+                💡 Remember to replace "your-api-key" with the actual key created in the "API Keys"
+                tab above.
               </p>
             </div>
 
@@ -280,9 +296,12 @@
 
         <!-- Verify Environment Variable Setup -->
         <div class="mt-6 rounded-lg border border-blue-200 bg-blue-50 p-3 sm:p-4">
-          <h6 class="mb-2 font-medium text-blue-800 dark:text-blue-300">Verify Environment Variable Setup</h6>
+          <h6 class="mb-2 font-medium text-blue-800 dark:text-blue-300">
+            Verify Environment Variable Setup
+          </h6>
           <p class="mb-3 text-sm text-blue-700">
-            After setting environment variables, you can verify if they were set successfully with the following commands:
+            After setting environment variables, you can verify if they were set successfully with
+            the following commands:
           </p>
 
           <div class="space-y-4">
@@ -320,7 +339,8 @@
               <div>cr_xxxxxxxxxxxxxxxxxx</div>
             </div>
             <p class="text-xs text-blue-700">
-              💡 If output is empty or shows variable name itself, environment variable setup failed, please reconfigure.
+              💡 If output is empty or shows variable name itself, environment variable setup
+              failed, please reconfigure.
             </p>
           </div>
         </div>
@@ -416,7 +436,8 @@
             Configure Codex Environment Variables
           </h5>
           <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
-            If you use tools that support OpenAI API (such as Codex), you need to set the following environment variables:
+            If you use tools that support OpenAI API (such as Codex), you need to set the following
+            environment variables:
           </p>
 
           <div class="space-y-4">
@@ -528,8 +549,8 @@
               <ul class="list-inside list-disc space-y-1 text-sm">
                 <li>Run PowerShell as Administrator</li>
                 <li>
-                  Or configure npm to use user directory: <code
-                    class="rounded bg-gray-200 px-1 text-xs sm:text-sm"
+                  Or configure npm to use user directory:
+                  <code class="rounded bg-gray-200 px-1 text-xs sm:text-sm"
                     >npm config set prefix %APPDATA%\npm</code
                   >
                 </li>
@@ -567,7 +588,8 @@
                 <li>Restart PowerShell or CMD</li>
                 <li>Or log out and log back into Windows</li>
                 <li>
-                  Verify settings: <code class="rounded bg-gray-200 px-1 text-xs sm:text-sm"
+                  Verify settings:
+                  <code class="rounded bg-gray-200 px-1 text-xs sm:text-sm"
                     >echo $env:ANTHROPIC_BASE_URL</code
                   >
                 </li>
@@ -605,7 +627,8 @@
           <div class="mb-4">
             <p class="mb-3 text-gray-700">Method 1: Using Homebrew (Recommended)</p>
             <p class="mb-2 text-xs text-gray-600 dark:text-gray-400 sm:text-sm">
-              If you already have Homebrew installed, using it to install Node.js will be more convenient:
+              If you already have Homebrew installed, using it to install Node.js will be more
+              convenient:
             </p>
             <div
               class="overflow-x-auto rounded-lg bg-gray-900 p-3 font-mono text-xs text-green-400 sm:p-4 sm:text-sm"
@@ -655,15 +678,21 @@
 
         <!-- Verify Installation -->
         <div class="rounded-lg border border-green-200 bg-green-50 p-3 sm:p-4">
-          <h6 class="mb-2 font-medium text-green-800 dark:text-green-300">Verify Installation Success</h6>
-          <p class="mb-3 text-sm text-green-700">After installation, open Terminal and enter the following commands:</p>
+          <h6 class="mb-2 font-medium text-green-800 dark:text-green-300">
+            Verify Installation Success
+          </h6>
+          <p class="mb-3 text-sm text-green-700">
+            After installation, open Terminal and enter the following commands:
+          </p>
           <div
             class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
           >
             <div class="whitespace-nowrap text-gray-300">node --version</div>
             <div class="whitespace-nowrap text-gray-300">npm --version</div>
           </div>
-          <p class="mt-2 text-sm text-green-700">If version numbers are displayed, the installation was successful!</p>
+          <p class="mt-2 text-sm text-green-700">
+            If version numbers are displayed, the installation was successful!
+          </p>
         </div>
       </div>
 
@@ -699,7 +728,9 @@
               npm install -g @anthropic-ai/claude-code
             </div>
           </div>
-          <p class="mb-2 text-sm text-gray-600">If you encounter permission issues, you can use sudo:</p>
+          <p class="mb-2 text-sm text-gray-600">
+            If you encounter permission issues, you can use sudo:
+          </p>
           <div
             class="overflow-x-auto rounded-lg bg-gray-900 p-3 font-mono text-xs text-green-400 sm:p-4 sm:text-sm"
           >
@@ -711,15 +742,21 @@
 
         <!-- Verify Installation -->
         <div class="rounded-lg border border-green-200 bg-green-50 p-3 sm:p-4">
-          <h6 class="mb-2 font-medium text-green-800 dark:text-green-300">Verify Claude Code Installation</h6>
-          <p class="mb-3 text-sm text-green-700">After installation completes, enter the following command to check if installation was successful:</p>
+          <h6 class="mb-2 font-medium text-green-800 dark:text-green-300">
+            Verify Claude Code Installation
+          </h6>
+          <p class="mb-3 text-sm text-green-700">
+            After installation completes, enter the following command to check if installation was
+            successful:
+          </p>
           <div
             class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
           >
             <div class="whitespace-nowrap text-gray-300">claude --version</div>
           </div>
           <p class="mt-2 text-sm text-green-700">
-            If version number is displayed, congratulations! Claude Code has been successfully installed.
+            If version number is displayed, congratulations! Claude Code has been successfully
+            installed.
           </p>
         </div>
       </div>
@@ -766,7 +803,8 @@
                 </div>
               </div>
               <p class="mt-2 text-xs text-yellow-700">
-                💡 Remember to replace "your-api-key" with the actual key created in the "API Keys" tab above.
+                💡 Remember to replace "your-api-key" with the actual key created in the "API Keys"
+                tab above.
               </p>
             </div>
 
@@ -903,7 +941,8 @@
             Configure Codex Environment Variables
           </h5>
           <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
-            If you use tools that support OpenAI API (such as Codex), you need to set the following environment variables:
+            If you use tools that support OpenAI API (such as Codex), you need to set the following
+            environment variables:
           </p>
 
           <div class="space-y-4">
@@ -1014,13 +1053,14 @@
               <p class="mb-2">Try the following solutions:</p>
               <ul class="list-inside list-disc space-y-1 text-sm">
                 <li>
-                  Install with sudo: <code class="rounded bg-gray-200 px-1 text-xs sm:text-sm"
+                  Install with sudo:
+                  <code class="rounded bg-gray-200 px-1 text-xs sm:text-sm"
                     >sudo npm install -g @anthropic-ai/claude-code</code
                   >
                 </li>
                 <li>
-                  Or configure npm to use user directory: <code
-                    class="rounded bg-gray-200 px-1 text-xs sm:text-sm"
+                  Or configure npm to use user directory:
+                  <code class="rounded bg-gray-200 px-1 text-xs sm:text-sm"
                     >npm config set prefix ~/.npm-global</code
                   >
                 </li>
@@ -1040,7 +1080,8 @@
                 <li>Open "System Preferences" → "Security & Privacy"</li>
                 <li>Click "Allow Anyway" or "Open Anyway"</li>
                 <li>
-                  Or run in Terminal: <code class="rounded bg-gray-200 px-1 text-xs sm:text-sm"
+                  Or run in Terminal:
+                  <code class="rounded bg-gray-200 px-1 text-xs sm:text-sm"
                     >sudo spctl --master-disable</code
                   >
                 </li>
@@ -1057,10 +1098,13 @@
             <div class="px-3 pb-3 text-gray-600 sm:px-4 sm:pb-4">
               <p class="mb-2">Check the following points:</p>
               <ul class="list-inside list-disc space-y-1 text-sm">
-                <li>Confirm you modified the correct configuration file (.zshrc or .bash_profile)</li>
+                <li>
+                  Confirm you modified the correct configuration file (.zshrc or .bash_profile)
+                </li>
                 <li>Restart Terminal</li>
                 <li>
-                  Verify settings: <code class="rounded bg-gray-200 px-1 text-xs sm:text-sm"
+                  Verify settings:
+                  <code class="rounded bg-gray-200 px-1 text-xs sm:text-sm"
                     >echo $ANTHROPIC_BASE_URL</code
                   >
                 </li>
@@ -1127,7 +1171,10 @@
             <h6 class="mb-2 text-sm font-medium text-orange-800 sm:text-base">Linux Notes</h6>
             <ul class="space-y-1 text-xs text-orange-700 sm:text-sm">
               <li>• Some distributions may require additional dependencies</li>
-              <li>• If you encounter permission issues, use <code class="rounded bg-orange-200 px-1">sudo</code></li>
+              <li>
+                • If you encounter permission issues, use
+                <code class="rounded bg-orange-200 px-1">sudo</code>
+              </li>
               <li>• Ensure your user has write permissions to npm's global directory</li>
             </ul>
           </div>
@@ -1135,15 +1182,21 @@
 
         <!-- Verify Installation -->
         <div class="rounded-lg border border-green-200 bg-green-50 p-3 sm:p-4">
-          <h6 class="mb-2 font-medium text-green-800 dark:text-green-300">Verify Installation Success</h6>
-          <p class="mb-3 text-sm text-green-700">After installation, open terminal and enter the following commands:</p>
+          <h6 class="mb-2 font-medium text-green-800 dark:text-green-300">
+            Verify Installation Success
+          </h6>
+          <p class="mb-3 text-sm text-green-700">
+            After installation, open terminal and enter the following commands:
+          </p>
           <div
             class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
           >
             <div class="whitespace-nowrap text-gray-300">node --version</div>
             <div class="whitespace-nowrap text-gray-300">npm --version</div>
           </div>
-          <p class="mt-2 text-sm text-green-700">If version numbers are displayed, the installation was successful!</p>
+          <p class="mt-2 text-sm text-green-700">
+            If version numbers are displayed, the installation was successful!
+          </p>
         </div>
       </div>
 
@@ -1179,7 +1232,9 @@
               npm install -g @anthropic-ai/claude-code
             </div>
           </div>
-          <p class="mb-2 text-sm text-gray-600">If you encounter permission issues, you can use sudo:</p>
+          <p class="mb-2 text-sm text-gray-600">
+            If you encounter permission issues, you can use sudo:
+          </p>
           <div
             class="overflow-x-auto rounded-lg bg-gray-900 p-3 font-mono text-xs text-green-400 sm:p-4 sm:text-sm"
           >
@@ -1191,15 +1246,21 @@
 
         <!-- Verify Installation -->
         <div class="rounded-lg border border-green-200 bg-green-50 p-3 sm:p-4">
-          <h6 class="mb-2 font-medium text-green-800 dark:text-green-300">Verify Claude Code Installation</h6>
-          <p class="mb-3 text-sm text-green-700">After installation completes, enter the following command to check if installation was successful:</p>
+          <h6 class="mb-2 font-medium text-green-800 dark:text-green-300">
+            Verify Claude Code Installation
+          </h6>
+          <p class="mb-3 text-sm text-green-700">
+            After installation completes, enter the following command to check if installation was
+            successful:
+          </p>
           <div
             class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
           >
             <div class="whitespace-nowrap text-gray-300">claude --version</div>
           </div>
           <p class="mt-2 text-sm text-green-700">
-            If version number is displayed, congratulations! Claude Code has been successfully installed.
+            If version number is displayed, congratulations! Claude Code has been successfully
+            installed.
           </p>
         </div>
       </div>
@@ -1246,7 +1307,8 @@
                 </div>
               </div>
               <p class="mt-2 text-xs text-yellow-700">
-                💡 Remember to replace "your-api-key" with the actual key created in the "API Keys" tab above.
+                💡 Remember to replace "your-api-key" with the actual key created in the "API Keys"
+                tab above.
               </p>
             </div>
 
@@ -1381,7 +1443,8 @@
             Configure Codex Environment Variables
           </h5>
           <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
-            If you use tools that support OpenAI API (such as Codex), you need to set the following environment variables:
+            If you use tools that support OpenAI API (such as Codex), you need to set the following
+            environment variables:
           </p>
 
           <div class="space-y-4">
@@ -1492,18 +1555,20 @@
               <p class="mb-2">Try the following solutions:</p>
               <ul class="list-inside list-disc space-y-1 text-sm">
                 <li>
-                  Install with sudo: <code class="rounded bg-gray-200 px-1 text-xs sm:text-sm"
+                  Install with sudo:
+                  <code class="rounded bg-gray-200 px-1 text-xs sm:text-sm"
                     >sudo npm install -g @anthropic-ai/claude-code</code
                   >
                 </li>
                 <li>
-                  Or configure npm to use user directory: <code
-                    class="rounded bg-gray-200 px-1 text-xs sm:text-sm"
+                  Or configure npm to use user directory:
+                  <code class="rounded bg-gray-200 px-1 text-xs sm:text-sm"
                     >npm config set prefix ~/.npm-global</code
                   >
                 </li>
                 <li>
-                  Then add to PATH: <code class="rounded bg-gray-200 px-1 text-xs sm:text-sm"
+                  Then add to PATH:
+                  <code class="rounded bg-gray-200 px-1 text-xs sm:text-sm"
                     >export PATH=~/.npm-global/bin:$PATH</code
                   >
                 </li>
@@ -1547,7 +1612,8 @@
                   <code class="rounded bg-gray-200 px-1 text-xs sm:text-sm">source ~/.bashrc</code>
                 </li>
                 <li>
-                  Verify settings: <code class="rounded bg-gray-200 px-1 text-xs sm:text-sm"
+                  Verify settings:
+                  <code class="rounded bg-gray-200 px-1 text-xs sm:text-sm"
                     >echo $ANTHROPIC_BASE_URL</code
                   >
                 </li>
@@ -1564,10 +1630,12 @@
     >
       <h5 class="mb-2 text-lg font-semibold sm:text-xl">🎉 Congratulations!</h5>
       <p class="mb-3 text-sm text-blue-100 sm:mb-4 sm:text-base">
-        You have successfully installed and configured Claude Code. Now you can start enjoying the convenience brought by AI programming assistant.
+        You have successfully installed and configured Claude Code. Now you can start enjoying the
+        convenience brought by AI programming assistant.
       </p>
       <p class="text-xs text-blue-200 sm:text-sm">
-        If you encounter any issues during use, you can check the official documentation or community discussions for help.
+        If you encounter any issues during use, you can check the official documentation or
+        community discussions for help.
       </p>
     </div>
   </div>

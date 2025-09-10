@@ -68,7 +68,10 @@
                   icon="fa-calendar-alt"
                   icon-color="text-blue-500"
                   :options="timeRangeOptions"
-                  :placeholder="timeRangeOptions.find(o => o.value === 'today')?.label || t('apiKeys.timeRange.today')"
+                  :placeholder="
+                    timeRangeOptions.find((o) => o.value === 'today')?.label ||
+                    t('apiKeys.timeRange.today')
+                  "
                   @change="loadApiKeys()"
                 />
               </div>
@@ -84,7 +87,9 @@
                     icon="fa-tags"
                     icon-color="text-purple-500"
                     :options="tagOptions"
-                    :placeholder="tagOptions.find(o => o.value === '')?.label || t('apiKeys.allTags')"
+                    :placeholder="
+                      tagOptions.find((o) => o.value === '')?.label || t('apiKeys.allTags')
+                    "
                     @change="currentPage = 1"
                   />
                   <span
@@ -105,7 +110,11 @@
                   <input
                     v-model="searchKeyword"
                     class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 pl-9 text-sm text-gray-700 placeholder-gray-400 shadow-sm transition-all duration-200 hover:border-gray-300 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 dark:hover:border-gray-500"
-                    :placeholder="isLdapEnabled ? t('apiKeys.searchPlaceholderWithOwner') : t('apiKeys.searchPlaceholder')"
+                    :placeholder="
+                      isLdapEnabled
+                        ? t('apiKeys.searchPlaceholderWithOwner')
+                        : t('apiKeys.searchPlaceholder')
+                    "
                     type="text"
                     @input="currentPage = 1"
                   />
@@ -148,7 +157,9 @@
                   class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
                 ></div>
                 <i class="fas fa-edit relative text-blue-600 dark:text-blue-400" />
-                <span class="relative">{{ t('apiKeys.bulkEdit') }} ({{ selectedApiKeys.length }})</span>
+                <span class="relative"
+                  >{{ t('apiKeys.bulkEdit') }} ({{ selectedApiKeys.length }})</span
+                >
               </button>
 
               <!-- 批量删除按钮 - 移到刷新按钮旁边 -->
@@ -161,7 +172,9 @@
                   class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-red-500 to-pink-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
                 ></div>
                 <i class="fas fa-trash relative text-red-600 dark:text-red-400" />
-                <span class="relative">{{ t('apiKeys.bulkDelete') }} ({{ selectedApiKeys.length }})</span>
+                <span class="relative"
+                  >{{ t('apiKeys.bulkDelete') }} ({{ selectedApiKeys.length }})</span
+                >
               </button>
             </div>
 
@@ -471,25 +484,34 @@
                         <!-- 今日使用统计 -->
                         <div class="mb-2">
                           <div class="mb-1 flex items-center justify-between text-sm">
-                            <span class="text-gray-600 dark:text-gray-400">{{ t('apiKeys.dailyRequests') }}</span>
+                            <span class="text-gray-600 dark:text-gray-400">{{
+                              t('apiKeys.dailyRequests')
+                            }}</span>
                             <span class="font-semibold text-gray-900 dark:text-gray-100"
-                              >{{ formatNumber(key.usage?.daily?.requests || 0) }}{{ t('apiKeys.requests') }}</span
+                              >{{ formatNumber(key.usage?.daily?.requests || 0)
+                              }}{{ t('apiKeys.requests') }}</span
                             >
                           </div>
                           <div class="flex items-center justify-between text-sm">
-                            <span class="text-gray-600 dark:text-gray-400">{{ t('apiKeys.dailyCost') }}</span>
+                            <span class="text-gray-600 dark:text-gray-400">{{
+                              t('apiKeys.dailyCost')
+                            }}</span>
                             <span class="font-semibold text-green-600"
                               >${{ (key.dailyCost || 0).toFixed(4) }}</span
                             >
                           </div>
                           <div class="flex items-center justify-between text-sm">
-                            <span class="text-gray-600 dark:text-gray-400">{{ t('apiKeys.totalCost') }}</span>
+                            <span class="text-gray-600 dark:text-gray-400">{{
+                              t('apiKeys.totalCost')
+                            }}</span>
                             <span class="font-semibold text-blue-600"
                               >${{ (key.totalCost || 0).toFixed(4) }}</span
                             >
                           </div>
                           <div class="flex items-center justify-between text-sm">
-                            <span class="text-gray-600 dark:text-gray-400">{{ t('apiKeys.lastUsed') }}</span>
+                            <span class="text-gray-600 dark:text-gray-400">{{
+                              t('apiKeys.lastUsed')
+                            }}</span>
                             <span class="font-medium text-gray-700 dark:text-gray-300">{{
                               formatLastUsed(key.lastUsedAt)
                             }}</span>
@@ -499,7 +521,9 @@
                         <!-- 每日费用限制进度条 -->
                         <div v-if="key.dailyCostLimit > 0" class="space-y-1">
                           <div class="flex items-center justify-between text-xs">
-                            <span class="text-gray-500 dark:text-gray-400">{{ t('apiKeys.dailyLimit') }}</span>
+                            <span class="text-gray-500 dark:text-gray-400">{{
+                              t('apiKeys.dailyLimit')
+                            }}</span>
                             <span class="text-gray-700 dark:text-gray-300">
                               ${{ (key.dailyCost || 0).toFixed(2) }} / ${{
                                 key.dailyCostLimit.toFixed(2)
@@ -518,7 +542,9 @@
                         <!-- Opus 周费用限制进度条 -->
                         <div v-if="key.weeklyOpusCostLimit > 0" class="space-y-1">
                           <div class="flex items-center justify-between text-xs">
-                            <span class="text-gray-500 dark:text-gray-400">{{ t('apiKeys.weeklyOpusLimit') }}</span>
+                            <span class="text-gray-500 dark:text-gray-400">{{
+                              t('apiKeys.weeklyOpusLimit')
+                            }}</span>
                             <span class="text-gray-700 dark:text-gray-300">
                               ${{ (key.weeklyOpusCost || 0).toFixed(2) }} / ${{
                                 key.weeklyOpusCostLimit.toFixed(2)
@@ -703,7 +729,9 @@
                     <td class="bg-gray-50 px-3 py-4 dark:bg-gray-700" colspan="8">
                       <div v-if="!apiKeyModelStats[key.id]" class="py-4 text-center">
                         <div class="loading-spinner mx-auto" />
-                        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t('apiKeys.loadingModelStats') }}</p>
+                        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                          {{ t('apiKeys.loadingModelStats') }}
+                        </p>
                       </div>
                       <div class="space-y-4">
                         <!-- 通用的标题和时间筛选器，无论是否有数据都显示 -->
@@ -719,7 +747,11 @@
                               v-if="apiKeyModelStats[key.id] && apiKeyModelStats[key.id].length > 0"
                               class="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-500 dark:bg-gray-700 dark:text-gray-400"
                             >
-                              {{ t('apiKeys.modelStatsCount', { count: apiKeyModelStats[key.id].length }) }}
+                              {{
+                                t('apiKeys.modelStatsCount', {
+                                  count: apiKeyModelStats[key.id].length
+                                })
+                              }}
                             </span>
 
                             <!-- API Keys日期筛选器 -->
@@ -773,7 +805,9 @@
                         >
                           <div class="mb-3 flex items-center justify-center gap-2">
                             <i class="fas fa-chart-line text-lg text-gray-400" />
-                            <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('apiKeys.noModelData') }}</p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">
+                              {{ t('apiKeys.noModelData') }}
+                            </p>
                             <button
                               class="ml-2 flex items-center gap-1 text-sm text-blue-500 transition-colors hover:text-blue-700"
                               :title="t('apiKeys.resetFilter')"
@@ -1078,7 +1112,9 @@
                 <!-- 今日使用 -->
                 <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-700">
                   <div class="mb-2 flex items-center justify-between">
-                    <span class="text-xs text-gray-600 dark:text-gray-400">{{ t('apiKeys.dailyUsage') }}</span>
+                    <span class="text-xs text-gray-600 dark:text-gray-400">{{
+                      t('apiKeys.dailyUsage')
+                    }}</span>
                     <button
                       class="text-xs text-blue-600 hover:text-blue-800"
                       @click="showUsageDetails(key)"
@@ -1089,19 +1125,26 @@
                   <div class="grid grid-cols-2 gap-3">
                     <div>
                       <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                        {{ formatNumber(key.usage?.daily?.requests || 0) }} {{ t('apiKeys.requests') }}
+                        {{ formatNumber(key.usage?.daily?.requests || 0) }}
+                        {{ t('apiKeys.requests') }}
                       </p>
-                      <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('apiKeys.requests') }}</p>
+                      <p class="text-xs text-gray-500 dark:text-gray-400">
+                        {{ t('apiKeys.requests') }}
+                      </p>
                     </div>
                     <div>
                       <p class="text-sm font-semibold text-green-600">
                         ${{ (key.dailyCost || 0).toFixed(4) }}
                       </p>
-                      <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('apiKeys.totalCost') }}</p>
+                      <p class="text-xs text-gray-500 dark:text-gray-400">
+                        {{ t('apiKeys.totalCost') }}
+                      </p>
                     </div>
                   </div>
                   <div class="mt-2 flex items-center justify-between">
-                    <span class="text-xs text-gray-600 dark:text-gray-400">{{ t('apiKeys.lastUsed') }}</span>
+                    <span class="text-xs text-gray-600 dark:text-gray-400">{{
+                      t('apiKeys.lastUsed')
+                    }}</span>
                     <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{
                       formatLastUsed(key.lastUsedAt)
                     }}</span>
@@ -1111,7 +1154,9 @@
                 <!-- 限制进度 -->
                 <div v-if="key.dailyCostLimit > 0" class="space-y-1">
                   <div class="flex items-center justify-between text-xs">
-                    <span class="text-gray-500 dark:text-gray-400">{{ t('apiKeys.dailyLimit') }}</span>
+                    <span class="text-gray-500 dark:text-gray-400">{{
+                      t('apiKeys.dailyLimit')
+                    }}</span>
                     <span class="text-gray-700 dark:text-gray-300">
                       ${{ (key.dailyCost || 0).toFixed(2) }} / ${{ key.dailyCostLimit.toFixed(2) }}
                     </span>
@@ -1250,7 +1295,9 @@
                 {{ t('apiKeys.totalRecords', { count: sortedApiKeys.length }) }}
               </span>
               <div class="flex items-center gap-2">
-                <span class="text-xs text-gray-600 dark:text-gray-400 sm:text-sm">{{ t('apiKeys.pageSize') }}</span>
+                <span class="text-xs text-gray-600 dark:text-gray-400 sm:text-sm">{{
+                  t('apiKeys.pageSize')
+                }}</span>
                 <select
                   v-model="pageSize"
                   class="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 transition-colors hover:border-gray-300 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 sm:text-sm"
@@ -1260,7 +1307,9 @@
                     {{ size }}
                   </option>
                 </select>
-                <span class="text-xs text-gray-600 dark:text-gray-400 sm:text-sm">{{ t('apiKeys.records') }}</span>
+                <span class="text-xs text-gray-600 dark:text-gray-400 sm:text-sm">{{
+                  t('apiKeys.records')
+                }}</span>
               </div>
             </div>
 
@@ -1475,19 +1524,26 @@
                     <td class="px-3 py-4">
                       <div class="text-sm">
                         <div class="flex items-center justify-between">
-                          <span class="text-gray-600 dark:text-gray-400">{{ t('apiKeys.requests') }}</span>
+                          <span class="text-gray-600 dark:text-gray-400">{{
+                            t('apiKeys.requests')
+                          }}</span>
                           <span class="font-semibold text-gray-900 dark:text-gray-100">
-                            {{ formatNumber(key.usage?.total?.requests || 0) }} {{ t('apiKeys.requests') }}
+                            {{ formatNumber(key.usage?.total?.requests || 0) }}
+                            {{ t('apiKeys.requests') }}
                           </span>
                         </div>
                         <div class="flex items-center justify-between">
-                          <span class="text-gray-600 dark:text-gray-400">{{ t('apiKeys.totalCost') }}</span>
+                          <span class="text-gray-600 dark:text-gray-400">{{
+                            t('apiKeys.totalCost')
+                          }}</span>
                           <span class="font-semibold text-green-600">
                             ${{ (key.usage?.total?.cost || 0).toFixed(4) }}
                           </span>
                         </div>
                         <div v-if="key.lastUsedAt" class="flex items-center justify-between">
-                          <span class="text-gray-600 dark:text-gray-400">{{ t('apiKeys.lastUsed') }}</span>
+                          <span class="text-gray-600 dark:text-gray-400">{{
+                            t('apiKeys.lastUsed')
+                          }}</span>
                           <span class="font-medium text-gray-700 dark:text-gray-300">
                             {{ formatLastUsed(key.lastUsedAt) }}
                           </span>
@@ -2350,9 +2406,7 @@ const toggleApiKeyStatus = async (key) => {
       )
     } else {
       // 降级方案
-      confirmed = confirm(
-        t('apiKeys.confirmDisable', { name: key.name })
-      )
+      confirmed = confirm(t('apiKeys.confirmDisable', { name: key.name }))
     }
   }
 
@@ -2539,7 +2593,12 @@ const batchDeleteApiKeys = async () => {
   const message = t('apiKeys.confirmBatchDelete', { count: selectedCount })
 
   if (window.showConfirm) {
-    confirmed = await window.showConfirm(t('apiKeys.confirmBatchDelete').split(' ')[0], message, t('common.confirm'), t('common.cancel'))
+    confirmed = await window.showConfirm(
+      t('apiKeys.confirmBatchDelete').split(' ')[0],
+      message,
+      t('common.confirm'),
+      t('common.cancel')
+    )
   } else {
     confirmed = confirm(message)
   }
@@ -2562,7 +2621,10 @@ const batchDeleteApiKeys = async () => {
         // 如果有失败的，显示详细信息
         if (failedCount > 0) {
           const errorMessages = errors.map((e) => `${e.keyId}: ${e.error}`).join('\n')
-          showToast(t('apiKeys.batchPartialFail', { failed: failedCount }) + ':\n' + errorMessages, 'warning')
+          showToast(
+            t('apiKeys.batchPartialFail', { failed: failedCount }) + ':\n' + errorMessages,
+            'warning'
+          )
         }
       } else {
         showToast(t('apiKeys.batchAllFailed'), 'error')

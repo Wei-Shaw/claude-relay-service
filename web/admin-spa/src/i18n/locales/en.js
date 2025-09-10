@@ -24,7 +24,7 @@ export default {
     userMenu: 'User Menu',
     logout: 'Logout',
     settings: 'Settings',
-    
+
     // Version related
     currentVersion: 'Current Version',
     newVersionAvailable: 'New version available',
@@ -34,10 +34,10 @@ export default {
     checkingUpdate: 'Checking for updates...',
     alreadyLatest: 'Already the latest version',
     checkUpdate: 'Check Update',
-    
+
     // User menu items
     changeAccountInfo: 'Change Account Info',
-    
+
     // Change password modal
     changePasswordModal: {
       title: 'Change Account Information',
@@ -55,7 +55,7 @@ export default {
       confirmPasswordPlaceholder: 'Please enter new password again',
       saving: 'Saving...',
       save: 'Save Changes',
-      
+
       // Messages
       passwordMismatch: 'Passwords do not match',
       passwordTooShort: 'New password must be at least 8 characters',
@@ -64,7 +64,7 @@ export default {
       changeFailed: 'Change failed',
       changePasswordFailed: 'Failed to change password'
     },
-    
+
     // Logout
     logoutConfirm: 'Are you sure you want to logout?',
     logoutSuccess: 'Logged out safely'
@@ -79,7 +79,7 @@ export default {
     timeRange: 'Statistics Time Range',
     today: 'Today',
     thisMonth: 'This Month',
-    
+
     // API Key Input
     usageStatsQuery: 'Usage Statistics Query',
     apiKeyDescription: 'Query your API Key usage and statistical data',
@@ -90,7 +90,7 @@ export default {
     singleModeTitle: 'Single Mode',
     aggregateModeTitle: 'Aggregate Mode',
     queryButton: 'Query',
-    
+
     // Stats Overview
     batchQuerySummary: 'Batch Query Summary',
     apiKeyInfo: 'API Key Information',
@@ -101,13 +101,13 @@ export default {
     totalTokens: 'Total Tokens',
     totalCost: 'Total Cost',
     individual: '',
-    
+
     // Aggregated Stats Card
     usageRatio: 'Usage Ratio',
     requests: ' requests',
     otherKeys: 'Other',
     keys: 'Keys',
-    
+
     // Model Usage Stats
     modelUsageStats: 'Model Usage Statistics',
     loadingModelStats: 'Loading model statistics...',
@@ -118,14 +118,14 @@ export default {
     cacheCreateTokens: 'Cache Create',
     cacheReadTokens: 'Cache Read',
     noModelData: 'No {period} model usage data available',
-    
+
     // Token Distribution
     tokenDistribution: 'Token Usage Distribution',
     inputToken: 'Input Tokens',
     outputToken: 'Output Tokens',
     cacheCreateToken: 'Cache Create Tokens',
     cacheReadToken: 'Cache Read Tokens',
-    
+
     // Limit Config
     limitConfig: 'Limit Configuration',
     limitConfigAggregate: 'Limit Configuration (Aggregate Query Mode)',
@@ -138,7 +138,7 @@ export default {
     usageToday: 'Usage Today',
     usageThisMonth: 'Usage This Month',
     remaining: 'Remaining',
-    
+
     // Stats Overview - Additional keys
     name: 'Name',
     status: 'Status',
@@ -165,7 +165,7 @@ export default {
     monthlyTokens: 'Monthly Tokens',
     monthlyCost: 'Monthly Cost',
     monthlyInputTokens: 'Monthly Input Tokens',
-    
+
     // Limit Config - Additional keys
     dailyCostLimit: 'Daily Cost Limit',
     concurrencyLimit: 'Concurrency Limit',
@@ -181,31 +181,38 @@ export default {
     allowedClientsList: 'Allowed Clients',
     allowedClientsNote: 'This API Key can only be used by the clients listed above',
     timeWindowLimit: 'Time Window Limit',
-    aggregateStatsNote: 'Each API Key has independent limit settings, individual limit configurations are not shown in aggregate mode',
+    aggregateStatsNote:
+      'Each API Key has independent limit settings, individual limit configurations are not shown in aggregate mode',
     aggregateStatsSummary: 'Aggregate Statistics Summary',
     invalidKeysCount: '{count} invalid API Keys',
-    orRelationshipRequests: 'Request count and cost limits have an "OR" relationship, rate limiting is triggered when either limit is reached',
-    orRelationshipTokens: 'Request count and token usage have an "OR" relationship, rate limiting is triggered when either limit is reached',
+    orRelationshipRequests:
+      'Request count and cost limits have an "OR" relationship, rate limiting is triggered when either limit is reached',
+    orRelationshipTokens:
+      'Request count and token usage have an "OR" relationship, rate limiting is triggered when either limit is reached',
     onlyRequestsLimit: 'Only request count is limited',
-    
+
     // Token Distribution - Additional keys
     totalAmount: 'Total',
     todayTotal: 'Today Total',
     monthlyTotal: 'Monthly Total',
-    
+
     // Additional missing keys
     usageRatioOnlyInMultiMode: 'Usage ratio is only displayed in multi-key query mode',
     noData: 'No Data',
-    
+
     // ApiKeyInput placeholders and texts
     apiKeyPlaceholder: 'Please enter your API Key (cr_...)',
-    apiKeysPlaceholder: 'Please enter your API Keys, supporting the following formats:\ncr_xxx\ncr_yyy\nor\ncr_xxx, cr_yyy',
+    apiKeysPlaceholder:
+      'Please enter your API Keys, supporting the following formats:\ncr_xxx\ncr_yyy\nor\ncr_xxx, cr_yyy',
     clearInput: 'Clear Input',
-    securityNoticeSingle: 'Your API Key is only used to query your own statistical data and will not be stored or used for other purposes',
-    securityNoticeMulti: 'Your API Keys are only used to query statistical data and will not be stored. Some individual information will not be displayed in aggregate mode.',
-    multiKeyTip: 'Tip: Supports querying up to 30 API Keys simultaneously. Use Ctrl+Enter for quick query.'
+    securityNoticeSingle:
+      'Your API Key is only used to query your own statistical data and will not be stored or used for other purposes',
+    securityNoticeMulti:
+      'Your API Keys are only used to query statistical data and will not be stored. Some individual information will not be displayed in aggregate mode.',
+    multiKeyTip:
+      'Tip: Supports querying up to 30 API Keys simultaneously. Use Ctrl+Enter for quick query.'
   },
-  
+
   // Login page
   login: {
     title: 'Admin Panel',
@@ -216,7 +223,7 @@ export default {
     loginButton: 'Login',
     loggingIn: 'Logging in...'
   },
-  
+
   // Dashboard page
   dashboard: {
     // Main stats cards
@@ -231,7 +238,7 @@ export default {
     totalRequests: 'Total Requests',
     systemStatus: 'System Status',
     uptime: 'Uptime',
-    
+
     // Platform accounts tooltip
     claudeAccount: 'Claude: {total} accounts (Normal: {normal})',
     consoleAccount: 'Console: {total} accounts (Normal: {normal})',
@@ -239,7 +246,7 @@ export default {
     bedrockAccount: 'Bedrock: {total} accounts (Normal: {normal})',
     openaiAccount: 'OpenAI: {total} accounts (Normal: {normal})',
     azureOpenaiAccount: 'Azure OpenAI: {total} accounts (Normal: {normal})',
-    
+
     // Token stats cards
     todayToken: 'Today Tokens',
     totalTokenConsumption: 'Total Token Consumption',
@@ -247,7 +254,7 @@ export default {
     outputTokens: 'Output',
     cacheCreateTokens: 'Cache Create',
     cacheReadTokens: 'Cache Read',
-    
+
     // Real-time metrics
     realtimeRPM: 'Realtime RPM',
     realtimeTPM: 'Realtime TPM',
@@ -255,10 +262,10 @@ export default {
     tokensPerMinute: 'Tokens per Minute',
     historicalData: 'Historical Data',
     minutes: 'minutes',
-    
+
     // Charts section
     modelDistributionAndTrend: 'Model Usage Distribution & Token Usage Trends',
-    
+
     // Date filter presets
     today: 'Today',
     yesterday: 'Yesterday',
@@ -268,35 +275,35 @@ export default {
     lastWeek: 'Last Week',
     thisMonth: 'This Month',
     lastMonth: 'Last Month',
-    
+
     // Granularity buttons
     byDay: 'By Day',
     byHour: 'By Hour',
-    
+
     // Date picker
     startDatePlaceholder: 'Start Date',
     endDatePlaceholder: 'End Date',
     dateSeparator: 'to',
     maxHours24: 'Maximum 24 hours',
-    
+
     // Auto refresh controls
     autoRefresh: 'Auto Refresh',
     refresh: 'Refresh',
     refreshing: 'Refreshing',
     refreshDataNow: 'Refresh data now',
-    
+
     // Charts
     tokenUsageDistribution: 'Token Usage Distribution',
     detailedStatistics: 'Detailed Statistics',
     noModelUsageData: 'No model usage data available',
-    
+
     // Table headers
     model: 'Model',
     requestCount: 'Requests',
     totalTokens: 'Total Tokens',
     cost: 'Cost',
     percentage: 'Percentage',
-    
+
     // Trend charts
     tokenUsageTrend: 'Token Usage Trend',
     apiKeysUsageTrend: 'API Keys Usage Trend',
@@ -304,7 +311,7 @@ export default {
     tokenCount: 'Token Count',
     totalApiKeysCount: 'Total {count} API Keys',
     showingTop10: 'Total {count} API Keys, showing top 10 by usage',
-    
+
     // Chart labels
     inputTokensLabel: 'Input Tokens',
     outputTokensLabel: 'Output Tokens',
@@ -317,12 +324,13 @@ export default {
     tokenQuantity: 'Token Quantity',
     requestsQuantity: 'Requests Count'
   },
-  
+
   // Accounts page
   accounts: {
     title: 'Account Management',
-    description: 'Manage your Claude, Gemini, OpenAI and Azure OpenAI accounts and proxy configurations',
-    
+    description:
+      'Manage your Claude, Gemini, OpenAI and Azure OpenAI accounts and proxy configurations',
+
     // Filters and sorting
     sortBy: 'Select Sort',
     selectPlatform: 'Select Platform',
@@ -330,14 +338,14 @@ export default {
     refresh: 'Refresh',
     refreshTooltip: 'Refresh data (Ctrl/⌘+click to force refresh all caches)',
     addAccount: 'Add Account',
-    
+
     // Sort options
     sortByName: 'Sort by Name',
     sortByDailyTokens: 'Sort by Daily Tokens',
     sortByDailyRequests: 'Sort by Daily Requests',
     sortByTotalTokens: 'Sort by Total Tokens',
     sortByLastUsed: 'Sort by Last Used',
-    
+
     // Platform options
     allPlatforms: 'All Platforms',
     claudePlatform: 'Claude',
@@ -346,16 +354,16 @@ export default {
     openaiPlatform: 'OpenAI',
     azureOpenaiPlatform: 'Azure OpenAI',
     bedrockPlatform: 'Bedrock',
-    
+
     // Group options
     allAccounts: 'All Accounts',
     ungroupedAccounts: 'Ungrouped Accounts',
-    
+
     // Loading states
     loadingAccounts: 'Loading accounts...',
     noAccounts: 'No Accounts',
     noAccountsHint: 'Click the button above to add your first account',
-    
+
     // Table headers
     name: 'Name',
     platformType: 'Platform/Type',
@@ -366,20 +374,20 @@ export default {
     sessionWindow: 'Session Window',
     lastUsed: 'Last Used',
     actions: 'Actions',
-    
+
     // Account types
     dedicated: 'Dedicated',
     groupScheduling: 'Group Scheduling',
     shared: 'Shared',
     belongsToGroup: 'Belongs to group: {name}',
-    
+
     // Platform labels
     unknown: 'Unknown',
     apiKey: 'API Key',
     oauth: 'OAuth',
     setup: 'Setup',
     aws: 'AWS',
-    
+
     // Account status
     normal: 'Normal',
     abnormal: 'Abnormal',
@@ -388,15 +396,15 @@ export default {
     rateLimited: 'Rate Limited',
     notSchedulable: 'Not Schedulable',
     bound: 'Bound: {count} API Keys',
-    
+
     // Proxy status
     noProxy: 'No Proxy',
-    
+
     // Usage statistics
     requests: ' requests',
     noData: 'No Data',
     averageRpm: 'Average {rpm} RPM',
-    
+
     // Session window tooltip
     sessionWindowTooltip: {
       title: 'Session window progress indicates the time progress of the 5-hour window',
@@ -404,16 +412,16 @@ export default {
       warning: 'Warning: Approaching limit',
       rejected: 'Rejected: Rate limit reached'
     },
-    
+
     // Session window status
     remaining: 'Remaining {time}',
     ended: 'Ended',
-    
+
     // Console quota
     quotaProgress: 'Quota Progress',
     remainingQuota: 'Remaining $${amount}',
     reset: 'Reset {time}',
-    
+
     // Mobile view labels
     dailyUsageLabel: 'Daily Usage',
     sessionWindowLabel: 'Session Window',
@@ -421,8 +429,9 @@ export default {
     proxyLabel: 'Proxy',
     priorityLabel: 'Priority',
     neverUsed: 'Never Used',
-    sessionWindowTooltipMobile: 'Session window progress does not represent usage, it only shows the remaining time until the next 5-hour window',
-    
+    sessionWindowTooltipMobile:
+      'Session window progress does not represent usage, it only shows the remaining time until the next 5-hour window',
+
     // Action buttons
     resetStatus: 'Reset Status',
     resetting: 'Resetting...',
@@ -437,7 +446,7 @@ export default {
     deleteTooltip: 'Delete account',
     pause: 'Pause',
     enable: 'Enable',
-    
+
     // Time formatting
     justNow: 'Just now',
     minutesAgo: '{minutes} minutes ago',
@@ -448,44 +457,47 @@ export default {
     minutesOnly: '{minutes} minutes',
     daysAndHours: '{days} days {hours} hours',
     daysOnly: '{days} days',
-    
+
     // Rate limit time
     rateLimitTime: '({time})',
-    
+
     // Messages and confirmations
     resetStatusConfirmTitle: 'Reset Account Status',
-    resetStatusConfirmMessage: 'Are you sure you want to reset all abnormal statuses for this account? This will clear rate limit status, 401 error counts, and all other abnormal flags.',
+    resetStatusConfirmMessage:
+      'Are you sure you want to reset all abnormal statuses for this account? This will clear rate limit status, 401 error counts, and all other abnormal flags.',
     resetStatusConfirmButton: 'Confirm Reset',
     resetStatusCancelButton: 'Cancel',
     statusResetSuccess: 'Account status has been reset',
     statusResetFailed: 'Status reset failed',
-    
+
     deleteAccountTitle: 'Delete Account',
-    deleteAccountMessage: 'Are you sure you want to delete account "{name}"?\n\nThis action cannot be undone.',
+    deleteAccountMessage:
+      'Are you sure you want to delete account "{name}"?\n\nThis action cannot be undone.',
     deleteAccountButton: 'Delete',
     deleteAccountCancel: 'Cancel',
-    cannotDeleteBoundAccount: 'Cannot delete this account, {count} API Keys are bound to this account, please unbind all API Keys first',
+    cannotDeleteBoundAccount:
+      'Cannot delete this account, {count} API Keys are bound to this account, please unbind all API Keys first',
     accountDeleted: 'Account deleted',
     deleteFailed: 'Delete failed',
-    
+
     enabledScheduling: 'Scheduling enabled',
     disabledScheduling: 'Scheduling disabled',
     schedulingToggleFailed: 'Failed to toggle scheduling status',
     unsupportedAccountType: 'This account type does not support scheduling control',
     operationFailed: 'Operation failed',
-    
+
     accountCreateSuccess: 'Account created successfully',
     accountUpdateSuccess: 'Account updated successfully',
     loadAccountsFailed: 'Failed to load accounts',
     unsupportedAccountTypeReset: 'Unsupported account type',
-    
+
     // Schedulable reasons
     invalidApiKey: 'API Key invalid or expired (401 error)',
     serviceOverload: 'Service overloaded (529 error)',
     rateLimitTriggered: 'Rate limit triggered (429 error)',
     authFailed: 'Authentication failed (401 error)',
     manualStop: 'Manually stopped scheduling',
-    
+
     // Account type display
     claudeMax: 'Claude Max',
     claudePro: 'Claude Pro',
@@ -499,18 +511,18 @@ export default {
     // Page title and description
     title: 'API Keys Management',
     description: 'Manage and monitor your API keys',
-    
+
     // Tab navigation
     activeTab: 'Active API Keys',
     deletedTab: 'Deleted API Keys',
-    
+
     // Toolbar and actions
     refresh: 'Refresh',
     refreshTooltip: 'Refresh API Keys list (Ctrl+click for force refresh)',
     createNew: 'Create New Key',
     bulkEdit: 'Edit Selected',
     bulkDelete: 'Delete Selected',
-    
+
     // Table headers
     name: 'Name',
     tags: 'Tags',
@@ -519,7 +531,7 @@ export default {
     createdAt: 'Created At',
     expiresAt: 'Expires At',
     actions: 'Actions',
-    
+
     // Filter options
     timeRange: {
       today: 'Today',
@@ -527,7 +539,7 @@ export default {
       month: 'This Month',
       all: 'All Time'
     },
-    
+
     // Status
     active: 'Active',
     disabled: 'Disabled',
@@ -535,7 +547,7 @@ export default {
     expiringSoon: 'Expiring Soon',
     neverExpire: 'Never Expire',
     notActivated: 'Not Activated',
-    
+
     // Usage statistics
     dailyCost: 'Daily Cost',
     totalCost: 'Total Cost',
@@ -547,26 +559,26 @@ export default {
     daysAgo: '{days} days ago',
     justNow: 'Just now',
     requests: 'requests',
-    
+
     // Search and filter
     searchPlaceholder: 'Search name...',
     searchPlaceholderWithOwner: 'Search name or owner...',
     allTags: 'All Tags',
     noTags: 'No Tags',
-    
+
     // Binding information
     shared: 'Using Shared Pool',
     dedicated: 'Dedicated',
     consoleAccount: 'Console Account',
     bindingWarning: '⚠️ Account not found',
-    
+
     // Limits and quotas
     dailyLimit: 'Daily Cost',
     weeklyOpusLimit: 'Opus Weekly Cost',
     remainingQuota: 'Remaining: ${amount}',
     reset: 'Reset at {time}',
     quotaProgress: 'Quota Progress',
-    
+
     // Model statistics
     modelStats: 'Model Usage Distribution',
     modelStatsCount: '{count} models',
@@ -579,14 +591,14 @@ export default {
     noModelData: 'No model usage data',
     resetFilter: 'Refresh',
     adjustTimeRange: 'Try adjusting the time range or click refresh to reload data',
-    
+
     // Date filter
     dateFilter: {
       today: 'Today',
       days7: '7 Days',
       days30: '30 Days'
     },
-    
+
     // Actions
     viewDetails: 'View Detailed Statistics',
     edit: 'Edit',
@@ -595,12 +607,12 @@ export default {
     disable: 'Disable',
     copy: 'Copy',
     copyStatsLink: 'Copy Stats Page Link',
-    
+
     // Pagination
     totalRecords: 'Total {count} records',
     pageSize: 'Show',
     records: 'per page',
-    
+
     // Empty states
     noApiKeys: 'No API Keys',
     noApiKeysHint: 'Click the button above to create your first API Key',
@@ -609,7 +621,7 @@ export default {
     loading: 'Loading API Keys...',
     loadingDeleted: 'Loading deleted API Keys...',
     loadingModelStats: 'Loading model statistics...',
-    
+
     // Deleted keys table
     creator: 'Creator',
     deletedBy: 'Deleted By',
@@ -617,21 +629,25 @@ export default {
     canRestore: 'Restore',
     permanentDelete: 'Permanent Delete',
     clearAllDeleted: 'Clear All Deleted',
-    
+
     // User types
     admin: 'Admin',
     user: 'User',
     unknown: 'Unknown',
     system: 'System',
-    
+
     // Confirmation dialogs
-    confirmDisable: 'Are you sure to disable API Key "{name}"? All requests using this key will return 401 errors after disabled.',
+    confirmDisable:
+      'Are you sure to disable API Key "{name}"? All requests using this key will return 401 errors after disabled.',
     confirmDelete: 'Are you sure to delete this API Key? This action cannot be undone.',
-    confirmBatchDelete: 'Are you sure to delete selected {count} API Keys? This action cannot be undone.',
+    confirmBatchDelete:
+      'Are you sure to delete selected {count} API Keys? This action cannot be undone.',
     confirmRestore: 'Are you sure to restore this API Key? It can be used again after restoration.',
-    confirmPermanentDelete: 'Are you sure to permanently delete this API Key? This action cannot be undone and all related data will be permanently deleted.',
-    confirmClearAll: 'Are you sure to permanently delete all {count} deleted API Keys? This action cannot be undone and all related data will be permanently deleted.',
-    
+    confirmPermanentDelete:
+      'Are you sure to permanently delete this API Key? This action cannot be undone and all related data will be permanently deleted.',
+    confirmClearAll:
+      'Are you sure to permanently delete all {count} deleted API Keys? This action cannot be undone and all related data will be permanently deleted.',
+
     // Success messages
     keyActivated: 'API Key activated',
     keyDisabled: 'API Key disabled',
@@ -641,7 +657,7 @@ export default {
     allDeletedCleared: 'All deleted API Keys cleared',
     linkCopied: 'Stats page link copied',
     expiryUpdated: 'Expiry time updated',
-    
+
     // Error messages
     selectKeysFirst: 'Please select API Keys to edit first',
     loadFailed: 'Failed to load API Keys',
@@ -651,17 +667,613 @@ export default {
     deleteFailed: 'Delete failed',
     restoreFailed: 'Restore failed',
     clearFailed: 'Clear failed',
-    
+
     // Tooltips and helpers
     editExpiry: 'Edit expiry time',
     activationDays: 'Not activated ({days} days)',
     boundTo: 'Bound to',
     belongsToGroup: 'Belongs to group: {name}',
-    
+
     // Batch operations
     batchSuccess: 'Successfully processed {count} items',
     batchPartialFail: '{failed} items failed to process',
-    batchAllFailed: 'All items failed to process'
+    batchAllFailed: 'All items failed to process',
+
+    // Batch API Key Modal
+    batchApiKeyModal: {
+      title: 'Batch Creation Successful',
+      successMessage: 'Successfully created {count} API Keys',
+      importantReminder: 'Important Reminder',
+      warningMessage:
+        'This is your only chance to see all API Keys. After closing this window, the system will no longer display the complete API Keys. Please download and save them immediately.',
+
+      // Statistics cards
+      createdCount: 'Created Count',
+      baseName: 'Base Name',
+      permissionScope: 'Permission Scope',
+      expiryTime: 'Expiry Time',
+
+      // Permission texts
+      permissions: {
+        all: 'All Services',
+        claude: 'Claude Only',
+        gemini: 'Gemini Only',
+        unknown: 'Unknown'
+      },
+
+      // Expiry time texts
+      neverExpire: 'Never Expires',
+      daysFormat: '{days} days',
+      weeksFormat: '{weeks} weeks',
+      monthsFormat: '{months} months',
+      yearsFormat: '{years} years',
+
+      // Preview section
+      previewTitle: 'API Keys Preview',
+      hide: 'Hide',
+      show: 'Show',
+      preview: 'Preview',
+      maxDisplayNote: '(Maximum 10 displayed)',
+      moreKeysNote: '... and {count} more API Keys',
+
+      // Action buttons
+      downloadAll: 'Download All API Keys',
+      alreadySaved: 'I Have Saved',
+      directCloseTooltip: 'Close Directly (Not Recommended)',
+
+      // File info
+      fileFormatInfo:
+        'The downloaded file is in text format (.txt), with one API Key per line. Please save the file in a secure location to avoid leakage.',
+
+      // Confirmation dialogs
+      closeReminderTitle: 'Close Reminder',
+      closeReminderMessage:
+        'Once closed, you will not be able to view these API Keys again. Please ensure you have downloaded and saved them properly.\n\nAre you sure you want to close?',
+      confirmCloseButton: 'Confirm Close',
+      goBackDownloadButton: 'Go Back to Download',
+
+      directCloseTitle: 'Are you sure you want to close?',
+      directCloseMessage:
+        "You haven't downloaded the API Keys yet. Once closed, you will not be able to view them again.\n\nWe strongly recommend downloading them first.",
+      stillCloseButton: 'Close Anyway',
+
+      directCloseFallbackMessage:
+        "You haven't downloaded the API Keys yet. Once closed, you will not be able to view them again.\n\nAre you sure you want to close?",
+
+      // Success messages
+      downloadSuccess: 'API Keys file downloaded successfully'
+    },
+
+    // Expiry Edit Modal
+    expiryEditModal: {
+      title: 'Edit Expiry Time',
+      subtitle: 'Set new expiry time for "{name}"',
+      currentStatus: 'Current Status',
+      notActivated: 'Not Activated',
+      activationDaysHint: '(expires after {days} days when activated)',
+      neverExpire: 'Never Expire',
+      expired: 'Expired',
+      daysToExpire: 'expires in {days} days',
+      monthsToExpire: 'expires in {months} months',
+      activateNow: 'Activate Now',
+      activateButton: 'Activate Now (expires in {days} days)',
+      activationInfo:
+        'Click to activate this API Key immediately, it will expire in {days} days after activation',
+      selectNewDuration: 'Select New Duration',
+      neverExpireOption: 'Never Expire',
+      oneDay: '1 Day',
+      sevenDays: '7 Days',
+      thirtyDays: '30 Days',
+      ninetyDays: '90 Days',
+      oneHundredEightyDays: '180 Days',
+      threeSixtyFiveDays: '1 Year',
+      twoYears: '2 Years',
+      custom: 'Custom',
+      selectDateAndTime: 'Select Date and Time',
+      selectFutureDateTime: 'Select a future date and time as the expiry time',
+      newExpiryTime: 'New Expiry Time',
+      cancel: 'Cancel',
+      saving: 'Saving...',
+      saveChanges: 'Save Changes',
+      activateConfirmTitle: 'Activate API Key',
+      activateConfirmMessage:
+        'Are you sure you want to activate this API Key now? It will automatically expire after {days} days.',
+      confirmActivate: 'Confirm Activation',
+      confirmCancel: 'Cancel'
+    },
+
+    // Usage Detail Modal
+    usageDetailModal: {
+      title: 'Usage Statistics Details',
+      close: 'Close',
+
+      // Statistics cards
+      totalRequests: 'Total Requests',
+      totalTokens: 'Total Tokens',
+      totalCost: 'Total Cost',
+      averageRate: 'Average Rate',
+
+      // Today stats
+      today: 'Today',
+      todayRequests: '{count} requests',
+      todayTokens: '{count}',
+      todayCost: '${amount}',
+
+      // Usage labels
+      times: ' requests',
+
+      // Token distribution
+      tokenDistribution: 'Token Usage Distribution',
+      inputTokens: 'Input Tokens',
+      outputTokens: 'Output Tokens',
+      cacheCreateTokens: 'Cache Create Tokens',
+      cacheReadTokens: 'Cache Read Tokens',
+
+      // Limits section
+      limitSettings: 'Limit Settings',
+      dailyCostLimit: 'Daily Cost Limit',
+      concurrencyLimit: 'Concurrency Limit',
+      timeWindowLimit: 'Time Window Limit',
+      windowStatus: 'Window Status',
+      used: 'Used',
+      remainingQuota: 'Remaining: ${amount}',
+
+      // Progress indicators
+      usedPercentage: 'Used {percentage}%'
+    },
+
+    // Batch Edit API Key Modal
+    batchEditApiKeyModal: {
+      title: 'Batch Edit API Keys ({count} items)',
+
+      // Info section
+      infoTitle: 'Batch Edit Instructions',
+      infoContent:
+        'The following settings will be applied to the selected {count} API Keys. Only filled or modified fields will be updated, blank fields will keep their original values.',
+
+      // Tag operations
+      tagLabel: 'Tags (Batch Operations)',
+      tagOperations: {
+        replace: 'Replace Tags',
+        add: 'Add Tags',
+        remove: 'Remove Tags',
+        none: "Don't Modify Tags"
+      },
+
+      // Tag status texts
+      newTagsList: 'New tag list:',
+      tagsToAdd: 'Tags to add:',
+      tagsToRemove: 'Tags to remove:',
+      clickToSelectTags: 'Click to select existing tags:',
+      createNewTag: 'Create new tag:',
+      inputNewTagPlaceholder: 'Enter new tag name',
+
+      // Rate limit settings
+      rateLimitTitle: 'Rate Limit Settings',
+      rateLimitWindow: 'Time Window (minutes)',
+      rateLimitRequests: 'Request Limit',
+      rateLimitCost: 'Cost Limit (USD)',
+      noModifyPlaceholder: "Don't modify",
+
+      // Daily cost limit
+      dailyCostLimit: 'Daily Cost Limit (USD)',
+      dailyCostLimitPlaceholder: "Don't modify (0 means unlimited)",
+
+      // Weekly Opus cost limit
+      weeklyOpusCostLimit: 'Opus Model Weekly Cost Limit (USD)',
+      weeklyOpusCostLimitPlaceholder: "Don't modify (0 means unlimited)",
+      opusLimitDescription:
+        'Set weekly cost limit for Opus model (Monday to Sunday), only for Claude official accounts',
+
+      // Concurrency limit
+      concurrencyLimit: 'Concurrency Limit',
+      concurrencyLimitPlaceholder: "Don't modify (0 means unlimited)",
+
+      // Active status
+      activeStatus: 'Active Status',
+      statusOptions: {
+        active: 'Active',
+        disabled: 'Disabled',
+        noChange: "Don't modify"
+      },
+
+      // Service permissions
+      servicePermissions: 'Service Permissions',
+      permissionOptions: {
+        noChange: "Don't modify",
+        all: 'All Services',
+        claude: 'Claude Only',
+        gemini: 'Gemini Only',
+        openai: 'OpenAI Only'
+      },
+
+      // Account binding
+      accountBinding: 'Dedicated Account Binding',
+      refreshAccounts: 'Refresh Accounts',
+      refreshing: 'Refreshing...',
+
+      claudeAccount: 'Claude Dedicated Account',
+      geminiAccount: 'Gemini Dedicated Account',
+      openaiAccount: 'OpenAI Dedicated Account',
+      bedrockAccount: 'Bedrock Dedicated Account',
+
+      accountOptions: {
+        noChange: "Don't modify",
+        sharedPool: 'Use shared account pool',
+        groupPrefix: 'Group - '
+      },
+
+      // Optgroup labels
+      optgroupLabels: {
+        accountGroups: 'Account Groups',
+        dedicatedAccounts: 'Dedicated Accounts'
+      },
+
+      // Buttons
+      cancel: 'Cancel',
+      saving: 'Saving...',
+      batchSave: 'Batch Save',
+
+      // Messages
+      refreshAccountsSuccess: 'Account list refreshed',
+      refreshAccountsFailed: 'Failed to refresh account list',
+      batchEditSuccess: 'Successfully batch edited {count} API Keys',
+      batchEditPartialFail: '{failedCount} edits failed:\n{errors}',
+      batchEditAllFailed: 'All API Keys edit failed',
+      batchEditFailed: 'Batch edit failed',
+      batchEditErrorLog: 'Batch edit API Keys failed:'
+    },
+
+    // Edit API Key Modal
+    editApiKeyModal: {
+      title: 'Edit API Key',
+
+      // Basic Info
+      name: 'Name',
+      namePlaceholder: 'Please enter API Key name',
+      nameHint: 'Used to identify the purpose of this API Key',
+
+      // Owner
+      owner: 'Owner',
+      adminLabel: '- Admin',
+      ownerHint:
+        'Assign this API Key to specified user or admin, admin assignment is not limited by user API Key count',
+
+      // Tags
+      tags: 'Tags',
+      selectedTags: 'Selected tags:',
+      clickToSelectTags: 'Click to select existing tags:',
+      createNewTag: 'Create new tag:',
+      newTagPlaceholder: 'Enter new tag name',
+      tagsHint: 'Used to mark different teams or purposes, convenient for filtering and management',
+
+      // Rate Limit Settings
+      rateLimitTitle: 'Rate Limit Settings (Optional)',
+      rateLimitWindow: 'Time Window (minutes)',
+      rateLimitRequests: 'Request Limit',
+      rateLimitCost: 'Cost Limit (USD)',
+      rateLimitWindowHint: 'Time period unit',
+      rateLimitRequestsHint: 'Max requests in window',
+      rateLimitCostHint: 'Max cost in window',
+      noLimit: 'Unlimited',
+
+      // Usage Examples
+      usageExamples: '💡 Usage Examples',
+      example1: 'Example 1: Time window=60, Requests=1000 → Max 1000 requests per 60 minutes',
+      example2: 'Example 2: Time window=1, Cost=0.1 → Max $0.1 cost per minute',
+      example3:
+        'Example 3: Window=30, Requests=50, Cost=5 → 50 requests and max $5 cost per 30 minutes',
+
+      // Cost Limits
+      dailyCostLimit: 'Daily Cost Limit (USD)',
+      dailyCostLimitPlaceholder: '0 means unlimited',
+      dailyCostHint:
+        'Set daily cost limit for this API Key, requests will be rejected when exceeded, 0 or empty means unlimited',
+      weeklyOpusCostLimit: 'Opus Model Weekly Cost Limit (USD)',
+      weeklyOpusHint:
+        'Set weekly cost limit for Opus model (Monday to Sunday), Claude official accounts only, 0 or empty means unlimited',
+      custom: 'Custom',
+
+      // Concurrency
+      concurrencyLimit: 'Concurrency Limit',
+      concurrencyLimitPlaceholder: '0 means unlimited',
+      concurrencyHint: 'Set maximum concurrent requests this API Key can handle',
+
+      // Active Status
+      activeStatus: 'Activate Account',
+      activeStatusHint:
+        'Unchecking will disable this API Key, pause all requests, client returns 401 error',
+
+      // Service Permissions
+      servicePermissions: 'Service Permissions',
+      allServices: 'All Services',
+      claudeOnly: 'Claude Only',
+      geminiOnly: 'Gemini Only',
+      openaiOnly: 'OpenAI Only',
+      permissionsHint: 'Control which services this API Key can access',
+
+      // Account Binding
+      accountBinding: 'Dedicated Account Binding',
+      refreshAccounts: 'Refresh Accounts',
+      refreshing: 'Refreshing...',
+      claudeAccount: 'Claude Dedicated Account',
+      geminiAccount: 'Gemini Dedicated Account',
+      openaiAccount: 'OpenAI Dedicated Account',
+      bedrockAccount: 'Bedrock Dedicated Account',
+      useSharedPool: 'Use Shared Account Pool',
+      selectClaudeAccount: 'Please select Claude account',
+      selectGeminiAccount: 'Please select Gemini account',
+      selectOpenaiAccount: 'Please select OpenAI account',
+      selectBedrockAccount: 'Please select Bedrock account',
+      accountBindingHint: 'Modifying binding account will affect this API Key request routing',
+
+      // Model Restrictions
+      enableModelRestriction: 'Enable Model Restrictions',
+      restrictedModels: 'Restricted Models List',
+      noRestrictedModels: 'No restricted models',
+      allCommonModelsRestricted: 'All common models are in restricted list',
+      addRestrictedModelPlaceholder: 'Enter model name, press Enter to add',
+      modelRestrictionHint:
+        'Set models that this API Key cannot access, e.g.: claude-opus-4-20250514',
+
+      // Client Restrictions
+      enableClientRestriction: 'Enable Client Restrictions',
+      allowedClients: 'Allowed Clients',
+      clientRestrictionHint: 'Check clients that are allowed to use this API Key',
+
+      // Buttons
+      cancel: 'Cancel',
+      save: 'Save Changes',
+      saving: 'Saving...',
+
+      // Messages
+      costLimitConfirmTitle: 'Cost Limit Reminder',
+      costLimitConfirmMessage:
+        'You set a time window but cost limit is 0, which means no cost limit.\n\nContinue?',
+      costLimitConfirmContinue: 'Continue Save',
+      costLimitConfirmBack: 'Go Back to Modify',
+      refreshAccountsSuccess: 'Account list refreshed',
+      refreshAccountsFailed: 'Failed to refresh account list',
+      updateFailed: 'Update failed'
+    },
+
+    // Renew API Key Modal
+    renewApiKeyModal: {
+      title: 'Renew API Key',
+      apiKeyInfo: 'API Key Information',
+      currentExpiry: 'Current Expiry Time: ',
+      neverExpires: 'Never expires',
+      renewDuration: 'Renew Duration',
+      extend7Days: 'Extend 7 days',
+      extend30Days: 'Extend 30 days',
+      extend90Days: 'Extend 90 days',
+      extend180Days: 'Extend 180 days',
+      extend365Days: 'Extend 365 days',
+      customDate: 'Custom date',
+      setPermanent: 'Set to never expire',
+      newExpiry: 'New expiry time: ',
+      cancel: 'Cancel',
+      renewing: 'Renewing...',
+      confirmRenew: 'Confirm Renew',
+      renewSuccess: 'API Key renewed successfully',
+      renewFailed: 'Renewal failed'
+    },
+
+    // New API Key Modal
+    newApiKeyModal: {
+      title: 'API Key Created Successfully',
+      subtitle: 'Please save your API Key securely',
+      directCloseTooltip: 'Close directly (not recommended)',
+
+      // Warning section
+      warningTitle: 'Important Notice',
+      warningMessage:
+        'This is the only chance to see the complete API Key. After closing this window, the system will no longer display the complete API Key. Please copy and save it immediately.',
+
+      // Field labels
+      apiKeyName: 'API Key Name',
+      remarks: 'Remarks',
+      noDescription: 'No description',
+      apiKey: 'API Key',
+
+      // Visibility toggle
+      hideApiKey: 'Hide API Key',
+      showFullApiKey: 'Show Full API Key',
+      visibilityHint:
+        'Click the eye icon to toggle display mode, use the button below to copy the complete API Key',
+
+      // Buttons
+      copyApiKey: 'Copy API Key',
+      alreadySaved: 'I Have Saved It',
+
+      // Confirmation dialogs
+      closeReminderTitle: 'Close Reminder',
+      closeReminderMessage:
+        'After closing, you will not be able to view the complete API Key again. Please ensure it has been saved securely.\n\nAre you sure you want to close?',
+      confirmClose: 'Confirm Close',
+      cancel: 'Cancel',
+
+      directCloseTitle: 'Are you sure you want to close?',
+      directCloseMessage:
+        'You have not saved the API Key yet. After closing, you will not be able to view it again.\n\nWe recommend copying the API Key before closing.',
+      stillClose: 'Close Anyway',
+      goBack: 'Go Back to Copy',
+
+      directCloseFallback:
+        'You have not saved the API Key yet. After closing, you will not be able to view it again.\n\nAre you sure you want to close?',
+
+      // Success messages
+      apiKeyNotFound: 'API Key not found',
+      copySuccess: 'API Key copied to clipboard',
+      copyFailed: 'Copy failed, please copy manually'
+    },
+
+    // Create API Key Modal
+    createApiKeyModal: {
+      title: 'Create New API Key',
+
+      // Create type section
+      createType: 'Create Type',
+      singleCreate: 'Single Create',
+      batchCreate: 'Batch Create',
+      batchCount: 'Create Count',
+      batchCountPlaceholder: 'Enter count (2-500)',
+      maxSupported: 'Max support 500',
+      batchHint:
+        'When creating in batch, each Key name will automatically add number suffix, e.g.: {name}_1, {name}_2 ...',
+
+      // Basic form fields
+      name: 'Name',
+      nameRequired: '*',
+      nameError: 'Please enter API Key name',
+      singleNamePlaceholder: 'Give your API Key a name',
+      batchNamePlaceholder: 'Enter base name (will auto add numbers)',
+      description: 'Description (optional)',
+      descriptionPlaceholder: 'Describe the purpose of this API Key...',
+
+      // Tags section
+      tags: 'Tags',
+      selectedTags: 'Selected tags:',
+      clickToSelectTags: 'Click to select existing tags:',
+      createNewTag: 'Create new tag:',
+      newTagPlaceholder: 'Enter new tag name',
+      tagHint: 'Used to mark different teams or purposes for easy filtering',
+
+      // Rate limit section
+      rateLimitTitle: 'Rate Limit Settings (optional)',
+      rateLimitWindow: 'Time Window (minutes)',
+      rateLimitRequests: 'Request Limit',
+      rateLimitCost: 'Cost Limit (USD)',
+      rateLimitWindowPlaceholder: 'Unlimited',
+      rateLimitRequestsPlaceholder: 'Unlimited',
+      rateLimitCostPlaceholder: 'Unlimited',
+      rateLimitWindowHint: 'Time period unit',
+      rateLimitRequestsHint: 'Max requests in window',
+      rateLimitCostHint: 'Max cost in window',
+
+      // Rate limit examples
+      exampleTitle: '💡 Usage Examples',
+      example1: 'Example 1: Window=60, Requests=1000 → Max 1000 requests per 60 minutes',
+      example2: 'Example 2: Window=1, Cost=0.1 → Max $0.1 cost per minute',
+      example3:
+        'Example 3: Window=30, Requests=50, Cost=5 → 50 requests and $5 cost per 30 minutes',
+
+      // Cost limits
+      dailyCostLimit: 'Daily Cost Limit (USD)',
+      dailyCostLimitPlaceholder: '0 means unlimited',
+      dailyCostHint:
+        'Set daily cost limit for this API Key, requests will be rejected when exceeded, 0 or empty means unlimited',
+      weeklyOpusCostLimit: 'Opus Model Weekly Cost Limit (USD)',
+      weeklyOpusCostLimitPlaceholder: '0 means unlimited',
+      weeklyOpusHint:
+        'Set weekly cost limit for Opus model (Monday to Sunday), Claude official accounts only, 0 or empty means unlimited',
+      custom: 'Custom',
+
+      // Concurrency limit
+      concurrencyLimit: 'Concurrency Limit (optional)',
+      concurrencyLimitPlaceholder: '0 means unlimited',
+      concurrencyHint:
+        'Set maximum concurrent requests this API Key can handle, 0 or empty means unlimited',
+
+      // Expiration settings
+      expirationSettings: 'Expiration Settings',
+      fixedTimeExpiry: 'Fixed Time Expiry',
+      activationExpiry: 'Activate After First Use',
+      fixedModeHint:
+        'Fixed time mode: Key takes effect immediately after creation, expires at set time',
+      activationModeHint:
+        'Key activates on first use, expires after set days from activation (suitable for batch sales)',
+
+      // Expiration duration options
+      neverExpire: 'Never Expire',
+      '1d': '1 Day',
+      '7d': '7 Days',
+      '30d': '30 Days',
+      '90d': '90 Days',
+      '180d': '180 Days',
+      '365d': '365 Days',
+      customDate: 'Custom Date',
+
+      // Activation mode
+      activationDays: 'Enter days',
+      daysUnit: 'days',
+      activationHint: 'Key will activate on first use, expires after {days} days from activation',
+
+      // Expiry status
+      willExpireOn: 'Will expire on {date}',
+
+      // Service permissions
+      servicePermissions: 'Service Permissions',
+      allServices: 'All Services',
+      claudeOnly: 'Claude Only',
+      geminiOnly: 'Gemini Only',
+      openaiOnly: 'OpenAI Only',
+      permissionHint: 'Control which services this API Key can access',
+
+      // Account binding
+      dedicatedAccountBinding: 'Dedicated Account Binding (optional)',
+      refreshAccounts: 'Refresh Accounts',
+      refreshing: 'Refreshing...',
+      claudeDedicatedAccount: 'Claude Dedicated Account',
+      geminiDedicatedAccount: 'Gemini Dedicated Account',
+      openaiDedicatedAccount: 'OpenAI Dedicated Account',
+      bedrockDedicatedAccount: 'Bedrock Dedicated Account',
+      useSharedPool: 'Use shared account pool',
+      accountBindingHint:
+        'After selecting dedicated account, this API Key will only use that account, otherwise use shared account pool',
+      selectClaudeAccount: 'Please select Claude account',
+      selectGeminiAccount: 'Please select Gemini account',
+      selectOpenaiAccount: 'Please select OpenAI account',
+      selectBedrockAccount: 'Please select Bedrock account',
+
+      // Model restrictions
+      enableModelRestriction: 'Enable Model Restriction',
+      restrictedModelsList: 'Restricted Models List',
+      noRestrictedModels: 'No restricted models',
+      allCommonModelsRestricted: 'All common models are in the restricted list',
+      addRestrictedModelPlaceholder: 'Enter model name, press Enter to add',
+      modelRestrictionHint: 'Set models this API Key cannot access, e.g.: claude-opus-4-20250514',
+
+      // Client restrictions
+      enableClientRestriction: 'Enable Client Restriction',
+      allowedClients: 'Allowed Clients',
+
+      // Buttons
+      cancel: 'Cancel',
+      create: 'Create',
+      creating: 'Creating...',
+
+      // Messages
+      batchCountError: 'Batch create count must be between 2-500',
+      costLimitConfirmTitle: 'Cost Limit Reminder',
+      costLimitConfirmMessage:
+        'You set time window but cost limit is 0, which means no cost limit.\n\nContinue?',
+      costLimitConfirmContinue: 'Continue Creating',
+      costLimitConfirmBack: 'Go Back to Modify',
+      costLimitFallbackMessage:
+        'You set time window but cost limit is 0, which means no cost limit.\nContinue?',
+      createSuccess: 'API Key created successfully',
+      batchCreateSuccess: 'Successfully created {count} API Keys',
+      createFailed: 'Create failed',
+      batchCreateFailed: 'Batch create failed',
+      refreshAccountsSuccess: 'Account list refreshed',
+      refreshAccountsFailed: 'Failed to refresh account list'
+    },
+
+    // Window Countdown
+    windowCountdown: {
+      expired: 'Window expired',
+      notStarted: 'Window not started',
+      minutes: 'minutes',
+      requests: 'Requests',
+      tokens: 'Tokens',
+      cost: 'Cost',
+      aboutToReset: 'About to reset',
+      minutesUntilReset: 'minutes until reset',
+      untilReset: 'until reset',
+      windowLimit: 'Window Limit',
+      hours: 'hours'
+    }
   },
 
   // User-related translations
@@ -670,22 +1282,22 @@ export default {
     dashboard: {
       title: 'Dashboard Overview',
       welcomeMessage: 'Welcome to your Claude Relay dashboard',
-      
+
       // Navigation tabs
       overview: 'Overview',
       apiKeys: 'API Keys',
       usageStats: 'Usage Stats',
-      
+
       // Welcome section
       welcome: 'Welcome',
-      
+
       // Stats cards
       activeApiKeys: 'Active API Keys',
       deletedApiKeys: 'Deleted API Keys',
       totalRequests: 'Total Requests',
       inputTokens: 'Input Tokens',
       totalCost: 'Total Cost',
-      
+
       // Account information section
       accountInformation: 'Account Information',
       username: 'Username',
@@ -695,7 +1307,7 @@ export default {
       memberSince: 'Member Since',
       lastLogin: 'Last Login',
       notAvailable: 'N/A',
-      
+
       // Messages
       logout: 'Logout',
       logoutSuccess: 'Logged out successfully',
@@ -703,7 +1315,7 @@ export default {
       loadProfileFailed: 'Failed to load user profile',
       loadStatsFailed: 'Failed to load API keys stats'
     },
-    
+
     // User Login
     login: {
       title: 'User Sign In',
@@ -715,25 +1327,25 @@ export default {
       signIn: 'Sign In',
       signingIn: 'Signing In...',
       adminLogin: 'Admin Login',
-      
+
       // Validation and error messages
       requiredFields: 'Please enter both username and password',
       loginSuccess: 'Login successful!',
       loginFailed: 'Login failed'
     },
-    
+
     // User Management
     management: {
       title: 'User Management',
       description: 'Manage users, their API keys, and view usage statistics',
       refresh: 'Refresh',
-      
+
       // Stats cards
       totalUsers: 'Total Users',
       activeUsers: 'Active Users',
       totalApiKeys: 'Total API Keys',
       totalCost: 'Total Cost',
-      
+
       // Search and filters
       searchPlaceholder: 'Search users...',
       allRoles: 'All Roles',
@@ -742,14 +1354,14 @@ export default {
       allStatus: 'All Status',
       active: 'Active',
       disabled: 'Disabled',
-      
+
       // User list
       users: 'Users',
       loadingUsers: 'Loading users...',
       noUsersFound: 'No users found',
       noUsersMatch: 'No users match your search criteria.',
       noUsersCreated: 'No users have been created yet.',
-      
+
       // User info and actions
       displayName: 'Display Name',
       email: 'Email',
@@ -760,31 +1372,33 @@ export default {
       neverLoggedIn: 'Never logged in',
       requests: 'requests',
       totalCostLabel: 'total cost',
-      
+
       // Action buttons and tooltips
       viewUsageStats: 'View Usage Stats',
       disableAllApiKeys: 'Disable All API Keys',
       disableUser: 'Disable User',
       enableUser: 'Enable User',
       changeRole: 'Change Role',
-      
+
       // Confirmation dialogs
       disableUserTitle: 'Disable User',
       enableUserTitle: 'Enable User',
-      disableUserMessage: 'Are you sure you want to disable user "{username}"? This will prevent them from logging in.',
+      disableUserMessage:
+        'Are you sure you want to disable user "{username}"? This will prevent them from logging in.',
       enableUserMessage: 'Are you sure you want to enable user "{username}"?',
       disable: 'Disable',
       enable: 'Enable',
-      
+
       disableAllKeysTitle: 'Disable All API Keys',
-      disableAllKeysMessage: 'Are you sure you want to disable all {count} API keys for user "{username}"? This will prevent them from using the service.',
+      disableAllKeysMessage:
+        'Are you sure you want to disable all {count} API keys for user "{username}"? This will prevent them from using the service.',
       disableKeys: 'Disable Keys',
-      
+
       // Success messages
       userDisabledSuccess: 'User disabled successfully',
       userEnabledSuccess: 'User enabled successfully',
       keysDisabledSuccess: 'Disabled {count} API keys',
-      
+
       // Error messages
       loadUsersError: 'Failed to load users',
       toggleStatusError: 'Failed to toggleStatus',
@@ -795,7 +1409,7 @@ export default {
     usageStatsModal: {
       title: 'Usage Statistics',
       titleWithUser: 'Usage Statistics - {displayName}',
-      
+
       // Time period selection
       periodSelection: {
         day: 'Last 24 Hours',
@@ -803,10 +1417,10 @@ export default {
         month: 'Last 30 Days',
         quarter: 'Last 90 Days'
       },
-      
+
       // Loading state
       loadingStats: 'Loading usage statistics...',
-      
+
       // Summary cards
       summaryCards: {
         requests: 'Requests',
@@ -814,7 +1428,7 @@ export default {
         outputTokens: 'Output Tokens',
         totalCost: 'Total Cost'
       },
-      
+
       // API Keys table
       apiKeysTable: {
         title: 'API Keys Usage',
@@ -836,7 +1450,7 @@ export default {
         },
         never: 'Never'
       },
-      
+
       // Usage trend chart
       usageTrend: {
         title: 'Usage Trend',
@@ -844,13 +1458,13 @@ export default {
         dailyTrends: 'Daily usage trends for {period} period',
         chartNote: '(Chart integration can be added with Chart.js, D3.js, or similar library)'
       },
-      
+
       // No data state
       noData: {
         title: 'No usage data',
-        description: 'This user hasn\'t made any API requests in the selected period.'
+        description: "This user hasn't made any API requests in the selected period."
       },
-      
+
       // Buttons
       close: 'Close'
     },
@@ -858,10 +1472,10 @@ export default {
     // Change Role Modal
     changeRoleModal: {
       title: 'Change User Role',
-      
+
       // User info display
       currentRole: 'Current: {role}',
-      
+
       // Role selection form
       newRole: 'New Role',
       roles: {
@@ -870,19 +1484,21 @@ export default {
         admin: 'Administrator',
         adminDesc: 'Full access to manage users and system'
       },
-      
+
       // Warning messages
       roleChangeWarning: {
         title: 'Role Change Warning',
-        grantAdmin: 'Granting admin privileges will give this user full access to the system, including the ability to manage other users and their API keys.',
-        removeAdmin: 'Removing admin privileges will restrict this user to only managing their own API keys and viewing their own usage statistics.'
+        grantAdmin:
+          'Granting admin privileges will give this user full access to the system, including the ability to manage other users and their API keys.',
+        removeAdmin:
+          'Removing admin privileges will restrict this user to only managing their own API keys and viewing their own usage statistics.'
       },
-      
+
       // Buttons
       cancel: 'Cancel',
       updateRole: 'Update Role',
       updating: 'Updating...',
-      
+
       // Success message
       roleUpdated: 'User role updated to {role}'
     }
@@ -893,17 +1509,17 @@ export default {
     title: 'System Settings',
     description: 'Website customization and notification configuration',
     loading: 'Loading settings...',
-    
+
     // Navigation tabs
     branding: 'Branding Settings',
     webhook: 'Notification Settings',
-    
+
     // Branding settings
     siteName: 'Site Name',
     siteNameDescription: 'Brand identity',
     siteNamePlaceholder: 'Claude Relay Service',
     siteNameHint: 'Will be displayed in browser title and page header',
-    
+
     siteIcon: 'Site Icon',
     siteIconDescription: 'Favicon',
     currentIcon: 'Current icon',
@@ -911,13 +1527,13 @@ export default {
     removeIcon: 'Remove',
     iconFormats: 'Supports .ico, .png, .jpg, .svg formats, max 350KB',
     iconPreview: 'Icon preview',
-    
+
     adminEntry: 'Admin Entry',
     adminEntryDescription: 'Login button display',
     hideLoginButton: 'Hide login button',
     showLoginButton: 'Show login button',
     adminEntryHint: 'When hidden, users need to visit /admin/login directly',
-    
+
     // Mobile card titles
     siteNameCard: 'Site Name',
     siteNameCardDesc: 'Customize your site brand name',
@@ -925,18 +1541,18 @@ export default {
     siteIconCardDesc: 'Upload custom icon or enter icon URL',
     adminEntryCard: 'Admin Entry',
     adminEntryCardDesc: 'Control login button visibility on homepage',
-    
+
     // Action buttons
     save: 'Save Settings',
     saving: 'Saving...',
     reset: 'Reset to Default',
     lastUpdated: 'Last updated: {time}',
     lastUpdatedMobile: 'Last updated: {time}',
-    
+
     // Webhook settings
     enableWebhook: 'Enable Webhook Notifications',
     webhookDescription: 'When enabled, system will send notifications to configured platforms',
-    
+
     // Notification types
     notificationTypes: 'Notification Types',
     accountAnomaly: 'Account Anomaly',
@@ -947,7 +1563,7 @@ export default {
     quotaWarningDesc: 'API call quota insufficient warnings',
     systemErrorDesc: 'System runtime errors and failures',
     securityAlertDesc: 'Security-related alert notifications',
-    
+
     // Notification platforms
     notificationPlatforms: 'Notification Platforms',
     addPlatform: 'Add Platform',
@@ -956,32 +1572,32 @@ export default {
     testConnection: 'Test Connection',
     edit: 'Edit',
     delete: 'Delete',
-    
+
     // Advanced settings
     advancedSettings: 'Advanced Settings',
     maxRetries: 'Max Retries',
     retryDelay: 'Retry Delay (ms)',
     timeout: 'Timeout (ms)',
-    
+
     // Test notification
     sendTestNotification: 'Send Test Notification',
-    
+
     // Platform modal
     addPlatformModal: 'Add Notification Platform',
     editPlatformModal: 'Edit Notification Platform',
     configurePlatform: 'Configure new Webhook notification channel',
     updatePlatform: 'Configure and update Webhook notification channel',
-    
+
     platformType: 'Platform Type',
     platformName: 'Name',
     platformNameOptional: '(Optional)',
     platformNamePlaceholder: 'e.g.: Operations team, Dev test group',
-    
+
     webhookUrl: 'Webhook URL',
     webhookUrlRequired: '*',
     webhookUrlPlaceholder: 'https://...',
     editModeWarning: 'Platform type cannot be changed in edit mode',
-    
+
     // Bark specific settings
     deviceKey: 'Device Key',
     deviceKeyPlaceholder: 'e.g.: aBcDeFgHiJkLmNoPqRsTuVwX',
@@ -994,14 +1610,14 @@ export default {
     notificationGroup: 'Notification Group',
     notificationGroupOptional: '(Optional)',
     notificationGroupPlaceholder: 'Default: claude-relay',
-    
+
     // Notification level options
     levelAuto: 'Auto (based on notification type)',
     levelPassive: 'Passive',
     levelActive: 'Default',
     levelTimeSensitive: 'Time Sensitive',
     levelCritical: 'Critical',
-    
+
     // Sound options
     soundAuto: 'Auto (based on notification type)',
     soundDefault: 'Default',
@@ -1012,20 +1628,20 @@ export default {
     soundGlass: 'Glass',
     soundHorn: 'Horn',
     soundSilence: 'Silence',
-    
+
     // Bark instructions
     barkInstructions: [
       '1. Install Bark App on iPhone',
       '2. Open the app to get your device key',
       '3. Paste the key into the input box above'
     ],
-    
+
     // Signature settings
     enableSignatureVerify: 'Enable Signature Verification',
     signatureEnabled: 'Enabled',
     signatureSecret: 'Signature Secret',
     signatureSecretPlaceholder: 'SEC...',
-    
+
     // Platform hints
     wechatWorkHint: 'Get Webhook URL from WeChat Work group bot settings',
     dingtalkHint: 'Get Webhook URL from DingTalk group bot settings',
@@ -1034,14 +1650,14 @@ export default {
     discordHint: 'Create Webhook in Discord server integration settings',
     barkHint: 'Check your device key in Bark App',
     customHint: 'Enter complete Webhook receiving URL',
-    
+
     // Modal buttons
     required: 'Required fields',
     cancel: 'Cancel',
     testing: 'Testing...',
     saveChanges: 'Save Changes',
     addPlatformBtn: 'Add Platform',
-    
+
     // Success/error messages
     loadSettingsFailed: 'Failed to load settings',
     settingsSaved: 'Settings saved',
@@ -1050,35 +1666,36 @@ export default {
     oemSettingsSaveFailed: 'Failed to save OEM settings',
     resetToDefault: 'Reset to default settings',
     resetFailed: 'Reset failed',
-    confirmReset: 'Are you sure you want to reset to default settings?\n\nThis will clear all custom site name and icon settings.',
-    
+    confirmReset:
+      'Are you sure you want to reset to default settings?\n\nThis will clear all custom site name and icon settings.',
+
     webhookConfigSaved: 'Configuration saved',
     webhookConfigSaveFailed: 'Failed to save configuration',
     getWebhookConfigFailed: 'Failed to get webhook configuration',
-    
+
     platformAdded: 'Platform added',
     platformUpdated: 'Platform updated',
     platformDeleted: 'Platform deleted',
     platformDeleteFailed: 'Delete failed',
     confirmDeletePlatform: 'Are you sure you want to delete this platform?',
     operationFailed: 'Operation failed',
-    
+
     testSuccess: 'Test successful, webhook connection normal',
     testFailed: 'Test failed',
     testNotificationSent: 'Test notification sent',
     testNotificationFailed: 'Send failed',
-    
+
     // Form validation messages
     enterBarkDeviceKey: 'Please enter Bark device key',
     enterWebhookUrl: 'Please enter Webhook URL',
     enterValidWebhookUrl: 'Please enter valid Webhook URL',
     enterWebhookUrlFirst: 'Please enter Webhook URL first',
     enterBarkDeviceKeyFirst: 'Please enter Bark device key first',
-    
+
     // File upload
     fileReadFailed: 'File read failed',
     iconLoadFailed: 'Icon failed to load',
-    
+
     // Platform names
     platforms: {
       wechatWork: 'WeChat Work',
@@ -1096,11 +1713,11 @@ export default {
     // Titles and modal
     editAccount: 'Edit Account',
     addAccount: 'Add Account',
-    
+
     // Step indicators
     stepBasicInfo: 'Basic Information',
     stepAuthorization: 'Authorization',
-    
+
     // Platform selection
     platform: 'Platform',
     platformClaude: 'Claude',
@@ -1109,27 +1726,28 @@ export default {
     platformOpenAI: 'OpenAI',
     platformAzureOpenAI: 'Azure OpenAI',
     platformBedrock: 'Bedrock',
-    
+
     // Add methods
     addMethod: 'Add Method',
     addTypeSetupToken: 'Setup Token (Recommended)',
     addTypeOAuth: 'OAuth Authorization',
     addTypeManual: 'Manual Access Token Input',
-    
+
     // Basic information fields
     accountName: 'Account Name',
     accountNamePlaceholder: 'Set an easily recognizable name for the account',
     description: 'Description',
     descriptionOptional: 'Description (Optional)',
     descriptionPlaceholder: 'Account usage description...',
-    
+
     // Account type
     accountType: 'Account Type',
     accountTypeShared: 'Shared Account',
     accountTypeDedicated: 'Dedicated Account',
     accountTypeGroup: 'Group Scheduling',
-    accountTypeDescription: 'Shared: Available to all API Keys; Dedicated: Only for specific API Keys; Group: Join group for group scheduling',
-    
+    accountTypeDescription:
+      'Shared: Available to all API Keys; Dedicated: Only for specific API Keys; Group: Join group for group scheduling',
+
     // Group selection
     selectGroup: 'Select Group',
     selectGroupRequired: 'Select Group *',
@@ -1137,7 +1755,7 @@ export default {
     memberCount: 'members',
     newGroup: 'New Group',
     refreshGroups: 'Refresh Groups',
-    
+
     // Gemini Project ID
     projectId: 'Project ID',
     projectIdOptional: 'Project ID (Optional)',
@@ -1147,10 +1765,12 @@ export default {
     projectIdStep1: 'Visit Google Cloud Console',
     projectIdStep2: 'Copy Project ID (Project ID), usually in string format',
     projectIdStep3: '⚠️ Note: Copy Project ID, not Project Number!',
-    projectIdTip: 'Tip: If your account is a regular personal account (not bound to Google Cloud), leave this field blank.',
+    projectIdTip:
+      'Tip: If your account is a regular personal account (not bound to Google Cloud), leave this field blank.',
     projectIdGoogleCloudRequired: 'Google Cloud/Workspace accounts require Project ID',
-    projectIdGoogleCloudDescription: 'Some Google accounts (especially those bound to Google Cloud) will be identified as Workspace accounts and require an additional Project ID.',
-    
+    projectIdGoogleCloudDescription:
+      'Some Google accounts (especially those bound to Google Cloud) will be identified as Workspace accounts and require an additional Project ID.',
+
     // Bedrock fields
     awsAccessKeyId: 'AWS Access Key ID',
     awsAccessKeyIdRequired: 'AWS Access Key ID *',
@@ -1176,7 +1796,8 @@ export default {
     defaultModel: 'Default Primary Model',
     defaultModelOptional: 'Default Primary Model (Optional)',
     defaultModelPlaceholder: 'e.g.: us.anthropic.claude-sonnet-4-20250514-v1:0',
-    defaultModelDescription: 'Leave blank to use system default model. Supports inference profile ID or ARN',
+    defaultModelDescription:
+      'Leave blank to use system default model. Supports inference profile ID or ARN',
     bedrockModelConfigTitle: 'Bedrock Model Configuration:',
     bedrockModelConfigInferenceProfile: '• Supports Inference Profile ID (recommended)',
     bedrockModelConfigArn: '• Supports Application Inference Profile ARN',
@@ -1185,13 +1806,15 @@ export default {
     smallFastModel: 'Small Fast Model',
     smallFastModelOptional: 'Small Fast Model (Optional)',
     smallFastModelPlaceholder: 'e.g.: us.anthropic.claude-3-5-haiku-20241022-v1:0',
-    smallFastModelDescription: 'Lightweight model for fast responses, leave blank to use system default',
-    
+    smallFastModelDescription:
+      'Lightweight model for fast responses, leave blank to use system default',
+
     // Azure OpenAI fields
     azureEndpoint: 'Azure Endpoint',
     azureEndpointRequired: 'Azure Endpoint *',
     azureEndpointPlaceholder: 'https://your-resource.openai.azure.com',
-    azureEndpointDescription: 'Azure OpenAI resource endpoint URL, format: https://your-resource.openai.azure.com',
+    azureEndpointDescription:
+      'Azure OpenAI resource endpoint URL, format: https://your-resource.openai.azure.com',
     apiVersion: 'API Version',
     apiVersionPlaceholder: '2024-02-01',
     apiVersionDescription: 'Azure OpenAI API version, defaults to latest stable version 2024-02-01',
@@ -1205,7 +1828,7 @@ export default {
     apiKeyDescription: 'API key obtained from Azure portal',
     supportedModels: 'Supported Models',
     supportedModelsDescription: 'Select model types supported by this deployment',
-    
+
     // Claude Console fields
     apiUrl: 'API URL',
     apiUrlRequired: 'API URL *',
@@ -1224,102 +1847,128 @@ export default {
     used: 'Used',
     modelMapping: 'Model Mapping Table',
     modelMappingOptional: 'Model Mapping Table (Optional)',
-    modelMappingDescription: 'Leave blank to support all models without modification. With mapping configured, left models will be recognized as supported, right models are actually sent.',
+    modelMappingDescription:
+      'Leave blank to support all models without modification. With mapping configured, left models will be recognized as supported, right models are actually sent.',
     originalModel: 'Original Model Name',
     mappedModel: 'Mapped Model Name',
     addModelMapping: 'Add Model Mapping',
     userAgent: 'Custom User-Agent',
     userAgentOptional: 'Custom User-Agent (Optional)',
     userAgentPlaceholder: 'Leave blank to pass through client User-Agent',
-    userAgentDescription: 'When blank, will automatically use client User-Agent, only fill when need to fix specific UA',
+    userAgentDescription:
+      'When blank, will automatically use client User-Agent, only fill when need to fix specific UA',
     rateLimitMechanism: 'Rate Limit Mechanism',
     enableRateLimit: 'Enable Rate Limiting',
-    rateLimitDescription: 'When enabled, will pause scheduling for a period when account returns 429 errors',
+    rateLimitDescription:
+      'When enabled, will pause scheduling for a period when account returns 429 errors',
     rateLimitDuration: 'Rate Limit Duration (minutes)',
-    rateLimitDurationDescription: 'Time to pause scheduling after account is rate limited (minutes)',
-    
+    rateLimitDurationDescription:
+      'Time to pause scheduling after account is rate limited (minutes)',
+
     // Claude subscription types
     subscriptionType: 'Subscription Type',
     subscriptionClaudeMax: 'Claude Max',
     subscriptionClaudePro: 'Claude Pro',
     claudeProLimitation: 'Pro accounts do not support Claude Opus 4 model',
-    
+
     // Claude special features
     autoStopOnWarning: 'Auto stop scheduling when 5-hour usage approaches limit',
-    autoStopOnWarningDescription: 'When system detects account approaching 5-hour usage limit, automatically pause scheduling this account. Will automatically resume when entering new time window.',
+    autoStopOnWarningDescription:
+      'When system detects account approaching 5-hour usage limit, automatically pause scheduling this account. Will automatically resume when entering new time window.',
     useUnifiedUserAgent: 'Use Unified Claude Code Version',
-    useUnifiedUserAgentDescription: 'When enabled, will use unified User-Agent captured from real Claude Code client to improve compatibility',
+    useUnifiedUserAgentDescription:
+      'When enabled, will use unified User-Agent captured from real Claude Code client to improve compatibility',
     currentUnifiedVersion: '💡 Current unified version: ',
     clearCache: 'Clear Cache',
     clearing: 'Clearing...',
     waitingForCapture: '⏳ Waiting to capture User-Agent from Claude Code client',
-    captureHint: '💡 Tip: If unable to capture for a long time, please confirm Claude Code client is using this account, or contact developer to check if User-Agent format has changed',
+    captureHint:
+      '💡 Tip: If unable to capture for a long time, please confirm Claude Code client is using this account, or contact developer to check if User-Agent format has changed',
     useUnifiedClientId: 'Use Unified Client Identifier',
-    useUnifiedClientIdDescription: 'When enabled, will use fixed client identifier to make all requests appear from same client, reducing fingerprint',
+    useUnifiedClientIdDescription:
+      'When enabled, will use fixed client identifier to make all requests appear from same client, reducing fingerprint',
     clientId: 'Client Identifier ID',
     regenerate: 'Regenerate',
-    clientIdDescription: 'This ID will replace user_id client part in requests, keeping session part for sticky sessions',
-    
+    clientIdDescription:
+      'This ID will replace user_id client part in requests, keeping session part for sticky sessions',
+
     // Schedule priority
     schedulePriority: 'Schedule Priority',
     schedulePriorityRange: 'Schedule Priority (1-100)',
     schedulePriorityPlaceholder: 'Lower number = higher priority, default 50',
     schedulePriorityDescription: 'Lower number = higher priority, recommended range: 1-100',
-    
+
     // Manual token input
     manualTokenTitle: 'Manual Token Input',
-    manualTokenDescription: 'Please enter valid Access Token. If you have Refresh Token, also recommend filling it to support auto refresh.',
-    manualTokenClaudeDescription: 'Please enter valid Claude Access Token. If you have Refresh Token, also recommend filling it to support auto refresh.',
-    manualTokenGeminiDescription: 'Please enter valid Gemini Access Token. If you have Refresh Token, also recommend filling it to support auto refresh.',
-    manualTokenOpenAIDescription: 'Please enter valid OpenAI Access Token. If you have Refresh Token, also recommend filling it to support auto refresh.',
+    manualTokenDescription:
+      'Please enter valid Access Token. If you have Refresh Token, also recommend filling it to support auto refresh.',
+    manualTokenClaudeDescription:
+      'Please enter valid Claude Access Token. If you have Refresh Token, also recommend filling it to support auto refresh.',
+    manualTokenGeminiDescription:
+      'Please enter valid Gemini Access Token. If you have Refresh Token, also recommend filling it to support auto refresh.',
+    manualTokenOpenAIDescription:
+      'Please enter valid OpenAI Access Token. If you have Refresh Token, also recommend filling it to support auto refresh.',
     obtainTokenMethods: 'Methods to obtain Access Token:',
-    claudeTokenPath: 'Please get credentials from ~/.claude/.credentials.json file on machine with logged-in Claude Code, do not use keys from Claude official website API Keys page.',
-    geminiTokenPath: 'Please get credentials from ~/.config/gemini/credentials.json file on machine with logged-in Gemini CLI.',
-    openaiTokenPath: 'Please get authentication credentials from machine with logged-in OpenAI account, or get Access Token through OAuth authorization flow.',
+    claudeTokenPath:
+      'Please get credentials from ~/.claude/.credentials.json file on machine with logged-in Claude Code, do not use keys from Claude official website API Keys page.',
+    geminiTokenPath:
+      'Please get credentials from ~/.config/gemini/credentials.json file on machine with logged-in Gemini CLI.',
+    openaiTokenPath:
+      'Please get authentication credentials from machine with logged-in OpenAI account, or get Access Token through OAuth authorization flow.',
     accessToken: 'Access Token',
     accessTokenOptional: 'Access Token (Optional)',
     accessTokenRequired: 'Access Token *',
     accessTokenPlaceholder: 'Please enter Access Token...',
-    accessTokenOptionalPlaceholder: 'Optional: If not filled, system will automatically get via Refresh Token...',
-    accessTokenOptionalDescription: 'Access Token is optional. If not provided, system will automatically get via Refresh Token.',
+    accessTokenOptionalPlaceholder:
+      'Optional: If not filled, system will automatically get via Refresh Token...',
+    accessTokenOptionalDescription:
+      'Access Token is optional. If not provided, system will automatically get via Refresh Token.',
     refreshToken: 'Refresh Token',
     refreshTokenOptional: 'Refresh Token (Optional)',
     refreshTokenRequired: 'Refresh Token *',
     refreshTokenPlaceholder: 'Please enter Refresh Token...',
     refreshTokenRequiredPlaceholder: 'Please enter Refresh Token (required)...',
-    refreshTokenDescription: 'System will use Refresh Token to automatically get Access Token and user info',
+    refreshTokenDescription:
+      'System will use Refresh Token to automatically get Access Token and user info',
     refreshTokenTip: '💡 If Refresh Token not filled, token needs manual update after expiry.',
-    
+
     // Setup Token flow
     setupTokenTitle: 'Claude Setup Token Authorization',
-    setupTokenDescription: 'Please follow these steps to complete Claude account authorization via Setup Token:',
+    setupTokenDescription:
+      'Please follow these steps to complete Claude account authorization via Setup Token:',
     setupTokenStep1Title: 'Click button below to generate authorization link',
     setupTokenStep2Title: 'Open link in browser and complete authorization',
-    setupTokenStep2Description: 'Please open authorization link in new tab, login to your Claude account and authorize Claude Code.',
-    setupTokenStep2Warning: 'Note: If you have proxy configured, please ensure browser also uses same proxy to access authorization page.',
+    setupTokenStep2Description:
+      'Please open authorization link in new tab, login to your Claude account and authorize Claude Code.',
+    setupTokenStep2Warning:
+      'Note: If you have proxy configured, please ensure browser also uses same proxy to access authorization page.',
     setupTokenStep3Title: 'Enter Authorization Code',
-    setupTokenStep3Description: 'After authorization completes, copy Authorization Code from return page and paste into input below:',
+    setupTokenStep3Description:
+      'After authorization completes, copy Authorization Code from return page and paste into input below:',
     generateSetupTokenUrl: 'Generate Setup Token Authorization Link',
     generating: 'Generating...',
     copyLink: 'Copy Link',
     regenerateLink: 'Regenerate',
     authorizationCode: 'Authorization Code',
-    authorizationCodePlaceholder: 'Paste Authorization Code obtained from Claude Code authorization page...',
-    authorizationCodeDescription: 'Please paste Authorization Code copied from Claude Code authorization page',
+    authorizationCodePlaceholder:
+      'Paste Authorization Code obtained from Claude Code authorization page...',
+    authorizationCodeDescription:
+      'Please paste Authorization Code copied from Claude Code authorization page',
     verifying: 'Verifying...',
     completeAuthorization: 'Complete Authorization',
-    
+
     // Token update (edit mode)
     updateTokenTitle: 'Update Token',
-    updateTokenDescription: 'Can update Access Token and Refresh Token. For security, current Token values are not displayed.',
+    updateTokenDescription:
+      'Can update Access Token and Refresh Token. For security, current Token values are not displayed.',
     updateTokenTip: '💡 Leave blank to not update that field.',
     newAccessToken: 'New Access Token',
     newRefreshToken: 'New Refresh Token',
     leaveBlankNoUpdate: 'Leave blank to not update...',
-    
+
     // Usage information
     currentUsage: 'Current Usage',
-    
+
     // Buttons
     cancel: 'Cancel',
     nextStep: 'Next Step',
@@ -1328,7 +1977,7 @@ export default {
     creating: 'Creating...',
     update: 'Update',
     updating: 'Updating...',
-    
+
     // Error messages
     pleaseEnterAccountName: 'Please enter account name',
     pleaseSelectGroup: 'Please select a group',
@@ -1341,7 +1990,7 @@ export default {
     pleaseEnterDeploymentName: 'Please enter deployment name',
     pleaseEnterAccessToken: 'Please enter Access Token',
     pleaseEnterRefreshToken: 'Please enter Refresh Token',
-    
+
     // Success messages
     linkCopied: 'Link copied',
     extractedAuthCode: 'Successfully extracted authorization code!',
@@ -1350,7 +1999,7 @@ export default {
     groupsRefreshed: 'Groups list refreshed',
     modelMappingAdded: 'Mapping added',
     modelMappingExists: 'Model mapping already exists',
-    
+
     // Warnings and hints
     copyFailed: 'Copy failed, please copy manually',
     clearCacheFailed: 'Clear cache failed',
@@ -1358,84 +2007,101 @@ export default {
     urlFormatError: 'Link format error, please check if it is a complete URL',
     wrongUrlFormat: 'Please paste link starting with http://localhost:45462',
     loadGroupsFailed: 'Failed to load groups list',
-    
+
     // Confirmation dialogs
     projectIdNotFilledTitle: 'Project ID Not Filled',
-    projectIdNotFilledMessage: 'You have not filled Project ID.\n\nIf your Google account is bound to Google Cloud or identified as Workspace account, Project ID is required.\nIf you are using regular personal account, you can continue without filling.',
+    projectIdNotFilledMessage:
+      'You have not filled Project ID.\n\nIf your Google account is bound to Google Cloud or identified as Workspace account, Project ID is required.\nIf you are using regular personal account, you can continue without filling.',
     continueButton: 'Continue',
     goBackToFill: 'Go Back to Fill',
     continueSave: 'Continue Save',
-    
+
     // Quick model mapping buttons
     presetSonnet4: '+ Sonnet 4',
     presetOpus41: '+ Opus 4.1',
     presetHaiku35: '+ Haiku 3.5',
     presetOpus41ToSonnet4: '+ Opus 4.1 → Sonnet 4',
-    
+
     // Edit mode special hints
     leaveBlankNoUpdateApiKey: 'Leave blank to not update API Key',
     leaveBlankNoUpdateAwsKey: 'Leave blank to not update AWS Access Key ID',
     leaveBlankNoUpdateAwsSecret: 'Leave blank to not update AWS Secret Access Key',
     leaveBlankNoUpdateSession: 'Leave blank to not update',
-    
+
     // General description text
-    allModelsIfEmpty: 'Leave blank to support all models. If models specified, requests with models not in list will not be scheduled to this account',
-    systemDefaultIfEmpty: 'Leave blank to use system default model. Supports inference profile ID or ARN',
+    allModelsIfEmpty:
+      'Leave blank to support all models. If models specified, requests with models not in list will not be scheduled to this account',
+    systemDefaultIfEmpty:
+      'Leave blank to use system default model. Supports inference profile ID or ARN',
     noUpdateIfEmpty: 'Leave blank to not update this field',
-    
+
     // Manual Token Input Section
     manualTokenInput: 'Manual Token Input',
-    manualTokenClaudeDescription: 'Please enter valid Claude Access Token. If you have Refresh Token, it is recommended to fill both for automatic refresh support.',
-    manualTokenGeminiDescription: 'Please enter valid Gemini Access Token. If you have Refresh Token, it is recommended to fill both for automatic refresh support.',
-    manualTokenOpenAIDescription: 'Please enter valid OpenAI Access Token. If you have Refresh Token, it is recommended to fill both for automatic refresh support.',
+    manualTokenClaudeDescription:
+      'Please enter valid Claude Access Token. If you have Refresh Token, it is recommended to fill both for automatic refresh support.',
+    manualTokenGeminiDescription:
+      'Please enter valid Gemini Access Token. If you have Refresh Token, it is recommended to fill both for automatic refresh support.',
+    manualTokenOpenAIDescription:
+      'Please enter valid OpenAI Access Token. If you have Refresh Token, it is recommended to fill both for automatic refresh support.',
     getAccessTokenMethod: 'Methods to get Access Token:',
     claudeCredentialsPath: 'Please get from logged-in Claude Code machine',
     geminiCredentialsPath: 'Please get from logged-in Gemini CLI machine',
-    openaiCredentialsPath: 'Please get authentication credentials from logged-in OpenAI account machine, or obtain Access Token through OAuth authorization flow.',
-    claudeCredentialsWarning: 'credentials from file, do not use keys from Claude official API Keys page.',
-    refreshTokenWarning: '💡 If Refresh Token is not filled, Token needs manual update after expiration.',
+    openaiCredentialsPath:
+      'Please get authentication credentials from logged-in OpenAI account machine, or obtain Access Token through OAuth authorization flow.',
+    claudeCredentialsWarning:
+      'credentials from file, do not use keys from Claude official API Keys page.',
+    refreshTokenWarning:
+      '💡 If Refresh Token is not filled, Token needs manual update after expiration.',
     accessTokenOptional: 'Access Token (Optional)',
-    accessTokenOptionalPlaceholder: 'Optional: If not filled, system will automatically obtain through Refresh Token...',
-    accessTokenOptionalInfo: 'Access Token is optional. If not provided, system will automatically obtain through Refresh Token.',
+    accessTokenOptionalPlaceholder:
+      'Optional: If not filled, system will automatically obtain through Refresh Token...',
+    accessTokenOptionalInfo:
+      'Access Token is optional. If not provided, system will automatically obtain through Refresh Token.',
     accessTokenRequired: 'Access Token *',
     accessTokenRequiredPlaceholder: 'Please enter Access Token...',
     refreshTokenRequired: 'Refresh Token *',
     refreshTokenRequiredPlaceholder: 'Please enter Refresh Token (required)...',
-    refreshTokenRequiredInfo: 'System will use Refresh Token to automatically obtain Access Token and user information',
+    refreshTokenRequiredInfo:
+      'System will use Refresh Token to automatically obtain Access Token and user information',
     refreshTokenOptional: 'Refresh Token (Optional)',
     refreshTokenOptionalPlaceholder: 'Please enter Refresh Token...',
-    
+
     // Priority Settings
     priorityPlaceholder: 'Lower number = higher priority, default 50',
     priorityDescription: 'Lower number = higher priority, recommended range: 1-100',
     prioritySchedulingTitle: 'Scheduling Priority (1-100)',
     priorityEditPlaceholder: 'Lower number = higher priority',
-    
+
     // Gemini Project ID
     projectIdOptional: 'Project ID (Optional)',
     projectIdPlaceholder: 'e.g., verdant-wares-464411-k9',
     projectIdDescription: 'Google Cloud/Workspace accounts may require Project ID',
-    
+
     // Claude Subscription Type and Advanced Options
     subscriptionType: 'Subscription Type',
     claudeMaxSubscription: 'Claude Max',
     claudeProSubscription: 'Claude Pro',
     claudeProLimitation: 'Pro accounts do not support Claude Opus 4 model',
     autoStopOnWarning: 'Auto-stop scheduling when approaching 5-hour limit',
-    autoStopOnWarningDescription: 'When system detects account approaching 5-hour usage limit, automatically pause scheduling for this account. Will resume automatically when entering new time window.',
+    autoStopOnWarningDescription:
+      'When system detects account approaching 5-hour usage limit, automatically pause scheduling for this account. Will resume automatically when entering new time window.',
     useUnifiedUserAgent: 'Use unified Claude Code version',
-    useUnifiedUserAgentDescription: 'When enabled, will use unified User-Agent captured from real Claude Code client, improving compatibility',
+    useUnifiedUserAgentDescription:
+      'When enabled, will use unified User-Agent captured from real Claude Code client, improving compatibility',
     currentUnifiedVersion: 'Current unified version:',
     clearCache: 'Clear Cache',
     clearing: 'Clearing...',
     waitingForCapture: 'Waiting to capture User-Agent from Claude Code client',
-    captureHint: '💡 Hint: If unable to capture for long time, please confirm Claude Code client is using this account, or contact developer to check if User-Agent format has changed',
+    captureHint:
+      '💡 Hint: If unable to capture for long time, please confirm Claude Code client is using this account, or contact developer to check if User-Agent format has changed',
     useUnifiedClientId: 'Use unified client identifier',
-    useUnifiedClientIdDescription: 'When enabled, will use fixed client identifier, making all requests appear to come from same client, reducing characteristics',
+    useUnifiedClientIdDescription:
+      'When enabled, will use fixed client identifier, making all requests appear to come from same client, reducing characteristics',
     clientIdLabel: 'Client Identifier ID',
     regenerateClientId: 'Regenerate',
-    clientIdDescription: 'This ID will replace user_id client part in requests, preserving session part for sticky sessions',
-    
+    clientIdDescription:
+      'This ID will replace user_id client part in requests, preserving session part for sticky sessions',
+
     // Edit Mode Fields
     accountNameEdit: 'Account Name',
     accountNameEditPlaceholder: 'Set an identifiable name for the account',
@@ -1446,30 +2112,34 @@ export default {
     noAvailableGroups: 'No available groups',
     membersCount: ' members',
     createNewGroup: 'Create New Group',
-    
+
     // AWS Bedrock Configuration
     bedrockCredentials: 'Credentials Configuration',
-    bedrockCredentialsDescription: 'Please fill in AWS access credentials for calling Amazon Bedrock service.',
+    bedrockCredentialsDescription:
+      'Please fill in AWS access credentials for calling Amazon Bedrock service.',
     awsAccessKeyId: 'AWS Access Key ID *',
     awsAccessKeyIdPlaceholder: 'Please enter AWS Access Key ID...',
     awsSecretAccessKey: 'AWS Secret Access Key *',
     awsSecretAccessKeyPlaceholder: 'Please enter AWS Secret Access Key...',
     sessionTokenOptional: 'Session Token (Optional)',
     sessionTokenOptionalPlaceholder: 'Session token for temporary credentials...',
-    sessionTokenDescription: 'Only required when using temporary credentials (like STS generated credentials)',
+    sessionTokenDescription:
+      'Only required when using temporary credentials (like STS generated credentials)',
     awsRegion: 'AWS Region *',
     awsRegionPlaceholder: 'Select AWS region...',
     bedrockModelConfig: 'Model Configuration',
     defaultModelLabel: 'Default Model',
     defaultModelPlaceholder: 'e.g., anthropic.claude-3-5-sonnet-20240620-v1:0',
-    defaultModelDescription: 'Leave blank to use system default model. Supports inference profile ID or ARN',
+    defaultModelDescription:
+      'Leave blank to use system default model. Supports inference profile ID or ARN',
     smallFastModelLabel: 'Small Fast Model',
     smallFastModelPlaceholder: 'e.g., anthropic.claude-3-haiku-20240307-v1:0',
     smallFastModelDescription: 'Fast model for simple tasks, supports inference profile ID or ARN',
-    
+
     // Azure OpenAI Configuration
     azureOpenAIConfig: 'Azure OpenAI Configuration',
-    azureOpenAIDescription: 'Please configure connection information and deployment details for Azure OpenAI service.',
+    azureOpenAIDescription:
+      'Please configure connection information and deployment details for Azure OpenAI service.',
     azureEndpoint: 'Azure Endpoint *',
     azureEndpointPlaceholder: 'e.g., https://your-resource.openai.azure.com/',
     azureEndpointDescription: 'Endpoint URL for Azure OpenAI service',
@@ -1482,14 +2152,16 @@ export default {
     azureDeploymentDescription: 'Deployment name created in Azure OpenAI Studio',
     azureSupportedModels: 'Supported Models',
     azureSupportedModelsPlaceholder: 'e.g., gpt-4, gpt-3.5-turbo',
-    azureSupportedModelsDescription: 'Model list supported by this account, separated by commas. Leave blank to support all models',
+    azureSupportedModelsDescription:
+      'Model list supported by this account, separated by commas. Leave blank to support all models',
     azureAccountSettings: 'Account Settings',
     azureIsActive: 'Enable this account',
     azureSchedulable: 'Allow scheduling',
-    
+
     // Claude Console Model Mapping
     claudeConsoleModels: 'Model Mapping',
-    claudeConsoleModelsDescription: 'Configure model request mapping relationships, mapping client-requested model names to actual models called.',
+    claudeConsoleModelsDescription:
+      'Configure model request mapping relationships, mapping client-requested model names to actual models called.',
     modelMappingFrom: 'Request Model',
     modelMappingFromPlaceholder: 'e.g., claude-3-5-sonnet-20241022',
     modelMappingTo: 'Actual Model',
@@ -1499,26 +2171,33 @@ export default {
     presetMappings: 'Preset Mappings',
     modelMappingExample: 'Example: claude-3-5-sonnet-20241022 → claude-3-5-sonnet-latest',
     noMappingsConfigured: 'No mappings configured, will use original model name directly',
-    
+
     // Setup Token Authorization Flow Detailed Steps
     setupTokenAuth: 'Setup Token Authorization',
-    setupTokenAuthDescription: 'Setup Token is a secure authorization method that completes account verification through temporary authorization code.',
+    setupTokenAuthDescription:
+      'Setup Token is a secure authorization method that completes account verification through temporary authorization code.',
     setupTokenStep1: 'Step 1: Generate Authorization Link',
-    setupTokenStep1Description: 'System will generate a dedicated authorization link for obtaining temporary authorization code.',
+    setupTokenStep1Description:
+      'System will generate a dedicated authorization link for obtaining temporary authorization code.',
     setupTokenStep2: 'Step 2: Complete Authorization',
-    setupTokenStep2Description: 'Open authorization link in new window, log in with your Claude account and complete authorization.',
+    setupTokenStep2Description:
+      'Open authorization link in new window, log in with your Claude account and complete authorization.',
     setupTokenStep3: 'Step 3: Enter Authorization Code',
-    setupTokenStep3Description: 'After successful authorization, system will display authorization code, please copy and paste into input box below.',
+    setupTokenStep3Description:
+      'After successful authorization, system will display authorization code, please copy and paste into input box below.',
     setupTokenUrlGenerated: 'Authorization link generated',
     setupTokenOpenInBrowser: 'Open in browser',
     setupTokenCopyLink: 'Copy link',
     setupTokenUrlExpiry: 'This link expires in 10 minutes, please complete authorization quickly',
     setupTokenAuthCode: 'Authorization Code *',
-    setupTokenAuthCodePlaceholder: 'Please paste authorization code obtained from authorization page...',
-    setupTokenAuthCodeDescription: 'After completing authorization, will display authorization code in format like "auth_code_xxx"',
+    setupTokenAuthCodePlaceholder:
+      'Please paste authorization code obtained from authorization page...',
+    setupTokenAuthCodeDescription:
+      'After completing authorization, will display authorization code in format like "auth_code_xxx"',
     setupTokenSmartDetection: 'Smart Detection',
-    setupTokenSmartDetectionDesc: 'Supports directly pasting complete callback URL, system will automatically extract authorization code',
-    
+    setupTokenSmartDetectionDesc:
+      'Supports directly pasting complete callback URL, system will automatically extract authorization code',
+
     // More Error Messages and Validation Text
     unsupportedPlatform: 'Unsupported platform',
     accountCreationFailed: 'Account creation failed',
@@ -1530,13 +2209,14 @@ export default {
     unknownError: 'Unknown error',
     modelMappingExistsInfo: 'Model mapping already exists',
     modelAddedMapping: 'Mapping added',
-    
+
     // Rate Limiting and Quota Management
     rateLimitSettings: 'Rate Limit Settings',
     enableRateLimit: 'Enable rate limiting',
     rateLimitDuration: 'Rate limit duration (seconds)',
     rateLimitDurationPlaceholder: 'e.g., 60',
-    rateLimitDescription: 'When enabled, will limit request frequency to prevent account being blocked',
+    rateLimitDescription:
+      'When enabled, will limit request frequency to prevent account being blocked',
     quotaManagement: 'Quota Management',
     dailyQuotaLabel: 'Daily quota limit',
     dailyQuotaPlaceholder: '0 means unlimited',
@@ -1544,13 +2224,13 @@ export default {
     quotaResetTimePlaceholder: 'e.g., 00:00',
     quotaResetDescription: 'Time point when daily quota resets',
     currentDailyUsage: 'Today used',
-    
+
     // Advanced Settings
     advancedSettings: 'Advanced Settings',
     customUserAgent: 'Custom User-Agent',
     customUserAgentPlaceholder: 'Leave blank to use default User-Agent...',
     userAgentDescription: 'User-Agent identifier for requests',
-    
+
     // General Hints and Status
     notSet: 'Not set',
     unlimited: 'Unlimited',
@@ -1561,7 +2241,7 @@ export default {
     optional: 'Optional',
     required: 'Required',
     recommended: 'Recommended',
-    
+
     // Additional Action Buttons
     testConnection: 'Test connection',
     testing: 'Testing...',
@@ -1571,21 +2251,24 @@ export default {
     validating: 'Validating...',
     save: 'Save',
     saving: 'Saving...',
-    
+
     // Usage Statistics
     usageStats: 'Usage Statistics',
     loadingUsage: 'Loading usage...',
     usageLoadFailed: 'Failed to load usage',
-    
+
     // Gemini Project ID Details
     geminiProjectIdRequired: 'Google Cloud/Workspace accounts require Project ID',
-    geminiProjectIdDetail: 'Some Google accounts (especially those bound to Google Cloud) will be identified as Workspace accounts and require additional Project ID.',
+    geminiProjectIdDetail:
+      'Some Google accounts (especially those bound to Google Cloud) will be identified as Workspace accounts and require additional Project ID.',
     geminiHowToGetProjectId: 'How to get Project ID:',
     geminiVisitConsole: 'Visit',
     geminiCopyProjectId: 'Copy Project ID (Project ID), usually in string format',
-    geminiProjectIdWarning: '⚠️ Note: Copy Project ID (Project ID), not Project Number (Project Number)!',
-    geminiPersonalAccountTip: 'Tip: If your account is a regular personal account (not bound to Google Cloud), please leave this field empty.',
-    
+    geminiProjectIdWarning:
+      '⚠️ Note: Copy Project ID (Project ID), not Project Number (Project Number)!',
+    geminiPersonalAccountTip:
+      'Tip: If your account is a regular personal account (not bound to Google Cloud), please leave this field empty.',
+
     // AWS Region Reference
     awsRegionReference: 'Common AWS regions reference:',
     awsRegionEastUS: 'us-east-1 (US East)',
@@ -1595,55 +2278,58 @@ export default {
     awsRegionAsiaTokyo: 'ap-northeast-1 (Tokyo)',
     awsRegionEuropeFrankfurt: 'eu-central-1 (Frankfurt)',
     awsRegionInputTip: '💡 Please enter complete region code, e.g. us-east-1',
-    
+
     // Bedrock Model Description
     bedrockModelConfigDesc: 'Bedrock model configuration description:',
     bedrockSupportsInferenceProfile: 'Supports Inference Profile ID (recommended)',
     bedrockSupportsARN: 'Supports Application Inference Profile ARN',
     bedrockCommonModel: 'Common model: us.anthropic.claude-sonnet-4-20250514-v1:0',
     bedrockEmptyUsesDefault: 'Leave empty to use system configured default model',
-    
+
     // Azure OpenAI Model Selection
     azureModelSelectionDesc: 'Select model types supported by this deployment',
-    
+
     // Rate Limiting
     rateLimitMechanism: 'Rate limiting mechanism',
     enableRateLimitMechanism: 'Enable rate limiting mechanism',
-    rateLimitDescription2: 'When enabled, will pause scheduling for some time when account returns 429 error',
+    rateLimitDescription2:
+      'When enabled, will pause scheduling for some time when account returns 429 error',
     rateLimitDurationMinutes: 'Rate limit duration (minutes)',
     rateLimitDefaultMinutes: 'Default 60 minutes',
     rateLimitPauseDesc: 'Time to pause scheduling after account is rate limited (minutes)',
-    
+
     // Claude Console Specific Fields
     claudeConsoleFields: 'Claude Console specific fields',
     quotaManagement: 'Quota management',
     modelMappingTable: 'Model mapping table',
     modelMappingTableOptional: 'Model mapping table (optional)',
     addModelMapping: 'Add model mapping',
-    
+
     // Claude Subscription Type
     subscriptionType: 'Subscription type',
-    
+
     // Setup Token Auth
     setupTokenAuth: 'Setup Token authorization',
     claudeSetupTokenAuth: 'Claude Setup Token authorization',
-    setupTokenAuthSteps: 'Please follow these steps to complete Claude account authorization through Setup Token:',
+    setupTokenAuthSteps:
+      'Please follow these steps to complete Claude account authorization through Setup Token:',
     generateSetupTokenLink: 'Generate Setup Token auth link',
     generating: 'Generating...',
-    
+
     // Buttons and actions
     verifying: 'Verifying...',
     completeAuth: 'Complete authorization',
     updating: 'Updating...',
     update: 'Update',
-    
+
     // Error messages
     generateSetupTokenFailed: 'Failed to generate Setup Token auth link',
     copyFailed: 'Copy failed, please copy manually',
-    setupTokenAuthFailed: 'Setup Token authorization failed, please check if the authorization code is correct',
+    setupTokenAuthFailed:
+      'Setup Token authorization failed, please check if the authorization code is correct',
     accountCreationFailed: 'Account creation failed',
     accountCreationError: 'Account creation failed:',
-    
+
     // Page structure comments
     stepIndicator: 'Step indicator',
     step1BasicInfo: 'Step 1: Basic information and proxy settings',
@@ -1653,7 +2339,7 @@ export default {
     geminiProjectId: 'Gemini project ID field',
     bedrockFields: 'Bedrock specific fields',
     azureOpenAIFields: 'Azure OpenAI specific fields',
-    
+
     // Validation messages
     nameRequired: 'Please enter account name',
     apiUrlRequired: 'Please enter API URL',
@@ -1666,8 +2352,9 @@ export default {
     dailyQuotaDescription: 'Set daily usage quota, 0 means unlimited',
     quotaResetTime: 'Quota reset time',
     quotaResetTimeDescription: 'Time to automatically reset quota daily',
-    modelMappingDescription: 'Leave empty to support all models without modifying requests. After configuring mapping, left model will be recognized as supported model, right is the actual model sent.',
-    
+    modelMappingDescription:
+      'Leave empty to support all models without modifying requests. After configuring mapping, left model will be recognized as supported model, right is the actual model sent.',
+
     // Quota Management
     quotaManagementFields: 'Quota management fields',
     dailyQuotaLimitDollar: 'Daily quota limit ($)',
@@ -1675,57 +2362,65 @@ export default {
     dailyQuotaDesc: 'Set daily usage quota, 0 means unlimited',
     quotaResetTime: 'Quota reset time',
     quotaResetTimeDesc: 'Time to automatically reset quota daily',
-    
+
     // Model Mapping
     modelMappingOptional: 'Model mapping table (optional)',
-    modelMappingDesc: 'Leave empty to support all models without modifying requests. After configuring mapping, left model will be recognized as supported model, right is the actual model sent.',
+    modelMappingDesc:
+      'Leave empty to support all models without modifying requests. After configuring mapping, left model will be recognized as supported model, right is the actual model sent.',
     originalModelName: 'Original model name',
     mappedModelName: 'Mapped model name',
     addModelMappingBtn: 'Add model mapping',
     customUserAgentOptional: 'Custom User-Agent (optional)',
-    customUserAgentDesc: 'When empty, will automatically use client User-Agent, only fill when need to fix specific UA',
+    customUserAgentDesc:
+      'When empty, will automatically use client User-Agent, only fill when need to fix specific UA',
     userAgentPassthrough: 'Leave empty to pass through client User-Agent',
-    
+
     // Claude Subscription Type
     claudeSubscriptionType: 'Subscription type',
     claudeProLimitation: 'Pro accounts do not support Claude Opus 4 model',
-    
+
     // Claude Advanced Options
     claudeAutoStopScheduling: 'Auto-stop scheduling when approaching 5-hour limit',
-    claudeAutoStopDesc: 'When system detects account approaching 5-hour usage limit, automatically pause scheduling for this account. Will resume automatically when entering new time window.',
+    claudeAutoStopDesc:
+      'When system detects account approaching 5-hour usage limit, automatically pause scheduling for this account. Will resume automatically when entering new time window.',
     claudeUseUnifiedUA: 'Use unified Claude Code version',
-    claudeUnifiedUADesc: 'When enabled, will use unified User-Agent captured from real Claude Code client, improving compatibility',
+    claudeUnifiedUADesc:
+      'When enabled, will use unified User-Agent captured from real Claude Code client, improving compatibility',
     claudeCurrentUnifiedVersion: '💡 Current unified version:',
     claudeWaitingCapture: '⏳ Waiting to capture User-Agent from Claude Code client',
-    claudeCaptureHint: '💡 Hint: If unable to capture for long time, please confirm Claude Code client is using this account, or contact developer to check if User-Agent format has changed',
+    claudeCaptureHint:
+      '💡 Hint: If unable to capture for long time, please confirm Claude Code client is using this account, or contact developer to check if User-Agent format has changed',
     claudeUseUnifiedClientId: 'Use unified client identifier',
-    claudeUnifiedClientIdDesc: 'When enabled, will use fixed client identifier, making all requests appear to come from same client, reducing characteristics',
+    claudeUnifiedClientIdDesc:
+      'When enabled, will use fixed client identifier, making all requests appear to come from same client, reducing characteristics',
     claudeClientIdLabel: 'Client identifier ID',
-    claudeClientIdDesc: 'This ID will replace user_id client part in requests, preserving session part for sticky sessions',
-    
+    claudeClientIdDesc:
+      'This ID will replace user_id client part in requests, preserving session part for sticky sessions',
+
     // Setup Token Process
     setupTokenAuthProcess: 'Claude Setup Token Authorization',
-    setupTokenProcessDesc: 'Please follow these steps to complete Claude account authorization through Setup Token:',
+    setupTokenProcessDesc:
+      'Please follow these steps to complete Claude account authorization through Setup Token:',
     setupTokenStepOneTitle: 'Step 1: Generate authorization link',
     setupTokenStepOneDesc: 'Click button below to generate authorization link',
     setupTokenGenerating: 'Generating...',
     setupTokenGenerateBtn: 'Generate Setup Token authorization link',
     setupTokenCopyTitle: 'Copy link',
-    
+
     // Step Indicators
     stepIndicator: 'Step indicator',
     step1BasicInfo: 'Step 1: Basic information and proxy settings',
     step2OAuth: 'Step 2: OAuth authorization',
     step2SetupToken: 'Step 2: Setup Token authorization',
-    
+
     // Group Selector
     groupSelector: 'Group selector',
     multiGroupInterface: 'Multi-group interface',
     createNewGroupOption: 'Create new group option',
-    
+
     // Manual Token Input Tips
     credentialsFromFile: 'credentials from file.',
-    
+
     // Placeholder texts
     originalModelNamePlaceholder: 'Original model name',
     mappedModelNamePlaceholder: 'Mapped model name',
@@ -1734,7 +2429,7 @@ export default {
     leaveEmptyNoUpdate: 'Leave empty for no update',
     leaveEmptyNoUpdateKey: 'Leave empty for no API Key update',
     leaveEmptyNoUpdateToken: 'Leave empty for no update...',
-    
+
     // Labels and descriptions
     customUserAgentOptional: 'Custom User-Agent (optional)',
     clientIdLabel: 'Client ID',
@@ -1744,61 +2439,72 @@ export default {
     newAccessTokenLabel: 'New Access Token',
     newRefreshTokenLabel: 'New Refresh Token',
     updateTokenLabel: 'Update Token',
-    
+
     // Button texts
     regenerateBtn: 'Regenerate',
     previousStepBtn: 'Previous Step',
-    
+
     // Descriptive texts
     claudeProLimitation: 'Pro accounts do not support Claude Opus 4 model',
     claude5HourLimitDesc: 'Auto-stop scheduling when approaching 5-hour usage limit',
-    claude5HourLimitExplanation: 'When system detects account approaching 5-hour usage limit, automatically pause scheduling for this account. Will resume automatically when entering new time window.',
+    claude5HourLimitExplanation:
+      'When system detects account approaching 5-hour usage limit, automatically pause scheduling for this account. Will resume automatically when entering new time window.',
     useUnifiedClaudeVersion: 'Use unified Claude Code version',
-    unifiedVersionDesc: 'When enabled, will use unified User-Agent captured from real Claude Code client, improving compatibility',
+    unifiedVersionDesc:
+      'When enabled, will use unified User-Agent captured from real Claude Code client, improving compatibility',
     currentUnifiedVersion: '💡 Current unified version:',
     waitingUserAgent: '⏳ Waiting to capture User-Agent from Claude Code client',
-    userAgentTip: '💡 Tip: If unable to capture for a long time, please confirm that Claude Code client is using this account,',
+    userAgentTip:
+      '💡 Tip: If unable to capture for a long time, please confirm that Claude Code client is using this account,',
     contactDeveloper: 'or contact developer to check if User-Agent format has changed',
     useUnifiedClientId: 'Use unified client identifier',
-    unifiedClientIdDesc: 'When enabled, will use fixed client identifier, making all requests appear from same client, reducing fingerprinting',
-    clientIdReplaceDesc: 'This ID will replace the user_id client part in requests, retaining session part for sticky sessions',
-    
+    unifiedClientIdDesc:
+      'When enabled, will use fixed client identifier, making all requests appear from same client, reducing fingerprinting',
+    clientIdReplaceDesc:
+      'This ID will replace the user_id client part in requests, retaining session part for sticky sessions',
+
     // OAuth step texts
     step1GenerateAuthLink: 'Step 1: Generate Authorization Link',
     clickButtonGenerate: 'Click button below to generate authorization link',
     copyLinkTitle: 'Copy Link',
     step2AccessAndAuth: 'Step 2: Access Link and Authorize',
     openInBrowser: 'Open link in browser and complete authorization',
-    browserAuthDesc: 'Please open the authorization link in a new tab, login to your Claude account and authorize Claude Code.',
-    proxyNotice: 'If you have set up a proxy, please ensure your browser also uses the same proxy to access the authorization page.',
+    browserAuthDesc:
+      'Please open the authorization link in a new tab, login to your Claude account and authorize Claude Code.',
+    proxyNotice:
+      'If you have set up a proxy, please ensure your browser also uses the same proxy to access the authorization page.',
     step3InputAuthCode: 'Step 3: Input Authorization Code',
     inputAuthCodeTitle: 'Input Authorization Code',
-    authCompleteDesc: 'After authorization is complete, copy Authorization Code from the return page and paste it into the input box below:',
-    pasteAuthCodeDesc: 'Please paste the Authorization Code copied from Claude Code authorization page',
-    
+    authCompleteDesc:
+      'After authorization is complete, copy Authorization Code from the return page and paste it into the input box below:',
+    pasteAuthCodeDesc:
+      'Please paste the Authorization Code copied from Claude Code authorization page',
+
     // AWS region reference
     awsRegionRef: 'Common AWS regions reference:',
-    
+
     // Error messages
     apiKeyRequired: 'Please enter API Key',
     refreshTokenRequired: 'Please enter Refresh Token',
     accessTokenRequired: 'Please enter Access Token',
     copyFailedManual: 'Copy failed, please copy manually',
-    
+
     // Form descriptions
-    modelSupportDesc: 'Leave empty to support all models. If models are specified, requests with models not in the list will not be scheduled to this account',
+    modelSupportDesc:
+      'Leave empty to support all models. If models are specified, requests with models not in the list will not be scheduled to this account',
     modelTypeSelectionDesc: 'Select model types supported by this deployment',
-    userAgentDesc: 'When empty, will automatically use client User-Agent, only fill when need to fix specific UA',
-    
+    userAgentDesc:
+      'When empty, will automatically use client User-Agent, only fill when need to fix specific UA',
+
     // Basic labels
     apiUrlLabel: 'API URL',
     apiUrlRequired: 'API URL *',
     apiKeyLabel: 'API Key',
     apiKeyRequired: 'API Key *',
-    
+
     // More missing keys
     copyLinkTooltip: 'Copy Link',
-    
+
     // Claude subscription type display
     claudeMaxDisplay: 'Claude Max',
     claudeProDisplay: 'Claude Pro'
@@ -1810,29 +2516,33 @@ export default {
     claudeAccountAuth: 'Claude Account Authorization',
     geminiAccountAuth: 'Gemini Account Authorization',
     openaiAccountAuth: 'OpenAI Account Authorization',
-    
+
     // Flow descriptions
     claudeAuthDescription: 'Please follow these steps to complete Claude account authorization:',
     geminiAuthDescription: 'Please follow these steps to complete Gemini account authorization:',
     openaiAuthDescription: 'Please follow these steps to complete OpenAI account authorization:',
-    
+
     // Step titles
     step1Title: 'Click the button below to generate authorization link',
     step2Title: 'Open the link in browser and complete authorization',
     step3Title: 'Input Authorization Code',
     step3TitleOpenAI: 'Input authorization link or Code',
-    
+
     // Step descriptions
-    step2Description: 'Please open the authorization link in a new tab, log in to your Claude account and authorize.',
-    step2DescriptionGemini: 'Please open the authorization link in a new tab, log in to your Gemini account and authorize.',
-    step2DescriptionOpenAI: 'Please open the authorization link in a new tab, log in to your OpenAI account and authorize.',
-    
+    step2Description:
+      'Please open the authorization link in a new tab, log in to your Claude account and authorize.',
+    step2DescriptionGemini:
+      'Please open the authorization link in a new tab, log in to your Gemini account and authorize.',
+    step2DescriptionOpenAI:
+      'Please open the authorization link in a new tab, log in to your OpenAI account and authorize.',
+
     step3Description: 'After authorization is complete, the page will display a',
     step3DescriptionMiddle: ', please copy and paste it into the input box below:',
-    step3DescriptionGemini: 'After authorization is complete, the page will display an Authorization Code, please copy and paste it into the input box below:',
+    step3DescriptionGemini:
+      'After authorization is complete, the page will display an Authorization Code, please copy and paste it into the input box below:',
     step3DescriptionOpenAI: 'After authorization is complete, when the page address changes to',
     step3DescriptionOpenAIMiddle: ':',
-    
+
     // Button text
     generating: 'Generating...',
     generateAuthLink: 'Generate Authorization Link',
@@ -1840,41 +2550,47 @@ export default {
     previousStep: 'Previous Step',
     completeAuth: 'Complete Authorization',
     verifying: 'Verifying...',
-    
+
     // Placeholders
     authCodePlaceholder: 'Paste the Authorization Code obtained from Claude page...',
     authCodePlaceholderGemini: 'Paste the Authorization Code obtained from Gemini page...',
-    authCodePlaceholderOpenAI: 'Method 1: Copy the complete link (http://localhost:1455/auth/callback?code=...)\nMethod 2: Copy only the code parameter value\nThe system will automatically recognize and extract the required information',
-    
+    authCodePlaceholderOpenAI:
+      'Method 1: Copy the complete link (http://localhost:1455/auth/callback?code=...)\nMethod 2: Copy only the code parameter value\nThe system will automatically recognize and extract the required information',
+
     // Labels
     authorizationCode: 'Authorization Code',
     authLinkOrCode: 'Authorization Link or Code',
-    
+
     // Hints
     copyLinkTooltip: 'Copy Link',
     authCodeHint: 'Please paste the Authorization Code copied from Claude page',
     authCodeHintGemini: 'Please paste the Authorization Code copied from Gemini page',
-    
+
     // Notices
     proxyNotice: 'Note:',
-    proxyNoticeText: 'If you have set up a proxy, please ensure the browser also uses the same proxy to access the authorization page.',
-    
+    proxyNoticeText:
+      'If you have set up a proxy, please ensure the browser also uses the same proxy to access the authorization page.',
+
     // OpenAI specific hints
     openaiImportantNote: 'Important Notice:',
-    openaiLoadingNote: 'The page may take a long time to load after authorization, please wait patiently.',
+    openaiLoadingNote:
+      'The page may take a long time to load after authorization, please wait patiently.',
     openaiAddressNote: 'When the browser address bar changes to',
     openaiAddressNoteMiddle: 'at the beginning, it means authorization is complete.',
-    
+
     openaiTip: 'Tip:',
-    openaiTipText: 'You can directly copy the entire link or just copy the code parameter value, the system will automatically recognize.',
+    openaiTipText:
+      'You can directly copy the entire link or just copy the code parameter value, the system will automatically recognize.',
     openaiLinkExample: '• Complete link example:',
     openaiCodeExample: '• Code only example:',
-    
+
     // Success and error messages
     successExtractCode: 'Successfully extracted authorization code!',
-    errorCodeNotFound: 'Authorization code parameter not found in URL, please check if the link is correct',
+    errorCodeNotFound:
+      'Authorization code parameter not found in URL, please check if the link is correct',
     errorLinkFormat: 'Link format error, please check if it is a complete URL',
-    errorWrongUrlFormat: 'Please paste links starting with http://localhost:1455 or http://localhost:45462',
+    errorWrongUrlFormat:
+      'Please paste links starting with http://localhost:1455 or http://localhost:45462',
     linkCopied: 'Link copied',
     authFailed: 'Authorization failed, please check if the authorization code is correct',
     generateAuthFailed: 'Failed to generate authorization link'
@@ -1922,8 +2638,10 @@ export default {
   proxyConfig: {
     title: 'Proxy Settings (Optional)',
     enableProxy: 'Enable Proxy',
-    configDescription: 'Configure proxy to access restricted network resources. Supports SOCKS5 and HTTP proxy.',
-    stabilityNotice: 'Please ensure the proxy server is stable and available, otherwise it will affect normal account usage.',
+    configDescription:
+      'Configure proxy to access restricted network resources. Supports SOCKS5 and HTTP proxy.',
+    stabilityNotice:
+      'Please ensure the proxy server is stable and available, otherwise it will affect normal account usage.',
     proxyType: 'Proxy Type',
     hostAddress: 'Host Address',
     hostPlaceholder: 'e.g., 192.168.1.100',
@@ -1935,6 +2653,7 @@ export default {
     password: 'Password',
     passwordPlaceholder: 'Proxy password',
     tip: 'Tip:',
-    apiRequestNotice: 'Proxy settings will be used for all API requests related to this account. Please ensure the proxy server supports HTTPS traffic forwarding.'
+    apiRequestNotice:
+      'Proxy settings will be used for all API requests related to this account. Please ensure the proxy server supports HTTPS traffic forwarding.'
   }
 }
