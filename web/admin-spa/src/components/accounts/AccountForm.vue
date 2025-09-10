@@ -280,6 +280,37 @@
                           <i class="fas fa-check text-xs text-white"></i>
                         </div>
                       </label>
+
+                      <label
+                        class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
+                        :class="[
+                          form.platform === 'ccr'
+                            ? 'border-cyan-500 bg-cyan-50 dark:border-cyan-400 dark:bg-cyan-900/30'
+                            : 'border-gray-300 bg-white hover:border-cyan-400 hover:bg-cyan-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-cyan-500 dark:hover:bg-cyan-900/20'
+                        ]"
+                      >
+                        <input
+                          v-model="form.platform"
+                          class="sr-only"
+                          type="radio"
+                          value="ccr"
+                        />
+                        <div class="flex items-center gap-2">
+                          <i class="fas fa-code-branch text-sm text-cyan-600 dark:text-cyan-400"></i>
+                          <div>
+                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
+                              >CCR</span
+                            >
+                            <span class="text-xs text-gray-500 dark:text-gray-400">Claude Connector</span>
+                          </div>
+                        </div>
+                        <div
+                          v-if="form.platform === 'ccr'"
+                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-cyan-500"
+                        >
+                          <i class="fas fa-check text-xs text-white"></i>
+                        </div>
+                      </label>
                     </template>
 
                     <!-- OpenAI 子选项 -->
@@ -428,7 +459,8 @@
                 form.platform !== 'claude-console' &&
                 form.platform !== 'bedrock' &&
                 form.platform !== 'azure_openai' &&
-                form.platform !== 'openai-responses'
+                form.platform !== 'openai-responses' &&
+                form.platform !== 'ccr'
               "
             >
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -2709,7 +2741,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'success'])
+const emit = defineEmits(['close', 'success', 'platform-changed'])
 
 const accountsStore = useAccountsStore()
 const { showConfirmModal, confirmOptions, showConfirm, handleConfirm, handleCancel } = useConfirm()
@@ -3952,6 +3984,17 @@ watch(setupTokenAuthCode, (newValue) => {
   }
   // 如果不是 URL，保持原值（兼容直接输入授权码）
 })
+
+// 监听平台变化
+watch(
+  () => form.value.platform,
+  (newPlatform) => {
+    // 当选择 CCR 平台时，通知父组件
+    if (!isEdit.value) {
+      emit('platform-changed', newPlatform)
+    }
+  }
+)
 
 // 监听账户类型变化
 watch(
