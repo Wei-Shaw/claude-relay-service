@@ -138,57 +138,42 @@ const selectTheme = (mode) => {
 .theme-toggle-button {
   @apply flex items-center justify-center;
   @apply h-9 w-9 rounded-full;
-  @apply bg-white/80 dark:bg-gray-800/80;
-  @apply hover:bg-white/90 dark:hover:bg-gray-700/90;
+  @apply bg-white/90 dark:bg-gray-800/90;
+  @apply hover:bg-white dark:hover:bg-gray-700;
   @apply text-gray-600 dark:text-gray-300;
   @apply border border-gray-200/50 dark:border-gray-600/50;
   @apply transition-all duration-200 ease-out;
-  @apply shadow-md backdrop-blur-sm hover:shadow-lg;
+  /* 移除 backdrop-blur 减少 GPU 负担 */
+  @apply shadow-md hover:shadow-lg;
   @apply hover:scale-110 active:scale-95;
   position: relative;
   overflow: hidden;
 }
 
-/* 添加优雅的光环效果 */
+/* 简化的 hover 效果 */
 .theme-toggle-button::before {
   content: '';
   position: absolute;
-  inset: -2px;
+  inset: 0;
   border-radius: inherit;
-  background: conic-gradient(
-    from 180deg at 50% 50%,
-    rgba(59, 130, 246, 0.2),
-    rgba(147, 51, 234, 0.2),
-    rgba(59, 130, 246, 0.2)
-  );
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.1), transparent);
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.2s ease;
   pointer-events: none;
-  animation: rotate 3s linear infinite;
-}
-
-@keyframes rotate {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .theme-toggle-button:hover::before {
-  opacity: 0.6;
+  opacity: 1;
 }
 
-/* 图标样式优化 - 更生动 */
+/* 图标样式优化 - 简洁高效 */
 .theme-toggle-button i {
   @apply text-base;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
-  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  transition: transform 0.2s ease;
 }
 
 .theme-toggle-button:hover i {
-  transform: rotate(180deg) scale(1.1);
+  transform: scale(1.1);
 }
 
 /* 不同主题的图标颜色 */
@@ -300,13 +285,13 @@ const selectTheme = (mode) => {
   pointer-events: none;
 }
 
-/* 星星装饰（深色模式） */
+/* 星星装饰（深色模式） - 优化版 */
 .stars {
   position: absolute;
   width: 100%;
   height: 100%;
   opacity: 0;
-  transition: opacity 0.4s ease;
+  transition: opacity 0.3s ease;
 }
 
 .theme-switch.is-dark .stars {
@@ -320,56 +305,42 @@ const selectTheme = (mode) => {
   height: 2px;
   background: white;
   border-radius: 50%;
-  box-shadow: 0 0 2px white;
-  animation: twinkle 3s infinite;
+  opacity: 0.6;
 }
 
 .stars span:nth-child(1) {
   top: 25%;
   left: 20%;
-  animation-delay: 0s;
 }
 
 .stars span:nth-child(2) {
   top: 40%;
   left: 40%;
-  animation-delay: 1s;
+  width: 1.5px;
+  height: 1.5px;
 }
 
 .stars span:nth-child(3) {
   top: 60%;
   left: 25%;
-  animation-delay: 2s;
 }
 
-@keyframes twinkle {
-  0%,
-  100% {
-    opacity: 0;
-    transform: scale(0.5);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-/* 云朵装饰（浅色模式） */
+/* 云朵装饰（浅色模式） - 优化版 */
 .clouds {
   position: absolute;
   width: 100%;
   height: 100%;
   opacity: 0;
-  transition: opacity 0.4s ease;
+  transition: opacity 0.3s ease;
 }
 
 .theme-switch:not(.is-dark):not(.is-auto) .clouds {
-  opacity: 1;
+  opacity: 0.7;
 }
 
 .clouds span {
   position: absolute;
-  background: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.3);
   border-radius: 100px;
 }
 
@@ -378,7 +349,6 @@ const selectTheme = (mode) => {
   height: 8px;
   top: 40%;
   left: 15%;
-  animation: float 4s infinite ease-in-out;
 }
 
 .clouds span:nth-child(2) {
@@ -386,18 +356,6 @@ const selectTheme = (mode) => {
   height: 6px;
   top: 60%;
   left: 35%;
-  animation: float 4s infinite ease-in-out;
-  animation-delay: 1s;
-}
-
-@keyframes float {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  50% {
-    transform: translateX(5px);
-  }
 }
 
 /* 切换滑块 */
@@ -428,16 +386,17 @@ const selectTheme = (mode) => {
     0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 
-/* 自动模式滑块位置 - 玻璃态设计 */
+/* 自动模式滑块位置 - 优化后的半透明设计 */
 .theme-switch.is-auto .switch-handle {
   transform: translateY(-50%) translateX(19px);
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.25);
+  /* 降低 blur 强度，减少 GPU 负担 */
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.35);
   box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.1),
-    inset 0 0 8px rgba(255, 255, 255, 0.2);
+    inset 0 0 8px rgba(255, 255, 255, 0.25);
 }
 
 /* 滑块图标 */
@@ -471,28 +430,7 @@ const selectTheme = (mode) => {
   font-size: 15px;
 }
 
-/* 滑块悬停动画 */
-.theme-switch:hover .switch-handle {
-  animation: bounce 0.5s ease;
-}
-
-@keyframes bounce {
-  0%,
-  100% {
-    transform: translateY(-50%) translateX(var(--handle-x, 0));
-  }
-  50% {
-    transform: translateY(calc(-50% - 3px)) translateX(var(--handle-x, 0));
-  }
-}
-
-.theme-switch.is-dark:hover .switch-handle {
-  --handle-x: 38px;
-}
-
-.theme-switch.is-auto:hover .switch-handle {
-  --handle-x: 19px;
-}
+/* 移除弹跳动画，保持简洁 */
 
 /* 分段按钮样式 - 更现代 */
 .theme-segmented {
