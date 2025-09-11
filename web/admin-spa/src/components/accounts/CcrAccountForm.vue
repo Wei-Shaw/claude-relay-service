@@ -346,7 +346,7 @@ const submit = async () => {
       }
       const res = await apiClient.put(`/admin/ccr-accounts/${props.account.id}`, updates)
       if (res.success) {
-        showToast('保存成功', 'success')
+        // 不在这里显示 toast，由父组件统一处理
         emit('success')
       } else {
         showToast(res.message || '保存失败', 'error')
@@ -369,7 +369,7 @@ const submit = async () => {
       }
       const res = await apiClient.post('/admin/ccr-accounts', payload)
       if (res.success) {
-        showToast('创建成功', 'success')
+        // 不在这里显示 toast，由父组件统一处理
         emit('success')
       } else {
         showToast(res.message || '创建失败', 'error')

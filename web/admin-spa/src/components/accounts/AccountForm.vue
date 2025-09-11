@@ -456,10 +456,10 @@
               v-if="
                 !isEdit &&
                 form.platform !== 'claude-console' &&
+                form.platform !== 'ccr' &&
                 form.platform !== 'bedrock' &&
                 form.platform !== 'azure_openai' &&
-                form.platform !== 'openai-responses' &&
-                form.platform !== 'ccr'
+                form.platform !== 'openai-responses'
               "
             >
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -950,8 +950,11 @@
               </div>
             </div>
 
-            <!-- Claude Console 特定字段 -->
-            <div v-if="form.platform === 'claude-console' && !isEdit" class="space-y-4">
+            <!-- Claude Console 和 CCR 特定字段 -->
+            <div
+              v-if="(form.platform === 'claude-console' || form.platform === 'ccr') && !isEdit"
+              class="space-y-4"
+            >
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >API URL *</label
@@ -1405,6 +1408,7 @@
               v-if="
                 form.addType === 'manual' &&
                 form.platform !== 'claude-console' &&
+                form.platform !== 'ccr' &&
                 form.platform !== 'bedrock' &&
                 form.platform !== 'azure_openai' &&
                 form.platform !== 'openai-responses'
@@ -1565,6 +1569,7 @@
                 v-if="
                   (form.addType === 'oauth' || form.addType === 'setup-token') &&
                   form.platform !== 'claude-console' &&
+                  form.platform !== 'ccr' &&
                   form.platform !== 'bedrock' &&
                   form.platform !== 'azure_openai' &&
                   form.platform !== 'openai-responses'
@@ -2080,8 +2085,11 @@
             </p>
           </div>
 
-          <!-- Claude Console 特定字段（编辑模式）-->
-          <div v-if="form.platform === 'claude-console'" class="space-y-4">
+          <!-- Claude Console 和 CCR 特定字段（编辑模式）-->
+          <div
+            v-if="form.platform === 'claude-console' || form.platform === 'ccr'"
+            class="space-y-4"
+          >
             <div>
               <label class="mb-3 block text-sm font-semibold text-gray-700">API URL</label>
               <input
@@ -2608,6 +2616,7 @@
           <div
             v-if="
               form.platform !== 'claude-console' &&
+              form.platform !== 'ccr' &&
               form.platform !== 'bedrock' &&
               form.platform !== 'azure_openai' &&
               form.platform !== 'openai-responses'
@@ -2752,7 +2761,7 @@ const platformGroup = ref('')
 
 // 根据现有平台确定分组
 const determinePlatformGroup = (platform) => {
-  if (['claude', 'claude-console', 'bedrock'].includes(platform)) {
+  if (['claude', 'claude-console', 'ccr', 'bedrock'].includes(platform)) {
     return 'claude'
   } else if (['openai', 'openai-responses', 'azure_openai'].includes(platform)) {
     return 'openai'
@@ -3238,6 +3247,18 @@ const createAccount = async () => {
     }
   }
 
+  // CCR (Claude Code Router) 验证 - 使用与 Claude Console 相同的字段
+  if (form.value.platform === 'ccr') {
+    if (!form.value.apiUrl || form.value.apiUrl.trim() === '') {
+      errors.value.apiUrl = '请填写 API URL'
+      hasError = true
+    }
+    if (!form.value.apiKey || form.value.apiKey.trim() === '') {
+      errors.value.apiKey = '请填写 API Key'
+      hasError = true
+    }
+  }
+
   // OpenAI-Responses 验证
   if (form.value.platform === 'openai-responses') {
     if (!form.value.baseApi || form.value.baseApi.trim() === '') {
@@ -3277,7 +3298,7 @@ const createAccount = async () => {
       hasError = true
     }
   } else if (form.value.addType === 'manual') {
-    // 手动模式验证
+    // 手动模式验证 - 只有部分平台需要验证 Token
     if (form.value.platform === 'openai') {
       // OpenAI 平台必须有 Refresh Token
       if (!form.value.refreshToken || form.value.refreshToken.trim() === '') {
@@ -3285,13 +3306,20 @@ const createAccount = async () => {
         hasError = true
       }
       // Access Token 可选，如果没有会通过 Refresh Token 获取
-    } else {
-      // 其他平台（Gemini）需要 Access Token
+    } else if (form.value.platform === 'gemini') {
+      // Gemini 平台需要 Access Token
+      if (!form.value.accessToken || form.value.accessToken.trim() === '') {
+        errors.value.accessToken = '请填写 Access Token'
+        hasError = true
+      }
+    } else if (form.value.platform === 'claude') {
+      // Claude 平台需要 Access Token
       if (!form.value.accessToken || form.value.accessToken.trim() === '') {
         errors.value.accessToken = '请填写 Access Token'
         hasError = true
       }
     }
+    // Claude Console、CCR、OpenAI-Responses 等其他平台不需要 Token 验证
   }
 
   // 分组类型验证 - 创建账户流程修复
@@ -3413,8 +3441,8 @@ const createAccount = async () => {
       data.needsImmediateRefresh = true
       data.requireRefreshSuccess = true // 必须刷新成功才能创建账户
       data.priority = form.value.priority || 50
-    } else if (form.value.platform === 'claude-console') {
-      // Claude Console 账户特定数据
+    } else if (form.value.platform === 'claude-console' || form.value.platform === 'ccr') {
+      // Claude Console 和 CCR 账户特定数据（CCR 使用 Claude Console 的后端逻辑）
       data.apiUrl = form.value.apiUrl
       data.apiKey = form.value.apiKey
       data.priority = form.value.priority || 50
@@ -3464,7 +3492,8 @@ const createAccount = async () => {
     let result
     if (form.value.platform === 'claude') {
       result = await accountsStore.createClaudeAccount(data)
-    } else if (form.value.platform === 'claude-console') {
+    } else if (form.value.platform === 'claude-console' || form.value.platform === 'ccr') {
+      // CCR 使用 Claude Console 的后端 API
       result = await accountsStore.createClaudeConsoleAccount(data)
     } else if (form.value.platform === 'openai-responses') {
       result = await accountsStore.createOpenAIResponsesAccount(data)
@@ -3841,8 +3870,8 @@ const showGroupManagement = ref(false)
 // 根据平台筛选分组
 const filteredGroups = computed(() => {
   let platformFilter = form.value.platform
-  // Claude Console 使用 Claude 分组
-  if (form.value.platform === 'claude-console') {
+  // Claude Console 和 CCR 使用 Claude 分组
+  if (form.value.platform === 'claude-console' || form.value.platform === 'ccr') {
     platformFilter = 'claude'
   }
   // OpenAI-Responses 使用 OpenAI 分组
@@ -3889,10 +3918,11 @@ watch(
     // 处理添加方式的自动切换
     if (
       newPlatform === 'claude-console' ||
+      newPlatform === 'ccr' ||
       newPlatform === 'bedrock' ||
       newPlatform === 'openai-responses'
     ) {
-      form.value.addType = 'manual' // Claude Console、Bedrock 和 OpenAI-Responses 只支持手动模式
+      form.value.addType = 'manual' // Claude Console、CCR、Bedrock 和 OpenAI-Responses 只支持手动模式
     } else if (newPlatform === 'claude') {
       // 切换到 Claude 时，使用 Setup Token 作为默认方式
       form.value.addType = 'setup-token'

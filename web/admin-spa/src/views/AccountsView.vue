@@ -492,6 +492,7 @@
                     account.platform === 'bedrock' ||
                     account.platform === 'gemini' ||
                     account.platform === 'openai' ||
+                    account.platform === 'openai-responses' ||
                     account.platform === 'azure_openai' ||
                     account.platform === 'ccr'
                   "
@@ -1295,9 +1296,12 @@ const loadAccounts = async (forceReload = false) => {
 
     if (claudeConsoleData.success) {
       const claudeConsoleAccounts = (claudeConsoleData.data || []).map((acc) => {
-        // Claude Console账户暂时不支持直接绑定
+        // 计算每个Claude Console账户绑定的API Key数量
+        const boundApiKeysCount = apiKeys.value.filter(
+          (key) => key.claudeConsoleAccountId === acc.id
+        ).length
         // 后端已经包含了groupInfos，直接使用
-        return { ...acc, platform: 'claude-console', boundApiKeysCount: 0 }
+        return { ...acc, platform: 'claude-console', boundApiKeysCount }
       })
       allAccounts.push(...claudeConsoleAccounts)
     }
@@ -1594,8 +1598,11 @@ const deleteAccount = async (account) => {
   const boundKeysCount = apiKeys.value.filter(
     (key) =>
       key.claudeAccountId === account.id ||
+      key.claudeConsoleAccountId === account.id ||
       key.geminiAccountId === account.id ||
-      key.openaiAccountId === account.id
+      key.openaiAccountId === account.id ||
+      key.azureOpenaiAccountId === account.id ||
+      key.openaiAccountId === `responses:${account.id}`
   ).length
 
   if (boundKeysCount > 0) {
