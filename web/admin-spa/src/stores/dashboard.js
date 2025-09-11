@@ -3,7 +3,6 @@ import { ref, computed } from 'vue'
 import { apiClient } from '@/config/api'
 import { showToast } from '@/utils/toast'
 import i18n from '@/i18n'
-import i18n from '@/i18n'
 
 export const useDashboardStore = defineStore('dashboard', () => {
   // 状态
@@ -43,7 +42,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     realtimeTPM: 0,
     metricsWindow: 5,
     isHistoricalMetrics: false,
-    systemStatus: '正常',
+    systemStatus: i18n.global.t('system.status.normal'),
     uptime: 0,
     systemTimezone: 8 // 默认 UTC+8
   })
@@ -200,7 +199,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
           realtimeTPM: realtimeMetrics.tpm || 0,
           metricsWindow: realtimeMetrics.windowMinutes || 5,
           isHistoricalMetrics: realtimeMetrics.isHistorical || false,
-          systemStatus: systemHealth.redisConnected ? '正常' : '异常',
+          systemStatus: systemHealth.redisConnected
+            ? i18n.global.t('system.status.normal')
+            : i18n.global.t('system.status.abnormal'),
           uptime: systemHealth.uptime || 0,
           systemTimezone: dashboardResponse.data.systemTimezone || 8
         }
@@ -220,7 +221,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
         }
       }
     } catch (error) {
-      console.error('加载仪表板数据失败:', error)
+      console.error(i18n.global.t('common.errors.loadDashboardFailed'), error)
     } finally {
       loading.value = false
     }
@@ -308,7 +309,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
         trendData.value = response.data
       }
     } catch (error) {
-      console.error('加载使用趋势失败:', error)
+      console.error(i18n.global.t('common.errors.loadUsageTrendFailed'), error)
     }
   }
 
@@ -399,7 +400,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
         dashboardModelStats.value = response.data
       }
     } catch (error) {
-      console.error('加载模型统计失败:', error)
+      console.error(i18n.global.t('common.errors.loadModelStatsFailed'), error)
     }
   }
 
@@ -501,7 +502,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
         }
       }
     } catch (error) {
-      console.error('加载API Keys趋势失败:', error)
+      console.error(i18n.global.t('common.errors.loadApiKeysTrendFailed'), error)
     }
   }
 

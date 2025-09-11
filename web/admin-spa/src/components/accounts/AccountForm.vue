@@ -1847,14 +1847,14 @@
                   <input
                     v-model="mapping.from"
                     class="form-input flex-1"
-                    placeholder="原始模型名称"
+                    :placeholder="t('accountForm.originalModelName')"
                     type="text"
                   />
                   <i class="fas fa-arrow-right text-gray-400" />
                   <input
                     v-model="mapping.to"
                     class="form-input flex-1"
-                    placeholder="映射后的模型名称"
+                    :placeholder="t('accountForm.mappedModelName')"
                     type="text"
                   />
                   <button
@@ -1874,7 +1874,7 @@
                 @click="addModelMapping"
               >
                 <i class="fas fa-plus mr-2" />
-                添加模型映射
+                {{ t('accountForm.addModelMapping') }}
               </button>
 
               <!-- 快捷添加按钮 -->

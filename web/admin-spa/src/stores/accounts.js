@@ -204,7 +204,9 @@ export const useAccountsStore = defineStore('accounts', () => {
         await fetchClaudeConsoleAccounts()
         return response.data
       } else {
-        throw new Error(response.message || '创建Claude Console账户失败')
+        throw new Error(
+          response.message || i18n.global.t('common.errors.createClaudeConsoleAccountFailed')
+        )
       }
     } catch (err) {
       error.value = err.message
@@ -284,7 +286,9 @@ export const useAccountsStore = defineStore('accounts', () => {
         await fetchAzureOpenAIAccounts()
         return response.data
       } else {
-        throw new Error(response.message || '创建Azure OpenAI账户失败')
+        throw new Error(
+          response.message || i18n.global.t('common.errors.createAzureOpenAIAccountFailed')
+        )
       }
     } catch (err) {
       error.value = err.message
@@ -344,7 +348,9 @@ export const useAccountsStore = defineStore('accounts', () => {
         await fetchClaudeConsoleAccounts()
         return response
       } else {
-        throw new Error(response.message || '更新Claude Console账户失败')
+        throw new Error(
+          response.message || i18n.global.t('common.errors.updateClaudeConsoleAccountFailed')
+        )
       }
     } catch (err) {
       error.value = err.message
@@ -424,7 +430,9 @@ export const useAccountsStore = defineStore('accounts', () => {
         await fetchAzureOpenAIAccounts()
         return response
       } else {
-        throw new Error(response.message || '更新Azure OpenAI账户失败')
+        throw new Error(
+          response.message || i18n.global.t('common.errors.updateAzureOpenAIAccountFailed')
+        )
       }
     } catch (err) {
       error.value = err.message
@@ -624,7 +632,9 @@ export const useAccountsStore = defineStore('accounts', () => {
       if (response.success) {
         return response.data // 返回整个对象，包含authUrl和sessionId
       } else {
-        throw new Error(response.message || '生成Setup Token URL失败')
+        throw new Error(
+          response.message || i18n.global.t('common.errors.generateSetupTokenUrlFailed')
+        )
       }
     } catch (err) {
       error.value = err.message
@@ -642,7 +652,7 @@ export const useAccountsStore = defineStore('accounts', () => {
       if (response.success) {
         return response.data
       } else {
-        throw new Error(response.message || '交换Setup Token授权码失败')
+        throw new Error(response.message || i18n.global.t('common.errors.exchangeSetupTokenFailed'))
       }
     } catch (err) {
       error.value = err.message

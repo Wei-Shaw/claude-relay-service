@@ -309,13 +309,13 @@
                   }}</span></span
                 >
                 <span v-if="(dashboardData.totalCacheCreateTokens || 0) > 0" class="text-purple-600"
-                  >缓存创建:
+                  >{{ t('dashboard.cacheCreateTokens') }}:
                   <span class="font-medium">{{
                     formatNumber(dashboardData.totalCacheCreateTokens || 0)
                   }}</span></span
                 >
                 <span v-if="(dashboardData.totalCacheReadTokens || 0) > 0" class="text-purple-600"
-                  >缓存读取:
+                  >{{ t('dashboard.cacheReadTokens') }}:
                   <span class="font-medium">{{
                     formatNumber(dashboardData.totalCacheReadTokens || 0)
                   }}</span></span
@@ -930,11 +930,14 @@ function createUsageTrendChart() {
             const bLabel = b.dataset.label || ''
 
             // 费用和请求数使用不同的轴，单独处理
-            if (aLabel === '费用 (USD)' || bLabel === '费用 (USD)') {
-              return aLabel === '费用 (USD)' ? -1 : 1
+            if (aLabel === t('dashboard.costLabel') || bLabel === t('dashboard.costLabel')) {
+              return aLabel === t('dashboard.costLabel') ? -1 : 1
             }
-            if (aLabel === '请求数' || bLabel === '请求数') {
-              return aLabel === '请求数' ? 1 : -1
+            if (
+              aLabel === t('dashboard.requestsLabel') ||
+              bLabel === t('dashboard.requestsLabel')
+            ) {
+              return aLabel === t('dashboard.requestsLabel') ? 1 : -1
             }
 
             // 其他按token值倒序
@@ -945,15 +948,15 @@ function createUsageTrendChart() {
               const label = context.dataset.label || ''
               let value = context.parsed.y
 
-              if (label === '费用 (USD)') {
+              if (label === t('dashboard.costLabel')) {
                 // 格式化费用显示
                 if (value < 0.01) {
                   return label + ': $' + value.toFixed(6)
                 } else {
                   return label + ': $' + value.toFixed(4)
                 }
-              } else if (label === '请求数') {
-                return label + ': ' + value.toLocaleString() + ' 次'
+              } else if (label === t('dashboard.requestsLabel')) {
+                return label + ': ' + value.toLocaleString()
               } else {
                 // 格式化token数显示
                 if (value >= 1000000) {

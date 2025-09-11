@@ -107,7 +107,7 @@ export const useAuthStore = defineStore('auth', () => {
         }
       }
     } catch (error) {
-      console.error('加载OEM设置失败:', error)
+      console.error(i18n.global.t('common.errors.loadOemSettingsFailed'), error)
     } finally {
       oemLoading.value = false
     }

@@ -367,7 +367,7 @@ export const useApiStatsStore = defineStore('apistats', () => {
       })
 
       if (validIds.length === 0) {
-        throw new Error('所有 API Key 都无效')
+        throw new Error(i18n.global.t('common.errors.allApiKeysInvalid'))
       }
 
       apiIds.value = validIds
