@@ -42,14 +42,14 @@ async function handleMessagesRequest(req, res) {
       })
     }
 
-    // 模型限制（允许列表）校验：统一在此处处理（去除供应商前缀）
+    // 模型限制（黑名单）校验：统一在此处处理（去除供应商前缀）
     if (
       req.apiKey.enableModelRestriction &&
       Array.isArray(req.apiKey.restrictedModels) &&
       req.apiKey.restrictedModels.length > 0
     ) {
       const effectiveModel = getEffectiveModel(req.body.model || '')
-      if (!req.apiKey.restrictedModels.includes(effectiveModel)) {
+      if (req.apiKey.restrictedModels.includes(effectiveModel)) {
         return res.status(403).json({
           error: {
             type: 'forbidden',
@@ -899,14 +899,14 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
 
     logger.info(`🔢 Processing token count request for key: ${req.apiKey.name}`)
 
-    // 模型限制（允许列表）校验：统一在此处处理（去除供应商前缀）
+    // 模型限制（黑名单）校验：统一在此处处理（去除供应商前缀）
     if (
       req.apiKey.enableModelRestriction &&
       Array.isArray(req.apiKey.restrictedModels) &&
       req.apiKey.restrictedModels.length > 0
     ) {
       const effectiveModel = getEffectiveModel(req.body.model || '')
-      if (!req.apiKey.restrictedModels.includes(effectiveModel)) {
+      if (req.apiKey.restrictedModels.includes(effectiveModel)) {
         return res.status(403).json({
           error: {
             type: 'forbidden',
