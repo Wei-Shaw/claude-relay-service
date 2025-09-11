@@ -1718,6 +1718,42 @@ class RedisClient {
 
 const redisClient = new RedisClient()
 
+// 分布式锁相关方法
+redisClient.setAccountLock = async function (lockKey, lockValue, ttlMs) {
+  try {
+    // 使用SET NX EX实现原子性的锁获取
+    const result = await this.client.set(lockKey, lockValue, {
+      NX: true, // 只在键不存在时设置
+      PX: ttlMs // 毫秒级过期时间
+    })
+    return result === 'OK'
+  } catch (error) {
+    logger.error(`Failed to acquire lock ${lockKey}:`, error)
+    return false
+  }
+}
+
+redisClient.releaseAccountLock = async function (lockKey, lockValue) {
+  try {
+    // 使用Lua脚本确保只有持有锁的进程才能释放锁
+    const script = `
+      if redis.call("get", KEYS[1]) == ARGV[1] then
+        return redis.call("del", KEYS[1])
+      else
+        return 0
+      end
+    `
+    const result = await this.client.eval(script, {
+      keys: [lockKey],
+      arguments: [lockValue]
+    })
+    return result === 1
+  } catch (error) {
+    logger.error(`Failed to release lock ${lockKey}:`, error)
+    return false
+  }
+}
+
 // 导出时区辅助函数
 redisClient.getDateInTimezone = getDateInTimezone
 redisClient.getDateStringInTimezone = getDateStringInTimezone

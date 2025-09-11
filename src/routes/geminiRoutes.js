@@ -961,4 +961,10 @@ router.post(
   handleStreamGenerateContent
 )
 
+// 导出处理函数供标准路由使用
 module.exports = router
+module.exports.handleLoadCodeAssist = handleLoadCodeAssist
+module.exports.handleOnboardUser = handleOnboardUser
+module.exports.handleCountTokens = handleCountTokens
+module.exports.handleGenerateContent = handleGenerateContent
+module.exports.handleStreamGenerateContent = handleStreamGenerateContent

@@ -1290,11 +1290,15 @@ async function generateContent(
   // 按照 gemini-cli 的转换格式构造请求
   const request = {
     model: requestData.model,
-    user_prompt_id: userPromptId,
     request: {
       ...requestData.request,
       session_id: sessionId
     }
+  }
+
+  // 只有当 userPromptId 存在时才添加
+  if (userPromptId) {
+    request.user_prompt_id = userPromptId
   }
 
   // 只有当projectId存在时才添加project字段
@@ -1307,6 +1311,12 @@ async function generateContent(
     userPromptId,
     projectId,
     sessionId
+  })
+
+  // 添加详细的请求日志
+  logger.info('📦 generateContent 请求详情', {
+    url: `${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:generateContent`,
+    requestBody: JSON.stringify(request, null, 2)
   })
 
   const axiosConfig = {
@@ -1356,11 +1366,15 @@ async function generateContentStream(
   // 按照 gemini-cli 的转换格式构造请求
   const request = {
     model: requestData.model,
-    user_prompt_id: userPromptId,
     request: {
       ...requestData.request,
       session_id: sessionId
     }
+  }
+
+  // 只有当 userPromptId 存在时才添加
+  if (userPromptId) {
+    request.user_prompt_id = userPromptId
   }
 
   // 只有当projectId存在时才添加project字段
