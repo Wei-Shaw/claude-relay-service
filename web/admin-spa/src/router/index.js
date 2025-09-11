@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useUserStore } from '@/stores/user'
 import { APP_CONFIG } from '@/config/app'
+import { showToast } from '@/utils/toast'
 
 // 路由懒加载
 const LoginView = () => import('@/views/LoginView.vue')
@@ -150,7 +151,7 @@ router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   const userStore = useUserStore()
 
-  console.log('路由导航:', {
+  console.log('Router navigation:', {
     to: to.path,
     from: from.path,
     fullPath: to.fullPath,
@@ -177,8 +178,6 @@ router.beforeEach(async (to, from, next) => {
       } catch (error) {
         // If the error is about disabled account, redirect to login with error
         if (error.message && error.message.includes('disabled')) {
-          // Import showToast to display the error
-          const { showToast } = await import('@/utils/toast')
           showToast(error.message, 'error')
         }
         return next('/user-login')

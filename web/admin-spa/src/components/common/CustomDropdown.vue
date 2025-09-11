@@ -11,7 +11,7 @@
       <span
         class="select-none whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200"
       >
-        {{ selectedLabel || placeholder }}
+        {{ selectedLabel || placeholderText }}
       </span>
       <i
         :class="[
@@ -80,7 +80,7 @@ const props = defineProps({
   },
   placeholder: {
     type: String,
-    default: () => t('common.customDropdown.placeholder')
+    default: ''
   },
   icon: {
     type: String,
@@ -98,6 +98,8 @@ const isOpen = ref(false)
 const triggerRef = ref(null)
 const dropdownRef = ref(null)
 const dropdownStyle = ref({})
+
+const placeholderText = computed(() => props.placeholder || t('common.customDropdown.placeholder'))
 
 const selectedLabel = computed(() => {
   const selected = props.options.find((opt) => opt.value === props.modelValue)

@@ -145,7 +145,7 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
         throw new Error(response.message || i18n.global.t('apiKeys.operationFailed'))
       }
     } catch (err) {
-      console.error('获取API Key统计失败:', err)
+      console.error(i18n.global.t('common.errors.getApiKeyStatsFailed'), err)
       return null
     }
   }
@@ -170,7 +170,7 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
         throw new Error(response.message || i18n.global.t('apiKeys.operationFailed'))
       }
     } catch (err) {
-      console.error('获取标签失败:', err)
+      console.error(i18n.global.t('common.errors.getTagsFailed'), err)
       return []
     }
   }
