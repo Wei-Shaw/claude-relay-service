@@ -200,7 +200,7 @@
               {{ t('dashboard.systemStatus') }}
             </p>
             <p class="text-2xl font-bold text-green-600 sm:text-3xl">
-              {{ dashboardData.systemStatus }}
+              {{ t(`common.system.status.${dashboardData.systemStatusCode || 'normal'}`) }}
             </p>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {{ t('dashboard.uptime') }}: {{ formattedUptime }}
