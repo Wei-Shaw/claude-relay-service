@@ -79,34 +79,6 @@ class ClaudeRelayService {
         requestedModel: requestBody.model
       })
 
-      // 检查模型限制（restrictedModels 作为允许列表）
-      if (
-        apiKeyData.enableModelRestriction &&
-        apiKeyData.restrictedModels &&
-        apiKeyData.restrictedModels.length > 0
-      ) {
-        const requestedModel = requestBody.model
-        logger.info(
-          `🔒 Model restriction check - Requested model: ${requestedModel}, Restricted models: ${JSON.stringify(apiKeyData.restrictedModels)}`
-        )
-
-        if (requestedModel && apiKeyData.restrictedModels.includes(requestedModel)) {
-          logger.warn(
-            `🚫 Model restriction violation for key ${apiKeyData.name}: Attempted to use restricted model ${requestedModel}`
-          )
-          return {
-            statusCode: 403,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              error: {
-                type: 'forbidden',
-                message: '暂无该模型访问权限'
-              }
-            })
-          }
-        }
-      }
-
       // 生成会话哈希用于sticky会话
       const sessionHash = sessionHelper.generateSessionHash(requestBody)
 
@@ -865,36 +837,6 @@ class ClaudeRelayService {
         restrictedModels: apiKeyData.restrictedModels,
         requestedModel: requestBody.model
       })
-
-      // 检查模型限制（restrictedModels 作为允许列表）
-      if (
-        apiKeyData.enableModelRestriction &&
-        apiKeyData.restrictedModels &&
-        apiKeyData.restrictedModels.length > 0
-      ) {
-        const requestedModel = requestBody.model
-        logger.info(
-          `🔒 [Stream] Model restriction check - Requested model: ${requestedModel}, Restricted models: ${JSON.stringify(apiKeyData.restrictedModels)}`
-        )
-
-        if (requestedModel && apiKeyData.restrictedModels.includes(requestedModel)) {
-          logger.warn(
-            `🚫 Model restriction violation for key ${apiKeyData.name}: Attempted to use restricted model ${requestedModel}`
-          )
-
-          // 对于流式响应，需要写入错误并结束流
-          const errorResponse = JSON.stringify({
-            error: {
-              type: 'forbidden',
-              message: '暂无该模型访问权限'
-            }
-          })
-
-          responseStream.writeHead(403, { 'Content-Type': 'application/json' })
-          responseStream.end(errorResponse)
-          return
-        }
-      }
 
       // 生成会话哈希用于sticky会话
       const sessionHash = sessionHelper.generateSessionHash(requestBody)
