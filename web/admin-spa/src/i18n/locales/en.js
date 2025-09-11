@@ -62,6 +62,30 @@ export default {
         info: 'Information'
       }
     },
+    errors: {
+      loadDashboardFailed: 'Failed to load dashboard data',
+      loadUsageTrendFailed: 'Failed to load usage trend',
+      loadModelStatsFailed: 'Failed to load model statistics',
+      loadApiKeysTrendFailed: 'Failed to load API Keys trend',
+      createClaudeConsoleAccountFailed: 'Failed to create Claude Console account',
+      createAzureOpenAIAccountFailed: 'Failed to create Azure OpenAI account',
+      updateClaudeConsoleAccountFailed: 'Failed to update Claude Console account',
+      updateAzureOpenAIAccountFailed: 'Failed to update Azure OpenAI account',
+      generateSetupTokenUrlFailed: 'Failed to generate Setup Token URL',
+      exchangeSetupTokenFailed: 'Failed to exchange Setup Token authorization code',
+      allApiKeysInvalid: 'All API Keys are invalid',
+      loadOemSettingsFailed: 'Failed to load OEM settings',
+      getApiKeyStatsFailed: 'Failed to get API Key statistics',
+      getTagsFailed: 'Failed to get tags',
+      requestFailed: 'Request failed: {status}',
+      loadSupportedClientsFailed: 'Failed to load supported clients'
+    },
+    system: {
+      status: {
+        normal: 'Normal',
+        abnormal: 'Abnormal'
+      }
+    },
     confirmDialog: {
       confirm: 'Confirm',
       cancel: 'Cancel'
@@ -131,10 +155,6 @@ export default {
       minutesAgo: '{minutes} minutes ago',
       hoursAgo: '{hours} hours ago',
       daysAgo: '{days} days ago'
-    },
-    errors: {
-      requestFailed: 'Request failed: {status}',
-      loadSupportedClientsFailed: 'Failed to load supported clients'
     }
   },
   language: {
@@ -221,7 +241,6 @@ export default {
     apiKeyInfo: 'API Key Information',
     queryKeysCount: 'Query Keys Count',
     activeKeysCount: 'Active Keys Count',
-    invalidKeysCount: 'Invalid Keys Count',
     totalRequests: 'Total Requests',
     totalTokens: 'Total Tokens',
     totalCost: 'Total Cost',
@@ -237,7 +256,6 @@ export default {
     modelUsageStats: 'Model Usage Statistics',
     loadingModelStats: 'Loading model statistics...',
     requestCount: ' requests',
-    totalCost: 'Total Cost',
     inputTokens: 'Input Tokens',
     outputTokens: 'Output Tokens',
     cacheCreateTokens: 'Cache Create',
@@ -2436,12 +2454,6 @@ export default {
 
     // Manual Token Input Section
     manualTokenInput: 'Manual Token Input',
-    manualTokenClaudeDescription:
-      'Please enter valid Claude Access Token. If you have Refresh Token, it is recommended to fill both for automatic refresh support.',
-    manualTokenGeminiDescription:
-      'Please enter valid Gemini Access Token. If you have Refresh Token, it is recommended to fill both for automatic refresh support.',
-    manualTokenOpenAIDescription:
-      'Please enter valid OpenAI Access Token. If you have Refresh Token, it is recommended to fill both for automatic refresh support.',
     getAccessTokenMethod: 'Methods to get Access Token:',
     claudeCredentialsPath: 'Please get from logged-in Claude Code machine',
     geminiCredentialsPath: 'Please get from logged-in Gemini CLI machine',
@@ -2451,18 +2463,11 @@ export default {
       'credentials from file, do not use keys from Claude official API Keys page.',
     refreshTokenWarning:
       '💡 If Refresh Token is not filled, Token needs manual update after expiration.',
-    accessTokenOptional: 'Access Token (Optional)',
-    accessTokenOptionalPlaceholder:
-      'Optional: If not filled, system will automatically obtain through Refresh Token...',
     accessTokenOptionalInfo:
       'Access Token is optional. If not provided, system will automatically obtain through Refresh Token.',
-    accessTokenRequired: 'Access Token *',
     accessTokenRequiredPlaceholder: 'Please enter Access Token...',
-    refreshTokenRequired: 'Refresh Token *',
-    refreshTokenRequiredPlaceholder: 'Please enter Refresh Token (required)...',
     refreshTokenRequiredInfo:
       'System will use Refresh Token to automatically obtain Access Token and user information',
-    refreshTokenOptional: 'Refresh Token (Optional)',
     refreshTokenOptionalPlaceholder: 'Please enter Refresh Token...',
 
     // Priority Settings
@@ -2471,35 +2476,11 @@ export default {
     prioritySchedulingTitle: 'Scheduling Priority (1-100)',
     priorityEditPlaceholder: 'Lower number = higher priority',
 
-    // Gemini Project ID
-    projectIdOptional: 'Project ID (Optional)',
-    projectIdPlaceholder: 'e.g., verdant-wares-464411-k9',
-    projectIdDescription: 'Google Cloud/Workspace accounts may require Project ID',
-
     // Claude Subscription Type and Advanced Options
-    subscriptionType: 'Subscription Type',
     claudeMaxSubscription: 'Claude Max',
     claudeProSubscription: 'Claude Pro',
-    claudeProLimitation: 'Pro accounts do not support Claude Opus 4 model',
-    autoStopOnWarning: 'Auto-stop scheduling when approaching 5-hour limit',
-    autoStopOnWarningDescription:
-      'When system detects account approaching 5-hour usage limit, automatically pause scheduling for this account. Will resume automatically when entering new time window.',
-    useUnifiedUserAgent: 'Use unified Claude Code version',
-    useUnifiedUserAgentDescription:
-      'When enabled, will use unified User-Agent captured from real Claude Code client, improving compatibility',
-    currentUnifiedVersion: 'Current unified version:',
-    clearCache: 'Clear Cache',
-    clearing: 'Clearing...',
-    waitingForCapture: 'Waiting to capture User-Agent from Claude Code client',
-    captureHint:
-      '💡 Hint: If unable to capture for long time, please confirm Claude Code client is using this account, or contact developer to check if User-Agent format has changed',
-    useUnifiedClientId: 'Use unified client identifier',
-    useUnifiedClientIdDescription:
-      'When enabled, will use fixed client identifier, making all requests appear to come from same client, reducing characteristics',
     clientIdLabel: 'Client Identifier ID',
     regenerateClientId: 'Regenerate',
-    clientIdDescription:
-      'This ID will replace user_id client part in requests, preserving session part for sticky sessions',
 
     // Edit Mode Fields
     accountNameEdit: 'Account Name',
@@ -2507,7 +2488,6 @@ export default {
     descriptionOptionalEdit: 'Description (Optional)',
     descriptionOptionalEditPlaceholder: 'Account usage description...',
     accountTypeEdit: 'Account Type',
-    selectGroupRequired: 'Select Group *',
     noAvailableGroups: 'No available groups',
     membersCount: ' members',
     createNewGroup: 'Create New Group',
@@ -2516,32 +2496,14 @@ export default {
     bedrockCredentials: 'Credentials Configuration',
     bedrockCredentialsDescription:
       'Please fill in AWS access credentials for calling Amazon Bedrock service.',
-    awsAccessKeyId: 'AWS Access Key ID *',
-    awsAccessKeyIdPlaceholder: 'Please enter AWS Access Key ID...',
-    awsSecretAccessKey: 'AWS Secret Access Key *',
-    awsSecretAccessKeyPlaceholder: 'Please enter AWS Secret Access Key...',
-    sessionTokenOptional: 'Session Token (Optional)',
-    sessionTokenOptionalPlaceholder: 'Session token for temporary credentials...',
-    sessionTokenDescription:
-      'Only required when using temporary credentials (like STS generated credentials)',
-    awsRegion: 'AWS Region *',
-    awsRegionPlaceholder: 'Select AWS region...',
     bedrockModelConfig: 'Model Configuration',
     defaultModelLabel: 'Default Model',
-    defaultModelPlaceholder: 'e.g., anthropic.claude-3-5-sonnet-20240620-v1:0',
-    defaultModelDescription:
-      'Leave blank to use system default model. Supports inference profile ID or ARN',
     smallFastModelLabel: 'Small Fast Model',
-    smallFastModelPlaceholder: 'e.g., anthropic.claude-3-haiku-20240307-v1:0',
-    smallFastModelDescription: 'Fast model for simple tasks, supports inference profile ID or ARN',
 
     // Azure OpenAI Configuration
     azureOpenAIConfig: 'Azure OpenAI Configuration',
     azureOpenAIDescription:
       'Please configure connection information and deployment details for Azure OpenAI service.',
-    azureEndpoint: 'Azure Endpoint *',
-    azureEndpointPlaceholder: 'e.g., https://your-resource.openai.azure.com/',
-    azureEndpointDescription: 'Endpoint URL for Azure OpenAI service',
     azureApiKey: 'API Key *',
     azureApiKeyPlaceholder: 'Please enter Azure OpenAI API Key...',
     azureApiVersion: 'API Version',
@@ -2565,7 +2527,6 @@ export default {
     modelMappingFromPlaceholder: 'e.g., claude-3-5-sonnet-20241022',
     modelMappingTo: 'Actual Model',
     modelMappingToPlaceholder: 'e.g., claude-3-5-sonnet-latest',
-    addModelMapping: 'Add Mapping',
     removeMapping: 'Remove',
     presetMappings: 'Preset Mappings',
     modelMappingExample: 'Example: claude-3-5-sonnet-20241022 → claude-3-5-sonnet-latest',
@@ -2579,11 +2540,7 @@ export default {
     setupTokenStep1Description:
       'System will generate a dedicated authorization link for obtaining temporary authorization code.',
     setupTokenStep2: 'Step 2: Complete Authorization',
-    setupTokenStep2Description:
-      'Open authorization link in new window, log in with your Claude account and complete authorization.',
     setupTokenStep3: 'Step 3: Enter Authorization Code',
-    setupTokenStep3Description:
-      'After successful authorization, system will display authorization code, please copy and paste into input box below.',
     setupTokenUrlGenerated: 'Authorization link generated',
     setupTokenOpenInBrowser: 'Open in browser',
     setupTokenCopyLink: 'Copy link',
@@ -2611,16 +2568,9 @@ export default {
 
     // Rate Limiting and Quota Management
     rateLimitSettings: 'Rate Limit Settings',
-    enableRateLimit: 'Enable rate limiting',
-    rateLimitDuration: 'Rate limit duration (seconds)',
     rateLimitDurationPlaceholder: 'e.g., 60',
-    rateLimitDescription:
-      'When enabled, will limit request frequency to prevent account being blocked',
     quotaManagement: 'Quota Management',
-    dailyQuotaLabel: 'Daily quota limit',
-    dailyQuotaPlaceholder: '0 means unlimited',
     quotaResetTimeLabel: 'Quota reset time',
-    quotaResetTimePlaceholder: 'e.g., 00:00',
     quotaResetDescription: 'Time point when daily quota resets',
     currentDailyUsage: 'Today used',
 
@@ -2628,7 +2578,6 @@ export default {
     advancedSettings: 'Advanced Settings',
     customUserAgent: 'Custom User-Agent',
     customUserAgentPlaceholder: 'Leave blank to use default User-Agent...',
-    userAgentDescription: 'User-Agent identifier for requests',
 
     // General Hints and Status
     notSet: 'Not set',
@@ -2669,7 +2618,6 @@ export default {
       'Tip: If your account is a regular personal account (not bound to Google Cloud), please leave this field empty.',
 
     // AWS Region Reference
-    awsRegionReference: 'Common AWS regions reference:',
     awsRegionEastUS: 'us-east-1 (US East)',
     awsRegionWestUS: 'us-west-2 (US West)',
     awsRegionEuropeIreland: 'eu-west-1 (Europe Ireland)',
@@ -2689,7 +2637,6 @@ export default {
     azureModelSelectionDesc: 'Select model types supported by this deployment',
 
     // Rate Limiting
-    rateLimitMechanism: 'Rate limiting mechanism',
     enableRateLimitMechanism: 'Enable rate limiting mechanism',
     rateLimitDescription2:
       'When enabled, will pause scheduling for some time when account returns 429 error',
@@ -2699,34 +2646,22 @@ export default {
 
     // Claude Console Specific Fields
     claudeConsoleFields: 'Claude Console specific fields',
-    quotaManagement: 'Quota management',
     modelMappingTable: 'Model mapping table',
     modelMappingTableOptional: 'Model mapping table (optional)',
-    addModelMapping: 'Add model mapping',
-
-    // Claude Subscription Type
-    subscriptionType: 'Subscription type',
 
     // Setup Token Auth
-    setupTokenAuth: 'Setup Token authorization',
     claudeSetupTokenAuth: 'Claude Setup Token authorization',
     setupTokenAuthSteps:
       'Please follow these steps to complete Claude account authorization through Setup Token:',
     generateSetupTokenLink: 'Generate Setup Token auth link',
-    generating: 'Generating...',
 
     // Buttons and actions
-    verifying: 'Verifying...',
     completeAuth: 'Complete authorization',
-    updating: 'Updating...',
-    update: 'Update',
 
     // Error messages
     generateSetupTokenFailed: 'Failed to generate Setup Token auth link',
-    copyFailed: 'Copy failed, please copy manually',
     setupTokenAuthFailed:
       'Setup Token authorization failed, please check if the authorization code is correct',
-    accountCreationFailed: 'Account creation failed',
     accountCreationError: 'Account creation failed:',
 
     // Page structure comments
@@ -2741,29 +2676,18 @@ export default {
 
     // Validation messages
     nameRequired: 'Please enter account name',
-    apiUrlRequired: 'Please enter API URL',
     rateLimitDefault60: 'Default 60 minutes',
     rateLimitPauseDescription: 'Time to pause scheduling after account is rate limited (minutes)',
-    apiUrlPlaceholder: 'e.g., https://api.example.com',
-    apiKeyPlaceholder: 'Please enter API Key',
     dailyQuotaLimit: 'Daily quota limit ($)',
     quotaZeroUnlimited: '0 means unlimited',
-    dailyQuotaDescription: 'Set daily usage quota, 0 means unlimited',
-    quotaResetTime: 'Quota reset time',
-    quotaResetTimeDescription: 'Time to automatically reset quota daily',
-    modelMappingDescription:
-      'Leave empty to support all models without modifying requests. After configuring mapping, left model will be recognized as supported model, right is the actual model sent.',
 
     // Quota Management
     quotaManagementFields: 'Quota management fields',
     dailyQuotaLimitDollar: 'Daily quota limit ($)',
-    quotaZeroUnlimited: '0 means unlimited',
     dailyQuotaDesc: 'Set daily usage quota, 0 means unlimited',
-    quotaResetTime: 'Quota reset time',
     quotaResetTimeDesc: 'Time to automatically reset quota daily',
 
     // Model Mapping
-    modelMappingOptional: 'Model mapping table (optional)',
     modelMappingDesc:
       'Leave empty to support all models without modifying requests. After configuring mapping, left model will be recognized as supported model, right is the actual model sent.',
     originalModelName: 'Original model name',
@@ -2776,7 +2700,6 @@ export default {
 
     // Claude Subscription Type
     claudeSubscriptionType: 'Subscription type',
-    claudeProLimitation: 'Pro accounts do not support Claude Opus 4 model',
 
     // Claude Advanced Options
     claudeAutoStopScheduling: 'Auto-stop scheduling when approaching 5-hour limit',
@@ -2807,13 +2730,10 @@ export default {
     setupTokenCopyTitle: 'Copy link',
 
     // Step Indicators
-    stepIndicator: 'Step indicator',
-    step1BasicInfo: 'Step 1: Basic information and proxy settings',
     step2OAuth: 'Step 2: OAuth authorization',
     step2SetupToken: 'Step 2: Setup Token authorization',
 
     // Group Selector
-    groupSelector: 'Group selector',
     multiGroupInterface: 'Multi-group interface',
     createNewGroupOption: 'Create new group option',
 
@@ -2823,15 +2743,12 @@ export default {
     // Placeholder texts
     originalModelNamePlaceholder: 'Original model name',
     mappedModelNamePlaceholder: 'Mapped model name',
-    userAgentPlaceholder: 'Leave empty to pass through client User-Agent',
     authCodePlaceholder: 'Paste Authorization Code obtained from Claude Code auth page...',
     leaveEmptyNoUpdate: 'Leave empty for no update',
     leaveEmptyNoUpdateKey: 'Leave empty for no API Key update',
     leaveEmptyNoUpdateToken: 'Leave empty for no update...',
 
     // Labels and descriptions
-    customUserAgentOptional: 'Custom User-Agent (optional)',
-    clientIdLabel: 'Client ID',
     schedulePriorityLabel: 'Schedule Priority (1-100)',
     attentionLabel: 'Attention:',
     supportedModelsLabel: 'Supported Models',
@@ -2844,19 +2761,16 @@ export default {
     previousStepBtn: 'Previous Step',
 
     // Descriptive texts
-    claudeProLimitation: 'Pro accounts do not support Claude Opus 4 model',
     claude5HourLimitDesc: 'Auto-stop scheduling when approaching 5-hour usage limit',
     claude5HourLimitExplanation:
       'When system detects account approaching 5-hour usage limit, automatically pause scheduling for this account. Will resume automatically when entering new time window.',
     useUnifiedClaudeVersion: 'Use unified Claude Code version',
     unifiedVersionDesc:
       'When enabled, will use unified User-Agent captured from real Claude Code client, improving compatibility',
-    currentUnifiedVersion: '💡 Current unified version:',
     waitingUserAgent: '⏳ Waiting to capture User-Agent from Claude Code client',
     userAgentTip:
       '💡 Tip: If unable to capture for a long time, please confirm that Claude Code client is using this account,',
     contactDeveloper: 'or contact developer to check if User-Agent format has changed',
-    useUnifiedClientId: 'Use unified client identifier',
     unifiedClientIdDesc:
       'When enabled, will use fixed client identifier, making all requests appear from same client, reducing fingerprinting',
     clientIdReplaceDesc:
@@ -2883,9 +2797,6 @@ export default {
     awsRegionRef: 'Common AWS regions reference:',
 
     // Error messages
-    apiKeyRequired: 'Please enter API Key',
-    refreshTokenRequired: 'Please enter Refresh Token',
-    accessTokenRequired: 'Please enter Access Token',
     copyFailedManual: 'Copy failed, please copy manually',
 
     // Form descriptions
@@ -2897,9 +2808,7 @@ export default {
 
     // Basic labels
     apiUrlLabel: 'API URL',
-    apiUrlRequired: 'API URL *',
     apiKeyLabel: 'API Key',
-    apiKeyRequired: 'API Key *',
 
     // More missing keys
     copyLinkTooltip: 'Copy Link',

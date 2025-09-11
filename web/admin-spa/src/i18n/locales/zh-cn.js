@@ -62,6 +62,30 @@ export default {
         info: '信息'
       }
     },
+    errors: {
+      loadDashboardFailed: '加载仪表板数据失败',
+      loadUsageTrendFailed: '加载使用趋势失败',
+      loadModelStatsFailed: '加载模型统计失败',
+      loadApiKeysTrendFailed: '加载API Keys趋势失败',
+      createClaudeConsoleAccountFailed: '创建Claude Console账户失败',
+      createAzureOpenAIAccountFailed: '创建Azure OpenAI账户失败',
+      updateClaudeConsoleAccountFailed: '更新Claude Console账户失败',
+      updateAzureOpenAIAccountFailed: '更新Azure OpenAI账户失败',
+      generateSetupTokenUrlFailed: '生成Setup Token URL失败',
+      exchangeSetupTokenFailed: '交换Setup Token授权码失败',
+      allApiKeysInvalid: '所有 API Key 都无效',
+      loadOemSettingsFailed: '加载OEM设置失败',
+      getApiKeyStatsFailed: '获取API Key统计失败',
+      getTagsFailed: '获取标签失败',
+      requestFailed: '请求失败: {status}',
+      loadSupportedClientsFailed: '加载支持的客户端失败'
+    },
+    system: {
+      status: {
+        normal: '正常',
+        abnormal: '异常'
+      }
+    },
     confirmDialog: {
       confirm: '确认',
       cancel: '取消'
@@ -131,10 +155,6 @@ export default {
       minutesAgo: '{minutes}分钟前',
       hoursAgo: '{hours}小时前',
       daysAgo: '{days}天前'
-    },
-    errors: {
-      requestFailed: '请求失败: {status}',
-      loadSupportedClientsFailed: '加载支持的客户端失败'
     }
   },
   language: {
@@ -143,37 +163,6 @@ export default {
     en: 'English',
     current: '当前语言',
     switch: '切换语言'
-  },
-
-  layout: {
-    tabBar: {
-      tabs: {
-        dashboard: {
-          name: '仪表板',
-          shortName: '仪表板'
-        },
-        apiKeys: {
-          name: 'API Keys',
-          shortName: 'API'
-        },
-        accounts: {
-          name: '账户管理',
-          shortName: '账户'
-        },
-        userManagement: {
-          name: '用户管理',
-          shortName: '用户'
-        },
-        tutorial: {
-          name: '使用教程',
-          shortName: '教程'
-        },
-        settings: {
-          name: '系统设置',
-          shortName: '设置'
-        }
-      }
-    }
   },
 
   header: {
@@ -253,7 +242,6 @@ export default {
     apiKeyInfo: 'API Key 信息',
     queryKeysCount: '查询 Keys 数',
     activeKeysCount: '有效 Keys 数',
-    invalidKeysCount: '无效 Keys 数',
     totalRequests: '总请求数',
     totalTokens: '总 Token 数',
     totalCost: '总费用',
@@ -269,7 +257,6 @@ export default {
     modelUsageStats: '模型使用统计',
     loadingModelStats: '加载模型统计数据中...',
     requestCount: '次请求',
-    totalCost: '总费用',
     inputTokens: '输入 Token',
     outputTokens: '输出 Token',
     cacheCreateTokens: '缓存创建',
@@ -2420,12 +2407,6 @@ export default {
 
     // 手动 Token 输入部分
     manualTokenInput: '手动输入 Token',
-    manualTokenClaudeDescription:
-      '请输入有效的 Claude Access Token。如果您有 Refresh Token，建议也一并填写以支持自动刷新。',
-    manualTokenGeminiDescription:
-      '请输入有效的 Gemini Access Token。如果您有 Refresh Token，建议也一并填写以支持自动刷新。',
-    manualTokenOpenAIDescription:
-      '请输入有效的 OpenAI Access Token。如果您有 Refresh Token，建议也一并填写以支持自动刷新。',
     getAccessTokenMethod: '获取 Access Token 的方法：',
     claudeCredentialsPath: '请从已登录 Claude Code 的机器上获取',
     geminiCredentialsPath: '请从已登录 Gemini CLI 的机器上获取',
@@ -2433,15 +2414,9 @@ export default {
       '请从已登录 OpenAI 账户的机器上获取认证凭证，或通过 OAuth 授权流程获取 Access Token。',
     claudeCredentialsWarning: '文件中的凭证，请勿使用 Claude 官网 API Keys 页面的密钥。',
     refreshTokenWarning: '💡 如果未填写 Refresh Token，Token 过期后需要手动更新。',
-    accessTokenOptional: 'Access Token (可选)',
-    accessTokenOptionalPlaceholder: '可选：如果不填写，系统会自动通过 Refresh Token 获取...',
     accessTokenOptionalInfo: 'Access Token 可选填。如果不提供，系统会通过 Refresh Token 自动获取。',
-    accessTokenRequired: 'Access Token *',
     accessTokenRequiredPlaceholder: '请输入 Access Token...',
-    refreshTokenRequired: 'Refresh Token *',
-    refreshTokenRequiredPlaceholder: '请输入 Refresh Token（必填）...',
     refreshTokenRequiredInfo: '系统将使用 Refresh Token 自动获取 Access Token 和用户信息',
-    refreshTokenOptional: 'Refresh Token (可选)',
     refreshTokenOptionalPlaceholder: '请输入 Refresh Token...',
 
     // 优先级设置
@@ -2450,34 +2425,11 @@ export default {
     prioritySchedulingTitle: '调度优先级 (1-100)',
     priorityEditPlaceholder: '数字越小优先级越高',
 
-    // Gemini 项目ID
-    projectIdOptional: '项目 ID (可选)',
-    projectIdPlaceholder: '例如：verdant-wares-464411-k9',
-    projectIdDescription: 'Google Cloud/Workspace 账号可能需要提供项目 ID',
-
     // Claude 订阅类型和高级选项
-    subscriptionType: '订阅类型',
     claudeMaxSubscription: 'Claude Max',
     claudeProSubscription: 'Claude Pro',
-    claudeProLimitation: 'Pro 账号不支持 Claude Opus 4 模型',
-    autoStopOnWarning: '5小时使用量接近限制时自动停止调度',
-    autoStopOnWarningDescription:
-      '当系统检测到账户接近5小时使用限制时，自动暂停调度该账户。进入新的时间窗口后会自动恢复调度。',
-    useUnifiedUserAgent: '使用统一 Claude Code 版本',
-    useUnifiedUserAgentDescription:
-      '开启后将使用从真实 Claude Code 客户端捕获的统一 User-Agent，提高兼容性',
-    currentUnifiedVersion: '当前统一版本：',
-    clearCache: '清除缓存',
-    clearing: '清除中...',
-    waitingForCapture: '等待从 Claude Code 客户端捕获 User-Agent',
-    captureHint:
-      '💡 提示：如果长时间未能捕获，请确认有 Claude Code 客户端正在使用此账户，或联系开发者检查 User-Agent 格式是否发生变化',
-    useUnifiedClientId: '使用统一的客户端标识',
-    useUnifiedClientIdDescription:
-      '开启后将使用固定的客户端标识，使所有请求看起来来自同一个客户端，减少特征',
     clientIdLabel: '客户端标识 ID',
     regenerateClientId: '重新生成',
-    clientIdDescription: '此ID将替换请求中的user_id客户端部分，保留session部分用于粘性会话',
 
     // 编辑模式字段
     accountNameEdit: '账户名称',
@@ -2485,7 +2437,6 @@ export default {
     descriptionOptionalEdit: '描述 (可选)',
     descriptionOptionalEditPlaceholder: '账户用途说明...',
     accountTypeEdit: '账户类型',
-    selectGroupRequired: '选择分组 *',
     noAvailableGroups: '暂无可用分组',
     membersCount: ' 个成员',
     createNewGroup: '新建分组',
@@ -2493,29 +2444,14 @@ export default {
     // AWS Bedrock 配置
     bedrockCredentials: '凭证配置',
     bedrockCredentialsDescription: '请填写 AWS 访问凭证，用于调用 Amazon Bedrock 服务。',
-    awsAccessKeyId: 'AWS Access Key ID *',
-    awsAccessKeyIdPlaceholder: '请输入 AWS 访问密钥 ID...',
-    awsSecretAccessKey: 'AWS Secret Access Key *',
-    awsSecretAccessKeyPlaceholder: '请输入 AWS 秘密访问密钥...',
-    sessionTokenOptional: 'Session Token (可选)',
     sessionTokenOptionalPlaceholder: '临时凭证的会话令牌...',
-    sessionTokenDescription: '仅在使用临时凭证（如 STS 生成的凭证）时需要填写',
-    awsRegion: 'AWS 区域 *',
-    awsRegionPlaceholder: '选择 AWS 区域...',
     bedrockModelConfig: '模型配置',
     defaultModelLabel: '默认模型',
-    defaultModelPlaceholder: '例如：anthropic.claude-3-5-sonnet-20240620-v1:0',
-    defaultModelDescription: '留空将使用系统默认模型。支持 inference profile ID 或 ARN',
     smallFastModelLabel: '小型快速模型',
-    smallFastModelPlaceholder: '例如：anthropic.claude-3-haiku-20240307-v1:0',
-    smallFastModelDescription: '用于简单任务的快速模型，支持 inference profile ID 或 ARN',
 
     // Azure OpenAI 配置
     azureOpenAIConfig: 'Azure OpenAI 配置',
     azureOpenAIDescription: '请配置 Azure OpenAI 服务的连接信息和部署详情。',
-    azureEndpoint: 'Azure Endpoint *',
-    azureEndpointPlaceholder: '例如：https://your-resource.openai.azure.com/',
-    azureEndpointDescription: 'Azure OpenAI 服务的端点 URL',
     azureApiKey: 'API Key *',
     azureApiKeyPlaceholder: '请输入 Azure OpenAI API Key...',
     azureApiVersion: 'API 版本',
@@ -2538,7 +2474,6 @@ export default {
     modelMappingFromPlaceholder: '例如：claude-3-5-sonnet-20241022',
     modelMappingTo: '实际模型',
     modelMappingToPlaceholder: '例如：claude-3-5-sonnet-latest',
-    addModelMapping: '添加映射',
     removeMapping: '移除',
     presetMappings: '预设映射',
     modelMappingExample: '示例：claude-3-5-sonnet-20241022 → claude-3-5-sonnet-latest',
@@ -2550,9 +2485,7 @@ export default {
     setupTokenStep1: '步骤 1：生成授权链接',
     setupTokenStep1Description: '系统将生成一个专用的授权链接，用于获取临时授权码。',
     setupTokenStep2: '步骤 2：完成授权',
-    setupTokenStep2Description: '在新窗口中打开授权链接，使用您的 Claude 账户登录并完成授权。',
     setupTokenStep3: '步骤 3：输入授权码',
-    setupTokenStep3Description: '授权成功后，系统会显示授权码，请复制并粘贴到下方输入框。',
     setupTokenUrlGenerated: '授权链接已生成',
     setupTokenOpenInBrowser: '在浏览器中打开',
     setupTokenCopyLink: '复制链接',
@@ -2577,15 +2510,9 @@ export default {
 
     // 限流和配额管理
     rateLimitSettings: '限流设置',
-    enableRateLimit: '启用速率限制',
-    rateLimitDuration: '限流时长 (秒)',
     rateLimitDurationPlaceholder: '例如：60',
-    rateLimitDescription: '启用后将限制请求频率，防止账户被封锁',
     quotaManagement: '配额管理',
-    dailyQuotaLabel: '每日配额限制',
-    dailyQuotaPlaceholder: '0 表示不限制',
     quotaResetTimeLabel: '配额重置时间',
-    quotaResetTimePlaceholder: '例如：00:00',
     quotaResetDescription: '每天配额重置的时间点',
     currentDailyUsage: '今日已用',
 
@@ -2593,7 +2520,6 @@ export default {
     advancedSettings: '高级设置',
     customUserAgent: '自定义 User-Agent',
     customUserAgentPlaceholder: '留空使用默认 User-Agent...',
-    userAgentDescription: '用于请求时的 User-Agent 标识',
 
     // 通用提示和状态
     notSet: '未设置',
@@ -2634,7 +2560,6 @@ export default {
       '\u63d0示\uff1a如果您的账号是普通个人账号（未绑定 Google Cloud），请留空此字段。',
 
     // AWS 区域参考
-    awsRegionReference: '常用 AWS 区域参考：',
     awsRegionEastUS: 'us-east-1 (美国东部)',
     awsRegionWestUS: 'us-west-2 (美国西部)',
     awsRegionEuropeIreland: 'eu-west-1 (欧洲爱尔兰)',
@@ -2654,38 +2579,25 @@ export default {
     azureModelSelectionDesc: '选择此部署支持的模型类型',
 
     // 限流机制
-    rateLimitMechanism: '限流机制',
     enableRateLimitMechanism: '启用限流机制',
     rateLimitDescription2: '启用后，当账号返回429错误时将暂停调度一段时间',
 
     // Claude Console 特定字段
     claudeConsoleFields: 'Claude Console 特定字段',
-    quotaManagement: '额度管理',
     modelMappingTable: '模型映射表',
     modelMappingTableOptional: '模型映射表 (可选)',
-    addModelMapping: '添加模型映射',
-
-    // Claude 订阅类型
-    subscriptionType: '订阅类型',
 
     // Setup Token 授权
-    setupTokenAuth: 'Setup Token 授权',
     claudeSetupTokenAuth: 'Claude Setup Token 授权',
     setupTokenAuthSteps: '请按照以下步骤通过 Setup Token 完成 Claude 账户的授权：',
     generateSetupTokenLink: '生成 Setup Token 授权链接',
-    generating: '生成中...',
 
     // 按钮和操作
-    verifying: '验证中...',
     completeAuth: '完成授权',
-    updating: '更新中...',
-    update: '更新',
 
     // 错误消息
     generateSetupTokenFailed: '生成Setup Token授权链接失败',
-    copyFailed: '复制失败，请手动复制',
     setupTokenAuthFailed: 'Setup Token授权失败，请检查授权码是否正确',
-    accountCreationFailed: '账户创建失败',
     accountCreationError: '账户创建失败:',
 
     // 页面结构注释
@@ -2700,18 +2612,10 @@ export default {
 
     // 验证消息
     nameRequired: '请填写账户名称',
-    apiUrlRequired: '请填写 API URL',
     rateLimitDefault60: '默认60分钟',
     rateLimitPauseDescription: '账号被限流后暂停调度的时间（分钟）',
-    apiUrlPlaceholder: '例如：https://api.example.com',
-    apiKeyPlaceholder: '请输入API Key',
     dailyQuotaLimit: '每日额度限制 ($)',
     quotaZeroUnlimited: '0 表示不限制',
-    dailyQuotaDescription: '设置每日使用额度，0 表示不限制',
-    quotaResetTime: '额度重置时间',
-    quotaResetTimeDescription: '每日自动重置额度的时间',
-    modelMappingDescription:
-      '留空表示支持所有模型且不修改请求。配置映射后，左侧模型会被识别为支持的模型，右侧是实际发送的模型。',
     rateLimitDurationMinutes: '限流时间 (分钟)',
     rateLimitDefaultMinutes: '默认60分钟',
     rateLimitPauseDesc: '账号被限流后暂停调度的时间（分钟）',
@@ -2719,13 +2623,10 @@ export default {
     // 额度管理
     quotaManagementFields: '额度管理字段',
     dailyQuotaLimitDollar: '每日额度限制 ($)',
-    quotaZeroUnlimited: '0 表示不限制',
     dailyQuotaDesc: '设置每日使用额度，0 表示不限制',
-    quotaResetTime: '额度重置时间',
     quotaResetTimeDesc: '每日自动重置额度的时间',
 
     // 模型映射
-    modelMappingOptional: '模型映射表 (可选)',
     modelMappingDesc:
       '留空表示支持所有模型且不修改请求。配置映射后，左侧模型会被识别为支持的模型，右侧是实际发送的模型。',
     originalModelName: '原始模型名称',
@@ -2737,7 +2638,6 @@ export default {
 
     // Claude 订阅类型
     claudeSubscriptionType: '订阅类型',
-    claudeProLimitation: 'Pro 账号不支持 Claude Opus 4 模型',
 
     // Claude 高级选项
     claudeAutoStopScheduling: '5小时使用量接近限制时自动停止调度',
@@ -2765,13 +2665,10 @@ export default {
     setupTokenCopyTitle: '复制链接',
 
     // 步骤指示器
-    stepIndicator: '步骤指示器',
-    step1BasicInfo: '步骤1: 基本信息和代理设置',
     step2OAuth: '步骤2: OAuth授权',
     step2SetupToken: '步骤2: Setup Token授权',
 
     // 分组选择器
-    groupSelector: '分组选择器',
     multiGroupInterface: '多选分组界面',
     createNewGroupOption: '新建分组选项',
 
@@ -2781,15 +2678,12 @@ export default {
     // Placeholder 文本
     originalModelNamePlaceholder: '原始模型名称',
     mappedModelNamePlaceholder: '映射后的模型名称',
-    userAgentPlaceholder: '留空则透传客户端 User-Agent',
     authCodePlaceholder: '粘贴从Claude Code授权页面获取的Authorization Code...',
     leaveEmptyNoUpdate: '留空表示不更新',
     leaveEmptyNoUpdateKey: '留空表示不更新 API Key',
     leaveEmptyNoUpdateToken: '留空表示不更新...',
 
     // 标签和描述
-    customUserAgentOptional: '自定义 User-Agent (可选)',
-    clientIdLabel: '客户端标识 ID',
     schedulePriorityLabel: '调度优先级 (1-100)',
     attentionLabel: '注意：',
     supportedModelsLabel: '支持的模型',
@@ -2802,17 +2696,14 @@ export default {
     previousStepBtn: '上一步',
 
     // 描述性文本
-    claudeProLimitation: 'Pro 账号不支持 Claude Opus 4 模型',
     claude5HourLimitDesc: '5小时使用量接近限制时自动停止调度',
     claude5HourLimitExplanation:
       '当系统检测到账户接近5小时使用限制时，自动暂停调度该账户。进入新的时间窗口后会自动恢复调度。',
     useUnifiedClaudeVersion: '使用统一 Claude Code 版本',
     unifiedVersionDesc: '开启后将使用从真实 Claude Code 客户端捕获的统一 User-Agent，提高兼容性',
-    currentUnifiedVersion: '💡 当前统一版本：',
     waitingUserAgent: '⏳ 等待从 Claude Code 客户端捕获 User-Agent',
     userAgentTip: '💡 提示：如果长时间未能捕获，请确认有 Claude Code 客户端正在使用此账户，',
     contactDeveloper: '或联系开发者检查 User-Agent 格式是否发生变化',
-    useUnifiedClientId: '使用统一的客户端标识',
     unifiedClientIdDesc: '开启后将使用固定的客户端标识，使所有请求看起来来自同一个客户端，减少特征',
     clientIdReplaceDesc: '此ID将替换请求中的user_id客户端部分，保留session部分用于粘性会话',
 
@@ -2834,8 +2725,6 @@ export default {
 
     // Error messages
     apiKeyRequiredError: '请填写 API Key',
-    refreshTokenRequired: '请填写 Refresh Token',
-    accessTokenRequired: '请填写 Access Token',
     copyFailedManual: '复制失败，请手动复制',
 
     // 表单描述
@@ -2846,9 +2735,7 @@ export default {
 
     // 基础标签
     apiUrlLabel: 'API URL',
-    apiUrlRequired: 'API URL *',
     apiKeyLabel: 'API Key',
-    apiKeyRequired: 'API Key *',
 
     // 更多缺失的翻译键
     copyLinkTooltip: '复制链接',
