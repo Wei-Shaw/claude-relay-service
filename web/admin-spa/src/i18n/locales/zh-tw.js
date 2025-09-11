@@ -62,6 +62,30 @@ export default {
         info: '資訊'
       }
     },
+    errors: {
+      loadDashboardFailed: '載入儀表板數據失敗',
+      loadUsageTrendFailed: '載入使用趨勢失敗',
+      loadModelStatsFailed: '載入模型統計失敗',
+      loadApiKeysTrendFailed: '載入API Keys趨勢失敗',
+      createClaudeConsoleAccountFailed: '建立Claude Console帳戶失敗',
+      createAzureOpenAIAccountFailed: '建立Azure OpenAI帳戶失敗',
+      updateClaudeConsoleAccountFailed: '更新Claude Console帳戶失敗',
+      updateAzureOpenAIAccountFailed: '更新Azure OpenAI帳戶失敗',
+      generateSetupTokenUrlFailed: '產生Setup Token URL失敗',
+      exchangeSetupTokenFailed: '交換Setup Token授權碼失敗',
+      allApiKeysInvalid: '所有 API Key 都無效',
+      loadOemSettingsFailed: '載入OEM設定失敗',
+      getApiKeyStatsFailed: '獲取API Key統計失敗',
+      getTagsFailed: '獲取標籤失敗',
+      requestFailed: '請求失敗: {status}',
+      loadSupportedClientsFailed: '載入支援的客戶端失敗'
+    },
+    system: {
+      status: {
+        normal: '正常',
+        abnormal: '異常'
+      }
+    },
     confirmDialog: {
       confirm: '確認',
       cancel: '取消'
@@ -131,10 +155,6 @@ export default {
       minutesAgo: '{minutes}分鐘前',
       hoursAgo: '{hours}小時前',
       daysAgo: '{days}天前'
-    },
-    errors: {
-      requestFailed: '請求失敗: {status}',
-      loadSupportedClientsFailed: '載入支援的客戶端失敗'
     }
   },
   language: {
@@ -221,7 +241,6 @@ export default {
     apiKeyInfo: 'API Key 資訊',
     queryKeysCount: '查詢 Keys 數',
     activeKeysCount: '有效 Keys 數',
-    invalidKeysCount: '無效 Keys 數',
     totalRequests: '總請求數',
     totalTokens: '總 Token 數',
     totalCost: '總費用',
@@ -237,7 +256,6 @@ export default {
     modelUsageStats: '模型使用統計',
     loadingModelStats: '載入模型統計資料中...',
     requestCount: '次請求',
-    totalCost: '總費用',
     inputTokens: '輸入 Token',
     outputTokens: '輸出 Token',
     cacheCreateTokens: '快取建立',
@@ -2228,7 +2246,7 @@ export default {
     rateLimitDurationDescription: '帳號被限流後暫停排程的時間（分鐘）',
 
     // Claude 訂閱類型
-    subscriptionType: '訂閱類型',
+
     subscriptionClaudeMax: 'Claude Max',
     subscriptionClaudePro: 'Claude Pro',
     claudeProLimitation: 'Pro 帳號不支援 Claude Opus 4 模型',
@@ -2391,12 +2409,6 @@ export default {
 
     // 手動 Token 輸入部分
     manualTokenInput: '手動輸入 Token',
-    manualTokenClaudeDescription:
-      '請輸入有效的 Claude Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動刷新。',
-    manualTokenGeminiDescription:
-      '請輸入有效的 Gemini Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動刷新。',
-    manualTokenOpenAIDescription:
-      '請輸入有效的 OpenAI Access Token。如果您有 Refresh Token，建議也一併填寫以支援自動刷新。',
     getAccessTokenMethod: '取得 Access Token 的方法：',
     claudeCredentialsPath: '請從已登入 Claude Code 的機器上取得',
     geminiCredentialsPath: '請從已登入 Gemini CLI 的機器上取得',
@@ -2404,15 +2416,9 @@ export default {
       '請從已登入 OpenAI 帳戶的機器上取得認證憑證，或透過 OAuth 授權流程取得 Access Token。',
     claudeCredentialsWarning: '檔案中的憑證，請勿使用 Claude 官網 API Keys 頁面的金鑰。',
     refreshTokenWarning: '💡 如果未填寫 Refresh Token，Token 過期後需要手動更新。',
-    accessTokenOptional: 'Access Token (可選)',
-    accessTokenOptionalPlaceholder: '可選：如果不填寫，系統會自動透過 Refresh Token 取得...',
     accessTokenOptionalInfo: 'Access Token 可選填。如果不提供，系統會透過 Refresh Token 自動取得。',
-    accessTokenRequired: 'Access Token *',
     accessTokenRequiredPlaceholder: '請輸入 Access Token...',
-    refreshTokenRequired: 'Refresh Token *',
-    refreshTokenRequiredPlaceholder: '請輸入 Refresh Token（必填）...',
     refreshTokenRequiredInfo: '系統將使用 Refresh Token 自動取得 Access Token 和使用者資訊',
-    refreshTokenOptional: 'Refresh Token (可選)',
     refreshTokenOptionalPlaceholder: '請輸入 Refresh Token...',
 
     // 優先級設定
@@ -2421,34 +2427,12 @@ export default {
     prioritySchedulingTitle: '排程優先級 (1-100)',
     priorityEditPlaceholder: '數字越小優先級越高',
 
-    // Gemini 專案ID
-    projectIdOptional: '專案 ID (可選)',
-    projectIdPlaceholder: '例如：verdant-wares-464411-k9',
-    projectIdDescription: 'Google Cloud/Workspace 帳號可能需要提供專案 ID',
-
     // Claude 訂閱類型和進階選項
-    subscriptionType: '訂閱類型',
+
     claudeMaxSubscription: 'Claude Max',
     claudeProSubscription: 'Claude Pro',
-    claudeProLimitation: 'Pro 帳號不支援 Claude Opus 4 模型',
-    autoStopOnWarning: '5小時使用量接近限制時自動停止排程',
-    autoStopOnWarningDescription:
-      '當系統檢測到帳戶接近5小時使用限制時，自動暫停排程該帳戶。進入新的時間視窗後會自動恢復排程。',
-    useUnifiedUserAgent: '使用統一 Claude Code 版本',
-    useUnifiedUserAgentDescription:
-      '開啟後將使用從真實 Claude Code 用戶端捕獲的統一 User-Agent，提高相容性',
-    currentUnifiedVersion: '目前統一版本：',
-    clearCache: '清除快取',
-    clearing: '清除中...',
-    waitingForCapture: '等待從 Claude Code 用戶端捕獲 User-Agent',
-    captureHint:
-      '💡 提示：如果長時間未能捕獲，請確認有 Claude Code 用戶端正在使用此帳戶，或聯絡開發者檢查 User-Agent 格式是否發生變化',
-    useUnifiedClientId: '使用統一的用戶端識別',
-    useUnifiedClientIdDescription:
-      '開啟後將使用固定的用戶端識別，使所有請求看起來來自同一個用戶端，減少特徵',
     clientIdLabel: '用戶端識別 ID',
     regenerateClientId: '重新產生',
-    clientIdDescription: '此ID將替換請求中的user_id用戶端部分，保留session部分用於黏性工作階段',
 
     // 編輯模式欄位
     accountNameEdit: '帳戶名稱',
@@ -2456,7 +2440,6 @@ export default {
     descriptionOptionalEdit: '描述 (可選)',
     descriptionOptionalEditPlaceholder: '帳戶用途說明...',
     accountTypeEdit: '帳戶類型',
-    selectGroupRequired: '選擇群組 *',
     noAvailableGroups: '暫無可用群組',
     membersCount: ' 個成員',
     createNewGroup: '新建群組',
@@ -2464,29 +2447,14 @@ export default {
     // AWS Bedrock 設定
     bedrockCredentials: '憑證設定',
     bedrockCredentialsDescription: '請填寫 AWS 存取憑證，用於呼叫 Amazon Bedrock 服務。',
-    awsAccessKeyId: 'AWS Access Key ID *',
-    awsAccessKeyIdPlaceholder: '請輸入 AWS 存取密鑰 ID...',
-    awsSecretAccessKey: 'AWS Secret Access Key *',
-    awsSecretAccessKeyPlaceholder: '請輸入 AWS 秘密存取密鑰...',
-    sessionTokenOptional: 'Session Token (可選)',
     sessionTokenOptionalPlaceholder: '臨時憑證的工作階段令牌...',
-    sessionTokenDescription: '僅在使用臨時憑證（如 STS 產生的憑證）時需要填寫',
-    awsRegion: 'AWS 區域 *',
-    awsRegionPlaceholder: '選擇 AWS 區域...',
     bedrockModelConfig: '模型設定',
     defaultModelLabel: '預設模型',
-    defaultModelPlaceholder: '例如：anthropic.claude-3-5-sonnet-20240620-v1:0',
-    defaultModelDescription: '留空將使用系統預設模型。支援 inference profile ID 或 ARN',
     smallFastModelLabel: '小型快速模型',
-    smallFastModelPlaceholder: '例如：anthropic.claude-3-haiku-20240307-v1:0',
-    smallFastModelDescription: '用於簡單任務的快速模型，支援 inference profile ID 或 ARN',
 
     // Azure OpenAI 設定
     azureOpenAIConfig: 'Azure OpenAI 設定',
     azureOpenAIDescription: '請設定 Azure OpenAI 服務的連線資訊和部署詳情。',
-    azureEndpoint: 'Azure Endpoint *',
-    azureEndpointPlaceholder: '例如：https://your-resource.openai.azure.com/',
-    azureEndpointDescription: 'Azure OpenAI 服務的端點 URL',
     azureApiKey: 'API Key *',
     azureApiKeyPlaceholder: '請輸入 Azure OpenAI API Key...',
     azureApiVersion: 'API 版本',
@@ -2509,7 +2477,6 @@ export default {
     modelMappingFromPlaceholder: '例如：claude-3-5-sonnet-20241022',
     modelMappingTo: '實際模型',
     modelMappingToPlaceholder: '例如：claude-3-5-sonnet-latest',
-    addModelMapping: '新增映射',
     removeMapping: '移除',
     presetMappings: '預設映射',
     modelMappingExample: '示例：claude-3-5-sonnet-20241022 → claude-3-5-sonnet-latest',
@@ -2521,9 +2488,7 @@ export default {
     setupTokenStep1: '步驟 1：產生授權連結',
     setupTokenStep1Description: '系統將產生一個專用的授權連結，用於取得臨時授權碼。',
     setupTokenStep2: '步驟 2：完成授權',
-    setupTokenStep2Description: '在新視窗中開啟授權連結，使用您的 Claude 帳戶登入並完成授權。',
     setupTokenStep3: '步驟 3：輸入授權碼',
-    setupTokenStep3Description: '授權成功後，系統會顯示授權碼，請複製並貼上到下方輸入框。',
     setupTokenUrlGenerated: '授權連結已產生',
     setupTokenOpenInBrowser: '在瀏覽器中開啟',
     setupTokenCopyLink: '複製連結',
@@ -2548,15 +2513,9 @@ export default {
 
     // 限流和配額管理
     rateLimitSettings: '限流設定',
-    enableRateLimit: '啟用速率限制',
-    rateLimitDuration: '限流時長 (秒)',
     rateLimitDurationPlaceholder: '例如：60',
-    rateLimitDescription: '啟用後將限制請求頻率，防止帳戶被封鎖',
     quotaManagement: '配額管理',
-    dailyQuotaLabel: '每日配額限制',
-    dailyQuotaPlaceholder: '0 表示不限制',
     quotaResetTimeLabel: '配額重設時間',
-    quotaResetTimePlaceholder: '例如：00:00',
     quotaResetDescription: '每天配額重設的時間點',
     currentDailyUsage: '今日已用',
 
@@ -2564,7 +2523,6 @@ export default {
     advancedSettings: '進階設定',
     customUserAgent: '自定義 User-Agent',
     customUserAgentPlaceholder: '留空使用預設 User-Agent...',
-    userAgentDescription: '用於請求時的 User-Agent 識別',
 
     // 通用提示和狀態
     notSet: '未設定',
@@ -2605,7 +2563,6 @@ export default {
       '提示：如果您的帳戶是普通個人帳戶（未綁定 Google Cloud），請留空此欄位。',
 
     // AWS 區域參考
-    awsRegionReference: '常用 AWS 區域參考：',
     awsRegionEastUS: 'us-east-1 (美國東部)',
     awsRegionWestUS: 'us-west-2 (美國西部)',
     awsRegionEuropeIreland: 'eu-west-1 (歐洲愛爾蘭)',
@@ -2625,7 +2582,6 @@ export default {
     azureModelSelectionDesc: '選擇此部署支援的模型類型',
 
     // 限流機制
-    rateLimitMechanism: '限流機制',
     enableRateLimitMechanism: '啟用限流機制',
     rateLimitDescription2: '啟用後，當帳戶返回429錯誤時將暫停調度一段時間',
     rateLimitDurationMinutes: '限流時間 (分鐘)',
@@ -2634,32 +2590,23 @@ export default {
 
     // Claude Console 特定欄位
     claudeConsoleFields: 'Claude Console 特定欄位',
-    quotaManagement: '額度管理',
     modelMappingTable: '模型映射表',
     modelMappingTableOptional: '模型映射表 (可選)',
-    addModelMapping: '新增模型映射',
 
     // Claude 訂閱類型
     subscriptionType: '訂閱類型',
 
     // Setup Token 授權
-    setupTokenAuth: 'Setup Token 授權',
     claudeSetupTokenAuth: 'Claude Setup Token 授權',
     setupTokenAuthSteps: '請按照以下步驟透過 Setup Token 完成 Claude 帳戶的授權：',
     generateSetupTokenLink: '產生 Setup Token 授權連結',
-    generating: '產生中...',
 
     // 按鈕和操作
-    verifying: '驗證中...',
     completeAuth: '完成授權',
-    updating: '更新中...',
-    update: '更新',
 
     // 錯誤訊息
     generateSetupTokenFailed: '產生Setup Token授權連結失敗',
-    copyFailed: '複製失敗，請手動複製',
     setupTokenAuthFailed: 'Setup Token授權失敗，請檢查授權碼是否正確',
-    accountCreationFailed: '帳戶建立失敗',
     accountCreationError: '帳戶建立失敗:',
 
     // 頁面結構註釋
@@ -2674,29 +2621,18 @@ export default {
 
     // 驗證訊息
     nameRequired: '請填寫帳戶名稱',
-    apiUrlRequired: '請填寫 API URL',
     rateLimitDefault60: '預設60分鐘',
     rateLimitPauseDescription: '帳戶被限流後暫停調度的時間（分鐘）',
-    apiUrlPlaceholder: '例如：https://api.example.com',
-    apiKeyPlaceholder: '請輸入API Key',
     dailyQuotaLimit: '每日額度限制 ($)',
     quotaZeroUnlimited: '0 表示不限制',
-    dailyQuotaDescription: '設定每日使用額度，0 表示不限制',
-    quotaResetTime: '額度重設時間',
-    quotaResetTimeDescription: '每日自動重設額度的時間',
-    modelMappingDescription:
-      '留空表示支援所有模型且不修改請求。設定映射後，左側模型會被識別為支援的模型，右側是實際傳送的模型。',
 
     // 額度管理
     quotaManagementFields: '配額管理欄位',
     dailyQuotaLimitDollar: '每日配額限制 ($)',
-    quotaZeroUnlimited: '0 表示不限制',
     dailyQuotaDesc: '設定每日使用配額，0 表示不限制',
-    quotaResetTime: '配額重設時間',
     quotaResetTimeDesc: '每日自動重設配額的時間',
 
     // 模型映射
-    modelMappingOptional: '模型映射表 (可選)',
     modelMappingDesc:
       '留空表示支援所有模型且不修改請求。設定映射後，左側模型會被識別為支援的模型，右側是實際發送的模型。',
     originalModelName: '原始模型名稱',
@@ -2708,7 +2644,6 @@ export default {
 
     // Claude 訂閱類型
     claudeSubscriptionType: '訂閱類型',
-    claudeProLimitation: 'Pro 帳戶不支援 Claude Opus 4 模型',
 
     // Claude 進階選項
     claudeAutoStopScheduling: '5小時使用量接近限制時自動停止調度',
@@ -2736,13 +2671,10 @@ export default {
     setupTokenCopyTitle: '複製連結',
 
     // 步驟指示器
-    stepIndicator: '步驟指示器',
-    step1BasicInfo: '步驟1: 基本資訊和代理設定',
     step2OAuth: '步驟2: OAuth授權',
     step2SetupToken: '步驟2: Setup Token授權',
 
     // 群組選擇器
-    groupSelector: '群組選擇器',
     multiGroupInterface: '多選群組介面',
     createNewGroupOption: '新建群組選項',
 
@@ -2752,15 +2684,12 @@ export default {
     // Placeholder 文字
     originalModelNamePlaceholder: '原始模型名稱',
     mappedModelNamePlaceholder: '映射後的模型名稱',
-    userAgentPlaceholder: '留空則透傳用戶端 User-Agent',
     authCodePlaceholder: '貼上Claude Code授權頁面獲取的Authorization Code...',
     leaveEmptyNoUpdate: '留空表示不更新',
     leaveEmptyNoUpdateKey: '留空表示不更新 API Key',
     leaveEmptyNoUpdateToken: '留空表示不更新...',
 
     // 標籤和描述
-    customUserAgentOptional: '自定義 User-Agent (可選)',
-    clientIdLabel: '用戶端標識 ID',
     schedulePriorityLabel: '調度優先級 (1-100)',
     attentionLabel: '注意：',
     supportedModelsLabel: '支援的模型',
@@ -2773,17 +2702,14 @@ export default {
     previousStepBtn: '上一步',
 
     // 描述性文字
-    claudeProLimitation: 'Pro 帳戶不支援 Claude Opus 4 模型',
     claude5HourLimitDesc: '5小時使用量接近限制時自動停止調度',
     claude5HourLimitExplanation:
       '當系統檢測到帳戶接近5小時使用限制時，自動暫停調度該帳戶。進入新的時間視窗後會自動恢復調度。',
     useUnifiedClaudeVersion: '使用統一 Claude Code 版本',
     unifiedVersionDesc: '開啟後將使用從真實 Claude Code 用戶端捕獲的統一 User-Agent，提高相容性',
-    currentUnifiedVersion: '💡 目前統一版本：',
     waitingUserAgent: '⏳ 等待從 Claude Code 用戶端捕獲 User-Agent',
     userAgentTip: '💡 提示：如果長時間未能捕獲，請確認有 Claude Code 用戶端正在使用此帳戶，',
     contactDeveloper: '或聯繫開發者檢查 User-Agent 格式是否發生變化',
-    useUnifiedClientId: '使用統一的用戶端標識',
     unifiedClientIdDesc: '開啟後將使用固定的用戶端標識，使所有請求看起來來自同一個用戶端，減少特徵',
     clientIdReplaceDesc: '此ID將替換請求中的user_id用戶端部分，保留session部分用於黏性工作階段',
 
@@ -2804,9 +2730,6 @@ export default {
     awsRegionRef: '常用 AWS 區域參考：',
 
     // 錯誤訊息
-    apiKeyRequired: '請填寫 API Key',
-    refreshTokenRequired: '請填寫 Refresh Token',
-    accessTokenRequired: '請填寫 Access Token',
     copyFailedManual: '複製失敗，請手動複製',
 
     // 表單描述
@@ -2817,9 +2740,7 @@ export default {
 
     // 基础標籤
     apiUrlLabel: 'API URL',
-    apiUrlRequired: 'API URL *',
     apiKeyLabel: 'API Key',
-    apiKeyRequired: 'API Key *',
 
     // 更多缺失的翻譯鍵
     copyLinkTooltip: '複製連結',
