@@ -155,7 +155,11 @@ export default {
       minutesAgo: '{minutes}分鐘前',
       hoursAgo: '{hours}小時前',
       daysAgo: '{days}天前'
-    }
+    },
+
+    // API Keys 頁面按鈕
+    model: '模型',
+    stats: '統計'
   },
   language: {
     zh: '簡體中文',
@@ -2747,7 +2751,37 @@ export default {
 
     // Claude 訂閱類型顯示
     claudeMaxDisplay: 'Claude Max',
-    claudeProDisplay: 'Claude Pro'
+    claudeProDisplay: 'Claude Pro',
+
+    // 新增缺失的翻譯鍵
+    modelSupportDescription:
+      '留空表示支援所有模型。如果指定模型，請求中的模型不在列表內將不會調度到此帳戶',
+    regenerateButton: '重新產生',
+    cancelButton: '取消',
+    credentialsFileDescription: '檔案中的憑證。',
+    authCodeInputHint: '請貼上從 Claude Code 授權頁面複製的 Authorization Code',
+    dailyQuotaLimitLabel: '每日額度限制 ($)',
+    todayUsageLabel: '今日使用情況',
+    remainingQuota: '剩餘: ${amount}',
+    usedPercentage: '{percentage}% 已使用',
+    modelMappingTableLabel: '模型映射表 (可選)',
+    modelMappingTableDescription:
+      '留空表示支援所有模型且不修改請求。配置映射後，左側模型會被識別為支援的模型，右側是實際發送的模型。',
+    customUserAgentLabel: '自定義 User-Agent (可選)',
+    rateLimitDurationLabel: '限流時間 (分鐘)',
+    awsRegionReferenceTitle: '常用 AWS 區域參考：',
+    azureModelTypeDescription: '選擇此部署支援的模型類型',
+    tokenUpdateDescription:
+      '可以更新 Access Token 和 Refresh Token。為了安全起見，不會顯示當前的 Token 值。',
+    tokenUpdateHint: '💡 留空表示不更新該欄位。',
+
+    // Setup Token 流程翻譯
+    clickToGenerateAuthLink: '點擊產生授權連結',
+    openLinkInBrowser: '在瀏覽器中開啟連結並完成授權',
+    openAuthLinkDescription: '請在新分頁中開啟授權連結，登錄您的 Claude 帳戶並授權。',
+    proxyWarning: '注意：如果您配置了代理，請確保瀏覽器也使用相同的代理訪問授權頁面。',
+    enterAuthorizationCode: '輸入授權碼',
+    copyAuthCodeDescription: '授權完成後，從返回頁面複製 Authorization Code，並貼上到下方輸入框：'
   },
 
   // OAuth Flow Component

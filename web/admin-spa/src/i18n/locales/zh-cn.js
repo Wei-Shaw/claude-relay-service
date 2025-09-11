@@ -155,7 +155,11 @@ export default {
       minutesAgo: '{minutes}分钟前',
       hoursAgo: '{hours}小时前',
       daysAgo: '{days}天前'
-    }
+    },
+
+    // API Keys 页面按钮
+    model: '模型',
+    stats: '统计'
   },
   language: {
     zh: '简体中文',
@@ -1982,6 +1986,9 @@ export default {
     webhookUrlRequired: '*',
     webhookUrlPlaceholder: 'https://...',
     editModeWarning: '编辑模式下不能更改平台类型',
+    cannotChangePlatformType: '编辑模式下不能更改平台类型',
+    serverUrl: '服务器地址',
+    requiredField: '必填项',
 
     // Bark 特有设置
     deviceKey: '设备密钥 (Device Key)',
@@ -2742,7 +2749,37 @@ export default {
 
     // Claude 订阅类型显示
     claudeMaxDisplay: 'Claude Max',
-    claudeProDisplay: 'Claude Pro'
+    claudeProDisplay: 'Claude Pro',
+
+    // 新增缺失的翻译键
+    modelSupportDescription:
+      '留空表示支持所有模型。如果指定模型，请求中的模型不在列表内将不会调度到此账号',
+    regenerateButton: '重新生成',
+    cancelButton: '取消',
+    credentialsFileDescription: '文件中的凭证。',
+    authCodeInputHint: '请粘贴从Claude Code授权页面复制的Authorization Code',
+    dailyQuotaLimitLabel: '每日额度限制 ($)',
+    todayUsageLabel: '今日使用情况',
+    remainingQuota: '剩余: ${amount}',
+    usedPercentage: '{percentage}% 已使用',
+    modelMappingTableLabel: '模型映射表 (可选)',
+    modelMappingTableDescription:
+      '留空表示支持所有模型且不修改请求。配置映射后，左侧模型会被识别为支持的模型，右侧是实际发送的模型。',
+    customUserAgentLabel: '自定义 User-Agent (可选)',
+    rateLimitDurationLabel: '限流时间 (分钟)',
+    awsRegionReferenceTitle: '常用 AWS 区域参考：',
+    azureModelTypeDescription: '选择此部署支持的模型类型',
+    tokenUpdateDescription:
+      '可以更新 Access Token 和 Refresh Token。为了安全起见，不会显示当前的 Token 值。',
+    tokenUpdateHint: '💡 留空表示不更新该字段。',
+
+    // Setup Token 流程翻译
+    clickToGenerateAuthLink: '点击生成授权链接',
+    openLinkInBrowser: '在浏览器中打开链接并完成授权',
+    openAuthLinkDescription: '请在新标签页中打开授权链接，登录您的 Claude 账户并授权。',
+    proxyWarning: '注意：如果您配置了代理，请确保浏览器也使用相同的代理访问授权页面。',
+    enterAuthorizationCode: '输入授权码',
+    copyAuthCodeDescription: '授权完成后，从返回页面复制 Authorization Code，并粘贴到下方输入框：'
   },
 
   // OAuth Flow Component

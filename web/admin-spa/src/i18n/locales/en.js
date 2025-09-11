@@ -155,7 +155,11 @@ export default {
       minutesAgo: '{minutes} minutes ago',
       hoursAgo: '{hours} hours ago',
       daysAgo: '{days} days ago'
-    }
+    },
+
+    // API Keys page buttons
+    model: 'Model',
+    stats: 'Stats'
   },
   language: {
     zh: '简体中文',
@@ -2815,7 +2819,41 @@ export default {
 
     // Claude subscription type display
     claudeMaxDisplay: 'Claude Max',
-    claudeProDisplay: 'Claude Pro'
+    claudeProDisplay: 'Claude Pro',
+
+    // Missing translation keys for AccountForm
+    modelSupportDescription:
+      'Leave empty to support all models. If models are specified, requests with models not in the list will not be scheduled to this account',
+    regenerateButton: 'Regenerate',
+    cancelButton: 'Cancel',
+    credentialsFileDescription: 'credentials from file.',
+    authCodeInputHint:
+      'Please paste the Authorization Code copied from Claude Code authorization page',
+    dailyQuotaLimitLabel: 'Daily Quota Limit ($)',
+    todayUsageLabel: "Today's Usage",
+    remainingQuota: 'Remaining: ${amount}',
+    usedPercentage: '{percentage}% Used',
+    modelMappingTableLabel: 'Model Mapping Table (Optional)',
+    modelMappingTableDescription:
+      'Leave empty to support all models without modifying requests. After configuration, left models will be recognized as supported models, right models are actually sent.',
+    customUserAgentLabel: 'Custom User-Agent (Optional)',
+    rateLimitDurationLabel: 'Rate Limit Duration (Minutes)',
+    awsRegionReferenceTitle: 'Common AWS Regions Reference:',
+    azureModelTypeDescription: 'Select model types supported by this deployment',
+    tokenUpdateDescription:
+      'You can update Access Token and Refresh Token. For security reasons, current Token values will not be displayed.',
+    tokenUpdateHint: '💡 Leave empty to keep current value unchanged.',
+
+    // Setup Token Flow Translations
+    clickToGenerateAuthLink: 'Click to generate authorization link',
+    openLinkInBrowser: 'Open link in browser and complete authorization',
+    openAuthLinkDescription:
+      'Please open the authorization link in a new tab, log in to your Claude account and authorize.',
+    proxyWarning:
+      'Note: If you have configured a proxy, please ensure your browser also uses the same proxy to access the authorization page.',
+    enterAuthorizationCode: 'Enter Authorization Code',
+    copyAuthCodeDescription:
+      'After authorization is complete, copy the Authorization Code from the return page and paste it into the input box below:'
   },
 
   // OAuth Flow Component
