@@ -663,7 +663,7 @@ import Chart from 'chart.js/auto'
 
 const dashboardStore = useDashboardStore()
 const themeStore = useThemeStore()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { isDarkMode } = storeToRefs(themeStore)
 
 const {
@@ -1330,6 +1330,15 @@ watch(autoRefreshEnabled, (newVal) => {
 
 // 监听主题变化，重新创建图表
 watch(isDarkMode, () => {
+  nextTick(() => {
+    createModelUsageChart()
+    createUsageTrendChart()
+    createApiKeysUsageTrendChart()
+  })
+})
+
+// 监听语言变化，重新创建图表
+watch(locale, () => {
   nextTick(() => {
     createModelUsageChart()
     createUsageTrendChart()

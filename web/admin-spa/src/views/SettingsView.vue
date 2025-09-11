@@ -467,13 +467,15 @@
             class="mb-6 rounded-lg bg-white/80 p-6 shadow-lg backdrop-blur-sm dark:bg-gray-800/80"
           >
             <div class="mb-4 flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">通知平台</h2>
+              <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                {{ t('settings.notificationPlatforms') }}
+              </h2>
               <button
                 class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
                 @click="showAddPlatformModal = true"
               >
                 <i class="fas fa-plus mr-2"></i>
-                添加平台
+                {{ t('settings.addPlatform') }}
               </button>
             </div>
 
@@ -510,7 +512,7 @@
                         class="flex items-center text-gray-600 dark:text-gray-400"
                       >
                         <i class="fas fa-shield-alt mr-2"></i>
-                        <span>已启用签名验证</span>
+                        <span>{{ t('settings.enableSignature') }}</span>
                       </div>
                     </div>
                   </div>
@@ -556,17 +558,19 @@
               </div>
             </div>
             <div v-else class="py-8 text-center text-gray-500 dark:text-gray-400">
-              暂无配置的通知平台，请点击"添加平台"按钮添加
+              {{ t('settings.noPlatforms') }}
             </div>
           </div>
 
           <!-- 高级设置 -->
           <div class="rounded-lg bg-white/80 p-6 shadow-lg backdrop-blur-sm dark:bg-gray-800/80">
-            <h2 class="mb-4 text-lg font-semibold text-gray-800 dark:text-gray-200">高级设置</h2>
+            <h2 class="mb-4 text-lg font-semibold text-gray-800 dark:text-gray-200">
+              {{ t('settings.advancedSettings') }}
+            </h2>
             <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  最大重试次数
+                  {{ t('settings.maxRetries') }}
                 </label>
                 <input
                   v-model.number="webhookConfig.retrySettings.maxRetries"
@@ -579,7 +583,7 @@
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  重试延迟 (毫秒)
+                  {{ t('settings.retryDelay') }}
                 </label>
                 <input
                   v-model.number="webhookConfig.retrySettings.retryDelay"
@@ -593,7 +597,7 @@
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  超时时间 (毫秒)
+                  {{ t('settings.timeout') }}
                 </label>
                 <input
                   v-model.number="webhookConfig.retrySettings.timeout"
@@ -615,7 +619,7 @@
               @click="sendTestNotification"
             >
               <i class="fas fa-paper-plane mr-2"></i>
-              发送测试通知
+              {{ t('settings.sendTestNotification') }}
             </button>
           </div>
         </div>
@@ -646,10 +650,12 @@
             </div>
             <div>
               <h3 class="text-xl font-semibold text-gray-900 dark:text-white">
-                {{ editingPlatform ? '编辑' : '添加' }}通知平台
+                {{
+                  editingPlatform ? t('settings.editPlatformModal') : t('settings.addPlatformModal')
+                }}
               </h3>
               <p class="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
-                配置{{ editingPlatform ? '并更新' : '新的' }}Webhook通知渠道
+                {{ t('settings.configurePlatform') }}
               </p>
             </div>
           </div>
@@ -671,7 +677,7 @@
               class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
             >
               <i class="fas fa-layer-group mr-2 text-gray-400"></i>
-              平台类型
+              {{ t('settings.platformType') }}
             </label>
             <div class="relative">
               <select
@@ -679,13 +685,13 @@
                 class="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 text-gray-900 shadow-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 :disabled="editingPlatform"
               >
-                <option value="wechat_work">🟢 企业微信</option>
-                <option value="dingtalk">🔵 钉钉</option>
-                <option value="feishu">🟦 飞书</option>
-                <option value="slack">🟣 Slack</option>
-                <option value="discord">🟪 Discord</option>
-                <option value="bark">🔔 Bark</option>
-                <option value="custom">⚙️ 自定义</option>
+                <option value="wechat_work">🟢 {{ t('settings.platforms.wechatWork') }}</option>
+                <option value="dingtalk">🔵 {{ t('settings.platforms.dingtalk') }}</option>
+                <option value="feishu">🟦 {{ t('settings.platforms.feishu') }}</option>
+                <option value="slack">🟣 {{ t('settings.platforms.slack') }}</option>
+                <option value="discord">🟪 {{ t('settings.platforms.discord') }}</option>
+                <option value="bark">🔔 {{ t('settings.platforms.bark') }}</option>
+                <option value="custom">⚙️ {{ t('settings.platforms.custom') }}</option>
               </select>
               <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
                 <i class="fas fa-chevron-down text-gray-400"></i>
@@ -693,7 +699,7 @@
             </div>
             <p v-if="editingPlatform" class="mt-1 text-xs text-amber-600 dark:text-amber-400">
               <i class="fas fa-info-circle mr-1"></i>
-              编辑模式下不能更改平台类型
+              {{ t('settings.cannotChangePlatformType') }}
             </p>
           </div>
 
@@ -703,13 +709,13 @@
               class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
             >
               <i class="fas fa-tag mr-2 text-gray-400"></i>
-              名称
-              <span class="ml-2 text-xs text-gray-500">(可选)</span>
+              {{ t('settings.platformName') }}
+              <span class="ml-2 text-xs text-gray-500">{{ t('settings.optional') }}</span>
             </label>
             <input
               v-model="platformForm.name"
               class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
-              placeholder="例如：运维群通知、开发测试群"
+              :placeholder="t('settings.platformNamePlaceholder')"
               type="text"
             />
           </div>
@@ -720,7 +726,7 @@
               class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
             >
               <i class="fas fa-link mr-2 text-gray-400"></i>
-              Webhook URL
+              {{ t('settings.webhookUrl') }}
               <span class="ml-1 text-xs text-red-500">*</span>
             </label>
             <div class="relative">
@@ -762,7 +768,7 @@
                 class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
               >
                 <i class="fas fa-key mr-2 text-gray-400"></i>
-                设备密钥 (Device Key)
+                {{ t('settings.deviceKey') }}
                 <span class="ml-1 text-xs text-red-500">*</span>
               </label>
               <input
@@ -783,8 +789,8 @@
                 class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
               >
                 <i class="fas fa-server mr-2 text-gray-400"></i>
-                服务器地址
-                <span class="ml-2 text-xs text-gray-500">(可选)</span>
+                {{ t('settings.serverUrl') }}
+                <span class="ml-2 text-xs text-gray-500">{{ t('settings.optional') }}</span>
               </label>
               <input
                 v-model="platformForm.serverUrl"
@@ -800,7 +806,7 @@
                 class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
               >
                 <i class="fas fa-flag mr-2 text-gray-400"></i>
-                通知级别
+                {{ t('settings.notificationLevel') }}
               </label>
               <select
                 v-model="platformForm.level"
@@ -820,7 +826,7 @@
                 class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
               >
                 <i class="fas fa-volume-up mr-2 text-gray-400"></i>
-                通知声音
+                {{ t('settings.notificationSound') }}
               </label>
               <select
                 v-model="platformForm.sound"
@@ -926,7 +932,7 @@
         <div class="flex items-center justify-between">
           <div class="text-xs text-gray-500 dark:text-gray-400">
             <i class="fas fa-asterisk mr-1 text-red-500"></i>
-            必填项
+            {{ t('settings.requiredField') }}
           </div>
           <div class="flex space-x-3">
             <button
@@ -934,7 +940,7 @@
               @click="closePlatformModal"
             >
               <i class="fas fa-times mr-2 transition-transform group-hover:scale-110"></i>
-              取消
+              {{ t('common.cancel') }}
             </button>
             <button
               class="group flex items-center rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-700 shadow-sm transition-all hover:bg-blue-100 hover:shadow-md dark:border-blue-800 dark:bg-blue-900/50 dark:text-blue-300 dark:hover:bg-blue-900/70"
@@ -947,7 +953,7 @@
                   testingConnection ? 'fas fa-spinner fa-spin' : 'fas fa-vial group-hover:scale-110'
                 "
               ></i>
-              {{ testingConnection ? '测试中...' : '测试连接' }}
+              {{ testingConnection ? t('settings.testing') : t('settings.testConnection') }}
             </button>
             <button
               class="group flex items-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2.5 text-sm font-medium text-white shadow-md transition-all hover:from-blue-700 hover:to-indigo-700 hover:shadow-lg disabled:cursor-not-allowed disabled:from-gray-400 disabled:to-gray-500"
@@ -960,7 +966,13 @@
                   savingPlatform ? 'fas fa-spinner fa-spin' : 'fas fa-save group-hover:scale-110'
                 "
               ></i>
-              {{ savingPlatform ? '保存中...' : editingPlatform ? '保存修改' : '添加平台' }}
+              {{
+                savingPlatform
+                  ? t('settings.saving')
+                  : editingPlatform
+                    ? t('settings.saveChanges')
+                    : t('settings.addPlatform')
+              }}
             </button>
           </div>
         </div>

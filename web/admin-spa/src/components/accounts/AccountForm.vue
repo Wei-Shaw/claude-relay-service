@@ -806,7 +806,7 @@
                   </button>
                 </div>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  留空表示支持所有模型。如果指定模型，请求中的模型不在列表内将不会调度到此账号
+                  {{ t('accountForm.modelSupportDescription') }}
                 </p>
               </div>
 
@@ -821,7 +821,7 @@
                   type="text"
                 />
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  留空时将自动使用客户端的 User-Agent，仅在需要固定特定 UA 时填写
+                  {{ t('accountForm.userAgentDescription') }}
                 </p>
               </div>
 
@@ -995,7 +995,7 @@
                           @click="regenerateClientId"
                         >
                           <i class="fas fa-sync-alt mr-1" />
-                          重新生成
+                          {{ t('accountForm.regenerateButton') }}
                         </button>
                       </div>
                       <div class="flex items-center gap-2">
@@ -1103,7 +1103,7 @@
                       <code class="rounded bg-blue-100 px-1 py-0.5 font-mono dark:bg-blue-900/50"
                         >~/.config/gemini/credentials.json</code
                       >
-                      文件中的凭证。
+                      {{ t('accountForm.credentialsFileDescription') }}
                     </p>
                     <p
                       v-else-if="form.platform === 'openai'"
@@ -1267,7 +1267,7 @@
                         </div>
                         <div class="flex-1">
                           <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
-                            点击下方按钮生成授权链接
+                            {{ t('accountForm.clickToGenerateAuthLink') }}
                           </p>
                           <button
                             v-if="!setupTokenAuthUrl"
@@ -1326,10 +1326,10 @@
                         </div>
                         <div class="flex-1">
                           <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
-                            在浏览器中打开链接并完成授权
+                            {{ t('accountForm.openLinkInBrowser') }}
                           </p>
                           <p class="mb-2 text-sm text-blue-700 dark:text-blue-300">
-                            请在新标签页中打开授权链接，登录您的 Claude 账户并授权 Claude Code。
+                            {{ t('accountForm.openAuthLinkDescription') }}
                           </p>
                           <div
                             class="rounded border border-yellow-300 bg-yellow-50 p-3 dark:border-yellow-700 dark:bg-yellow-900/30"
@@ -1337,7 +1337,7 @@
                             <p class="text-xs text-yellow-800 dark:text-yellow-300">
                               <i class="fas fa-exclamation-triangle mr-1" />
                               <strong>{{ t('accountForm.attentionLabel') }}</strong
-                              >如果您设置了代理，请确保浏览器也使用相同的代理访问授权页面。
+                              >{{ t('accountForm.proxyWarning') }}
                             </p>
                           </div>
                         </div>
@@ -1356,10 +1356,10 @@
                         </div>
                         <div class="flex-1">
                           <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
-                            输入 Authorization Code
+                            {{ t('accountForm.enterAuthorizationCode') }}
                           </p>
                           <p class="mb-3 text-sm text-blue-700 dark:text-blue-300">
-                            授权完成后，从返回页面复制 Authorization Code，并粘贴到下方输入框：
+                            {{ t('accountForm.copyAuthCodeDescription') }}
                           </p>
                           <div class="space-y-3">
                             <div>
@@ -1377,7 +1377,7 @@
                             </div>
                             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                               <i class="fas fa-info-circle mr-1" />
-                              请粘贴从Claude Code授权页面复制的Authorization Code
+                              {{ t('accountForm.authCodeInputHint') }}
                             </p>
                           </div>
                         </div>
@@ -1761,7 +1761,7 @@
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
-                  每日额度限制 ($)
+                  {{ t('accountForm.dailyQuotaLimitLabel') }}
                 </label>
                 <input
                   v-model.number="form.dailyQuota"
@@ -1772,13 +1772,13 @@
                   type="number"
                 />
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  设置每日使用额度，0 表示不限制
+                  {{ t('accountForm.dailyQuotaDescription') }}
                 </p>
               </div>
 
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
-                  额度重置时间
+                  {{ t('accountForm.quotaResetTimeLabel') }}
                 </label>
                 <input
                   v-model="form.quotaResetTime"
@@ -1786,7 +1786,9 @@
                   placeholder="00:00"
                   type="time"
                 />
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">每日自动重置额度的时间</p>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('accountForm.quotaResetTimeDescription') }}
+                </p>
               </div>
             </div>
 
@@ -1797,7 +1799,7 @@
             >
               <div class="mb-2 flex items-center justify-between">
                 <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                  今日使用情况
+                  {{ t('accountForm.todayUsageLabel') }}
                 </span>
                 <span class="text-sm text-gray-500 dark:text-gray-400">
                   ${{ calculateCurrentUsage().toFixed(4) }} / ${{ form.dailyQuota.toFixed(2) }}
@@ -1818,22 +1820,26 @@
               </div>
               <div class="mt-2 flex items-center justify-between text-xs">
                 <span class="text-gray-500 dark:text-gray-400">
-                  剩余: ${{ Math.max(0, form.dailyQuota - calculateCurrentUsage()).toFixed(2) }}
+                  {{
+                    t('accountForm.remainingQuota', {
+                      amount: Math.max(0, form.dailyQuota - calculateCurrentUsage()).toFixed(2)
+                    })
+                  }}
                 </span>
                 <span class="text-gray-500 dark:text-gray-400">
-                  {{ usagePercentage.toFixed(1) }}% 已使用
+                  {{ t('accountForm.usedPercentage', { percentage: usagePercentage.toFixed(1) }) }}
                 </span>
               </div>
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700"
-                >模型映射表 (可选)</label
-              >
+              <label class="mb-3 block text-sm font-semibold text-gray-700">{{
+                t('accountForm.modelMappingTableLabel')
+              }}</label>
               <div class="mb-3 rounded-lg bg-blue-50 p-3">
                 <p class="text-xs text-blue-700">
                   <i class="fas fa-info-circle mr-1" />
-                  留空表示支持所有模型且不修改请求。配置映射后，左侧模型会被识别为支持的模型，右侧是实际发送的模型。
+                  {{ t('accountForm.modelMappingTableDescription') }}
                 </p>
               </div>
 
@@ -1911,14 +1917,14 @@
                 </button>
               </div>
               <p class="mt-1 text-xs text-gray-500">
-                留空表示支持所有模型。如果指定模型，请求中的模型不在列表内将不会调度到此账号
+                {{ t('accountForm.modelSupportDescription') }}
               </p>
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700"
-                >自定义 User-Agent (可选)</label
-              >
+              <label class="mb-3 block text-sm font-semibold text-gray-700">{{
+                t('accountForm.customUserAgentLabel')
+              }}</label>
               <input
                 v-model="form.userAgent"
                 class="form-input w-full"
@@ -1926,7 +1932,7 @@
                 type="text"
               />
               <p class="mt-1 text-xs text-gray-500">
-                留空时将自动使用客户端的 User-Agent，仅在需要固定特定 UA 时填写
+                {{ t('accountForm.userAgentDescription') }}
               </p>
             </div>
 
@@ -1946,21 +1952,23 @@
                   }}</span>
                 </label>
                 <p class="mt-1 text-xs text-gray-500">
-                  启用后，当账号返回429错误时将暂停调度一段时间
+                  {{ t('accountForm.rateLimitDescription') }}
                 </p>
               </div>
 
               <div v-if="form.enableRateLimit">
-                <label class="mb-3 block text-sm font-semibold text-gray-700"
-                  >限流时间 (分钟)</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700">{{
+                  t('accountForm.rateLimitDurationLabel')
+                }}</label>
                 <input
                   v-model.number="form.rateLimitDuration"
                   class="form-input w-full"
                   min="1"
                   type="number"
                 />
-                <p class="mt-1 text-xs text-gray-500">账号被限流后暂停调度的时间（分钟）</p>
+                <p class="mt-1 text-xs text-gray-500">
+                  {{ t('accountForm.rateLimitDurationDescription') }}
+                </p>
               </div>
             </div>
           </div>
@@ -2011,14 +2019,14 @@
                 <div class="flex items-start gap-2">
                   <i class="fas fa-info-circle mt-0.5 text-blue-600" />
                   <div class="text-xs text-blue-700">
-                    <p class="mb-1 font-medium">常用 AWS 区域参考：</p>
+                    <p class="mb-1 font-medium">{{ t('accountForm.awsRegionReferenceTitle') }}</p>
                     <div class="grid grid-cols-2 gap-1 text-xs">
-                      <span>• us-east-1 (美国东部)</span>
-                      <span>• us-west-2 (美国西部)</span>
-                      <span>• eu-west-1 (欧洲爱尔兰)</span>
-                      <span>• ap-southeast-1 (新加坡)</span>
-                      <span>• ap-northeast-1 (东京)</span>
-                      <span>• eu-central-1 (法兰克福)</span>
+                      <span>{{ t('accountForm.awsRegionUsEast1') }}</span>
+                      <span>{{ t('accountForm.awsRegionUsWest2') }}</span>
+                      <span>{{ t('accountForm.awsRegionEuWest1') }}</span>
+                      <span>{{ t('accountForm.awsRegionApSoutheast1') }}</span>
+                      <span>{{ t('accountForm.awsRegionApNortheast1') }}</span>
+                      <span>{{ t('accountForm.awsRegionEuCentral1') }}</span>
                     </div>
                   </div>
                 </div>
@@ -2083,21 +2091,23 @@
                   }}</span>
                 </label>
                 <p class="mt-1 text-xs text-gray-500">
-                  启用后，当账号返回429错误时将暂停调度一段时间
+                  {{ t('accountForm.rateLimitDescription') }}
                 </p>
               </div>
 
               <div v-if="form.enableRateLimit">
-                <label class="mb-3 block text-sm font-semibold text-gray-700"
-                  >限流时间 (分钟)</label
-                >
+                <label class="mb-3 block text-sm font-semibold text-gray-700">{{
+                  t('accountForm.rateLimitDurationLabel')
+                }}</label>
                 <input
                   v-model.number="form.rateLimitDuration"
                   class="form-input w-full"
                   min="1"
                   type="number"
                 />
-                <p class="mt-1 text-xs text-gray-500">账号被限流后暂停调度的时间（分钟）</p>
+                <p class="mt-1 text-xs text-gray-500">
+                  {{ t('accountForm.rateLimitDurationDescription') }}
+                </p>
               </div>
             </div>
           </div>
@@ -2199,7 +2209,9 @@
                   <span class="text-sm text-gray-700 dark:text-gray-300">{{ model }}</span>
                 </label>
               </div>
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">选择此部署支持的模型类型</p>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {{ t('accountForm.azureModelTypeDescription') }}
+              </p>
             </div>
           </div>
 
@@ -2223,9 +2235,11 @@
                   {{ t('accountForm.updateTokenLabel') }}
                 </h5>
                 <p class="mb-2 text-sm text-amber-800 dark:text-amber-300">
-                  可以更新 Access Token 和 Refresh Token。为了安全起见，不会显示当前的 Token 值。
+                  {{ t('accountForm.tokenUpdateDescription') }}
                 </p>
-                <p class="text-xs text-amber-600 dark:text-amber-400">💡 留空表示不更新该字段。</p>
+                <p class="text-xs text-amber-600 dark:text-amber-400">
+                  {{ t('accountForm.tokenUpdateHint') }}
+                </p>
               </div>
             </div>
 
@@ -2265,7 +2279,7 @@
               type="button"
               @click="$emit('close')"
             >
-              取消
+              {{ t('accountForm.cancelButton') }}
             </button>
             <button
               class="btn btn-primary flex-1 px-6 py-3 font-semibold"
@@ -2504,7 +2518,7 @@ const usagePercentage = computed(() => {
   return (currentUsage / form.value.dailyQuota) * 100
 })
 
-// 加载账户今日使用情况
+// 加载账户{{ t('accountForm.todayUsageLabel') }}
 const loadAccountUsage = async () => {
   if (!isEdit.value || !props.account?.id) return
 
@@ -2603,7 +2617,7 @@ const generateSetupTokenAuthUrl = async () => {
   }
 }
 
-// 重新生成Setup Token授权URL
+// {{ t('accountForm.regenerateButton') }}Setup Token授权URL
 const regenerateSetupTokenAuthUrl = () => {
   setupTokenAuthUrl.value = ''
   setupTokenAuthCode.value = ''
@@ -3771,7 +3785,7 @@ const generateClientId = () => {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-// 重新生成客户端标识
+// {{ t('accountForm.regenerateButton') }}客户端标识
 const regenerateClientId = () => {
   form.value.unifiedClientId = generateClientId()
   showToast(t('accountForm.newClientIdGenerated'), 'success')
