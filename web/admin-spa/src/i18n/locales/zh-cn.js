@@ -704,7 +704,7 @@ export default {
     claudeMax: 'Claude Max',
     claudePro: 'Claude Pro',
     claudeFree: 'Claude Free',
-    
+
     // Platform display
     openaiResponsesPlatform: 'OpenAI-Responses',
     ccrPlatform: 'CCR'
