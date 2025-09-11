@@ -2882,7 +2882,8 @@ const errors = ref({
   secretAccessKey: '',
   region: '',
   azureEndpoint: '',
-  deploymentName: ''
+  deploymentName: '',
+  baseApi: ''
 })
 
 // 计算是否可以进入下一步
@@ -3218,6 +3219,7 @@ const createAccount = async () => {
   errors.value.accessToken = ''
   errors.value.apiUrl = ''
   errors.value.apiKey = ''
+  errors.value.baseApi = ''
 
   let hasError = false
 
@@ -3277,7 +3279,7 @@ const createAccount = async () => {
       hasError = true
     }
   } else if (form.value.addType === 'manual') {
-    // 手动模式验证
+    // 手动模式验证 - 只对需要OAuth的平台进行验证
     if (form.value.platform === 'openai') {
       // OpenAI 平台必须有 Refresh Token
       if (!form.value.refreshToken || form.value.refreshToken.trim() === '') {
@@ -3285,8 +3287,8 @@ const createAccount = async () => {
         hasError = true
       }
       // Access Token 可选，如果没有会通过 Refresh Token 获取
-    } else {
-      // 其他平台（Gemini）需要 Access Token
+    } else if (form.value.platform === 'claude' || form.value.platform === 'gemini') {
+      // Claude 和 Gemini 平台需要 Access Token
       if (!form.value.accessToken || form.value.accessToken.trim() === '') {
         errors.value.accessToken = '请填写 Access Token'
         hasError = true
