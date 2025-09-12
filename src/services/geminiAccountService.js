@@ -394,6 +394,9 @@ async function createAccount(accountData) {
     // 项目 ID（Google Cloud/Workspace 账号需要）
     projectId: accountData.projectId || '',
 
+    // 临时项目 ID（从 loadCodeAssist 接口自动获取）
+    tempProjectId: accountData.tempProjectId || '',
+
     // 支持的模型列表（可选）
     supportedModels: accountData.supportedModels || [], // 空数组表示支持所有模型
 
@@ -1426,6 +1429,29 @@ async function generateContentStream(
   return response.data // 返回流对象
 }
 
+// 更新账户的临时项目 ID
+async function updateTempProjectId(accountId, tempProjectId) {
+  if (!tempProjectId) {
+    return
+  }
+
+  try {
+    const account = await getAccount(accountId)
+    if (!account) {
+      logger.warn(`Account ${accountId} not found when updating tempProjectId`)
+      return
+    }
+
+    // 只有在没有固定项目 ID 的情况下才更新临时项目 ID
+    if (!account.projectId && tempProjectId !== account.tempProjectId) {
+      await updateAccount(accountId, { tempProjectId })
+      logger.info(`Updated tempProjectId for account ${accountId}: ${tempProjectId}`)
+    }
+  } catch (error) {
+    logger.error(`Failed to update tempProjectId for account ${accountId}:`, error)
+  }
+}
+
 module.exports = {
   generateAuthUrl,
   pollAuthorizationStatus,
@@ -1454,6 +1480,7 @@ module.exports = {
   countTokens,
   generateContent,
   generateContentStream,
+  updateTempProjectId,
   OAUTH_CLIENT_ID,
   OAUTH_SCOPES
 }

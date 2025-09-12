@@ -102,13 +102,46 @@ async function handleStandardGenerateContent(req, res) {
 
     const client = await geminiAccountService.getOauthClient(accessToken, refreshToken, proxyConfig)
 
-    // 使用账户的项目ID（如果有的话）
-    const effectiveProjectId = account.projectId || null
+    // 项目ID优先级：账户配置的项目ID > 临时项目ID > 尝试获取
+    let effectiveProjectId = account.projectId || account.tempProjectId || null
+
+    // 如果没有任何项目ID，尝试调用 loadCodeAssist 获取
+    if (!effectiveProjectId) {
+      try {
+        logger.info('📋 No projectId available, attempting to fetch from loadCodeAssist...')
+        const loadResponse = await geminiAccountService.loadCodeAssist(client, null, proxyConfig)
+
+        if (loadResponse.cloudaicompanionProject) {
+          effectiveProjectId = loadResponse.cloudaicompanionProject
+          // 保存临时项目ID
+          await geminiAccountService.updateTempProjectId(accountId, effectiveProjectId)
+          logger.info(`📋 Fetched and cached temporary projectId: ${effectiveProjectId}`)
+        }
+      } catch (loadError) {
+        logger.warn('Failed to fetch projectId from loadCodeAssist:', loadError.message)
+      }
+    }
+
+    // 如果还是没有项目ID，返回错误
+    if (!effectiveProjectId) {
+      return res.status(403).json({
+        error: {
+          message:
+            'This account requires a project ID to be configured. Please configure a project ID in the account settings.',
+          type: 'configuration_required'
+        }
+      })
+    }
 
     logger.info('📋 Standard API 项目ID处理逻辑', {
       accountProjectId: account.projectId,
+      tempProjectId: account.tempProjectId,
       effectiveProjectId,
-      decision: account.projectId ? '使用账户配置' : '不使用项目ID'
+      decision: account.projectId
+        ? '使用账户配置'
+        : account.tempProjectId
+          ? '使用临时项目ID'
+          : '从loadCodeAssist获取'
     })
 
     // 生成一个符合 Gemini CLI 格式的 user_prompt_id
@@ -119,7 +152,7 @@ async function handleStandardGenerateContent(req, res) {
       client,
       { model, request: actualRequestData },
       userPromptId, // 使用生成的 user_prompt_id
-      effectiveProjectId || 'oceanic-graph-cgcz4', // 如果没有项目ID，使用默认值
+      effectiveProjectId, // 使用处理后的项目ID
       req.apiKey?.id, // 使用 API Key ID 作为 session ID
       proxyConfig
     )
@@ -288,13 +321,46 @@ async function handleStandardStreamGenerateContent(req, res) {
 
     const client = await geminiAccountService.getOauthClient(accessToken, refreshToken, proxyConfig)
 
-    // 使用账户的项目ID（如果有的话）
-    const effectiveProjectId = account.projectId || null
+    // 项目ID优先级：账户配置的项目ID > 临时项目ID > 尝试获取
+    let effectiveProjectId = account.projectId || account.tempProjectId || null
+
+    // 如果没有任何项目ID，尝试调用 loadCodeAssist 获取
+    if (!effectiveProjectId) {
+      try {
+        logger.info('📋 No projectId available, attempting to fetch from loadCodeAssist...')
+        const loadResponse = await geminiAccountService.loadCodeAssist(client, null, proxyConfig)
+
+        if (loadResponse.cloudaicompanionProject) {
+          effectiveProjectId = loadResponse.cloudaicompanionProject
+          // 保存临时项目ID
+          await geminiAccountService.updateTempProjectId(accountId, effectiveProjectId)
+          logger.info(`📋 Fetched and cached temporary projectId: ${effectiveProjectId}`)
+        }
+      } catch (loadError) {
+        logger.warn('Failed to fetch projectId from loadCodeAssist:', loadError.message)
+      }
+    }
+
+    // 如果还是没有项目ID，返回错误
+    if (!effectiveProjectId) {
+      return res.status(403).json({
+        error: {
+          message:
+            'This account requires a project ID to be configured. Please configure a project ID in the account settings.',
+          type: 'configuration_required'
+        }
+      })
+    }
 
     logger.info('📋 Standard API 流式项目ID处理逻辑', {
       accountProjectId: account.projectId,
+      tempProjectId: account.tempProjectId,
       effectiveProjectId,
-      decision: account.projectId ? '使用账户配置' : '不使用项目ID'
+      decision: account.projectId
+        ? '使用账户配置'
+        : account.tempProjectId
+          ? '使用临时项目ID'
+          : '从loadCodeAssist获取'
     })
 
     // 生成一个符合 Gemini CLI 格式的 user_prompt_id
@@ -305,7 +371,7 @@ async function handleStandardStreamGenerateContent(req, res) {
       client,
       { model, request: actualRequestData },
       userPromptId, // 使用生成的 user_prompt_id
-      effectiveProjectId || 'oceanic-graph-cgcz4', // 如果没有项目ID，使用默认值
+      effectiveProjectId, // 使用处理后的项目ID
       req.apiKey?.id, // 使用 API Key ID 作为 session ID
       abortController.signal,
       proxyConfig
