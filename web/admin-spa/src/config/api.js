@@ -67,7 +67,10 @@ class ApiClient {
       const currentPath = window.location.pathname + window.location.hash
       const isLoginPage = currentPath.includes('/login') || currentPath.endsWith('/')
 
-      if (!isLoginPage) {
+      // 检查当前页面是否需要认证（不需要认证的页面不重定向）
+      const isPublicPage = currentPath.includes('/api-stats') || currentPath.includes('/tutorial')
+
+      if (!isLoginPage && !isPublicPage) {
         localStorage.removeItem('authToken')
         // 使用统一的登录URL
         window.location.href = getLoginUrl()

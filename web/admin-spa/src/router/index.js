@@ -100,12 +100,13 @@ const routes = [
   {
     path: '/tutorial',
     component: MainLayout,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: false },
     children: [
       {
         path: '',
         name: 'Tutorial',
-        component: TutorialView
+        component: TutorialView,
+        meta: { requiresAuth: false }
       }
     ]
   },
@@ -187,8 +188,13 @@ router.beforeEach(async (to, from, next) => {
     return next()
   }
 
-  // API Stats 页面不需要认证，直接放行
-  if (to.path === '/api-stats' || to.path.startsWith('/api-stats')) {
+  // API Stats 页面和教程页面不需要认证，直接放行
+  if (
+    to.path === '/api-stats' ||
+    to.path.startsWith('/api-stats') ||
+    to.path === '/tutorial' ||
+    to.path.startsWith('/tutorial')
+  ) {
     next()
   } else if (to.path === '/user-login') {
     // 如果已经是用户登录状态，重定向到用户仪表板
