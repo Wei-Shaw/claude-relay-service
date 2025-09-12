@@ -18,8 +18,7 @@ module.exports = {
   rules: {
     'vue/multi-word-component-names': 'off',
     'vue/no-v-html': 'off',
-    // 允许在所有环境中使用 console 语句以避免构建警告
-    'no-console': 'off',
+    'no-console': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
     'no-debugger': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
     'prettier/prettier': 'error',
     'vue/attributes-order': [

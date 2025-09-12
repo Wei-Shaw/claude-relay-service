@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { apiClient } from '@/config/api'
-import i18n from '@/i18n'
 
 export const useSettingsStore = defineStore('settings', () => {
   // 状态
@@ -78,7 +77,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const applyOemSettings = () => {
     // 更新页面标题
     if (oemSettings.value.siteName) {
-      document.title = `${oemSettings.value.siteName} - ${i18n.global.t('header.adminPanel')}`
+      document.title = `${oemSettings.value.siteName} - 管理后台`
     }
 
     // 更新favicon
@@ -95,9 +94,7 @@ export const useSettingsStore = defineStore('settings', () => {
   // 格式化日期时间
   const formatDateTime = (dateString) => {
     if (!dateString) return ''
-    const localeMap = { 'zh-cn': 'zh-CN', 'zh-tw': 'zh-TW', en: 'en-US' }
-    const currentLocale = localeMap[i18n.global.locale.value] || 'en-US'
-    return new Date(dateString).toLocaleString(currentLocale, {
+    return new Date(dateString).toLocaleString('zh-CN', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -113,13 +110,13 @@ export const useSettingsStore = defineStore('settings', () => {
 
     // 检查文件大小 (350KB)
     if (file.size > 350 * 1024) {
-      errors.push(i18n.global.t('settings.validation.iconTooLarge'))
+      errors.push('图标文件大小不能超过 350KB')
     }
 
     // 检查文件类型
     const allowedTypes = ['image/x-icon', 'image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml']
     if (!allowedTypes.includes(file.type)) {
-      errors.push(i18n.global.t('settings.validation.iconTypeNotSupported'))
+      errors.push('不支持的文件类型，请选择 .ico, .png, .jpg 或 .svg 文件')
     }
 
     return {

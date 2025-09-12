@@ -8,7 +8,7 @@
     >
       <div class="mt-3">
         <div class="mb-4 flex items-center justify-between">
-          <h3 class="text-lg font-medium text-gray-900">{{ t('user.viewApiKeyModal.title') }}</h3>
+          <h3 class="text-lg font-medium text-gray-900">API Key Details</h3>
           <button class="text-gray-400 hover:text-gray-600" @click="emit('close')">
             <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -24,35 +24,29 @@
         <div v-if="apiKey" class="space-y-4">
           <!-- API Key Name -->
           <div>
-            <label class="block text-sm font-medium text-gray-700">{{
-              t('user.viewApiKeyModal.fields.name')
-            }}</label>
+            <label class="block text-sm font-medium text-gray-700">Name</label>
             <p class="mt-1 text-sm text-gray-900">{{ apiKey.name }}</p>
           </div>
 
           <!-- Description -->
           <div v-if="apiKey.description">
-            <label class="block text-sm font-medium text-gray-700">{{
-              t('user.viewApiKeyModal.fields.description')
-            }}</label>
+            <label class="block text-sm font-medium text-gray-700">Description</label>
             <p class="mt-1 text-sm text-gray-900">{{ apiKey.description }}</p>
           </div>
 
           <!-- API Key -->
           <div>
-            <label class="block text-sm font-medium text-gray-700">{{
-              t('user.viewApiKeyModal.fields.apiKey')
-            }}</label>
+            <label class="block text-sm font-medium text-gray-700">API Key</label>
             <div class="mt-1 flex items-center space-x-2">
               <div class="flex-1">
                 <div v-if="showFullKey" class="rounded-md border border-gray-300 bg-gray-50 p-3">
                   <code class="break-all font-mono text-sm text-gray-900">{{
-                    apiKey.key || t('user.viewApiKeyModal.apiKeyDisplay.notAvailable')
+                    apiKey.key || 'Not available'
                   }}</code>
                 </div>
                 <div v-else class="rounded-md border border-gray-300 bg-gray-50 p-3">
                   <code class="font-mono text-sm text-gray-900">{{
-                    apiKey.keyPreview || t('user.viewApiKeyModal.apiKeyDisplay.keyPreview')
+                    apiKey.keyPreview || 'cr_****'
                   }}</code>
                 </div>
               </div>
@@ -96,11 +90,7 @@
                       stroke-width="2"
                     />
                   </svg>
-                  {{
-                    showFullKey
-                      ? t('user.viewApiKeyModal.buttons.hide')
-                      : t('user.viewApiKeyModal.buttons.show')
-                  }}
+                  {{ showFullKey ? 'Hide' : 'Show' }}
                 </button>
                 <button
                   v-if="showFullKey && apiKey.key"
@@ -115,20 +105,18 @@
                       stroke-width="2"
                     />
                   </svg>
-                  {{ t('user.viewApiKeyModal.buttons.copy') }}
+                  Copy
                 </button>
               </div>
             </div>
             <p v-if="!apiKey.key" class="mt-1 text-xs text-gray-500">
-              {{ t('user.viewApiKeyModal.apiKeyDisplay.fullKeyNotice') }}
+              Full API key is only shown when first created or regenerated
             </p>
           </div>
 
           <!-- Status -->
           <div>
-            <label class="block text-sm font-medium text-gray-700">{{
-              t('user.viewApiKeyModal.fields.status')
-            }}</label>
+            <label class="block text-sm font-medium text-gray-700">Status</label>
             <div class="mt-1">
               <span
                 :class="[
@@ -136,47 +124,33 @@
                   apiKey.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                 ]"
               >
-                {{
-                  apiKey.isActive
-                    ? t('user.viewApiKeyModal.status.active')
-                    : t('user.viewApiKeyModal.status.disabled')
-                }}
+                {{ apiKey.isActive ? 'Active' : 'Disabled' }}
               </span>
             </div>
           </div>
 
           <!-- Usage Stats -->
           <div v-if="apiKey.usage" class="border-t border-gray-200 pt-4">
-            <label class="mb-2 block text-sm font-medium text-gray-700">{{
-              t('user.viewApiKeyModal.fields.usageStatistics')
-            }}</label>
+            <label class="mb-2 block text-sm font-medium text-gray-700">Usage Statistics</label>
             <div class="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <span class="text-gray-500"
-                  >{{ t('user.viewApiKeyModal.usageStats.requests') }}:</span
-                >
+                <span class="text-gray-500">Requests:</span>
                 <span class="ml-2 font-medium">{{ formatNumber(apiKey.usage.requests || 0) }}</span>
               </div>
               <div>
-                <span class="text-gray-500"
-                  >{{ t('user.viewApiKeyModal.usageStats.inputTokens') }}:</span
-                >
+                <span class="text-gray-500">Input Tokens:</span>
                 <span class="ml-2 font-medium">{{
                   formatNumber(apiKey.usage.inputTokens || 0)
                 }}</span>
               </div>
               <div>
-                <span class="text-gray-500"
-                  >{{ t('user.viewApiKeyModal.usageStats.outputTokens') }}:</span
-                >
+                <span class="text-gray-500">Output Tokens:</span>
                 <span class="ml-2 font-medium">{{
                   formatNumber(apiKey.usage.outputTokens || 0)
                 }}</span>
               </div>
               <div>
-                <span class="text-gray-500"
-                  >{{ t('user.viewApiKeyModal.usageStats.totalCost') }}:</span
-                >
+                <span class="text-gray-500">Total Cost:</span>
                 <span class="ml-2 font-medium"
                   >${{ (apiKey.usage.totalCost || 0).toFixed(4) }}</span
                 >
@@ -187,17 +161,15 @@
           <!-- Timestamps -->
           <div class="space-y-2 border-t border-gray-200 pt-4 text-sm">
             <div class="flex justify-between">
-              <span class="text-gray-500">{{ t('user.viewApiKeyModal.timestamps.created') }}:</span>
+              <span class="text-gray-500">Created:</span>
               <span class="text-gray-900">{{ formatDate(apiKey.createdAt) }}</span>
             </div>
             <div v-if="apiKey.lastUsedAt" class="flex justify-between">
-              <span class="text-gray-500"
-                >{{ t('user.viewApiKeyModal.timestamps.lastUsed') }}:</span
-              >
+              <span class="text-gray-500">Last Used:</span>
               <span class="text-gray-900">{{ formatDate(apiKey.lastUsedAt) }}</span>
             </div>
             <div v-if="apiKey.expiresAt" class="flex justify-between">
-              <span class="text-gray-500">{{ t('user.viewApiKeyModal.timestamps.expires') }}:</span>
+              <span class="text-gray-500">Expires:</span>
               <span
                 :class="[
                   'font-medium',
@@ -214,7 +186,7 @@
               class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
               @click="emit('close')"
             >
-              {{ t('user.viewApiKeyModal.buttons.close') }}
+              Close
             </button>
           </div>
         </div>
@@ -225,10 +197,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { showToast } from '@/utils/toast'
-
-const { t } = useI18n()
 
 defineProps({
   show: {
@@ -256,26 +225,22 @@ const formatNumber = (num) => {
 
 const formatDate = (dateString) => {
   if (!dateString) return null
-  const { locale } = useI18n()
-  return new Date(dateString).toLocaleDateString(
-    locale.value === 'zh-cn' ? 'zh-CN' : locale.value === 'zh-tw' ? 'zh-TW' : 'en-US',
-    {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }
-  )
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
 }
 
 const copyToClipboard = async (text) => {
   try {
     await navigator.clipboard.writeText(text)
-    showToast(t('user.viewApiKeyModal.messages.copySuccess'), 'success')
+    showToast('Copied to clipboard!', 'success')
   } catch (err) {
     console.error('Failed to copy:', err)
-    showToast(t('user.viewApiKeyModal.messages.copyFailed'), 'error')
+    showToast('Failed to copy to clipboard', 'error')
   }
 }
 </script>

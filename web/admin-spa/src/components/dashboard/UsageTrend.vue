@@ -3,17 +3,13 @@
     <div class="mb-6 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
       <h2 class="flex items-center text-xl font-bold text-gray-800">
         <i class="fas fa-chart-area mr-2 text-blue-500" />
-        {{ $t('dashboard.usageTrend.title') }}
+        使用趋势
       </h2>
 
       <div class="flex items-center gap-3">
         <el-radio-group v-model="granularity" size="small" @change="handleGranularityChange">
-          <el-radio-button label="day">
-            {{ $t('dashboard.usageTrend.granularity.byDay') }}
-          </el-radio-button>
-          <el-radio-button label="hour">
-            {{ $t('dashboard.usageTrend.granularity.byHour') }}
-          </el-radio-button>
+          <el-radio-button label="day"> 按天 </el-radio-button>
+          <el-radio-button label="hour"> 按小时 </el-radio-button>
         </el-radio-group>
 
         <el-select
@@ -25,7 +21,7 @@
           <el-option
             v-for="period in periodOptions"
             :key="period.days"
-            :label="$t('dashboard.usageTrend.periodOptions.recentDays', { days: period.days })"
+            :label="`最近${period.days}天`"
             :value="period.days"
           />
         </el-select>
@@ -39,25 +35,23 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { Chart } from 'chart.js/auto'
 import { useDashboardStore } from '@/stores/dashboard'
 import { useChartConfig } from '@/composables/useChartConfig'
-import { useI18n } from 'vue-i18n'
 
 const dashboardStore = useDashboardStore()
 const chartCanvas = ref(null)
 let chart = null
-const { t } = useI18n()
 
 const trendPeriod = ref(7)
 const granularity = ref('day')
 
-const periodOptions = computed(() => [
-  { days: 1, label: t('dashboard.usageTrend.periodOptions.last24Hours') },
-  { days: 7, label: t('dashboard.usageTrend.periodOptions.last7Days') },
-  { days: 30, label: t('dashboard.usageTrend.periodOptions.last30Days') }
-])
+const periodOptions = [
+  { days: 1, label: '24小时' },
+  { days: 7, label: '7天' },
+  { days: 30, label: '30天' }
+]
 
 const createChart = () => {
   if (!chartCanvas.value || !dashboardStore.trendData.length) return
@@ -87,7 +81,7 @@ const createChart = () => {
       labels,
       datasets: [
         {
-          label: t('dashboard.usageTrend.chartLabels.requests'),
+          label: '请求次数',
           data: dashboardStore.trendData.map((item) => item.requests),
           borderColor: '#667eea',
           backgroundColor: getGradient(ctx, '#667eea', 0.1),
@@ -95,7 +89,7 @@ const createChart = () => {
           tension: 0.4
         },
         {
-          label: t('dashboard.usageTrend.chartLabels.tokens'),
+          label: 'Token使用量',
           data: dashboardStore.trendData.map((item) => item.tokens),
           borderColor: '#f093fb',
           backgroundColor: getGradient(ctx, '#f093fb', 0.1),
@@ -133,7 +127,7 @@ const createChart = () => {
           position: 'left',
           title: {
             display: true,
-            text: t('dashboard.usageTrend.chartLabels.requestsAxis')
+            text: '请求次数'
           }
         },
         y1: {
@@ -142,7 +136,7 @@ const createChart = () => {
           position: 'right',
           title: {
             display: true,
-            text: t('dashboard.usageTrend.chartLabels.tokensAxis')
+            text: 'Token使用量'
           },
           grid: {
             drawOnChartArea: false

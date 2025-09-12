@@ -11,7 +11,7 @@
       <span
         class="select-none whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200"
       >
-        {{ selectedLabel || placeholderText }}
+        {{ selectedLabel || placeholder }}
       </span>
       <i
         :class="[
@@ -65,9 +65,6 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import { useI18n } from 'vue-i18n'
-
-const { t } = useI18n()
 
 const props = defineProps({
   modelValue: {
@@ -80,7 +77,7 @@ const props = defineProps({
   },
   placeholder: {
     type: String,
-    default: ''
+    default: '请选择'
   },
   icon: {
     type: String,
@@ -98,8 +95,6 @@ const isOpen = ref(false)
 const triggerRef = ref(null)
 const dropdownRef = ref(null)
 const dropdownStyle = ref({})
-
-const placeholderText = computed(() => props.placeholder || t('common.customDropdown.placeholder'))
 
 const selectedLabel = computed(() => {
   const selected = props.options.find((opt) => opt.value === props.modelValue)

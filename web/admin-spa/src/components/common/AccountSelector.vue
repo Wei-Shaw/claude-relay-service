@@ -41,7 +41,7 @@
                 ref="searchInput"
                 v-model="searchQuery"
                 class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                :placeholder="$t('common.accountSelector.searchPlaceholder')"
+                placeholder="搜索账号名称..."
                 style="padding-left: 40px; padding-right: 36px"
                 type="text"
                 @input="handleSearch"
@@ -68,9 +68,7 @@
               :class="{ 'bg-blue-50 dark:bg-blue-900/20': !modelValue }"
               @click="selectAccount(null)"
             >
-              <span class="text-gray-700 dark:text-gray-300">{{
-                props.defaultOptionText || $t('common.accountSelector.useSharedPool')
-              }}</span>
+              <span class="text-gray-700 dark:text-gray-300">{{ defaultOptionText }}</span>
             </div>
 
             <!-- 分组选项 -->
@@ -78,7 +76,7 @@
               <div
                 class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
               >
-                {{ $t('common.accountSelector.schedulingGroups') }}
+                调度分组
               </div>
               <div
                 v-for="group in filteredGroups"
@@ -90,8 +88,7 @@
                 <div class="flex items-center justify-between">
                   <span class="text-gray-700 dark:text-gray-300">{{ group.name }}</span>
                   <span class="text-xs text-gray-500 dark:text-gray-400"
-                    >{{ group.memberCount || 0
-                    }}{{ $t('common.accountSelector.membersUnit') }}</span
+                    >{{ group.memberCount || 0 }} 个成员</span
                   >
                 </div>
               </div>
@@ -104,8 +101,10 @@
               >
                 {{
                   platform === 'claude'
-                    ? $t('common.accountSelector.claudeOAuthAccounts')
-                    : $t('common.accountSelector.oauthAccounts')
+                    ? 'Claude OAuth 专属账号'
+                    : platform === 'openai'
+                      ? 'OpenAI 专属账号'
+                      : 'OAuth 专属账号'
                 }}
               </div>
               <div
@@ -143,7 +142,7 @@
               <div
                 class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
               >
-                {{ $t('common.accountSelector.claudeConsoleAccounts') }}
+                Claude Console 专属账号
               </div>
               <div
                 v-for="account in filteredConsoleAccounts"
@@ -177,13 +176,52 @@
               </div>
             </div>
 
+            <!-- OpenAI-Responses 账号（仅 OpenAI） -->
+            <div v-if="platform === 'openai' && filteredOpenAIResponsesAccounts.length > 0">
+              <div
+                class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+              >
+                OpenAI-Responses 专属账号
+              </div>
+              <div
+                v-for="account in filteredOpenAIResponsesAccounts"
+                :key="account.id"
+                class="cursor-pointer px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
+                :class="{
+                  'bg-blue-50 dark:bg-blue-900/20': modelValue === `responses:${account.id}`
+                }"
+                @click="selectAccount(`responses:${account.id}`)"
+              >
+                <div class="flex items-center justify-between">
+                  <div>
+                    <span class="text-gray-700 dark:text-gray-300">{{ account.name }}</span>
+                    <span
+                      class="ml-2 rounded-full px-2 py-0.5 text-xs"
+                      :class="
+                        account.isActive === 'true' || account.isActive === true
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          : account.status === 'rate_limited'
+                            ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                      "
+                    >
+                      {{ getAccountStatusText(account) }}
+                    </span>
+                  </div>
+                  <span class="text-xs text-gray-400 dark:text-gray-500">
+                    {{ formatDate(account.createdAt) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
             <!-- 无搜索结果 -->
             <div
               v-if="searchQuery && !hasResults"
               class="px-4 py-8 text-center text-gray-500 dark:text-gray-400"
             >
               <i class="fas fa-search mb-2 text-2xl" />
-              <p class="text-sm">{{ $t('common.accountSelector.noResultsFound') }}</p>
+              <p class="text-sm">没有找到匹配的账号</p>
             </div>
           </div>
         </div>
@@ -194,9 +232,6 @@
 
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
-import { useI18n } from 'vue-i18n'
-
-const { t: $t } = useI18n()
 
 const props = defineProps({
   modelValue: {
@@ -206,7 +241,7 @@ const props = defineProps({
   platform: {
     type: String,
     required: true,
-    validator: (value) => ['claude', 'gemini'].includes(value)
+    validator: (value) => ['claude', 'gemini', 'openai', 'bedrock'].includes(value)
   },
   accounts: {
     type: Array,
@@ -222,11 +257,11 @@ const props = defineProps({
   },
   placeholder: {
     type: String,
-    default: null
+    default: '请选择账号'
   },
   defaultOptionText: {
     type: String,
-    default: null
+    default: '使用共享账号池'
   }
 })
 
@@ -243,16 +278,13 @@ const lastDirection = ref('') // 记住上次的显示方向
 // 获取选中的标签
 const selectedLabel = computed(() => {
   // 如果没有选中值，显示默认选项文本
-  if (!props.modelValue)
-    return props.defaultOptionText || $t('common.accountSelector.useSharedPool')
+  if (!props.modelValue) return props.defaultOptionText
 
   // 分组
   if (props.modelValue.startsWith('group:')) {
     const groupId = props.modelValue.substring(6)
     const group = props.groups.find((g) => g.id === groupId)
-    return group
-      ? `${group.name} (${group.memberCount || 0}${$t('common.accountSelector.membersUnit')})`
-      : ''
+    return group ? `${group.name} (${group.memberCount || 0} 个成员)` : ''
   }
 
   // Console 账号
@@ -264,6 +296,15 @@ const selectedLabel = computed(() => {
     return account ? `${account.name} (${getAccountStatusText(account)})` : ''
   }
 
+  // OpenAI-Responses 账号
+  if (props.modelValue.startsWith('responses:')) {
+    const accountId = props.modelValue.substring(10)
+    const account = props.accounts.find(
+      (a) => a.id === accountId && a.platform === 'openai-responses'
+    )
+    return account ? `${account.name} (${getAccountStatusText(account)})` : ''
+  }
+
   // OAuth 账号
   const account = props.accounts.find((a) => a.id === props.modelValue)
   return account ? `${account.name} (${getAccountStatusText(account)})` : ''
@@ -271,26 +312,36 @@ const selectedLabel = computed(() => {
 
 // 获取账户状态文本
 const getAccountStatusText = (account) => {
-  if (!account) return $t('common.accountSelector.accountStatus.unknown')
+  if (!account) return '未知'
+
+  // 处理 OpenAI-Responses 账号（isActive 可能是字符串）
+  const isActive = account.isActive === 'true' || account.isActive === true
 
   // 优先使用 isActive 判断
-  if (account.isActive === false) {
+  if (!isActive) {
     // 根据 status 提供更详细的状态信息
     switch (account.status) {
       case 'unauthorized':
-        return $t('common.accountSelector.accountStatus.unauthorized')
+        return '未授权'
       case 'error':
-        return $t('common.accountSelector.accountStatus.tokenError')
+        return 'Token错误'
       case 'created':
-        return $t('common.accountSelector.accountStatus.pending')
+        return '待验证'
       case 'rate_limited':
-        return $t('common.accountSelector.accountStatus.rateLimited')
+        return '限流中'
+      case 'quota_exceeded':
+        return '额度超限'
       default:
-        return $t('common.accountSelector.accountStatus.error')
+        return '异常'
     }
   }
 
-  return $t('common.accountSelector.accountStatus.active')
+  // 对于激活的账号，如果是限流状态也要显示
+  if (account.status === 'rate_limited') {
+    return '限流中'
+  }
+
+  return '正常'
 }
 
 // 按创建时间倒序排序账号
@@ -302,18 +353,42 @@ const sortedAccounts = computed(() => {
   })
 })
 
-// 过滤的分组
+// 过滤的分组（根据平台类型过滤）
 const filteredGroups = computed(() => {
-  if (!searchQuery.value) return props.groups
-  const query = searchQuery.value.toLowerCase()
-  return props.groups.filter((group) => group.name.toLowerCase().includes(query))
+  // 只显示与当前平台匹配的分组
+  let groups = props.groups.filter((group) => {
+    // 如果分组有platform属性，则必须匹配当前平台
+    // 如果没有platform属性，则认为是旧数据，根据平台判断
+    if (group.platform) {
+      return group.platform === props.platform
+    }
+    // 向后兼容：如果没有platform字段，通过其他方式判断
+    return true
+  })
+
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase()
+    groups = groups.filter((group) => group.name.toLowerCase().includes(query))
+  }
+
+  return groups
 })
 
 // 过滤的 OAuth 账号
 const filteredOAuthAccounts = computed(() => {
-  let accounts = sortedAccounts.value.filter((a) =>
-    props.platform === 'claude' ? a.platform === 'claude-oauth' : a.platform !== 'claude-console'
-  )
+  let accounts = []
+
+  if (props.platform === 'claude') {
+    accounts = sortedAccounts.value.filter((a) => a.platform === 'claude-oauth')
+  } else if (props.platform === 'openai') {
+    // 对于 OpenAI，只显示 openai 类型的账号
+    accounts = sortedAccounts.value.filter((a) => a.platform === 'openai')
+  } else {
+    // 其他平台显示所有非特殊类型的账号
+    accounts = sortedAccounts.value.filter(
+      (a) => !['claude-oauth', 'claude-console', 'openai-responses'].includes(a.platform)
+    )
+  }
 
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
@@ -337,12 +412,27 @@ const filteredConsoleAccounts = computed(() => {
   return accounts
 })
 
+// 过滤的 OpenAI-Responses 账号
+const filteredOpenAIResponsesAccounts = computed(() => {
+  if (props.platform !== 'openai') return []
+
+  let accounts = sortedAccounts.value.filter((a) => a.platform === 'openai-responses')
+
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase()
+    accounts = accounts.filter((account) => account.name.toLowerCase().includes(query))
+  }
+
+  return accounts
+})
+
 // 是否有搜索结果
 const hasResults = computed(() => {
   return (
     filteredGroups.value.length > 0 ||
     filteredOAuthAccounts.value.length > 0 ||
-    filteredConsoleAccounts.value.length > 0
+    filteredConsoleAccounts.value.length > 0 ||
+    filteredOpenAIResponsesAccounts.value.length > 0
   )
 })
 
@@ -354,12 +444,12 @@ const formatDate = (dateString) => {
   const diffInHours = (now - date) / (1000 * 60 * 60)
 
   if (diffInHours < 24) {
-    return $t('common.accountSelector.dateFormat.today')
+    return '今天创建'
   } else if (diffInHours < 48) {
-    return $t('common.accountSelector.dateFormat.yesterday')
+    return '昨天创建'
   } else if (diffInHours < 168) {
     // 7天内
-    return `${Math.floor(diffInHours / 24)}${$t('common.accountSelector.dateFormat.daysAgo')}`
+    return `${Math.floor(diffInHours / 24)} 天前`
   } else {
     return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
   }

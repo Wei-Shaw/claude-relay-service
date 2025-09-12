@@ -49,26 +49,22 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useI18n } from 'vue-i18n'
-
-// 国际化
-const { t } = useI18n()
 
 // 状态
 const isVisible = ref(false)
 const isProcessing = ref(false)
 const title = ref('')
 const message = ref('')
-const confirmText = ref(t('common.confirmDialog.confirm'))
-const cancelText = ref(t('common.confirmDialog.cancel'))
+const confirmText = ref('确认')
+const cancelText = ref('取消')
 let resolvePromise = null
 
 // 显示确认对话框
 const showConfirm = (
   titleText,
   messageText,
-  confirmTextParam = t('common.confirmDialog.confirm'),
-  cancelTextParam = t('common.confirmDialog.cancel')
+  confirmTextParam = '确认',
+  cancelTextParam = '取消'
 ) => {
   return new Promise((resolve) => {
     title.value = titleText

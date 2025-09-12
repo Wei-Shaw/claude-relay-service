@@ -12,8 +12,8 @@
             <i :class="getIconClass(toast.type)" />
           </div>
           <div class="toast-body">
-            <div v-if="toast.title || getDefaultTitle(toast.type)" class="toast-title">
-              {{ toast.title || getDefaultTitle(toast.type) }}
+            <div v-if="toast.title" class="toast-title">
+              {{ toast.title }}
             </div>
             <div class="toast-message">
               {{ toast.message }}
@@ -35,9 +35,6 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useI18n } from 'vue-i18n'
-
-const { t } = useI18n()
 
 // 状态
 const toasts = ref([])
@@ -52,11 +49,6 @@ const getIconClass = (type) => {
     info: 'fas fa-info-circle'
   }
   return iconMap[type] || iconMap.info
-}
-
-// 获取默认标题
-const getDefaultTitle = (type) => {
-  return t(`common.toastNotification.defaultTitles.${type}`)
 }
 
 // 添加Toast

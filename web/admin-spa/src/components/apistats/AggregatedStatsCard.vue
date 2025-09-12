@@ -5,10 +5,10 @@
     >
       <span class="flex items-center">
         <i class="fas fa-chart-pie mr-2 text-sm text-orange-500 md:mr-3 md:text-base" />
-        {{ t('apiStats.usageRatio') }}
+        使用占比
       </span>
       <span class="text-xs font-normal text-gray-600 dark:text-gray-400 sm:ml-2 md:text-sm"
-        >({{ statsPeriod === 'daily' ? t('apiStats.today') : t('apiStats.thisMonth') }})</span
+        >({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span
       >
     </h3>
 
@@ -33,9 +33,7 @@
         <div
           class="mt-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
         >
-          <span
-            >{{ formatNumber(getStatUsage(stat)?.requests || 0) }}{{ t('apiStats.requests') }}</span
-          >
+          <span>{{ formatNumber(getStatUsage(stat)?.requests || 0) }}次</span>
           <span>{{ getStatUsage(stat)?.formattedCost || '$0.00' }}</span>
         </div>
       </div>
@@ -43,10 +41,7 @@
       <!-- 其他Keys汇总 -->
       <div v-if="otherKeysCount > 0" class="border-t border-gray-200 pt-2 dark:border-gray-700">
         <div class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-          <span
-            >{{ t('apiStats.otherKeys') }} {{ otherKeysCount }} {{ t('apiStats.individual')
-            }}{{ t('apiStats.keys') }}</span
-          >
+          <span>其他 {{ otherKeysCount }} 个Keys</span>
           <span>{{ otherPercentage }}%</span>
         </div>
       </div>
@@ -59,7 +54,7 @@
     >
       <div class="text-center">
         <i class="fas fa-chart-pie mb-2 text-2xl" />
-        <p>{{ t('apiStats.usageRatioOnlyInMultiMode') }}</p>
+        <p>使用占比仅在多Key查询时显示</p>
       </div>
     </div>
 
@@ -68,7 +63,7 @@
       class="flex h-32 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
     >
       <i class="fas fa-chart-pie mr-2" />
-      {{ t('apiStats.noData') }}
+      暂无数据
     </div>
   </div>
 </template>
@@ -76,10 +71,7 @@
 <script setup>
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useI18n } from 'vue-i18n'
 import { useApiStatsStore } from '@/stores/apistats'
-
-const { t } = useI18n()
 
 const apiStatsStore = useApiStatsStore()
 const { aggregatedStats, individualStats, statsPeriod, multiKeyMode } = storeToRefs(apiStatsStore)

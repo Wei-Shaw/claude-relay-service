@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
-import i18n from '@/i18n'
 import { showToast } from '@/utils/toast'
 
 const API_BASE = '/users'
@@ -41,7 +40,7 @@ export const useUserStore = defineStore('user', {
 
           return response.data
         } else {
-          throw new Error(response.data.message || i18n.global.t('user.login.loginFailed'))
+          throw new Error(response.data.message || 'Login failed')
         }
       } catch (error) {
         this.clearAuth()
@@ -116,9 +115,7 @@ export const useUserStore = defineStore('user', {
           this.clearAuth()
           // If it's a disabled account error, throw a specific error
           if (error.response?.status === 403) {
-            throw new Error(
-              error.response.data?.message || i18n.global.t('user.login.accountDisabled')
-            )
+            throw new Error(error.response.data?.message || 'Your account has been disabled')
           }
         }
         throw error

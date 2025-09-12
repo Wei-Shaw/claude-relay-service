@@ -12,11 +12,9 @@
             <i class="fas fa-link text-white" />
           </div>
           <div class="flex-1">
-            <h4 class="mb-3 font-semibold text-blue-900 dark:text-blue-200">
-              {{ t('oauthFlow.claudeAccountAuth') }}
-            </h4>
+            <h4 class="mb-3 font-semibold text-blue-900 dark:text-blue-200">Claude 账户授权</h4>
             <p class="mb-4 text-sm text-blue-800 dark:text-blue-300">
-              {{ t('oauthFlow.claudeAuthDescription') }}
+              请按照以下步骤完成 Claude 账户的授权：
             </p>
 
             <div class="space-y-4">
@@ -32,7 +30,7 @@
                   </div>
                   <div class="flex-1">
                     <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
-                      {{ t('oauthFlow.step1Title') }}
+                      点击下方按钮生成授权链接
                     </p>
                     <button
                       v-if="!authUrl"
@@ -42,7 +40,7 @@
                     >
                       <i v-if="!loading" class="fas fa-link mr-2" />
                       <div v-else class="loading-spinner mr-2" />
-                      {{ loading ? t('oauthFlow.generating') : t('oauthFlow.generateAuthLink') }}
+                      {{ loading ? '生成中...' : '生成授权链接' }}
                     </button>
                     <div v-else class="space-y-3">
                       <div class="flex items-center gap-2">
@@ -54,7 +52,7 @@
                         />
                         <button
                           class="rounded-lg bg-gray-100 px-3 py-2 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
-                          :title="t('oauthFlow.copyLinkTooltip')"
+                          title="复制链接"
                           @click="copyAuthUrl"
                         >
                           <i :class="copied ? 'fas fa-check text-green-500' : 'fas fa-copy'" />
@@ -64,7 +62,7 @@
                         class="text-xs text-blue-600 hover:text-blue-700"
                         @click="regenerateAuthUrl"
                       >
-                        <i class="fas fa-sync-alt mr-1" />{{ t('oauthFlow.regenerate') }}
+                        <i class="fas fa-sync-alt mr-1" />重新生成
                       </button>
                     </div>
                   </div>
@@ -83,18 +81,18 @@
                   </div>
                   <div class="flex-1">
                     <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
-                      {{ t('oauthFlow.step2Title') }}
+                      在浏览器中打开链接并完成授权
                     </p>
                     <p class="mb-2 text-sm text-blue-700 dark:text-blue-300">
-                      {{ t('oauthFlow.step2Description') }}
+                      请在新标签页中打开授权链接，登录您的 Claude 账户并授权。
                     </p>
                     <div
                       class="rounded border border-yellow-300 bg-yellow-50 p-3 dark:border-yellow-700 dark:bg-yellow-900/30"
                     >
                       <p class="text-xs text-yellow-800 dark:text-yellow-300">
                         <i class="fas fa-exclamation-triangle mr-1" />
-                        <strong>{{ t('oauthFlow.proxyNotice') }}</strong
-                        >{{ t('oauthFlow.proxyNoticeText') }}
+                        <strong>注意：</strong
+                        >如果您设置了代理，请确保浏览器也使用相同的代理访问授权页面。
                       </p>
                     </div>
                   </div>
@@ -113,32 +111,29 @@
                   </div>
                   <div class="flex-1">
                     <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
-                      {{ t('oauthFlow.step3Title') }}
+                      输入 Authorization Code
                     </p>
                     <p class="mb-3 text-sm text-blue-700 dark:text-blue-300">
-                      {{ t('oauthFlow.step3Description') }}
-                      <strong>{{ t('oauthFlow.authorizationCode') }}</strong
-                      >{{ t('oauthFlow.step3DescriptionMiddle') }}
+                      授权完成后，页面会显示一个
+                      <strong>Authorization Code</strong>，请将其复制并粘贴到下方输入框：
                     </p>
                     <div class="space-y-3">
                       <div>
                         <label
                           class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                         >
-                          <i class="fas fa-key mr-2 text-blue-500" />{{
-                            t('oauthFlow.authorizationCode')
-                          }}
+                          <i class="fas fa-key mr-2 text-blue-500" />Authorization Code
                         </label>
                         <textarea
                           v-model="authCode"
                           class="form-input w-full resize-none font-mono text-sm"
-                          :placeholder="t('oauthFlow.authCodePlaceholder')"
+                          placeholder="粘贴从Claude页面获取的Authorization Code..."
                           rows="3"
                         />
                       </div>
                       <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                         <i class="fas fa-info-circle mr-1" />
-                        {{ t('oauthFlow.authCodeHint') }}
+                        请粘贴从Claude页面复制的Authorization Code
                       </p>
                     </div>
                   </div>
@@ -162,11 +157,9 @@
             <i class="fas fa-robot text-white" />
           </div>
           <div class="flex-1">
-            <h4 class="mb-3 font-semibold text-green-900 dark:text-green-200">
-              {{ t('oauthFlow.geminiAccountAuth') }}
-            </h4>
+            <h4 class="mb-3 font-semibold text-green-900 dark:text-green-200">Gemini 账户授权</h4>
             <p class="mb-4 text-sm text-green-800 dark:text-green-300">
-              {{ t('oauthFlow.geminiAuthDescription') }}
+              请按照以下步骤完成 Gemini 账户的授权：
             </p>
 
             <div class="space-y-4">
@@ -182,7 +175,7 @@
                   </div>
                   <div class="flex-1">
                     <p class="mb-2 font-medium text-green-900 dark:text-green-200">
-                      {{ t('oauthFlow.step1Title') }}
+                      点击下方按钮生成授权链接
                     </p>
                     <button
                       v-if="!authUrl"
@@ -192,7 +185,7 @@
                     >
                       <i v-if="!loading" class="fas fa-link mr-2" />
                       <div v-else class="loading-spinner mr-2" />
-                      {{ loading ? t('oauthFlow.generating') : t('oauthFlow.generateAuthLink') }}
+                      {{ loading ? '生成中...' : '生成授权链接' }}
                     </button>
                     <div v-else class="space-y-3">
                       <div class="flex items-center gap-2">
@@ -204,7 +197,7 @@
                         />
                         <button
                           class="rounded-lg bg-gray-100 px-3 py-2 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
-                          :title="t('oauthFlow.copyLinkTooltip')"
+                          title="复制链接"
                           @click="copyAuthUrl"
                         >
                           <i :class="copied ? 'fas fa-check text-green-500' : 'fas fa-copy'" />
@@ -214,7 +207,7 @@
                         class="text-xs text-green-600 hover:text-green-700"
                         @click="regenerateAuthUrl"
                       >
-                        <i class="fas fa-sync-alt mr-1" />{{ t('oauthFlow.regenerate') }}
+                        <i class="fas fa-sync-alt mr-1" />重新生成
                       </button>
                     </div>
                   </div>
@@ -233,18 +226,18 @@
                   </div>
                   <div class="flex-1">
                     <p class="mb-2 font-medium text-green-900 dark:text-green-200">
-                      {{ t('oauthFlow.step2Title') }}
+                      在浏览器中打开链接并完成授权
                     </p>
                     <p class="mb-2 text-sm text-green-700 dark:text-green-300">
-                      {{ t('oauthFlow.step2DescriptionGemini') }}
+                      请在新标签页中打开授权链接，登录您的 Gemini 账户并授权。
                     </p>
                     <div
                       class="rounded border border-yellow-300 bg-yellow-50 p-3 dark:border-yellow-700 dark:bg-yellow-900/30"
                     >
                       <p class="text-xs text-yellow-800 dark:text-yellow-300">
                         <i class="fas fa-exclamation-triangle mr-1" />
-                        <strong>{{ t('oauthFlow.proxyNotice') }}</strong
-                        >{{ t('oauthFlow.proxyNoticeText') }}
+                        <strong>注意：</strong
+                        >如果您设置了代理，请确保浏览器也使用相同的代理访问授权页面。
                       </p>
                     </div>
                   </div>
@@ -263,31 +256,29 @@
                   </div>
                   <div class="flex-1">
                     <p class="mb-2 font-medium text-green-900 dark:text-green-200">
-                      {{ t('oauthFlow.step3Title') }}
+                      输入 Authorization Code
                     </p>
                     <p class="mb-3 text-sm text-green-700 dark:text-green-300">
-                      {{ t('oauthFlow.step3DescriptionGemini') }}
+                      授权完成后，页面会显示一个 Authorization Code，请将其复制并粘贴到下方输入框：
                     </p>
                     <div class="space-y-3">
                       <div>
                         <label
                           class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                         >
-                          <i class="fas fa-key mr-2 text-green-500" />{{
-                            t('oauthFlow.authorizationCode')
-                          }}
+                          <i class="fas fa-key mr-2 text-green-500" />Authorization Code
                         </label>
                         <textarea
                           v-model="authCode"
                           class="form-input w-full resize-none font-mono text-sm"
-                          :placeholder="t('oauthFlow.authCodePlaceholderGemini')"
+                          placeholder="粘贴从Gemini页面获取的Authorization Code..."
                           rows="3"
                         />
                       </div>
                       <div class="mt-2 space-y-1">
                         <p class="text-xs text-gray-600 dark:text-gray-400">
                           <i class="fas fa-check-circle mr-1 text-green-500" />
-                          {{ t('oauthFlow.authCodeHintGemini') }}
+                          请粘贴从Gemini页面复制的Authorization Code
                         </p>
                       </div>
                     </div>
@@ -312,11 +303,9 @@
             <i class="fas fa-brain text-white" />
           </div>
           <div class="flex-1">
-            <h4 class="mb-3 font-semibold text-orange-900 dark:text-orange-200">
-              {{ t('oauthFlow.openaiAccountAuth') }}
-            </h4>
+            <h4 class="mb-3 font-semibold text-orange-900 dark:text-orange-200">OpenAI 账户授权</h4>
             <p class="mb-4 text-sm text-orange-800 dark:text-orange-300">
-              {{ t('oauthFlow.openaiAuthDescription') }}
+              请按照以下步骤完成 OpenAI 账户的授权：
             </p>
 
             <div class="space-y-4">
@@ -332,7 +321,7 @@
                   </div>
                   <div class="flex-1">
                     <p class="mb-2 font-medium text-orange-900 dark:text-orange-200">
-                      {{ t('oauthFlow.step1Title') }}
+                      点击下方按钮生成授权链接
                     </p>
                     <button
                       v-if="!authUrl"
@@ -342,7 +331,7 @@
                     >
                       <i v-if="!loading" class="fas fa-link mr-2" />
                       <div v-else class="loading-spinner mr-2" />
-                      {{ loading ? t('oauthFlow.generating') : t('oauthFlow.generateAuthLink') }}
+                      {{ loading ? '生成中...' : '生成授权链接' }}
                     </button>
                     <div v-else class="space-y-3">
                       <div class="flex items-center gap-2">
@@ -354,7 +343,7 @@
                         />
                         <button
                           class="rounded-lg bg-gray-100 px-3 py-2 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
-                          :title="t('oauthFlow.copyLinkTooltip')"
+                          title="复制链接"
                           @click="copyAuthUrl"
                         >
                           <i :class="copied ? 'fas fa-check text-green-500' : 'fas fa-copy'" />
@@ -364,7 +353,7 @@
                         class="text-xs text-orange-600 hover:text-orange-700"
                         @click="regenerateAuthUrl"
                       >
-                        <i class="fas fa-sync-alt mr-1" />{{ t('oauthFlow.regenerate') }}
+                        <i class="fas fa-sync-alt mr-1" />重新生成
                       </button>
                     </div>
                   </div>
@@ -383,23 +372,22 @@
                   </div>
                   <div class="flex-1">
                     <p class="mb-2 font-medium text-orange-900 dark:text-orange-200">
-                      {{ t('oauthFlow.step2Title') }}
+                      在浏览器中打开链接并完成授权
                     </p>
                     <p class="mb-2 text-sm text-orange-700 dark:text-orange-300">
-                      {{ t('oauthFlow.step2DescriptionOpenAI') }}
+                      请在新标签页中打开授权链接，登录您的 OpenAI 账户并授权。
                     </p>
                     <div
                       class="mb-3 rounded border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-900/30"
                     >
                       <p class="text-xs text-amber-800 dark:text-amber-300">
                         <i class="fas fa-clock mr-1" />
-                        <strong>{{ t('oauthFlow.openaiImportantNote') }}</strong
-                        >{{ t('oauthFlow.openaiLoadingNote') }}
+                        <strong>重要提示：</strong>授权后页面可能会加载较长时间，请耐心等待。
                       </p>
                       <p class="mt-2 text-xs text-amber-700 dark:text-amber-400">
-                        {{ t('oauthFlow.openaiAddressNote') }}
+                        当浏览器地址栏变为
                         <strong class="font-mono">http://localhost:1455/...</strong>
-                        {{ t('oauthFlow.openaiAddressNoteMiddle') }}
+                        开头时，表示授权已完成。
                       </p>
                     </div>
                     <div
@@ -407,8 +395,8 @@
                     >
                       <p class="text-xs text-yellow-800 dark:text-yellow-300">
                         <i class="fas fa-exclamation-triangle mr-1" />
-                        <strong>{{ t('oauthFlow.proxyNotice') }}</strong
-                        >{{ t('oauthFlow.proxyNoticeText') }}
+                        <strong>注意：</strong
+                        >如果您设置了代理，请确保浏览器也使用相同的代理访问授权页面。
                       </p>
                     </div>
                   </div>
@@ -427,26 +415,23 @@
                   </div>
                   <div class="flex-1">
                     <p class="mb-2 font-medium text-orange-900 dark:text-orange-200">
-                      {{ t('oauthFlow.step3TitleOpenAI') }}
+                      输入授权链接或 Code
                     </p>
                     <p class="mb-3 text-sm text-orange-700 dark:text-orange-300">
-                      {{ t('oauthFlow.step3DescriptionOpenAI') }}
-                      <strong class="font-mono">http://localhost:1455/...</strong>
-                      {{ t('oauthFlow.step3DescriptionOpenAIMiddle') }}
+                      授权完成后，当页面地址变为
+                      <strong class="font-mono">http://localhost:1455/...</strong> 时：
                     </p>
                     <div class="space-y-3">
                       <div>
                         <label
                           class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                         >
-                          <i class="fas fa-link mr-2 text-orange-500" />{{
-                            t('oauthFlow.authLinkOrCode')
-                          }}
+                          <i class="fas fa-link mr-2 text-orange-500" />授权链接或 Code
                         </label>
                         <textarea
                           v-model="authCode"
                           class="form-input w-full resize-none font-mono text-sm"
-                          :placeholder="t('oauthFlow.authCodePlaceholderOpenAI')"
+                          placeholder="方式1：复制完整的链接（http://localhost:1455/auth/callback?code=...）&#10;方式2：仅复制 code 参数的值&#10;系统会自动识别并提取所需信息"
                           rows="3"
                         />
                       </div>
@@ -455,18 +440,18 @@
                       >
                         <p class="text-xs text-blue-700 dark:text-blue-300">
                           <i class="fas fa-lightbulb mr-1" />
-                          <strong>{{ t('oauthFlow.openaiTip') }}</strong
-                          >{{ t('oauthFlow.openaiTipText') }}
+                          <strong>提示：</strong>您可以直接复制整个链接或仅复制 code
+                          参数值，系统会自动识别。
                         </p>
                         <p class="mt-1 text-xs text-blue-600 dark:text-blue-400">
-                          {{ t('oauthFlow.openaiLinkExample')
-                          }}<span class="font-mono"
+                          • 完整链接示例：<span class="font-mono"
                             >http://localhost:1455/auth/callback?code=ac_4hm8...</span
                           >
                         </p>
                         <p class="text-xs text-blue-600">
-                          {{ t('oauthFlow.openaiCodeExample')
-                          }}<span class="font-mono">ac_4hm8iqmx9A2fzMy_cwye7U3W7...</span>
+                          • 仅 Code 示例：<span class="font-mono"
+                            >ac_4hm8iqmx9A2fzMy_cwye7U3W7...</span
+                          >
                         </p>
                       </div>
                     </div>
@@ -485,7 +470,7 @@
         type="button"
         @click="$emit('back')"
       >
-        {{ t('oauthFlow.previousStep') }}
+        上一步
       </button>
       <button
         class="btn btn-primary flex-1 px-6 py-3 font-semibold"
@@ -494,7 +479,7 @@
         @click="exchangeCode"
       >
         <div v-if="exchanging" class="loading-spinner mr-2" />
-        {{ exchanging ? t('oauthFlow.verifying') : t('oauthFlow.completeAuth') }}
+        {{ exchanging ? '验证中...' : '完成授权' }}
       </button>
     </div>
   </div>
@@ -502,11 +487,8 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { showToast } from '@/utils/toast'
 import { useAccountsStore } from '@/stores/accounts'
-
-const { t } = useI18n()
 
 const props = defineProps({
   platform: {
@@ -562,16 +544,16 @@ watch(authCode, (newValue) => {
         if (code) {
           // 成功提取授权码
           authCode.value = code
-          showToast(t('oauthFlow.successExtractCode'), 'success')
+          showToast('成功提取授权码！', 'success')
           console.log('Successfully extracted authorization code from URL')
         } else {
           // URL 中没有 code 参数
-          showToast(t('oauthFlow.errorCodeNotFound'), 'error')
+          showToast('URL 中未找到授权码参数，请检查链接是否正确', 'error')
         }
       } catch (error) {
         // URL 解析失败
         console.error('Failed to parse URL:', error)
-        showToast(t('oauthFlow.errorLinkFormat'), 'error')
+        showToast('链接格式错误，请检查是否为完整的 URL', 'error')
       }
     } else if (props.platform === 'gemini' || props.platform === 'openai') {
       // Gemini 和 OpenAI 平台可能使用不同的回调URL
@@ -582,14 +564,14 @@ watch(authCode, (newValue) => {
 
         if (code) {
           authCode.value = code
-          showToast(t('oauthFlow.successExtractCode'), 'success')
+          showToast('成功提取授权码！', 'success')
         }
       } catch (error) {
         // 不是有效的URL，保持原值
       }
     } else {
       // 错误的 URL（不是正确的 localhost 回调地址）
-      showToast(t('oauthFlow.errorWrongUrlFormat'), 'error')
+      showToast('请粘贴以 http://localhost:1455 或 http://localhost:45462 开头的链接', 'error')
     }
   }
   // 如果不是 URL，保持原值（兼容直接输入授权码）
@@ -625,7 +607,7 @@ const generateAuthUrl = async () => {
       sessionId.value = result.sessionId
     }
   } catch (error) {
-    showToast(error.message || t('oauthFlow.generateAuthFailed'), 'error')
+    showToast(error.message || '生成授权链接失败', 'error')
   } finally {
     loading.value = false
   }
@@ -643,7 +625,7 @@ const copyAuthUrl = async () => {
   try {
     await navigator.clipboard.writeText(authUrl.value)
     copied.value = true
-    showToast(t('oauthFlow.linkCopied'), 'success')
+    showToast('链接已复制', 'success')
     setTimeout(() => {
       copied.value = false
     }, 2000)
@@ -656,7 +638,7 @@ const copyAuthUrl = async () => {
     document.execCommand('copy')
     document.body.removeChild(input)
     copied.value = true
-    showToast(t('oauthFlow.linkCopied'), 'success')
+    showToast('链接已复制', 'success')
     setTimeout(() => {
       copied.value = false
     }, 2000)
@@ -713,7 +695,7 @@ const exchangeCode = async () => {
 
     emit('success', tokenInfo)
   } catch (error) {
-    showToast(error.message || t('oauthFlow.authFailed'), 'error')
+    showToast(error.message || '授权失败，请检查授权码是否正确', 'error')
   } finally {
     exchanging.value = false
   }

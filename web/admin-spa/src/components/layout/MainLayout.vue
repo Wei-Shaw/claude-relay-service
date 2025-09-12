@@ -22,12 +22,9 @@
 <script setup>
 import { ref, watch, nextTick, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import AppHeader from './AppHeader.vue'
 import TabBar from './TabBar.vue'
-
-const { t } = useI18n()
 
 const route = useRoute()
 const router = useRouter()
@@ -127,7 +124,7 @@ const handleTabChange = async (tabKey) => {
   } catch (err) {
     // 如果路由切换失败，恢复activeTab状态
     if (err.name !== 'NavigationDuplicated') {
-      console.error(t('layout.mainLayout.routing.routeChangeError'), err)
+      console.error('路由切换失败:', err)
       // 恢复到当前路由对应的tab
       initActiveTab()
     }

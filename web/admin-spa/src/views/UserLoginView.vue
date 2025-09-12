@@ -26,10 +26,10 @@
           <span class="ml-2 text-xl font-bold text-gray-900 dark:text-white">Claude Relay</span>
         </div>
         <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
-          {{ t('user.login.title') }}
+          User Sign In
         </h2>
         <p class="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-          {{ t('user.login.subtitle') }}
+          Sign in to your account to manage your API keys
         </p>
       </div>
 
@@ -40,7 +40,7 @@
               class="block text-sm font-medium text-gray-700 dark:text-gray-300"
               for="username"
             >
-              {{ t('user.login.username') }}
+              Username
             </label>
             <div class="mt-1">
               <input
@@ -49,7 +49,7 @@
                 class="relative block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-400 dark:focus:ring-blue-400 sm:text-sm"
                 :disabled="loading"
                 name="username"
-                :placeholder="t('user.login.usernamePlaceholder')"
+                placeholder="Enter your username"
                 required
                 type="text"
               />
@@ -61,7 +61,7 @@
               class="block text-sm font-medium text-gray-700 dark:text-gray-300"
               for="password"
             >
-              {{ t('user.login.password') }}
+              Password
             </label>
             <div class="mt-1">
               <input
@@ -70,7 +70,7 @@
                 class="relative block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-400 dark:focus:ring-blue-400 sm:text-sm"
                 :disabled="loading"
                 name="password"
-                :placeholder="t('user.login.passwordPlaceholder')"
+                placeholder="Enter your password"
                 required
                 type="password"
               />
@@ -125,7 +125,7 @@
                   ></path>
                 </svg>
               </span>
-              {{ loading ? t('user.login.signingIn') : t('user.login.signIn') }}
+              {{ loading ? 'Signing In...' : 'Sign In' }}
             </button>
           </div>
 
@@ -134,7 +134,7 @@
               class="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
               to="/admin-login"
             >
-              {{ t('user.login.adminLogin') }}
+              Admin Login
             </router-link>
           </div>
         </form>
@@ -146,14 +146,12 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import { showToast } from '@/utils/toast'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 
 const router = useRouter()
-const { t } = useI18n()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
 
@@ -167,7 +165,7 @@ const form = reactive({
 
 const handleLogin = async () => {
   if (!form.username || !form.password) {
-    error.value = t('user.login.requiredFields')
+    error.value = 'Please enter both username and password'
     return
   }
 
@@ -180,11 +178,11 @@ const handleLogin = async () => {
       password: form.password
     })
 
-    showToast(t('user.login.loginSuccess'), 'success')
+    showToast('Login successful!', 'success')
     router.push('/user-dashboard')
   } catch (err) {
     console.error('Login error:', err)
-    error.value = err.response?.data?.message || err.message || t('user.login.loginFailed')
+    error.value = err.response?.data?.message || err.message || 'Login failed'
   } finally {
     loading.value = false
   }

@@ -1,5 +1,4 @@
 import { Chart } from 'chart.js/auto'
-import i18n from '@/i18n'
 
 export function useChartConfig() {
   // 设置Chart.js默认配置
@@ -52,9 +51,7 @@ export function useChartConfig() {
               label += ': '
             }
             if (context.parsed.y !== null) {
-              const localeMap = { 'zh-cn': 'zh-CN', 'zh-tw': 'zh-TW', en: 'en-US' }
-              const currentLocale = localeMap[i18n.global.locale.value] || 'en-US'
-              label += new Intl.NumberFormat(currentLocale).format(context.parsed.y)
+              label += new Intl.NumberFormat('zh-CN').format(context.parsed.y)
             }
             return label
           }

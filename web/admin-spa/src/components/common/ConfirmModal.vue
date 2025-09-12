@@ -25,13 +25,13 @@
             class="flex-1 rounded-xl bg-gray-100 px-4 py-2.5 font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
             @click="$emit('cancel')"
           >
-            {{ cancelLabel }}
+            {{ cancelText }}
           </button>
           <button
             class="flex-1 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 px-4 py-2.5 font-medium text-white shadow-sm transition-colors hover:from-yellow-600 hover:to-orange-600"
             @click="$emit('confirm')"
           >
-            {{ confirmLabel }}
+            {{ confirmText }}
           </button>
         </div>
       </div>
@@ -40,12 +40,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
-
-const { t } = useI18n()
-
-const props = defineProps({
+defineProps({
   show: {
     type: Boolean,
     required: true
@@ -60,16 +55,13 @@ const props = defineProps({
   },
   confirmText: {
     type: String,
-    default: ''
+    default: '继续'
   },
   cancelText: {
     type: String,
-    default: ''
+    default: '取消'
   }
 })
-
-const confirmLabel = computed(() => props.confirmText || t('common.confirmModal.continue'))
-const cancelLabel = computed(() => props.cancelText || t('common.confirmModal.cancel'))
 
 defineEmits(['confirm', 'cancel'])
 </script>

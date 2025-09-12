@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { apiClient } from '@/config/api'
-import i18n from '@/i18n'
 
 export const useAccountsStore = defineStore('accounts', () => {
   // 状态
@@ -28,7 +27,7 @@ export const useAccountsStore = defineStore('accounts', () => {
       if (response.success) {
         claudeAccounts.value = response.data || []
       } else {
-        throw new Error(response.message || i18n.global.t('accounts.loadAccountsFailed'))
+        throw new Error(response.message || '获取Claude账户失败')
       }
     } catch (err) {
       error.value = err.message
@@ -47,7 +46,7 @@ export const useAccountsStore = defineStore('accounts', () => {
       if (response.success) {
         claudeConsoleAccounts.value = response.data || []
       } else {
-        throw new Error(response.message || i18n.global.t('accounts.loadAccountsFailed'))
+        throw new Error(response.message || '获取Claude Console账户失败')
       }
     } catch (err) {
       error.value = err.message
@@ -66,7 +65,7 @@ export const useAccountsStore = defineStore('accounts', () => {
       if (response.success) {
         bedrockAccounts.value = response.data || []
       } else {
-        throw new Error(response.message || i18n.global.t('accounts.loadAccountsFailed'))
+        throw new Error(response.message || '获取Bedrock账户失败')
       }
     } catch (err) {
       error.value = err.message
@@ -85,7 +84,7 @@ export const useAccountsStore = defineStore('accounts', () => {
       if (response.success) {
         geminiAccounts.value = response.data || []
       } else {
-        throw new Error(response.message || i18n.global.t('accounts.loadAccountsFailed'))
+        throw new Error(response.message || '获取Gemini账户失败')
       }
     } catch (err) {
       error.value = err.message
@@ -104,7 +103,7 @@ export const useAccountsStore = defineStore('accounts', () => {
       if (response.success) {
         openaiAccounts.value = response.data || []
       } else {
-        throw new Error(response.message || i18n.global.t('accounts.loadAccountsFailed'))
+        throw new Error(response.message || '获取OpenAI账户失败')
       }
     } catch (err) {
       error.value = err.message
@@ -123,7 +122,7 @@ export const useAccountsStore = defineStore('accounts', () => {
       if (response.success) {
         azureOpenaiAccounts.value = response.data || []
       } else {
-        throw new Error(response.message || i18n.global.t('accounts.loadAccountsFailed'))
+        throw new Error(response.message || '获取Azure OpenAI账户失败')
       }
     } catch (err) {
       error.value = err.message
@@ -184,7 +183,7 @@ export const useAccountsStore = defineStore('accounts', () => {
         await fetchClaudeAccounts()
         return response.data
       } else {
-        throw new Error(response.message || i18n.global.t('accounts.operationFailed'))
+        throw new Error(response.message || '创建Claude账户失败')
       }
     } catch (err) {
       error.value = err.message
@@ -204,9 +203,7 @@ export const useAccountsStore = defineStore('accounts', () => {
         await fetchClaudeConsoleAccounts()
         return response.data
       } else {
-        throw new Error(
-          response.message || i18n.global.t('common.errors.createClaudeConsoleAccountFailed')
-        )
+        throw new Error(response.message || '创建Claude Console账户失败')
       }
     } catch (err) {
       error.value = err.message
@@ -226,7 +223,7 @@ export const useAccountsStore = defineStore('accounts', () => {
         await fetchBedrockAccounts()
         return response.data
       } else {
-        throw new Error(response.message || i18n.global.t('accounts.operationFailed'))
+        throw new Error(response.message || '创建Bedrock账户失败')
       }
     } catch (err) {
       error.value = err.message
@@ -246,7 +243,7 @@ export const useAccountsStore = defineStore('accounts', () => {
         await fetchGeminiAccounts()
         return response.data
       } else {
-        throw new Error(response.message || i18n.global.t('accounts.operationFailed'))
+        throw new Error(response.message || '创建Gemini账户失败')
       }
     } catch (err) {
       error.value = err.message
@@ -266,7 +263,7 @@ export const useAccountsStore = defineStore('accounts', () => {
         await fetchOpenAIAccounts()
         return response.data
       } else {
-        throw new Error(response.message || i18n.global.t('accounts.operationFailed'))
+        throw new Error(response.message || '创建OpenAI账户失败')
       }
     } catch (err) {
       error.value = err.message
@@ -286,9 +283,7 @@ export const useAccountsStore = defineStore('accounts', () => {
         await fetchAzureOpenAIAccounts()
         return response.data
       } else {
-        throw new Error(
-          response.message || i18n.global.t('common.errors.createAzureOpenAIAccountFailed')
-        )
+        throw new Error(response.message || '创建Azure OpenAI账户失败')
       }
     } catch (err) {
       error.value = err.message
@@ -328,7 +323,7 @@ export const useAccountsStore = defineStore('accounts', () => {
         await fetchClaudeAccounts()
         return response
       } else {
-        throw new Error(response.message || i18n.global.t('accounts.operationFailed'))
+        throw new Error(response.message || '更新Claude账户失败')
       }
     } catch (err) {
       error.value = err.message
@@ -348,9 +343,7 @@ export const useAccountsStore = defineStore('accounts', () => {
         await fetchClaudeConsoleAccounts()
         return response
       } else {
-        throw new Error(
-          response.message || i18n.global.t('common.errors.updateClaudeConsoleAccountFailed')
-        )
+        throw new Error(response.message || '更新Claude Console账户失败')
       }
     } catch (err) {
       error.value = err.message
@@ -370,7 +363,7 @@ export const useAccountsStore = defineStore('accounts', () => {
         await fetchBedrockAccounts()
         return response
       } else {
-        throw new Error(response.message || i18n.global.t('accounts.operationFailed'))
+        throw new Error(response.message || '更新Bedrock账户失败')
       }
     } catch (err) {
       error.value = err.message
@@ -390,7 +383,7 @@ export const useAccountsStore = defineStore('accounts', () => {
         await fetchGeminiAccounts()
         return response
       } else {
-        throw new Error(response.message || i18n.global.t('accounts.operationFailed'))
+        throw new Error(response.message || '更新Gemini账户失败')
       }
     } catch (err) {
       error.value = err.message
@@ -410,7 +403,7 @@ export const useAccountsStore = defineStore('accounts', () => {
         await fetchOpenAIAccounts()
         return response
       } else {
-        throw new Error(response.message || i18n.global.t('accounts.operationFailed'))
+        throw new Error(response.message || '更新OpenAI账户失败')
       }
     } catch (err) {
       error.value = err.message
@@ -430,9 +423,7 @@ export const useAccountsStore = defineStore('accounts', () => {
         await fetchAzureOpenAIAccounts()
         return response
       } else {
-        throw new Error(
-          response.message || i18n.global.t('common.errors.updateAzureOpenAIAccountFailed')
-        )
+        throw new Error(response.message || '更新Azure OpenAI账户失败')
       }
     } catch (err) {
       error.value = err.message
@@ -507,7 +498,7 @@ export const useAccountsStore = defineStore('accounts', () => {
         }
         return response
       } else {
-        throw new Error(response.message || i18n.global.t('accounts.schedulingToggleFailed'))
+        throw new Error(response.message || '切换状态失败')
       }
     } catch (err) {
       error.value = err.message
@@ -562,7 +553,7 @@ export const useAccountsStore = defineStore('accounts', () => {
         }
         return response
       } else {
-        throw new Error(response.message || i18n.global.t('accounts.deleteFailed'))
+        throw new Error(response.message || '删除失败')
       }
     } catch (err) {
       error.value = err.message
@@ -582,7 +573,7 @@ export const useAccountsStore = defineStore('accounts', () => {
         await fetchClaudeAccounts()
         return response
       } else {
-        throw new Error(response.message || i18n.global.t('accounts.operationFailed'))
+        throw new Error(response.message || 'Token刷新失败')
       }
     } catch (err) {
       error.value = err.message
@@ -599,7 +590,7 @@ export const useAccountsStore = defineStore('accounts', () => {
       if (response.success) {
         return response.data // 返回整个对象，包含authUrl和sessionId
       } else {
-        throw new Error(response.message || i18n.global.t('accounts.operationFailed'))
+        throw new Error(response.message || '生成授权URL失败')
       }
     } catch (err) {
       error.value = err.message
@@ -614,7 +605,7 @@ export const useAccountsStore = defineStore('accounts', () => {
       if (response.success) {
         return response.data
       } else {
-        throw new Error(response.message || i18n.global.t('accounts.operationFailed'))
+        throw new Error(response.message || '交换授权码失败')
       }
     } catch (err) {
       error.value = err.message
@@ -632,9 +623,7 @@ export const useAccountsStore = defineStore('accounts', () => {
       if (response.success) {
         return response.data // 返回整个对象，包含authUrl和sessionId
       } else {
-        throw new Error(
-          response.message || i18n.global.t('common.errors.generateSetupTokenUrlFailed')
-        )
+        throw new Error(response.message || '生成Setup Token URL失败')
       }
     } catch (err) {
       error.value = err.message
@@ -652,7 +641,7 @@ export const useAccountsStore = defineStore('accounts', () => {
       if (response.success) {
         return response.data
       } else {
-        throw new Error(response.message || i18n.global.t('common.errors.exchangeSetupTokenFailed'))
+        throw new Error(response.message || '交换Setup Token授权码失败')
       }
     } catch (err) {
       error.value = err.message
@@ -667,7 +656,7 @@ export const useAccountsStore = defineStore('accounts', () => {
       if (response.success) {
         return response.data // 返回整个对象，包含authUrl和sessionId
       } else {
-        throw new Error(response.message || i18n.global.t('accounts.operationFailed'))
+        throw new Error(response.message || '生成授权URL失败')
       }
     } catch (err) {
       error.value = err.message
@@ -682,7 +671,7 @@ export const useAccountsStore = defineStore('accounts', () => {
       if (response.success) {
         return response.data
       } else {
-        throw new Error(response.message || i18n.global.t('accounts.operationFailed'))
+        throw new Error(response.message || '交换授权码失败')
       }
     } catch (err) {
       error.value = err.message
@@ -697,7 +686,7 @@ export const useAccountsStore = defineStore('accounts', () => {
       if (response.success) {
         return response.data // 返回整个对象，包含authUrl和sessionId
       } else {
-        throw new Error(response.message || i18n.global.t('accounts.operationFailed'))
+        throw new Error(response.message || '生成授权URL失败')
       }
     } catch (err) {
       error.value = err.message
@@ -712,7 +701,7 @@ export const useAccountsStore = defineStore('accounts', () => {
       if (response.success) {
         return response.data
       } else {
-        throw new Error(response.message || i18n.global.t('accounts.operationFailed'))
+        throw new Error(response.message || '交换授权码失败')
       }
     } catch (err) {
       error.value = err.message

@@ -8,7 +8,7 @@
     >
       <div class="mt-3">
         <div class="mb-4 flex items-center justify-between">
-          <h3 class="text-lg font-medium text-gray-900">{{ t('user.createApiKeyModal.title') }}</h3>
+          <h3 class="text-lg font-medium text-gray-900">Create New API Key</h3>
           <button class="text-gray-400 hover:text-gray-600" @click="$emit('close')">
             <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -23,16 +23,13 @@
 
         <form class="space-y-4" @submit.prevent="handleSubmit">
           <div>
-            <label class="block text-sm font-medium text-gray-700" for="name">
-              {{ t('user.createApiKeyModal.form.nameLabel') }}
-              {{ t('user.createApiKeyModal.form.nameRequired') }}
-            </label>
+            <label class="block text-sm font-medium text-gray-700" for="name"> Name * </label>
             <input
               id="name"
               v-model="form.name"
               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
               :disabled="loading"
-              :placeholder="t('user.createApiKeyModal.form.namePlaceholder')"
+              placeholder="Enter API key name"
               required
               type="text"
             />
@@ -40,14 +37,14 @@
 
           <div>
             <label class="block text-sm font-medium text-gray-700" for="description">
-              {{ t('user.createApiKeyModal.form.descriptionLabel') }}
+              Description
             </label>
             <textarea
               id="description"
               v-model="form.description"
               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
               :disabled="loading"
-              :placeholder="t('user.createApiKeyModal.form.descriptionPlaceholder')"
+              placeholder="Optional description"
               rows="3"
             ></textarea>
           </div>
@@ -76,7 +73,7 @@
               type="button"
               @click="$emit('close')"
             >
-              {{ t('user.createApiKeyModal.buttons.cancel') }}
+              Cancel
             </button>
             <button
               class="rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -104,9 +101,9 @@
                     fill="currentColor"
                   ></path>
                 </svg>
-                {{ t('user.createApiKeyModal.buttons.creating') }}
+                Creating...
               </span>
-              <span v-else>{{ t('user.createApiKeyModal.buttons.createApiKey') }}</span>
+              <span v-else>Create API Key</span>
             </button>
           </div>
         </form>
@@ -124,13 +121,11 @@
               </svg>
             </div>
             <div class="ml-3 flex-1">
-              <h4 class="text-sm font-medium text-green-800">
-                {{ t('user.createApiKeyModal.success.title') }}
-              </h4>
+              <h4 class="text-sm font-medium text-green-800">API Key Created Successfully!</h4>
               <div class="mt-3">
                 <p class="mb-2 text-sm text-green-700">
-                  <strong>{{ t('user.createApiKeyModal.success.warning.important') }}</strong>
-                  {{ t('user.createApiKeyModal.success.warning.message') }}
+                  <strong>Important:</strong> Copy your API key now. You won't be able to see it
+                  again!
                 </p>
                 <div class="rounded-md border border-green-300 bg-white p-3">
                   <div class="flex items-center justify-between">
@@ -154,7 +149,7 @@
                           stroke-width="2"
                         />
                       </svg>
-                      {{ t('user.createApiKeyModal.buttons.copy') }}
+                      Copy
                     </button>
                   </div>
                 </div>
@@ -164,7 +159,7 @@
                   class="rounded-md border border-transparent bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
                   @click="handleClose"
                 >
-                  {{ t('user.createApiKeyModal.buttons.done') }}
+                  Done
                 </button>
               </div>
             </div>
@@ -177,7 +172,6 @@
 
 <script setup>
 import { ref, reactive, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { showToast } from '@/utils/toast'
 
@@ -190,7 +184,6 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'created'])
 
-const { t } = useI18n()
 const userStore = useUserStore()
 
 const loading = ref(false)
@@ -211,7 +204,7 @@ const resetForm = () => {
 
 const handleSubmit = async () => {
   if (!form.name.trim()) {
-    error.value = t('user.createApiKeyModal.validation.nameRequired')
+    error.value = 'API key name is required'
     return
   }
 
@@ -228,14 +221,13 @@ const handleSubmit = async () => {
 
     if (result.success) {
       newApiKey.value = result.apiKey
-      showToast(t('user.createApiKeyModal.messages.createSuccess'), 'success')
+      showToast('API key created successfully!', 'success')
     } else {
-      error.value = result.message || t('user.createApiKeyModal.errors.createFailed')
+      error.value = result.message || 'Failed to create API key'
     }
   } catch (err) {
     console.error('Create API key error:', err)
-    error.value =
-      err.response?.data?.message || err.message || t('user.createApiKeyModal.errors.createFailed')
+    error.value = err.response?.data?.message || err.message || 'Failed to create API key'
   } finally {
     loading.value = false
   }
@@ -244,10 +236,10 @@ const handleSubmit = async () => {
 const copyToClipboard = async (text) => {
   try {
     await navigator.clipboard.writeText(text)
-    showToast(t('user.createApiKeyModal.messages.copySuccess'), 'success')
+    showToast('API key copied to clipboard!', 'success')
   } catch (err) {
     console.error('Failed to copy:', err)
-    showToast(t('user.createApiKeyModal.messages.copyFailed'), 'error')
+    showToast('Failed to copy to clipboard', 'error')
   }
 }
 

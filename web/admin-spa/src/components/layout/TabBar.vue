@@ -38,10 +38,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
-
-const { t } = useI18n()
 
 defineProps({
   activeTab: {
@@ -57,49 +54,24 @@ const authStore = useAuthStore()
 // 根据 LDAP 配置动态生成 tabs
 const tabs = computed(() => {
   const baseTabs = [
-    {
-      key: 'dashboard',
-      name: t('layout.tabBar.tabs.dashboard.name'),
-      shortName: t('layout.tabBar.tabs.dashboard.shortName'),
-      icon: 'fas fa-tachometer-alt'
-    },
-    {
-      key: 'apiKeys',
-      name: t('layout.tabBar.tabs.apiKeys.name'),
-      shortName: t('layout.tabBar.tabs.apiKeys.shortName'),
-      icon: 'fas fa-key'
-    },
-    {
-      key: 'accounts',
-      name: t('layout.tabBar.tabs.accounts.name'),
-      shortName: t('layout.tabBar.tabs.accounts.shortName'),
-      icon: 'fas fa-user-circle'
-    }
+    { key: 'dashboard', name: '仪表板', shortName: '仪表板', icon: 'fas fa-tachometer-alt' },
+    { key: 'apiKeys', name: 'API Keys', shortName: 'API', icon: 'fas fa-key' },
+    { key: 'accounts', name: '账户管理', shortName: '账户', icon: 'fas fa-user-circle' }
   ]
 
   // 只有在 LDAP 启用时才显示用户管理
   if (authStore.oemSettings?.ldapEnabled) {
     baseTabs.push({
       key: 'userManagement',
-      name: t('layout.tabBar.tabs.userManagement.name'),
-      shortName: t('layout.tabBar.tabs.userManagement.shortName'),
+      name: '用户管理',
+      shortName: '用户',
       icon: 'fas fa-users'
     })
   }
 
   baseTabs.push(
-    {
-      key: 'tutorial',
-      name: t('layout.tabBar.tabs.tutorial.name'),
-      shortName: t('layout.tabBar.tabs.tutorial.shortName'),
-      icon: 'fas fa-graduation-cap'
-    },
-    {
-      key: 'settings',
-      name: t('layout.tabBar.tabs.settings.name'),
-      shortName: t('layout.tabBar.tabs.settings.shortName'),
-      icon: 'fas fa-cogs'
-    }
+    { key: 'tutorial', name: '使用教程', shortName: '教程', icon: 'fas fa-graduation-cap' },
+    { key: 'settings', name: '系统设置', shortName: '设置', icon: 'fas fa-cogs' }
   )
 
   return baseTabs

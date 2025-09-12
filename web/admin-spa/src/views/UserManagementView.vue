@@ -3,11 +3,9 @@
     <!-- Header -->
     <div class="sm:flex sm:items-center">
       <div class="sm:flex-auto">
-        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
-          {{ t('user.management.title') }}
-        </h1>
+        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">User Management</h1>
         <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">
-          {{ t('user.management.description') }}
+          Manage users, their API keys, and view usage statistics
         </p>
       </div>
       <div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
@@ -24,7 +22,7 @@
               stroke-width="2"
             />
           </svg>
-          {{ t('user.management.refresh') }}
+          Refresh
         </button>
       </div>
     </div>
@@ -52,7 +50,7 @@
             <div class="ml-5 w-0 flex-1">
               <dl>
                 <dt class="truncate text-sm font-medium text-gray-500 dark:text-gray-400">
-                  {{ t('user.management.totalUsers') }}
+                  Total Users
                 </dt>
                 <dd class="text-lg font-medium text-gray-900 dark:text-white">
                   {{ userStats?.totalUsers || 0 }}
@@ -84,7 +82,7 @@
             <div class="ml-5 w-0 flex-1">
               <dl>
                 <dt class="truncate text-sm font-medium text-gray-500 dark:text-gray-400">
-                  {{ t('user.management.activeUsers') }}
+                  Active Users
                 </dt>
                 <dd class="text-lg font-medium text-gray-900 dark:text-white">
                   {{ userStats?.activeUsers || 0 }}
@@ -116,7 +114,7 @@
             <div class="ml-5 w-0 flex-1">
               <dl>
                 <dt class="truncate text-sm font-medium text-gray-500 dark:text-gray-400">
-                  {{ t('user.management.totalApiKeys') }}
+                  Total API Keys
                 </dt>
                 <dd class="text-lg font-medium text-gray-900 dark:text-white">
                   {{ userStats?.totalApiKeys || 0 }}
@@ -148,7 +146,7 @@
             <div class="ml-5 w-0 flex-1">
               <dl>
                 <dt class="truncate text-sm font-medium text-gray-500 dark:text-gray-400">
-                  {{ t('user.management.totalCost') }}
+                  Total Cost
                 </dt>
                 <dd class="text-lg font-medium text-gray-900 dark:text-white">
                   ${{ (userStats?.totalUsage?.totalCost || 0).toFixed(4) }}
@@ -186,7 +184,7 @@
                 <input
                   v-model="searchQuery"
                   class="block w-full rounded-md border-gray-300 pl-10 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
-                  :placeholder="t('user.management.searchPlaceholder')"
+                  placeholder="Search users..."
                   type="search"
                   @input="debouncedSearch"
                 />
@@ -200,9 +198,9 @@
                 class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
                 @change="loadUsers"
               >
-                <option value="">{{ t('user.management.allRoles') }}</option>
-                <option value="user">{{ t('user.management.user') }}</option>
-                <option value="admin">{{ t('user.management.admin') }}</option>
+                <option value="">All Roles</option>
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
               </select>
             </div>
 
@@ -213,9 +211,9 @@
                 class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
                 @change="loadUsers"
               >
-                <option value="">{{ t('user.management.allStatus') }}</option>
-                <option value="true">{{ t('user.management.active') }}</option>
-                <option value="false">{{ t('user.management.disabled') }}</option>
+                <option value="">All Status</option>
+                <option value="true">Active</option>
+                <option value="false">Disabled</option>
               </select>
             </div>
           </div>
@@ -227,7 +225,7 @@
     <div class="overflow-hidden bg-white shadow dark:bg-gray-800 sm:rounded-md">
       <div class="border-b border-gray-200 px-4 py-5 dark:border-gray-700 sm:px-6">
         <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
-          {{ t('user.management.users') }}
+          Users
           <span v-if="!loading" class="text-sm text-gray-500 dark:text-gray-400"
             >({{ filteredUsers.length }} of {{ users.length }})</span
           >
@@ -256,9 +254,7 @@
             fill="currentColor"
           ></path>
         </svg>
-        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-          {{ t('user.management.loadingUsers') }}
-        </p>
+        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading users...</p>
       </div>
 
       <!-- Users List -->
@@ -303,9 +299,7 @@
                           : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                       ]"
                     >
-                      {{
-                        user.isActive ? t('user.management.active') : t('user.management.disabled')
-                      }}
+                      {{ user.isActive ? 'Active' : 'Disabled' }}
                     </span>
                     <span
                       :class="[
@@ -324,24 +318,18 @@
                 >
                   <span>@{{ user.username }}</span>
                   <span v-if="user.email">{{ user.email }}</span>
-                  <span>{{ user.apiKeyCount || 0 }} {{ t('user.management.apiKeysCount') }}</span>
+                  <span>{{ user.apiKeyCount || 0 }} API keys</span>
                   <span v-if="user.lastLoginAt"
-                    >{{ t('user.management.lastLogin') }}: {{ formatDate(user.lastLoginAt) }}</span
+                    >Last login: {{ formatDate(user.lastLoginAt) }}</span
                   >
-                  <span v-else>{{ t('user.management.neverLoggedIn') }}</span>
+                  <span v-else>Never logged in</span>
                 </div>
                 <div
                   v-if="user.totalUsage"
                   class="mt-1 flex items-center space-x-4 text-xs text-gray-400 dark:text-gray-500"
                 >
-                  <span
-                    >{{ formatNumber(user.totalUsage.requests || 0) }}
-                    {{ t('user.management.requests') }}</span
-                  >
-                  <span
-                    >${{ (user.totalUsage.totalCost || 0).toFixed(4) }}
-                    {{ t('user.management.totalCostLabel') }}</span
-                  >
+                  <span>{{ formatNumber(user.totalUsage.requests || 0) }} requests</span>
+                  <span>${{ (user.totalUsage.totalCost || 0).toFixed(4) }} total cost</span>
                 </div>
               </div>
             </div>
@@ -349,7 +337,7 @@
               <!-- View Usage Stats -->
               <button
                 class="inline-flex items-center rounded border border-transparent p-1 text-gray-400 hover:text-blue-600"
-                :title="t('user.management.viewUsageStats')"
+                title="View Usage Stats"
                 @click="viewUserStats(user)"
               >
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -366,7 +354,7 @@
               <button
                 class="inline-flex items-center rounded border border-transparent p-1 text-gray-400 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
                 :disabled="user.apiKeyCount === 0"
-                :title="t('user.management.disableAllApiKeys')"
+                title="Disable All API Keys"
                 @click="disableUserApiKeys(user)"
               >
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -387,9 +375,7 @@
                     ? 'text-gray-400 hover:text-red-600'
                     : 'text-gray-400 hover:text-green-600'
                 ]"
-                :title="
-                  user.isActive ? t('user.management.disableUser') : t('user.management.enableUser')
-                "
+                :title="user.isActive ? 'Disable User' : 'Enable User'"
                 @click="toggleUserStatus(user)"
               >
                 <svg
@@ -419,7 +405,7 @@
               <!-- Change Role -->
               <button
                 class="inline-flex items-center rounded border border-transparent p-1 text-gray-400 hover:text-purple-600"
-                :title="t('user.management.changeRole')"
+                title="Change Role"
                 @click="changeUserRole(user)"
               >
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -451,12 +437,10 @@
             stroke-width="2"
           />
         </svg>
-        <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">
-          {{ t('user.management.noUsersFound') }}
-        </h3>
+        <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No users found</h3>
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
           {{
-            searchQuery ? t('user.management.noUsersMatch') : t('user.management.noUsersCreated')
+            searchQuery ? 'No users match your search criteria.' : 'No users have been created yet.'
           }}
         </p>
       </div>
@@ -492,7 +476,6 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { apiClient } from '@/config/api'
 import { showToast } from '@/utils/toast'
 import { debounce } from 'lodash-es'
@@ -500,7 +483,6 @@ import UserUsageStatsModal from '@/components/admin/UserUsageStatsModal.vue'
 import ChangeRoleModal from '@/components/admin/ChangeRoleModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
-const { t } = useI18n()
 const loading = ref(true)
 const users = ref([])
 const userStats = ref(null)
@@ -595,7 +577,7 @@ const loadUsers = async () => {
     }
   } catch (error) {
     console.error('Failed to load users:', error)
-    showToast(t('user.management.loadUsersError'), 'error')
+    showToast('Failed to load users', 'error')
   } finally {
     loading.value = false
   }
@@ -613,13 +595,11 @@ const viewUserStats = (user) => {
 const toggleUserStatus = (user) => {
   selectedUser.value = user
   confirmAction.value = {
-    title: user.isActive
-      ? t('user.management.disableUserTitle')
-      : t('user.management.enableUserTitle'),
+    title: user.isActive ? 'Disable User' : 'Enable User',
     message: user.isActive
-      ? t('user.management.disableUserMessage', { username: user.username })
-      : t('user.management.enableUserMessage', { username: user.username }),
-    confirmText: user.isActive ? t('user.management.disable') : t('user.management.enable'),
+      ? `Are you sure you want to disable user "${user.username}"? This will prevent them from logging in.`
+      : `Are you sure you want to enable user "${user.username}"?`,
+    confirmText: user.isActive ? 'Disable' : 'Enable',
     confirmClass: user.isActive ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700',
     action: 'toggleStatus'
   }
@@ -631,12 +611,9 @@ const disableUserApiKeys = (user) => {
 
   selectedUser.value = user
   confirmAction.value = {
-    title: t('user.management.disableAllKeysTitle'),
-    message: t('user.management.disableAllKeysMessage', {
-      count: user.apiKeyCount,
-      username: user.username
-    }),
-    confirmText: t('user.management.disableKeys'),
+    title: 'Disable All API Keys',
+    message: `Are you sure you want to disable all ${user.apiKeyCount} API keys for user "${user.username}"? This will prevent them from using the service.`,
+    confirmText: 'Disable Keys',
     confirmClass: 'bg-red-600 hover:bg-red-700',
     action: 'disableKeys'
   }
@@ -663,27 +640,19 @@ const handleConfirmAction = async () => {
         if (userIndex !== -1) {
           users.value[userIndex].isActive = !user.isActive
         }
-        showToast(
-          user.isActive
-            ? t('user.management.userDisabledSuccess')
-            : t('user.management.userEnabledSuccess'),
-          'success'
-        )
+        showToast(`User ${user.isActive ? 'disabled' : 'enabled'} successfully`, 'success')
       }
     } else if (action === 'disableKeys') {
       const response = await apiClient.post(`/users/${user.id}/disable-keys`)
 
       if (response.success) {
-        showToast(
-          t('user.management.keysDisabledSuccess', { count: response.disabledCount }),
-          'success'
-        )
+        showToast(`Disabled ${response.disabledCount} API keys`, 'success')
         await loadUsers() // Refresh to get updated counts
       }
     }
   } catch (error) {
     console.error(`Failed to ${action}:`, error)
-    showToast(t(`user.management.${action}Error`), 'error')
+    showToast(`Failed to ${action}`, 'error')
   } finally {
     showConfirmModal.value = false
     selectedUser.value = null
