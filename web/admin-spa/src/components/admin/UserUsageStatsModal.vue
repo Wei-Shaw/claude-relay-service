@@ -8,7 +8,11 @@
         <div class="mb-6 flex items-center justify-between">
           <div>
             <h3 class="text-lg font-medium text-gray-900">
-              Usage Statistics - {{ user?.displayName || user?.username }}
+              {{
+                $t('user.usageStatsModal.titleWithUser', {
+                  displayName: user?.displayName || user?.username
+                })
+              }}
             </h3>
             <p class="text-sm text-gray-500">@{{ user?.username }} • {{ user?.role }}</p>
           </div>
@@ -31,10 +35,12 @@
             class="block w-32 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
             @change="loadUsageStats"
           >
-            <option value="day">Last 24 Hours</option>
-            <option value="week">Last 7 Days</option>
-            <option value="month">Last 30 Days</option>
-            <option value="quarter">Last 90 Days</option>
+            <option value="day">{{ $t('user.usageStatsModal.periodSelection.day') }}</option>
+            <option value="week">{{ $t('user.usageStatsModal.periodSelection.week') }}</option>
+            <option value="month">{{ $t('user.usageStatsModal.periodSelection.month') }}</option>
+            <option value="quarter">
+              {{ $t('user.usageStatsModal.periodSelection.quarter') }}
+            </option>
           </select>
         </div>
 
@@ -60,7 +66,7 @@
               fill="currentColor"
             ></path>
           </svg>
-          <p class="mt-2 text-sm text-gray-500">Loading usage statistics...</p>
+          <p class="mt-2 text-sm text-gray-500">{{ $t('user.usageStatsModal.loadingStats') }}</p>
         </div>
 
         <!-- Stats Content -->
@@ -87,7 +93,9 @@
                   </div>
                   <div class="ml-5 w-0 flex-1">
                     <dl>
-                      <dt class="truncate text-sm font-medium text-blue-600">Requests</dt>
+                      <dt class="truncate text-sm font-medium text-blue-600">
+                        {{ $t('user.usageStatsModal.summaryCards.requests') }}
+                      </dt>
                       <dd class="text-lg font-medium text-blue-900">
                         {{ formatNumber(usageStats?.totalRequests || 0) }}
                       </dd>
@@ -117,7 +125,9 @@
                   </div>
                   <div class="ml-5 w-0 flex-1">
                     <dl>
-                      <dt class="truncate text-sm font-medium text-green-600">Input Tokens</dt>
+                      <dt class="truncate text-sm font-medium text-green-600">
+                        {{ $t('user.usageStatsModal.summaryCards.inputTokens') }}
+                      </dt>
                       <dd class="text-lg font-medium text-green-900">
                         {{ formatNumber(usageStats?.totalInputTokens || 0) }}
                       </dd>
@@ -147,7 +157,9 @@
                   </div>
                   <div class="ml-5 w-0 flex-1">
                     <dl>
-                      <dt class="truncate text-sm font-medium text-purple-600">Output Tokens</dt>
+                      <dt class="truncate text-sm font-medium text-purple-600">
+                        {{ $t('user.usageStatsModal.summaryCards.outputTokens') }}
+                      </dt>
                       <dd class="text-lg font-medium text-purple-900">
                         {{ formatNumber(usageStats?.totalOutputTokens || 0) }}
                       </dd>
@@ -177,7 +189,9 @@
                   </div>
                   <div class="ml-5 w-0 flex-1">
                     <dl>
-                      <dt class="truncate text-sm font-medium text-yellow-600">Total Cost</dt>
+                      <dt class="truncate text-sm font-medium text-yellow-600">
+                        {{ $t('user.usageStatsModal.summaryCards.totalCost') }}
+                      </dt>
                       <dd class="text-lg font-medium text-yellow-900">
                         ${{ (usageStats?.totalCost || 0).toFixed(4) }}
                       </dd>
@@ -194,7 +208,9 @@
             class="rounded-lg border border-gray-200 bg-white"
           >
             <div class="border-b border-gray-200 px-4 py-5 sm:px-6">
-              <h4 class="text-lg font-medium leading-6 text-gray-900">API Keys Usage</h4>
+              <h4 class="text-lg font-medium leading-6 text-gray-900">
+                {{ $t('user.usageStatsModal.apiKeysTable.title') }}
+              </h4>
             </div>
             <div class="overflow-hidden">
               <table class="min-w-full divide-y divide-gray-200">
@@ -204,37 +220,37 @@
                       class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
                       scope="col"
                     >
-                      API Key
+                      {{ $t('user.usageStatsModal.apiKeysTable.headers.apiKey') }}
                     </th>
                     <th
                       class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
                       scope="col"
                     >
-                      Status
+                      {{ $t('user.usageStatsModal.apiKeysTable.headers.status') }}
                     </th>
                     <th
                       class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
                       scope="col"
                     >
-                      Requests
+                      {{ $t('user.usageStatsModal.apiKeysTable.headers.requests') }}
                     </th>
                     <th
                       class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
                       scope="col"
                     >
-                      Tokens
+                      {{ $t('user.usageStatsModal.apiKeysTable.headers.tokens') }}
                     </th>
                     <th
                       class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
                       scope="col"
                     >
-                      Cost
+                      {{ $t('user.usageStatsModal.apiKeysTable.headers.cost') }}
                     </th>
                     <th
                       class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
                       scope="col"
                     >
-                      Last Used
+                      {{ $t('user.usageStatsModal.apiKeysTable.headers.lastUsed') }}
                     </th>
                   </tr>
                 </thead>
@@ -253,21 +269,35 @@
                             : 'bg-red-100 text-red-800'
                         ]"
                       >
-                        {{ apiKey.isActive ? 'Active' : 'Disabled' }}
+                        {{
+                          apiKey.isActive
+                            ? $t('user.usageStatsModal.apiKeysTable.status.active')
+                            : $t('user.usageStatsModal.apiKeysTable.status.disabled')
+                        }}
                       </span>
                     </td>
                     <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
                       {{ formatNumber(apiKey.usage?.requests || 0) }}
                     </td>
                     <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                      <div>In: {{ formatNumber(apiKey.usage?.inputTokens || 0) }}</div>
-                      <div>Out: {{ formatNumber(apiKey.usage?.outputTokens || 0) }}</div>
+                      <div>
+                        {{ $t('user.usageStatsModal.apiKeysTable.tokensFormat.input') }}:
+                        {{ formatNumber(apiKey.usage?.inputTokens || 0) }}
+                      </div>
+                      <div>
+                        {{ $t('user.usageStatsModal.apiKeysTable.tokensFormat.output') }}:
+                        {{ formatNumber(apiKey.usage?.outputTokens || 0) }}
+                      </div>
                     </td>
                     <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
                       ${{ (apiKey.usage?.totalCost || 0).toFixed(4) }}
                     </td>
                     <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                      {{ apiKey.lastUsedAt ? formatDate(apiKey.lastUsedAt) : 'Never' }}
+                      {{
+                        apiKey.lastUsedAt
+                          ? formatDate(apiKey.lastUsedAt)
+                          : $t('user.usageStatsModal.apiKeysTable.never')
+                      }}
                     </td>
                   </tr>
                 </tbody>
@@ -278,7 +308,9 @@
           <!-- Chart Placeholder -->
           <div class="rounded-lg border border-gray-200 bg-white">
             <div class="border-b border-gray-200 px-4 py-5 sm:px-6">
-              <h4 class="text-lg font-medium leading-6 text-gray-900">Usage Trend</h4>
+              <h4 class="text-lg font-medium leading-6 text-gray-900">
+                {{ $t('user.usageStatsModal.usageTrend.title') }}
+              </h4>
             </div>
             <div class="p-6">
               <div
@@ -298,12 +330,16 @@
                       stroke-width="2"
                     />
                   </svg>
-                  <h3 class="mt-2 text-sm font-medium text-gray-900">Usage Chart</h3>
+                  <h3 class="mt-2 text-sm font-medium text-gray-900">
+                    {{ $t('user.usageStatsModal.usageTrend.chartTitle') }}
+                  </h3>
                   <p class="mt-1 text-sm text-gray-500">
-                    Daily usage trends for {{ selectedPeriod }} period
+                    {{
+                      $t('user.usageStatsModal.usageTrend.dailyTrends', { period: selectedPeriod })
+                    }}
                   </p>
                   <p class="mt-2 text-xs text-gray-400">
-                    (Chart integration can be added with Chart.js, D3.js, or similar library)
+                    {{ $t('user.usageStatsModal.usageTrend.chartNote') }}
                   </p>
                 </div>
               </div>
@@ -325,9 +361,11 @@
                 stroke-width="2"
               />
             </svg>
-            <h3 class="mt-2 text-sm font-medium text-gray-900">No usage data</h3>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">
+              {{ $t('user.usageStatsModal.noData.title') }}
+            </h3>
             <p class="mt-1 text-sm text-gray-500">
-              This user hasn't made any API requests in the selected period.
+              {{ $t('user.usageStatsModal.noData.description') }}
             </p>
           </div>
         </div>
@@ -337,7 +375,7 @@
             class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             @click="$emit('close')"
           >
-            Close
+            {{ $t('user.usageStatsModal.close') }}
           </button>
         </div>
       </div>
@@ -349,6 +387,7 @@
 import { ref, watch } from 'vue'
 import { apiClient } from '@/config/api'
 import { showToast } from '@/utils/toast'
+// import { useI18n } from 'vue-i18n' - using $t in template instead
 
 const props = defineProps({
   show: {

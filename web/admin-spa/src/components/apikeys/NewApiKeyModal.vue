@@ -12,13 +12,17 @@
               <i class="fas fa-check text-lg text-white" />
             </div>
             <div>
-              <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">API Key 创建成功</h3>
-              <p class="text-sm text-gray-600 dark:text-gray-400">请妥善保存您的 API Key</p>
+              <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">
+                {{ t('apiKeys.newApiKeyModal.title') }}
+              </h3>
+              <p class="text-sm text-gray-600 dark:text-gray-400">
+                {{ t('apiKeys.newApiKeyModal.subtitle') }}
+              </p>
             </div>
           </div>
           <button
             class="text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-            title="直接关闭（不推荐）"
+            :title="t('apiKeys.newApiKeyModal.directCloseTooltip')"
             @click="handleDirectClose"
           >
             <i class="fas fa-times text-xl" />
@@ -36,10 +40,11 @@
               <i class="fas fa-exclamation-triangle text-sm text-white" />
             </div>
             <div class="ml-3">
-              <h5 class="mb-1 font-semibold text-amber-900 dark:text-amber-400">重要提醒</h5>
+              <h5 class="mb-1 font-semibold text-amber-900 dark:text-amber-400">
+                {{ t('apiKeys.newApiKeyModal.warningTitle') }}
+              </h5>
               <p class="text-sm text-amber-800 dark:text-amber-300">
-                这是您唯一能看到完整 API Key 的机会。关闭此窗口后，系统将不再显示完整的 API
-                Key。请立即复制并妥善保存。
+                {{ t('apiKeys.newApiKeyModal.warningMessage') }}
               </p>
             </div>
           </div>
@@ -48,9 +53,9 @@
         <!-- API Key 信息 -->
         <div class="mb-6 space-y-4">
           <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >API Key 名称</label
-            >
+            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              t('apiKeys.newApiKeyModal.apiKeyName')
+            }}</label>
             <div
               class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800"
             >
@@ -59,22 +64,22 @@
           </div>
 
           <div v-if="apiKey.description">
-            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >备注</label
-            >
+            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              t('apiKeys.newApiKeyModal.remarks')
+            }}</label>
             <div
               class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800"
             >
               <span class="text-gray-700 dark:text-gray-300">{{
-                apiKey.description || '无描述'
+                apiKey.description || t('apiKeys.newApiKeyModal.noDescription')
               }}</span>
             </div>
           </div>
 
           <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >API Key</label
-            >
+            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              t('apiKeys.newApiKeyModal.apiKey')
+            }}</label>
             <div class="relative">
               <div
                 class="flex min-h-[60px] items-center break-all rounded-lg border border-gray-700 bg-gray-900 p-4 pr-14 font-mono text-sm text-white dark:border-gray-600 dark:bg-gray-900"
@@ -84,7 +89,11 @@
               <div class="absolute right-3 top-3">
                 <button
                   class="btn-icon-sm bg-gray-700 hover:bg-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600"
-                  :title="showFullKey ? '隐藏API Key' : '显示完整API Key'"
+                  :title="
+                    showFullKey
+                      ? t('apiKeys.newApiKeyModal.hideApiKey')
+                      : t('apiKeys.newApiKeyModal.showFullApiKey')
+                  "
                   type="button"
                   @click="toggleKeyVisibility"
                 >
@@ -93,7 +102,7 @@
               </div>
             </div>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              点击眼睛图标切换显示模式，使用下方按钮复制完整 API Key
+              {{ t('apiKeys.newApiKeyModal.visibilityHint') }}
             </p>
           </div>
         </div>
@@ -105,13 +114,13 @@
             @click="copyApiKey"
           >
             <i class="fas fa-copy" />
-            复制 API Key
+            {{ t('apiKeys.newApiKeyModal.copyApiKey') }}
           </button>
           <button
             class="rounded-xl border border-gray-300 bg-gray-200 px-6 py-3 font-semibold text-gray-800 transition-colors hover:bg-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
             @click="handleClose"
           >
-            我已保存
+            {{ t('apiKeys.newApiKeyModal.alreadySaved') }}
           </button>
         </div>
       </div>
@@ -121,7 +130,10 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { showToast } from '@/utils/toast'
+
+const { t } = useI18n()
 
 const props = defineProps({
   apiKey: {
@@ -159,13 +171,13 @@ const getDisplayedApiKey = () => {
 const copyApiKey = async () => {
   const key = props.apiKey.apiKey || props.apiKey.key || ''
   if (!key) {
-    showToast('API Key 不存在', 'error')
+    showToast(t('apiKeys.newApiKeyModal.apiKeyNotFound'), 'error')
     return
   }
 
   try {
     await navigator.clipboard.writeText(key)
-    showToast('API Key 已复制到剪贴板', 'success')
+    showToast(t('apiKeys.newApiKeyModal.copySuccess'), 'success')
   } catch (error) {
     // console.error('Failed to copy:', error)
     // 降级方案：创建一个临时文本区域
@@ -175,9 +187,9 @@ const copyApiKey = async () => {
     textArea.select()
     try {
       document.execCommand('copy')
-      showToast('API Key 已复制到剪贴板', 'success')
+      showToast(t('apiKeys.newApiKeyModal.copySuccess'), 'success')
     } catch (fallbackError) {
-      showToast('复制失败，请手动复制', 'error')
+      showToast(t('apiKeys.newApiKeyModal.copyFailed'), 'error')
     } finally {
       document.body.removeChild(textArea)
     }
@@ -188,19 +200,17 @@ const copyApiKey = async () => {
 const handleClose = async () => {
   if (window.showConfirm) {
     const confirmed = await window.showConfirm(
-      '关闭提醒',
-      '关闭后将无法再次查看完整的API Key，请确保已经妥善保存。\n\n确定要关闭吗？',
-      '确定关闭',
-      '取消'
+      t('apiKeys.newApiKeyModal.closeReminderTitle'),
+      t('apiKeys.newApiKeyModal.closeReminderMessage'),
+      t('apiKeys.newApiKeyModal.confirmClose'),
+      t('apiKeys.newApiKeyModal.cancel')
     )
     if (confirmed) {
       emit('close')
     }
   } else {
     // 降级方案
-    const confirmed = confirm(
-      '关闭后将无法再次查看完整的API Key，请确保已经妥善保存。\n\n确定要关闭吗？'
-    )
+    const confirmed = confirm(t('apiKeys.newApiKeyModal.closeReminderMessage'))
     if (confirmed) {
       emit('close')
     }
@@ -211,17 +221,17 @@ const handleClose = async () => {
 const handleDirectClose = async () => {
   if (window.showConfirm) {
     const confirmed = await window.showConfirm(
-      '确定要关闭吗？',
-      '您还没有保存API Key，关闭后将无法再次查看。\n\n建议您先复制API Key再关闭。',
-      '仍然关闭',
-      '返回复制'
+      t('apiKeys.newApiKeyModal.directCloseTitle'),
+      t('apiKeys.newApiKeyModal.directCloseMessage'),
+      t('apiKeys.newApiKeyModal.stillClose'),
+      t('apiKeys.newApiKeyModal.goBack')
     )
     if (confirmed) {
       emit('close')
     }
   } else {
     // 降级方案
-    const confirmed = confirm('您还没有保存API Key，关闭后将无法再次查看。\n\n确定要关闭吗？')
+    const confirmed = confirm(t('apiKeys.newApiKeyModal.directCloseFallback'))
     if (confirmed) {
       emit('close')
     }

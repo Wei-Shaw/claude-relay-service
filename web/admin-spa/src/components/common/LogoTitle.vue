@@ -7,7 +7,7 @@
       <template v-if="!loading">
         <img
           v-if="logoSrc"
-          alt="Logo"
+          :alt="$t('common.logoTitle.logoAlt')"
           class="h-8 w-8 object-contain"
           :src="logoSrc"
           @error="handleLogoError"

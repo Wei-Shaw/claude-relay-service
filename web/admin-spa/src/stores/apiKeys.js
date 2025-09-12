@@ -1,4 +1,5 @@
 import { apiClient } from '@/config/api'
+import i18n from '@/i18n'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
@@ -22,7 +23,7 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
       if (response.success) {
         apiKeys.value = response.data || []
       } else {
-        throw new Error(response.message || '获取API Keys失败')
+        throw new Error(response.message || i18n.global.t('apiKeys.loadFailed'))
       }
     } catch (err) {
       error.value = err.message
@@ -42,7 +43,7 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
         await fetchApiKeys()
         return response.data
       } else {
-        throw new Error(response.message || '创建API Key失败')
+        throw new Error(response.message || i18n.global.t('apiKeys.operationFailed'))
       }
     } catch (err) {
       error.value = err.message
@@ -62,7 +63,7 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
         await fetchApiKeys()
         return response
       } else {
-        throw new Error(response.message || '更新API Key失败')
+        throw new Error(response.message || i18n.global.t('apiKeys.updateFailed'))
       }
     } catch (err) {
       error.value = err.message
@@ -82,7 +83,7 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
         await fetchApiKeys()
         return response
       } else {
-        throw new Error(response.message || '切换状态失败')
+        throw new Error(response.message || i18n.global.t('apiKeys.operationFailed'))
       }
     } catch (err) {
       error.value = err.message
@@ -102,7 +103,7 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
         await fetchApiKeys()
         return response
       } else {
-        throw new Error(response.message || '续期失败')
+        throw new Error(response.message || i18n.global.t('apiKeys.operationFailed'))
       }
     } catch (err) {
       error.value = err.message
@@ -122,7 +123,7 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
         await fetchApiKeys()
         return response
       } else {
-        throw new Error(response.message || '删除失败')
+        throw new Error(response.message || i18n.global.t('apiKeys.deleteFailed'))
       }
     } catch (err) {
       error.value = err.message
@@ -141,10 +142,10 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
       if (response.success) {
         return response.stats
       } else {
-        throw new Error(response.message || '获取统计失败')
+        throw new Error(response.message || i18n.global.t('apiKeys.operationFailed'))
       }
     } catch (err) {
-      console.error('获取API Key统计失败:', err)
+      console.error(i18n.global.t('common.errors.getApiKeyStatsFailed'), err)
       return null
     }
   }
@@ -166,10 +167,10 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
       if (response.success) {
         return response.data || []
       } else {
-        throw new Error(response.message || '获取标签失败')
+        throw new Error(response.message || i18n.global.t('apiKeys.operationFailed'))
       }
     } catch (err) {
-      console.error('获取标签失败:', err)
+      console.error(i18n.global.t('common.errors.getTagsFailed'), err)
       return []
     }
   }

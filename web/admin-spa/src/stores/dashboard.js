@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { apiClient } from '@/config/api'
 import { showToast } from '@/utils/toast'
+import i18n from '@/i18n'
 
 export const useDashboardStore = defineStore('dashboard', () => {
   // 状态
@@ -41,7 +42,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     realtimeTPM: 0,
     metricsWindow: 5,
     isHistoricalMetrics: false,
-    systemStatus: '正常',
+    systemStatus: i18n.global.t('system.status.normal'),
     uptime: 0,
     systemTimezone: 8 // 默认 UTC+8
   })
@@ -68,9 +69,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
     customEnd: '',
     customRange: null,
     presetOptions: [
-      { value: 'today', label: '今日', days: 1 },
-      { value: '7days', label: '7天', days: 7 },
-      { value: '30days', label: '30天', days: 30 }
+      { value: 'today', label: i18n.global.t('dashboard.today'), days: 1 },
+      { value: '7days', label: i18n.global.t('dashboard.last7Days'), days: 7 },
+      { value: '30days', label: i18n.global.t('dashboard.last30Days'), days: 30 }
     ]
   })
 
@@ -89,11 +90,11 @@ export const useDashboardStore = defineStore('dashboard', () => {
     const minutes = Math.floor((seconds % 3600) / 60)
 
     if (days > 0) {
-      return `${days}天 ${hours}小时`
+      return i18n.global.t('dashboard.uptimeFormat.daysHours', { days, hours })
     } else if (hours > 0) {
-      return `${hours}小时 ${minutes}分钟`
+      return i18n.global.t('dashboard.uptimeFormat.hoursMinutes', { hours, minutes })
     } else {
-      return `${minutes}分钟`
+      return i18n.global.t('dashboard.uptimeFormat.minutes', { minutes })
     }
   })
 
@@ -198,7 +199,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
           realtimeTPM: realtimeMetrics.tpm || 0,
           metricsWindow: realtimeMetrics.windowMinutes || 5,
           isHistoricalMetrics: realtimeMetrics.isHistorical || false,
-          systemStatus: systemHealth.redisConnected ? '正常' : '异常',
+          systemStatus: systemHealth.redisConnected
+            ? i18n.global.t('system.status.normal')
+            : i18n.global.t('system.status.abnormal'),
           uptime: systemHealth.uptime || 0,
           systemTimezone: dashboardResponse.data.systemTimezone || 8
         }
@@ -218,7 +221,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
         }
       }
     } catch (error) {
-      console.error('加载仪表板数据失败:', error)
+      console.error(i18n.global.t('common.errors.loadDashboardFailed'), error)
     } finally {
       loading.value = false
     }
@@ -306,7 +309,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
         trendData.value = response.data
       }
     } catch (error) {
-      console.error('加载使用趋势失败:', error)
+      console.error(i18n.global.t('common.errors.loadUsageTrendFailed'), error)
     }
   }
 
@@ -397,7 +400,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
         dashboardModelStats.value = response.data
       }
     } catch (error) {
-      console.error('加载模型统计失败:', error)
+      console.error(i18n.global.t('common.errors.loadModelStatsFailed'), error)
     }
   }
 
@@ -499,7 +502,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
         }
       }
     } catch (error) {
-      console.error('加载API Keys趋势失败:', error)
+      console.error(i18n.global.t('common.errors.loadApiKeysTrendFailed'), error)
     }
   }
 
@@ -636,14 +639,14 @@ export const useDashboardStore = defineStore('dashboard', () => {
         // 小时粒度：限制 24 小时
         const hoursDiff = (end - start) / (1000 * 60 * 60)
         if (hoursDiff > 24) {
-          showToast('小时粒度下日期范围不能超过24小时', 'warning')
+          showToast(i18n.global.t('dashboard.errors.rangeTooLongHour'), 'warning')
           return
         }
       } else {
         // 天粒度：限制 31 天
         const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1
         if (daysDiff > 31) {
-          showToast('日期范围不能超过 31 天', 'warning')
+          showToast(i18n.global.t('dashboard.errors.rangeTooLongDay'), 'warning')
           return
         }
       }
@@ -662,9 +665,13 @@ export const useDashboardStore = defineStore('dashboard', () => {
     // 根据粒度更新预设选项
     if (granularity === 'hour') {
       dateFilter.value.presetOptions = [
-        { value: 'last24h', label: '近24小时', hours: 24 },
-        { value: 'yesterday', label: '昨天', hours: 24 },
-        { value: 'dayBefore', label: '前天', hours: 24 }
+        {
+          value: 'last24h',
+          label: i18n.global.t('dashboard.usageTrend.periodOptions.last24Hours'),
+          hours: 24
+        },
+        { value: 'yesterday', label: i18n.global.t('dashboard.yesterday'), hours: 24 },
+        { value: 'dayBefore', label: i18n.global.t('dashboard.dayBefore'), hours: 24 }
       ]
 
       // 检查当前自定义日期范围是否超过24小时
@@ -677,7 +684,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
         const end = new Date(dateFilter.value.customRange[1])
         const hoursDiff = (end - start) / (1000 * 60 * 60)
         if (hoursDiff > 24) {
-          showToast('小时粒度下日期范围不能超过24小时，已切换到近24小时', 'warning')
+          showToast(i18n.global.t('dashboard.errors.rangeTooLongHourSwitched'), 'warning')
           setDateFilterPreset('last24h')
           return
         }
@@ -691,9 +698,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
     } else {
       // 天粒度
       dateFilter.value.presetOptions = [
-        { value: 'today', label: '今日', days: 1 },
-        { value: '7days', label: '7天', days: 7 },
-        { value: '30days', label: '30天', days: 30 }
+        { value: 'today', label: i18n.global.t('dashboard.today'), days: 1 },
+        { value: '7days', label: i18n.global.t('dashboard.last7Days'), days: 7 },
+        { value: '30days', label: i18n.global.t('dashboard.last30Days'), days: 30 }
       ]
 
       // 如果当前是小时粒度的预设，切换到天粒度的默认预设

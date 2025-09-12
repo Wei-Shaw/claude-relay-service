@@ -1,0 +1,18 @@
+# Ignore frontend directory as it has its own prettier config and plugins
+web/admin-spa/
+
+# Ignore node_modules
+node_modules/
+
+# Ignore build outputs
+dist/
+build/
+coverage/
+
+# Ignore logs
+logs/
+*.log
+
+# Ignore temporary files
+*.tmp
+*.temp

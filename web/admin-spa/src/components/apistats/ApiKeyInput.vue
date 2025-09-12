@@ -4,9 +4,11 @@
     <div class="wide-card-title mb-6">
       <h2 class="mb-2 text-2xl font-bold text-gray-900 dark:text-gray-200">
         <i class="fas fa-chart-line mr-3" />
-        使用统计查询
+        {{ t('apiStats.usageStatsQuery') }}
       </h2>
-      <p class="text-base text-gray-600 dark:text-gray-400">查询您的 API Key 使用情况和统计数据</p>
+      <p class="text-base text-gray-600 dark:text-gray-400">
+        {{ t('apiStats.apiKeyDescription') }}
+      </p>
     </div>
 
     <!-- 输入区域 -->
@@ -16,7 +18,7 @@
         <!-- API Key 标签 -->
         <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
           <i class="fas fa-key mr-2" />
-          {{ multiKeyMode ? '输入您的 API Keys（每行一个或用逗号分隔）' : '输入您的 API Key' }}
+          {{ multiKeyMode ? t('apiStats.enterApiKeys') : t('apiStats.enterApiKey') }}
         </label>
 
         <!-- 模式切换和查询按钮组 -->
@@ -28,20 +30,20 @@
             <button
               class="mode-switch-btn"
               :class="{ active: !multiKeyMode }"
-              title="单一模式"
+              :title="t('apiStats.singleModeTitle')"
               @click="multiKeyMode = false"
             >
               <i class="fas fa-key" />
-              <span class="ml-2 hidden sm:inline">单一</span>
+              <span class="ml-2 hidden sm:inline">{{ t('apiStats.singleMode') }}</span>
             </button>
             <button
               class="mode-switch-btn"
               :class="{ active: multiKeyMode }"
-              title="聚合模式"
+              :title="t('apiStats.aggregateModeTitle')"
               @click="multiKeyMode = true"
             >
               <i class="fas fa-layer-group" />
-              <span class="ml-2 hidden sm:inline">聚合</span>
+              <span class="ml-2 hidden sm:inline">{{ t('apiStats.aggregateMode') }}</span>
               <span
                 v-if="multiKeyMode && parsedApiKeys.length > 0"
                 class="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-xs font-semibold"
@@ -62,7 +64,7 @@
             v-model="apiKey"
             class="wide-card-input w-full"
             :disabled="loading"
-            placeholder="请输入您的 API Key (cr_...)"
+            :placeholder="t('apiStats.apiKeyPlaceholder')"
             type="password"
             @keyup.enter="queryStats"
           />
@@ -73,14 +75,14 @@
               v-model="apiKey"
               class="wide-card-input w-full resize-y"
               :disabled="loading"
-              placeholder="请输入您的 API Keys，支持以下格式：&#10;cr_xxx&#10;cr_yyy&#10;或&#10;cr_xxx, cr_yyy"
+              :placeholder="t('apiStats.apiKeysPlaceholder')"
               rows="4"
               @keyup.ctrl.enter="queryStats"
             />
             <button
               v-if="apiKey && !loading"
               class="absolute right-2 top-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-              title="清空输入"
+              :title="t('apiStats.clearInput')"
               @click="clearInput"
             >
               <i class="fas fa-times-circle" />
@@ -97,7 +99,7 @@
           >
             <i v-if="loading" class="fas fa-spinner loading-spinner" />
             <i v-else class="fas fa-search" />
-            {{ loading ? '查询中...' : '查询统计' }}
+            {{ loading ? t('common.loading') : t('apiStats.queryButton') }}
           </button>
         </div>
       </div>
@@ -105,11 +107,7 @@
       <!-- 安全提示 -->
       <div class="security-notice mt-4">
         <i class="fas fa-shield-alt mr-2" />
-        {{
-          multiKeyMode
-            ? '您的 API Keys 仅用于查询统计数据，不会被存储。聚合模式下部分个体化信息将不显示。'
-            : '您的 API Key 仅用于查询自己的统计数据，不会被存储或用于其他用途'
-        }}
+        {{ multiKeyMode ? t('apiStats.securityNoticeMulti') : t('apiStats.securityNoticeSingle') }}
       </div>
 
       <!-- 多 Key 模式额外提示 -->
@@ -118,7 +116,7 @@
         class="mt-2 rounded-lg bg-blue-50 p-3 text-sm text-blue-700 dark:bg-blue-900/20 dark:text-blue-400"
       >
         <i class="fas fa-lightbulb mr-2" />
-        <span>提示：最多支持同时查询 30 个 API Keys。使用 Ctrl+Enter 快速查询。</span>
+        <span>{{ t('apiStats.multiKeyTip') }}</span>
       </div>
     </div>
   </div>
@@ -127,7 +125,10 @@
 <script setup>
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 import { useApiStatsStore } from '@/stores/apistats'
+
+const { t } = useI18n()
 
 const apiStatsStore = useApiStatsStore()
 const { apiKey, loading, multiKeyMode } = storeToRefs(apiStatsStore)

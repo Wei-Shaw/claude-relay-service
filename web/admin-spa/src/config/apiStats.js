@@ -1,6 +1,8 @@
 // API Stats 专用 API 客户端
 // 与管理员 API 隔离，不需要认证
 
+import i18n from '@/i18n'
+
 class ApiStatsClient {
   constructor() {
     this.baseURL = window.location.origin
@@ -26,7 +28,9 @@ class ApiStatsClient {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message || `请求失败: ${response.status}`)
+        throw new Error(
+          data.message || i18n.global.t('common.errors.requestFailed', { status: response.status })
+        )
       }
 
       return data

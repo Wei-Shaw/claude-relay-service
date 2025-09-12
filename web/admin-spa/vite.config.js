@@ -51,7 +51,9 @@ export default defineConfig(({ mode }) => {
         imports: ['vue', 'vue-router', 'pinia']
       }),
       Components({
-        resolvers: [ElementPlusResolver()]
+        // 仅自动注册 Element Plus 组件；本地组件显式导入
+        resolvers: [ElementPlusResolver()],
+        dirs: []
       })
     ],
     resolve: {
@@ -103,6 +105,8 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
       assetsDir: 'assets',
+      // 提升 chunk 大小限制以消除 UI 库的大量警告
+      chunkSizeWarningLimit: 1024,
       rollupOptions: {
         output: {
           manualChunks(id) {

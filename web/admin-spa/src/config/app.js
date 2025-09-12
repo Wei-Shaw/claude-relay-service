@@ -4,7 +4,7 @@ export const APP_CONFIG = {
   basePath: import.meta.env.VITE_APP_BASE_URL || (import.meta.env.DEV ? '/admin/' : '/web/admin/'),
 
   // 应用标题
-  title: import.meta.env.VITE_APP_TITLE || 'Claude Relay Service - 管理后台',
+  title: import.meta.env.VITE_APP_TITLE || 'Claude Relay Service - Admin Panel',
 
   // 是否为开发环境
   isDev: import.meta.env.DEV,

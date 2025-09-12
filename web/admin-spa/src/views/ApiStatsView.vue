@@ -6,10 +6,15 @@
         <LogoTitle
           :loading="oemLoading"
           :logo-src="oemSettings.siteIconData || oemSettings.siteIcon"
-          :subtitle="currentTab === 'stats' ? 'API Key 使用统计' : '使用教程'"
+          :subtitle="currentTab === 'stats' ? t('apiStats.title') : t('apiStats.tutorialTitle')"
           :title="oemSettings.siteName"
         />
         <div class="flex items-center gap-2 md:gap-4">
+          <!-- 语言切换按钮 -->
+          <div class="flex items-center">
+            <LanguageSwitch mode="dropdown" size="medium" />
+          </div>
+
           <!-- 主题切换按钮 -->
           <div class="flex items-center">
             <ThemeToggle mode="dropdown" />
@@ -28,7 +33,9 @@
             to="/user-login"
           >
             <i class="fas fa-user text-sm md:text-base" />
-            <span class="text-xs font-semibold tracking-wide md:text-sm">用户登录</span>
+            <span class="text-xs font-semibold tracking-wide md:text-sm">{{
+              t('apiStats.userLogin')
+            }}</span>
           </router-link>
           <!-- 管理后台按钮 -->
           <router-link
@@ -37,7 +44,9 @@
             to="/dashboard"
           >
             <i class="fas fa-shield-alt text-sm md:text-base" />
-            <span class="text-xs font-semibold tracking-wide md:text-sm">管理后台</span>
+            <span class="text-xs font-semibold tracking-wide md:text-sm">{{
+              t('apiStats.adminPanel')
+            }}</span>
           </router-link>
         </div>
       </div>
@@ -54,14 +63,14 @@
             @click="currentTab = 'stats'"
           >
             <i class="fas fa-chart-line mr-1 md:mr-2" />
-            <span class="text-sm md:text-base">统计查询</span>
+            <span class="text-sm md:text-base">{{ t('apiStats.statsQuery') }}</span>
           </button>
           <button
             :class="['tab-pill-button', currentTab === 'tutorial' ? 'active' : '']"
             @click="currentTab = 'tutorial'"
           >
             <i class="fas fa-graduation-cap mr-1 md:mr-2" />
-            <span class="text-sm md:text-base">使用教程</span>
+            <span class="text-sm md:text-base">{{ t('apiStats.tutorial') }}</span>
           </button>
         </div>
       </div>
@@ -92,9 +101,9 @@
             >
               <div class="flex items-center gap-2 md:gap-3">
                 <i class="fas fa-clock text-base text-blue-500 md:text-lg" />
-                <span class="text-base font-medium text-gray-700 dark:text-gray-200 md:text-lg"
-                  >统计时间范围</span
-                >
+                <span class="text-base font-medium text-gray-700 dark:text-gray-200 md:text-lg">{{
+                  t('apiStats.timeRange')
+                }}</span>
               </div>
               <div class="flex w-full gap-2 md:w-auto">
                 <button
@@ -104,7 +113,7 @@
                   @click="switchPeriod('daily')"
                 >
                   <i class="fas fa-calendar-day text-xs md:text-sm" />
-                  今日
+                  {{ t('apiStats.today') }}
                 </button>
                 <button
                   class="flex flex-1 items-center justify-center gap-1 px-4 py-2 text-xs font-medium md:flex-none md:gap-2 md:px-6 md:text-sm"
@@ -113,7 +122,7 @@
                   @click="switchPeriod('monthly')"
                 >
                   <i class="fas fa-calendar-alt text-xs md:text-sm" />
-                  本月
+                  {{ t('apiStats.thisMonth') }}
                 </button>
               </div>
             </div>
@@ -140,7 +149,7 @@
     <!-- 教程内容 -->
     <div v-if="currentTab === 'tutorial'" class="tab-content">
       <div class="glass-strong rounded-3xl shadow-xl">
-        <TutorialView />
+        <component :is="currentTutorialComponent" />
       </div>
     </div>
   </div>
@@ -150,27 +159,45 @@
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 import { useApiStatsStore } from '@/stores/apistats'
 import { useThemeStore } from '@/stores/theme'
+import { useLocaleStore } from '@/stores/locale'
 import LogoTitle from '@/components/common/LogoTitle.vue'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
+import LanguageSwitch from '@/components/common/LanguageSwitch.vue'
 import ApiKeyInput from '@/components/apistats/ApiKeyInput.vue'
 import StatsOverview from '@/components/apistats/StatsOverview.vue'
 import TokenDistribution from '@/components/apistats/TokenDistribution.vue'
 import LimitConfig from '@/components/apistats/LimitConfig.vue'
 import AggregatedStatsCard from '@/components/apistats/AggregatedStatsCard.vue'
 import ModelUsageStats from '@/components/apistats/ModelUsageStats.vue'
-import TutorialView from './TutorialView.vue'
+import TutorialViewZhCn from './tutorials/TutorialView-zh-cn.vue'
+import TutorialViewZhTw from './tutorials/TutorialView-zh-tw.vue'
+import TutorialViewEn from './tutorials/TutorialView-en.vue'
 
 const route = useRoute()
+const { t } = useI18n()
 const apiStatsStore = useApiStatsStore()
 const themeStore = useThemeStore()
+const localeStore = useLocaleStore()
 
 // 当前标签页
 const currentTab = ref('stats')
 
 // 主题相关
 const isDarkMode = computed(() => themeStore.isDarkMode)
+
+// 根据当前语言选择教程组件
+const currentTutorialComponent = computed(() => {
+  const locale = localeStore.currentLocale
+  const components = {
+    'zh-cn': TutorialViewZhCn,
+    'zh-tw': TutorialViewZhTw,
+    en: TutorialViewEn
+  }
+  return components[locale] || TutorialViewZhCn
+})
 
 const {
   apiKey,

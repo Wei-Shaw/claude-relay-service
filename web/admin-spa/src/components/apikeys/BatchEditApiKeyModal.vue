@@ -12,7 +12,7 @@
               <i class="fas fa-edit text-sm text-white sm:text-base" />
             </div>
             <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">
-              批量编辑 API Keys ({{ selectedCount }} 个)
+              {{ $t('apiKeys.batchEditApiKeyModal.title', { count: selectedCount }) }}
             </h3>
           </div>
           <button
@@ -32,10 +32,11 @@
             <div class="flex items-start gap-3">
               <i class="fas fa-info-circle mt-1 text-blue-500" />
               <div>
-                <p class="text-sm font-medium text-blue-800 dark:text-blue-300">批量编辑说明</p>
+                <p class="text-sm font-medium text-blue-800 dark:text-blue-300">
+                  {{ $t('apiKeys.batchEditApiKeyModal.infoTitle') }}
+                </p>
                 <p class="mt-1 text-sm text-blue-700 dark:text-blue-400">
-                  以下设置将应用到所选的 {{ selectedCount }} 个 API
-                  Key。只有填写或修改的字段才会被更新，空白字段将保持原值不变。
+                  {{ $t('apiKeys.batchEditApiKeyModal.infoContent', { count: selectedCount }) }}
                 </p>
               </div>
             </div>
@@ -46,26 +47,34 @@
             <label
               class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-3 sm:text-sm"
             >
-              标签 (批量操作)
+              {{ $t('apiKeys.batchEditApiKeyModal.tagLabel') }}
             </label>
             <div class="space-y-4">
               <!-- 标签操作模式选择 -->
               <div class="flex flex-wrap gap-4">
                 <label class="flex cursor-pointer items-center">
                   <input v-model="tagOperation" class="mr-2" type="radio" value="replace" />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">替换标签</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    $t('apiKeys.batchEditApiKeyModal.tagOperations.replace')
+                  }}</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input v-model="tagOperation" class="mr-2" type="radio" value="add" />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">添加标签</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    $t('apiKeys.batchEditApiKeyModal.tagOperations.add')
+                  }}</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input v-model="tagOperation" class="mr-2" type="radio" value="remove" />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">移除标签</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    $t('apiKeys.batchEditApiKeyModal.tagOperations.remove')
+                  }}</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input v-model="tagOperation" class="mr-2" type="radio" value="none" />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">不修改标签</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    $t('apiKeys.batchEditApiKeyModal.tagOperations.none')
+                  }}</span>
                 </label>
               </div>
 
@@ -76,10 +85,10 @@
                   <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">
                     {{
                       tagOperation === 'replace'
-                        ? '新标签列表:'
+                        ? $t('apiKeys.batchEditApiKeyModal.newTagsList')
                         : tagOperation === 'add'
-                          ? '要添加的标签:'
-                          : '要移除的标签:'
+                          ? $t('apiKeys.batchEditApiKeyModal.tagsToAdd')
+                          : $t('apiKeys.batchEditApiKeyModal.tagsToRemove')
                     }}
                   </div>
                   <div class="flex flex-wrap gap-2">
@@ -103,7 +112,7 @@
                 <!-- 可选择的已有标签 -->
                 <div v-if="unselectedTags.length > 0">
                   <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">
-                    点击选择已有标签:
+                    {{ $t('apiKeys.batchEditApiKeyModal.clickToSelectTags') }}
                   </div>
                   <div class="flex flex-wrap gap-2">
                     <button
@@ -122,13 +131,13 @@
                 <!-- 创建新标签 -->
                 <div>
                   <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">
-                    创建新标签:
+                    {{ $t('apiKeys.batchEditApiKeyModal.createNewTag') }}
                   </div>
                   <div class="flex gap-2">
                     <input
                       v-model="newTag"
                       class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                      placeholder="输入新标签名称"
+                      :placeholder="$t('apiKeys.batchEditApiKeyModal.inputNewTagPlaceholder')"
                       type="text"
                       @keypress.enter.prevent="addTag"
                     />
@@ -155,46 +164,48 @@
               >
                 <i class="fas fa-tachometer-alt text-xs text-white" />
               </div>
-              <h4 class="text-sm font-semibold text-gray-800 dark:text-gray-200">速率限制设置</h4>
+              <h4 class="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                {{ $t('apiKeys.batchEditApiKeyModal.rateLimitTitle') }}
+              </h4>
             </div>
 
             <div class="space-y-2">
               <div class="grid grid-cols-1 gap-2 lg:grid-cols-3">
                 <div>
                   <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
-                    时间窗口 (分钟)
+                    {{ $t('apiKeys.batchEditApiKeyModal.rateLimitWindow') }}
                   </label>
                   <input
                     v-model="form.rateLimitWindow"
                     class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                     min="1"
-                    placeholder="不修改"
+                    :placeholder="$t('apiKeys.batchEditApiKeyModal.noModifyPlaceholder')"
                     type="number"
                   />
                 </div>
 
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300"
-                    >请求次数限制</label
-                  >
+                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">{{
+                    $t('apiKeys.batchEditApiKeyModal.rateLimitRequests')
+                  }}</label>
                   <input
                     v-model="form.rateLimitRequests"
                     class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                     min="1"
-                    placeholder="不修改"
+                    :placeholder="$t('apiKeys.batchEditApiKeyModal.noModifyPlaceholder')"
                     type="number"
                   />
                 </div>
 
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300"
-                    >费用限制 (美元)</label
-                  >
+                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">{{
+                    $t('apiKeys.batchEditApiKeyModal.rateLimitCost')
+                  }}</label>
                   <input
                     v-model="form.rateLimitCost"
                     class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                     min="0"
-                    placeholder="不修改"
+                    :placeholder="$t('apiKeys.batchEditApiKeyModal.noModifyPlaceholder')"
                     step="0.01"
                     type="number"
                   />
@@ -206,13 +217,13 @@
           <!-- 每日费用限制 -->
           <div>
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
-              每日费用限制 (美元)
+              {{ $t('apiKeys.batchEditApiKeyModal.dailyCostLimit') }}
             </label>
             <input
               v-model="form.dailyCostLimit"
               class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
               min="0"
-              placeholder="不修改 (0 表示无限制)"
+              :placeholder="$t('apiKeys.batchEditApiKeyModal.dailyCostLimitPlaceholder')"
               step="0.01"
               type="number"
             />
@@ -221,31 +232,31 @@
           <!-- Opus 模型周费用限制 -->
           <div>
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Opus 模型周费用限制 (美元)
+              {{ $t('apiKeys.batchEditApiKeyModal.weeklyOpusCostLimit') }}
             </label>
             <input
               v-model="form.weeklyOpusCostLimit"
               class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
               min="0"
-              placeholder="不修改 (0 表示无限制)"
+              :placeholder="$t('apiKeys.batchEditApiKeyModal.weeklyOpusCostLimitPlaceholder')"
               step="0.01"
               type="number"
             />
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              设置 Opus 模型的周费用限制（周一到周日），仅限 Claude 官方账户
+              {{ $t('apiKeys.batchEditApiKeyModal.opusLimitDescription') }}
             </p>
           </div>
 
           <!-- 并发限制 -->
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >并发限制</label
-            >
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              $t('apiKeys.batchEditApiKeyModal.concurrencyLimit')
+            }}</label>
             <input
               v-model="form.concurrencyLimit"
               class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
               min="0"
-              placeholder="不修改 (0 表示无限制)"
+              :placeholder="$t('apiKeys.batchEditApiKeyModal.concurrencyLimitPlaceholder')"
               type="number"
             />
           </div>
@@ -253,19 +264,27 @@
           <!-- 激活状态 -->
           <div>
             <div class="mb-3 flex items-center gap-4">
-              <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">激活状态</label>
+              <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                $t('apiKeys.batchEditApiKeyModal.activeStatus')
+              }}</label>
               <div class="flex gap-4">
                 <label class="flex cursor-pointer items-center">
                   <input v-model="form.isActive" class="mr-2" type="radio" :value="true" />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">激活</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    $t('apiKeys.batchEditApiKeyModal.statusOptions.active')
+                  }}</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input v-model="form.isActive" class="mr-2" type="radio" :value="false" />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">禁用</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    $t('apiKeys.batchEditApiKeyModal.statusOptions.disabled')
+                  }}</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input v-model="form.isActive" class="mr-2" type="radio" :value="null" />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">不修改</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    $t('apiKeys.batchEditApiKeyModal.statusOptions.noChange')
+                  }}</span>
                 </label>
               </div>
             </div>
@@ -273,29 +292,39 @@
 
           <!-- 服务权限 -->
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >服务权限</label
-            >
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              $t('apiKeys.batchEditApiKeyModal.servicePermissions')
+            }}</label>
             <div class="flex flex-wrap gap-4">
               <label class="flex cursor-pointer items-center">
                 <input v-model="form.permissions" class="mr-2" type="radio" value="" />
-                <span class="text-sm text-gray-700">不修改</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                  $t('apiKeys.batchEditApiKeyModal.permissionOptions.noChange')
+                }}</span>
               </label>
               <label class="flex cursor-pointer items-center">
                 <input v-model="form.permissions" class="mr-2" type="radio" value="all" />
-                <span class="text-sm text-gray-700">全部服务</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                  $t('apiKeys.batchEditApiKeyModal.permissionOptions.all')
+                }}</span>
               </label>
               <label class="flex cursor-pointer items-center">
                 <input v-model="form.permissions" class="mr-2" type="radio" value="claude" />
-                <span class="text-sm text-gray-700">仅 Claude</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                  $t('apiKeys.batchEditApiKeyModal.permissionOptions.claude')
+                }}</span>
               </label>
               <label class="flex cursor-pointer items-center">
                 <input v-model="form.permissions" class="mr-2" type="radio" value="gemini" />
-                <span class="text-sm text-gray-700">仅 Gemini</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                  $t('apiKeys.batchEditApiKeyModal.permissionOptions.gemini')
+                }}</span>
               </label>
               <label class="flex cursor-pointer items-center">
                 <input v-model="form.permissions" class="mr-2" type="radio" value="openai" />
-                <span class="text-sm text-gray-700">仅 OpenAI</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                  $t('apiKeys.batchEditApiKeyModal.permissionOptions.openai')
+                }}</span>
               </label>
             </div>
           </div>
@@ -303,13 +332,13 @@
           <!-- 专属账号绑定 -->
           <div>
             <div class="mb-3 flex items-center justify-between">
-              <label class="text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >专属账号绑定</label
-              >
+              <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                $t('apiKeys.batchEditApiKeyModal.accountBinding')
+              }}</label>
               <button
                 class="flex items-center gap-1 text-sm text-blue-600 transition-colors hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
                 :disabled="accountsLoading"
-                title="刷新账号列表"
+                :title="$t('apiKeys.batchEditApiKeyModal.refreshAccounts')"
                 type="button"
                 @click="refreshAccounts"
               >
@@ -320,31 +349,46 @@
                     'text-xs'
                   ]"
                 />
-                <span>{{ accountsLoading ? '刷新中...' : '刷新账号' }}</span>
+                <span>{{
+                  accountsLoading
+                    ? $t('apiKeys.batchEditApiKeyModal.refreshing')
+                    : $t('apiKeys.batchEditApiKeyModal.refreshAccounts')
+                }}</span>
               </button>
             </div>
             <div class="grid grid-cols-1 gap-3">
               <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >Claude 专属账号</label
-                >
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400">{{
+                  $t('apiKeys.batchEditApiKeyModal.claudeAccount')
+                }}</label>
                 <select
                   v-model="form.claudeAccountId"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                   :disabled="form.permissions === 'gemini' || form.permissions === 'openai'"
                 >
-                  <option value="">不修改</option>
-                  <option value="SHARED_POOL">使用共享账号池</option>
-                  <optgroup v-if="localAccounts.claudeGroups.length > 0" label="账号分组">
+                  <option value="">
+                    {{ $t('apiKeys.batchEditApiKeyModal.accountOptions.noChange') }}
+                  </option>
+                  <option value="SHARED_POOL">
+                    {{ $t('apiKeys.batchEditApiKeyModal.accountOptions.sharedPool') }}
+                  </option>
+                  <optgroup
+                    v-if="localAccounts.claudeGroups.length > 0"
+                    :label="$t('apiKeys.batchEditApiKeyModal.optgroupLabels.accountGroups')"
+                  >
                     <option
                       v-for="group in localAccounts.claudeGroups"
                       :key="group.id"
                       :value="`group:${group.id}`"
                     >
-                      分组 - {{ group.name }}
+                      {{ $t('apiKeys.batchEditApiKeyModal.accountOptions.groupPrefix')
+                      }}{{ group.name }}
                     </option>
                   </optgroup>
-                  <optgroup v-if="localAccounts.claude.length > 0" label="专属账号">
+                  <optgroup
+                    v-if="localAccounts.claude.length > 0"
+                    :label="$t('apiKeys.batchEditApiKeyModal.optgroupLabels.dedicatedAccounts')"
+                  >
                     <option
                       v-for="account in localAccounts.claude"
                       :key="account.id"
@@ -360,26 +404,37 @@
                 </select>
               </div>
               <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >Gemini 专属账号</label
-                >
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400">{{
+                  $t('apiKeys.batchEditApiKeyModal.geminiAccount')
+                }}</label>
                 <select
                   v-model="form.geminiAccountId"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                   :disabled="form.permissions === 'claude' || form.permissions === 'openai'"
                 >
-                  <option value="">不修改</option>
-                  <option value="SHARED_POOL">使用共享账号池</option>
-                  <optgroup v-if="localAccounts.geminiGroups.length > 0" label="账号分组">
+                  <option value="">
+                    {{ $t('apiKeys.batchEditApiKeyModal.accountOptions.noChange') }}
+                  </option>
+                  <option value="SHARED_POOL">
+                    {{ $t('apiKeys.batchEditApiKeyModal.accountOptions.sharedPool') }}
+                  </option>
+                  <optgroup
+                    v-if="localAccounts.geminiGroups.length > 0"
+                    :label="$t('apiKeys.batchEditApiKeyModal.optgroupLabels.accountGroups')"
+                  >
                     <option
                       v-for="group in localAccounts.geminiGroups"
                       :key="group.id"
                       :value="`group:${group.id}`"
                     >
-                      分组 - {{ group.name }}
+                      {{ $t('apiKeys.batchEditApiKeyModal.accountOptions.groupPrefix')
+                      }}{{ group.name }}
                     </option>
                   </optgroup>
-                  <optgroup v-if="localAccounts.gemini.length > 0" label="专属账号">
+                  <optgroup
+                    v-if="localAccounts.gemini.length > 0"
+                    :label="$t('apiKeys.batchEditApiKeyModal.optgroupLabels.dedicatedAccounts')"
+                  >
                     <option
                       v-for="account in localAccounts.gemini"
                       :key="account.id"
@@ -391,26 +446,37 @@
                 </select>
               </div>
               <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >OpenAI 专属账号</label
-                >
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400">{{
+                  $t('apiKeys.batchEditApiKeyModal.openaiAccount')
+                }}</label>
                 <select
                   v-model="form.openaiAccountId"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                   :disabled="form.permissions === 'claude' || form.permissions === 'gemini'"
                 >
-                  <option value="">不修改</option>
-                  <option value="SHARED_POOL">使用共享账号池</option>
-                  <optgroup v-if="localAccounts.openaiGroups.length > 0" label="账号分组">
+                  <option value="">
+                    {{ $t('apiKeys.batchEditApiKeyModal.accountOptions.noChange') }}
+                  </option>
+                  <option value="SHARED_POOL">
+                    {{ $t('apiKeys.batchEditApiKeyModal.accountOptions.sharedPool') }}
+                  </option>
+                  <optgroup
+                    v-if="localAccounts.openaiGroups.length > 0"
+                    :label="$t('apiKeys.batchEditApiKeyModal.optgroupLabels.accountGroups')"
+                  >
                     <option
                       v-for="group in localAccounts.openaiGroups"
                       :key="group.id"
                       :value="`group:${group.id}`"
                     >
-                      分组 - {{ group.name }}
+                      {{ $t('apiKeys.batchEditApiKeyModal.accountOptions.groupPrefix')
+                      }}{{ group.name }}
                     </option>
                   </optgroup>
-                  <optgroup v-if="localAccounts.openai.length > 0" label="专属账号">
+                  <optgroup
+                    v-if="localAccounts.openai.length > 0"
+                    :label="$t('apiKeys.batchEditApiKeyModal.optgroupLabels.dedicatedAccounts')"
+                  >
                     <option
                       v-for="account in localAccounts.openai"
                       :key="account.id"
@@ -422,17 +488,24 @@
                 </select>
               </div>
               <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >Bedrock 专属账号</label
-                >
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400">{{
+                  $t('apiKeys.batchEditApiKeyModal.bedrockAccount')
+                }}</label>
                 <select
                   v-model="form.bedrockAccountId"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                   :disabled="form.permissions === 'gemini' || form.permissions === 'openai'"
                 >
-                  <option value="">不修改</option>
-                  <option value="SHARED_POOL">使用共享账号池</option>
-                  <optgroup v-if="localAccounts.bedrock.length > 0" label="专属账号">
+                  <option value="">
+                    {{ $t('apiKeys.batchEditApiKeyModal.accountOptions.noChange') }}
+                  </option>
+                  <option value="SHARED_POOL">
+                    {{ $t('apiKeys.batchEditApiKeyModal.accountOptions.sharedPool') }}
+                  </option>
+                  <optgroup
+                    v-if="localAccounts.bedrock.length > 0"
+                    :label="$t('apiKeys.batchEditApiKeyModal.optgroupLabels.dedicatedAccounts')"
+                  >
                     <option
                       v-for="account in localAccounts.bedrock"
                       :key="account.id"
@@ -452,7 +525,7 @@
               type="button"
               @click="$emit('close')"
             >
-              取消
+              {{ $t('apiKeys.batchEditApiKeyModal.cancel') }}
             </button>
             <button
               class="btn btn-primary flex-1 px-6 py-3 font-semibold"
@@ -461,7 +534,11 @@
             >
               <div v-if="loading" class="loading-spinner mr-2" />
               <i v-else class="fas fa-save mr-2" />
-              {{ loading ? '保存中...' : '批量保存' }}
+              {{
+                loading
+                  ? $t('apiKeys.batchEditApiKeyModal.saving')
+                  : $t('apiKeys.batchEditApiKeyModal.batchSave')
+              }}
             </button>
           </div>
         </form>
@@ -472,9 +549,12 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { showToast } from '@/utils/toast'
 import { useApiKeysStore } from '@/stores/apiKeys'
 import { apiClient } from '@/config/api'
+
+const { t } = useI18n()
 
 const props = defineProps({
   selectedKeys: {
@@ -620,9 +700,9 @@ const refreshAccounts = async () => {
       localAccounts.value.openaiGroups = allGroups.filter((g) => g.platform === 'openai')
     }
 
-    showToast('账号列表已刷新', 'success')
+    showToast(t('apiKeys.batchEditApiKeyModal.refreshAccountsSuccess'), 'success')
   } catch (error) {
-    showToast('刷新账号列表失败', 'error')
+    showToast(t('apiKeys.batchEditApiKeyModal.refreshAccountsFailed'), 'error')
   } finally {
     accountsLoading.value = false
   }
@@ -722,24 +802,33 @@ const batchUpdateApiKeys = async () => {
       const { successCount, failedCount, errors } = result.data
 
       if (successCount > 0) {
-        showToast(`成功批量编辑 ${successCount} 个 API Keys`, 'success')
+        showToast(
+          t('apiKeys.batchEditApiKeyModal.batchEditSuccess', { count: successCount }),
+          'success'
+        )
 
         if (failedCount > 0) {
           const errorMessages = errors.map((e) => `${e.keyId}: ${e.error}`).join('\n')
-          showToast(`${failedCount} 个编辑失败:\n${errorMessages}`, 'warning')
+          showToast(
+            t('apiKeys.batchEditApiKeyModal.batchEditPartialFail', {
+              failedCount,
+              errors: errorMessages
+            }),
+            'warning'
+          )
         }
       } else {
-        showToast('所有 API Keys 编辑失败', 'error')
+        showToast(t('apiKeys.batchEditApiKeyModal.batchEditAllFailed'), 'error')
       }
 
       emit('success')
       emit('close')
     } else {
-      showToast(result.message || '批量编辑失败', 'error')
+      showToast(result.message || t('apiKeys.batchEditApiKeyModal.batchEditFailed'), 'error')
     }
   } catch (error) {
-    showToast('批量编辑失败', 'error')
-    console.error('批量编辑 API Keys 失败:', error)
+    showToast(t('apiKeys.batchEditApiKeyModal.batchEditFailed'), 'error')
+    console.error(t('apiKeys.batchEditApiKeyModal.batchEditErrorLog'), error)
   } finally {
     loading.value = false
   }

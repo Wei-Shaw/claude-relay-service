@@ -32,7 +32,7 @@
                   ]"
                   @click="handleTabChange('overview')"
                 >
-                  Overview
+                  {{ t('user.dashboard.overview') }}
                 </button>
                 <button
                   :class="[
@@ -43,7 +43,7 @@
                   ]"
                   @click="handleTabChange('api-keys')"
                 >
-                  API Keys
+                  {{ t('user.dashboard.apiKeys') }}
                 </button>
                 <button
                   :class="[
@@ -54,7 +54,7 @@
                   ]"
                   @click="handleTabChange('usage')"
                 >
-                  Usage Stats
+                  {{ t('user.dashboard.usageStats') }}
                 </button>
                 <button
                   :class="[
@@ -72,7 +72,8 @@
           </div>
           <div class="flex items-center space-x-4">
             <div class="text-sm text-gray-700 dark:text-gray-300">
-              Welcome, <span class="font-medium">{{ userStore.userName }}</span>
+              {{ t('user.dashboard.welcome') }},
+              <span class="font-medium">{{ userStore.userName }}</span>
             </div>
 
             <!-- 主题切换按钮 -->
@@ -82,7 +83,7 @@
               class="rounded-md px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
               @click="handleLogout"
             >
-              Logout
+              {{ t('user.dashboard.logout') }}
             </button>
           </div>
         </div>
@@ -94,9 +95,11 @@
       <!-- Overview Tab -->
       <div v-if="activeTab === 'overview'" class="space-y-6">
         <div>
-          <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">Dashboard Overview</h1>
+          <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
+            {{ t('user.dashboard.title') }}
+          </h1>
           <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Welcome to your Claude Relay dashboard
+            {{ t('user.dashboard.welcomeMessage') }}
           </p>
         </div>
 
@@ -123,7 +126,7 @@
                 <div class="ml-5 w-0 flex-1">
                   <dl>
                     <dt class="truncate text-sm font-medium text-gray-500 dark:text-gray-400">
-                      Active API Keys
+                      {{ t('user.dashboard.activeApiKeys') }}
                     </dt>
                     <dd class="text-lg font-medium text-gray-900 dark:text-white">
                       {{ apiKeysStats.active }}
@@ -155,7 +158,7 @@
                 <div class="ml-5 w-0 flex-1">
                   <dl>
                     <dt class="truncate text-sm font-medium text-gray-500 dark:text-gray-400">
-                      Deleted API Keys
+                      {{ t('user.dashboard.deletedApiKeys') }}
                     </dt>
                     <dd class="text-lg font-medium text-gray-900 dark:text-white">
                       {{ apiKeysStats.deleted }}
@@ -187,7 +190,7 @@
                 <div class="ml-5 w-0 flex-1">
                   <dl>
                     <dt class="truncate text-sm font-medium text-gray-500 dark:text-gray-400">
-                      Total Requests
+                      {{ t('user.dashboard.totalRequests') }}
                     </dt>
                     <dd class="text-lg font-medium text-gray-900 dark:text-white">
                       {{ formatNumber(userProfile?.totalUsage?.requests || 0) }}
@@ -219,7 +222,7 @@
                 <div class="ml-5 w-0 flex-1">
                   <dl>
                     <dt class="truncate text-sm font-medium text-gray-500 dark:text-gray-400">
-                      Input Tokens
+                      {{ t('user.dashboard.inputTokens') }}
                     </dt>
                     <dd class="text-lg font-medium text-gray-900 dark:text-white">
                       {{ formatNumber(userProfile?.totalUsage?.inputTokens || 0) }}
@@ -251,7 +254,7 @@
                 <div class="ml-5 w-0 flex-1">
                   <dl>
                     <dt class="truncate text-sm font-medium text-gray-500 dark:text-gray-400">
-                      Total Cost
+                      {{ t('user.dashboard.totalCost') }}
                     </dt>
                     <dd class="text-lg font-medium text-gray-900 dark:text-white">
                       ${{ (userProfile?.totalUsage?.totalCost || 0).toFixed(4) }}
@@ -267,30 +270,38 @@
         <div class="rounded-lg bg-white shadow dark:bg-gray-800">
           <div class="px-4 py-5 sm:p-6">
             <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
-              Account Information
+              {{ t('user.dashboard.accountInformation') }}
             </h3>
             <div class="mt-5 border-t border-gray-200 dark:border-gray-700">
               <dl class="divide-y divide-gray-200 dark:divide-gray-700">
                 <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Username</dt>
+                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {{ t('user.dashboard.username') }}
+                  </dt>
                   <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
                     {{ userProfile?.username }}
                   </dd>
                 </div>
                 <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Display Name</dt>
+                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {{ t('user.dashboard.displayName') }}
+                  </dt>
                   <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
-                    {{ userProfile?.displayName || 'N/A' }}
+                    {{ userProfile?.displayName || t('user.dashboard.notAvailable') }}
                   </dd>
                 </div>
                 <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Email</dt>
+                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {{ t('user.dashboard.email') }}
+                  </dt>
                   <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
-                    {{ userProfile?.email || 'N/A' }}
+                    {{ userProfile?.email || t('user.dashboard.notAvailable') }}
                   </dd>
                 </div>
                 <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Role</dt>
+                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {{ t('user.dashboard.role') }}
+                  </dt>
                   <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
                     <span
                       class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200"
@@ -300,15 +311,19 @@
                   </dd>
                 </div>
                 <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Member Since</dt>
+                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {{ t('user.dashboard.memberSince') }}
+                  </dt>
                   <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
                     {{ formatDate(userProfile?.createdAt) }}
                   </dd>
                 </div>
                 <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
-                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Last Login</dt>
+                  <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {{ t('user.dashboard.lastLogin') }}
+                  </dt>
                   <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
-                    {{ formatDate(userProfile?.lastLoginAt) || 'N/A' }}
+                    {{ formatDate(userProfile?.lastLoginAt) || t('user.dashboard.notAvailable') }}
                   </dd>
                 </div>
               </dl>
@@ -338,6 +353,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import { showToast } from '@/utils/toast'
@@ -347,6 +363,7 @@ import UserUsageStats from '@/components/user/UserUsageStats.vue'
 import TutorialView from '@/views/TutorialView.vue'
 
 const router = useRouter()
+const { t } = useI18n()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
 
@@ -385,11 +402,11 @@ const handleTabChange = (tab) => {
 const handleLogout = async () => {
   try {
     await userStore.logout()
-    showToast('Logged out successfully', 'success')
+    showToast(t('user.dashboard.logoutSuccess'), 'success')
     router.push('/user-login')
   } catch (error) {
     console.error('Logout error:', error)
-    showToast('Logout failed', 'error')
+    showToast(t('user.dashboard.logoutFailed'), 'error')
   }
 }
 
@@ -398,7 +415,7 @@ const loadUserProfile = async () => {
     userProfile.value = await userStore.getUserProfile()
   } catch (error) {
     console.error('Failed to load user profile:', error)
-    showToast('Failed to load user profile', 'error')
+    showToast(t('user.dashboard.loadProfileFailed'), 'error')
   }
 }
 

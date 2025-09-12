@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { apiStatsClient } from '@/config/apiStats'
+import i18n from '@/i18n'
 
 export const useApiStatsStore = defineStore('apistats', () => {
   // 状态
@@ -93,7 +94,7 @@ export const useApiStatsStore = defineStore('apistats', () => {
     }
 
     if (!apiKey.value.trim()) {
-      error.value = '请输入 API Key'
+      error.value = i18n.global.t('apiStats.enterApiKey')
       return
     }
 
@@ -125,14 +126,18 @@ export const useApiStatsStore = defineStore('apistats', () => {
           // 更新 URL
           updateURL()
         } else {
-          throw new Error(statsResult.message || '查询失败')
+          throw new Error(
+            statsResult.message || i18n.global.t('common.errors.requestFailed', { status: 500 })
+          )
         }
       } else {
-        throw new Error(idResult.message || '获取 API Key ID 失败')
+        throw new Error(
+          idResult.message || i18n.global.t('common.errors.requestFailed', { status: 500 })
+        )
       }
     } catch (err) {
       console.error('Query stats error:', err)
-      error.value = err.message || '查询统计数据失败，请检查您的 API Key 是否正确'
+      error.value = err.message || i18n.global.t('apiStats.errors.queryStatsFailed')
       statsData.value = null
       modelStats.value = []
       apiId.value = null
@@ -209,7 +214,7 @@ export const useApiStatsStore = defineStore('apistats', () => {
       if (result.success) {
         modelStats.value = result.data || []
       } else {
-        throw new Error(result.message || '加载模型统计失败')
+        throw new Error(result.message || i18n.global.t('apiStats.errors.loadModelStatsFailed'))
       }
     } catch (err) {
       console.error('Load model stats error:', err)
@@ -266,11 +271,13 @@ export const useApiStatsStore = defineStore('apistats', () => {
         // 清除错误信息
         error.value = ''
       } else {
-        throw new Error(result.message || '查询失败')
+        throw new Error(
+          result.message || i18n.global.t('common.errors.requestFailed', { status: 500 })
+        )
       }
     } catch (err) {
       console.error('Load stats with apiId error:', err)
-      error.value = err.message || '查询统计数据失败'
+      error.value = err.message || i18n.global.t('apiStats.errors.queryStatsFailed')
       statsData.value = null
       modelStats.value = []
     } finally {
@@ -330,7 +337,7 @@ export const useApiStatsStore = defineStore('apistats', () => {
   async function queryBatchStats() {
     const keys = parseApiKeys()
     if (keys.length === 0) {
-      error.value = '请输入至少一个有效的 API Key'
+      error.value = i18n.global.t('apiStats.errors.enterAtLeastOneKey')
       return
     }
 
@@ -360,7 +367,7 @@ export const useApiStatsStore = defineStore('apistats', () => {
       })
 
       if (validIds.length === 0) {
-        throw new Error('所有 API Key 都无效')
+        throw new Error(i18n.global.t('common.errors.allApiKeysInvalid'))
       }
 
       apiIds.value = validIds
@@ -384,11 +391,11 @@ export const useApiStatsStore = defineStore('apistats', () => {
         // 更新 URL
         updateBatchURL()
       } else {
-        throw new Error(batchResult.message || '批量查询失败')
+        throw new Error(batchResult.message || i18n.global.t('apiStats.errors.batchQueryFailed'))
       }
     } catch (err) {
       console.error('Batch query error:', err)
-      error.value = err.message || '批量查询统计数据失败'
+      error.value = err.message || i18n.global.t('apiStats.errors.batchQueryFailed')
       aggregatedStats.value = null
       individualStats.value = []
     } finally {
@@ -408,7 +415,7 @@ export const useApiStatsStore = defineStore('apistats', () => {
       if (result.success) {
         modelStats.value = result.data || []
       } else {
-        throw new Error(result.message || '加载批量模型统计失败')
+        throw new Error(result.message || i18n.global.t('apiStats.errors.batchModelStatsFailed'))
       }
     } catch (err) {
       console.error('Load batch model stats error:', err)

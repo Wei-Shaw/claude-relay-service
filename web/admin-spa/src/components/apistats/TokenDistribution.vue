@@ -5,17 +5,17 @@
     >
       <span class="flex items-center">
         <i class="fas fa-coins mr-2 text-sm text-yellow-500 md:mr-3 md:text-base" />
-        Token 使用分布
+        {{ t('apiStats.tokenDistribution') }}
       </span>
       <span class="text-xs font-normal text-gray-600 dark:text-gray-400 sm:ml-2 md:text-sm"
-        >({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span
+        >({{ statsPeriod === 'daily' ? t('apiStats.today') : t('apiStats.thisMonth') }})</span
       >
     </h3>
     <div class="space-y-2 md:space-y-3">
       <div class="flex items-center justify-between">
         <span class="flex items-center text-sm text-gray-600 dark:text-gray-400 md:text-base">
           <i class="fas fa-arrow-right mr-1 text-xs text-green-500 md:mr-2 md:text-sm" />
-          输入 Token
+          {{ t('apiStats.inputToken') }}
         </span>
         <span class="text-sm font-medium text-gray-900 dark:text-gray-100 md:text-base">{{
           formatNumber(currentPeriodData.inputTokens)
@@ -24,7 +24,7 @@
       <div class="flex items-center justify-between">
         <span class="flex items-center text-sm text-gray-600 dark:text-gray-400 md:text-base">
           <i class="fas fa-arrow-left mr-1 text-xs text-blue-500 md:mr-2 md:text-sm" />
-          输出 Token
+          {{ t('apiStats.outputToken') }}
         </span>
         <span class="text-sm font-medium text-gray-900 dark:text-gray-100 md:text-base">{{
           formatNumber(currentPeriodData.outputTokens)
@@ -33,7 +33,7 @@
       <div class="flex items-center justify-between">
         <span class="flex items-center text-sm text-gray-600 dark:text-gray-400 md:text-base">
           <i class="fas fa-save mr-1 text-xs text-purple-500 md:mr-2 md:text-sm" />
-          缓存创建 Token
+          {{ t('apiStats.cacheCreateToken') }}
         </span>
         <span class="text-sm font-medium text-gray-900 dark:text-gray-100 md:text-base">{{
           formatNumber(currentPeriodData.cacheCreateTokens)
@@ -42,7 +42,7 @@
       <div class="flex items-center justify-between">
         <span class="flex items-center text-sm text-gray-600 dark:text-gray-400 md:text-base">
           <i class="fas fa-download mr-1 text-xs text-orange-500 md:mr-2 md:text-sm" />
-          缓存读取 Token
+          {{ t('apiStats.cacheReadToken') }}
         </span>
         <span class="text-sm font-medium text-gray-900 dark:text-gray-100 md:text-base">{{
           formatNumber(currentPeriodData.cacheReadTokens)
@@ -51,9 +51,9 @@
     </div>
     <div class="mt-3 border-t border-gray-200 pt-3 dark:border-gray-700 md:mt-4 md:pt-4">
       <div class="flex items-center justify-between font-bold text-gray-900 dark:text-gray-100">
-        <span class="text-sm md:text-base"
-          >{{ statsPeriod === 'daily' ? '今日' : '本月' }}总计</span
-        >
+        <span class="text-sm md:text-base">{{
+          statsPeriod === 'daily' ? t('apiStats.todayTotal') : t('apiStats.monthlyTotal')
+        }}</span>
         <span class="text-lg md:text-xl">{{ formatNumber(currentPeriodData.allTokens) }}</span>
       </div>
     </div>
@@ -62,7 +62,10 @@
 
 <script setup>
 import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 import { useApiStatsStore } from '@/stores/apistats'
+
+const { t } = useI18n()
 
 const apiStatsStore = useApiStatsStore()
 const { statsPeriod, currentPeriodData } = storeToRefs(apiStatsStore)
