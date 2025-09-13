@@ -1200,6 +1200,9 @@ class ClaudeAccountService {
         accountData.schedulable = 'true'
         delete accountData.rateLimitAutoStopped
         logger.info(`✅ Auto-resuming scheduling for account ${accountId} after rate limit cleared`)
+        logger.info(`📊 Account ${accountId} state after recovery: schedulable=${accountData.schedulable}`)
+      } else {
+        logger.info(`ℹ️ Account ${accountId} did not need auto-resume: autoStopped=${accountData.rateLimitAutoStopped}, schedulable=${accountData.schedulable}`)
       }
       await redis.setClaudeAccount(accountId, accountData)
 
@@ -1220,10 +1223,13 @@ class ClaudeAccountService {
         return false
       }
 
-      // 检查是否有限流状态
-      if (accountData.rateLimitStatus === 'limited' && accountData.rateLimitedAt) {
-        const now = new Date()
+      const now = new Date()
 
+      // 检查是否有限流状态（包括字段缺失但有自动停止标记的情况）
+      if (
+        (accountData.rateLimitStatus === 'limited' && accountData.rateLimitedAt) ||
+        (accountData.rateLimitAutoStopped === 'true' && accountData.rateLimitEndAt)
+      ) {
         // 优先使用 rateLimitEndAt（基于会话窗口）
         if (accountData.rateLimitEndAt) {
           const rateLimitEndAt = new Date(accountData.rateLimitEndAt)
@@ -1235,7 +1241,7 @@ class ClaudeAccountService {
           }
 
           return true
-        } else {
+        } else if (accountData.rateLimitedAt) {
           // 兼容旧数据：使用1小时限流
           const rateLimitedAt = new Date(accountData.rateLimitedAt)
           const hoursSinceRateLimit = (now - rateLimitedAt) / (1000 * 60 * 60)

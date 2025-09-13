@@ -180,11 +180,17 @@ class RateLimitCleanupService {
    */
   async cleanupClaudeAccounts(result) {
     try {
-      const accounts = await claudeAccountService.getAllAccounts()
+      // 使用原始数据而不是处理过的数据，避免字段被转换
+      const redis = require('../models/redis')
+      const accounts = await redis.getAllClaudeAccounts()
 
       for (const account of accounts) {
-        // 只检查标记为限流的账号
-        if (account.rateLimitStatus === 'limited' || account.rateLimitedAt) {
+        // 检查所有可能处于限流状态的账号，包括自动停止的账号
+        if (
+          account.rateLimitStatus === 'limited' ||
+          account.rateLimitedAt ||
+          account.rateLimitAutoStopped === 'true'
+        ) {
           result.checked++
 
           try {
