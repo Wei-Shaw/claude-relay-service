@@ -664,6 +664,7 @@
                 <option value="feishu">🟦 飞书</option>
                 <option value="slack">🟣 Slack</option>
                 <option value="discord">🟪 Discord</option>
+                <option value="telegram">📱 Telegram</option>
                 <option value="bark">🔔 Bark</option>
                 <option value="smtp">📧 邮件通知</option>
                 <option value="custom">⚙️ 自定义</option>
@@ -695,8 +696,14 @@
             />
           </div>
 
-          <!-- Webhook URL (非Bark和SMTP平台) -->
-          <div v-if="platformForm.type !== 'bark' && platformForm.type !== 'smtp'">
+          <!-- Webhook URL (非Bark、Telegram和SMTP平台) -->
+          <div
+            v-if="
+              platformForm.type !== 'bark' &&
+              platformForm.type !== 'telegram' &&
+              platformForm.type !== 'smtp'
+            "
+          >
             <label
               class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
             >
@@ -732,6 +739,103 @@
               <p class="text-sm text-blue-700 dark:text-blue-300">
                 {{ getWebhookHint(platformForm.type) }}
               </p>
+            </div>
+          </div>
+
+          <!-- Telegram 平台特有字段 -->
+          <div v-if="platformForm.type === 'telegram'" class="space-y-5">
+            <!-- Bot Token -->
+            <div>
+              <label
+                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                <i class="fas fa-robot mr-2 text-gray-400"></i>
+                Bot Token
+                <span class="ml-1 text-xs text-red-500">*</span>
+              </label>
+              <input
+                v-model="platformForm.botToken"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                placeholder="例如：123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+                required
+                type="text"
+              />
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                从 @BotFather 获取的Bot Token
+              </p>
+            </div>
+
+            <!-- Chat ID -->
+            <div>
+              <label
+                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                <i class="fas fa-comments mr-2 text-gray-400"></i>
+                Chat ID
+                <span class="ml-1 text-xs text-red-500">*</span>
+              </label>
+              <input
+                v-model="platformForm.chatId"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                placeholder="例如：123456789 或 @username"
+                required
+                type="text"
+              />
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                个人聊天ID（数字）或频道用户名（@开头）
+              </p>
+            </div>
+
+            <!-- 解析模式（可选） -->
+            <div>
+              <label
+                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                <i class="fas fa-code mr-2 text-gray-400"></i>
+                解析模式
+                <span class="ml-2 text-xs text-gray-500">(可选)</span>
+              </label>
+              <select
+                v-model="platformForm.parseMode"
+                class="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 text-gray-900 shadow-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              >
+                <option value="HTML">HTML</option>
+                <option value="Markdown">Markdown</option>
+                <option value="MarkdownV2">MarkdownV2</option>
+              </select>
+            </div>
+
+            <!-- API URL（可选） -->
+            <div>
+              <label
+                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                <i class="fas fa-link mr-2 text-gray-400"></i>
+                API URL
+                <span class="ml-2 text-xs text-gray-500">(可选)</span>
+              </label>
+              <input
+                v-model="platformForm.apiUrl"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                placeholder="https://api.telegram.org"
+                type="url"
+              />
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                自定义Telegram API地址，默认使用官方API
+              </p>
+            </div>
+
+            <!-- 提示信息 -->
+            <div class="mt-2 flex items-start rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
+              <i class="fas fa-info-circle mr-2 mt-0.5 text-blue-600 dark:text-blue-400"></i>
+              <div class="text-sm text-blue-700 dark:text-blue-300">
+                <p class="font-medium">如何获取配置信息：</p>
+                <ul class="mt-1 list-disc space-y-1 pl-4">
+                  <li>找到 @BotFather 创建Bot并获取Token</li>
+                  <li>与Bot发送 /start 开始对话</li>
+                  <li>访问 https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates 获取Chat ID</li>
+                </ul>
+              </div>
             </div>
           </div>
 
@@ -1161,6 +1265,11 @@ const platformForm = ref({
   level: '',
   sound: '',
   group: '',
+  // Telegram特有字段
+  botToken: '',
+  chatId: '',
+  parseMode: 'HTML',
+  apiUrl: 'https://api.telegram.org',
   // SMTP特有字段
   host: '',
   port: null,
@@ -1244,6 +1353,9 @@ const isPlatformFormValid = computed(() => {
   if (platformForm.value.type === 'bark') {
     // Bark平台需要deviceKey
     return !!platformForm.value.deviceKey
+  } else if (platformForm.value.type === 'telegram') {
+    // Telegram平台需要botToken和chatId
+    return !!platformForm.value.botToken && !!platformForm.value.chatId
   } else if (platformForm.value.type === 'smtp') {
     // SMTP平台需要必要的配置
     return !!(
@@ -1335,8 +1447,12 @@ const saveWebhookConfig = async () => {
 
 // 验证 URL
 const validateUrl = () => {
-  // Bark和SMTP平台不需要验证URL
-  if (platformForm.value.type === 'bark' || platformForm.value.type === 'smtp') {
+  // Bark、Telegram和SMTP平台不需要验证URL
+  if (
+    platformForm.value.type === 'bark' ||
+    platformForm.value.type === 'telegram' ||
+    platformForm.value.type === 'smtp'
+  ) {
     urlError.value = false
     urlValid.value = false
     return
@@ -1384,6 +1500,15 @@ const validatePlatformForm = () => {
         showToast(`请输入${message}`, 'error')
         return false
       }
+    }
+  } else if (platformForm.value.type === 'telegram') {
+    if (!platformForm.value.botToken) {
+      showToast('请输入Telegram Bot Token', 'error')
+      return
+    }
+    if (!platformForm.value.chatId) {
+      showToast('请输入Telegram Chat ID', 'error')
+      return
     }
   } else {
     if (!platformForm.value.url) {
@@ -1611,6 +1736,11 @@ const closePlatformModal = () => {
       level: '',
       sound: '',
       group: '',
+      // Telegram特有字段
+      botToken: '',
+      chatId: '',
+      parseMode: 'HTML',
+      apiUrl: 'https://api.telegram.org',
       // SMTP特有字段
       host: '',
       port: null,
@@ -1637,6 +1767,7 @@ const getPlatformName = (type) => {
     feishu: '飞书',
     slack: 'Slack',
     discord: 'Discord',
+    telegram: 'Telegram',
     bark: 'Bark',
     smtp: '邮件通知',
     custom: '自定义'
@@ -1651,6 +1782,7 @@ const getPlatformIcon = (type) => {
     feishu: 'fas fa-dove text-blue-600',
     slack: 'fab fa-slack text-purple-600',
     discord: 'fab fa-discord text-indigo-600',
+    telegram: 'fab fa-telegram text-blue-400',
     bark: 'fas fa-bell text-orange-500',
     smtp: 'fas fa-envelope text-blue-600',
     custom: 'fas fa-webhook text-gray-600'
@@ -1665,6 +1797,7 @@ const getWebhookHint = (type) => {
     feishu: '请在飞书群机器人设置中获取Webhook地址',
     slack: '请在Slack应用的Incoming Webhooks中获取地址',
     discord: '请在Discord服务器的集成设置中创建Webhook',
+    telegram: '请通过@BotFather创建机器人获取Token和Chat ID',
     bark: '请在Bark App中查看您的设备密钥',
     smtp: '请配置SMTP服务器信息，支持Gmail、QQ邮箱等',
     custom: '请输入完整的Webhook接收地址'

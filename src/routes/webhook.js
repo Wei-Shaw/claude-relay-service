@@ -125,6 +125,11 @@ router.post('/test', authenticateAdmin, async (req, res) => {
       level,
       sound,
       group,
+      // Telegram 相关字段
+      botToken,
+      chatId,
+      parseMode,
+      apiUrl,
       // SMTP 相关字段
       host,
       port,
@@ -158,6 +163,48 @@ router.post('/test', authenticateAdmin, async (req, res) => {
       }
 
       logger.info(`🧪 测试webhook: ${type} - Device Key: ${deviceKey.substring(0, 8)}...`)
+    } else if (type === 'telegram') {
+      // Telegram平台特殊处理
+      if (!botToken) {
+        return res.status(400).json({
+          error: 'Missing bot token',
+          message: '请提供Telegram Bot Token'
+        })
+      }
+
+      if (!chatId) {
+        return res.status(400).json({
+          error: 'Missing chat ID',
+          message: '请提供Telegram Chat ID'
+        })
+      }
+
+      // 验证Bot Token格式
+      if (!/^\d+:[A-Za-z0-9_-]+$/.test(botToken)) {
+        return res.status(400).json({
+          error: 'Invalid bot token format',
+          message: 'Bot Token格式无效，应该类似：123456789:ABCdefGHIjklMNOpqrsTUVwxyz'
+        })
+      }
+
+      // 验证Chat ID格式
+      if (typeof chatId === 'string') {
+        if (!chatId.startsWith('@') && !/^-?\d+$/.test(chatId)) {
+          return res.status(400).json({
+            error: 'Invalid chat ID format',
+            message: 'Chat ID格式无效，应该是数字或@username格式'
+          })
+        }
+      } else if (typeof chatId !== 'number') {
+        return res.status(400).json({
+          error: 'Invalid chat ID type',
+          message: 'Chat ID必须是字符串或数字'
+        })
+      }
+
+      logger.info(
+        `🧪 测试webhook: ${type} - Chat ID: ${typeof chatId === 'string' && chatId.startsWith('@') ? chatId : `${chatId}`.substring(0, 8)}...`
+      )
     } else if (type === 'smtp') {
       // SMTP平台验证
       if (!host) {
@@ -225,6 +272,12 @@ router.post('/test', authenticateAdmin, async (req, res) => {
       platform.level = level
       platform.sound = sound
       platform.group = group
+    } else if (type === 'telegram') {
+      // 添加Telegram特有字段
+      platform.botToken = botToken
+      platform.chatId = chatId
+      platform.parseMode = parseMode
+      platform.apiUrl = apiUrl
     } else if (type === 'smtp') {
       // 添加SMTP特有字段
       platform.host = host
@@ -240,22 +293,50 @@ router.post('/test', authenticateAdmin, async (req, res) => {
     const result = await webhookService.testWebhook(platform)
 
     if (result.success) {
-      const identifier = type === 'bark' ? `Device: ${deviceKey.substring(0, 8)}...` : url
+      let identifier
+      if (type === 'bark') {
+        identifier = `Device: ${deviceKey.substring(0, 8)}...`
+      } else if (type === 'telegram') {
+        identifier = `Chat: ${typeof chatId === 'string' && chatId.startsWith('@') ? chatId : `${chatId}`.substring(0, 8)}...`
+      } else {
+        identifier = url
+      }
+
       logger.info(`✅ Webhook测试成功: ${identifier}`)
       res.json({
         success: true,
         message: 'Webhook测试成功',
-        url: type === 'bark' ? undefined : url,
-        deviceKey: type === 'bark' ? `${deviceKey.substring(0, 8)}...` : undefined
+        url: type === 'bark' || type === 'telegram' ? undefined : url,
+        deviceKey: type === 'bark' ? `${deviceKey.substring(0, 8)}...` : undefined,
+        chatId:
+          type === 'telegram'
+            ? typeof chatId === 'string' && chatId.startsWith('@')
+              ? chatId
+              : `${`${chatId}`.substring(0, 8)}...`
+            : undefined
       })
     } else {
-      const identifier = type === 'bark' ? `Device: ${deviceKey.substring(0, 8)}...` : url
+      let identifier
+      if (type === 'bark') {
+        identifier = `Device: ${deviceKey.substring(0, 8)}...`
+      } else if (type === 'telegram') {
+        identifier = `Chat: ${typeof chatId === 'string' && chatId.startsWith('@') ? chatId : `${chatId}`.substring(0, 8)}...`
+      } else {
+        identifier = url
+      }
+
       logger.warn(`❌ Webhook测试失败: ${identifier} - ${result.error}`)
       res.status(400).json({
         success: false,
         message: 'Webhook测试失败',
-        url: type === 'bark' ? undefined : url,
+        url: type === 'bark' || type === 'telegram' ? undefined : url,
         deviceKey: type === 'bark' ? `${deviceKey.substring(0, 8)}...` : undefined,
+        chatId:
+          type === 'telegram'
+            ? typeof chatId === 'string' && chatId.startsWith('@')
+              ? chatId
+              : `${`${chatId}`.substring(0, 8)}...`
+            : undefined,
         error: result.error
       })
     }

@@ -16,6 +16,7 @@ class WebhookService {
       discord: this.sendToDiscord.bind(this),
       custom: this.sendToCustom.bind(this),
       bark: this.sendToBark.bind(this),
+      telegram: this.sendToTelegram.bind(this),
       smtp: this.sendToSMTP.bind(this)
     }
     this.timezone = appConfig.system.timezone || 'Asia/Shanghai'
@@ -242,6 +243,31 @@ class WebhookService {
     }
 
     const url = platform.serverUrl || 'https://api.day.app/push'
+    await this.sendHttpRequest(url, payload, platform.timeout || 10000)
+  }
+
+  /**
+   * Telegram webhook
+   */
+  async sendToTelegram(platform, type, data) {
+    const text = this.formatMessageForTelegram(type, data)
+
+    const payload = {
+      chat_id: platform.chatId,
+      text,
+      parse_mode: platform.parseMode || 'HTML',
+      disable_web_page_preview: platform.disableWebPagePreview || false,
+      disable_notification: platform.disableNotification || false
+    }
+
+    // 如果有回复消息ID
+    if (platform.replyToMessageId) {
+      payload.reply_to_message_id = platform.replyToMessageId
+    }
+
+    const apiUrl = platform.apiUrl || 'https://api.telegram.org'
+    const url = `${apiUrl}/bot${platform.botToken}/sendMessage`
+
     await this.sendHttpRequest(url, payload, platform.timeout || 10000)
   }
 
@@ -504,6 +530,98 @@ class WebhookService {
     lines.push(`时间: ${new Date().toLocaleString('zh-CN', { timeZone: this.timezone })}`)
 
     return lines.join('\n')
+  }
+
+  /**
+   * 格式化Telegram消息
+   */
+  formatMessageForTelegram(type, data) {
+    const title = this.getNotificationTitle(type)
+    const emoji = this.getTelegramEmoji(type)
+    const lines = []
+
+    // 标题行
+    lines.push(`${emoji} <b>${title}</b>`)
+    lines.push('')
+
+    // 详细信息
+    if (data.accountName) {
+      lines.push(`<b>账号:</b> ${this.escapeHtml(data.accountName)}`)
+    }
+
+    if (data.platform) {
+      lines.push(`<b>平台:</b> ${this.escapeHtml(data.platform)}`)
+    }
+
+    if (data.platforms) {
+      lines.push(`<b>涉及平台:</b> ${data.platforms.map((p) => this.escapeHtml(p)).join(', ')}`)
+    }
+
+    if (data.totalAccounts) {
+      lines.push(`<b>恢复账户数:</b> ${data.totalAccounts}`)
+    }
+
+    if (data.status) {
+      lines.push(`<b>状态:</b> ${this.escapeHtml(data.status)}`)
+    }
+
+    if (data.errorCode) {
+      lines.push(`<b>错误代码:</b> <code>${this.escapeHtml(data.errorCode)}</code>`)
+    }
+
+    if (data.reason) {
+      lines.push(`<b>原因:</b> ${this.escapeHtml(data.reason)}`)
+    }
+
+    if (data.message) {
+      lines.push(`<b>消息:</b> ${this.escapeHtml(data.message)}`)
+    }
+
+    if (data.quota) {
+      lines.push(`<b>剩余配额:</b> ${data.quota.remaining}/${data.quota.total}`)
+    }
+
+    if (data.usage) {
+      lines.push(`<b>使用率:</b> ${data.usage}%`)
+    }
+
+    // 添加服务标识和时间戳
+    lines.push('')
+    lines.push(`<b>服务:</b> Claude Relay Service`)
+    lines.push(`<b>时间:</b> ${new Date().toLocaleString('zh-CN', { timeZone: this.timezone })}`)
+
+    return lines.join('\n')
+  }
+
+  /**
+   * HTML实体转义
+   */
+  escapeHtml(text) {
+    if (typeof text !== 'string') {
+      return text
+    }
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+  }
+
+  /**
+   * 获取Telegram表情符号
+   */
+  getTelegramEmoji(type) {
+    const emojis = {
+      accountAnomaly: '⚠️',
+      quotaWarning: '📊',
+      systemError: '❌',
+      securityAlert: '🔒',
+      rateLimitRecovery: '🎉',
+      test: '🧪'
+    }
+
+    return emojis[type] || '📢'
   }
 
   /**
