@@ -697,7 +697,13 @@
           </div>
 
           <!-- Webhook URL (非Bark、Telegram和SMTP平台) -->
-          <div v-if="platformForm.type !== 'bark' && platformForm.type !== 'telegram' && platformForm.type !== 'smtp'">
+          <div
+            v-if="
+              platformForm.type !== 'bark' &&
+              platformForm.type !== 'telegram' &&
+              platformForm.type !== 'smtp'
+            "
+          >
             <label
               class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
             >
@@ -1442,7 +1448,11 @@ const saveWebhookConfig = async () => {
 // 验证 URL
 const validateUrl = () => {
   // Bark、Telegram和SMTP平台不需要验证URL
-  if (platformForm.value.type === 'bark' || platformForm.value.type === 'telegram' || platformForm.value.type === 'smtp') {
+  if (
+    platformForm.value.type === 'bark' ||
+    platformForm.value.type === 'telegram' ||
+    platformForm.value.type === 'smtp'
+  ) {
     urlError.value = false
     urlValid.value = false
     return
@@ -1499,24 +1509,6 @@ const validatePlatformForm = () => {
     if (!platformForm.value.chatId) {
       showToast('请输入Telegram Chat ID', 'error')
       return
-    }
-  } else if (platformForm.value.type === 'smtp') {
-    // SMTP平台验证
-    if (!platformForm.value.host) {
-      showToast('请输入SMTP服务器地址', 'error')
-      return false
-    }
-    if (!platformForm.value.user) {
-      showToast('请输入SMTP用户名', 'error')
-      return false
-    }
-    if (!platformForm.value.pass) {
-      showToast('请输入SMTP密码', 'error')
-      return false
-    }
-    if (!platformForm.value.to) {
-      showToast('请输入接收邮箱', 'error')
-      return false
     }
   } else {
     if (!platformForm.value.url) {
