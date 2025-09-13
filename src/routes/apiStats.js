@@ -336,15 +336,15 @@ router.post('/api/user-stats', async (req, res) => {
     const responseData = {
       id: keyId,
       name: fullKeyData.name,
-      description: keyData.description || '',
+      description: fullKeyData.description || keyData.description || '',
       isActive: true, // 如果能通过validateApiKey验证，说明一定是激活的
-      createdAt: keyData.createdAt,
-      expiresAt: keyData.expiresAt,
+      createdAt: fullKeyData.createdAt || keyData.createdAt,
+      expiresAt: fullKeyData.expiresAt || keyData.expiresAt,
       // 添加激活相关字段
-      expirationMode: keyData.expirationMode || 'fixed',
-      isActivated: keyData.isActivated === 'true',
-      activationDays: parseInt(keyData.activationDays || 0),
-      activatedAt: keyData.activatedAt || null,
+      expirationMode: fullKeyData.expirationMode || 'fixed',
+      isActivated: fullKeyData.isActivated === true || fullKeyData.isActivated === 'true',
+      activationDays: parseInt(fullKeyData.activationDays || 0),
+      activatedAt: fullKeyData.activatedAt || null,
       permissions: fullKeyData.permissions,
 
       // 使用统计（使用验证结果中的完整数据）

@@ -366,6 +366,14 @@ async function handleLoadCodeAssist(req, res) {
       proxyConfig
     )
 
+    // 如果响应中包含 cloudaicompanionProject，保存到账户作为临时项目 ID
+    if (response.cloudaicompanionProject && !account.projectId) {
+      await geminiAccountService.updateTempProjectId(accountId, response.cloudaicompanionProject)
+      logger.info(
+        `📋 Cached temporary projectId from loadCodeAssist: ${response.cloudaicompanionProject}`
+      )
+    }
+
     res.json(response)
   } catch (error) {
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
@@ -961,4 +969,10 @@ router.post(
   handleStreamGenerateContent
 )
 
+// 导出处理函数供标准路由使用
 module.exports = router
+module.exports.handleLoadCodeAssist = handleLoadCodeAssist
+module.exports.handleOnboardUser = handleOnboardUser
+module.exports.handleCountTokens = handleCountTokens
+module.exports.handleGenerateContent = handleGenerateContent
+module.exports.handleStreamGenerateContent = handleStreamGenerateContent

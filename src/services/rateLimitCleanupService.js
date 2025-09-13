@@ -215,6 +215,39 @@ class RateLimitCleanupService {
           }
         }
       }
+
+      // 检查并恢复因5小时限制被自动停止的账号
+      try {
+        const fiveHourResult = await claudeAccountService.checkAndRecoverFiveHourStoppedAccounts()
+
+        if (fiveHourResult.recovered > 0) {
+          // 将5小时限制恢复的账号也加入到已清理账户列表中，用于发送通知
+          for (const account of fiveHourResult.accounts) {
+            this.clearedAccounts.push({
+              platform: 'Claude',
+              accountId: account.id,
+              accountName: account.name,
+              previousStatus: '5hour_limited',
+              currentStatus: 'active',
+              windowInfo: account.newWindow
+            })
+          }
+
+          // 更新统计数据
+          result.checked += fiveHourResult.checked
+          result.cleared += fiveHourResult.recovered
+
+          logger.info(
+            `🕐 Claude 5-hour limit recovery: ${fiveHourResult.recovered}/${fiveHourResult.checked} accounts recovered`
+          )
+        }
+      } catch (error) {
+        logger.error('Failed to check and recover 5-hour stopped Claude accounts:', error)
+        result.errors.push({
+          type: '5hour_recovery',
+          error: error.message
+        })
+      }
     } catch (error) {
       logger.error('Failed to cleanup Claude accounts:', error)
       result.errors.push({ error: error.message })

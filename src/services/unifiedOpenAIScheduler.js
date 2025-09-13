@@ -1,4 +1,5 @@
 const openaiAccountService = require('./openaiAccountService')
+const openaiResponsesAccountService = require('./openaiResponsesAccountService')
 const accountGroupService = require('./accountGroupService')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
@@ -32,23 +33,53 @@ class UnifiedOpenAIScheduler {
           return await this.selectAccountFromGroup(groupId, sessionHash, requestedModel, apiKeyData)
         }
 
-        // 普通专属账户
-        const boundAccount = await openaiAccountService.getAccount(apiKeyData.openaiAccountId)
+        // 普通专属账户 - 根据前缀判断是 OpenAI 还是 OpenAI-Responses 类型
+        let boundAccount = null
+        let accountType = 'openai'
+
+        // 检查是否有 responses: 前缀（用于区分 OpenAI-Responses 账户）
+        if (apiKeyData.openaiAccountId.startsWith('responses:')) {
+          const accountId = apiKeyData.openaiAccountId.replace('responses:', '')
+          boundAccount = await openaiResponsesAccountService.getAccount(accountId)
+          accountType = 'openai-responses'
+        } else {
+          // 普通 OpenAI 账户
+          boundAccount = await openaiAccountService.getAccount(apiKeyData.openaiAccountId)
+          accountType = 'openai'
+        }
+
         if (
           boundAccount &&
           (boundAccount.isActive === true || boundAccount.isActive === 'true') &&
           boundAccount.status !== 'error'
         ) {
           // 检查是否被限流
-          const isRateLimited = await this.isAccountRateLimited(boundAccount.id)
-          if (isRateLimited) {
-            const errorMsg = `Dedicated account ${boundAccount.name} is currently rate limited`
-            logger.warn(`⚠️ ${errorMsg}`)
-            throw new Error(errorMsg)
+          if (accountType === 'openai') {
+            const isRateLimited = await this.isAccountRateLimited(boundAccount.id)
+            if (isRateLimited) {
+              const errorMsg = `Dedicated account ${boundAccount.name} is currently rate limited`
+              logger.warn(`⚠️ ${errorMsg}`)
+              throw new Error(errorMsg)
+            }
+          } else if (
+            accountType === 'openai-responses' &&
+            boundAccount.rateLimitStatus === 'limited'
+          ) {
+            // OpenAI-Responses 账户的限流检查
+            const isRateLimitCleared = await openaiResponsesAccountService.checkAndClearRateLimit(
+              boundAccount.id
+            )
+            if (!isRateLimitCleared) {
+              const errorMsg = `Dedicated account ${boundAccount.name} is currently rate limited`
+              logger.warn(`⚠️ ${errorMsg}`)
+              throw new Error(errorMsg)
+            }
           }
 
           // 专属账户：可选的模型检查（只有明确配置了supportedModels且不为空才检查）
+          // OpenAI-Responses 账户默认支持所有模型
           if (
+            accountType === 'openai' &&
             requestedModel &&
             boundAccount.supportedModels &&
             boundAccount.supportedModels.length > 0
@@ -62,13 +93,19 @@ class UnifiedOpenAIScheduler {
           }
 
           logger.info(
-            `🎯 Using bound dedicated OpenAI account: ${boundAccount.name} (${apiKeyData.openaiAccountId}) for API key ${apiKeyData.name}`
+            `🎯 Using bound dedicated ${accountType} account: ${boundAccount.name} (${boundAccount.id}) for API key ${apiKeyData.name}`
           )
           // 更新账户的最后使用时间
-          await openaiAccountService.recordUsage(apiKeyData.openaiAccountId, 0)
+          if (accountType === 'openai') {
+            await openaiAccountService.recordUsage(boundAccount.id, 0)
+          } else {
+            await openaiResponsesAccountService.updateAccount(boundAccount.id, {
+              lastUsedAt: new Date().toISOString()
+            })
+          }
           return {
-            accountId: apiKeyData.openaiAccountId,
-            accountType: 'openai'
+            accountId: boundAccount.id,
+            accountType
           }
         } else {
           // 专属账户不可用时直接报错，不降级到共享池
@@ -90,8 +127,8 @@ class UnifiedOpenAIScheduler {
             mappedAccount.accountType
           )
           if (isAvailable) {
-            // 🚀 智能会话续期：剩余时间少于14天时自动续期到15天
-            await redis.extendSessionAccountMappingTTL(sessionHash)
+            // 🚀 智能会话续期（续期 unified 映射键，按配置）
+            await this._extendSessionMappingTTL(sessionHash)
             logger.info(
               `🎯 Using sticky session account: ${mappedAccount.accountId} (${mappedAccount.accountType}) for session ${sessionHash}`
             )
@@ -230,6 +267,40 @@ class UnifiedOpenAIScheduler {
       }
     }
 
+    // 获取所有 OpenAI-Responses 账户（共享池）
+    const openaiResponsesAccounts = await openaiResponsesAccountService.getAllAccounts()
+    for (const account of openaiResponsesAccounts) {
+      if (
+        (account.isActive === true || account.isActive === 'true') &&
+        account.status !== 'error' &&
+        account.status !== 'rateLimited' &&
+        (account.accountType === 'shared' || !account.accountType) && // 兼容旧数据
+        this._isSchedulable(account.schedulable)
+      ) {
+        // 检查并清除过期的限流状态
+        const isRateLimitCleared = await openaiResponsesAccountService.checkAndClearRateLimit(
+          account.id
+        )
+
+        // 如果仍然处于限流状态，跳过
+        if (account.rateLimitStatus === 'limited' && !isRateLimitCleared) {
+          logger.debug(`⏭️ Skipping OpenAI-Responses account ${account.name} - rate limited`)
+          continue
+        }
+
+        // OpenAI-Responses 账户默认支持所有模型
+        // 因为它们是第三方兼容 API，模型支持由第三方决定
+
+        availableAccounts.push({
+          ...account,
+          accountId: account.id,
+          accountType: 'openai-responses',
+          priority: parseInt(account.priority) || 50,
+          lastUsedAt: account.lastUsedAt || '0'
+        })
+      }
+    }
+
     return availableAccounts
   }
 
@@ -262,6 +333,24 @@ class UnifiedOpenAIScheduler {
           return false
         }
         return !(await this.isAccountRateLimited(accountId))
+      } else if (accountType === 'openai-responses') {
+        const account = await openaiResponsesAccountService.getAccount(accountId)
+        if (
+          !account ||
+          (account.isActive !== true && account.isActive !== 'true') ||
+          account.status === 'error'
+        ) {
+          return false
+        }
+        // 检查是否可调度
+        if (!this._isSchedulable(account.schedulable)) {
+          logger.info(`🚫 OpenAI-Responses account ${accountId} is not schedulable`)
+          return false
+        }
+        // 检查并清除过期的限流状态
+        const isRateLimitCleared =
+          await openaiResponsesAccountService.checkAndClearRateLimit(accountId)
+        return account.rateLimitStatus !== 'limited' || isRateLimitCleared
       }
       return false
     } catch (error) {
@@ -291,9 +380,11 @@ class UnifiedOpenAIScheduler {
   async _setSessionMapping(sessionHash, accountId, accountType) {
     const client = redis.getClientSafe()
     const mappingData = JSON.stringify({ accountId, accountType })
-
-    // 设置1小时过期
-    await client.setex(`${this.SESSION_MAPPING_PREFIX}${sessionHash}`, 3600, mappingData)
+    // 依据配置设置TTL（小时）
+    const appConfig = require('../../config/config')
+    const ttlHours = appConfig.session?.stickyTtlHours || 1
+    const ttlSeconds = Math.max(1, Math.floor(ttlHours * 60 * 60))
+    await client.setex(`${this.SESSION_MAPPING_PREFIX}${sessionHash}`, ttlSeconds, mappingData)
   }
 
   // 🗑️ 删除会话映射
@@ -302,11 +393,64 @@ class UnifiedOpenAIScheduler {
     await client.del(`${this.SESSION_MAPPING_PREFIX}${sessionHash}`)
   }
 
+  // 🔁 续期统一调度会话映射TTL（针对 unified_openai_session_mapping:* 键），遵循会话配置
+  async _extendSessionMappingTTL(sessionHash) {
+    try {
+      const client = redis.getClientSafe()
+      const key = `${this.SESSION_MAPPING_PREFIX}${sessionHash}`
+      const remainingTTL = await client.ttl(key)
+
+      if (remainingTTL === -2) {
+        return false
+      }
+      if (remainingTTL === -1) {
+        return true
+      }
+
+      const appConfig = require('../../config/config')
+      const ttlHours = appConfig.session?.stickyTtlHours || 1
+      const renewalThresholdMinutes = appConfig.session?.renewalThresholdMinutes || 0
+      if (!renewalThresholdMinutes) {
+        return true
+      }
+
+      const fullTTL = Math.max(1, Math.floor(ttlHours * 60 * 60))
+      const threshold = Math.max(0, Math.floor(renewalThresholdMinutes * 60))
+
+      if (remainingTTL < threshold) {
+        await client.expire(key, fullTTL)
+        logger.debug(
+          `🔄 Renewed unified OpenAI session TTL: ${sessionHash} (was ${Math.round(remainingTTL / 60)}m, renewed to ${ttlHours}h)`
+        )
+      } else {
+        logger.debug(
+          `✅ Unified OpenAI session TTL sufficient: ${sessionHash} (remaining ${Math.round(remainingTTL / 60)}m)`
+        )
+      }
+      return true
+    } catch (error) {
+      logger.error('❌ Failed to extend unified OpenAI session TTL:', error)
+      return false
+    }
+  }
+
   // 🚫 标记账户为限流状态
   async markAccountRateLimited(accountId, accountType, sessionHash = null, resetsInSeconds = null) {
     try {
       if (accountType === 'openai') {
         await openaiAccountService.setAccountRateLimited(accountId, true, resetsInSeconds)
+      } else if (accountType === 'openai-responses') {
+        // 对于 OpenAI-Responses 账户，使用与普通 OpenAI 账户类似的处理方式
+        const duration = resetsInSeconds ? Math.ceil(resetsInSeconds / 60) : null
+        await openaiResponsesAccountService.markAccountRateLimited(accountId, duration)
+
+        // 同时更新调度状态，避免继续被调度
+        await openaiResponsesAccountService.updateAccount(accountId, {
+          schedulable: 'false',
+          rateLimitResetAt: resetsInSeconds
+            ? new Date(Date.now() + resetsInSeconds * 1000).toISOString()
+            : new Date(Date.now() + 3600000).toISOString() // 默认1小时
+        })
       }
 
       // 删除会话映射
@@ -329,6 +473,17 @@ class UnifiedOpenAIScheduler {
     try {
       if (accountType === 'openai') {
         await openaiAccountService.setAccountRateLimited(accountId, false)
+      } else if (accountType === 'openai-responses') {
+        // 清除 OpenAI-Responses 账户的限流状态
+        await openaiResponsesAccountService.updateAccount(accountId, {
+          rateLimitedAt: '',
+          rateLimitStatus: '',
+          rateLimitResetAt: '',
+          status: 'active',
+          errorMessage: '',
+          schedulable: 'true'
+        })
+        logger.info(`✅ Rate limit cleared for OpenAI-Responses account ${accountId}`)
       }
 
       return { success: true }
@@ -408,8 +563,8 @@ class UnifiedOpenAIScheduler {
               mappedAccount.accountType
             )
             if (isAvailable) {
-              // 🚀 智能会话续期：剩余时间少于14天时自动续期到15天
-              await redis.extendSessionAccountMappingTTL(sessionHash)
+              // 🚀 智能会话续期（续期 unified 映射键，按配置）
+              await this._extendSessionMappingTTL(sessionHash)
               logger.info(
                 `🎯 Using sticky session account from group: ${mappedAccount.accountId} (${mappedAccount.accountType})`
               )

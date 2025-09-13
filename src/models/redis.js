@@ -780,7 +780,7 @@ class RedisClient {
   }
 
   // 📊 获取账户使用统计
-  async getAccountUsageStats(accountId) {
+  async getAccountUsageStats(accountId, accountType = null) {
     const accountKey = `account_usage:${accountId}`
     const today = getDateStringInTimezone()
     const accountDailyKey = `account_usage:daily:${accountId}:${today}`
@@ -794,8 +794,25 @@ class RedisClient {
       this.client.hgetall(accountMonthlyKey)
     ])
 
-    // 获取账户创建时间来计算平均值
-    const accountData = await this.client.hgetall(`claude_account:${accountId}`)
+    // 获取账户创建时间来计算平均值 - 支持不同类型的账号
+    let accountData = {}
+    if (accountType === 'openai') {
+      accountData = await this.client.hgetall(`openai:account:${accountId}`)
+    } else if (accountType === 'openai-responses') {
+      accountData = await this.client.hgetall(`openai_responses_account:${accountId}`)
+    } else {
+      // 尝试多个前缀
+      accountData = await this.client.hgetall(`claude_account:${accountId}`)
+      if (!accountData.createdAt) {
+        accountData = await this.client.hgetall(`openai:account:${accountId}`)
+      }
+      if (!accountData.createdAt) {
+        accountData = await this.client.hgetall(`openai_responses_account:${accountId}`)
+      }
+      if (!accountData.createdAt) {
+        accountData = await this.client.hgetall(`openai_account:${accountId}`)
+      }
+    }
     const createdAt = accountData.createdAt ? new Date(accountData.createdAt) : new Date()
     const now = new Date()
     const daysSinceCreated = Math.max(1, Math.ceil((now - createdAt) / (1000 * 60 * 60 * 24)))
@@ -1700,6 +1717,42 @@ class RedisClient {
 }
 
 const redisClient = new RedisClient()
+
+// 分布式锁相关方法
+redisClient.setAccountLock = async function (lockKey, lockValue, ttlMs) {
+  try {
+    // 使用SET NX EX实现原子性的锁获取
+    const result = await this.client.set(lockKey, lockValue, {
+      NX: true, // 只在键不存在时设置
+      PX: ttlMs // 毫秒级过期时间
+    })
+    return result === 'OK'
+  } catch (error) {
+    logger.error(`Failed to acquire lock ${lockKey}:`, error)
+    return false
+  }
+}
+
+redisClient.releaseAccountLock = async function (lockKey, lockValue) {
+  try {
+    // 使用Lua脚本确保只有持有锁的进程才能释放锁
+    const script = `
+      if redis.call("get", KEYS[1]) == ARGV[1] then
+        return redis.call("del", KEYS[1])
+      else
+        return 0
+      end
+    `
+    const result = await this.client.eval(script, {
+      keys: [lockKey],
+      arguments: [lockValue]
+    })
+    return result === 1
+  } catch (error) {
+    logger.error(`Failed to release lock ${lockKey}:`, error)
+    return false
+  }
+}
 
 // 导出时区辅助函数
 redisClient.getDateInTimezone = getDateInTimezone

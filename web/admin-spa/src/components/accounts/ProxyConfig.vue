@@ -30,6 +30,45 @@
         </div>
       </div>
 
+      <!-- 快速配置输入框 -->
+      <div>
+        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+          快速配置
+          <span class="ml-1 text-xs font-normal text-gray-500 dark:text-gray-400">
+            (粘贴完整代理URL自动填充)
+          </span>
+        </label>
+        <div class="relative">
+          <input
+            v-model="proxyUrl"
+            class="form-input w-full border-gray-300 pr-10 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+            placeholder="例如: socks5://username:password@host:port 或 http://host:port"
+            type="text"
+            @input="handleInput"
+            @keyup.enter="parseProxyUrl"
+            @paste="handlePaste"
+          />
+          <button
+            v-if="proxyUrl"
+            class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-400"
+            type="button"
+            @click="clearProxyUrl"
+          >
+            <i class="fas fa-times" />
+          </button>
+        </div>
+        <p v-if="parseError" class="mt-1 text-xs text-red-500">
+          <i class="fas fa-exclamation-circle mr-1" />
+          {{ parseError }}
+        </p>
+        <p v-else-if="parseSuccess" class="mt-1 text-xs text-green-500">
+          <i class="fas fa-check-circle mr-1" />
+          代理配置已自动填充
+        </p>
+      </div>
+
+      <div class="my-3 border-t border-gray-200 dark:border-gray-600"></div>
+
       <div>
         <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
           >代理类型</label
@@ -159,6 +198,11 @@ const proxy = ref({ ...props.modelValue })
 const showAuth = ref(!!(proxy.value.username || proxy.value.password))
 const showPassword = ref(false)
 
+// 快速配置相关
+const proxyUrl = ref('')
+const parseError = ref('')
+const parseSuccess = ref(false)
+
 // 监听modelValue变化，只在真正需要更新时才更新
 watch(
   () => props.modelValue,
@@ -244,6 +288,122 @@ function emitUpdate() {
 
     emit('update:modelValue', data)
   }, 100) // 100ms 延迟
+}
+
+// 解析代理URL
+function parseProxyUrl() {
+  parseError.value = ''
+  parseSuccess.value = false
+
+  if (!proxyUrl.value) {
+    return
+  }
+
+  try {
+    // 移除 # 后面的别名部分
+    const urlWithoutAlias = proxyUrl.value.split('#')[0].trim()
+
+    if (!urlWithoutAlias) {
+      return
+    }
+
+    // 正则表达式匹配代理URL格式
+    // 支持格式：protocol://[username:password@]host:port
+    const proxyPattern = /^(socks5|https?):\/\/(?:([^:@]+):([^@]+)@)?([^:]+):(\d+)$/i
+    const match = urlWithoutAlias.match(proxyPattern)
+
+    if (!match) {
+      // 尝试简单格式：host:port（默认为socks5）
+      const simplePattern = /^([^:]+):(\d+)$/
+      const simpleMatch = urlWithoutAlias.match(simplePattern)
+
+      if (simpleMatch) {
+        proxy.value.type = 'socks5'
+        proxy.value.host = simpleMatch[1]
+        proxy.value.port = simpleMatch[2]
+        proxy.value.username = ''
+        proxy.value.password = ''
+        showAuth.value = false
+        parseSuccess.value = true
+        emitUpdate()
+
+        // 3秒后清除成功提示
+        setTimeout(() => {
+          parseSuccess.value = false
+        }, 3000)
+        return
+      }
+
+      parseError.value = '无效的代理URL格式，请检查输入'
+      return
+    }
+
+    // 解析匹配结果
+    const [, protocol, username, password, host, port] = match
+
+    // 填充表单
+    proxy.value.type = protocol.toLowerCase()
+    proxy.value.host = host
+    proxy.value.port = port
+
+    // 处理认证信息
+    if (username && password) {
+      proxy.value.username = decodeURIComponent(username)
+      proxy.value.password = decodeURIComponent(password)
+      showAuth.value = true
+    } else {
+      proxy.value.username = ''
+      proxy.value.password = ''
+      showAuth.value = false
+    }
+
+    parseSuccess.value = true
+    emitUpdate()
+
+    // 3秒后清除成功提示
+    setTimeout(() => {
+      parseSuccess.value = false
+    }, 3000)
+  } catch (error) {
+    // 解析代理URL失败
+    parseError.value = '解析失败，请检查URL格式'
+  }
+}
+
+// 清空快速配置输入
+function clearProxyUrl() {
+  proxyUrl.value = ''
+  parseError.value = ''
+  parseSuccess.value = false
+}
+
+// 处理粘贴事件
+function handlePaste() {
+  // 延迟一下以确保v-model已经更新
+  setTimeout(() => {
+    parseProxyUrl()
+  }, 0)
+}
+
+// 处理输入事件
+function handleInput() {
+  // 检测是否输入了代理URL格式
+  const value = proxyUrl.value.trim()
+
+  // 如果输入包含://，说明可能是完整的代理URL
+  if (value.includes('://')) {
+    // 检查是否看起来像完整的URL（有协议、主机和端口）
+    if (
+      /^(socks5|https?):\/\/[^:]+:\d+/i.test(value) ||
+      /^(socks5|https?):\/\/[^:@]+:[^@]+@[^:]+:\d+/i.test(value)
+    ) {
+      parseProxyUrl()
+    }
+  }
+  // 如果是简单的 host:port 格式，并且端口号输入完整
+  else if (/^[^:]+:\d{2,5}$/.test(value)) {
+    parseProxyUrl()
+  }
 }
 
 // 组件销毁时清理定时器

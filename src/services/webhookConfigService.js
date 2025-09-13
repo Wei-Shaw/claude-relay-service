@@ -64,7 +64,8 @@ class WebhookConfigService {
         'discord',
         'custom',
         'bark',
-        'telegram'
+        'telegram',
+        'smtp'
       ]
 
       for (const platform of config.platforms) {
@@ -72,8 +73,8 @@ class WebhookConfigService {
           throw new Error(`不支持的平台类型: ${platform.type}`)
         }
 
-        // Bark和Telegram平台有特殊的验证规则
-        if (platform.type !== 'bark' && platform.type !== 'telegram') {
+        // Bark、Telegram和SMTP平台不使用标准URL
+        if (platform.type !== 'bark' && platform.type !== 'telegram' && platform.type !== 'smtp') {
           if (!platform.url || !this.isValidUrl(platform.url)) {
             throw new Error(`无效的webhook URL: ${platform.url}`)
           }
@@ -247,6 +248,51 @@ class WebhookConfigService {
           throw new Error('Telegram API URL格式无效')
         }
         break
+      case 'smtp': {
+        // 验证SMTP必需配置
+        if (!platform.host) {
+          throw new Error('SMTP平台必须提供主机地址')
+        }
+        if (!platform.user) {
+          throw new Error('SMTP平台必须提供用户名')
+        }
+        if (!platform.pass) {
+          throw new Error('SMTP平台必须提供密码')
+        }
+        if (!platform.to) {
+          throw new Error('SMTP平台必须提供接收邮箱')
+        }
+
+        // 验证端口
+        if (platform.port && (platform.port < 1 || platform.port > 65535)) {
+          throw new Error('SMTP端口必须在1-65535之间')
+        }
+
+        // 验证邮箱格式
+        // 支持两种格式：1. 纯邮箱 user@domain.com  2. 带名称 Name <user@domain.com>
+        const simpleEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+        // 验证接收邮箱
+        const toEmails = Array.isArray(platform.to) ? platform.to : [platform.to]
+        for (const email of toEmails) {
+          // 提取实际邮箱地址（如果是 Name <email> 格式）
+          const actualEmail = email.includes('<') ? email.match(/<([^>]+)>/)?.[1] : email
+          if (!actualEmail || !simpleEmailRegex.test(actualEmail)) {
+            throw new Error(`无效的接收邮箱格式: ${email}`)
+          }
+        }
+
+        // 验证发送邮箱（支持 Name <email> 格式）
+        if (platform.from) {
+          const actualFromEmail = platform.from.includes('<')
+            ? platform.from.match(/<([^>]+)>/)?.[1]
+            : platform.from
+          if (!actualFromEmail || !simpleEmailRegex.test(actualFromEmail)) {
+            throw new Error(`无效的发送邮箱格式: ${platform.from}`)
+          }
+        }
+        break
+      }
     }
   }
 
