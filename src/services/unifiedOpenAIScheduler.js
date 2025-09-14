@@ -19,6 +19,26 @@ class UnifiedOpenAIScheduler {
     return schedulable !== false && schedulable !== 'false'
   }
 
+  // 🔧 辅助方法：检查账户是否被限流（兼容字符串和对象格式）
+  _isRateLimited(rateLimitStatus) {
+    if (!rateLimitStatus) {
+      return false
+    }
+
+    // 兼容字符串格式（Redis 原始数据）
+    if (typeof rateLimitStatus === 'string') {
+      return rateLimitStatus === 'limited'
+    }
+
+    // 兼容对象格式（getAllAccounts 返回的数据）
+    if (typeof rateLimitStatus === 'object') {
+      // 检查对象中的 status 字段
+      return rateLimitStatus.status === 'limited' || rateLimitStatus.isRateLimited === true
+    }
+
+    return false
+  }
+
   // 🎯 统一调度OpenAI账号
   async selectAccountForApiKey(apiKeyData, sessionHash = null, requestedModel = null) {
     try {
@@ -63,7 +83,7 @@ class UnifiedOpenAIScheduler {
             }
           } else if (
             accountType === 'openai-responses' &&
-            boundAccount.rateLimitStatus === 'limited'
+            this._isRateLimited(boundAccount.rateLimitStatus)
           ) {
             // OpenAI-Responses 账户的限流检查
             const isRateLimitCleared = await openaiResponsesAccountService.checkAndClearRateLimit(
@@ -283,7 +303,7 @@ class UnifiedOpenAIScheduler {
         )
 
         // 如果仍然处于限流状态，跳过
-        if (account.rateLimitStatus === 'limited' && !isRateLimitCleared) {
+        if (this._isRateLimited(account.rateLimitStatus) && !isRateLimitCleared) {
           logger.debug(`⏭️ Skipping OpenAI-Responses account ${account.name} - rate limited`)
           continue
         }
@@ -350,7 +370,7 @@ class UnifiedOpenAIScheduler {
         // 检查并清除过期的限流状态
         const isRateLimitCleared =
           await openaiResponsesAccountService.checkAndClearRateLimit(accountId)
-        return account.rateLimitStatus !== 'limited' || isRateLimitCleared
+        return !this._isRateLimited(account.rateLimitStatus) || isRateLimitCleared
       }
       return false
     } catch (error) {
@@ -504,7 +524,7 @@ class UnifiedOpenAIScheduler {
         return false
       }
 
-      if (account.rateLimitStatus === 'limited') {
+      if (this._isRateLimited(account.rateLimitStatus)) {
         // 如果有具体的重置时间，使用它
         if (account.rateLimitResetAt) {
           const resetTime = new Date(account.rateLimitResetAt).getTime()

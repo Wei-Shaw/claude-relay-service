@@ -134,11 +134,18 @@ class RateLimitCleanupService {
    */
   async cleanupOpenAIAccounts(result) {
     try {
+      // 使用服务层获取账户数据
       const accounts = await openaiAccountService.getAllAccounts()
 
       for (const account of accounts) {
-        // 只检查标记为限流的账号
-        if (account.rateLimitStatus === 'limited') {
+        // 检查是否处于限流状态（兼容对象和字符串格式）
+        const isRateLimited =
+          account.rateLimitStatus === 'limited' ||
+          (account.rateLimitStatus &&
+            typeof account.rateLimitStatus === 'object' &&
+            account.rateLimitStatus.status === 'limited')
+
+        if (isRateLimited) {
           result.checked++
 
           try {
@@ -180,17 +187,20 @@ class RateLimitCleanupService {
    */
   async cleanupClaudeAccounts(result) {
     try {
-      // 使用原始数据而不是处理过的数据，避免字段被转换
+      // 使用 Redis 获取账户数据
       const redis = require('../models/redis')
       const accounts = await redis.getAllClaudeAccounts()
 
       for (const account of accounts) {
-        // 检查所有可能处于限流状态的账号，包括自动停止的账号
-        if (
+        // 检查是否处于限流状态（兼容对象和字符串格式）
+        const isRateLimited =
           account.rateLimitStatus === 'limited' ||
-          account.rateLimitedAt ||
-          account.rateLimitAutoStopped === 'true'
-        ) {
+          (account.rateLimitStatus &&
+            typeof account.rateLimitStatus === 'object' &&
+            account.rateLimitStatus.status === 'limited')
+
+        // 检查所有可能处于限流状态的账号，包括自动停止的账号
+        if (isRateLimited || account.rateLimitedAt || account.rateLimitAutoStopped === 'true') {
           result.checked++
 
           try {
@@ -265,14 +275,21 @@ class RateLimitCleanupService {
    */
   async cleanupClaudeConsoleAccounts(result) {
     try {
+      // 使用服务层获取账户数据
       const accounts = await claudeConsoleAccountService.getAllAccounts()
 
       for (const account of accounts) {
+        // 检查是否处于限流状态（兼容对象和字符串格式）
+        const isRateLimited =
+          account.rateLimitStatus === 'limited' ||
+          (account.rateLimitStatus &&
+            typeof account.rateLimitStatus === 'object' &&
+            account.rateLimitStatus.status === 'limited')
+
         // 检查两种状态字段：rateLimitStatus 和 status
-        const hasRateLimitStatus = account.rateLimitStatus === 'limited'
         const hasStatusRateLimited = account.status === 'rate_limited'
 
-        if (hasRateLimitStatus || hasStatusRateLimited) {
+        if (isRateLimited || hasStatusRateLimited) {
           result.checked++
 
           try {
@@ -285,7 +302,7 @@ class RateLimitCleanupService {
               result.cleared++
 
               // 如果 status 字段是 rate_limited，需要额外清理
-              if (hasStatusRateLimited && !hasRateLimitStatus) {
+              if (hasStatusRateLimited && !isRateLimited) {
                 await claudeConsoleAccountService.updateAccount(account.id, {
                   status: 'active'
                 })
