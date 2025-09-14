@@ -138,7 +138,14 @@ class RateLimitCleanupService {
 
       for (const account of accounts) {
         // 只检查标记为限流的账号
-        if (account.rateLimitStatus === 'limited') {
+        // 兼容两种格式：
+        // 1) 老字段：rateLimitStatus === 'limited'
+        // 2) 新结构：rateLimitStatus = { isRateLimited: boolean, ... }
+        const isLimitedFlag =
+          account.rateLimitStatus === 'limited' ||
+          (account.rateLimitStatus && account.rateLimitStatus.isRateLimited === true)
+
+        if (isLimitedFlag) {
           result.checked++
 
           try {
