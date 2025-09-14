@@ -585,7 +585,10 @@
                       <div
                         :class="[
                           'h-2 rounded-full transition-all duration-300',
-                          getSessionProgressBarClass(account.sessionWindow.sessionWindowStatus)
+                          getSessionProgressBarClass(
+                            account.sessionWindow.sessionWindowStatus,
+                            account
+                          )
                         ]"
                         :style="{ width: account.sessionWindow.progress + '%' }"
                       />
@@ -872,7 +875,7 @@
                 <div
                   :class="[
                     'h-full transition-all duration-300',
-                    getSessionProgressBarClass(account.sessionWindow.sessionWindowStatus)
+                    getSessionProgressBarClass(account.sessionWindow.sessionWindowStatus, account)
                   ]"
                   :style="{ width: account.sessionWindow.progress + '%' }"
                 />
@@ -2009,11 +2012,24 @@ const formatRelativeTime = (dateString) => {
 }
 
 // 获取会话窗口进度条的样式类
-const getSessionProgressBarClass = (status) => {
+const getSessionProgressBarClass = (status, account = null) => {
   // 根据状态返回不同的颜色类，包含防御性检查
   if (!status) {
     // 无状态信息时默认为蓝色
     return 'bg-gradient-to-r from-blue-500 to-indigo-600'
+  }
+
+  // 检查账号是否处于限流状态
+  const isRateLimited =
+    account &&
+    (account.isRateLimited ||
+      account.status === 'rate_limited' ||
+      (account.rateLimitStatus && account.rateLimitStatus.isRateLimited) ||
+      account.rateLimitStatus === 'limited')
+
+  // 如果账号处于限流状态，显示红色
+  if (isRateLimited) {
+    return 'bg-gradient-to-r from-red-500 to-red-600'
   }
 
   // 转换为小写进行比较，避免大小写问题

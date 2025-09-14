@@ -1200,9 +1200,13 @@ class ClaudeAccountService {
         accountData.schedulable = 'true'
         delete accountData.rateLimitAutoStopped
         logger.info(`✅ Auto-resuming scheduling for account ${accountId} after rate limit cleared`)
-        logger.info(`📊 Account ${accountId} state after recovery: schedulable=${accountData.schedulable}`)
+        logger.info(
+          `📊 Account ${accountId} state after recovery: schedulable=${accountData.schedulable}`
+        )
       } else {
-        logger.info(`ℹ️ Account ${accountId} did not need auto-resume: autoStopped=${accountData.rateLimitAutoStopped}, schedulable=${accountData.schedulable}`)
+        logger.info(
+          `ℹ️ Account ${accountId} did not need auto-resume: autoStopped=${accountData.rateLimitAutoStopped}, schedulable=${accountData.schedulable}`
+        )
       }
       await redis.setClaudeAccount(accountId, accountData)
 
