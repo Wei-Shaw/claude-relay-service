@@ -1,6 +1,8 @@
 const axios = require('axios')
 const crypto = require('crypto')
 const nodemailer = require('nodemailer')
+const { HttpsProxyAgent } = require('https-proxy-agent')
+const { SocksProxyAgent } = require('socks-proxy-agent')
 const logger = require('../utils/logger')
 const webhookConfigService = require('./webhookConfigService')
 const { getISOStringWithTimezone } = require('../utils/dateHelper')
@@ -14,6 +16,7 @@ class WebhookService {
       feishu: this.sendToFeishu.bind(this),
       slack: this.sendToSlack.bind(this),
       discord: this.sendToDiscord.bind(this),
+      telegram: this.sendToTelegram.bind(this),
       custom: this.sendToCustom.bind(this),
       bark: this.sendToBark.bind(this),
       smtp: this.sendToSMTP.bind(this)
@@ -219,6 +222,38 @@ class WebhookService {
   }
 
   /**
+   * Telegram Bot 通知
+   */
+  async sendToTelegram(platform, type, data) {
+    if (!platform.botToken) {
+      throw new Error('缺少 Telegram 机器人 Token')
+    }
+    if (!platform.chatId) {
+      throw new Error('缺少 Telegram Chat ID')
+    }
+
+    const baseUrl = this.normalizeTelegramApiBase(platform.apiBaseUrl)
+    const apiUrl = `${baseUrl}/bot${platform.botToken}/sendMessage`
+    const payload = {
+      chat_id: platform.chatId,
+      text: this.formatMessageForTelegram(type, data),
+      disable_web_page_preview: true
+    }
+
+    const axiosOptions = this.buildTelegramAxiosOptions(platform)
+
+    const response = await this.sendHttpRequest(
+      apiUrl,
+      payload,
+      platform.timeout || 10000,
+      axiosOptions
+    )
+    if (!response || response.ok !== true) {
+      throw new Error(`Telegram API 错误: ${response?.description || '未知错误'}`)
+    }
+  }
+
+  /**
    * Bark webhook
    */
   async sendToBark(platform, type, data) {
@@ -293,13 +328,17 @@ class WebhookService {
   /**
    * 发送HTTP请求
    */
-  async sendHttpRequest(url, payload, timeout) {
+  async sendHttpRequest(url, payload, timeout, axiosOptions = {}) {
+    const headers = {
+      'Content-Type': 'application/json',
+      'User-Agent': 'claude-relay-service/2.0',
+      ...(axiosOptions.headers || {})
+    }
+
     const response = await axios.post(url, payload, {
       timeout,
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'claude-relay-service/2.0'
-      }
+      ...axiosOptions,
+      headers
     })
 
     if (response.status < 200 || response.status >= 300) {
@@ -392,6 +431,83 @@ class WebhookService {
     const details = this.formatNotificationDetails(data)
 
     return `*${title}*\n${details}`
+  }
+
+  /**
+   * 规范化Telegram基础地址
+   */
+  normalizeTelegramApiBase(baseUrl) {
+    const defaultBase = 'https://api.telegram.org'
+    if (!baseUrl) {
+      return defaultBase
+    }
+
+    try {
+      const parsed = new URL(baseUrl)
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        throw new Error('Telegram API 基础地址必须使用 http 或 https 协议')
+      }
+
+      // 移除结尾的 /
+      return parsed.href.replace(/\/$/, '')
+    } catch (error) {
+      logger.warn(`⚠️ Telegram API 基础地址无效，将使用默认值: ${error.message}`)
+      return defaultBase
+    }
+  }
+
+  /**
+   * 构建 Telegram 请求的 axios 选项（代理等）
+   */
+  buildTelegramAxiosOptions(platform) {
+    const options = {}
+
+    if (platform.proxyUrl) {
+      try {
+        const proxyUrl = new URL(platform.proxyUrl)
+        const { protocol } = proxyUrl
+
+        if (protocol.startsWith('socks')) {
+          const agent = new SocksProxyAgent(proxyUrl.toString())
+          options.httpAgent = agent
+          options.httpsAgent = agent
+          options.proxy = false
+        } else if (protocol === 'http:' || protocol === 'https:') {
+          const agent = new HttpsProxyAgent(proxyUrl.toString())
+          options.httpAgent = agent
+          options.httpsAgent = agent
+          options.proxy = false
+        } else {
+          logger.warn(`⚠️ 不支持的Telegram代理协议: ${protocol}`)
+        }
+      } catch (error) {
+        logger.warn(`⚠️ Telegram代理配置无效，将忽略: ${error.message}`)
+      }
+    }
+
+    return options
+  }
+
+  /**
+   * 格式化 Telegram 消息
+   */
+  formatMessageForTelegram(type, data) {
+    const title = this.getNotificationTitle(type)
+    const timestamp = new Date().toLocaleString('zh-CN', { timeZone: this.timezone })
+    const details = this.buildNotificationDetails(data)
+
+    const lines = [`${title}`, '服务: Claude Relay Service']
+
+    if (details.length > 0) {
+      lines.push('')
+      for (const detail of details) {
+        lines.push(`${detail.label}: ${detail.value}`)
+      }
+    }
+
+    lines.push('', `时间: ${timestamp}`)
+
+    return lines.join('\n')
   }
 
   /**
