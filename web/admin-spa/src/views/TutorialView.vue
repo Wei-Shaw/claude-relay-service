@@ -431,7 +431,7 @@
                 class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
               >
                 <div class="whitespace-nowrap text-gray-300">model_provider = "crs"</div>
-                <div class="whitespace-nowrap text-gray-300">model = "gpt-5"</div>
+                <div class="whitespace-nowrap text-gray-300">model = "gpt-5-codex"</div>
                 <div class="whitespace-nowrap text-gray-300">model_reasoning_effort = "high"</div>
                 <div class="whitespace-nowrap text-gray-300">disable_response_storage = true</div>
                 <div class="whitespace-nowrap text-gray-300">preferred_auth_method = "apikey"</div>
@@ -918,7 +918,7 @@
                 class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
               >
                 <div class="whitespace-nowrap text-gray-300">model_provider = "crs"</div>
-                <div class="whitespace-nowrap text-gray-300">model = "gpt-5"</div>
+                <div class="whitespace-nowrap text-gray-300">model = "gpt-5-codex"</div>
                 <div class="whitespace-nowrap text-gray-300">model_reasoning_effort = "high"</div>
                 <div class="whitespace-nowrap text-gray-300">disable_response_storage = true</div>
                 <div class="whitespace-nowrap text-gray-300">preferred_auth_method = "apikey"</div>
@@ -1396,7 +1396,7 @@
                 class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
               >
                 <div class="whitespace-nowrap text-gray-300">model_provider = "crs"</div>
-                <div class="whitespace-nowrap text-gray-300">model = "gpt-5"</div>
+                <div class="whitespace-nowrap text-gray-300">model = "gpt-5-codex"</div>
                 <div class="whitespace-nowrap text-gray-300">model_reasoning_effort = "high"</div>
                 <div class="whitespace-nowrap text-gray-300">disable_response_storage = true</div>
                 <div class="whitespace-nowrap text-gray-300">preferred_auth_method = "apikey"</div>

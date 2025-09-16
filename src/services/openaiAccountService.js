@@ -325,15 +325,15 @@ async function refreshAccountToken(accountId) {
       throw new Error('Failed to refresh token')
     }
 
-    // 准备更新数据
+    // 准备更新数据 - 不要在这里加密，让 updateAccount 统一处理
     const updates = {
-      accessToken: encrypt(newTokens.access_token),
+      accessToken: newTokens.access_token, // 不加密，让 updateAccount 处理
       expiresAt: new Date(newTokens.expiry_date).toISOString()
     }
 
     // 如果有新的 ID token，也更新它（这对于首次未提供 ID Token 的账户特别重要）
     if (newTokens.id_token) {
-      updates.idToken = encrypt(newTokens.id_token)
+      updates.idToken = newTokens.id_token // 不加密，让 updateAccount 处理
 
       // 如果之前没有 ID Token，尝试解析并更新用户信息
       if (!account.idToken || account.idToken === '') {
@@ -364,7 +364,7 @@ async function refreshAccountToken(accountId) {
               updates.organizationTitle = authClaims.organizations[0].title
             }
             if (payload.email) {
-              updates.email = encrypt(payload.email)
+              updates.email = payload.email // 不加密，让 updateAccount 处理
             }
             if (payload.email_verified !== undefined) {
               updates.emailVerified = payload.email_verified
@@ -380,14 +380,14 @@ async function refreshAccountToken(accountId) {
 
     // 如果返回了新的 refresh token，更新它
     if (newTokens.refresh_token && newTokens.refresh_token !== refreshToken) {
-      updates.refreshToken = encrypt(newTokens.refresh_token)
+      updates.refreshToken = newTokens.refresh_token // 不加密，让 updateAccount 处理
       logger.info(`Updated refresh token for account ${accountId}`)
     }
 
     // 更新账户信息
     await updateAccount(accountId, updates)
 
-    logRefreshSuccess(accountId, accountName, 'openai', newTokens.expiry_date)
+    logRefreshSuccess(accountId, accountName, 'openai', newTokens) // 传入完整的 newTokens 对象
     return newTokens
   } catch (error) {
     logRefreshError(accountId, account?.name || accountName, 'openai', error.message)
