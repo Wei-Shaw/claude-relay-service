@@ -139,7 +139,7 @@ const handleResponses = async (req, res) => {
     let requestedModel = req.body?.model || null
 
     // 如果模型是 gpt-5 开头且后面还有内容（如 gpt-5-2025-08-07），则覆盖为 gpt-5
-    if (requestedModel && requestedModel.startsWith('gpt-5-') && requestedModel !== 'gpt-5') {
+    if (requestedModel && requestedModel.startsWith('gpt-5-') && requestedModel !== 'gpt-5-codex') {
       logger.info(`📝 Model ${requestedModel} detected, normalizing to gpt-5 for Codex API`)
       requestedModel = 'gpt-5'
       req.body.model = 'gpt-5' // 同时更新请求体中的模型
