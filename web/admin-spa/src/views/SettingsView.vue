@@ -470,11 +470,41 @@
                     </div>
                     <div class="mt-3 space-y-1 text-sm">
                       <div
-                        v-if="platform.type !== 'smtp'"
+                        v-if="platform.type !== 'smtp' && platform.type !== 'telegram'"
                         class="flex items-center text-gray-600 dark:text-gray-400"
                       >
                         <i class="fas fa-link mr-2"></i>
                         <span class="truncate">{{ platform.url }}</span>
+                      </div>
+                      <div
+                        v-if="platform.type === 'telegram'"
+                        class="flex items-center text-gray-600 dark:text-gray-400"
+                      >
+                        <i class="fas fa-comments mr-2"></i>
+                        <span class="truncate">Chat ID: {{ platform.chatId || '未配置' }}</span>
+                      </div>
+                      <div
+                        v-if="platform.type === 'telegram' && platform.botToken"
+                        class="flex items-center text-gray-600 dark:text-gray-400"
+                      >
+                        <i class="fas fa-key mr-2"></i>
+                        <span class="truncate"
+                          >Token: {{ formatTelegramToken(platform.botToken) }}</span
+                        >
+                      </div>
+                      <div
+                        v-if="platform.type === 'telegram' && platform.apiBaseUrl"
+                        class="flex items-center text-gray-600 dark:text-gray-400"
+                      >
+                        <i class="fas fa-globe mr-2"></i>
+                        <span class="truncate">API: {{ platform.apiBaseUrl }}</span>
+                      </div>
+                      <div
+                        v-if="platform.type === 'telegram' && platform.proxyUrl"
+                        class="flex items-center text-gray-600 dark:text-gray-400"
+                      >
+                        <i class="fas fa-route mr-2"></i>
+                        <span class="truncate">代理: {{ platform.proxyUrl }}</span>
                       </div>
                       <div
                         v-if="platform.type === 'smtp' && platform.to"
@@ -664,6 +694,7 @@
                 <option value="feishu">🟦 飞书</option>
                 <option value="slack">🟣 Slack</option>
                 <option value="discord">🟪 Discord</option>
+                <option value="telegram">✈️ Telegram</option>
                 <option value="bark">🔔 Bark</option>
                 <option value="smtp">📧 邮件通知</option>
                 <option value="custom">⚙️ 自定义</option>
@@ -696,7 +727,13 @@
           </div>
 
           <!-- Webhook URL (非Bark和SMTP平台) -->
-          <div v-if="platformForm.type !== 'bark' && platformForm.type !== 'smtp'">
+          <div
+            v-if="
+              platformForm.type !== 'bark' &&
+              platformForm.type !== 'smtp' &&
+              platformForm.type !== 'telegram'
+            "
+          >
             <label
               class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
             >
@@ -732,6 +769,94 @@
               <p class="text-sm text-blue-700 dark:text-blue-300">
                 {{ getWebhookHint(platformForm.type) }}
               </p>
+            </div>
+          </div>
+
+          <!-- Telegram 平台特有字段 -->
+          <div v-if="platformForm.type === 'telegram'" class="space-y-5">
+            <div>
+              <label
+                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                <i class="fas fa-robot mr-2 text-gray-400"></i>
+                Bot Token
+                <span class="ml-1 text-xs text-red-500">*</span>
+              </label>
+              <input
+                v-model="platformForm.botToken"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                placeholder="例如：123456789:ABCDEFghijk-xyz"
+                required
+                type="text"
+              />
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                在 Telegram 的 @BotFather 中创建机器人后获得的 Token
+              </p>
+            </div>
+
+            <div>
+              <label
+                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                <i class="fas fa-comments mr-2 text-gray-400"></i>
+                Chat ID
+                <span class="ml-1 text-xs text-red-500">*</span>
+              </label>
+              <input
+                v-model="platformForm.chatId"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                placeholder="例如：123456789 或 -1001234567890"
+                required
+                type="text"
+              />
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                可使用 @userinfobot、@RawDataBot 或 API 获取聊天/频道的 Chat ID
+              </p>
+            </div>
+
+            <div>
+              <label
+                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                <i class="fas fa-globe mr-2 text-gray-400"></i>
+                API 基础地址
+                <span class="ml-2 text-xs text-gray-500">(可选)</span>
+              </label>
+              <input
+                v-model="platformForm.apiBaseUrl"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                placeholder="默认: https://api.telegram.org"
+                type="url"
+              />
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                使用自建 Bot API 时可覆盖默认域名，需以 http 或 https 开头
+              </p>
+            </div>
+
+            <div>
+              <label
+                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                <i class="fas fa-route mr-2 text-gray-400"></i>
+                代理地址
+                <span class="ml-2 text-xs text-gray-500">(可选)</span>
+              </label>
+              <input
+                v-model="platformForm.proxyUrl"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                placeholder="例如：socks5://user:pass@127.0.0.1:1080"
+                type="text"
+              />
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                支持 http、https、socks4/4a/5 代理，留空则直接连接 Telegram 官方 API
+              </p>
+            </div>
+
+            <div
+              class="flex items-start rounded-lg bg-blue-50 p-3 text-sm text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
+            >
+              <i class="fas fa-info-circle mr-2 mt-0.5"></i>
+              <div>机器人需先加入对应群组或频道并授予发送消息权限，通知会以纯文本方式发送。</div>
             </div>
           </div>
 
@@ -1155,6 +1280,11 @@ const platformForm = ref({
   url: '',
   enableSign: false,
   secret: '',
+  // Telegram特有字段
+  botToken: '',
+  chatId: '',
+  apiBaseUrl: '',
+  proxyUrl: '',
   // Bark特有字段
   deviceKey: '',
   serverUrl: '',
@@ -1196,6 +1326,11 @@ const platformTypeWatcher = watch(
         platformForm.value.url = ''
         platformForm.value.enableSign = false
         platformForm.value.secret = ''
+        // 清空Telegram字段
+        platformForm.value.botToken = ''
+        platformForm.value.chatId = ''
+        platformForm.value.apiBaseUrl = ''
+        platformForm.value.proxyUrl = ''
         // 清空SMTP字段
         platformForm.value.host = ''
         platformForm.value.port = null
@@ -1217,6 +1352,33 @@ const platformTypeWatcher = watch(
         platformForm.value.level = ''
         platformForm.value.sound = ''
         platformForm.value.group = ''
+        // 清空Telegram字段
+        platformForm.value.botToken = ''
+        platformForm.value.chatId = ''
+        platformForm.value.apiBaseUrl = ''
+        platformForm.value.proxyUrl = ''
+      } else if (newType === 'telegram') {
+        platformForm.value.url = ''
+        platformForm.value.enableSign = false
+        platformForm.value.secret = ''
+        platformForm.value.deviceKey = ''
+        platformForm.value.serverUrl = ''
+        platformForm.value.level = ''
+        platformForm.value.sound = ''
+        platformForm.value.group = ''
+        platformForm.value.host = ''
+        platformForm.value.port = null
+        platformForm.value.secure = false
+        platformForm.value.user = ''
+        platformForm.value.pass = ''
+        platformForm.value.from = ''
+        platformForm.value.to = ''
+        platformForm.value.timeout = null
+        platformForm.value.ignoreTLS = false
+        platformForm.value.botToken = ''
+        platformForm.value.chatId = ''
+        platformForm.value.apiBaseUrl = ''
+        platformForm.value.proxyUrl = ''
       } else {
         // 切换到其他平台时，清空Bark和SMTP相关字段
         platformForm.value.deviceKey = ''
@@ -1234,6 +1396,11 @@ const platformTypeWatcher = watch(
         platformForm.value.to = ''
         platformForm.value.timeout = null
         platformForm.value.ignoreTLS = false
+        // Telegram 字段
+        platformForm.value.botToken = ''
+        platformForm.value.chatId = ''
+        platformForm.value.apiBaseUrl = ''
+        platformForm.value.proxyUrl = ''
       }
     }
   }
@@ -1244,6 +1411,9 @@ const isPlatformFormValid = computed(() => {
   if (platformForm.value.type === 'bark') {
     // Bark平台需要deviceKey
     return !!platformForm.value.deviceKey
+  } else if (platformForm.value.type === 'telegram') {
+    // Telegram需要机器人Token和Chat ID
+    return !!(platformForm.value.botToken && platformForm.value.chatId)
   } else if (platformForm.value.type === 'smtp') {
     // SMTP平台需要必要的配置
     return !!(
@@ -1336,7 +1506,7 @@ const saveWebhookConfig = async () => {
 // 验证 URL
 const validateUrl = () => {
   // Bark和SMTP平台不需要验证URL
-  if (platformForm.value.type === 'bark' || platformForm.value.type === 'smtp') {
+  if (['bark', 'smtp', 'telegram'].includes(platformForm.value.type)) {
     urlError.value = false
     urlValid.value = false
     return
@@ -1370,6 +1540,40 @@ const validatePlatformForm = () => {
     if (!platformForm.value.deviceKey) {
       showToast('请输入Bark设备密钥', 'error')
       return false
+    }
+  } else if (platformForm.value.type === 'telegram') {
+    if (!platformForm.value.botToken) {
+      showToast('请输入 Telegram 机器人 Token', 'error')
+      return false
+    }
+    if (!platformForm.value.chatId) {
+      showToast('请输入 Telegram Chat ID', 'error')
+      return false
+    }
+    if (platformForm.value.apiBaseUrl) {
+      try {
+        const parsed = new URL(platformForm.value.apiBaseUrl)
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          showToast('Telegram API 基础地址仅支持 http 或 https', 'error')
+          return false
+        }
+      } catch (error) {
+        showToast('请输入有效的 Telegram API 基础地址', 'error')
+        return false
+      }
+    }
+    if (platformForm.value.proxyUrl) {
+      try {
+        const parsed = new URL(platformForm.value.proxyUrl)
+        const supportedProtocols = ['http:', 'https:', 'socks4:', 'socks4a:', 'socks5:']
+        if (!supportedProtocols.includes(parsed.protocol)) {
+          showToast('Telegram 代理仅支持 http/https/socks 协议', 'error')
+          return false
+        }
+      } catch (error) {
+        showToast('请输入有效的 Telegram 代理地址', 'error')
+        return false
+      }
     }
   } else if (platformForm.value.type === 'smtp') {
     const requiredFields = [
@@ -1442,7 +1646,34 @@ const savePlatform = async () => {
 // 编辑平台
 const editPlatform = (platform) => {
   editingPlatform.value = platform
-  platformForm.value = { ...platform }
+  platformForm.value = {
+    type: platform.type || 'wechat_work',
+    name: platform.name || '',
+    url: platform.url || '',
+    enableSign: platform.enableSign || false,
+    secret: platform.secret || '',
+    // Telegram特有字段
+    botToken: platform.botToken || '',
+    chatId: platform.chatId || '',
+    apiBaseUrl: platform.apiBaseUrl || '',
+    proxyUrl: platform.proxyUrl || '',
+    // Bark特有字段
+    deviceKey: platform.deviceKey || '',
+    serverUrl: platform.serverUrl || '',
+    level: platform.level || '',
+    sound: platform.sound || '',
+    group: platform.group || '',
+    // SMTP特有字段
+    host: platform.host || '',
+    port: platform.port ?? null,
+    secure: platform.secure || false,
+    user: platform.user || '',
+    pass: platform.pass || '',
+    from: platform.from || '',
+    to: Array.isArray(platform.to) ? platform.to.join(', ') : platform.to || '',
+    timeout: platform.timeout ?? null,
+    ignoreTLS: platform.ignoreTLS || false
+  }
   showAddPlatformModal.value = true
 }
 
@@ -1521,6 +1752,11 @@ const testPlatform = async (platform) => {
       testData.from = platform.from
       testData.to = platform.to
       testData.ignoreTLS = platform.ignoreTLS
+    } else if (platform.type === 'telegram') {
+      testData.botToken = platform.botToken
+      testData.chatId = platform.chatId
+      testData.apiBaseUrl = platform.apiBaseUrl
+      testData.proxyUrl = platform.proxyUrl
     } else {
       testData.url = platform.url
     }
@@ -1584,7 +1820,9 @@ const sendTestNotification = async () => {
   } catch (error) {
     if (error.name === 'AbortError') return
     if (!isMounted.value) return
-    showToast('发送失败', 'error')
+    const errorMessage =
+      error?.response?.data?.message || error?.response?.data?.error || error?.message || '发送失败'
+    showToast(errorMessage, 'error')
     console.error(error)
   }
 }
@@ -1605,6 +1843,11 @@ const closePlatformModal = () => {
       url: '',
       enableSign: false,
       secret: '',
+      // Telegram特有字段
+      botToken: '',
+      chatId: '',
+      apiBaseUrl: '',
+      proxyUrl: '',
       // Bark特有字段
       deviceKey: '',
       serverUrl: '',
@@ -1637,6 +1880,7 @@ const getPlatformName = (type) => {
     feishu: '飞书',
     slack: 'Slack',
     discord: 'Discord',
+    telegram: 'Telegram',
     bark: 'Bark',
     smtp: '邮件通知',
     custom: '自定义'
@@ -1651,6 +1895,7 @@ const getPlatformIcon = (type) => {
     feishu: 'fas fa-dove text-blue-600',
     slack: 'fab fa-slack text-purple-600',
     discord: 'fab fa-discord text-indigo-600',
+    telegram: 'fab fa-telegram-plane text-sky-500',
     bark: 'fas fa-bell text-orange-500',
     smtp: 'fas fa-envelope text-blue-600',
     custom: 'fas fa-webhook text-gray-600'
@@ -1665,11 +1910,18 @@ const getWebhookHint = (type) => {
     feishu: '请在飞书群机器人设置中获取Webhook地址',
     slack: '请在Slack应用的Incoming Webhooks中获取地址',
     discord: '请在Discord服务器的集成设置中创建Webhook',
+    telegram: '使用 @BotFather 创建机器人并复制 Token，Chat ID 可通过 @userinfobot 或相关工具获取',
     bark: '请在Bark App中查看您的设备密钥',
     smtp: '请配置SMTP服务器信息，支持Gmail、QQ邮箱等',
     custom: '请输入完整的Webhook接收地址'
   }
   return hints[type] || ''
+}
+
+const formatTelegramToken = (token) => {
+  if (!token) return ''
+  if (token.length <= 12) return token
+  return `${token.slice(0, 6)}...${token.slice(-4)}`
 }
 
 const getNotificationTypeName = (type) => {
