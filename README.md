@@ -433,11 +433,11 @@ requires_openai_auth = true
 env_key = "CRS_OAI_KEY"
 ```
 
-在 `~/.codex/auth.json` 文件中配置API密钥：
+在 `~/.codex/auth.json` 文件中配置API密钥为 null：
 
 ```json
 {
-    "OPENAI_API_KEY": null
+    "OPENAI_API_KEY": null  
 }
 ```
 
