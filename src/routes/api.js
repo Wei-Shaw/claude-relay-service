@@ -8,6 +8,7 @@ const unifiedClaudeScheduler = require('../services/unifiedClaudeScheduler')
 const apiKeyService = require('../services/apiKeyService')
 const pricingService = require('../services/pricingService')
 const { authenticateApiKey } = require('../middleware/auth')
+const historyService = require('../services/history/historyService')
 const logger = require('../utils/logger')
 const redis = require('../models/redis')
 const { getEffectiveModel, parseVendorPrefixedModel } = require('../utils/modelHelper')
@@ -17,6 +18,9 @@ const router = express.Router()
 
 // 🔧 共享的消息处理函数
 async function handleMessagesRequest(req, res) {
+  let historyRecorder = null
+  let isStream = false
+
   try {
     const startTime = Date.now()
 
@@ -60,7 +64,36 @@ async function handleMessagesRequest(req, res) {
     }
 
     // 检查是否为流式请求
-    const isStream = req.body.stream === true
+    isStream = req.body.stream === true
+
+    const sessionHeaderName = (
+      historyService.config.sessionHeaderName || 'X-CRS-Session-Id'
+    ).toLowerCase()
+    const providedSessionId =
+      req.headers[sessionHeaderName] ||
+      req.headers['x-crs-session-id'] ||
+      req.headers['x-session-id'] ||
+      req.body.sessionId ||
+      req.body.session_id
+
+    if (historyService.config.enabled) {
+      try {
+        historyRecorder = await historyService.createRecorder({
+          apiKey: req.apiKey,
+          requestBody: req.body,
+          requestId: req.requestId || req.headers['x-request-id'],
+          headers: req.headers,
+          isStream,
+          providedSessionId
+        })
+
+        if (historyRecorder && historyService.config.exposeSessionHeader) {
+          res.setHeader(historyService.config.sessionHeaderName, historyRecorder.sessionId)
+        }
+      } catch (historyError) {
+        logger.warn('⚠️ Failed to create history recorder:', historyError.message)
+      }
+    }
 
     logger.api(
       `🚀 Processing ${isStream ? 'stream' : 'non-stream'} request for key: ${req.apiKey.name}`
@@ -80,6 +113,41 @@ async function handleMessagesRequest(req, res) {
       }
 
       // 流式响应不需要额外处理，中间件已经设置了监听器
+
+      if (historyRecorder) {
+        const originalWrite = res.write.bind(res)
+        const originalEnd = res.end.bind(res)
+        let streamFinalized = false
+
+        const finalizeHistory = (error) => {
+          if (streamFinalized) {
+            return
+          }
+          streamFinalized = true
+          historyRecorder
+            .finalizeStream(error)
+            .catch((finalizeError) =>
+              logger.warn('⚠️ Failed to finalize stream history:', finalizeError.message)
+            )
+        }
+
+        res.write = (chunk, encoding, callback) => {
+          historyRecorder.captureStreamChunk(chunk, encoding)
+          return originalWrite(chunk, encoding, callback)
+        }
+
+        res.end = (chunk, encoding, callback) => {
+          if (chunk) {
+            historyRecorder.captureStreamChunk(chunk, encoding)
+          }
+          const result = originalEnd(chunk, encoding, callback)
+          finalizeHistory()
+          return result
+        }
+
+        res.once('close', () => finalizeHistory())
+        res.once('finish', () => finalizeHistory())
+      }
 
       let usageDataCaptured = false
 
@@ -155,6 +223,14 @@ async function handleMessagesRequest(req, res) {
                 .catch((error) => {
                   logger.error('❌ Failed to record stream usage:', error)
                 })
+
+              historyRecorder?.recordUsage({
+                input_tokens: inputTokens,
+                output_tokens: outputTokens,
+                cache_creation_input_tokens: cacheCreateTokens,
+                cache_read_input_tokens: cacheReadTokens,
+                model
+              })
 
               // 更新时间窗口内的token计数和费用
               if (req.rateLimitInfo) {
@@ -265,6 +341,14 @@ async function handleMessagesRequest(req, res) {
                   logger.error('❌ Failed to record stream usage:', error)
                 })
 
+              historyRecorder?.recordUsage({
+                input_tokens: inputTokens,
+                output_tokens: outputTokens,
+                cache_creation_input_tokens: cacheCreateTokens,
+                cache_read_input_tokens: cacheReadTokens,
+                model
+              })
+
               // 更新时间窗口内的token计数和费用
               if (req.rateLimitInfo) {
                 const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
@@ -332,6 +416,12 @@ async function handleMessagesRequest(req, res) {
               .catch((error) => {
                 logger.error('❌ Failed to record Bedrock stream usage:', error)
               })
+
+            historyRecorder?.recordUsage({
+              input_tokens: inputTokens,
+              output_tokens: outputTokens,
+              model: result.model
+            })
 
             // 更新时间窗口内的token计数和费用
             if (req.rateLimitInfo) {
@@ -433,6 +523,14 @@ async function handleMessagesRequest(req, res) {
                 .catch((error) => {
                   logger.error('❌ Failed to record CCR stream usage:', error)
                 })
+
+              historyRecorder?.recordUsage({
+                input_tokens: inputTokens,
+                output_tokens: outputTokens,
+                cache_creation_input_tokens: cacheCreateTokens,
+                cache_read_input_tokens: cacheReadTokens,
+                model
+              })
 
               // 更新时间窗口内的token计数和费用
               if (req.rateLimitInfo) {
@@ -658,8 +756,25 @@ async function handleMessagesRequest(req, res) {
           logger.api(
             `📊 Non-stream usage recorded (real) - Model: ${model}, Input: ${inputTokens}, Output: ${outputTokens}, Cache Create: ${cacheCreateTokens}, Cache Read: ${cacheReadTokens}, Total: ${inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens} tokens`
           )
+
+          historyRecorder?.recordUsage({
+            input_tokens: inputTokens,
+            output_tokens: outputTokens,
+            cache_creation_input_tokens: cacheCreateTokens,
+            cache_read_input_tokens: cacheReadTokens,
+            model
+          })
         } else {
           logger.warn('⚠️ No usage data found in Claude API JSON response')
+        }
+
+        if (historyRecorder) {
+          await historyService.recordAssistantFromJson({
+            recorder: historyRecorder,
+            responseJson: jsonData,
+            usage: jsonData.usage,
+            modelOverride: jsonData.model
+          })
         }
 
         res.json(jsonData)
@@ -685,6 +800,22 @@ async function handleMessagesRequest(req, res) {
       code: error.code,
       stack: error.stack
     })
+
+    if (historyRecorder) {
+      try {
+        if (isStream) {
+          await historyRecorder.finalizeStream(error)
+        } else {
+          await historyRecorder.recordAssistantResponse({
+            text: '',
+            raw: null,
+            error
+          })
+        }
+      } catch (historyError) {
+        logger.warn('⚠️ Failed to record history for error:', historyError.message)
+      }
+    }
 
     // 确保在任何情况下都能返回有效的JSON响应
     if (!res.headersSent) {
