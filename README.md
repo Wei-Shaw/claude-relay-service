@@ -429,14 +429,22 @@ preferred_auth_method = "apikey"
 name = "crs"
 base_url = "http://127.0.0.1:3000/openai"  # 根据实际填写你服务器的ip地址或者域名
 wire_api = "responses"
+requires_openai_auth = true
+env_key = "CRS_OAI_KEY"
 ```
 
 在 `~/.codex/auth.json` 文件中配置API密钥：
 
 ```json
 {
-    "OPENAI_API_KEY": "你的后台创建的API密钥"
+    "OPENAI_API_KEY": null
 }
+```
+
+环境变量设置：
+
+```bash
+export CRS_OAI_KEY="后台创建的API密钥"
 ```
 
 ### 5. 第三方工具API接入
