@@ -226,6 +226,7 @@ const handleResponses = async (req, res) => {
     // 如果有代理，添加代理配置
     if (proxyAgent) {
       axiosConfig.httpsAgent = proxyAgent
+      axiosConfig.proxy = false
       logger.info(`🌐 Using proxy for OpenAI request: ${ProxyHelper.getProxyDescription(proxy)}`)
     } else {
       logger.debug('🌐 No proxy configured for OpenAI request')
