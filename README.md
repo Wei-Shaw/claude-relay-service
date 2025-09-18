@@ -11,7 +11,7 @@
 
 **🔐 自行搭建Claude API中转服务，支持多账户管理**
 
-[English](#english) • [中文文档](#中文文档) • [📸 界面预览](docs/preview.md) • [📢 公告频道](https://t.me/claude_relay_service)
+[English](#english) • [中文文档](#中文文档) • [📸 演示站点](https://demo.pincc.ai/admin-next/login) • [📢 公告频道](https://t.me/claude_relay_service)
 
 </div>
 
@@ -42,26 +42,18 @@
 
 如果有以上困惑，那这个项目可能适合你。
 
-> 💡 **热心网友福利**  
-> 热心网友正在用本项目，正在拼车官方Claude Code Max 20X 200刀版本，是现在最稳定的方案。  
-> 有需要自取: [https://ctok.ai/](https://ctok.ai/)
+> 💡 **Claude Code 拼车服务**
+> 目前有两个稳定的 Claude Code Max 20X 200刀 拼车渠道：
+> 1. **PinCC** - 项目官方运营的拼车服务：[https://pincc.ai/](https://pincc.ai/)
+> 2. **CToK** - 社区认可的合作伙伴服务：[https://ctok.ai/](https://ctok.ai/)
 
 ### 适合的场景
 
-✅ **找朋友拼车**: 三五好友一起分摊Claude Code Max订阅，Opus爽用  
+✅ **找朋友拼车**: 三五好友一起分摊Claude Code Max订阅  
 ✅ **隐私敏感**: 不想让第三方镜像看到你的对话内容  
 ✅ **技术折腾**: 有基本的技术基础，愿意自己搭建和维护  
 ✅ **稳定需求**: 需要长期稳定的Claude访问，不想受制于镜像站  
 ✅ **地区受限**: 无法直接访问Claude官方服务
-
-### 不适合的场景
-
-❌ **纯小白**: 完全不懂技术，连服务器都不会买  
-❌ **偶尔使用**: 一个月用不了几次，没必要折腾  
-❌ **注册问题**: 无法自行注册Claude账号  
-❌ **支付问题**: 没有支付渠道订阅Claude Code
-
-**如果你只是普通用户，对隐私要求不高，随便玩玩、想快速体验 Claude，那选个你熟知的镜像站会更合适。**
 
 ---
 
@@ -84,7 +76,7 @@
 
 ## 🚀 核心功能
 
-> 📸 **[点击查看界面预览](docs/preview.md)** - 查看Web管理界面的详细截图
+> 📸 **[查看演示站点](https://demo.pincc.ai/admin-next/login)** 
 
 ### 基础功能
 
@@ -134,13 +126,7 @@
 ### 快速安装
 
 ```bash
-# 下载并运行管理脚本
-curl -fsSL https://raw.githubusercontent.com/Wei-Shaw/claude-relay-service/main/scripts/manage.sh -o manage.sh
-chmod +x manage.sh
-./manage.sh install
-
-# 安装后可以使用 crs 命令管理服务
-crs  # 显示交互式菜单
+curl -fsSL https://pincc.ai/manage.sh -o manage.sh && chmod +x manage.sh && ./manage.sh install
 ```
 
 ### 脚本功能
@@ -298,60 +284,15 @@ npm run service:status
 
 ## 🐳 Docker 部署
 
-### 使用 Docker Hub 镜像（最简单）
+### Docker compose
 
-> 🚀 使用官方镜像，自动构建，始终保持最新版本
-
+#### 第一步：下载构建docker-compose.yml文件的脚本并执行
 ```bash
-# 拉取镜像（支持 amd64 和 arm64）
-docker pull weishaw/claude-relay-service:latest
+curl -fsSL https://pincc.ai/crs-compose.sh -o crs-compose.sh && chmod +x crs-compose.sh && ./crs-compose.sh
+```
 
-# 使用 docker-compose
-# 创建 .env 文件用于 docker-compose 的环境变量：
-cat > .env << 'EOF'
-# 必填：安全密钥（请修改为随机值）
-JWT_SECRET=your-random-secret-key-at-least-32-chars
-ENCRYPTION_KEY=your-32-character-encryption-key
-
-# 可选：管理员凭据
-ADMIN_USERNAME=cr_admin
-ADMIN_PASSWORD=your-secure-password
-EOF
-
-# 创建 docker-compose.yml 文件：
-cat > docker-compose.yml << 'EOF'
-version: '3.8'
-services:
-  claude-relay:
-    image: weishaw/claude-relay-service:latest
-    container_name: claude-relay-service
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      - JWT_SECRET=${JWT_SECRET}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-      - REDIS_HOST=redis
-      - ADMIN_USERNAME=${ADMIN_USERNAME:-}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
-    volumes:
-      - ./logs:/app/logs
-      - ./data:/app/data
-    depends_on:
-      - redis
-
-  redis:
-    image: redis:7-alpine
-    container_name: claude-relay-redis
-    restart: unless-stopped
-    volumes:
-      - redis_data:/data
-
-volumes:
-  redis_data:
-EOF
-
-# 启动服务
+#### 第二步：启动
+```bash
 docker-compose up -d
 ```
 
@@ -364,7 +305,6 @@ docker-compose.yml 已包含：
 - ✅ Redis数据库
 - ✅ 健康检查
 - ✅ 自动重启
-- ✅ 所有配置通过环境变量管理
 
 ### 环境变量说明
 

@@ -1883,7 +1883,19 @@ const selectedTagCount = computed(() => {
 
 // 分页相关
 const currentPage = ref(1)
-const pageSize = ref(10)
+// 从 localStorage 读取保存的每页显示条数，默认为 10
+const getInitialPageSize = () => {
+  const saved = localStorage.getItem('apiKeysPageSize')
+  if (saved) {
+    const parsedSize = parseInt(saved, 10)
+    // 验证保存的值是否在允许的选项中
+    if ([10, 20, 50, 100].includes(parsedSize)) {
+      return parsedSize
+    }
+  }
+  return 10
+}
+const pageSize = ref(getInitialPageSize())
 const pageSizeOptions = [10, 20, 50, 100]
 
 // 模态框状态
@@ -3638,6 +3650,11 @@ watch(searchKeyword, () => {
 // 监听分页变化，更新全选状态
 watch([currentPage, pageSize], () => {
   updateSelectAllState()
+})
+
+// 监听每页显示条数变化，保存到 localStorage
+watch(pageSize, (newSize) => {
+  localStorage.setItem('apiKeysPageSize', newSize.toString())
 })
 
 // 监听API Keys数据变化，清理无效的选中状态

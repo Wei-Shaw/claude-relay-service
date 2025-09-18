@@ -671,10 +671,7 @@ async function getAllAccounts() {
       if (accountData.proxy) {
         try {
           accountData.proxy = JSON.parse(accountData.proxy)
-          // 屏蔽代理密码
-          if (accountData.proxy && accountData.proxy.password) {
-            accountData.proxy.password = '******'
-          }
+          // 不屏蔽代理密码，返回明文
         } catch (e) {
           // 如果解析失败，设置为null
           accountData.proxy = null
