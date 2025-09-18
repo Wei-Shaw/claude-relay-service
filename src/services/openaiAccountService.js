@@ -145,7 +145,7 @@ async function refreshAccessToken(refreshToken, proxy = null) {
     const proxyAgent = ProxyHelper.createProxyAgent(proxy)
     if (proxyAgent) {
       requestOptions.httpsAgent = proxyAgent
-      requestOptions.proxy = false // 重要：禁用 axios 的默认代理，强制使用我们的 httpsAgent
+      requestOptions.proxy = false
       logger.info(
         `🌐 Using proxy for OpenAI token refresh: ${ProxyHelper.getProxyDescription(proxy)}`
       )
@@ -671,7 +671,10 @@ async function getAllAccounts() {
       if (accountData.proxy) {
         try {
           accountData.proxy = JSON.parse(accountData.proxy)
-          // 不屏蔽代理密码，返回明文
+          // 屏蔽代理密码
+          if (accountData.proxy && accountData.proxy.password) {
+            accountData.proxy.password = '******'
+          }
         } catch (e) {
           // 如果解析失败，设置为null
           accountData.proxy = null
