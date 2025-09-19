@@ -168,7 +168,9 @@ class ApiKeyService {
         await redis.setApiKey(keyData.id, keyData)
 
         logger.success(
-          `🔓 API key activated: ${keyData.id} (${keyData.name}), will expire in ${activationDays} days at ${expiresAt.toISOString()}`
+          `🔓 API key activated: ${keyData.id} (${
+            keyData.name
+          }), will expire in ${activationDays} days at ${expiresAt.toISOString()}`
         )
       }
 
@@ -903,7 +905,9 @@ class ApiKeyService {
       // 记录 Opus 周费用
       await redis.incrementWeeklyOpusCost(keyId, cost)
       logger.database(
-        `💰 Recorded Opus weekly cost for ${keyId}: $${cost.toFixed(6)}, model: ${model}, account type: ${accountType}`
+        `💰 Recorded Opus weekly cost for ${keyId}: $${cost.toFixed(
+          6
+        )}, model: ${model}, account type: ${accountType}`
       )
     } catch (error) {
       logger.error('❌ Failed to record Opus cost:', error)
@@ -978,7 +982,9 @@ class ApiKeyService {
         // 记录详细的缓存费用（如果有）
         if (costInfo.ephemeral5mCost > 0 || costInfo.ephemeral1hCost > 0) {
           logger.database(
-            `💰 Cache costs - 5m: $${costInfo.ephemeral5mCost.toFixed(6)}, 1h: $${costInfo.ephemeral1hCost.toFixed(6)}`
+            `💰 Cache costs - 5m: $${costInfo.ephemeral5mCost.toFixed(
+              6
+            )}, 1h: $${costInfo.ephemeral1hCost.toFixed(6)}`
           )
         }
       } else {

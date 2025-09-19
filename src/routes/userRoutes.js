@@ -319,11 +319,7 @@ router.post('/api-keys', authenticateUser, async (req, res) => {
       })
     }
 
-    if (
-      totalUsageLimit !== undefined &&
-      totalUsageLimit !== null &&
-      totalUsageLimit !== ''
-    ) {
+    if (totalUsageLimit !== undefined && totalUsageLimit !== null && totalUsageLimit !== '') {
       const usageLimit = Number(totalUsageLimit)
       if (Number.isNaN(usageLimit) || usageLimit < 0) {
         return res.status(400).json({
