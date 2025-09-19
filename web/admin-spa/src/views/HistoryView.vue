@@ -11,8 +11,8 @@
         <div class="flex flex-wrap items-center gap-2">
           <button
             class="group relative flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-500"
-            :disabled="sessionsLoading || apiKeysLoading"
-            @click="refresh"
+            :disabled="sessionsLoading || apiKeysLoading || messagesLoading"
+            @click="refreshCurrent"
           >
             <div
               class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-indigo-500 to-cyan-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
@@ -94,7 +94,7 @@
               >
                 <div class="flex items-center justify-between text-sm">
                   <span class="font-semibold">{{
-                    session.metadata?.apiKeyName || session.id
+                    session.title || session.metadata?.apiKeyName || session.id
                   }}</span>
                   <span class="text-xs text-gray-500 dark:text-gray-400">
                     {{ formatRelative(session.lastActivity) }}
@@ -213,12 +213,12 @@
               </div>
             </div>
 
-            <div class="flex-1 space-y-4 overflow-y-auto">
+            <div class="flex-1 space-y-4 overflow-y-auto overflow-x-hidden">
               <div
                 v-for="message in messages"
                 :key="message.storedAt"
                 :class="[
-                  'rounded-xl border px-4 py-3 shadow-sm transition-all duration-150',
+                  'w-full min-w-0 rounded-xl border px-4 py-3 shadow-sm transition-all duration-150',
                   message.role === 'assistant'
                     ? 'border-indigo-200 bg-indigo-50/70 dark:border-indigo-500/40 dark:bg-indigo-500/10'
                     : 'border-gray-200 bg-white/80 dark:border-gray-700 dark:bg-gray-800/70'
@@ -239,10 +239,16 @@
                   </span>
                   <span>{{ formatDate(message.createdAt || message.storedAt) }}</span>
                 </div>
-                <pre
-                  class="whitespace-pre-wrap break-words text-sm text-gray-800 dark:text-gray-100"
-                  >{{ message.content || '（无内容）' }}</pre
-                >
+                <div
+                  class="markdown-view whitespace-pre-wrap break-words text-sm text-gray-800 dark:text-gray-100"
+                  v-html="renderMarkdown(message.content)"
+                />
+                <div v-if="message.role === 'assistant'" class="mt-2 flex justify-end">
+                  <button class="copy-btn" title="复制消息" @click="copyMessage(message.content)">
+                    <i class="fas fa-copy"></i>
+                    复制
+                  </button>
+                </div>
                 <div
                   class="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400"
                 >
@@ -351,7 +357,10 @@ const ensureApiKeys = async () => {
   }
 }
 
-const loadSessions = async (reset = true) => {
+const loadSessions = async (reset = true, options = {}) => {
+  const { preserveSelection = false } = options
+  const currentSelectedId = preserveSelection ? selectedSessionId.value : ''
+
   if (!selectedApiKeyId.value) {
     sessions.value = []
     totalSessions.value = 0
@@ -366,7 +375,9 @@ const loadSessions = async (reset = true) => {
   if (reset) {
     page.value = 1
     sessions.value = []
-    selectedSessionId.value = ''
+    if (!preserveSelection) {
+      selectedSessionId.value = ''
+    }
   }
 
   sessionsLoading.value = true
@@ -384,17 +395,26 @@ const loadSessions = async (reset = true) => {
     sessions.value = reset ? fetchedSessions : [...sessions.value, ...fetchedSessions]
     totalSessions.value = total
 
+    if (preserveSelection && currentSelectedId) {
+      const stillExists = sessions.value.some((item) => item.id === currentSelectedId)
+      if (stillExists) {
+        selectedSessionId.value = currentSelectedId
+        await loadMessages()
+        return
+      }
+    }
+
     if (!selectedSessionId.value && sessions.value.length > 0) {
       selectedSessionId.value = sessions.value[0].id
-    } else if (selectedSessionId.value) {
+    } else if (selectedSessionId.value && !preserveSelection) {
       const stillExists = sessions.value.some((item) => item.id === selectedSessionId.value)
-      if (!stillExists) {
+      if (stillExists) {
+        await loadMessages()
+      } else {
         selectedSessionId.value = sessions.value[0]?.id || ''
         if (!selectedSessionId.value) {
           messages.value = []
         }
-      } else if (reset) {
-        await loadMessages()
       }
     }
 
@@ -435,6 +455,69 @@ const loadMessages = async () => {
   }
 }
 
+const copyMessage = async (text) => {
+  if (!text) {
+    return
+  }
+  try {
+    await navigator.clipboard.writeText(text)
+    showToast('消息已复制', 'success')
+  } catch (error) {
+    console.error('复制失败:', error)
+    showToast('复制失败，请手动复制', 'error')
+  }
+}
+
+const escapeHtml = (value = '') =>
+  value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+const renderMarkdown = (content) => {
+  if (!content) {
+    return '<em>（无内容）</em>'
+  }
+
+  let html = escapeHtml(content)
+
+  html = html.replace(/```([\s\S]*?)```/g, (_, code) => `<pre><code>${code.trim()}</code></pre>`)
+
+  html = html.replace(/^###\s+(.*)$/gm, '<h3>$1</h3>')
+  html = html.replace(/^##\s+(.*)$/gm, '<h2>$1</h2>')
+  html = html.replace(/^#\s+(.*)$/gm, '<h1>$1</h1>')
+
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>')
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>')
+
+  html = html.replace(/(^|\n)([-*] .+(?:\n[-*] .+)*)/g, (match, prefix, body) => {
+    const items = body
+      .trim()
+      .split('\n')
+      .map((line) => line.replace(/^[-*]\s+/, ''))
+      .map((item) => `<li>${item}</li>`)
+      .join('')
+    return `${prefix}<ul>${items}</ul>`
+  })
+
+  html = html.replace(/(^|\n)(\d+\. .+(?:\n\d+\. .+)*)/g, (match, prefix, body) => {
+    const items = body
+      .trim()
+      .split('\n')
+      .map((line) => line.replace(/^\d+\.\s+/, ''))
+      .map((item) => `<li>${item}</li>`)
+      .join('')
+    return `${prefix}<ol>${items}</ol>`
+  })
+
+  html = html.replace(/\n{2,}/g, '<br /><br />').replace(/\n/g, '<br />')
+  html = html
+    .replace(/<ul><br \/>/g, '<ul>')
+    .replace(/<br \/><\/ul>/g, '</ul>')
+    .replace(/<ol><br \/>/g, '<ol>')
+    .replace(/<br \/><\/ol>/g, '</ol>')
+
+  return html
+}
+
 const selectSession = (sessionId) => {
   if (sessionId === selectedSessionId.value) {
     return
@@ -450,9 +533,13 @@ const loadMoreSessions = async () => {
   await loadSessions(false)
 }
 
-const refresh = async () => {
+const refreshCurrent = async () => {
   await ensureApiKeys()
-  await loadSessions(true)
+  if (selectedSessionId.value) {
+    await loadSessions(true, { preserveSelection: true })
+  } else {
+    await loadSessions(true)
+  }
 }
 
 const handleDeleteSession = async () => {
@@ -491,3 +578,60 @@ onMounted(async () => {
   await loadSessions(true)
 })
 </script>
+
+<style scoped>
+.markdown-view h1,
+.markdown-view h2,
+.markdown-view h3 {
+  margin: 0.5rem 0;
+  font-weight: 600;
+}
+
+.markdown-view {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  display: block;
+  width: 100%;
+}
+
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  border-radius: 0.375rem;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  color: rgba(71, 85, 105, 0.9);
+  background-color: rgba(255, 255, 255, 0.7);
+  transition: background-color 0.2s ease;
+}
+
+.copy-btn:hover {
+  background-color: rgba(241, 245, 249, 0.9);
+}
+
+.copy-btn i {
+  font-size: 0.75rem;
+}
+
+.markdown-view ul,
+.markdown-view ol {
+  padding-left: 1.25rem;
+  margin: 0.5rem 0;
+}
+
+.markdown-view pre {
+  background-color: rgba(15, 23, 42, 0.05);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+.markdown-view code {
+  background-color: rgba(15, 23, 42, 0.08);
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.25rem;
+}
+</style>

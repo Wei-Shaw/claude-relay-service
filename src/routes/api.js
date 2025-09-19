@@ -69,12 +69,45 @@ async function handleMessagesRequest(req, res) {
     const sessionHeaderName = (
       historyService.config.sessionHeaderName || 'X-CRS-Session-Id'
     ).toLowerCase()
-    const providedSessionId =
+    let providedSessionId =
       req.headers[sessionHeaderName] ||
       req.headers['x-crs-session-id'] ||
       req.headers['x-session-id'] ||
       req.body.sessionId ||
       req.body.session_id
+
+    const newSessionHeader = req.headers['x-crs-new-session']
+    let forceNewSession = false
+    if (newSessionHeader !== undefined) {
+      const value = String(newSessionHeader).trim().toLowerCase()
+      if (['1', 'true', 'yes', 'on'].includes(value)) {
+        forceNewSession = true
+      }
+    }
+
+    if (
+      req.body &&
+      typeof req.body.sessionId === 'string' &&
+      req.body.sessionId.trim().toLowerCase() === 'new'
+    ) {
+      forceNewSession = true
+      delete req.body.sessionId
+    }
+
+    if (
+      req.body &&
+      typeof req.body.sessionControl === 'string' &&
+      req.body.sessionControl.trim().toLowerCase() === 'new'
+    ) {
+      forceNewSession = true
+      delete req.body.sessionControl
+    }
+
+    if (forceNewSession) {
+      providedSessionId = null
+    }
+
+    const sessionHash = sessionHelper.generateSessionHash(req.body)
 
     if (historyService.config.enabled) {
       try {
@@ -84,7 +117,9 @@ async function handleMessagesRequest(req, res) {
           requestId: req.requestId || req.headers['x-request-id'],
           headers: req.headers,
           isStream,
-          providedSessionId
+          providedSessionId,
+          stickySessionId: sessionHash,
+          forceNewSession
         })
 
         if (historyRecorder && historyService.config.exposeSessionHeader) {
@@ -150,9 +185,6 @@ async function handleMessagesRequest(req, res) {
       }
 
       let usageDataCaptured = false
-
-      // 生成会话哈希用于sticky会话
-      const sessionHash = sessionHelper.generateSessionHash(req.body)
 
       // 使用统一调度选择账号（传递请求的模型）
       const requestedModel = req.body.model
@@ -591,9 +623,6 @@ async function handleMessagesRequest(req, res) {
         apiKeyId: req.apiKey.id,
         apiKeyName: req.apiKey.name
       })
-
-      // 生成会话哈希用于sticky会话
-      const sessionHash = sessionHelper.generateSessionHash(req.body)
 
       // 使用统一调度选择账号（传递请求的模型）
       const requestedModel = req.body.model

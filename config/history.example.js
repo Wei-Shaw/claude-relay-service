@@ -14,5 +14,7 @@ module.exports = {
   // 是否在响应头中返回 Session Id
   exposeSessionHeader: true,
   // 自定义响应头名称
-  sessionHeaderName: 'X-CRS-Session-Id'
+  sessionHeaderName: 'X-CRS-Session-Id',
+  // Sticky 会话映射的过期时间（秒），避免长期粘连
+  stickySessionTtlSeconds: 600
 }

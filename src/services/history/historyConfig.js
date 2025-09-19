@@ -8,7 +8,8 @@ const DEFAULTS = {
   maxContentLength: 8000,
   redisPrefix: 'chat',
   exposeSessionHeader: true,
-  sessionHeaderName: 'X-CRS-Session-Id'
+  sessionHeaderName: 'X-CRS-Session-Id',
+  stickySessionTtlSeconds: 600
 }
 
 const truthy = new Set(['1', 'true', 'yes', 'on'])
@@ -114,7 +115,13 @@ const config = {
   sessionHeaderName:
     process.env.CHAT_HISTORY_SESSION_HEADER_NAME ||
     fileConfig.sessionHeaderName ||
-    DEFAULTS.sessionHeaderName
+    DEFAULTS.sessionHeaderName,
+  stickySessionTtlSeconds: getConfigValue(
+    'CHAT_HISTORY_STICKY_TTL_SECONDS',
+    'stickySessionTtlSeconds',
+    toInteger,
+    DEFAULTS.stickySessionTtlSeconds
+  )
 }
 
 config.ttlSeconds = config.ttlDays > 0 ? config.ttlDays * 24 * 60 * 60 : 0

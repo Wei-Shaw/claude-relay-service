@@ -10,6 +10,8 @@ const PREFIX = config.redisPrefix || 'chat'
 const sessionsIndexKey = (apiKeyId) => `${PREFIX}:sessions:${apiKeyId}`
 const sessionMetaKey = (sessionId) => `${PREFIX}:session:${sessionId}`
 const sessionMessagesKey = (sessionId) => `${PREFIX}:messages:${sessionId}`
+const stickySessionKey = (apiKeyId, stickyId) =>
+  `${PREFIX}:sticky:${apiKeyId}:${stickyId}`
 
 const ensureClient = () => {
   try {
@@ -181,6 +183,14 @@ const getSessionMeta = async (sessionId) => {
   return Object.keys(meta || {}).length ? meta : null
 }
 
+const setSessionTitle = async (sessionId, title) => {
+  if (!title) {
+    return
+  }
+  const client = ensureClient()
+  await client.hset(sessionMetaKey(sessionId), 'title', title)
+}
+
 const listSessions = async (apiKeyId, { page = 1, pageSize = 20 } = {}) => {
   const client = ensureClient()
   const indexKey = sessionsIndexKey(apiKeyId)
@@ -240,6 +250,36 @@ const deleteSession = async (sessionId) => {
   return true
 }
 
+const getStickySession = async (apiKeyId, stickyId) => {
+  if (!stickyId) {
+    return null
+  }
+  const client = ensureClient()
+  const value = await client.get(stickySessionKey(apiKeyId, stickyId))
+  return value || null
+}
+
+const setStickySession = async (apiKeyId, stickyId, sessionId) => {
+  if (!stickyId || !sessionId) {
+    return
+  }
+  const client = ensureClient()
+  const key = stickySessionKey(apiKeyId, stickyId)
+  if (config.stickySessionTtlSeconds > 0) {
+    await client.set(key, sessionId, 'EX', config.stickySessionTtlSeconds)
+  } else {
+    await client.set(key, sessionId)
+  }
+}
+
+const clearStickySession = async (apiKeyId, stickyId) => {
+  if (!stickyId) {
+    return
+  }
+  const client = ensureClient()
+  await client.del(stickySessionKey(apiKeyId, stickyId))
+}
+
 module.exports = {
   ensureSession,
   appendMessage,
@@ -247,5 +287,9 @@ module.exports = {
   listSessions,
   getSessionMeta,
   getSessionMessages,
-  deleteSession
+  deleteSession,
+  getStickySession,
+  setStickySession,
+  clearStickySession,
+  setSessionTitle
 }
