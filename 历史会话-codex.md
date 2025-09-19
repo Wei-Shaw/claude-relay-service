@@ -14,6 +14,7 @@
   - `chat:session:<sessionId>`：Hash，字段包含：
     - `apiKey`、`createdAt`、`lastActivity`、`messageCount`、`totalTokens`
     - `metadata`：JSON 字符串，记录模型、耗时、客户端标识等可扩展信息。
+    - `title`：首条有效用户消息生成的会话标题。
   - `chat:messages:<sessionId>`：List，元素为消息对象 JSON；字段预留：
     - `role` (`user` | `assistant` | `system`)
     - `content`
@@ -61,6 +62,9 @@
   - 使用 `config/history.example.js` 复制生成 `config/history.js`；在 `config/config.js` 中仅引用一次 `require('./history')`，避免直接改写主配置文件。
   - `.env` 通过 `env-cmd` 或 `dotenv` 读取时合并 `.env.history`，也可以在 `README` 指导部署者手工添加变量。
 - 所有默认值放在 `historyConfig.js`，读取 `.env` 时设有 fallback，保持向后兼容。
+- Sticky 聚合相关参数：
+  - `CHAT_HISTORY_STICKY_TTL_SECONDS` 控制 sticky → 历史会话映射生效时间。
+  - 请求头 `X-CRS-Session-Id`、`X-CRS-New-Session`（或 body `sessionId="new"`）可复用或强制刷新会话。
 
 ## 升级兼容策略
 - 记录改动触达的文件列表（如 `src/routes/messages.js`、`src/services/history/*`、`config/history.js`、前端入口），强化代码审查时的关注点。
@@ -96,3 +100,10 @@
 6. 若时间允许，补充 Web 管理界面入口，否则记录后续任务。
 
 以上方案聚焦后端落地，兼顾扩展与升级安全，后续如需拓展更多维度（例如多租户、多模型分析），可以在 `metadata` 字段中持续演进。
+
+## 最近增强
+- **Sticky 聚合**：Redis 新增 `chat:sticky:<apiKey>:<hash>` 映射，根据调度器 hash 自动归并；可通过 `X-CRS-New-Session`/`sessionId="new"` 强制开启新会话。
+- **会话标题**：首条有效用户消息自动生成标题，后续对话不再覆盖；过滤 `<system-reminder>`、Todos、系统提示等噪音。
+- **消息录制**：修复流式写入时机，过滤空的 `tool_use` 事件，对错误回复写入 `【错误】...`，保证历史记录完整。
+- **管理端优化**：列表显示标题并保留当前选中会话；消息详情支持 Markdown 渲染、一键复制；小屏展示不会再被遮挡。
+
