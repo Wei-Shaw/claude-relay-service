@@ -114,6 +114,7 @@ router.post('/api/user-stats', async (req, res) => {
 
       // 获取当日费用统计
       const dailyCost = await redis.getDailyCost(keyId)
+      const costStats = await redis.getCostStats(keyId)
 
       // 处理数据格式，与 validateApiKey 返回的格式保持一致
       // 解析限制模型数据
@@ -140,7 +141,10 @@ router.post('/api/user-stats', async (req, res) => {
         rateLimitWindow: parseInt(keyData.rateLimitWindow) || 0,
         rateLimitRequests: parseInt(keyData.rateLimitRequests) || 0,
         dailyCostLimit: parseFloat(keyData.dailyCostLimit) || 0,
+        totalUsageLimit: parseFloat(keyData.totalUsageLimit) || 0,
+        totalCostLimit: parseFloat(keyData.totalCostLimit) || 0,
         dailyCost: dailyCost || 0,
+        totalCost: costStats.total || 0,
         enableModelRestriction: keyData.enableModelRestriction === 'true',
         restrictedModels,
         enableClientRestriction: keyData.enableClientRestriction === 'true',
@@ -372,11 +376,14 @@ router.post('/api/user-stats', async (req, res) => {
         rateLimitRequests: fullKeyData.rateLimitRequests || 0,
         rateLimitCost: parseFloat(fullKeyData.rateLimitCost) || 0, // 新增：费用限制
         dailyCostLimit: fullKeyData.dailyCostLimit || 0,
+        totalUsageLimit: fullKeyData.totalUsageLimit || 0,
+        totalCostLimit: fullKeyData.totalCostLimit || 0,
         // 当前使用量
         currentWindowRequests,
         currentWindowTokens,
         currentWindowCost, // 新增：当前窗口费用
         currentDailyCost,
+        currentTotalCost: totalCost,
         // 时间窗口信息
         windowStartTime,
         windowEndTime,

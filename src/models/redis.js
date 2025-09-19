@@ -636,6 +636,48 @@ class RedisClient {
     }
   }
 
+  async addUsageRecord(keyId, record, maxRecords = 200) {
+    const listKey = `usage:records:${keyId}`
+    const client = this.getClientSafe()
+
+    try {
+      await client
+        .multi()
+        .lpush(listKey, JSON.stringify(record))
+        .ltrim(listKey, 0, Math.max(0, maxRecords - 1))
+        .expire(listKey, 86400 * 90) // 默认保留90天
+        .exec()
+    } catch (error) {
+      logger.error(`❌ Failed to append usage record for key ${keyId}:`, error)
+    }
+  }
+
+  async getUsageRecords(keyId, limit = 50) {
+    const listKey = `usage:records:${keyId}`
+    const client = this.getClient()
+
+    if (!client) {
+      return []
+    }
+
+    try {
+      const rawRecords = await client.lrange(listKey, 0, Math.max(0, limit - 1))
+      return rawRecords
+        .map((entry) => {
+          try {
+            return JSON.parse(entry)
+          } catch (error) {
+            logger.warn('⚠️ Failed to parse usage record entry:', error)
+            return null
+          }
+        })
+        .filter(Boolean)
+    } catch (error) {
+      logger.error(`❌ Failed to load usage records for key ${keyId}:`, error)
+      return []
+    }
+  }
+
   // 💰 获取当日费用
   async getDailyCost(keyId) {
     const today = getDateStringInTimezone()

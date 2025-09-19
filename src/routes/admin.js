@@ -533,6 +533,8 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       enableClientRestriction,
       allowedClients,
       dailyCostLimit,
+      totalUsageLimit,
+      totalCostLimit,
       weeklyOpusCostLimit,
       tags,
       activationDays, // 新增：激活后有效天数
@@ -615,6 +617,35 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'All tags must be non-empty strings' })
     }
 
+    if (
+      totalUsageLimit !== undefined &&
+      totalUsageLimit !== null &&
+      totalUsageLimit !== ''
+    ) {
+      const usageLimit = Number(totalUsageLimit)
+      if (Number.isNaN(usageLimit) || usageLimit < 0) {
+        return res.status(400).json({ error: 'Total usage limit must be a non-negative number' })
+      }
+    }
+
+    if (
+      totalCostLimit !== undefined &&
+      totalCostLimit !== null &&
+      totalCostLimit !== '' &&
+      (Number.isNaN(Number(totalCostLimit)) || Number(totalCostLimit) < 0)
+    ) {
+      return res.status(400).json({ error: 'Total cost limit must be a non-negative number' })
+    }
+
+    if (
+      totalCostLimit !== undefined &&
+      totalCostLimit !== null &&
+      totalCostLimit !== '' &&
+      (Number.isNaN(Number(totalCostLimit)) || Number(totalCostLimit) < 0)
+    ) {
+      return res.status(400).json({ error: 'Total cost limit must be a non-negative number' })
+    }
+
     // 验证激活相关字段
     if (expirationMode && !['fixed', 'activation'].includes(expirationMode)) {
       return res
@@ -660,6 +691,8 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       enableClientRestriction,
       allowedClients,
       dailyCostLimit,
+      totalUsageLimit,
+      totalCostLimit,
       weeklyOpusCostLimit,
       tags,
       activationDays,
@@ -699,6 +732,8 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       enableClientRestriction,
       allowedClients,
       dailyCostLimit,
+      totalUsageLimit,
+      totalCostLimit,
       weeklyOpusCostLimit,
       tags,
       activationDays,
@@ -748,6 +783,8 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
           enableClientRestriction,
           allowedClients,
           dailyCostLimit,
+          totalUsageLimit,
+          totalCostLimit,
           weeklyOpusCostLimit,
           tags,
           activationDays,
@@ -864,6 +901,12 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
         }
         if (updates.dailyCostLimit !== undefined) {
           finalUpdates.dailyCostLimit = updates.dailyCostLimit
+        }
+        if (updates.totalUsageLimit !== undefined) {
+          finalUpdates.totalUsageLimit = updates.totalUsageLimit
+        }
+        if (updates.totalCostLimit !== undefined) {
+          finalUpdates.totalCostLimit = updates.totalCostLimit
         }
         if (updates.weeklyOpusCostLimit !== undefined) {
           finalUpdates.weeklyOpusCostLimit = updates.weeklyOpusCostLimit
@@ -993,6 +1036,8 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       allowedClients,
       expiresAt,
       dailyCostLimit,
+      totalUsageLimit,
+      totalCostLimit,
       weeklyOpusCostLimit,
       tags,
       ownerId // 新增：所有者ID字段
@@ -1140,6 +1185,22 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
         return res.status(400).json({ error: 'Daily cost limit must be a non-negative number' })
       }
       updates.dailyCostLimit = costLimit
+    }
+
+    if (totalCostLimit !== undefined && totalCostLimit !== null && totalCostLimit !== '') {
+      const costLimit = Number(totalCostLimit)
+      if (isNaN(costLimit) || costLimit < 0) {
+        return res.status(400).json({ error: 'Total cost limit must be a non-negative number' })
+      }
+      updates.totalCostLimit = costLimit
+    }
+
+    if (totalUsageLimit !== undefined && totalUsageLimit !== null && totalUsageLimit !== '') {
+      const usageLimit = Number(totalUsageLimit)
+      if (Number.isNaN(usageLimit) || usageLimit < 0) {
+        return res.status(400).json({ error: 'Total usage limit must be a non-negative number' })
+      }
+      updates.totalUsageLimit = usageLimit
     }
 
     // 处理 Opus 周费用限制
