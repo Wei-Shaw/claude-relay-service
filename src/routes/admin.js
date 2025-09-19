@@ -6076,6 +6076,7 @@ router.post('/openai-accounts/exchange-code', authenticateAdmin, async (req, res
     const proxyAgent = ProxyHelper.createProxyAgent(sessionData.proxy)
     if (proxyAgent) {
       axiosConfig.httpsAgent = proxyAgent
+      axiosConfig.proxy = false
     }
 
     // 交换 authorization code 获取 tokens
