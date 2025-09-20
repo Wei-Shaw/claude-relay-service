@@ -4010,6 +4010,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       bedrockAccountsResult,
       openaiAccounts,
       ccrAccounts,
+      openaiResponsesAccounts,
       todayStats,
       systemAverages,
       realtimeMetrics
@@ -4020,8 +4021,9 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       claudeConsoleAccountService.getAllAccounts(),
       geminiAccountService.getAllAccounts(),
       bedrockAccountService.getAllAccounts(),
-      ccrAccountService.getAllAccounts(),
       redis.getAllOpenAIAccounts(),
+      ccrAccountService.getAllAccounts(),
+      openaiResponsesAccountService.getAllAccounts(true),
       redis.getTodayStats(),
       redis.getSystemAverages(),
       redis.getRealtimeSystemMetrics()
@@ -4215,6 +4217,39 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       (acc) => acc.rateLimitStatus && acc.rateLimitStatus.isRateLimited
     ).length
 
+    // OpenAI-Responses账户统计
+    // 注意：OpenAI-Responses账户的isActive和schedulable也是字符串类型
+    const normalOpenAIResponsesAccounts = openaiResponsesAccounts.filter(
+      (acc) =>
+        (acc.isActive === 'true' ||
+          acc.isActive === true ||
+          (!acc.isActive && acc.isActive !== 'false' && acc.isActive !== false)) &&
+        acc.status !== 'blocked' &&
+        acc.status !== 'unauthorized' &&
+        acc.schedulable !== 'false' &&
+        acc.schedulable !== false &&
+        !(acc.rateLimitStatus && acc.rateLimitStatus.isRateLimited)
+    ).length
+    const abnormalOpenAIResponsesAccounts = openaiResponsesAccounts.filter(
+      (acc) =>
+        acc.isActive === 'false' ||
+        acc.isActive === false ||
+        acc.status === 'blocked' ||
+        acc.status === 'unauthorized'
+    ).length
+    const pausedOpenAIResponsesAccounts = openaiResponsesAccounts.filter(
+      (acc) =>
+        (acc.schedulable === 'false' || acc.schedulable === false) &&
+        (acc.isActive === 'true' ||
+          acc.isActive === true ||
+          (!acc.isActive && acc.isActive !== 'false' && acc.isActive !== false)) &&
+        acc.status !== 'blocked' &&
+        acc.status !== 'unauthorized'
+    ).length
+    const rateLimitedOpenAIResponsesAccounts = openaiResponsesAccounts.filter(
+      (acc) => acc.rateLimitStatus && acc.rateLimitStatus.isRateLimited
+    ).length
+
     const dashboard = {
       overview: {
         totalApiKeys: apiKeys.length,
@@ -4226,6 +4261,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           geminiAccounts.length +
           bedrockAccounts.length +
           openaiAccounts.length +
+          openaiResponsesAccounts.length +
           ccrAccounts.length,
         normalAccounts:
           normalClaudeAccounts +
@@ -4233,6 +4269,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           normalGeminiAccounts +
           normalBedrockAccounts +
           normalOpenAIAccounts +
+          normalOpenAIResponsesAccounts +
           normalCcrAccounts,
         abnormalAccounts:
           abnormalClaudeAccounts +
@@ -4240,6 +4277,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           abnormalGeminiAccounts +
           abnormalBedrockAccounts +
           abnormalOpenAIAccounts +
+          abnormalOpenAIResponsesAccounts +
           abnormalCcrAccounts,
         pausedAccounts:
           pausedClaudeAccounts +
@@ -4247,6 +4285,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           pausedGeminiAccounts +
           pausedBedrockAccounts +
           pausedOpenAIAccounts +
+          pausedOpenAIResponsesAccounts +
           pausedCcrAccounts,
         rateLimitedAccounts:
           rateLimitedClaudeAccounts +
@@ -4254,6 +4293,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           rateLimitedGeminiAccounts +
           rateLimitedBedrockAccounts +
           rateLimitedOpenAIAccounts +
+          rateLimitedOpenAIResponsesAccounts +
           rateLimitedCcrAccounts,
         // 各平台详细统计
         accountsByPlatform: {
@@ -4298,6 +4338,13 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
             abnormal: abnormalCcrAccounts,
             paused: pausedCcrAccounts,
             rateLimited: rateLimitedCcrAccounts
+          },
+          'openai-responses': {
+            total: openaiResponsesAccounts.length,
+            normal: normalOpenAIResponsesAccounts,
+            abnormal: abnormalOpenAIResponsesAccounts,
+            paused: pausedOpenAIResponsesAccounts,
+            rateLimited: rateLimitedOpenAIResponsesAccounts
           }
         },
         // 保留旧字段以兼容
@@ -4307,6 +4354,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           normalGeminiAccounts +
           normalBedrockAccounts +
           normalOpenAIAccounts +
+          normalOpenAIResponsesAccounts +
           normalCcrAccounts,
         totalClaudeAccounts: claudeAccounts.length + claudeConsoleAccounts.length,
         activeClaudeAccounts: normalClaudeAccounts + normalClaudeConsoleAccounts,
