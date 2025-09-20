@@ -155,7 +155,10 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
       const currentDate = new Date(start)
       while (currentDate <= end) {
         const tzDate = redisClient.getDateInTimezone(currentDate)
-        const dateStr = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}-${String(tzDate.getUTCDate()).padStart(2, '0')}`
+        const dateStr = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
+          2,
+          '0'
+        )}-${String(tzDate.getUTCDate()).padStart(2, '0')}`
         searchPatterns.push(`usage:daily:*:${dateStr}`)
         currentDate.setDate(currentDate.getDate() + 1)
       }
@@ -163,7 +166,10 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
       // 今日 - 使用时区日期
       const redisClient = require('../models/redis')
       const tzDate = redisClient.getDateInTimezone(now)
-      const dateStr = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}-${String(tzDate.getUTCDate()).padStart(2, '0')}`
+      const dateStr = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
+        2,
+        '0'
+      )}-${String(tzDate.getUTCDate()).padStart(2, '0')}`
       searchPatterns.push(`usage:daily:*:${dateStr}`)
     } else if (timeRange === '7days') {
       // 最近7天
@@ -172,14 +178,20 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
         const date = new Date(now)
         date.setDate(date.getDate() - i)
         const tzDate = redisClient.getDateInTimezone(date)
-        const dateStr = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}-${String(tzDate.getUTCDate()).padStart(2, '0')}`
+        const dateStr = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
+          2,
+          '0'
+        )}-${String(tzDate.getUTCDate()).padStart(2, '0')}`
         searchPatterns.push(`usage:daily:*:${dateStr}`)
       }
     } else if (timeRange === 'monthly') {
       // 本月
       const redisClient = require('../models/redis')
       const tzDate = redisClient.getDateInTimezone(now)
-      const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
+      const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
+        2,
+        '0'
+      )}`
       searchPatterns.push(`usage:monthly:*:${currentMonth}`)
     }
 
@@ -299,7 +311,10 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
         const redisClient = require('../models/redis')
         const tzToday = redisClient.getDateStringInTimezone(now)
         const tzDate = redisClient.getDateInTimezone(now)
-        const tzMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
+        const tzMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
+          2,
+          '0'
+        )}`
 
         let modelKeys = []
         if (timeRange === 'custom' && startDate && endDate) {
@@ -310,7 +325,9 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
 
           while (currentDate <= end) {
             const tzDateForKey = redisClient.getDateInTimezone(currentDate)
-            const dateStr = `${tzDateForKey.getUTCFullYear()}-${String(tzDateForKey.getUTCMonth() + 1).padStart(2, '0')}-${String(tzDateForKey.getUTCDate()).padStart(2, '0')}`
+            const dateStr = `${tzDateForKey.getUTCFullYear()}-${String(
+              tzDateForKey.getUTCMonth() + 1
+            ).padStart(2, '0')}-${String(tzDateForKey.getUTCDate()).padStart(2, '0')}`
             const dayKeys = await client.keys(`usage:${apiKey.id}:model:daily:*:${dateStr}`)
             modelKeys = modelKeys.concat(dayKeys)
             currentDate.setDate(currentDate.getDate() + 1)
@@ -533,6 +550,8 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       enableClientRestriction,
       allowedClients,
       dailyCostLimit,
+      totalUsageLimit,
+      totalCostLimit,
       weeklyOpusCostLimit,
       tags,
       activationDays, // 新增：激活后有效天数
@@ -615,6 +634,31 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'All tags must be non-empty strings' })
     }
 
+    if (totalUsageLimit !== undefined && totalUsageLimit !== null && totalUsageLimit !== '') {
+      const usageLimit = Number(totalUsageLimit)
+      if (Number.isNaN(usageLimit) || usageLimit < 0) {
+        return res.status(400).json({ error: 'Total usage limit must be a non-negative number' })
+      }
+    }
+
+    if (
+      totalCostLimit !== undefined &&
+      totalCostLimit !== null &&
+      totalCostLimit !== '' &&
+      (Number.isNaN(Number(totalCostLimit)) || Number(totalCostLimit) < 0)
+    ) {
+      return res.status(400).json({ error: 'Total cost limit must be a non-negative number' })
+    }
+
+    if (
+      totalCostLimit !== undefined &&
+      totalCostLimit !== null &&
+      totalCostLimit !== '' &&
+      (Number.isNaN(Number(totalCostLimit)) || Number(totalCostLimit) < 0)
+    ) {
+      return res.status(400).json({ error: 'Total cost limit must be a non-negative number' })
+    }
+
     // 验证激活相关字段
     if (expirationMode && !['fixed', 'activation'].includes(expirationMode)) {
       return res
@@ -660,6 +704,8 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       enableClientRestriction,
       allowedClients,
       dailyCostLimit,
+      totalUsageLimit,
+      totalCostLimit,
       weeklyOpusCostLimit,
       tags,
       activationDays,
@@ -699,6 +745,8 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       enableClientRestriction,
       allowedClients,
       dailyCostLimit,
+      totalUsageLimit,
+      totalCostLimit,
       weeklyOpusCostLimit,
       tags,
       activationDays,
@@ -748,6 +796,8 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
           enableClientRestriction,
           allowedClients,
           dailyCostLimit,
+          totalUsageLimit,
+          totalCostLimit,
           weeklyOpusCostLimit,
           tags,
           activationDays,
@@ -864,6 +914,12 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
         }
         if (updates.dailyCostLimit !== undefined) {
           finalUpdates.dailyCostLimit = updates.dailyCostLimit
+        }
+        if (updates.totalUsageLimit !== undefined) {
+          finalUpdates.totalUsageLimit = updates.totalUsageLimit
+        }
+        if (updates.totalCostLimit !== undefined) {
+          finalUpdates.totalCostLimit = updates.totalCostLimit
         }
         if (updates.weeklyOpusCostLimit !== undefined) {
           finalUpdates.weeklyOpusCostLimit = updates.weeklyOpusCostLimit
@@ -993,6 +1049,8 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       allowedClients,
       expiresAt,
       dailyCostLimit,
+      totalUsageLimit,
+      totalCostLimit,
       weeklyOpusCostLimit,
       tags,
       ownerId // 新增：所有者ID字段
@@ -1142,6 +1200,22 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       updates.dailyCostLimit = costLimit
     }
 
+    if (totalCostLimit !== undefined && totalCostLimit !== null && totalCostLimit !== '') {
+      const costLimit = Number(totalCostLimit)
+      if (isNaN(costLimit) || costLimit < 0) {
+        return res.status(400).json({ error: 'Total cost limit must be a non-negative number' })
+      }
+      updates.totalCostLimit = costLimit
+    }
+
+    if (totalUsageLimit !== undefined && totalUsageLimit !== null && totalUsageLimit !== '') {
+      const usageLimit = Number(totalUsageLimit)
+      if (Number.isNaN(usageLimit) || usageLimit < 0) {
+        return res.status(400).json({ error: 'Total usage limit must be a non-negative number' })
+      }
+      updates.totalUsageLimit = usageLimit
+    }
+
     // 处理 Opus 周费用限制
     if (
       weeklyOpusCostLimit !== undefined &&
@@ -1252,7 +1326,9 @@ router.patch('/api-keys/:keyId/expiration', authenticateAdmin, async (req, res) 
         updates.expiresAt = newExpiresAt.toISOString()
 
         logger.success(
-          `🔓 API key manually activated by admin: ${keyId} (${keyData.name}), expires at ${newExpiresAt.toISOString()}`
+          `🔓 API key manually activated by admin: ${keyId} (${
+            keyData.name
+          }), expires at ${newExpiresAt.toISOString()}`
         )
       } else {
         return res.status(400).json({
@@ -1317,7 +1393,11 @@ router.delete('/api-keys/batch', authenticateAdmin, async (req, res) => {
     // 参数验证
     if (!keyIds || !Array.isArray(keyIds) || keyIds.length === 0) {
       logger.warn(
-        `🚨 Invalid keyIds: ${JSON.stringify({ keyIds, type: typeof keyIds, isArray: Array.isArray(keyIds) })}`
+        `🚨 Invalid keyIds: ${JSON.stringify({
+          keyIds,
+          type: typeof keyIds,
+          isArray: Array.isArray(keyIds)
+        })}`
       )
       return res.status(400).json({
         error: 'Invalid request',
@@ -2338,7 +2418,9 @@ router.put(
       }
 
       logger.success(
-        `🔄 Admin toggled Claude account schedulable status: ${accountId} -> ${newSchedulable ? 'schedulable' : 'not schedulable'}`
+        `🔄 Admin toggled Claude account schedulable status: ${accountId} -> ${
+          newSchedulable ? 'schedulable' : 'not schedulable'
+        }`
       )
       return res.json({ success: true, schedulable: newSchedulable })
     } catch (error) {
@@ -2626,7 +2708,9 @@ router.put('/claude-console-accounts/:accountId/toggle', authenticateAdmin, asyn
     await claudeConsoleAccountService.updateAccount(accountId, { isActive: newStatus })
 
     logger.success(
-      `🔄 Admin toggled Claude Console account status: ${accountId} -> ${newStatus ? 'active' : 'inactive'}`
+      `🔄 Admin toggled Claude Console account status: ${accountId} -> ${
+        newStatus ? 'active' : 'inactive'
+      }`
     )
     return res.json({ success: true, isActive: newStatus })
   } catch (error) {
@@ -2667,7 +2751,9 @@ router.put(
       }
 
       logger.success(
-        `🔄 Admin toggled Claude Console account schedulable status: ${accountId} -> ${newSchedulable ? 'schedulable' : 'not schedulable'}`
+        `🔄 Admin toggled Claude Console account schedulable status: ${accountId} -> ${
+          newSchedulable ? 'schedulable' : 'not schedulable'
+        }`
       )
       return res.json({ success: true, schedulable: newSchedulable })
     } catch (error) {
@@ -3052,7 +3138,9 @@ router.put('/ccr-accounts/:accountId/toggle-schedulable', authenticateAdmin, asy
     }
 
     logger.success(
-      `🔄 Admin toggled CCR account schedulable status: ${accountId} -> ${newSchedulable ? 'schedulable' : 'not schedulable'}`
+      `🔄 Admin toggled CCR account schedulable status: ${accountId} -> ${
+        newSchedulable ? 'schedulable' : 'not schedulable'
+      }`
     )
     return res.json({ success: true, schedulable: newSchedulable })
   } catch (error) {
@@ -3375,7 +3463,9 @@ router.put('/bedrock-accounts/:accountId/toggle', authenticateAdmin, async (req,
     }
 
     logger.success(
-      `🔄 Admin toggled Bedrock account status: ${accountId} -> ${newStatus ? 'active' : 'inactive'}`
+      `🔄 Admin toggled Bedrock account status: ${accountId} -> ${
+        newStatus ? 'active' : 'inactive'
+      }`
     )
     return res.json({ success: true, isActive: newStatus })
   } catch (error) {
@@ -3424,7 +3514,9 @@ router.put(
       }
 
       logger.success(
-        `🔄 Admin toggled Bedrock account schedulable status: ${accountId} -> ${newSchedulable ? 'schedulable' : 'not schedulable'}`
+        `🔄 Admin toggled Bedrock account schedulable status: ${accountId} -> ${
+          newSchedulable ? 'schedulable' : 'not schedulable'
+        }`
       )
       return res.json({ success: true, schedulable: newSchedulable })
     } catch (error) {
@@ -3847,7 +3939,9 @@ router.put(
       }
 
       logger.success(
-        `🔄 Admin toggled Gemini account schedulable status: ${accountId} -> ${actualSchedulable ? 'schedulable' : 'not schedulable'}`
+        `🔄 Admin toggled Gemini account schedulable status: ${accountId} -> ${
+          actualSchedulable ? 'schedulable' : 'not schedulable'
+        }`
       )
 
       // 返回实际的数据库值，确保前端状态与后端一致
@@ -4322,7 +4416,10 @@ router.get('/model-stats', authenticateAdmin, async (req, res) => {
     const { period = 'daily', startDate, endDate } = req.query // daily, monthly, 支持自定义时间范围
     const today = redis.getDateStringInTimezone()
     const tzDate = redis.getDateInTimezone()
-    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
+      2,
+      '0'
+    )}`
 
     logger.info(
       `📊 Getting global model stats, period: ${period}, startDate: ${startDate}, endDate: ${endDate}, today: ${today}, currentMonth: ${currentMonth}`
@@ -4793,7 +4890,10 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
     const client = redis.getClientSafe()
     const today = redis.getDateStringInTimezone()
     const tzDate = redis.getDateInTimezone()
-    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
+      2,
+      '0'
+    )}`
 
     let searchPatterns = []
 
@@ -5324,7 +5424,10 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
     const client = redis.getClientSafe()
     const today = redis.getDateStringInTimezone()
     const tzDate = redis.getDateInTimezone()
-    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
+      2,
+      '0'
+    )}`
 
     let pattern
     if (period === 'today') {
@@ -5340,7 +5443,9 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
         const date = new Date()
         date.setDate(date.getDate() - i)
         const currentTzDate = redis.getDateInTimezone(date)
-        const dateStr = `${currentTzDate.getUTCFullYear()}-${String(currentTzDate.getUTCMonth() + 1).padStart(2, '0')}-${String(currentTzDate.getUTCDate()).padStart(2, '0')}`
+        const dateStr = `${currentTzDate.getUTCFullYear()}-${String(
+          currentTzDate.getUTCMonth() + 1
+        ).padStart(2, '0')}-${String(currentTzDate.getUTCDate()).padStart(2, '0')}`
         const dayPattern = `usage:model:daily:*:${dateStr}`
 
         const dayKeys = await client.keys(dayPattern)
@@ -5393,7 +5498,9 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
         totalCosts.totalCost += costResult.costs.total
 
         logger.info(
-          `💰 Model ${model} (7days): ${usage.inputTokens + usage.outputTokens + usage.cacheCreateTokens + usage.cacheReadTokens} tokens, cost: ${costResult.formatted.total}`
+          `💰 Model ${model} (7days): ${
+            usage.inputTokens + usage.outputTokens + usage.cacheCreateTokens + usage.cacheReadTokens
+          } tokens, cost: ${costResult.formatted.total}`
         )
 
         // 记录模型费用
@@ -5481,7 +5588,12 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
           totalCosts.totalCost += costResult.costs.total
 
           logger.info(
-            `💰 Model ${model}: ${usage.inputTokens + usage.outputTokens + usage.cacheCreateTokens + usage.cacheReadTokens} tokens, cost: ${costResult.formatted.total}`
+            `💰 Model ${model}: ${
+              usage.inputTokens +
+              usage.outputTokens +
+              usage.cacheCreateTokens +
+              usage.cacheReadTokens
+            } tokens, cost: ${costResult.formatted.total}`
           )
 
           // 记录模型费用
@@ -6844,7 +6956,9 @@ router.post('/azure-openai-accounts', authenticateAdmin, async (req, res) => {
 
     // 测试连接
     try {
-      const testUrl = `${azureEndpoint}/openai/deployments/${deploymentName}?api-version=${apiVersion || '2024-02-01'}`
+      const testUrl = `${azureEndpoint}/openai/deployments/${deploymentName}?api-version=${
+        apiVersion || '2024-02-01'
+      }`
       await axios.get(testUrl, {
         headers: {
           'api-key': apiKey
