@@ -337,8 +337,8 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
             timeRange === 'today'
               ? await client.keys(`usage:${apiKey.id}:model:daily:*:${tzToday}`)
               : timeRange === '7days'
-              ? await client.keys(`usage:${apiKey.id}:model:daily:*:*`)
-              : await client.keys(`usage:${apiKey.id}:model:monthly:*:${tzMonth}`)
+                ? await client.keys(`usage:${apiKey.id}:model:daily:*:*`)
+                : await client.keys(`usage:${apiKey.id}:model:monthly:*:${tzMonth}`)
         }
 
         const modelStatsMap = new Map()
@@ -1861,13 +1861,13 @@ router.post('/claude-accounts/exchange-code', authenticateAdmin, async (req, res
       codeLength: req.body.callbackUrl
         ? req.body.callbackUrl.length
         : req.body.authorizationCode
-        ? req.body.authorizationCode.length
-        : 0,
+          ? req.body.authorizationCode.length
+          : 0,
       codePrefix: req.body.callbackUrl
         ? `${req.body.callbackUrl.substring(0, 10)}...`
         : req.body.authorizationCode
-        ? `${req.body.authorizationCode.substring(0, 10)}...`
-        : 'N/A'
+          ? `${req.body.authorizationCode.substring(0, 10)}...`
+          : 'N/A'
     })
     return res
       .status(500)
@@ -1983,13 +1983,13 @@ router.post('/claude-accounts/exchange-setup-token-code', authenticateAdmin, asy
       codeLength: req.body.callbackUrl
         ? req.body.callbackUrl.length
         : req.body.authorizationCode
-        ? req.body.authorizationCode.length
-        : 0,
+          ? req.body.authorizationCode.length
+          : 0,
       codePrefix: req.body.callbackUrl
         ? `${req.body.callbackUrl.substring(0, 10)}...`
         : req.body.authorizationCode
-        ? `${req.body.authorizationCode.substring(0, 10)}...`
-        : 'N/A'
+          ? `${req.body.authorizationCode.substring(0, 10)}...`
+          : 'N/A'
     })
     return res
       .status(500)
