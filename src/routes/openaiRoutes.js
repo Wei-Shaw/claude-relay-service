@@ -390,23 +390,24 @@ const handleResponses = async (req, res) => {
 
         // 记录使用统计
         if (usageData) {
-          const inputTokens = usageData.input_tokens || usageData.prompt_tokens || 0
+          const totalInputTokens = usageData.input_tokens || usageData.prompt_tokens || 0
           const outputTokens = usageData.output_tokens || usageData.completion_tokens || 0
-          const cacheCreateTokens = usageData.input_tokens_details?.cache_creation_tokens || 0
           const cacheReadTokens = usageData.input_tokens_details?.cached_tokens || 0
+          // 计算实际输入token（总输入减去缓存部分）
+          const actualInputTokens = Math.max(0, totalInputTokens - cacheReadTokens)
 
           await apiKeyService.recordUsage(
             apiKeyData.id,
-            inputTokens,
+            actualInputTokens, // 传递实际输入（不含缓存）
             outputTokens,
-            cacheCreateTokens,
+            0, // OpenAI没有cache_creation_tokens
             cacheReadTokens,
             actualModel,
             accountId
           )
 
           logger.info(
-            `📊 Recorded OpenAI non-stream usage - Input: ${inputTokens}, Output: ${outputTokens}, Total: ${usageData.total_tokens || inputTokens + outputTokens}, Model: ${actualModel}`
+            `📊 Recorded OpenAI non-stream usage - Input: ${totalInputTokens}(actual:${actualInputTokens}+cached:${cacheReadTokens}), Output: ${outputTokens}, Total: ${usageData.total_tokens || totalInputTokens + outputTokens}, Model: ${actualModel}`
           )
         }
 
@@ -506,26 +507,27 @@ const handleResponses = async (req, res) => {
       // 记录使用统计
       if (!usageReported && usageData) {
         try {
-          const inputTokens = usageData.input_tokens || 0
+          const totalInputTokens = usageData.input_tokens || 0
           const outputTokens = usageData.output_tokens || 0
-          const cacheCreateTokens = usageData.input_tokens_details?.cache_creation_tokens || 0
           const cacheReadTokens = usageData.input_tokens_details?.cached_tokens || 0
+          // 计算实际输入token（总输入减去缓存部分）
+          const actualInputTokens = Math.max(0, totalInputTokens - cacheReadTokens)
 
           // 使用响应中的真实 model，如果没有则使用请求中的 model，最后回退到默认值
           const modelToRecord = actualModel || requestedModel || 'gpt-4'
 
           await apiKeyService.recordUsage(
             apiKeyData.id,
-            inputTokens,
+            actualInputTokens, // 传递实际输入（不含缓存）
             outputTokens,
-            cacheCreateTokens,
+            0, // OpenAI没有cache_creation_tokens
             cacheReadTokens,
             modelToRecord,
             accountId
           )
 
           logger.info(
-            `📊 Recorded OpenAI usage - Input: ${inputTokens}, Output: ${outputTokens}, Total: ${usageData.total_tokens || inputTokens + outputTokens}, Model: ${modelToRecord} (actual: ${actualModel}, requested: ${requestedModel})`
+            `📊 Recorded OpenAI usage - Input: ${totalInputTokens}(actual:${actualInputTokens}+cached:${cacheReadTokens}), Output: ${outputTokens}, Total: ${usageData.total_tokens || totalInputTokens + outputTokens}, Model: ${modelToRecord} (actual: ${actualModel}, requested: ${requestedModel})`
           )
           usageReported = true
         } catch (error) {

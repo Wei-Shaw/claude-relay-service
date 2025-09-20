@@ -215,7 +215,7 @@
                 class="text-orange-600"
               >
                 <i class="fas fa-exclamation-triangle mr-1 text-xs md:text-sm" />
-                限制 {{ statsData.restrictions.allowedClients.length }} 个客户端
+                限 {{ statsData.restrictions.allowedClients.length }} 种客户端使用
               </span>
               <span v-else class="text-green-600">
                 <i class="fas fa-check-circle mr-1 text-xs md:text-sm" />
