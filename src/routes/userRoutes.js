@@ -258,7 +258,6 @@ router.get('/api-keys', authenticateUser, async (req, res) => {
         usage: flatUsage,
         dailyCost: key.dailyCost,
         dailyCostLimit: key.dailyCostLimit,
-        totalUsageLimit: key.totalUsageLimit,
         totalCost: key.totalCost,
         totalCostLimit: key.totalCostLimit,
         // 不返回实际的key值，只返回前缀和后几位
@@ -290,15 +289,7 @@ router.get('/api-keys', authenticateUser, async (req, res) => {
 // 🔑 创建新的API Key
 router.post('/api-keys', authenticateUser, async (req, res) => {
   try {
-    const {
-      name,
-      description,
-      tokenLimit,
-      expiresAt,
-      dailyCostLimit,
-      totalUsageLimit,
-      totalCostLimit
-    } = req.body
+    const { name, description, tokenLimit, expiresAt, dailyCostLimit, totalCostLimit } = req.body
 
     if (!name || !name.trim()) {
       return res.status(400).json({
@@ -319,16 +310,6 @@ router.post('/api-keys', authenticateUser, async (req, res) => {
       })
     }
 
-    if (totalUsageLimit !== undefined && totalUsageLimit !== null && totalUsageLimit !== '') {
-      const usageLimit = Number(totalUsageLimit)
-      if (Number.isNaN(usageLimit) || usageLimit < 0) {
-        return res.status(400).json({
-          error: 'Invalid total usage limit',
-          message: 'Total usage limit must be a non-negative number'
-        })
-      }
-    }
-
     // 检查用户API Key数量限制
     const userApiKeys = await apiKeyService.getUserApiKeys(req.user.id)
     if (userApiKeys.length >= config.userManagement.maxApiKeysPerUser) {
@@ -347,7 +328,6 @@ router.post('/api-keys', authenticateUser, async (req, res) => {
       tokenLimit: tokenLimit || null,
       expiresAt: expiresAt || null,
       dailyCostLimit: dailyCostLimit || null,
-      totalUsageLimit: totalUsageLimit || null,
       totalCostLimit: totalCostLimit || null,
       createdBy: 'user',
       // 设置服务权限为全部服务，确保前端显示“服务权限”为“全部服务”且具备完整访问权限
@@ -372,7 +352,6 @@ router.post('/api-keys', authenticateUser, async (req, res) => {
         tokenLimit: newApiKey.tokenLimit,
         expiresAt: newApiKey.expiresAt,
         dailyCostLimit: newApiKey.dailyCostLimit,
-        totalUsageLimit: newApiKey.totalUsageLimit,
         totalCostLimit: newApiKey.totalCostLimit,
         createdAt: newApiKey.createdAt
       }

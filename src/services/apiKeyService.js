@@ -33,7 +33,6 @@ class ApiKeyService {
       enableClientRestriction = false,
       allowedClients = [],
       dailyCostLimit = 0,
-      totalUsageLimit = 0,
       totalCostLimit = 0,
       weeklyOpusCostLimit = 0,
       tags = [],
@@ -70,7 +69,6 @@ class ApiKeyService {
       enableClientRestriction: String(enableClientRestriction || false),
       allowedClients: JSON.stringify(allowedClients || []),
       dailyCostLimit: String(dailyCostLimit || 0),
-      totalUsageLimit: String(totalUsageLimit || 0),
       totalCostLimit: String(totalCostLimit || 0),
       weeklyOpusCostLimit: String(weeklyOpusCostLimit || 0),
       tags: JSON.stringify(tags || []),
@@ -115,7 +113,6 @@ class ApiKeyService {
       enableClientRestriction: keyData.enableClientRestriction === 'true',
       allowedClients: JSON.parse(keyData.allowedClients || '[]'),
       dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
-      totalUsageLimit: parseFloat(keyData.totalUsageLimit || 0),
       totalCostLimit: parseFloat(keyData.totalCostLimit || 0),
       weeklyOpusCostLimit: parseFloat(keyData.weeklyOpusCostLimit || 0),
       tags: JSON.parse(keyData.tags || '[]'),
@@ -257,7 +254,6 @@ class ApiKeyService {
           enableClientRestriction: keyData.enableClientRestriction === 'true',
           allowedClients,
           dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
-          totalUsageLimit: parseFloat(keyData.totalUsageLimit || 0),
           totalCostLimit: parseFloat(keyData.totalCostLimit || 0),
           weeklyOpusCostLimit: parseFloat(keyData.weeklyOpusCostLimit || 0),
           dailyCost: dailyCost || 0,
@@ -383,7 +379,6 @@ class ApiKeyService {
           enableClientRestriction: keyData.enableClientRestriction === 'true',
           allowedClients,
           dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
-          totalUsageLimit: parseFloat(keyData.totalUsageLimit || 0),
           totalCostLimit: parseFloat(keyData.totalCostLimit || 0),
           weeklyOpusCostLimit: parseFloat(keyData.weeklyOpusCostLimit || 0),
           dailyCost: dailyCost || 0,
@@ -426,10 +421,6 @@ class ApiKeyService {
         key.rateLimitWindow = parseInt(key.rateLimitWindow || 0)
         key.rateLimitRequests = parseInt(key.rateLimitRequests || 0)
         key.rateLimitCost = parseFloat(key.rateLimitCost || 0) // 新增：速率限制费用字段
-        key.totalUsageLimit = parseFloat(key.totalUsageLimit || 0)
-        if (Number.isNaN(key.totalUsageLimit)) {
-          key.totalUsageLimit = 0
-        }
         key.currentConcurrency = await redis.getConcurrency(key.id)
         key.isActive = key.isActive === 'true'
         key.enableModelRestriction = key.enableModelRestriction === 'true'
@@ -558,7 +549,6 @@ class ApiKeyService {
         'enableClientRestriction',
         'allowedClients',
         'dailyCostLimit',
-        'totalUsageLimit',
         'totalCostLimit',
         'weeklyOpusCostLimit',
         'tags',
@@ -1156,7 +1146,6 @@ class ApiKeyService {
           dailyCost,
           totalCost: costStats.total,
           dailyCostLimit: parseFloat(key.dailyCostLimit || 0),
-          totalUsageLimit: parseFloat(key.totalUsageLimit || 0),
           totalCostLimit: parseFloat(key.totalCostLimit || 0),
           userId: key.userId,
           userUsername: key.userUsername,
@@ -1204,7 +1193,6 @@ class ApiKeyService {
         createdBy: keyData.createdBy,
         permissions: keyData.permissions,
         dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
-        totalUsageLimit: parseFloat(keyData.totalUsageLimit || 0),
         totalCostLimit: parseFloat(keyData.totalCostLimit || 0)
       }
     } catch (error) {

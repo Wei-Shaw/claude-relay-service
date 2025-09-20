@@ -141,7 +141,6 @@ router.post('/api/user-stats', async (req, res) => {
         rateLimitWindow: parseInt(keyData.rateLimitWindow) || 0,
         rateLimitRequests: parseInt(keyData.rateLimitRequests) || 0,
         dailyCostLimit: parseFloat(keyData.dailyCostLimit) || 0,
-        totalUsageLimit: parseFloat(keyData.totalUsageLimit) || 0,
         totalCostLimit: parseFloat(keyData.totalCostLimit) || 0,
         dailyCost: dailyCost || 0,
         totalCost: costStats.total || 0,
@@ -376,7 +375,6 @@ router.post('/api/user-stats', async (req, res) => {
         rateLimitRequests: fullKeyData.rateLimitRequests || 0,
         rateLimitCost: parseFloat(fullKeyData.rateLimitCost) || 0, // 新增：费用限制
         dailyCostLimit: fullKeyData.dailyCostLimit || 0,
-        totalUsageLimit: fullKeyData.totalUsageLimit || 0,
         totalCostLimit: fullKeyData.totalCostLimit || 0,
         // 当前使用量
         currentWindowRequests,

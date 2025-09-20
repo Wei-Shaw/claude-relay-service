@@ -550,7 +550,6 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       enableClientRestriction,
       allowedClients,
       dailyCostLimit,
-      totalUsageLimit,
       totalCostLimit,
       weeklyOpusCostLimit,
       tags,
@@ -634,22 +633,6 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'All tags must be non-empty strings' })
     }
 
-    if (totalUsageLimit !== undefined && totalUsageLimit !== null && totalUsageLimit !== '') {
-      const usageLimit = Number(totalUsageLimit)
-      if (Number.isNaN(usageLimit) || usageLimit < 0) {
-        return res.status(400).json({ error: 'Total usage limit must be a non-negative number' })
-      }
-    }
-
-    if (
-      totalCostLimit !== undefined &&
-      totalCostLimit !== null &&
-      totalCostLimit !== '' &&
-      (Number.isNaN(Number(totalCostLimit)) || Number(totalCostLimit) < 0)
-    ) {
-      return res.status(400).json({ error: 'Total cost limit must be a non-negative number' })
-    }
-
     if (
       totalCostLimit !== undefined &&
       totalCostLimit !== null &&
@@ -704,7 +687,6 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       enableClientRestriction,
       allowedClients,
       dailyCostLimit,
-      totalUsageLimit,
       totalCostLimit,
       weeklyOpusCostLimit,
       tags,
@@ -745,7 +727,6 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       enableClientRestriction,
       allowedClients,
       dailyCostLimit,
-      totalUsageLimit,
       totalCostLimit,
       weeklyOpusCostLimit,
       tags,
@@ -796,7 +777,6 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
           enableClientRestriction,
           allowedClients,
           dailyCostLimit,
-          totalUsageLimit,
           totalCostLimit,
           weeklyOpusCostLimit,
           tags,
@@ -914,9 +894,6 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
         }
         if (updates.dailyCostLimit !== undefined) {
           finalUpdates.dailyCostLimit = updates.dailyCostLimit
-        }
-        if (updates.totalUsageLimit !== undefined) {
-          finalUpdates.totalUsageLimit = updates.totalUsageLimit
         }
         if (updates.totalCostLimit !== undefined) {
           finalUpdates.totalCostLimit = updates.totalCostLimit
@@ -1049,7 +1026,6 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       allowedClients,
       expiresAt,
       dailyCostLimit,
-      totalUsageLimit,
       totalCostLimit,
       weeklyOpusCostLimit,
       tags,
@@ -1206,14 +1182,6 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
         return res.status(400).json({ error: 'Total cost limit must be a non-negative number' })
       }
       updates.totalCostLimit = costLimit
-    }
-
-    if (totalUsageLimit !== undefined && totalUsageLimit !== null && totalUsageLimit !== '') {
-      const usageLimit = Number(totalUsageLimit)
-      if (Number.isNaN(usageLimit) || usageLimit < 0) {
-        return res.status(400).json({ error: 'Total usage limit must be a non-negative number' })
-      }
-      updates.totalUsageLimit = usageLimit
     }
 
     // 处理 Opus 周费用限制

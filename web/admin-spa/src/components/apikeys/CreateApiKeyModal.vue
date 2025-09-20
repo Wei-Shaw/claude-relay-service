@@ -344,34 +344,34 @@
                 <button
                   class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   type="button"
-                  @click="form.totalUsageLimit = '100'"
+                  @click="form.totalCostLimit = '100'"
                 >
                   $100
                 </button>
                 <button
                   class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   type="button"
-                  @click="form.totalUsageLimit = '500'"
+                  @click="form.totalCostLimit = '500'"
                 >
                   $500
                 </button>
                 <button
                   class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   type="button"
-                  @click="form.totalUsageLimit = '1000'"
+                  @click="form.totalCostLimit = '1000'"
                 >
                   $1000
                 </button>
                 <button
                   class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   type="button"
-                  @click="form.totalUsageLimit = ''"
+                  @click="form.totalCostLimit = ''"
                 >
                   自定义
                 </button>
               </div>
               <input
-                v-model="form.totalUsageLimit"
+                v-model="form.totalCostLimit"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 min="0"
                 placeholder="0 表示无限制"
@@ -910,7 +910,7 @@ const form = reactive({
   rateLimitCost: '', // 新增：费用限制
   concurrencyLimit: '',
   dailyCostLimit: '',
-  totalUsageLimit: '',
+  totalCostLimit: '',
   weeklyOpusCostLimit: '',
   expireDuration: '',
   customExpireDate: '',
@@ -1249,9 +1249,9 @@ const createApiKey = async () => {
         form.dailyCostLimit !== '' && form.dailyCostLimit !== null
           ? parseFloat(form.dailyCostLimit)
           : 0,
-      totalUsageLimit:
-        form.totalUsageLimit !== '' && form.totalUsageLimit !== null
-          ? parseFloat(form.totalUsageLimit)
+      totalCostLimit:
+        form.totalCostLimit !== '' && form.totalCostLimit !== null
+          ? parseFloat(form.totalCostLimit)
           : 0,
       weeklyOpusCostLimit:
         form.weeklyOpusCostLimit !== '' && form.weeklyOpusCostLimit !== null

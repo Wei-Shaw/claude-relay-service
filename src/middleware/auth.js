@@ -312,33 +312,6 @@ const authenticateApiKey = async (req, res, next) => {
       }
     }
 
-    // 检查总额度限制（基于累计费用）
-    const totalUsageLimit = Number(validation.keyData.totalUsageLimit || 0)
-    if (totalUsageLimit > 0) {
-      const totalCost = Number(validation.keyData.totalCost || 0)
-
-      if (totalCost >= totalUsageLimit) {
-        logger.security(
-          `📉 Total usage limit exceeded for key: ${validation.keyData.id} (${
-            validation.keyData.name
-          }), cost: $${totalCost.toFixed(2)}/$${totalUsageLimit.toFixed(2)}`
-        )
-
-        return res.status(429).json({
-          error: 'Total usage limit exceeded',
-          message: `已达到总额度限制 ($${totalUsageLimit.toFixed(2)})`,
-          currentCost: totalCost,
-          costLimit: totalUsageLimit
-        })
-      }
-
-      logger.api(
-        `📉 Total usage for key: ${validation.keyData.id} (${
-          validation.keyData.name
-        }), cost: $${totalCost.toFixed(2)}/$${totalUsageLimit.toFixed(2)}`
-      )
-    }
-
     // 检查每日费用限制
     const dailyCostLimit = validation.keyData.dailyCostLimit || 0
     if (dailyCostLimit > 0) {
@@ -460,7 +433,6 @@ const authenticateApiKey = async (req, res, next) => {
       allowedClients: validation.keyData.allowedClients,
       dailyCostLimit: validation.keyData.dailyCostLimit,
       dailyCost: validation.keyData.dailyCost,
-      totalUsageLimit: validation.keyData.totalUsageLimit,
       totalCostLimit: validation.keyData.totalCostLimit,
       totalCost: validation.keyData.totalCost,
       usage: validation.keyData.usage

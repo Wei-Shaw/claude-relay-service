@@ -223,7 +223,7 @@
               总费用限制 (美元)
             </label>
             <input
-              v-model="form.totalUsageLimit"
+              v-model="form.totalCostLimit"
               class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
               min="0"
               placeholder="不修改 (0 表示无限制)"
@@ -535,7 +535,7 @@ const form = reactive({
   rateLimitRequests: '',
   concurrencyLimit: '',
   dailyCostLimit: '',
-  totalUsageLimit: '',
+  totalCostLimit: '',
   weeklyOpusCostLimit: '', // 新增Opus周费用限制
   permissions: '', // 空字符串表示不修改
   claudeAccountId: '',
@@ -667,8 +667,8 @@ const batchUpdateApiKeys = async () => {
     if (form.dailyCostLimit !== '' && form.dailyCostLimit !== null) {
       updates.dailyCostLimit = parseFloat(form.dailyCostLimit)
     }
-    if (form.totalUsageLimit !== '' && form.totalUsageLimit !== null) {
-      updates.totalUsageLimit = parseFloat(form.totalUsageLimit)
+    if (form.totalCostLimit !== '' && form.totalCostLimit !== null) {
+      updates.totalCostLimit = parseFloat(form.totalCostLimit)
     }
     if (form.weeklyOpusCostLimit !== '' && form.weeklyOpusCostLimit !== null) {
       updates.weeklyOpusCostLimit = parseFloat(form.weeklyOpusCostLimit)

@@ -21,13 +21,13 @@ function createMockReq(apiKey) {
   return {
     headers: {
       'x-api-key': apiKey,
-      'user-agent': 'total-usage-limit-test'
+      'user-agent': 'total-cost-limit-test'
     },
     query: {},
     body: {},
     ip: '127.0.0.1',
     connection: {},
-    originalUrl: '/test-total-usage-limit',
+    originalUrl: '/test-total-cost-limit',
     once: () => {},
     on: () => {},
     get(header) {
@@ -102,18 +102,18 @@ async function cleanupKey(keyId) {
 async function main() {
   await redis.connect()
 
-  const testName = `TotalUsageLimitTest-${Date.now()}`
-  const totalLimit = 1.0
+  const testName = `TotalCostLimitTest-${Date.now()}`
+  const totalCostLimit = 1.0
   const newKey = await apiKeyService.generateApiKey({
     name: testName,
     permissions: 'all',
-    totalUsageLimit: totalLimit
+    totalCostLimit: totalCostLimit
   })
 
   const keyId = newKey.id
   const { apiKey } = newKey
 
-  console.log(`➕ Created test API key ${keyId} with total usage limit $${totalLimit}`)
+  console.log(`➕ Created test API key ${keyId} with total cost limit $${totalCostLimit}`)
 
   let authResult = await runAuth(apiKey)
   if (authResult.status !== 200) {
@@ -121,28 +121,33 @@ async function main() {
   }
   console.log('✅ Authentication succeeds before consuming quota')
 
-  await redis.incrementDailyCost(keyId, 0.6)
+  // 增加总费用
+  const client = redis.getClient()
+  await client.set(`usage:cost:total:${keyId}`, '0.6')
+
   authResult = await runAuth(apiKey)
   if (authResult.status !== 200) {
     throw new Error(`Expected success under quota, got status ${authResult.status}`)
   }
   console.log('✅ Authentication succeeds while still under quota ($0.60)')
 
-  await redis.incrementDailyCost(keyId, 0.5)
+  // 继续增加总费用超过限制
+  await client.set(`usage:cost:total:${keyId}`, '1.1')
+
   authResult = await runAuth(apiKey)
   if (authResult.status !== 429) {
     throw new Error(`Expected 429 after exceeding quota, got status ${authResult.status}`)
   }
-  console.log('✅ Authentication returns 429 after exceeding total usage limit ($1.10)')
+  console.log('✅ Authentication returns 429 after exceeding total cost limit ($1.10)')
 
   await cleanupKey(keyId)
   await redis.disconnect()
 
-  console.log('🎉 Total usage limit test completed successfully')
+  console.log('🎉 Total cost limit test completed successfully')
 }
 
 main().catch(async (error) => {
-  console.error('❌ Total usage limit test failed:', error)
+  console.error('❌ Total cost limit test failed:', error)
   try {
     await redis.disconnect()
   } catch (_) {
