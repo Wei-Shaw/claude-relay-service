@@ -417,7 +417,7 @@ jobs:
 
     - name: Build and push Docker image
       if: steps.check.outputs.needs_bump == 'true'
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v6
       with:
         context: .
         platforms: linux/amd64,linux/arm64
@@ -432,6 +432,7 @@ jobs:
         labels: |
           org.opencontainers.image.version=${{ steps.next_version.outputs.new_version }}
           org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.source=https://github.com/${{ github.repository }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
