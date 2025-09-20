@@ -111,7 +111,7 @@ async function main() {
   })
 
   const keyId = newKey.id
-  const apiKey = newKey.apiKey
+  const { apiKey } = newKey
 
   console.log(`➕ Created test API key ${keyId} with total usage limit $${totalLimit}`)
 
@@ -145,6 +145,8 @@ main().catch(async (error) => {
   console.error('❌ Total usage limit test failed:', error)
   try {
     await redis.disconnect()
-  } catch (_) {}
+  } catch (_) {
+    // Ignore disconnect errors during cleanup
+  }
   process.exitCode = 1
 })
