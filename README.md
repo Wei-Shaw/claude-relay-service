@@ -23,8 +23,8 @@
 
 | 平台 | 类型 | 介绍 |
 |:---:|:---:|:---|
-| **[PinCC.ai](https://pincc.ai/)** | 🏆 **官方运营** | 项目官方直营的Claude拼车服务<br>提供200刀 Claude Code Max 套餐共享服务 |
-| **[CToK.ai](https://ctok.ai/)** | 🤝 合作伙伴 | 社区认可的Claude拼车服务 |
+| **[pincc.ai](https://pincc.ai/)** | 🏆 **官方运营** | 项目官方直营的Claude拼车服务<br>提供200刀 Claude Code Max 套餐共享服务 |
+| **[ctok.ai](https://ctok.ai/)** | 🤝 合作伙伴 | 社区认可的Claude拼车服务 |
 
 
 </div>
