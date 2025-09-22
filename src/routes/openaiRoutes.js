@@ -33,7 +33,9 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
     )
 
     if (!result || !result.accountId) {
-      throw new Error('No available OpenAI account found')
+      const error = new Error('No available OpenAI account found')
+      error.statusCode = 402 // Payment Required - 资源耗尽
+      throw error
     }
 
     // 根据账户类型获取账户详情
@@ -45,7 +47,9 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
       // 处理 OpenAI-Responses 账户
       account = await openaiResponsesAccountService.getAccount(result.accountId)
       if (!account || !account.apiKey) {
-        throw new Error(`OpenAI-Responses account ${result.accountId} has no valid apiKey`)
+        const error = new Error(`OpenAI-Responses account ${result.accountId} has no valid apiKey`)
+        error.statusCode = 403 // Forbidden - 账户配置错误
+        throw error
       }
 
       // OpenAI-Responses 账户不需要 accessToken，直接返回账户信息
@@ -65,7 +69,9 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
       // 处理普通 OpenAI 账户
       account = await openaiAccountService.getAccount(result.accountId)
       if (!account || !account.accessToken) {
-        throw new Error(`OpenAI account ${result.accountId} has no valid accessToken`)
+        const error = new Error(`OpenAI account ${result.accountId} has no valid accessToken`)
+        error.statusCode = 403 // Forbidden - 账户配置错误
+        throw error
       }
 
       // 检查 token 是否过期并自动刷新（双重保护）
@@ -79,19 +85,25 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
             logger.info(`✅ Token refreshed successfully in route handler`)
           } catch (refreshError) {
             logger.error(`Failed to refresh token for ${account.name}:`, refreshError)
-            throw new Error(`Token expired and refresh failed: ${refreshError.message}`)
+            const error = new Error(`Token expired and refresh failed: ${refreshError.message}`)
+            error.statusCode = 403 // Forbidden - 认证失败
+            throw error
           }
         } else {
-          throw new Error(
+          const error = new Error(
             `Token expired and no refresh token available for account ${account.name}`
           )
+          error.statusCode = 403 // Forbidden - 认证失败
+          throw error
         }
       }
 
       // 解密 accessToken（account.accessToken 是加密的）
       accessToken = openaiAccountService.decrypt(account.accessToken)
       if (!accessToken) {
-        throw new Error('Failed to decrypt OpenAI accessToken')
+        const error = new Error('Failed to decrypt OpenAI accessToken')
+        error.statusCode = 403 // Forbidden - 配置/权限错误
+        throw error
       }
 
       // 解析代理配置
@@ -580,7 +592,8 @@ const handleResponses = async (req, res) => {
     req.on('aborted', cleanup)
   } catch (error) {
     logger.error('Proxy to ChatGPT codex/responses failed:', error)
-    const status = error.response?.status || 500
+    // 优先使用主动设置的 statusCode，然后是上游响应的状态码，最后默认 500
+    const status = error.statusCode || error.response?.status || 500
     const message = error.response?.data || error.message || 'Internal server error'
     if (!res.headersSent) {
       res.status(status).json({ error: { message } })

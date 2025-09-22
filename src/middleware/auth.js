@@ -3,7 +3,7 @@ const userService = require('../services/userService')
 const logger = require('../utils/logger')
 const redis = require('../models/redis')
 // const { RateLimiterRedis } = require('rate-limiter-flexible') // 暂时未使用
-const config = require('../../config/config')
+const ClientValidator = require('../validators/clientValidator')
 
 // 🔑 API Key验证中间件（优化版）
 const authenticateApiKey = async (req, res, next) => {
@@ -47,65 +47,34 @@ const authenticateApiKey = async (req, res, next) => {
       })
     }
 
-    // 🔒 检查客户端限制
+    // 🔒 检查客户端限制（使用新的验证器）
     if (
       validation.keyData.enableClientRestriction &&
       validation.keyData.allowedClients?.length > 0
     ) {
-      const userAgent = req.headers['user-agent'] || ''
-      const clientIP = req.ip || req.connection?.remoteAddress || 'unknown'
-
-      // 记录客户端限制检查开始
-      logger.api(
-        `🔍 Checking client restriction for key: ${validation.keyData.id} (${validation.keyData.name})`
+      // 使用新的 ClientValidator 进行验证
+      const validationResult = ClientValidator.validateRequest(
+        validation.keyData.allowedClients,
+        req
       )
-      logger.api(`   User-Agent: "${userAgent}"`)
-      logger.api(`   Allowed clients: ${validation.keyData.allowedClients.join(', ')}`)
 
-      let clientAllowed = false
-      let matchedClient = null
-
-      // 获取预定义客户端列表，如果配置不存在则使用默认值
-      const predefinedClients = config.clientRestrictions?.predefinedClients || []
-      const allowCustomClients = config.clientRestrictions?.allowCustomClients || false
-
-      // 遍历允许的客户端列表
-      for (const allowedClientId of validation.keyData.allowedClients) {
-        // 在预定义客户端列表中查找
-        const predefinedClient = predefinedClients.find((client) => client.id === allowedClientId)
-
-        if (predefinedClient) {
-          // 使用预定义的正则表达式匹配 User-Agent
-          if (
-            predefinedClient.userAgentPattern &&
-            predefinedClient.userAgentPattern.test(userAgent)
-          ) {
-            clientAllowed = true
-            matchedClient = predefinedClient.name
-            break
-          }
-        } else if (allowCustomClients) {
-          // 如果允许自定义客户端，这里可以添加自定义客户端的验证逻辑
-          // 目前暂时跳过自定义客户端
-          continue
-        }
-      }
-
-      if (!clientAllowed) {
+      if (!validationResult.allowed) {
+        const clientIP = req.ip || req.connection?.remoteAddress || 'unknown'
         logger.security(
-          `🚫 Client restriction failed for key: ${validation.keyData.id} (${validation.keyData.name}) from ${clientIP}, User-Agent: ${userAgent}`
+          `🚫 Client restriction failed for key: ${validation.keyData.id} (${validation.keyData.name}) from ${clientIP}`
         )
         return res.status(403).json({
           error: 'Client not allowed',
           message: 'Your client is not authorized to use this API key',
-          allowedClients: validation.keyData.allowedClients
+          allowedClients: validation.keyData.allowedClients,
+          userAgent: validationResult.userAgent
         })
       }
 
+      // 验证通过
       logger.api(
-        `✅ Client validated: ${matchedClient} for key: ${validation.keyData.id} (${validation.keyData.name})`
+        `✅ Client validated: ${validationResult.clientName} (${validationResult.matchedClient}) for key: ${validation.keyData.id} (${validation.keyData.name})`
       )
-      logger.api(`   Matched client: ${matchedClient} with User-Agent: "${userAgent}"`)
     }
 
     // 检查并发限制

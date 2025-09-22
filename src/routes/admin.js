@@ -467,29 +467,22 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
   }
 })
 
-// 获取支持的客户端列表
+// 获取支持的客户端列表（使用新的验证器）
 router.get('/supported-clients', authenticateAdmin, async (req, res) => {
   try {
-    // 检查配置是否存在，如果不存在则使用默认值
-    const predefinedClients = config.clientRestrictions?.predefinedClients || [
-      {
-        id: 'claude_code',
-        name: 'ClaudeCode',
-        description: 'Official Claude Code CLI'
-      },
-      {
-        id: 'gemini_cli',
-        name: 'Gemini-CLI',
-        description: 'Gemini Command Line Interface'
-      }
-    ]
+    // 使用新的 ClientValidator 获取所有可用客户端
+    const ClientValidator = require('../validators/clientValidator')
+    const availableClients = ClientValidator.getAvailableClients()
 
-    const clients = predefinedClients.map((client) => ({
+    // 格式化返回数据
+    const clients = availableClients.map((client) => ({
       id: client.id,
       name: client.name,
-      description: client.description
+      description: client.description,
+      icon: client.icon
     }))
 
+    logger.info(`📱 Returning ${clients.length} supported clients`)
     return res.json({ success: true, data: clients })
   } catch (error) {
     logger.error('❌ Failed to get supported clients:', error)
