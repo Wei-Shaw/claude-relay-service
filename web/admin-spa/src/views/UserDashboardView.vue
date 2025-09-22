@@ -388,7 +388,6 @@ const handleLogout = async () => {
     showToast('Logged out successfully', 'success')
     router.push('/user-login')
   } catch (error) {
-    console.error('Logout error:', error)
     showToast('Logout failed', 'error')
   }
 }

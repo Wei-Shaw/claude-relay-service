@@ -119,6 +119,20 @@
                     dashboardData.accountsByPlatform.azure_openai.total
                   }}</span>
                 </div>
+                <!-- OpenAI-Responses账户 -->
+                <div
+                  v-if="
+                    dashboardData.accountsByPlatform['openai-responses'] &&
+                    dashboardData.accountsByPlatform['openai-responses'].total > 0
+                  "
+                  class="inline-flex items-center gap-0.5"
+                  :title="`OpenAI Responses: ${dashboardData.accountsByPlatform['openai-responses'].total} 个 (正常: ${dashboardData.accountsByPlatform['openai-responses'].normal})`"
+                >
+                  <i class="fas fa-server text-xs text-cyan-600" />
+                  <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{
+                    dashboardData.accountsByPlatform['openai-responses'].total
+                  }}</span>
+                </div>
               </div>
             </div>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">

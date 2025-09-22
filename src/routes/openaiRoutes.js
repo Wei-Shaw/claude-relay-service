@@ -33,7 +33,9 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
     )
 
     if (!result || !result.accountId) {
-      throw new Error('No available OpenAI account found')
+      const error = new Error('No available OpenAI account found')
+      error.statusCode = 402 // Payment Required - 资源耗尽
+      throw error
     }
 
     // 根据账户类型获取账户详情
@@ -45,7 +47,9 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
       // 处理 OpenAI-Responses 账户
       account = await openaiResponsesAccountService.getAccount(result.accountId)
       if (!account || !account.apiKey) {
-        throw new Error(`OpenAI-Responses account ${result.accountId} has no valid apiKey`)
+        const error = new Error(`OpenAI-Responses account ${result.accountId} has no valid apiKey`)
+        error.statusCode = 403 // Forbidden - 账户配置错误
+        throw error
       }
 
       // OpenAI-Responses 账户不需要 accessToken，直接返回账户信息
@@ -65,7 +69,9 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
       // 处理普通 OpenAI 账户
       account = await openaiAccountService.getAccount(result.accountId)
       if (!account || !account.accessToken) {
-        throw new Error(`OpenAI account ${result.accountId} has no valid accessToken`)
+        const error = new Error(`OpenAI account ${result.accountId} has no valid accessToken`)
+        error.statusCode = 403 // Forbidden - 账户配置错误
+        throw error
       }
 
       // 检查 token 是否过期并自动刷新（双重保护）
@@ -79,19 +85,25 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
             logger.info(`✅ Token refreshed successfully in route handler`)
           } catch (refreshError) {
             logger.error(`Failed to refresh token for ${account.name}:`, refreshError)
-            throw new Error(`Token expired and refresh failed: ${refreshError.message}`)
+            const error = new Error(`Token expired and refresh failed: ${refreshError.message}`)
+            error.statusCode = 403 // Forbidden - 认证失败
+            throw error
           }
         } else {
-          throw new Error(
+          const error = new Error(
             `Token expired and no refresh token available for account ${account.name}`
           )
+          error.statusCode = 403 // Forbidden - 认证失败
+          throw error
         }
       }
 
       // 解密 accessToken（account.accessToken 是加密的）
       accessToken = openaiAccountService.decrypt(account.accessToken)
       if (!accessToken) {
-        throw new Error('Failed to decrypt OpenAI accessToken')
+        const error = new Error('Failed to decrypt OpenAI accessToken')
+        error.statusCode = 403 // Forbidden - 配置/权限错误
+        throw error
       }
 
       // 解析代理配置
@@ -139,7 +151,7 @@ const handleResponses = async (req, res) => {
     let requestedModel = req.body?.model || null
 
     // 如果模型是 gpt-5 开头且后面还有内容（如 gpt-5-2025-08-07），则覆盖为 gpt-5
-    if (requestedModel && requestedModel.startsWith('gpt-5-') && requestedModel !== 'gpt-5') {
+    if (requestedModel && requestedModel.startsWith('gpt-5-') && requestedModel !== 'gpt-5-codex') {
       logger.info(`📝 Model ${requestedModel} detected, normalizing to gpt-5 for Codex API`)
       requestedModel = 'gpt-5'
       req.body.model = 'gpt-5' // 同时更新请求体中的模型
@@ -226,6 +238,7 @@ const handleResponses = async (req, res) => {
     // 如果有代理，添加代理配置
     if (proxyAgent) {
       axiosConfig.httpsAgent = proxyAgent
+      axiosConfig.proxy = false
       logger.info(`🌐 Using proxy for OpenAI request: ${ProxyHelper.getProxyDescription(proxy)}`)
     } else {
       logger.debug('🌐 No proxy configured for OpenAI request')
@@ -389,23 +402,24 @@ const handleResponses = async (req, res) => {
 
         // 记录使用统计
         if (usageData) {
-          const inputTokens = usageData.input_tokens || usageData.prompt_tokens || 0
+          const totalInputTokens = usageData.input_tokens || usageData.prompt_tokens || 0
           const outputTokens = usageData.output_tokens || usageData.completion_tokens || 0
-          const cacheCreateTokens = usageData.input_tokens_details?.cache_creation_tokens || 0
           const cacheReadTokens = usageData.input_tokens_details?.cached_tokens || 0
+          // 计算实际输入token（总输入减去缓存部分）
+          const actualInputTokens = Math.max(0, totalInputTokens - cacheReadTokens)
 
           await apiKeyService.recordUsage(
             apiKeyData.id,
-            inputTokens,
+            actualInputTokens, // 传递实际输入（不含缓存）
             outputTokens,
-            cacheCreateTokens,
+            0, // OpenAI没有cache_creation_tokens
             cacheReadTokens,
             actualModel,
             accountId
           )
 
           logger.info(
-            `📊 Recorded OpenAI non-stream usage - Input: ${inputTokens}, Output: ${outputTokens}, Total: ${usageData.total_tokens || inputTokens + outputTokens}, Model: ${actualModel}`
+            `📊 Recorded OpenAI non-stream usage - Input: ${totalInputTokens}(actual:${actualInputTokens}+cached:${cacheReadTokens}), Output: ${outputTokens}, Total: ${usageData.total_tokens || totalInputTokens + outputTokens}, Model: ${actualModel}`
           )
         }
 
@@ -505,26 +519,27 @@ const handleResponses = async (req, res) => {
       // 记录使用统计
       if (!usageReported && usageData) {
         try {
-          const inputTokens = usageData.input_tokens || 0
+          const totalInputTokens = usageData.input_tokens || 0
           const outputTokens = usageData.output_tokens || 0
-          const cacheCreateTokens = usageData.input_tokens_details?.cache_creation_tokens || 0
           const cacheReadTokens = usageData.input_tokens_details?.cached_tokens || 0
+          // 计算实际输入token（总输入减去缓存部分）
+          const actualInputTokens = Math.max(0, totalInputTokens - cacheReadTokens)
 
           // 使用响应中的真实 model，如果没有则使用请求中的 model，最后回退到默认值
           const modelToRecord = actualModel || requestedModel || 'gpt-4'
 
           await apiKeyService.recordUsage(
             apiKeyData.id,
-            inputTokens,
+            actualInputTokens, // 传递实际输入（不含缓存）
             outputTokens,
-            cacheCreateTokens,
+            0, // OpenAI没有cache_creation_tokens
             cacheReadTokens,
             modelToRecord,
             accountId
           )
 
           logger.info(
-            `📊 Recorded OpenAI usage - Input: ${inputTokens}, Output: ${outputTokens}, Total: ${usageData.total_tokens || inputTokens + outputTokens}, Model: ${modelToRecord} (actual: ${actualModel}, requested: ${requestedModel})`
+            `📊 Recorded OpenAI usage - Input: ${totalInputTokens}(actual:${actualInputTokens}+cached:${cacheReadTokens}), Output: ${outputTokens}, Total: ${usageData.total_tokens || totalInputTokens + outputTokens}, Model: ${modelToRecord} (actual: ${actualModel}, requested: ${requestedModel})`
           )
           usageReported = true
         } catch (error) {
@@ -577,7 +592,8 @@ const handleResponses = async (req, res) => {
     req.on('aborted', cleanup)
   } catch (error) {
     logger.error('Proxy to ChatGPT codex/responses failed:', error)
-    const status = error.response?.status || 500
+    // 优先使用主动设置的 statusCode，然后是上游响应的状态码，最后默认 500
+    const status = error.statusCode || error.response?.status || 500
     const message = error.response?.data || error.message || 'Internal server error'
     if (!res.headersSent) {
       res.status(status).json({ error: { message } })

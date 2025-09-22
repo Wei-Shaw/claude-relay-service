@@ -385,28 +385,29 @@ class OpenAIResponsesRelayService {
       if (usageData) {
         try {
           // OpenAI-Responses 使用 input_tokens/output_tokens，标准 OpenAI 使用 prompt_tokens/completion_tokens
-          const inputTokens = usageData.input_tokens || usageData.prompt_tokens || 0
+          const totalInputTokens = usageData.input_tokens || usageData.prompt_tokens || 0
           const outputTokens = usageData.output_tokens || usageData.completion_tokens || 0
 
           // 提取缓存相关的 tokens（如果存在）
-          const cacheCreateTokens = usageData.input_tokens_details?.cache_creation_tokens || 0
           const cacheReadTokens = usageData.input_tokens_details?.cached_tokens || 0
+          // 计算实际输入token（总输入减去缓存部分）
+          const actualInputTokens = Math.max(0, totalInputTokens - cacheReadTokens)
 
-          const totalTokens = usageData.total_tokens || inputTokens + outputTokens
+          const totalTokens = usageData.total_tokens || totalInputTokens + outputTokens
           const modelToRecord = actualModel || requestedModel || 'gpt-4'
 
           await apiKeyService.recordUsage(
             apiKeyData.id,
-            inputTokens,
+            actualInputTokens, // 传递实际输入（不含缓存）
             outputTokens,
-            cacheCreateTokens,
+            0, // OpenAI没有cache_creation_tokens
             cacheReadTokens,
             modelToRecord,
             account.id
           )
 
           logger.info(
-            `📊 Recorded usage - Input: ${inputTokens}, Output: ${outputTokens}, CacheRead: ${cacheReadTokens}, CacheCreate: ${cacheCreateTokens}, Total: ${totalTokens}, Model: ${modelToRecord}`
+            `📊 Recorded usage - Input: ${totalInputTokens}(actual:${actualInputTokens}+cached:${cacheReadTokens}), Output: ${outputTokens}, Total: ${totalTokens}, Model: ${modelToRecord}`
           )
 
           // 更新账户的 token 使用统计
@@ -414,9 +415,18 @@ class OpenAIResponsesRelayService {
 
           // 更新账户使用额度（如果设置了额度限制）
           if (parseFloat(account.dailyQuota) > 0) {
-            // 估算费用（根据模型和token数量）
-            const estimatedCost = this._estimateCost(modelToRecord, inputTokens, outputTokens)
-            await openaiResponsesAccountService.updateUsageQuota(account.id, estimatedCost)
+            // 使用CostCalculator正确计算费用（考虑缓存token的不同价格）
+            const CostCalculator = require('../utils/costCalculator')
+            const costInfo = CostCalculator.calculateCost(
+              {
+                input_tokens: actualInputTokens, // 实际输入（不含缓存）
+                output_tokens: outputTokens,
+                cache_creation_input_tokens: 0, // OpenAI没有cache_creation
+                cache_read_input_tokens: cacheReadTokens
+              },
+              modelToRecord
+            )
+            await openaiResponsesAccountService.updateUsageQuota(account.id, costInfo.costs.total)
           }
         } catch (error) {
           logger.error('Failed to record usage:', error)
@@ -502,27 +512,28 @@ class OpenAIResponsesRelayService {
     if (usageData) {
       try {
         // OpenAI-Responses 使用 input_tokens/output_tokens，标准 OpenAI 使用 prompt_tokens/completion_tokens
-        const inputTokens = usageData.input_tokens || usageData.prompt_tokens || 0
+        const totalInputTokens = usageData.input_tokens || usageData.prompt_tokens || 0
         const outputTokens = usageData.output_tokens || usageData.completion_tokens || 0
 
         // 提取缓存相关的 tokens（如果存在）
-        const cacheCreateTokens = usageData.input_tokens_details?.cache_creation_tokens || 0
         const cacheReadTokens = usageData.input_tokens_details?.cached_tokens || 0
+        // 计算实际输入token（总输入减去缓存部分）
+        const actualInputTokens = Math.max(0, totalInputTokens - cacheReadTokens)
 
-        const totalTokens = usageData.total_tokens || inputTokens + outputTokens
+        const totalTokens = usageData.total_tokens || totalInputTokens + outputTokens
 
         await apiKeyService.recordUsage(
           apiKeyData.id,
-          inputTokens,
+          actualInputTokens, // 传递实际输入（不含缓存）
           outputTokens,
-          cacheCreateTokens,
+          0, // OpenAI没有cache_creation_tokens
           cacheReadTokens,
           actualModel,
           account.id
         )
 
         logger.info(
-          `📊 Recorded non-stream usage - Input: ${inputTokens}, Output: ${outputTokens}, CacheRead: ${cacheReadTokens}, CacheCreate: ${cacheCreateTokens}, Total: ${totalTokens}, Model: ${actualModel}`
+          `📊 Recorded non-stream usage - Input: ${totalInputTokens}(actual:${actualInputTokens}+cached:${cacheReadTokens}), Output: ${outputTokens}, Total: ${totalTokens}, Model: ${actualModel}`
         )
 
         // 更新账户的 token 使用统计
@@ -530,9 +541,18 @@ class OpenAIResponsesRelayService {
 
         // 更新账户使用额度（如果设置了额度限制）
         if (parseFloat(account.dailyQuota) > 0) {
-          // 估算费用（根据模型和token数量）
-          const estimatedCost = this._estimateCost(actualModel, inputTokens, outputTokens)
-          await openaiResponsesAccountService.updateUsageQuota(account.id, estimatedCost)
+          // 使用CostCalculator正确计算费用（考虑缓存token的不同价格）
+          const CostCalculator = require('../utils/costCalculator')
+          const costInfo = CostCalculator.calculateCost(
+            {
+              input_tokens: actualInputTokens, // 实际输入（不含缓存）
+              output_tokens: outputTokens,
+              cache_creation_input_tokens: 0, // OpenAI没有cache_creation
+              cache_read_input_tokens: cacheReadTokens
+            },
+            actualModel
+          )
+          await openaiResponsesAccountService.updateUsageQuota(account.id, costInfo.costs.total)
         }
       } catch (error) {
         logger.error('Failed to record usage:', error)

@@ -190,6 +190,31 @@
                 </span>
               </div>
 
+              <div v-if="apiKey.totalCostLimit > 0" class="space-y-2">
+                <div class="flex items-center justify-between text-sm">
+                  <span class="text-gray-600 dark:text-gray-400">总费用限制</span>
+                  <span class="font-semibold text-gray-900 dark:text-gray-100">
+                    ${{ apiKey.totalCostLimit.toFixed(2) }}
+                  </span>
+                </div>
+                <div class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-600">
+                  <div
+                    class="h-2 rounded-full transition-all duration-300"
+                    :class="
+                      totalUsagePercentage >= 100
+                        ? 'bg-red-500'
+                        : totalUsagePercentage >= 80
+                          ? 'bg-yellow-500'
+                          : 'bg-indigo-500'
+                    "
+                    :style="{ width: Math.min(totalUsagePercentage, 100) + '%' }"
+                  />
+                </div>
+                <div class="text-right text-xs text-gray-500 dark:text-gray-400">
+                  已使用 {{ totalUsagePercentage.toFixed(1) }}%
+                </div>
+              </div>
+
               <div v-if="apiKey.rateLimitWindow > 0" class="space-y-2">
                 <h5 class="text-sm font-medium text-gray-700 dark:text-gray-300">
                   <i class="fas fa-clock mr-1 text-blue-500" />
@@ -250,6 +275,7 @@ const totalTokens = computed(() => props.apiKey.usage?.total?.tokens || 0)
 const dailyTokens = computed(() => props.apiKey.usage?.daily?.tokens || 0)
 const totalCost = computed(() => props.apiKey.usage?.total?.cost || 0)
 const dailyCost = computed(() => props.apiKey.dailyCost || 0)
+const totalCostLimit = computed(() => props.apiKey.totalCostLimit || 0)
 const inputTokens = computed(() => props.apiKey.usage?.total?.inputTokens || 0)
 const outputTokens = computed(() => props.apiKey.usage?.total?.outputTokens || 0)
 const cacheCreateTokens = computed(() => props.apiKey.usage?.total?.cacheCreateTokens || 0)
@@ -260,6 +286,7 @@ const tpm = computed(() => props.apiKey.usage?.averages?.tpm || 0)
 const hasLimits = computed(() => {
   return (
     props.apiKey.dailyCostLimit > 0 ||
+    props.apiKey.totalCostLimit > 0 ||
     props.apiKey.concurrencyLimit > 0 ||
     props.apiKey.rateLimitWindow > 0 ||
     props.apiKey.tokenLimit > 0
@@ -269,6 +296,11 @@ const hasLimits = computed(() => {
 const dailyCostPercentage = computed(() => {
   if (!props.apiKey.dailyCostLimit || props.apiKey.dailyCostLimit === 0) return 0
   return (dailyCost.value / props.apiKey.dailyCostLimit) * 100
+})
+
+const totalUsagePercentage = computed(() => {
+  if (!totalCostLimit.value || totalCostLimit.value === 0) return 0
+  return (totalCost.value / totalCostLimit.value) * 100
 })
 
 // 方法

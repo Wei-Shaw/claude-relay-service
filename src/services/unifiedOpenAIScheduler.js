@@ -79,7 +79,9 @@ class UnifiedOpenAIScheduler {
             if (isRateLimited) {
               const errorMsg = `Dedicated account ${boundAccount.name} is currently rate limited`
               logger.warn(`⚠️ ${errorMsg}`)
-              throw new Error(errorMsg)
+              const error = new Error(errorMsg)
+              error.statusCode = 429 // Too Many Requests - 限流
+              throw error
             }
           } else if (
             accountType === 'openai-responses' &&
@@ -92,7 +94,9 @@ class UnifiedOpenAIScheduler {
             if (!isRateLimitCleared) {
               const errorMsg = `Dedicated account ${boundAccount.name} is currently rate limited`
               logger.warn(`⚠️ ${errorMsg}`)
-              throw new Error(errorMsg)
+              const error = new Error(errorMsg)
+              error.statusCode = 429 // Too Many Requests - 限流
+              throw error
             }
           }
 
@@ -108,7 +112,9 @@ class UnifiedOpenAIScheduler {
             if (!modelSupported) {
               const errorMsg = `Dedicated account ${boundAccount.name} does not support model ${requestedModel}`
               logger.warn(`⚠️ ${errorMsg}`)
-              throw new Error(errorMsg)
+              const error = new Error(errorMsg)
+              error.statusCode = 400 // Bad Request - 请求参数错误
+              throw error
             }
           }
 
@@ -133,7 +139,9 @@ class UnifiedOpenAIScheduler {
             ? `Dedicated account ${boundAccount.name} is not available (inactive or error status)`
             : `Dedicated account ${apiKeyData.openaiAccountId} not found`
           logger.warn(`⚠️ ${errorMsg}`)
-          throw new Error(errorMsg)
+          const error = new Error(errorMsg)
+          error.statusCode = boundAccount ? 403 : 404 // Forbidden 或 Not Found
+          throw error
         }
       }
 
@@ -170,11 +178,15 @@ class UnifiedOpenAIScheduler {
       if (availableAccounts.length === 0) {
         // 提供更详细的错误信息
         if (requestedModel) {
-          throw new Error(
+          const error = new Error(
             `No available OpenAI accounts support the requested model: ${requestedModel}`
           )
+          error.statusCode = 400 // Bad Request - 模型不支持
+          throw error
         } else {
-          throw new Error('No available OpenAI accounts')
+          const error = new Error('No available OpenAI accounts')
+          error.statusCode = 402 // Payment Required - 资源耗尽
+          throw error
         }
       }
 
@@ -562,11 +574,15 @@ class UnifiedOpenAIScheduler {
       // 获取分组信息
       const group = await accountGroupService.getGroup(groupId)
       if (!group) {
-        throw new Error(`Group ${groupId} not found`)
+        const error = new Error(`Group ${groupId} not found`)
+        error.statusCode = 404 // Not Found - 资源不存在
+        throw error
       }
 
       if (group.platform !== 'openai') {
-        throw new Error(`Group ${group.name} is not an OpenAI group`)
+        const error = new Error(`Group ${group.name} is not an OpenAI group`)
+        error.statusCode = 400 // Bad Request - 请求参数错误
+        throw error
       }
 
       logger.info(`👥 Selecting account from OpenAI group: ${group.name}`)
@@ -601,7 +617,9 @@ class UnifiedOpenAIScheduler {
       // 获取分组成员
       const memberIds = await accountGroupService.getGroupMembers(groupId)
       if (memberIds.length === 0) {
-        throw new Error(`Group ${group.name} has no members`)
+        const error = new Error(`Group ${group.name} has no members`)
+        error.statusCode = 402 // Payment Required - 资源耗尽
+        throw error
       }
 
       // 获取可用的分组成员账户
@@ -653,7 +671,9 @@ class UnifiedOpenAIScheduler {
       }
 
       if (availableAccounts.length === 0) {
-        throw new Error(`No available accounts in group ${group.name}`)
+        const error = new Error(`No available accounts in group ${group.name}`)
+        error.statusCode = 402 // Payment Required - 资源耗尽
+        throw error
       }
 
       // 按最后使用时间排序（最久未使用的优先，与 Claude 保持一致）

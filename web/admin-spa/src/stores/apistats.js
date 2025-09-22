@@ -260,6 +260,12 @@ export const useApiStatsStore = defineStore('apistats', () => {
       if (result.success) {
         statsData.value = result.data
 
+        // 调试：打印返回的限制数据
+        console.log('API Stats - Full response:', result.data)
+        console.log('API Stats - limits data:', result.data.limits)
+        console.log('API Stats - weeklyOpusCostLimit:', result.data.limits?.weeklyOpusCostLimit)
+        console.log('API Stats - weeklyOpusCost:', result.data.limits?.weeklyOpusCost)
+
         // 同时加载今日和本月的统计数据
         await loadAllPeriodStats()
 
