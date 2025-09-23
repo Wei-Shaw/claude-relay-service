@@ -1598,7 +1598,7 @@ const editAccount = (account) => {
 // 删除账户
 const deleteAccount = async (account) => {
   // 检查是否有API Key绑定到此账号
-  const boundKeysCount = apiKeys.value.filter(
+  const boundKeys = apiKeys.value.filter(
     (key) =>
       key.claudeAccountId === account.id ||
       key.claudeConsoleAccountId === account.id ||
@@ -1606,22 +1606,18 @@ const deleteAccount = async (account) => {
       key.openaiAccountId === account.id ||
       key.azureOpenaiAccountId === account.id ||
       key.openaiAccountId === `responses:${account.id}`
-  ).length
-
-  if (boundKeysCount > 0) {
-    showToast(
-      `无法删除此账号，有 ${boundKeysCount} 个API Key绑定到此账号，请先解绑所有API Key`,
-      'error'
-    )
-    return
-  }
-
-  const confirmed = await showConfirm(
-    '删除账户',
-    `确定要删除账户 "${account.name}" 吗？\n\n此操作不可恢复。`,
-    '删除',
-    '取消'
   )
+  const boundKeysCount = boundKeys.length
+
+  // 构建确认消息
+  let confirmMessage = `确定要删除账户 "${account.name}" 吗？`
+  if (boundKeysCount > 0) {
+    confirmMessage += `\n\n⚠️ 注意：此账号有 ${boundKeysCount} 个 API Key 绑定。`
+    confirmMessage += `\n删除后，这些 API Key 将自动切换为共享池模式。`
+  }
+  confirmMessage += '\n\n此操作不可恢复。'
+
+  const confirmed = await showConfirm('删除账户', confirmMessage, '删除', '取消')
 
   if (!confirmed) return
 
@@ -1648,10 +1644,18 @@ const deleteAccount = async (account) => {
     const data = await apiClient.delete(endpoint)
 
     if (data.success) {
-      showToast('账户已删除', 'success')
-      // 清空分组成员缓存，因为账户可能从分组中移除
+      // 根据解绑结果显示不同的消息
+      let toastMessage = '账户已成功删除'
+      if (data.unboundKeys > 0) {
+        toastMessage += `，${data.unboundKeys} 个 API Key 已切换为共享池模式`
+      }
+      showToast(toastMessage, 'success')
+
+      // 清空相关缓存
       groupMembersLoaded.value = false
+      apiKeysLoaded.value = false // 重新加载API Keys以反映解绑变化
       loadAccounts()
+      loadApiKeys(true) // 强制重新加载API Keys
     } else {
       showToast(data.message || '删除失败', 'error')
     }

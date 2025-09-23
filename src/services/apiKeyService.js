@@ -1328,6 +1328,70 @@ class ApiKeyService {
     }
   }
 
+  // 🔓 解绑账号从所有API Keys
+  async unbindAccountFromAllKeys(accountId, accountType) {
+    try {
+      // 账号类型与字段的映射关系
+      const fieldMap = {
+        claude: 'claudeAccountId',
+        'claude-console': 'claudeConsoleAccountId',
+        gemini: 'geminiAccountId',
+        openai: 'openaiAccountId',
+        'openai-responses': 'openaiAccountId', // 特殊处理，带 responses: 前缀
+        azure_openai: 'azureOpenaiAccountId',
+        bedrock: 'bedrockAccountId',
+        ccr: null // CCR 账号没有对应的 API Key 字段
+      }
+
+      const field = fieldMap[accountType]
+      if (!field) {
+        logger.info(`账号类型 ${accountType} 不需要解绑 API Key`)
+        return 0
+      }
+
+      // 获取所有API Keys
+      const allKeys = await this.getAllApiKeys()
+
+      // 筛选绑定到此账号的 API Keys
+      let boundKeys = []
+      if (accountType === 'openai-responses') {
+        // OpenAI-Responses 特殊处理：查找 openaiAccountId 字段中带 responses: 前缀的
+        boundKeys = allKeys.filter((key) => key.openaiAccountId === `responses:${accountId}`)
+      } else {
+        // 其他账号类型正常匹配
+        boundKeys = allKeys.filter((key) => key[field] === accountId)
+      }
+
+      // 批量解绑
+      for (const key of boundKeys) {
+        const updates = {}
+        if (accountType === 'openai-responses') {
+          updates.openaiAccountId = null
+        } else if (accountType === 'claude-console') {
+          updates.claudeConsoleAccountId = null
+        } else {
+          updates[field] = null
+        }
+
+        await this.updateApiKey(key.id, updates)
+        logger.info(
+          `✅ 自动解绑 API Key ${key.id} (${key.name}) 从 ${accountType} 账号 ${accountId}`
+        )
+      }
+
+      if (boundKeys.length > 0) {
+        logger.success(
+          `🔓 成功解绑 ${boundKeys.length} 个 API Key 从 ${accountType} 账号 ${accountId}`
+        )
+      }
+
+      return boundKeys.length
+    } catch (error) {
+      logger.error(`❌ 解绑 API Keys 失败 (${accountType} 账号 ${accountId}):`, error)
+      return 0
+    }
+  }
+
   // 🧹 清理过期的API Keys
   async cleanupExpiredKeys() {
     try {

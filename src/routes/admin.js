@@ -2256,6 +2256,9 @@ router.delete('/claude-accounts/:accountId', authenticateAdmin, async (req, res)
   try {
     const { accountId } = req.params
 
+    // 自动解绑所有绑定的 API Keys
+    const unboundCount = await apiKeyService.unbindAccountFromAllKeys(accountId, 'claude')
+
     // 获取账户信息以检查是否在分组中
     const account = await claudeAccountService.getAccount(accountId)
     if (account && account.accountType === 'group') {
@@ -2267,8 +2270,17 @@ router.delete('/claude-accounts/:accountId', authenticateAdmin, async (req, res)
 
     await claudeAccountService.deleteAccount(accountId)
 
-    logger.success(`🗑️ Admin deleted Claude account: ${accountId}`)
-    return res.json({ success: true, message: 'Claude account deleted successfully' })
+    let message = 'Claude账号已成功删除'
+    if (unboundCount > 0) {
+      message += `，${unboundCount} 个 API Key 已切换为共享池模式`
+    }
+
+    logger.success(`🗑️ Admin deleted Claude account: ${accountId}, unbound ${unboundCount} keys`)
+    return res.json({
+      success: true,
+      message,
+      unboundKeys: unboundCount
+    })
   } catch (error) {
     logger.error('❌ Failed to delete Claude account:', error)
     return res
@@ -2634,6 +2646,9 @@ router.delete('/claude-console-accounts/:accountId', authenticateAdmin, async (r
   try {
     const { accountId } = req.params
 
+    // 自动解绑所有绑定的 API Keys
+    const unboundCount = await apiKeyService.unbindAccountFromAllKeys(accountId, 'claude-console')
+
     // 获取账户信息以检查是否在分组中
     const account = await claudeConsoleAccountService.getAccount(accountId)
     if (account && account.accountType === 'group') {
@@ -2645,8 +2660,19 @@ router.delete('/claude-console-accounts/:accountId', authenticateAdmin, async (r
 
     await claudeConsoleAccountService.deleteAccount(accountId)
 
-    logger.success(`🗑️ Admin deleted Claude Console account: ${accountId}`)
-    return res.json({ success: true, message: 'Claude Console account deleted successfully' })
+    let message = 'Claude Console账号已成功删除'
+    if (unboundCount > 0) {
+      message += `，${unboundCount} 个 API Key 已切换为共享池模式`
+    }
+
+    logger.success(
+      `🗑️ Admin deleted Claude Console account: ${accountId}, unbound ${unboundCount} keys`
+    )
+    return res.json({
+      success: true,
+      message,
+      unboundKeys: unboundCount
+    })
   } catch (error) {
     logger.error('❌ Failed to delete Claude Console account:', error)
     return res
@@ -3028,6 +3054,9 @@ router.delete('/ccr-accounts/:accountId', authenticateAdmin, async (req, res) =>
   try {
     const { accountId } = req.params
 
+    // 尝试自动解绑（CCR账户实际上不会绑定API Key，但保持代码一致性）
+    const unboundCount = await apiKeyService.unbindAccountFromAllKeys(accountId, 'ccr')
+
     // 获取账户信息以检查是否在分组中
     const account = await ccrAccountService.getAccount(accountId)
     if (account && account.accountType === 'group') {
@@ -3039,8 +3068,18 @@ router.delete('/ccr-accounts/:accountId', authenticateAdmin, async (req, res) =>
 
     await ccrAccountService.deleteAccount(accountId)
 
+    let message = 'CCR账号已成功删除'
+    if (unboundCount > 0) {
+      // 理论上不会发生，但保持消息格式一致
+      message += `，${unboundCount} 个 API Key 已切换为共享池模式`
+    }
+
     logger.success(`🗑️ Admin deleted CCR account: ${accountId}`)
-    return res.json({ success: true, message: 'CCR account deleted successfully' })
+    return res.json({
+      success: true,
+      message,
+      unboundKeys: unboundCount
+    })
   } catch (error) {
     logger.error('❌ Failed to delete CCR account:', error)
     return res.status(500).json({ error: 'Failed to delete CCR account', message: error.message })
@@ -3384,6 +3423,9 @@ router.delete('/bedrock-accounts/:accountId', authenticateAdmin, async (req, res
   try {
     const { accountId } = req.params
 
+    // 自动解绑所有绑定的 API Keys
+    const unboundCount = await apiKeyService.unbindAccountFromAllKeys(accountId, 'bedrock')
+
     const result = await bedrockAccountService.deleteAccount(accountId)
 
     if (!result.success) {
@@ -3392,8 +3434,17 @@ router.delete('/bedrock-accounts/:accountId', authenticateAdmin, async (req, res
         .json({ error: 'Failed to delete Bedrock account', message: result.error })
     }
 
-    logger.success(`🗑️ Admin deleted Bedrock account: ${accountId}`)
-    return res.json({ success: true, message: 'Bedrock account deleted successfully' })
+    let message = 'Bedrock账号已成功删除'
+    if (unboundCount > 0) {
+      message += `，${unboundCount} 个 API Key 已切换为共享池模式`
+    }
+
+    logger.success(`🗑️ Admin deleted Bedrock account: ${accountId}, unbound ${unboundCount} keys`)
+    return res.json({
+      success: true,
+      message,
+      unboundKeys: unboundCount
+    })
   } catch (error) {
     logger.error('❌ Failed to delete Bedrock account:', error)
     return res
@@ -3830,6 +3881,9 @@ router.delete('/gemini-accounts/:accountId', authenticateAdmin, async (req, res)
   try {
     const { accountId } = req.params
 
+    // 自动解绑所有绑定的 API Keys
+    const unboundCount = await apiKeyService.unbindAccountFromAllKeys(accountId, 'gemini')
+
     // 获取账户信息以检查是否在分组中
     const account = await geminiAccountService.getAccount(accountId)
     if (account && account.accountType === 'group') {
@@ -3841,8 +3895,17 @@ router.delete('/gemini-accounts/:accountId', authenticateAdmin, async (req, res)
 
     await geminiAccountService.deleteAccount(accountId)
 
-    logger.success(`🗑️ Admin deleted Gemini account: ${accountId}`)
-    return res.json({ success: true, message: 'Gemini account deleted successfully' })
+    let message = 'Gemini账号已成功删除'
+    if (unboundCount > 0) {
+      message += `，${unboundCount} 个 API Key 已切换为共享池模式`
+    }
+
+    logger.success(`🗑️ Admin deleted Gemini account: ${accountId}, unbound ${unboundCount} keys`)
+    return res.json({
+      success: true,
+      message,
+      unboundKeys: unboundCount
+    })
   } catch (error) {
     logger.error('❌ Failed to delete Gemini account:', error)
     return res.status(500).json({ error: 'Failed to delete account', message: error.message })
@@ -6692,6 +6755,9 @@ router.delete('/openai-accounts/:id', authenticateAdmin, async (req, res) => {
       })
     }
 
+    // 自动解绑所有绑定的 API Keys
+    const unboundCount = await apiKeyService.unbindAccountFromAllKeys(id, 'openai')
+
     // 如果账户在分组中，从分组中移除
     if (account.accountType === 'group') {
       const group = await accountGroupService.getAccountGroup(id)
@@ -6702,11 +6768,19 @@ router.delete('/openai-accounts/:id', authenticateAdmin, async (req, res) => {
 
     await openaiAccountService.deleteAccount(id)
 
-    logger.success(`✅ 删除 OpenAI 账户成功: ${account.name} (ID: ${id})`)
+    let message = 'OpenAI账号已成功删除'
+    if (unboundCount > 0) {
+      message += `，${unboundCount} 个 API Key 已切换为共享池模式`
+    }
+
+    logger.success(
+      `✅ 删除 OpenAI 账户成功: ${account.name} (ID: ${id}), unbound ${unboundCount} keys`
+    )
 
     return res.json({
       success: true,
-      message: '账户删除成功'
+      message,
+      unboundKeys: unboundCount
     })
   } catch (error) {
     logger.error('删除 OpenAI 账户失败:', error)
@@ -7055,11 +7129,22 @@ router.delete('/azure-openai-accounts/:id', authenticateAdmin, async (req, res) 
   try {
     const { id } = req.params
 
+    // 自动解绑所有绑定的 API Keys
+    const unboundCount = await apiKeyService.unbindAccountFromAllKeys(id, 'azure_openai')
+
     await azureOpenaiAccountService.deleteAccount(id)
+
+    let message = 'Azure OpenAI账号已成功删除'
+    if (unboundCount > 0) {
+      message += `，${unboundCount} 个 API Key 已切换为共享池模式`
+    }
+
+    logger.success(`🗑️ Admin deleted Azure OpenAI account: ${id}, unbound ${unboundCount} keys`)
 
     res.json({
       success: true,
-      message: 'Azure OpenAI account deleted successfully'
+      message,
+      unboundKeys: unboundCount
     })
   } catch (error) {
     logger.error('Failed to delete Azure OpenAI account:', error)
@@ -7424,6 +7509,9 @@ router.delete('/openai-responses-accounts/:id', authenticateAdmin, async (req, r
       })
     }
 
+    // 自动解绑所有绑定的 API Keys
+    const unboundCount = await apiKeyService.unbindAccountFromAllKeys(id, 'openai-responses')
+
     // 检查是否在分组中
     const groups = await accountGroupService.getAllGroups()
     for (const group of groups) {
@@ -7434,7 +7522,20 @@ router.delete('/openai-responses-accounts/:id', authenticateAdmin, async (req, r
     }
 
     const result = await openaiResponsesAccountService.deleteAccount(id)
-    res.json({ success: true, ...result })
+
+    let message = 'OpenAI-Responses账号已成功删除'
+    if (unboundCount > 0) {
+      message += `，${unboundCount} 个 API Key 已切换为共享池模式`
+    }
+
+    logger.success(`🗑️ Admin deleted OpenAI-Responses account: ${id}, unbound ${unboundCount} keys`)
+
+    res.json({
+      success: true,
+      ...result,
+      message,
+      unboundKeys: unboundCount
+    })
   } catch (error) {
     logger.error('Failed to delete OpenAI-Responses account:', error)
     res.status(500).json({
