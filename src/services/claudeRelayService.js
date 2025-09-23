@@ -26,7 +26,7 @@ class ClaudeRelayService {
     const userAgent = clientHeaders?.['user-agent'] || clientHeaders?.['User-Agent'] || ''
     const isClaudeCodeUserAgent = /^claude-cli\/[\d.]+\s+\(/i.test(userAgent)
 
-    // 检查系统提示词是否包含 Claude Code 标识
+    // 检查系统提示词是否包含 Claude Code 标识（支持两种类型的提示词）
     const hasClaudeCodeSystemPrompt = this._hasClaudeCodeSystemPrompt(requestBody)
 
     // 只有当 user-agent 匹配且系统提示词正确时，才认为是真实的 Claude Code 请求
@@ -44,16 +44,17 @@ class ClaudeRelayService {
       return false
     }
 
-    // 处理数组格式
+    // 处理数组格式 - 检查第一个元素
     if (Array.isArray(requestBody.system) && requestBody.system.length > 0) {
       const firstItem = requestBody.system[0]
-      // 检查第一个元素是否包含 Claude Code 提示词
-      return (
-        firstItem &&
-        firstItem.type === 'text' &&
-        firstItem.text &&
-        firstItem.text === this.claudeCodeSystemPrompt
-      )
+      // 检查第一个元素是否包含 Claude Code 相关的提示词
+      if (firstItem && firstItem.type === 'text' && firstItem.text) {
+        // Claude Code 的两种典型提示词开头
+        return (
+          firstItem.text.startsWith("You are Claude Code, Anthropic's official CLI for Claude.") ||
+          firstItem.text.startsWith('Analyze if this message indicates a new conversation topic')
+        )
+      }
     }
 
     return false
