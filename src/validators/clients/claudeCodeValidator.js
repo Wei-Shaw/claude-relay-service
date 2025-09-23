@@ -35,6 +35,37 @@ class ClaudeCodeValidator {
   }
 
   /**
+   * 检查请求是否包含 Claude Code 系统提示词
+   * @param {Object} requestBody - 请求体
+   * @returns {boolean} 是否包含 Claude Code 系统提示词
+   */
+  static hasClaudeCodeSystemPrompt(requestBody) {
+    if (!requestBody || !requestBody.system) {
+      return false
+    }
+
+    // 如果是字符串格式，一定不是真实的 Claude Code 请求
+    if (typeof requestBody.system === 'string') {
+      return false
+    }
+
+    // 处理数组格式 - 检查第一个元素
+    if (Array.isArray(requestBody.system) && requestBody.system.length > 0) {
+      const firstItem = requestBody.system[0]
+      // 检查第一个元素是否包含 Claude Code 相关的提示词
+      if (firstItem && firstItem.type === 'text' && firstItem.text) {
+        // Claude Code 的两种典型提示词开头
+        return (
+          firstItem.text.startsWith("You are Claude Code, Anthropic's official CLI for Claude.") ||
+          firstItem.text.startsWith('Analyze if this message indicates a new conversation topic')
+        )
+      }
+    }
+
+    return false
+  }
+
+  /**
    * 验证请求是否来自 Claude Code CLI
    * @param {Object} req - Express 请求对象
    * @returns {boolean} 验证结果
@@ -59,7 +90,13 @@ class ClaudeCodeValidator {
         return true
       }
 
-      // 3. 检查必需的头部（值不为空即可）
+      // 3. 检查系统提示词是否为 Claude Code 的系统提示词
+      if (!this.hasClaudeCodeSystemPrompt(req.body)) {
+        logger.debug('Claude Code validation failed - missing or invalid Claude Code system prompt')
+        return false
+      }
+
+      // 4. 检查必需的头部（值不为空即可）
       const xApp = req.headers['x-app']
       const anthropicBeta = req.headers['anthropic-beta']
       const anthropicVersion = req.headers['anthropic-version']
@@ -79,9 +116,11 @@ class ClaudeCodeValidator {
         return false
       }
 
-      logger.debug(`Claude Code headers - x-app: ${xApp}, anthropic-beta: ${anthropicBeta}, anthropic-version: ${anthropicVersion}`)
+      logger.debug(
+        `Claude Code headers - x-app: ${xApp}, anthropic-beta: ${anthropicBeta}, anthropic-version: ${anthropicVersion}`
+      )
 
-      // 4. 验证 body 中的 metadata.user_id
+      // 5. 验证 body 中的 metadata.user_id
       if (!req.body || !req.body.metadata || !req.body.metadata.user_id) {
         logger.debug('Claude Code validation failed - missing metadata.user_id in body')
         return false
@@ -111,12 +150,11 @@ class ClaudeCodeValidator {
         return false
       }
 
-      // 5. 额外日志记录（用于调试）
+      // 6. 额外日志记录（用于调试）
       logger.debug(`Claude Code validation passed - UA: ${userAgent}, userId: ${userId}`)
 
       // 所有必要检查通过
       return true
-
     } catch (error) {
       logger.error('Error in ClaudeCodeValidator:', error)
       // 验证出错时默认拒绝
