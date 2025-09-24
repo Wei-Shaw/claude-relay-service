@@ -138,12 +138,12 @@ class RateLimitCleanupService {
       const accounts = await openaiAccountService.getAllAccounts()
 
       for (const account of accounts) {
-        // 检查是否处于限流状态（兼容对象和字符串格式）
+        const { rateLimitStatus } = account
         const isRateLimited =
-          account.rateLimitStatus === 'limited' ||
-          (account.rateLimitStatus &&
-            typeof account.rateLimitStatus === 'object' &&
-            account.rateLimitStatus.status === 'limited')
+          rateLimitStatus === 'limited' ||
+          (rateLimitStatus &&
+            typeof rateLimitStatus === 'object' &&
+            (rateLimitStatus.status === 'limited' || rateLimitStatus.isRateLimited === true))
 
         if (isRateLimited) {
           result.checked++

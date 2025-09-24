@@ -694,13 +694,17 @@ async function getAllAccounts() {
         // 添加限流状态信息（统一格式）
         rateLimitStatus: rateLimitInfo
           ? {
+              status: rateLimitInfo.status,
               isRateLimited: rateLimitInfo.isRateLimited,
               rateLimitedAt: rateLimitInfo.rateLimitedAt,
+              rateLimitResetAt: rateLimitInfo.rateLimitResetAt,
               minutesRemaining: rateLimitInfo.minutesRemaining
             }
           : {
+              status: 'normal',
               isRateLimited: false,
               rateLimitedAt: null,
+              rateLimitResetAt: null,
               minutesRemaining: 0
             }
       })
@@ -979,34 +983,39 @@ async function getAccountRateLimitInfo(accountId) {
     return null
   }
 
-  if (account.rateLimitStatus === 'limited') {
+  const status = account.rateLimitStatus || 'normal'
+  const rateLimitedAt = account.rateLimitedAt || null
+  const rateLimitResetAt = account.rateLimitResetAt || null
+
+  if (status === 'limited') {
     const now = Date.now()
     let remainingTime = 0
 
-    // 优先使用 rateLimitResetAt 字段（精确的重置时间）
-    if (account.rateLimitResetAt) {
-      const resetAt = new Date(account.rateLimitResetAt).getTime()
+    if (rateLimitResetAt) {
+      const resetAt = new Date(rateLimitResetAt).getTime()
       remainingTime = Math.max(0, resetAt - now)
-    }
-    // 回退到使用 rateLimitedAt + 默认1小时
-    else if (account.rateLimitedAt) {
-      const limitedAt = new Date(account.rateLimitedAt).getTime()
+    } else if (rateLimitedAt) {
+      const limitedAt = new Date(rateLimitedAt).getTime()
       const limitDuration = 60 * 60 * 1000 // 默认1小时
       remainingTime = Math.max(0, limitedAt + limitDuration - now)
     }
 
+    const minutesRemaining = remainingTime > 0 ? Math.ceil(remainingTime / (60 * 1000)) : 0
+
     return {
-      isRateLimited: remainingTime > 0,
-      rateLimitedAt: account.rateLimitedAt,
-      rateLimitResetAt: account.rateLimitResetAt,
-      minutesRemaining: Math.ceil(remainingTime / (60 * 1000))
+      status,
+      isRateLimited: minutesRemaining > 0,
+      rateLimitedAt,
+      rateLimitResetAt,
+      minutesRemaining
     }
   }
 
   return {
+    status,
     isRateLimited: false,
-    rateLimitedAt: null,
-    rateLimitResetAt: null,
+    rateLimitedAt,
+    rateLimitResetAt,
     minutesRemaining: 0
   }
 }
