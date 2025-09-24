@@ -3,7 +3,8 @@ const { CLIENT_DEFINITIONS } = require('../clientDefinitions')
 const {
   haikuSystemPrompt,
   claudeOtherSystemPrompt1,
-  claudeOtherSystemPrompt2
+  claudeOtherSystemPrompt2,
+  claudeOtherSystemPromptCompact
 } = require('../../utils/contents')
 const { simple: similaritySimple } = require('../../utils/text-similarity')
 
@@ -88,7 +89,12 @@ class ClaudeCodeValidator {
     }
 
     const sys1 = similaritySimple(system1Text, claudeOtherSystemPrompt2, 0.5)
-    return sys1.passed
+    const sysCompact = similaritySimple(system1Text, claudeOtherSystemPromptCompact, 0.9)
+    if (!sys1.passed && !sysCompact.passed) {
+      return false
+    }
+
+    return true
   }
 
   /**
@@ -102,8 +108,10 @@ class ClaudeCodeValidator {
       const path = req.path || ''
 
       // 1. 先检查是否是 Claude Code 的 User-Agent
-      // 格式: claude-cli/1.0.86 (external, cli)
-      const claudeCodePattern = /^claude-cli\/[\d\.]+([-\w]*)?\s+\(external,\s*cli\)$/i
+      // 格式: claude-cli/1.0.86 (external, cli) sdk-cli sdk-py
+
+      const claudeCodePattern = /^claude-cli\/[\d.]+(?:[-\w]*)?\s+\(external,\s*(?:cli|sdk-[a-z]+)\)$/i
+
       if (!claudeCodePattern.test(userAgent)) {
         // 不是 Claude Code 的请求，此验证器不处理
         return false

@@ -163,9 +163,11 @@ user: Where are errors from the client handled?
 assistant: Clients are marked as failed in the \`connectToServer\` function in src/services/process.ts:712.
 </example>
 `
+const claudeOtherSystemPromptCompact = `You are a helpful AI assistant tasked with summarizing conversations.`
 
 module.exports = {
   haikuSystemPrompt,
   claudeOtherSystemPrompt1,
-  claudeOtherSystemPrompt2
+  claudeOtherSystemPrompt2,
+  claudeOtherSystemPromptCompact
 }
