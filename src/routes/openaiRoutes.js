@@ -135,6 +135,13 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
 // 主处理函数，供两个路由共享
 const handleResponses = async (req, res) => {
   let upstream = null
+  let accountId = null
+  let accountType = 'openai'
+  let sessionHash = null
+  let account = null
+  let proxy = null
+  let accessToken = null
+
   try {
     // 从中间件获取 API Key 数据
     const apiKeyData = req.apiKey || {}
@@ -146,6 +153,8 @@ const handleResponses = async (req, res) => {
       req.body?.session_id ||
       req.body?.conversation_id ||
       null
+
+    sessionHash = sessionId ? crypto.createHash('sha256').update(sessionId).digest('hex') : null
 
     // 从请求体中提取模型和流式标志
     let requestedModel = req.body?.model || null
@@ -191,14 +200,11 @@ const handleResponses = async (req, res) => {
     }
 
     // 使用调度器选择账户
-    const {
-      accessToken,
-      accountId,
-      accountName: _accountName,
-      accountType,
-      proxy,
-      account
-    } = await getOpenAIAuthToken(apiKeyData, sessionId, requestedModel)
+    ;({ accessToken, accountId, accountType, proxy, account } = await getOpenAIAuthToken(
+      apiKeyData,
+      sessionId,
+      requestedModel
+    ))
 
     // 如果是 OpenAI-Responses 账户，使用专门的中继服务处理
     if (accountType === 'openai-responses') {
@@ -312,7 +318,7 @@ const handleResponses = async (req, res) => {
       await unifiedOpenAIScheduler.markAccountRateLimited(
         accountId,
         'openai',
-        sessionId ? crypto.createHash('sha256').update(sessionId).digest('hex') : null,
+        sessionHash,
         resetsInSeconds
       )
 
@@ -337,6 +343,77 @@ const handleResponses = async (req, res) => {
         res.status(429).json(errorResponse)
       }
 
+      return
+    } else if (upstream.status === 401) {
+      logger.warn(`🔐 Unauthorized error detected for OpenAI account ${accountId} (Codex API)`)
+
+      let errorData = null
+
+      try {
+        if (isStream && upstream.data && typeof upstream.data.on === 'function') {
+          const chunks = []
+          await new Promise((resolve, reject) => {
+            upstream.data.on('data', (chunk) => chunks.push(chunk))
+            upstream.data.on('end', resolve)
+            upstream.data.on('error', reject)
+            setTimeout(resolve, 5000)
+          })
+
+          const fullResponse = Buffer.concat(chunks).toString()
+          try {
+            errorData = JSON.parse(fullResponse)
+          } catch (parseError) {
+            logger.error('Failed to parse 401 error response:', parseError)
+            logger.debug('Raw 401 response:', fullResponse)
+            errorData = { error: { message: fullResponse || 'Unauthorized' } }
+          }
+        } else {
+          errorData = upstream.data
+        }
+      } catch (parseError) {
+        logger.error('⚠️ Failed to handle 401 error response:', parseError)
+      }
+
+      let reason = 'OpenAI账号认证失败（401错误）'
+      if (errorData) {
+        const messageCandidate =
+          errorData.error &&
+          typeof errorData.error.message === 'string' &&
+          errorData.error.message.trim()
+            ? errorData.error.message.trim()
+            : typeof errorData.message === 'string' && errorData.message.trim()
+              ? errorData.message.trim()
+              : null
+        if (messageCandidate) {
+          reason = `OpenAI账号认证失败（401错误）：${messageCandidate}`
+        }
+      }
+
+      try {
+        await unifiedOpenAIScheduler.markAccountUnauthorized(
+          accountId,
+          'openai',
+          sessionHash,
+          reason
+        )
+      } catch (markError) {
+        logger.error('❌ Failed to mark OpenAI account unauthorized after 401:', markError)
+      }
+
+      let errorResponse = errorData
+      if (!errorResponse || typeof errorResponse !== 'object' || Buffer.isBuffer(errorResponse)) {
+        const fallbackMessage =
+          typeof errorData === 'string' && errorData.trim() ? errorData.trim() : 'Unauthorized'
+        errorResponse = {
+          error: {
+            message: fallbackMessage,
+            type: 'unauthorized',
+            code: 'unauthorized'
+          }
+        }
+      }
+
+      res.status(401).json(errorResponse)
       return
     } else if (upstream.status === 200 || upstream.status === 201) {
       // 请求成功，检查并移除限流状态
@@ -553,7 +630,7 @@ const handleResponses = async (req, res) => {
         await unifiedOpenAIScheduler.markAccountRateLimited(
           accountId,
           'openai',
-          sessionId ? crypto.createHash('sha256').update(sessionId).digest('hex') : null,
+          sessionHash,
           rateLimitResetsInSeconds
         )
       } else if (upstream.status === 200) {
@@ -594,9 +671,51 @@ const handleResponses = async (req, res) => {
     logger.error('Proxy to ChatGPT codex/responses failed:', error)
     // 优先使用主动设置的 statusCode，然后是上游响应的状态码，最后默认 500
     const status = error.statusCode || error.response?.status || 500
-    const message = error.response?.data || error.message || 'Internal server error'
+
+    if (status === 401 && accountId) {
+      let reason = 'OpenAI账号认证失败（401错误）'
+      const errorData = error.response?.data
+      if (errorData) {
+        if (typeof errorData === 'string' && errorData.trim()) {
+          reason = `OpenAI账号认证失败（401错误）：${errorData.trim()}`
+        } else if (
+          errorData.error &&
+          typeof errorData.error.message === 'string' &&
+          errorData.error.message.trim()
+        ) {
+          reason = `OpenAI账号认证失败（401错误）：${errorData.error.message.trim()}`
+        } else if (typeof errorData.message === 'string' && errorData.message.trim()) {
+          reason = `OpenAI账号认证失败（401错误）：${errorData.message.trim()}`
+        }
+      } else if (error.message) {
+        reason = `OpenAI账号认证失败（401错误）：${error.message}`
+      }
+
+      try {
+        await unifiedOpenAIScheduler.markAccountUnauthorized(
+          accountId,
+          accountType || 'openai',
+          sessionHash,
+          reason
+        )
+      } catch (markError) {
+        logger.error('❌ Failed to mark OpenAI account unauthorized in catch handler:', markError)
+      }
+    }
+
+    let responsePayload = error.response?.data
+    if (!responsePayload) {
+      responsePayload = { error: { message: error.message || 'Internal server error' } }
+    } else if (typeof responsePayload === 'string') {
+      responsePayload = { error: { message: responsePayload } }
+    } else if (typeof responsePayload === 'object' && !responsePayload.error) {
+      responsePayload = {
+        error: { message: responsePayload.message || error.message || 'Internal server error' }
+      }
+    }
+
     if (!res.headersSent) {
-      res.status(status).json({ error: { message } })
+      res.status(status).json(responsePayload)
     }
   }
 }
