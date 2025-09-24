@@ -1,5 +1,11 @@
 const logger = require('../../utils/logger')
 const { CLIENT_DEFINITIONS } = require('../clientDefinitions')
+import {
+  haikuSystemPrompt,
+  claudeOtherSystemPrompt1,
+  claudeOtherSystemPrompt2
+} from '../../utils/contents'
+import { simple as similaritySimple } from '../../utils/text-similarity'
 
 /**
  * Claude Code CLI 验证器
@@ -36,30 +42,47 @@ class ClaudeCodeValidator {
 
   /**
    * 检查请求是否包含 Claude Code 系统提示词
-   * @param {Object} requestBody - 请求体
+   * @param {Object} body - 请求体
    * @returns {boolean} 是否包含 Claude Code 系统提示词
    */
-  static hasClaudeCodeSystemPrompt(requestBody) {
-    if (!requestBody || !requestBody.system) {
+  static hasClaudeCodeSystemPrompt(body) {
+    if (!body || typeof body !== 'object') {
       return false
     }
 
-    // 如果是字符串格式，一定不是真实的 Claude Code 请求
-    if (typeof requestBody.system === 'string') {
+    const model = typeof body.model === 'string' ? body.model : null
+    if (!model) {
       return false
     }
 
-    // 处理数组格式 - 检查第一个元素
-    if (Array.isArray(requestBody.system) && requestBody.system.length > 0) {
-      const firstItem = requestBody.system[0]
-      // 检查第一个元素是否包含 Claude Code 相关的提示词
-      if (firstItem && firstItem.type === 'text' && firstItem.text) {
-        // Claude Code 的两种典型提示词开头
-        return (
-          firstItem.text.startsWith("You are Claude Code, Anthropic's official CLI for Claude.") ||
-          firstItem.text.startsWith('Analyze if this message indicates a new conversation topic')
-        )
+    const systemEntries = Array.isArray(body.system) ? body.system : []
+    const system0Text = systemEntries?.[0]?.text
+    const system1Text = systemEntries?.[1]?.text
+
+    if (model.startsWith('claude-3-5-haiku')) {
+      const messages = Array.isArray(body.messages) ? body.messages : []
+      const isSingleUserMessage =
+        messages.length === 1 && messages.every((item) => item?.role === 'user')
+
+      if (!isSingleUserMessage) {
+        return false
       }
+
+      const similarity = similaritySimple(system0Text, haikuSystemPrompt, 0.9)
+      if (!similarity.passed) {
+        return false
+      }
+      return
+    }
+
+    const sys0 = similaritySimple(system0Text, claudeOtherSystemPrompt1, 0.9)
+    if (!sys0.passed) {
+      return false
+    }
+
+    const sys1 = similaritySimple(system1Text, claudeOtherSystemPrompt2, 0.5)
+    if (!sys1.passed) {
+      return false
     }
 
     return false

@@ -69,6 +69,7 @@
     "ora": "^5.4.1",
     "rate-limiter-flexible": "^5.0.5",
     "socks-proxy-agent": "^8.0.2",
+    "string-similarity": "^4.0.4",
     "table": "^6.8.1",
     "uuid": "^9.0.1",
     "winston": "^3.11.0",
