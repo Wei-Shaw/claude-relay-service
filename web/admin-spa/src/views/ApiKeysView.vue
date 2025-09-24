@@ -1375,14 +1375,14 @@
               <div class="flex items-center gap-1">
                 <!-- 第一页 -->
                 <button
-                  v-if="currentPage > 3"
+                  v-if="shouldShowFirstPage"
                   class="hidden rounded-md border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:block"
                   @click="currentPage = 1"
                 >
                   1
                 </button>
                 <span
-                  v-if="currentPage > 4"
+                  v-if="showLeadingEllipsis"
                   class="hidden px-2 text-gray-500 dark:text-gray-400 sm:inline"
                   >...</span
                 >
@@ -1404,12 +1404,12 @@
 
                 <!-- 最后一页 -->
                 <span
-                  v-if="currentPage < totalPages - 3"
+                  v-if="showTrailingEllipsis"
                   class="hidden px-2 text-gray-500 dark:text-gray-400 sm:inline"
                   >...</span
                 >
                 <button
-                  v-if="totalPages > 1 && currentPage < totalPages - 2"
+                  v-if="shouldShowLastPage"
                   class="hidden rounded-md border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:block"
                   @click="currentPage = totalPages"
                 >
@@ -2017,6 +2017,30 @@ const pageNumbers = computed(() => {
   }
 
   return pages
+})
+
+const shouldShowFirstPage = computed(() => {
+  const pages = pageNumbers.value
+  if (pages.length === 0) return false
+  return pages[0] > 1
+})
+
+const shouldShowLastPage = computed(() => {
+  const pages = pageNumbers.value
+  if (pages.length === 0) return false
+  return pages[pages.length - 1] < totalPages.value
+})
+
+const showLeadingEllipsis = computed(() => {
+  const pages = pageNumbers.value
+  if (pages.length === 0) return false
+  return shouldShowFirstPage.value && pages[0] > 2
+})
+
+const showTrailingEllipsis = computed(() => {
+  const pages = pageNumbers.value
+  if (pages.length === 0) return false
+  return shouldShowLastPage.value && pages[pages.length - 1] < totalPages.value - 1
 })
 
 // 获取分页后的数据
