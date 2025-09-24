@@ -715,9 +715,7 @@ class ClaudeRelayService {
         options.headers['user-agent'] = userAgent
       }
 
-      logger.info(
-        `🔗 指纹是这个: ${options.headers['user-agent']}`
-      )
+      logger.info(`🔗 指纹是这个: ${options.headers['user-agent']}`)
 
       // 使用自定义的 betaHeader 或默认值
       const betaHeader =
@@ -956,9 +954,7 @@ class ClaudeRelayService {
         options.headers['user-agent'] = userAgent
       }
 
-      logger.info(
-        `🔗 指纹是这个: ${options.headers['user-agent']}`
-      )
+      logger.info(`🔗 指纹是这个: ${options.headers['user-agent']}`)
       // 使用自定义的 betaHeader 或默认值
       const betaHeader =
         requestOptions?.betaHeader !== undefined ? requestOptions.betaHeader : this.betaHeader
