@@ -865,6 +865,49 @@ async function setAccountRateLimited(accountId, isLimited, resetsInSeconds = nul
   }
 }
 
+// 🚫 标记账户为未授权状态（401错误）
+async function markAccountUnauthorized(accountId, reason = 'OpenAI账号认证失败（401错误）') {
+  const account = await getAccount(accountId)
+  if (!account) {
+    throw new Error('Account not found')
+  }
+
+  const now = new Date().toISOString()
+  const currentCount = parseInt(account.unauthorizedCount || '0', 10)
+  const unauthorizedCount = Number.isFinite(currentCount) ? currentCount + 1 : 1
+
+  const updates = {
+    status: 'unauthorized',
+    schedulable: 'false',
+    errorMessage: reason,
+    unauthorizedAt: now,
+    unauthorizedCount: unauthorizedCount.toString()
+  }
+
+  await updateAccount(accountId, updates)
+  logger.warn(
+    `🚫 Marked OpenAI account ${account.name || accountId} as unauthorized due to 401 error`
+  )
+
+  try {
+    const webhookNotifier = require('../utils/webhookNotifier')
+    await webhookNotifier.sendAccountAnomalyNotification({
+      accountId,
+      accountName: account.name || accountId,
+      platform: 'openai',
+      status: 'unauthorized',
+      errorCode: 'OPENAI_UNAUTHORIZED',
+      reason,
+      timestamp: now
+    })
+    logger.info(
+      `📢 Webhook notification sent for OpenAI account ${account.name} unauthorized state`
+    )
+  } catch (webhookError) {
+    logger.error('Failed to send unauthorized webhook notification:', webhookError)
+  }
+}
+
 // 🔄 重置账户所有异常状态
 async function resetAccountStatus(accountId) {
   const account = await getAccount(accountId)
@@ -1001,6 +1044,7 @@ module.exports = {
   refreshAccountToken,
   isTokenExpired,
   setAccountRateLimited,
+  markAccountUnauthorized,
   resetAccountStatus,
   toggleSchedulable,
   getAccountRateLimitInfo,

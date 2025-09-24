@@ -356,7 +356,12 @@ class UnifiedOpenAIScheduler {
     try {
       if (accountType === 'openai') {
         const account = await openaiAccountService.getAccount(accountId)
-        if (!account || !account.isActive || account.status === 'error') {
+        if (
+          !account ||
+          !account.isActive ||
+          account.status === 'error' ||
+          account.status === 'unauthorized'
+        ) {
           return false
         }
         // 检查是否可调度
@@ -370,7 +375,8 @@ class UnifiedOpenAIScheduler {
         if (
           !account ||
           (account.isActive !== true && account.isActive !== 'true') ||
-          account.status === 'error'
+          account.status === 'error' ||
+          account.status === 'unauthorized'
         ) {
           return false
         }
@@ -494,6 +500,39 @@ class UnifiedOpenAIScheduler {
     } catch (error) {
       logger.error(
         `❌ Failed to mark account as rate limited: ${accountId} (${accountType})`,
+        error
+      )
+      throw error
+    }
+  }
+
+  // 🚫 标记账户为未授权状态
+  async markAccountUnauthorized(
+    accountId,
+    accountType,
+    sessionHash = null,
+    reason = 'OpenAI账号认证失败（401错误）'
+  ) {
+    try {
+      if (accountType === 'openai') {
+        await openaiAccountService.markAccountUnauthorized(accountId, reason)
+      } else if (accountType === 'openai-responses') {
+        await openaiResponsesAccountService.markAccountUnauthorized(accountId, reason)
+      } else {
+        logger.warn(
+          `⚠️ Unsupported account type ${accountType} when marking unauthorized for account ${accountId}`
+        )
+        return { success: false }
+      }
+
+      if (sessionHash) {
+        await this._deleteSessionMapping(sessionHash)
+      }
+
+      return { success: true }
+    } catch (error) {
+      logger.error(
+        `❌ Failed to mark account as unauthorized: ${accountId} (${accountType})`,
         error
       )
       throw error

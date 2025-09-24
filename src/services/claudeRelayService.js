@@ -715,9 +715,7 @@ class ClaudeRelayService {
         options.headers['user-agent'] = userAgent
       }
 
-      logger.info(
-        `🔗 指纹是这个: ${options.headers['user-agent']}`
-      )
+      logger.info(`🔗 指纹是这个: ${options.headers['user-agent']}`)
 
       // 使用自定义的 betaHeader 或默认值
       const betaHeader =
@@ -956,9 +954,7 @@ class ClaudeRelayService {
         options.headers['user-agent'] = userAgent
       }
 
-      logger.info(
-        `🔗 指纹是这个: ${options.headers['user-agent']}`
-      )
+      logger.info(`🔗 指纹是这个: ${options.headers['user-agent']}`)
       // 使用自定义的 betaHeader 或默认值
       const betaHeader =
         requestOptions?.betaHeader !== undefined ? requestOptions.betaHeader : this.betaHeader
@@ -1619,7 +1615,7 @@ class ClaudeRelayService {
   }
 
   // 🛠️ 统一的错误处理方法
-  async _handleServerError(accountId, statusCode, sessionHash = null, context = '') {
+  async _handleServerError(accountId, statusCode, _sessionHash = null, context = '') {
     try {
       await claudeAccountService.recordServerError(accountId, statusCode)
       const errorCount = await claudeAccountService.getServerErrorCount(accountId)
@@ -1635,10 +1631,10 @@ class ClaudeRelayService {
 
       if (errorCount > threshold) {
         const errorTypeLabel = isTimeout ? 'timeout' : '5xx'
+        // ⚠️ 只记录5xx/504告警，不再自动停止调度，避免上游抖动导致误停
         logger.error(
-          `❌ ${prefix}Account ${accountId} exceeded ${errorTypeLabel} error threshold (${errorCount} errors), marking as temp_error`
+          `❌ ${prefix}Account ${accountId} exceeded ${errorTypeLabel} error threshold (${errorCount} errors), please investigate upstream stability`
         )
-        await claudeAccountService.markAccountTempError(accountId, sessionHash)
       }
     } catch (handlingError) {
       logger.error(`❌ Failed to handle ${context} server error:`, handlingError)

@@ -169,6 +169,61 @@ class OpenAIResponsesRelayService {
           errorData
         })
 
+        if (response.status === 401) {
+          let reason = 'OpenAI Responses账号认证失败（401错误）'
+          if (errorData) {
+            if (typeof errorData === 'string' && errorData.trim()) {
+              reason = `OpenAI Responses账号认证失败（401错误）：${errorData.trim()}`
+            } else if (
+              errorData.error &&
+              typeof errorData.error.message === 'string' &&
+              errorData.error.message.trim()
+            ) {
+              reason = `OpenAI Responses账号认证失败（401错误）：${errorData.error.message.trim()}`
+            } else if (typeof errorData.message === 'string' && errorData.message.trim()) {
+              reason = `OpenAI Responses账号认证失败（401错误）：${errorData.message.trim()}`
+            }
+          }
+
+          try {
+            await unifiedOpenAIScheduler.markAccountUnauthorized(
+              account.id,
+              'openai-responses',
+              sessionHash,
+              reason
+            )
+          } catch (markError) {
+            logger.error(
+              '❌ Failed to mark OpenAI-Responses account unauthorized after 401:',
+              markError
+            )
+          }
+
+          let unauthorizedResponse = errorData
+          if (
+            !unauthorizedResponse ||
+            typeof unauthorizedResponse !== 'object' ||
+            unauthorizedResponse.pipe ||
+            Buffer.isBuffer(unauthorizedResponse)
+          ) {
+            const fallbackMessage =
+              typeof errorData === 'string' && errorData.trim() ? errorData.trim() : 'Unauthorized'
+            unauthorizedResponse = {
+              error: {
+                message: fallbackMessage,
+                type: 'unauthorized',
+                code: 'unauthorized'
+              }
+            }
+          }
+
+          // 清理监听器
+          req.removeListener('close', handleClientDisconnect)
+          res.removeListener('close', handleClientDisconnect)
+
+          return res.status(401).json(unauthorizedResponse)
+        }
+
         // 清理监听器
         req.removeListener('close', handleClientDisconnect)
         res.removeListener('close', handleClientDisconnect)
@@ -248,6 +303,57 @@ class OpenAIResponsesRelayService {
               errorData.error.message = error.response.data
             }
           }
+        }
+
+        if (status === 401) {
+          let reason = 'OpenAI Responses账号认证失败（401错误）'
+          if (errorData) {
+            if (typeof errorData === 'string' && errorData.trim()) {
+              reason = `OpenAI Responses账号认证失败（401错误）：${errorData.trim()}`
+            } else if (
+              errorData.error &&
+              typeof errorData.error.message === 'string' &&
+              errorData.error.message.trim()
+            ) {
+              reason = `OpenAI Responses账号认证失败（401错误）：${errorData.error.message.trim()}`
+            } else if (typeof errorData.message === 'string' && errorData.message.trim()) {
+              reason = `OpenAI Responses账号认证失败（401错误）：${errorData.message.trim()}`
+            }
+          }
+
+          try {
+            await unifiedOpenAIScheduler.markAccountUnauthorized(
+              account.id,
+              'openai-responses',
+              sessionHash,
+              reason
+            )
+          } catch (markError) {
+            logger.error(
+              '❌ Failed to mark OpenAI-Responses account unauthorized in catch handler:',
+              markError
+            )
+          }
+
+          let unauthorizedResponse = errorData
+          if (
+            !unauthorizedResponse ||
+            typeof unauthorizedResponse !== 'object' ||
+            unauthorizedResponse.pipe ||
+            Buffer.isBuffer(unauthorizedResponse)
+          ) {
+            const fallbackMessage =
+              typeof errorData === 'string' && errorData.trim() ? errorData.trim() : 'Unauthorized'
+            unauthorizedResponse = {
+              error: {
+                message: fallbackMessage,
+                type: 'unauthorized',
+                code: 'unauthorized'
+              }
+            }
+          }
+
+          return res.status(401).json(unauthorizedResponse)
         }
 
         return res.status(status).json(errorData)

@@ -1,11 +1,11 @@
 const logger = require('../../utils/logger')
 const { CLIENT_DEFINITIONS } = require('../clientDefinitions')
-import {
+const {
   haikuSystemPrompt,
   claudeOtherSystemPrompt1,
   claudeOtherSystemPrompt2
-} from '../../utils/contents'
-import { simple as similaritySimple } from '../../utils/text-similarity'
+} = require('../../utils/contents')
+const { simple: similaritySimple } = require('../../utils/text-similarity')
 
 /**
  * Claude Code CLI 验证器
@@ -56,23 +56,30 @@ class ClaudeCodeValidator {
     }
 
     const systemEntries = Array.isArray(body.system) ? body.system : []
-    const system0Text = systemEntries?.[0]?.text
-    const system1Text = systemEntries?.[1]?.text
+    const system0Text =
+      systemEntries.length > 0 && typeof systemEntries[0]?.text === 'string'
+        ? systemEntries[0].text
+        : null
+    const system1Text =
+      systemEntries.length > 1 && typeof systemEntries[1]?.text === 'string'
+        ? systemEntries[1].text
+        : null
 
     if (model.startsWith('claude-3-5-haiku')) {
       const messages = Array.isArray(body.messages) ? body.messages : []
       const isSingleUserMessage =
         messages.length === 1 && messages.every((item) => item?.role === 'user')
 
-      if (!isSingleUserMessage) {
+      if (!isSingleUserMessage || !system0Text) {
         return false
       }
 
       const similarity = similaritySimple(system0Text, haikuSystemPrompt, 0.9)
-      if (!similarity.passed) {
-        return false
-      }
-      return
+      return similarity.passed
+    }
+
+    if (!system0Text || !system1Text) {
+      return false
     }
 
     const sys0 = similaritySimple(system0Text, claudeOtherSystemPrompt1, 0.9)
@@ -81,11 +88,7 @@ class ClaudeCodeValidator {
     }
 
     const sys1 = similaritySimple(system1Text, claudeOtherSystemPrompt2, 0.5)
-    if (!sys1.passed) {
-      return false
-    }
-
-    return false
+    return sys1.passed
   }
 
   /**
