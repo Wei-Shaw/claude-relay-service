@@ -673,7 +673,9 @@
                               'h-2 rounded-full transition-all duration-300',
                               getCodexUsageBarClass(account.codexUsage.primary.usedPercent)
                             ]"
-                            :style="{ width: getCodexUsageWidth(account.codexUsage.primary.usedPercent) }"
+                            :style="{
+                              width: getCodexUsageWidth(account.codexUsage.primary.usedPercent)
+                            }"
                           />
                         </div>
                         <span class="text-[11px] text-gray-500 dark:text-gray-400">
@@ -701,7 +703,9 @@
                               'h-2 rounded-full transition-all duration-300',
                               getCodexUsageBarClass(account.codexUsage.secondary.usedPercent)
                             ]"
-                            :style="{ width: getCodexUsageWidth(account.codexUsage.secondary.usedPercent) }"
+                            :style="{
+                              width: getCodexUsageWidth(account.codexUsage.secondary.usedPercent)
+                            }"
                           />
                         </div>
                         <span class="text-[11px] text-gray-500 dark:text-gray-400">
@@ -713,7 +717,10 @@
                       </div>
                     </div>
                     <div
-                      v-if="account.codexUsage.primaryOverSecondaryPercent !== null && account.codexUsage.primaryOverSecondaryPercent !== undefined"
+                      v-if="
+                        account.codexUsage.primaryOverSecondaryPercent !== null &&
+                        account.codexUsage.primaryOverSecondaryPercent !== undefined
+                      "
                       class="text-[11px] text-gray-500 dark:text-gray-400"
                     >
                       短期/长期占比
@@ -975,7 +982,10 @@
               </div>
             </div>
             <div v-else-if="account.platform === 'openai'" class="space-y-2">
-              <div v-if="account.codexUsage" class="space-y-2 rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+              <div
+                v-if="account.codexUsage"
+                class="space-y-2 rounded-lg bg-gray-50 p-2 dark:bg-gray-700"
+              >
                 <div class="flex items-center justify-between text-xs">
                   <div class="flex items-center gap-1 text-gray-600 dark:text-gray-300">
                     <i class="fas fa-hourglass-half text-indigo-500" />
@@ -1003,7 +1013,10 @@
                   重置剩余 {{ formatCodexRemaining(account.codexUsage.primary) }}
                 </div>
               </div>
-              <div v-if="account.codexUsage" class="space-y-2 rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+              <div
+                v-if="account.codexUsage"
+                class="space-y-2 rounded-lg bg-gray-50 p-2 dark:bg-gray-700"
+              >
                 <div class="flex items-center justify-between text-xs">
                   <div class="flex items-center gap-1 text-gray-600 dark:text-gray-300">
                     <i class="fas fa-calendar-week text-blue-500" />
@@ -1020,7 +1033,9 @@
                         'h-2 rounded-full transition-all duration-300',
                         getCodexUsageBarClass(account.codexUsage.secondary.usedPercent)
                       ]"
-                      :style="{ width: getCodexUsageWidth(account.codexUsage.secondary.usedPercent) }"
+                      :style="{
+                        width: getCodexUsageWidth(account.codexUsage.secondary.usedPercent)
+                      }"
                     />
                   </div>
                   <span class="text-[11px] text-gray-500 dark:text-gray-400">
@@ -1032,7 +1047,11 @@
                 </div>
               </div>
               <div
-                v-if="account.codexUsage && account.codexUsage.primaryOverSecondaryPercent !== null && account.codexUsage.primaryOverSecondaryPercent !== undefined"
+                v-if="
+                  account.codexUsage &&
+                  account.codexUsage.primaryOverSecondaryPercent !== null &&
+                  account.codexUsage.primaryOverSecondaryPercent !== undefined
+                "
                 class="text-[11px] text-gray-500 dark:text-gray-400"
               >
                 短期/长期占比
