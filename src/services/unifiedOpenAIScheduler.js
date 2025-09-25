@@ -32,11 +32,99 @@ class UnifiedOpenAIScheduler {
 
     // 兼容对象格式（getAllAccounts 返回的数据）
     if (typeof rateLimitStatus === 'object') {
+      if (rateLimitStatus.isRateLimited === false) {
+        return false
+      }
       // 检查对象中的 status 字段
       return rateLimitStatus.status === 'limited' || rateLimitStatus.isRateLimited === true
     }
 
     return false
+  }
+
+  // 🔍 判断账号是否带有限流标记（即便已过期，用于自动恢复）
+  _hasRateLimitFlag(rateLimitStatus) {
+    if (!rateLimitStatus) {
+      return false
+    }
+
+    if (typeof rateLimitStatus === 'string') {
+      return rateLimitStatus === 'limited'
+    }
+
+    if (typeof rateLimitStatus === 'object') {
+      return rateLimitStatus.status === 'limited' || rateLimitStatus.isRateLimited === true
+    }
+
+    return false
+  }
+
+  // ✅ 确保账号在调度前完成限流恢复与 schedulable 校正
+  async _ensureAccountReadyForScheduling(account, accountId, { sanitized = true } = {}) {
+    const hasRateLimitFlag = this._hasRateLimitFlag(account.rateLimitStatus)
+    let rateLimitChecked = false
+    let stillLimited = false
+
+    let isSchedulable = this._isSchedulable(account.schedulable)
+
+    if (!isSchedulable) {
+      if (!hasRateLimitFlag) {
+        return { canUse: false, reason: 'not_schedulable' }
+      }
+
+      stillLimited = await this.isAccountRateLimited(accountId)
+      rateLimitChecked = true
+      if (stillLimited) {
+        return { canUse: false, reason: 'rate_limited' }
+      }
+
+      // 限流已恢复，矫正本地状态
+      if (sanitized) {
+        account.schedulable = true
+      } else {
+        account.schedulable = 'true'
+      }
+      isSchedulable = true
+      logger.info(`✅ OpenAI账号 ${account.name || accountId} 已解除限流，恢复调度权限`)
+    }
+
+    if (hasRateLimitFlag) {
+      if (!rateLimitChecked) {
+        stillLimited = await this.isAccountRateLimited(accountId)
+        rateLimitChecked = true
+      }
+      if (stillLimited) {
+        return { canUse: false, reason: 'rate_limited' }
+      }
+
+      // 更新本地限流状态，避免重复判定
+      if (sanitized) {
+        account.rateLimitStatus = {
+          status: 'normal',
+          isRateLimited: false,
+          rateLimitedAt: null,
+          rateLimitResetAt: null,
+          minutesRemaining: 0
+        }
+      } else {
+        account.rateLimitStatus = 'normal'
+        account.rateLimitedAt = null
+        account.rateLimitResetAt = null
+      }
+
+      if (account.status === 'rateLimited') {
+        account.status = 'active'
+      }
+    }
+
+    if (!rateLimitChecked) {
+      stillLimited = await this.isAccountRateLimited(accountId)
+      if (stillLimited) {
+        return { canUse: false, reason: 'rate_limited' }
+      }
+    }
+
+    return { canUse: true }
   }
 
   // 🎯 统一调度OpenAI账号
@@ -242,10 +330,22 @@ class UnifiedOpenAIScheduler {
       if (
         account.isActive &&
         account.status !== 'error' &&
-        (account.accountType === 'shared' || !account.accountType) && // 兼容旧数据
-        this._isSchedulable(account.schedulable)
+        (account.accountType === 'shared' || !account.accountType) // 兼容旧数据
       ) {
-        // 检查是否可调度
+        const accountId = account.id || account.accountId
+
+        const readiness = await this._ensureAccountReadyForScheduling(account, accountId, {
+          sanitized: true
+        })
+
+        if (!readiness.canUse) {
+          if (readiness.reason === 'rate_limited') {
+            logger.debug(`⏭️ 跳过 OpenAI 账号 ${account.name} - 仍处于限流状态`)
+          } else {
+            logger.debug(`⏭️ 跳过 OpenAI 账号 ${account.name} - 已被管理员禁用调度`)
+          }
+          continue
+        }
 
         // 检查token是否过期并自动刷新
         const isExpired = openaiAccountService.isTokenExpired(account)
@@ -282,13 +382,6 @@ class UnifiedOpenAIScheduler {
           }
         }
 
-        // 检查是否被限流
-        const isRateLimited = await this.isAccountRateLimited(account.id)
-        if (isRateLimited) {
-          logger.debug(`⏭️ Skipping OpenAI account ${account.name} - rate limited`)
-          continue
-        }
-
         availableAccounts.push({
           ...account,
           accountId: account.id,
@@ -306,18 +399,32 @@ class UnifiedOpenAIScheduler {
         (account.isActive === true || account.isActive === 'true') &&
         account.status !== 'error' &&
         account.status !== 'rateLimited' &&
-        (account.accountType === 'shared' || !account.accountType) && // 兼容旧数据
-        this._isSchedulable(account.schedulable)
+        (account.accountType === 'shared' || !account.accountType)
       ) {
-        // 检查并清除过期的限流状态
-        const isRateLimitCleared = await openaiResponsesAccountService.checkAndClearRateLimit(
-          account.id
-        )
+        const hasRateLimitFlag = this._hasRateLimitFlag(account.rateLimitStatus)
+        const schedulable = this._isSchedulable(account.schedulable)
 
-        // 如果仍然处于限流状态，跳过
-        if (this._isRateLimited(account.rateLimitStatus) && !isRateLimitCleared) {
-          logger.debug(`⏭️ Skipping OpenAI-Responses account ${account.name} - rate limited`)
+        if (!schedulable && !hasRateLimitFlag) {
+          logger.debug(`⏭️ Skipping OpenAI-Responses account ${account.name} - not schedulable`)
           continue
+        }
+
+        let isRateLimitCleared = false
+        if (hasRateLimitFlag) {
+          isRateLimitCleared = await openaiResponsesAccountService.checkAndClearRateLimit(
+            account.id
+          )
+
+          if (!isRateLimitCleared) {
+            logger.debug(`⏭️ Skipping OpenAI-Responses account ${account.name} - rate limited`)
+            continue
+          }
+
+          if (!schedulable) {
+            account.schedulable = 'true'
+            account.status = 'active'
+            logger.info(`✅ OpenAI-Responses账号 ${account.name} 已解除限流，恢复调度权限`)
+          }
         }
 
         // OpenAI-Responses 账户默认支持所有模型
@@ -364,12 +471,22 @@ class UnifiedOpenAIScheduler {
         ) {
           return false
         }
-        // 检查是否可调度
-        if (!this._isSchedulable(account.schedulable)) {
-          logger.info(`🚫 OpenAI account ${accountId} is not schedulable`)
+        const readiness = await this._ensureAccountReadyForScheduling(account, accountId, {
+          sanitized: false
+        })
+
+        if (!readiness.canUse) {
+          if (readiness.reason === 'rate_limited') {
+            logger.debug(
+              `🚫 OpenAI account ${accountId} still rate limited when checking availability`
+            )
+          } else {
+            logger.info(`🚫 OpenAI account ${accountId} is not schedulable`)
+          }
           return false
         }
-        return !(await this.isAccountRateLimited(accountId))
+
+        return true
       } else if (accountType === 'openai-responses') {
         const account = await openaiResponsesAccountService.getAccount(accountId)
         if (
@@ -665,12 +782,24 @@ class UnifiedOpenAIScheduler {
       const availableAccounts = []
       for (const memberId of memberIds) {
         const account = await openaiAccountService.getAccount(memberId)
-        if (
-          account &&
-          account.isActive &&
-          account.status !== 'error' &&
-          this._isSchedulable(account.schedulable)
-        ) {
+        if (account && account.isActive && account.status !== 'error') {
+          const readiness = await this._ensureAccountReadyForScheduling(account, account.id, {
+            sanitized: false
+          })
+
+          if (!readiness.canUse) {
+            if (readiness.reason === 'rate_limited') {
+              logger.debug(
+                `⏭️ Skipping group member OpenAI account ${account.name} - still rate limited`
+              )
+            } else {
+              logger.debug(
+                `⏭️ Skipping group member OpenAI account ${account.name} - not schedulable`
+              )
+            }
+            continue
+          }
+
           // 检查token是否过期
           const isExpired = openaiAccountService.isTokenExpired(account)
           if (isExpired && !account.refreshToken) {
@@ -693,12 +822,6 @@ class UnifiedOpenAIScheduler {
           }
 
           // 检查是否被限流
-          const isRateLimited = await this.isAccountRateLimited(account.id)
-          if (isRateLimited) {
-            logger.debug(`⏭️ Skipping group member OpenAI account ${account.name} - rate limited`)
-            continue
-          }
-
           availableAccounts.push({
             ...account,
             accountId: account.id,
