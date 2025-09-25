@@ -1,11 +1,10 @@
 const logger = require('../../utils/logger')
 const { CLIENT_DEFINITIONS } = require('../clientDefinitions')
 const {
-  haikuSystemPrompt,
-  claudeOtherSystemPrompt1,
-  claudeOtherSystemPrompt2
+  SYSTEM_PROMPT_THRESHOLD,
+  normalizeSystemText,
+  bestSimilarity
 } = require('../../utils/contents')
-const { simple: similaritySimple } = require('../../utils/text-similarity')
 
 /**
  * Claude Code CLI 验证器
@@ -56,39 +55,21 @@ class ClaudeCodeValidator {
     }
 
     const systemEntries = Array.isArray(body.system) ? body.system : []
-    const system0Text =
-      systemEntries.length > 0 && typeof systemEntries[0]?.text === 'string'
-        ? systemEntries[0].text
-        : null
-    const system1Text =
-      systemEntries.length > 1 && typeof systemEntries[1]?.text === 'string'
-        ? systemEntries[1].text
-        : null
+    const normalizedSystem = systemEntries.map((entry) => normalizeSystemText(entry?.text))
 
-    if (model.startsWith('claude-3-5-haiku')) {
-      const messages = Array.isArray(body.messages) ? body.messages : []
-      const isSingleUserMessage =
-        messages.length === 1 && messages.every((item) => item?.role === 'user')
+    if (normalizedSystem.length === 0) {
+      return false
+    }
 
-      if (!isSingleUserMessage || !system0Text) {
+    for (const normalizedEntry of normalizedSystem) {
+      const { bestScore } = bestSimilarity(normalizedEntry)
+      logger.info(`Claude system prompt similarity score: ${bestScore.toFixed(4)}`)
+      if (bestScore < SYSTEM_PROMPT_THRESHOLD) {
         return false
       }
-
-      const similarity = similaritySimple(system0Text, haikuSystemPrompt, 0.9)
-      return similarity.passed
     }
 
-    if (!system0Text || !system1Text) {
-      return false
-    }
-
-    const sys0 = similaritySimple(system0Text, claudeOtherSystemPrompt1, 0.9)
-    if (!sys0.passed) {
-      return false
-    }
-
-    const sys1 = similaritySimple(system1Text, claudeOtherSystemPrompt2, 0.5)
-    return sys1.passed
+    return true
   }
 
   /**
