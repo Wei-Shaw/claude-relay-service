@@ -52,8 +52,12 @@ class ClaudeCodeValidator {
     }
 
     const model = typeof body.model === 'string' ? body.model : null
-    if (!model || model.startsWith('claude-3-5-haiku')) {
+    if (!model) {
       return false
+    }
+
+    if (model.startsWith('claude-3-5-haiku')) {
+      return true
     }
 
     const systemEntries = Array.isArray(body.system) ? body.system : []
