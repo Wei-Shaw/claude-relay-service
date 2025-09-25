@@ -654,6 +654,82 @@
                     <i class="fas fa-minus" />
                   </div>
                 </div>
+                <div v-else-if="account.platform === 'openai'" class="space-y-2">
+                  <div v-if="account.codexUsage" class="space-y-2">
+                    <div class="space-y-1 rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70">
+                      <div class="flex items-center justify-between text-xs">
+                        <div class="flex items-center gap-1 text-gray-600 dark:text-gray-300">
+                          <i class="fas fa-hourglass-half text-indigo-500" />
+                          <span>5小时窗口</span>
+                        </div>
+                        <span class="font-semibold text-gray-800 dark:text-gray-100">
+                          {{ formatCodexUsagePercent(account.codexUsage.primary.usedPercent) }}
+                        </span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <div class="h-2 w-24 rounded-full bg-gray-200 dark:bg-gray-600">
+                          <div
+                            :class="[
+                              'h-2 rounded-full transition-all duration-300',
+                              getCodexUsageBarClass(account.codexUsage.primary.usedPercent)
+                            ]"
+                            :style="{ width: getCodexUsageWidth(account.codexUsage.primary.usedPercent) }"
+                          />
+                        </div>
+                        <span class="text-[11px] text-gray-500 dark:text-gray-400">
+                          {{ formatCodexWindowDisplay(account.codexUsage.primary.windowMinutes) }}
+                        </span>
+                      </div>
+                      <div class="text-[11px] text-gray-500 dark:text-gray-400">
+                        重置剩余 {{ formatCodexRemaining(account.codexUsage.primary) }}
+                      </div>
+                    </div>
+                    <div class="space-y-1 rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70">
+                      <div class="flex items-center justify-between text-xs">
+                        <div class="flex items-center gap-1 text-gray-600 dark:text-gray-300">
+                          <i class="fas fa-calendar-week text-blue-500" />
+                          <span>7天窗口</span>
+                        </div>
+                        <span class="font-semibold text-gray-800 dark:text-gray-100">
+                          {{ formatCodexUsagePercent(account.codexUsage.secondary.usedPercent) }}
+                        </span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <div class="h-2 w-24 rounded-full bg-gray-200 dark:bg-gray-600">
+                          <div
+                            :class="[
+                              'h-2 rounded-full transition-all duration-300',
+                              getCodexUsageBarClass(account.codexUsage.secondary.usedPercent)
+                            ]"
+                            :style="{ width: getCodexUsageWidth(account.codexUsage.secondary.usedPercent) }"
+                          />
+                        </div>
+                        <span class="text-[11px] text-gray-500 dark:text-gray-400">
+                          {{ formatCodexWindowDisplay(account.codexUsage.secondary.windowMinutes) }}
+                        </span>
+                      </div>
+                      <div class="text-[11px] text-gray-500 dark:text-gray-400">
+                        重置剩余 {{ formatCodexRemaining(account.codexUsage.secondary) }}
+                      </div>
+                    </div>
+                    <div
+                      v-if="account.codexUsage.primaryOverSecondaryPercent !== null && account.codexUsage.primaryOverSecondaryPercent !== undefined"
+                      class="text-[11px] text-gray-500 dark:text-gray-400"
+                    >
+                      短期/长期占比
+                      {{ formatCodexUsagePercent(account.codexUsage.primaryOverSecondaryPercent) }}
+                    </div>
+                    <div
+                      v-if="account.codexUsage.updatedAt"
+                      class="text-[11px] text-gray-400 dark:text-gray-500"
+                    >
+                      更新 {{ formatRelativeTime(account.codexUsage.updatedAt) }}
+                    </div>
+                  </div>
+                  <div v-else class="text-sm text-gray-400">
+                    <span class="text-xs">N/A</span>
+                  </div>
+                </div>
                 <div v-else-if="account.platform === 'claude'" class="text-sm text-gray-400">
                   <i class="fas fa-minus" />
                 </div>
@@ -897,6 +973,78 @@
                 </span>
                 <span v-else class="text-gray-500"> 已结束 </span>
               </div>
+            </div>
+            <div v-else-if="account.platform === 'openai'" class="space-y-2">
+              <div v-if="account.codexUsage" class="space-y-2 rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+                <div class="flex items-center justify-between text-xs">
+                  <div class="flex items-center gap-1 text-gray-600 dark:text-gray-300">
+                    <i class="fas fa-hourglass-half text-indigo-500" />
+                    <span>5小时窗口</span>
+                  </div>
+                  <span class="font-semibold text-gray-800 dark:text-gray-100">
+                    {{ formatCodexUsagePercent(account.codexUsage.primary.usedPercent) }}
+                  </span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <div class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-600">
+                    <div
+                      :class="[
+                        'h-2 rounded-full transition-all duration-300',
+                        getCodexUsageBarClass(account.codexUsage.primary.usedPercent)
+                      ]"
+                      :style="{ width: getCodexUsageWidth(account.codexUsage.primary.usedPercent) }"
+                    />
+                  </div>
+                  <span class="text-[11px] text-gray-500 dark:text-gray-400">
+                    {{ formatCodexWindowDisplay(account.codexUsage.primary.windowMinutes) }}
+                  </span>
+                </div>
+                <div class="text-[11px] text-gray-500 dark:text-gray-400">
+                  重置剩余 {{ formatCodexRemaining(account.codexUsage.primary) }}
+                </div>
+              </div>
+              <div v-if="account.codexUsage" class="space-y-2 rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+                <div class="flex items-center justify-between text-xs">
+                  <div class="flex items-center gap-1 text-gray-600 dark:text-gray-300">
+                    <i class="fas fa-calendar-week text-blue-500" />
+                    <span>7天窗口</span>
+                  </div>
+                  <span class="font-semibold text-gray-800 dark:text-gray-100">
+                    {{ formatCodexUsagePercent(account.codexUsage.secondary.usedPercent) }}
+                  </span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <div class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-600">
+                    <div
+                      :class="[
+                        'h-2 rounded-full transition-all duration-300',
+                        getCodexUsageBarClass(account.codexUsage.secondary.usedPercent)
+                      ]"
+                      :style="{ width: getCodexUsageWidth(account.codexUsage.secondary.usedPercent) }"
+                    />
+                  </div>
+                  <span class="text-[11px] text-gray-500 dark:text-gray-400">
+                    {{ formatCodexWindowDisplay(account.codexUsage.secondary.windowMinutes) }}
+                  </span>
+                </div>
+                <div class="text-[11px] text-gray-500 dark:text-gray-400">
+                  重置剩余 {{ formatCodexRemaining(account.codexUsage.secondary) }}
+                </div>
+              </div>
+              <div
+                v-if="account.codexUsage && account.codexUsage.primaryOverSecondaryPercent !== null && account.codexUsage.primaryOverSecondaryPercent !== undefined"
+                class="text-[11px] text-gray-500 dark:text-gray-400"
+              >
+                短期/长期占比
+                {{ formatCodexUsagePercent(account.codexUsage.primaryOverSecondaryPercent) }}
+              </div>
+              <div
+                v-if="account.codexUsage && account.codexUsage.updatedAt"
+                class="text-[11px] text-gray-400 dark:text-gray-500"
+              >
+                更新 {{ formatRelativeTime(account.codexUsage.updatedAt) }}
+              </div>
+              <div v-if="!account.codexUsage" class="text-xs text-gray-400">暂无统计</div>
             </div>
 
             <!-- 最后使用时间 -->
@@ -2049,6 +2197,102 @@ const getSessionProgressBarClass = (status, account = null) => {
     // 正常状态（allowed 或其他） - 蓝色
     return 'bg-gradient-to-r from-blue-500 to-indigo-600'
   }
+}
+
+// OpenAI 限额进度条颜色
+const getCodexUsageBarClass = (percent) => {
+  if (percent === null || percent === undefined || Number.isNaN(percent)) {
+    return 'bg-gradient-to-r from-gray-300 to-gray-400'
+  }
+  if (percent >= 90) {
+    return 'bg-gradient-to-r from-red-500 to-red-600'
+  }
+  if (percent >= 75) {
+    return 'bg-gradient-to-r from-yellow-500 to-orange-500'
+  }
+  return 'bg-gradient-to-r from-emerald-500 to-teal-500'
+}
+
+// 百分比显示
+const formatCodexUsagePercent = (percent) => {
+  if (percent === null || percent === undefined || Number.isNaN(percent)) {
+    return '--'
+  }
+  return `${percent.toFixed(1)}%`
+}
+
+// 进度条宽度
+const getCodexUsageWidth = (percent) => {
+  if (percent === null || percent === undefined || Number.isNaN(percent)) {
+    return '0%'
+  }
+  const clamped = Math.max(0, Math.min(100, percent))
+  return `${clamped}%`
+}
+
+// 格式化窗口时长
+const formatCodexWindowDisplay = (minutes) => {
+  if (!minutes || Number.isNaN(Number(minutes))) {
+    return '窗口 --'
+  }
+  const value = Number(minutes)
+  if (value >= 1440) {
+    const days = Math.floor(value / 1440)
+    const hours = Math.floor((value % 1440) / 60)
+    if (hours > 0) {
+      return `窗口 ${days}天${hours}小时`
+    }
+    return `窗口 ${days}天`
+  }
+  if (value >= 60) {
+    const hours = Math.floor(value / 60)
+    const remain = value % 60
+    if (remain > 0) {
+      return `窗口 ${hours}小时${remain}分钟`
+    }
+    return `窗口 ${hours}小时`
+  }
+  return `窗口 ${value}分钟`
+}
+
+// 格式化剩余时间
+const formatCodexRemaining = (usageItem) => {
+  if (!usageItem) {
+    return '--'
+  }
+
+  let seconds = usageItem.remainingSeconds
+  if (seconds === null || seconds === undefined) {
+    seconds = usageItem.resetAfterSeconds
+  }
+
+  if (seconds === null || seconds === undefined || Number.isNaN(Number(seconds))) {
+    return '--'
+  }
+
+  seconds = Math.max(0, Math.floor(Number(seconds)))
+
+  const days = Math.floor(seconds / 86400)
+  const hours = Math.floor((seconds % 86400) / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const secs = seconds % 60
+
+  if (days > 0) {
+    if (hours > 0) {
+      return `${days}天${hours}小时`
+    }
+    return `${days}天`
+  }
+  if (hours > 0) {
+    if (minutes > 0) {
+      return `${hours}小时${minutes}分钟`
+    }
+    return `${hours}小时`
+  }
+  if (minutes > 0) {
+    return `${minutes}分钟`
+  }
+  return `${secs}秒`
 }
 
 // 格式化费用显示

@@ -115,6 +115,85 @@ setInterval(
   10 * 60 * 1000
 )
 
+function toNumberOrNull(value) {
+  if (value === undefined || value === null || value === '') {
+    return null
+  }
+
+  const num = Number(value)
+  return Number.isFinite(num) ? num : null
+}
+
+function computeResetMeta(updatedAt, resetAfterSeconds) {
+  if (!updatedAt || resetAfterSeconds === null || resetAfterSeconds === undefined) {
+    return {
+      resetAt: null,
+      remainingSeconds: null
+    }
+  }
+
+  const updatedMs = Date.parse(updatedAt)
+  if (Number.isNaN(updatedMs)) {
+    return {
+      resetAt: null,
+      remainingSeconds: null
+    }
+  }
+
+  const resetMs = updatedMs + resetAfterSeconds * 1000
+  return {
+    resetAt: new Date(resetMs).toISOString(),
+    remainingSeconds: Math.max(0, Math.round((resetMs - Date.now()) / 1000))
+  }
+}
+
+function buildCodexUsageSnapshot(accountData) {
+  const updatedAt = accountData.codexUsageUpdatedAt
+
+  const primaryUsedPercent = toNumberOrNull(accountData.codexPrimaryUsedPercent)
+  const primaryResetAfterSeconds = toNumberOrNull(accountData.codexPrimaryResetAfterSeconds)
+  const primaryWindowMinutes = toNumberOrNull(accountData.codexPrimaryWindowMinutes)
+  const secondaryUsedPercent = toNumberOrNull(accountData.codexSecondaryUsedPercent)
+  const secondaryResetAfterSeconds = toNumberOrNull(accountData.codexSecondaryResetAfterSeconds)
+  const secondaryWindowMinutes = toNumberOrNull(accountData.codexSecondaryWindowMinutes)
+  const overSecondaryPercent = toNumberOrNull(accountData.codexPrimaryOverSecondaryLimitPercent)
+
+  const hasPrimaryData =
+    primaryUsedPercent !== null ||
+    primaryResetAfterSeconds !== null ||
+    primaryWindowMinutes !== null
+  const hasSecondaryData =
+    secondaryUsedPercent !== null ||
+    secondaryResetAfterSeconds !== null ||
+    secondaryWindowMinutes !== null
+
+  if (!updatedAt && !hasPrimaryData && !hasSecondaryData) {
+    return null
+  }
+
+  const primaryMeta = computeResetMeta(updatedAt, primaryResetAfterSeconds)
+  const secondaryMeta = computeResetMeta(updatedAt, secondaryResetAfterSeconds)
+
+  return {
+    updatedAt,
+    primary: {
+      usedPercent: primaryUsedPercent,
+      resetAfterSeconds: primaryResetAfterSeconds,
+      windowMinutes: primaryWindowMinutes,
+      resetAt: primaryMeta.resetAt,
+      remainingSeconds: primaryMeta.remainingSeconds
+    },
+    secondary: {
+      usedPercent: secondaryUsedPercent,
+      resetAfterSeconds: secondaryResetAfterSeconds,
+      windowMinutes: secondaryWindowMinutes,
+      resetAt: secondaryMeta.resetAt,
+      remainingSeconds: secondaryMeta.remainingSeconds
+    },
+    primaryOverSecondaryPercent: overSecondaryPercent
+  }
+}
+
 // 刷新访问令牌
 async function refreshAccessToken(refreshToken, proxy = null) {
   try {
@@ -650,6 +729,8 @@ async function getAllAccounts() {
   for (const key of keys) {
     const accountData = await client.hgetall(key)
     if (accountData && Object.keys(accountData).length > 0) {
+      const codexUsage = buildCodexUsageSnapshot(accountData)
+
       // 解密敏感数据（但不返回给前端）
       if (accountData.email) {
         accountData.email = decrypt(accountData.email)
@@ -657,12 +738,24 @@ async function getAllAccounts() {
 
       // 先保存 refreshToken 是否存在的标记
       const hasRefreshTokenFlag = !!accountData.refreshToken
+      const maskedAccessToken = accountData.accessToken ? '[ENCRYPTED]' : ''
+      const maskedRefreshToken = accountData.refreshToken ? '[ENCRYPTED]' : ''
+      const maskedOauth = accountData.openaiOauth ? '[ENCRYPTED]' : ''
 
       // 屏蔽敏感信息（token等不应该返回给前端）
       delete accountData.idToken
       delete accountData.accessToken
       delete accountData.refreshToken
       delete accountData.openaiOauth
+      delete accountData.codexPrimaryUsedPercent
+      delete accountData.codexPrimaryResetAfterSeconds
+      delete accountData.codexPrimaryWindowMinutes
+      delete accountData.codexSecondaryUsedPercent
+      delete accountData.codexSecondaryResetAfterSeconds
+      delete accountData.codexSecondaryWindowMinutes
+      delete accountData.codexPrimaryOverSecondaryLimitPercent
+      // 时间戳改由 codexUsage.updatedAt 暴露
+      delete accountData.codexUsageUpdatedAt
 
       // 获取限流状态信息
       const rateLimitInfo = await getAccountRateLimitInfo(accountData.id)
@@ -682,9 +775,9 @@ async function getAllAccounts() {
         ...accountData,
         isActive: accountData.isActive === 'true',
         schedulable: accountData.schedulable !== 'false',
-        openaiOauth: accountData.openaiOauth ? '[ENCRYPTED]' : '',
-        accessToken: accountData.accessToken ? '[ENCRYPTED]' : '',
-        refreshToken: accountData.refreshToken ? '[ENCRYPTED]' : '',
+        openaiOauth: maskedOauth,
+        accessToken: maskedAccessToken,
+        refreshToken: maskedRefreshToken,
         // 添加 scopes 字段用于判断认证方式
         // 处理空字符串的情况
         scopes:
@@ -706,7 +799,8 @@ async function getAllAccounts() {
               rateLimitedAt: null,
               rateLimitResetAt: null,
               minutesRemaining: 0
-            }
+            },
+        codexUsage
       })
     }
   }
@@ -1043,6 +1137,41 @@ async function updateAccountUsage(accountId, tokens = 0) {
 // 为了兼容性，保留recordUsage作为updateAccountUsage的别名
 const recordUsage = updateAccountUsage
 
+async function updateCodexUsageSnapshot(accountId, usageSnapshot) {
+  if (!usageSnapshot || typeof usageSnapshot !== 'object') {
+    return
+  }
+
+  const fieldMap = {
+    primaryUsedPercent: 'codexPrimaryUsedPercent',
+    primaryResetAfterSeconds: 'codexPrimaryResetAfterSeconds',
+    primaryWindowMinutes: 'codexPrimaryWindowMinutes',
+    secondaryUsedPercent: 'codexSecondaryUsedPercent',
+    secondaryResetAfterSeconds: 'codexSecondaryResetAfterSeconds',
+    secondaryWindowMinutes: 'codexSecondaryWindowMinutes',
+    primaryOverSecondaryPercent: 'codexPrimaryOverSecondaryLimitPercent'
+  }
+
+  const updates = {}
+  let hasPayload = false
+
+  for (const [key, field] of Object.entries(fieldMap)) {
+    if (usageSnapshot[key] !== undefined && usageSnapshot[key] !== null) {
+      updates[field] = String(usageSnapshot[key])
+      hasPayload = true
+    }
+  }
+
+  if (!hasPayload) {
+    return
+  }
+
+  updates.codexUsageUpdatedAt = new Date().toISOString()
+
+  const client = redisClient.getClientSafe()
+  await client.hset(`${OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`, updates)
+}
+
 module.exports = {
   createAccount,
   getAccount,
@@ -1059,6 +1188,7 @@ module.exports = {
   getAccountRateLimitInfo,
   updateAccountUsage,
   recordUsage, // 别名，指向updateAccountUsage
+  updateCodexUsageSnapshot,
   encrypt,
   decrypt,
   generateEncryptionKey,
