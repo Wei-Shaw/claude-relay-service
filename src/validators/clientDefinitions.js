@@ -9,9 +9,6 @@ const CLIENT_DEFINITIONS = {
     name: 'Claude Code',
     displayName: 'Claude Code CLI',
     description: 'Claude Code command-line interface',
-    userAgentPattern: /^claude-cli\/[\d.]+(?:[-\w]*)?\s+\(external,\s*(?:cli|sdk-[a-z]+)\)$/i,
-    requiredHeaders: ['x-app', 'anthropic-beta', 'anthropic-version'],
-    restrictedPaths: ['/api/v1/messages', '/claude/v1/messages'],
     icon: '🤖'
   },
 
@@ -20,9 +17,6 @@ const CLIENT_DEFINITIONS = {
     name: 'Gemini CLI',
     displayName: 'Gemini Command Line Tool',
     description: 'Google Gemini API command-line interface',
-    userAgentPattern: /^GeminiCLI\/v?[\d.]+/i,
-    requiredPaths: ['/gemini'],
-    validatePaths: ['generateContent'],
     icon: '💎'
   },
 
@@ -31,9 +25,6 @@ const CLIENT_DEFINITIONS = {
     name: 'Codex CLI',
     displayName: 'Codex Command Line Tool',
     description: 'Cursor/Codex command-line interface',
-    userAgentPattern: /^(codex_vscode|codex_cli_rs)\/[\d.]+/i,
-    requiredHeaders: ['originator', 'session_id'],
-    restrictedPaths: ['/openai', '/azure'],
     icon: '🔷'
   }
 }
