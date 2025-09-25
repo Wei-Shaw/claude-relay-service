@@ -156,34 +156,59 @@ class UnifiedOpenAIScheduler {
           accountType = 'openai'
         }
 
-        if (
+        const isActiveBoundAccount =
           boundAccount &&
           (boundAccount.isActive === true || boundAccount.isActive === 'true') &&
-          boundAccount.status !== 'error'
-        ) {
-          // 检查是否被限流
+          boundAccount.status !== 'error' &&
+          boundAccount.status !== 'unauthorized'
+
+        if (isActiveBoundAccount) {
           if (accountType === 'openai') {
-            const isRateLimited = await this.isAccountRateLimited(boundAccount.id)
-            if (isRateLimited) {
-              const errorMsg = `Dedicated account ${boundAccount.name} is currently rate limited`
+            const readiness = await this._ensureAccountReadyForScheduling(
+              boundAccount,
+              boundAccount.id,
+              { sanitized: false }
+            )
+
+            if (!readiness.canUse) {
+              const isRateLimited = readiness.reason === 'rate_limited'
+              const errorMsg = isRateLimited
+                ? `Dedicated account ${boundAccount.name} is currently rate limited`
+                : `Dedicated account ${boundAccount.name} is not schedulable`
               logger.warn(`⚠️ ${errorMsg}`)
               const error = new Error(errorMsg)
-              error.statusCode = 429 // Too Many Requests - 限流
+              error.statusCode = isRateLimited ? 429 : 403
               throw error
             }
-          } else if (
-            accountType === 'openai-responses' &&
-            this._isRateLimited(boundAccount.rateLimitStatus)
-          ) {
-            // OpenAI-Responses 账户的限流检查
-            const isRateLimitCleared = await openaiResponsesAccountService.checkAndClearRateLimit(
-              boundAccount.id
-            )
-            if (!isRateLimitCleared) {
-              const errorMsg = `Dedicated account ${boundAccount.name} is currently rate limited`
+          } else {
+            const hasRateLimitFlag = this._isRateLimited(boundAccount.rateLimitStatus)
+            if (hasRateLimitFlag) {
+              const isRateLimitCleared = await openaiResponsesAccountService.checkAndClearRateLimit(
+                boundAccount.id
+              )
+              if (!isRateLimitCleared) {
+                const errorMsg = `Dedicated account ${boundAccount.name} is currently rate limited`
+                logger.warn(`⚠️ ${errorMsg}`)
+                const error = new Error(errorMsg)
+                error.statusCode = 429 // Too Many Requests - 限流
+                throw error
+              }
+              // 限流已解除，刷新账户最新状态，确保后续调度信息准确
+              boundAccount = await openaiResponsesAccountService.getAccount(boundAccount.id)
+              if (!boundAccount) {
+                const errorMsg = `Dedicated account ${apiKeyData.openaiAccountId} not found after rate limit reset`
+                logger.warn(`⚠️ ${errorMsg}`)
+                const error = new Error(errorMsg)
+                error.statusCode = 404
+                throw error
+              }
+            }
+
+            if (!this._isSchedulable(boundAccount.schedulable)) {
+              const errorMsg = `Dedicated account ${boundAccount.name} is not schedulable`
               logger.warn(`⚠️ ${errorMsg}`)
               const error = new Error(errorMsg)
-              error.statusCode = 429 // Too Many Requests - 限流
+              error.statusCode = 403 // Forbidden - 调度被禁止
               throw error
             }
           }
@@ -223,9 +248,18 @@ class UnifiedOpenAIScheduler {
           }
         } else {
           // 专属账户不可用时直接报错，不降级到共享池
-          const errorMsg = boundAccount
-            ? `Dedicated account ${boundAccount.name} is not available (inactive or error status)`
-            : `Dedicated account ${apiKeyData.openaiAccountId} not found`
+          let errorMsg
+          if (!boundAccount) {
+            errorMsg = `Dedicated account ${apiKeyData.openaiAccountId} not found`
+          } else if (!(boundAccount.isActive === true || boundAccount.isActive === 'true')) {
+            errorMsg = `Dedicated account ${boundAccount.name} is not active`
+          } else if (boundAccount.status === 'unauthorized') {
+            errorMsg = `Dedicated account ${boundAccount.name} is unauthorized`
+          } else if (boundAccount.status === 'error') {
+            errorMsg = `Dedicated account ${boundAccount.name} is not available (error status)`
+          } else {
+            errorMsg = `Dedicated account ${boundAccount.name} is not available (inactive or forbidden)`
+          }
           logger.warn(`⚠️ ${errorMsg}`)
           const error = new Error(errorMsg)
           error.statusCode = boundAccount ? 403 : 404 // Forbidden 或 Not Found
