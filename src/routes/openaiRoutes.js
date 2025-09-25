@@ -17,6 +17,12 @@ function createProxyAgent(proxy) {
   return ProxyHelper.createProxyAgent(proxy)
 }
 
+// 检查 API Key 是否具备 OpenAI 权限
+function checkOpenAIPermissions(apiKeyData) {
+  const permissions = apiKeyData?.permissions || 'all'
+  return permissions === 'all' || permissions === 'openai'
+}
+
 function normalizeHeaders(headers = {}) {
   if (!headers || typeof headers !== 'object') {
     return {}
@@ -189,6 +195,19 @@ const handleResponses = async (req, res) => {
   try {
     // 从中间件获取 API Key 数据
     const apiKeyData = req.apiKey || {}
+
+    if (!checkOpenAIPermissions(apiKeyData)) {
+      logger.security(
+        `🚫 API Key ${apiKeyData.id || 'unknown'} 缺少 OpenAI 权限，拒绝访问 ${req.originalUrl}`
+      )
+      return res.status(403).json({
+        error: {
+          message: 'This API key does not have permission to access OpenAI',
+          type: 'permission_denied',
+          code: 'permission_denied'
+        }
+      })
+    }
 
     // 从请求头或请求体中提取会话 ID
     const sessionId =
