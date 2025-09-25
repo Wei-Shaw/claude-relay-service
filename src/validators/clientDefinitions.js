@@ -9,7 +9,7 @@ const CLIENT_DEFINITIONS = {
     name: 'Claude Code',
     displayName: 'Claude Code CLI',
     description: 'Claude Code command-line interface',
-    userAgentPattern: /^claude-cli\/[\d.]+([-\w]*)?\s+\(external,\s*cli\)$/i,
+    userAgentPattern: /^claude-cli\/[\d.]+(?:[-\w]*)?\s+\(external,\s*(?:cli|sdk-[a-z]+)\)$/i,
     requiredHeaders: ['x-app', 'anthropic-beta', 'anthropic-version'],
     restrictedPaths: ['/api/v1/messages', '/claude/v1/messages'],
     icon: '🤖'
