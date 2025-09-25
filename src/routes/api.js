@@ -20,6 +20,20 @@ async function handleMessagesRequest(req, res) {
   try {
     const startTime = Date.now()
 
+    // Claude 服务权限校验，阻止未授权的 Key
+    if (
+      req.apiKey.permissions &&
+      req.apiKey.permissions !== 'all' &&
+      req.apiKey.permissions !== 'claude'
+    ) {
+      return res.status(403).json({
+        error: {
+          type: 'permission_error',
+          message: '此 API Key 无权访问 Claude 服务'
+        }
+      })
+    }
+
     // 严格的输入验证
     if (!req.body || typeof req.body !== 'object') {
       return res.status(400).json({
@@ -988,3 +1002,4 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
 })
 
 module.exports = router
+module.exports.handleMessagesRequest = handleMessagesRequest
