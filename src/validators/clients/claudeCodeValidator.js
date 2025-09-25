@@ -52,7 +52,7 @@ class ClaudeCodeValidator {
     }
 
     const model = typeof body.model === 'string' ? body.model : null
-    if (!model) {
+    if (!model || model.startsWith('claude-3-5-haiku')) {
       return false
     }
 
@@ -65,19 +65,6 @@ class ClaudeCodeValidator {
       systemEntries.length > 1 && typeof systemEntries[1]?.text === 'string'
         ? systemEntries[1].text
         : null
-
-    if (model.startsWith('claude-3-5-haiku')) {
-      const messages = Array.isArray(body.messages) ? body.messages : []
-      const isSingleUserMessage =
-        messages.length === 1 && messages.every((item) => item?.role === 'user')
-
-      if (!isSingleUserMessage || !system0Text) {
-        return false
-      }
-
-      const similarity = similaritySimple(system0Text, haikuSystemPrompt, 0.9)
-      return similarity.passed
-    }
 
     if (!system0Text || !system1Text) {
       return false
