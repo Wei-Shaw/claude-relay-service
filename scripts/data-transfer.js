@@ -204,7 +204,7 @@ async function exportData() {
     }
 
     // 写入文件
-    await fs.writeFile(outputFile, JSON.stringify(exportData, null, 2))
+    await fs.writeFile(outputFile, JSON.stringify(exportDataObj, null, 2))
 
     // 显示导出摘要
     console.log(`\n${'='.repeat(60)}`)
