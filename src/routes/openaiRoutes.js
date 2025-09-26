@@ -416,8 +416,12 @@ const handleResponses = async (req, res) => {
       }
 
       return
-    } else if (upstream.status === 401) {
-      logger.warn(`🔐 Unauthorized error detected for OpenAI account ${accountId} (Codex API)`)
+    } else if (upstream.status === 401 || upstream.status === 402) {
+      const unauthorizedStatus = upstream.status
+      const statusDescription = unauthorizedStatus === 401 ? 'Unauthorized' : 'Payment required'
+      logger.warn(
+        `🔐 ${statusDescription} error detected for OpenAI account ${accountId} (Codex API)`
+      )
 
       let errorData = null
 
@@ -435,18 +439,20 @@ const handleResponses = async (req, res) => {
           try {
             errorData = JSON.parse(fullResponse)
           } catch (parseError) {
-            logger.error('Failed to parse 401 error response:', parseError)
-            logger.debug('Raw 401 response:', fullResponse)
+            logger.error(`Failed to parse ${unauthorizedStatus} error response:`, parseError)
+            logger.debug(`Raw ${unauthorizedStatus} response:`, fullResponse)
             errorData = { error: { message: fullResponse || 'Unauthorized' } }
           }
         } else {
           errorData = upstream.data
         }
       } catch (parseError) {
-        logger.error('⚠️ Failed to handle 401 error response:', parseError)
+        logger.error(`⚠️ Failed to handle ${unauthorizedStatus} error response:`, parseError)
       }
 
-      let reason = 'OpenAI账号认证失败（401错误）'
+      const statusLabel = unauthorizedStatus === 401 ? '401错误' : '402错误'
+      const extraHint = unauthorizedStatus === 402 ? '，可能欠费' : ''
+      let reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）`
       if (errorData) {
         const messageCandidate =
           errorData.error &&
@@ -457,7 +463,7 @@ const handleResponses = async (req, res) => {
               ? errorData.message.trim()
               : null
         if (messageCandidate) {
-          reason = `OpenAI账号认证失败（401错误）：${messageCandidate}`
+          reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）：${messageCandidate}`
         }
       }
 
@@ -469,7 +475,10 @@ const handleResponses = async (req, res) => {
           reason
         )
       } catch (markError) {
-        logger.error('❌ Failed to mark OpenAI account unauthorized after 401:', markError)
+        logger.error(
+          `❌ Failed to mark OpenAI account unauthorized after ${unauthorizedStatus}:`,
+          markError
+        )
       }
 
       let errorResponse = errorData
@@ -485,7 +494,7 @@ const handleResponses = async (req, res) => {
         }
       }
 
-      res.status(401).json(errorResponse)
+      res.status(unauthorizedStatus).json(errorResponse)
       return
     } else if (upstream.status === 200 || upstream.status === 201) {
       // 请求成功，检查并移除限流状态
@@ -744,23 +753,25 @@ const handleResponses = async (req, res) => {
     // 优先使用主动设置的 statusCode，然后是上游响应的状态码，最后默认 500
     const status = error.statusCode || error.response?.status || 500
 
-    if (status === 401 && accountId) {
-      let reason = 'OpenAI账号认证失败（401错误）'
+    if ((status === 401 || status === 402) && accountId) {
+      const statusLabel = status === 401 ? '401错误' : '402错误'
+      const extraHint = status === 402 ? '，可能欠费' : ''
+      let reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）`
       const errorData = error.response?.data
       if (errorData) {
         if (typeof errorData === 'string' && errorData.trim()) {
-          reason = `OpenAI账号认证失败（401错误）：${errorData.trim()}`
+          reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）：${errorData.trim()}`
         } else if (
           errorData.error &&
           typeof errorData.error.message === 'string' &&
           errorData.error.message.trim()
         ) {
-          reason = `OpenAI账号认证失败（401错误）：${errorData.error.message.trim()}`
+          reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）：${errorData.error.message.trim()}`
         } else if (typeof errorData.message === 'string' && errorData.message.trim()) {
-          reason = `OpenAI账号认证失败（401错误）：${errorData.message.trim()}`
+          reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）：${errorData.message.trim()}`
         }
       } else if (error.message) {
-        reason = `OpenAI账号认证失败（401错误）：${error.message}`
+        reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）：${error.message}`
       }
 
       try {
