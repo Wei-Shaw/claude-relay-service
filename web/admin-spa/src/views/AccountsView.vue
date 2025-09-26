@@ -195,26 +195,72 @@
                   <span>会话窗口</span>
                   <el-tooltip placement="top">
                     <template #content>
-                      <div class="space-y-2">
-                        <div>会话窗口进度表示5小时窗口的时间进度</div>
-                        <div class="space-y-1 text-xs">
-                          <div class="flex items-center gap-2">
-                            <div
-                              class="h-2 w-16 rounded bg-gradient-to-r from-blue-500 to-indigo-600"
-                            ></div>
-                            <span>正常：请求正常处理</span>
+                      <div
+                        class="w-[260px] space-y-3 text-xs leading-relaxed text-white dark:text-gray-800"
+                      >
+                        <div class="space-y-2">
+                          <div class="text-sm font-semibold text-white dark:text-gray-900">
+                            Claude 系列
                           </div>
-                          <div class="flex items-center gap-2">
-                            <div
-                              class="h-2 w-16 rounded bg-gradient-to-r from-yellow-500 to-orange-500"
-                            ></div>
-                            <span>警告：接近限制</span>
+                          <div class="text-gray-200 dark:text-gray-600">
+                            会话窗口进度表示 5 小时窗口的时间推移，颜色提示当前调度状态。
                           </div>
-                          <div class="flex items-center gap-2">
-                            <div
-                              class="h-2 w-16 rounded bg-gradient-to-r from-red-500 to-red-600"
-                            ></div>
-                            <span>拒绝：达到速率限制</span>
+                          <div class="space-y-1 pt-1 text-gray-200 dark:text-gray-600">
+                            <div class="flex items-center gap-2">
+                              <div
+                                class="h-2 w-16 rounded bg-gradient-to-r from-blue-500 to-indigo-600"
+                              ></div>
+                              <span class="font-medium text-white dark:text-gray-900"
+                                >正常：请求正常处理</span
+                              >
+                            </div>
+                            <div class="flex items-center gap-2">
+                              <div
+                                class="h-2 w-16 rounded bg-gradient-to-r from-yellow-500 to-orange-500"
+                              ></div>
+                              <span class="font-medium text-white dark:text-gray-900"
+                                >警告：接近限制</span
+                              >
+                            </div>
+                            <div class="flex items-center gap-2">
+                              <div
+                                class="h-2 w-16 rounded bg-gradient-to-r from-red-500 to-red-600"
+                              ></div>
+                              <span class="font-medium text-white dark:text-gray-900"
+                                >拒绝：达到速率限制</span
+                              >
+                            </div>
+                          </div>
+                        </div>
+                        <div class="h-px bg-gray-200 dark:bg-gray-600/50"></div>
+                        <div class="space-y-2">
+                          <div class="text-sm font-semibold text-white dark:text-gray-900">
+                            OpenAI
+                          </div>
+                          <div class="text-gray-200 dark:text-gray-600">
+                            进度条分别展示 5h 与周限窗口的额度使用比例，颜色含义与上方保持一致。
+                          </div>
+                          <div class="space-y-1 text-gray-200 dark:text-gray-600">
+                            <div class="flex items-start gap-2">
+                              <i class="fas fa-clock mt-[2px] text-[10px] text-blue-500"></i>
+                              <span class="font-medium text-white dark:text-gray-900"
+                                >5h 窗口：5小时使用量进度，到达重置时间后会自动归零。</span
+                              >
+                            </div>
+                            <div class="flex items-start gap-2">
+                              <i class="fas fa-history mt-[2px] text-[10px] text-emerald-500"></i>
+                              <span class="font-medium text-white dark:text-gray-900"
+                                >周限窗口：7天使用量进度，重置时同样回到 0%。</span
+                              >
+                            </div>
+                            <div class="flex items-start gap-2">
+                              <i
+                                class="fas fa-info-circle mt-[2px] text-[10px] text-indigo-500"
+                              ></i>
+                              <span class="font-medium text-white dark:text-gray-900"
+                                >当“重置剩余”为 0 时，进度条与百分比会同步清零。</span
+                              >
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -669,17 +715,17 @@
                               <div
                                 :class="[
                                   'h-2 rounded-full transition-all duration-300',
-                                  getCodexUsageBarClass(account.codexUsage.primary.usedPercent)
+                                  getCodexUsageBarClass(account.codexUsage.primary)
                                 ]"
                                 :style="{
-                                  width: getCodexUsageWidth(account.codexUsage.primary.usedPercent)
+                                  width: getCodexUsageWidth(account.codexUsage.primary)
                                 }"
                               />
                             </div>
                             <span
                               class="w-12 text-right text-xs font-semibold text-gray-800 dark:text-gray-100"
                             >
-                              {{ formatCodexUsagePercent(account.codexUsage.primary.usedPercent) }}
+                              {{ formatCodexUsagePercent(account.codexUsage.primary) }}
                             </span>
                           </div>
                         </div>
@@ -701,21 +747,17 @@
                               <div
                                 :class="[
                                   'h-2 rounded-full transition-all duration-300',
-                                  getCodexUsageBarClass(account.codexUsage.secondary.usedPercent)
+                                  getCodexUsageBarClass(account.codexUsage.secondary)
                                 ]"
                                 :style="{
-                                  width: getCodexUsageWidth(
-                                    account.codexUsage.secondary.usedPercent
-                                  )
+                                  width: getCodexUsageWidth(account.codexUsage.secondary)
                                 }"
                               />
                             </div>
                             <span
                               class="w-12 text-right text-xs font-semibold text-gray-800 dark:text-gray-100"
                             >
-                              {{
-                                formatCodexUsagePercent(account.codexUsage.secondary.usedPercent)
-                              }}
+                              {{ formatCodexUsagePercent(account.codexUsage.secondary) }}
                             </span>
                           </div>
                         </div>
@@ -988,17 +1030,17 @@
                           <div
                             :class="[
                               'h-2 rounded-full transition-all duration-300',
-                              getCodexUsageBarClass(account.codexUsage.primary.usedPercent)
+                              getCodexUsageBarClass(account.codexUsage.primary)
                             ]"
                             :style="{
-                              width: getCodexUsageWidth(account.codexUsage.primary.usedPercent)
+                              width: getCodexUsageWidth(account.codexUsage.primary)
                             }"
                           />
                         </div>
                         <span
                           class="w-12 text-right text-xs font-semibold text-gray-800 dark:text-gray-100"
                         >
-                          {{ formatCodexUsagePercent(account.codexUsage.primary.usedPercent) }}
+                          {{ formatCodexUsagePercent(account.codexUsage.primary) }}
                         </span>
                       </div>
                     </div>
@@ -1020,17 +1062,17 @@
                           <div
                             :class="[
                               'h-2 rounded-full transition-all duration-300',
-                              getCodexUsageBarClass(account.codexUsage.secondary.usedPercent)
+                              getCodexUsageBarClass(account.codexUsage.secondary)
                             ]"
                             :style="{
-                              width: getCodexUsageWidth(account.codexUsage.secondary.usedPercent)
+                              width: getCodexUsageWidth(account.codexUsage.secondary)
                             }"
                           />
                         </div>
                         <span
                           class="w-12 text-right text-xs font-semibold text-gray-800 dark:text-gray-100"
                         >
-                          {{ formatCodexUsagePercent(account.codexUsage.secondary.usedPercent) }}
+                          {{ formatCodexUsagePercent(account.codexUsage.secondary) }}
                         </span>
                       </div>
                     </div>
@@ -2195,9 +2237,47 @@ const getSessionProgressBarClass = (status, account = null) => {
   }
 }
 
+// 归一化 OpenAI 会话窗口使用率
+const normalizeCodexUsagePercent = (usageItem) => {
+  if (!usageItem) {
+    return null
+  }
+
+  const basePercent =
+    typeof usageItem.usedPercent === 'number' && !Number.isNaN(usageItem.usedPercent)
+      ? usageItem.usedPercent
+      : null
+
+  const resetAfterSeconds =
+    typeof usageItem.resetAfterSeconds === 'number' && !Number.isNaN(usageItem.resetAfterSeconds)
+      ? usageItem.resetAfterSeconds
+      : null
+
+  const remainingSeconds =
+    typeof usageItem.remainingSeconds === 'number' ? usageItem.remainingSeconds : null
+
+  const resetAtMs = usageItem.resetAt ? Date.parse(usageItem.resetAt) : null
+
+  const resetElapsed =
+    resetAfterSeconds !== null &&
+    ((remainingSeconds !== null && remainingSeconds <= 0) ||
+      (resetAtMs !== null && !Number.isNaN(resetAtMs) && Date.now() >= resetAtMs))
+
+  if (resetElapsed) {
+    return 0
+  }
+
+  if (basePercent === null) {
+    return null
+  }
+
+  return Math.max(0, Math.min(100, basePercent))
+}
+
 // OpenAI 限额进度条颜色
-const getCodexUsageBarClass = (percent) => {
-  if (percent === null || percent === undefined || Number.isNaN(percent)) {
+const getCodexUsageBarClass = (usageItem) => {
+  const percent = normalizeCodexUsagePercent(usageItem)
+  if (percent === null) {
     return 'bg-gradient-to-r from-gray-300 to-gray-400'
   }
   if (percent >= 90) {
@@ -2210,20 +2290,21 @@ const getCodexUsageBarClass = (percent) => {
 }
 
 // 百分比显示
-const formatCodexUsagePercent = (percent) => {
-  if (percent === null || percent === undefined || Number.isNaN(percent)) {
+const formatCodexUsagePercent = (usageItem) => {
+  const percent = normalizeCodexUsagePercent(usageItem)
+  if (percent === null) {
     return '--'
   }
   return `${percent.toFixed(1)}%`
 }
 
 // 进度条宽度
-const getCodexUsageWidth = (percent) => {
-  if (percent === null || percent === undefined || Number.isNaN(percent)) {
+const getCodexUsageWidth = (usageItem) => {
+  const percent = normalizeCodexUsagePercent(usageItem)
+  if (percent === null) {
     return '0%'
   }
-  const clamped = Math.max(0, Math.min(100, percent))
-  return `${clamped}%`
+  return `${percent}%`
 }
 
 // 时间窗口标签
