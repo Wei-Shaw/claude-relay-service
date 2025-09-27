@@ -547,6 +547,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       weeklyOpusCostLimit,
       tags,
       activationDays, // 新增：激活后有效天数
+      activationUnit, // 新增：激活时间单位 (hours/days)
       expirationMode, // 新增：过期模式
       icon // 新增：图标
     } = req.body
@@ -643,14 +644,23 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
     }
 
     if (expirationMode === 'activation') {
+      // 验证激活时间单位
+      if (!activationUnit || !['hours', 'days'].includes(activationUnit)) {
+        return res.status(400).json({
+          error: 'Activation unit must be either "hours" or "days" when using activation mode'
+        })
+      }
+
+      // 验证激活时间数值
       if (
         !activationDays ||
         !Number.isInteger(Number(activationDays)) ||
         Number(activationDays) < 1
       ) {
-        return res
-          .status(400)
-          .json({ error: 'Activation days must be a positive integer when using activation mode' })
+        const unitText = activationUnit === 'hours' ? 'hours' : 'days'
+        return res.status(400).json({
+          error: `Activation ${unitText} must be a positive integer when using activation mode`
+        })
       }
       // 激活模式下不应该设置固定过期时间
       if (expiresAt) {
@@ -684,6 +694,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       weeklyOpusCostLimit,
       tags,
       activationDays,
+      activationUnit,
       expirationMode,
       icon
     })
@@ -724,6 +735,7 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       weeklyOpusCostLimit,
       tags,
       activationDays,
+      activationUnit,
       expirationMode,
       icon
     } = req.body
@@ -774,6 +786,7 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
           weeklyOpusCostLimit,
           tags,
           activationDays,
+          activationUnit,
           expirationMode,
           icon
         })

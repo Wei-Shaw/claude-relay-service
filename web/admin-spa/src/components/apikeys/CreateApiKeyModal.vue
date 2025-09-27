@@ -492,11 +492,11 @@
               <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 <span v-if="form.expirationMode === 'fixed'">
                   <i class="fas fa-info-circle mr-1" />
-                  固定时间模式：Key 创建后立即生效，按设定时间过期
+                  固定时间模式：Key 创建后立即生效，按设定时间过期（支持小时和天数）
                 </span>
                 <span v-else>
                   <i class="fas fa-info-circle mr-1" />
-                  激活模式：Key 首次使用时激活，激活后按设定天数过期（适合批量销售）
+                  激活模式：Key 首次使用时激活，激活后按设定时间过期（支持小时和天数，适合批量销售）
                 </span>
               </p>
             </div>
@@ -509,6 +509,10 @@
                 @change="updateExpireAt"
               >
                 <option value="">永不过期</option>
+                <option value="1h">1 小时</option>
+                <option value="3h">3 小时</option>
+                <option value="6h">6 小时</option>
+                <option value="12h">12 小时</option>
                 <option value="1d">1 天</option>
                 <option value="7d">7 天</option>
                 <option value="30d">30 天</option>
@@ -537,27 +541,36 @@
                 <input
                   v-model.number="form.activationDays"
                   class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                  max="3650"
+                  :max="form.activationUnit === 'hours' ? 8760 : 3650"
                   min="1"
-                  placeholder="输入天数"
+                  :placeholder="form.activationUnit === 'hours' ? '输入小时数' : '输入天数'"
                   type="number"
                 />
-                <span class="text-sm text-gray-600 dark:text-gray-400">天</span>
+                <select
+                  v-model="form.activationUnit"
+                  class="form-input w-20 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  @change="updateActivationValue"
+                >
+                  <option value="hours">小时</option>
+                  <option value="days">天</option>
+                </select>
               </div>
               <div class="mt-2 flex flex-wrap gap-2">
                 <button
-                  v-for="days in [30, 90, 180, 365]"
-                  :key="days"
+                  v-for="value in getQuickTimeOptions()"
+                  :key="value.value"
                   class="rounded-md border border-gray-300 px-3 py-1 text-xs hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-700"
                   type="button"
-                  @click="form.activationDays = days"
+                  @click="form.activationDays = value.value"
                 >
-                  {{ days }}天
+                  {{ value.label }}
                 </button>
               </div>
               <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 <i class="fas fa-clock mr-1" />
-                Key 将在首次使用后激活，激活后 {{ form.activationDays || 30 }} 天过期
+                Key 将在首次使用后激活，激活后
+                {{ form.activationDays || (form.activationUnit === 'hours' ? 24 : 30) }}
+                {{ form.activationUnit === 'hours' ? '小时' : '天' }}过期
               </p>
             </div>
           </div>
@@ -917,6 +930,7 @@ const form = reactive({
   expiresAt: null,
   expirationMode: 'fixed', // 过期模式：fixed(固定) 或 activation(激活)
   activationDays: 30, // 激活后有效天数
+  activationUnit: 'days', // 激活时间单位：hours 或 days
   permissions: 'all',
   claudeAccountId: '',
   geminiAccountId: '',
@@ -1185,6 +1199,40 @@ const removeTag = (index) => {
   form.tags.splice(index, 1)
 }
 
+// 获取快捷时间选项
+const getQuickTimeOptions = () => {
+  if (form.activationUnit === 'hours') {
+    return [
+      { value: 1, label: '1小时' },
+      { value: 3, label: '3小时' },
+      { value: 6, label: '6小时' },
+      { value: 12, label: '12小时' }
+    ]
+  } else {
+    return [
+      { value: 30, label: '30天' },
+      { value: 90, label: '90天' },
+      { value: 180, label: '180天' },
+      { value: 365, label: '365天' }
+    ]
+  }
+}
+
+// 单位变化时更新数值
+const updateActivationValue = () => {
+  if (form.activationUnit === 'hours') {
+    // 从天切换到小时，设置一个合理的默认值
+    if (form.activationDays > 24) {
+      form.activationDays = 24
+    }
+  } else {
+    // 从小时切换到天，设置一个合理的默认值
+    if (form.activationDays < 1) {
+      form.activationDays = 1
+    }
+  }
+}
+
 // 创建 API Key
 const createApiKey = async () => {
   // 验证表单
@@ -1260,6 +1308,7 @@ const createApiKey = async () => {
       expiresAt: form.expirationMode === 'fixed' ? form.expiresAt || undefined : undefined,
       expirationMode: form.expirationMode,
       activationDays: form.expirationMode === 'activation' ? form.activationDays : undefined,
+      activationUnit: form.expirationMode === 'activation' ? form.activationUnit : undefined,
       permissions: form.permissions,
       tags: form.tags.length > 0 ? form.tags : undefined,
       enableModelRestriction: form.enableModelRestriction,
