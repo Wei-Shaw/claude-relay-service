@@ -67,7 +67,7 @@
                 <input
                   v-model="searchKeyword"
                   class="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 pl-9 text-sm text-gray-700 placeholder-gray-400 shadow-sm transition-all duration-200 hover:border-gray-300 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 dark:hover:border-gray-500"
-                  placeholder="搜索账户名称或邮箱..."
+                  placeholder="搜索账户名称..."
                   type="text"
                 />
                 <i class="fas fa-search absolute left-3 text-sm text-cyan-500" />
@@ -1359,7 +1359,7 @@ const platformOptions = ref([
   { value: 'all', label: '所有平台', icon: 'fa-globe' },
   { value: 'claude', label: 'Claude', icon: 'fa-brain' },
   { value: 'claude-console', label: 'Claude Console', icon: 'fa-terminal' },
-  { value: 'gemini', label: 'Gemini', icon: 'fa-google' },
+  { value: 'gemini', label: 'Gemini', icon: 'fab fa-google' },
   { value: 'openai', label: 'OpenAi', icon: 'fa-openai' },
   { value: 'azure_openai', label: 'Azure OpenAI', icon: 'fab fa-microsoft' },
   { value: 'bedrock', label: 'Bedrock', icon: 'fab fa-aws' },
