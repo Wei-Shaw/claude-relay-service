@@ -155,64 +155,53 @@
               限制设置
             </h4>
             <div class="space-y-3 rounded-lg bg-gray-50 p-4 dark:bg-gray-700/50">
-              <div v-if="apiKey.dailyCostLimit > 0" class="space-y-2">
-                <div class="flex items-center justify-between text-sm">
-                  <span class="text-gray-600 dark:text-gray-400">每日费用限制</span>
-                  <span class="font-semibold text-gray-900 dark:text-gray-100">
-                    ${{ apiKey.dailyCostLimit.toFixed(2) }}
-                  </span>
-                </div>
-                <div class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-600">
-                  <div
-                    class="h-2 rounded-full transition-all duration-300"
-                    :class="
-                      dailyCostPercentage >= 100
-                        ? 'bg-red-500'
-                        : dailyCostPercentage >= 80
-                          ? 'bg-yellow-500'
-                          : 'bg-green-500'
-                    "
-                    :style="{ width: Math.min(dailyCostPercentage, 100) + '%' }"
-                  />
-                </div>
+              <div v-if="apiKey.dailyCostLimit > 0" class="space-y-1.5">
+                <LimitProgressBar
+                  :current="dailyCost"
+                  label="每日费用限制"
+                  :limit="apiKey.dailyCostLimit"
+                  :show-shine="true"
+                  type="daily"
+                />
                 <div class="text-right text-xs text-gray-500 dark:text-gray-400">
-                  已使用 {{ dailyCostPercentage.toFixed(1) }}%
+                  已使用 {{ Math.min(dailyCostPercentage, 100).toFixed(1) }}%
+                </div>
+              </div>
+
+              <div v-if="apiKey.weeklyOpusCostLimit > 0" class="space-y-1.5">
+                <LimitProgressBar
+                  :current="weeklyOpusCost"
+                  label="Opus 周费用限制"
+                  :limit="apiKey.weeklyOpusCostLimit"
+                  :show-shine="true"
+                  type="opus"
+                />
+                <div class="text-right text-xs text-gray-500 dark:text-gray-400">
+                  已使用 {{ Math.min(opusUsagePercentage, 100).toFixed(1) }}%
+                </div>
+              </div>
+
+              <div v-if="apiKey.totalCostLimit > 0" class="space-y-1.5">
+                <LimitProgressBar
+                  :current="totalCost"
+                  label="总费用限制"
+                  :limit="apiKey.totalCostLimit"
+                  :show-shine="true"
+                  type="total"
+                />
+                <div class="text-right text-xs text-gray-500 dark:text-gray-400">
+                  已使用 {{ Math.min(totalUsagePercentage, 100).toFixed(1) }}%
                 </div>
               </div>
 
               <div
                 v-if="apiKey.concurrencyLimit > 0"
-                class="flex items-center justify-between text-sm"
+                class="flex items-center justify-between rounded-lg border border-purple-200/70 bg-white/60 px-3 py-2 text-sm shadow-sm dark:border-purple-500/40 dark:bg-purple-950/20"
               >
-                <span class="text-gray-600 dark:text-gray-400">并发限制</span>
-                <span class="font-semibold text-purple-600">
+                <span class="text-gray-600 dark:text-gray-300">并发限制</span>
+                <span class="font-semibold text-purple-600 dark:text-purple-300">
                   {{ apiKey.currentConcurrency || 0 }} / {{ apiKey.concurrencyLimit }}
                 </span>
-              </div>
-
-              <div v-if="apiKey.totalCostLimit > 0" class="space-y-2">
-                <div class="flex items-center justify-between text-sm">
-                  <span class="text-gray-600 dark:text-gray-400">总费用限制</span>
-                  <span class="font-semibold text-gray-900 dark:text-gray-100">
-                    ${{ apiKey.totalCostLimit.toFixed(2) }}
-                  </span>
-                </div>
-                <div class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-600">
-                  <div
-                    class="h-2 rounded-full transition-all duration-300"
-                    :class="
-                      totalUsagePercentage >= 100
-                        ? 'bg-red-500'
-                        : totalUsagePercentage >= 80
-                          ? 'bg-yellow-500'
-                          : 'bg-indigo-500'
-                    "
-                    :style="{ width: Math.min(totalUsagePercentage, 100) + '%' }"
-                  />
-                </div>
-                <div class="text-right text-xs text-gray-500 dark:text-gray-400">
-                  已使用 {{ totalUsagePercentage.toFixed(1) }}%
-                </div>
               </div>
 
               <div v-if="apiKey.rateLimitWindow > 0" class="space-y-2">
@@ -253,6 +242,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import LimitProgressBar from './LimitProgressBar.vue'
 import WindowCountdown from './WindowCountdown.vue'
 
 const props = defineProps({
@@ -276,6 +266,8 @@ const dailyTokens = computed(() => props.apiKey.usage?.daily?.tokens || 0)
 const totalCost = computed(() => props.apiKey.usage?.total?.cost || 0)
 const dailyCost = computed(() => props.apiKey.dailyCost || 0)
 const totalCostLimit = computed(() => props.apiKey.totalCostLimit || 0)
+const weeklyOpusCost = computed(() => props.apiKey.weeklyOpusCost || 0)
+const weeklyOpusCostLimit = computed(() => props.apiKey.weeklyOpusCostLimit || 0)
 const inputTokens = computed(() => props.apiKey.usage?.total?.inputTokens || 0)
 const outputTokens = computed(() => props.apiKey.usage?.total?.outputTokens || 0)
 const cacheCreateTokens = computed(() => props.apiKey.usage?.total?.cacheCreateTokens || 0)
@@ -288,6 +280,7 @@ const hasLimits = computed(() => {
     props.apiKey.dailyCostLimit > 0 ||
     props.apiKey.totalCostLimit > 0 ||
     props.apiKey.concurrencyLimit > 0 ||
+    props.apiKey.weeklyOpusCostLimit > 0 ||
     props.apiKey.rateLimitWindow > 0 ||
     props.apiKey.tokenLimit > 0
   )
@@ -301,6 +294,11 @@ const dailyCostPercentage = computed(() => {
 const totalUsagePercentage = computed(() => {
   if (!totalCostLimit.value || totalCostLimit.value === 0) return 0
   return (totalCost.value / totalCostLimit.value) * 100
+})
+
+const opusUsagePercentage = computed(() => {
+  if (!weeklyOpusCostLimit.value || weeklyOpusCostLimit.value === 0) return 0
+  return (weeklyOpusCost.value / weeklyOpusCostLimit.value) * 100
 })
 
 // 方法

@@ -578,48 +578,29 @@
                           <LimitProgressBar
                             v-if="key.dailyCostLimit > 0"
                             :current="key.dailyCost || 0"
-                            label="每日"
+                            label="每日限制"
                             :limit="key.dailyCostLimit"
                             type="daily"
+                            variant="compact"
                           />
 
-                          <!-- Opus 周费用限制进度条 -->
+                          <!-- 总费用限制进度条（无每日限制时展示） -->
                           <LimitProgressBar
-                            v-if="key.weeklyOpusCostLimit > 0"
-                            :current="key.weeklyOpusCost || 0"
-                            label="Opus"
-                            :limit="key.weeklyOpusCostLimit"
-                            type="opus"
-                          />
-
-                          <!-- 时间窗口限制进度条 -->
-                          <WindowLimitBar
-                            v-if="key.rateLimitWindow > 0"
-                            :cost-limit="key.rateLimitCost || 0"
-                            :current-cost="key.currentWindowCost || 0"
-                            :current-requests="key.currentWindowRequests || 0"
-                            :current-tokens="key.currentWindowTokens || 0"
-                            :rate-limit-window="key.rateLimitWindow"
-                            :remaining-seconds="key.windowRemainingSeconds || 0"
-                            :request-limit="key.rateLimitRequests || 0"
-                            :token-limit="key.tokenLimit || 0"
+                            v-else-if="key.totalCostLimit > 0"
+                            :current="key.usage?.total?.cost || 0"
+                            label="总费用限制"
+                            :limit="key.totalCostLimit"
+                            type="total"
+                            variant="compact"
                           />
 
                           <!-- 如果没有任何限制 -->
                           <div
-                            v-if="
-                              !key.dailyCostLimit &&
-                              !key.weeklyOpusCostLimit &&
-                              !key.rateLimitWindow
-                            "
-                            class="dark:to-gray-750 relative h-7 w-full overflow-hidden rounded-md border border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 dark:border-gray-700 dark:from-gray-800"
+                            v-else
+                            class="flex items-center justify-center gap-1.5 py-2 text-gray-500 dark:text-gray-400"
                           >
-                            <div class="flex h-full items-center justify-center gap-1.5">
-                              <i class="fas fa-infinity text-xs text-gray-400 dark:text-gray-500" />
-                              <span class="text-xs font-medium text-gray-400 dark:text-gray-500">
-                                无限制
-                              </span>
-                            </div>
+                            <i class="fas fa-infinity text-base" />
+                            <span class="text-xs font-medium">无限制</span>
                           </div>
                         </div>
                       </td>
@@ -1219,44 +1200,29 @@
                   <LimitProgressBar
                     v-if="key.dailyCostLimit > 0"
                     :current="key.dailyCost || 0"
-                    label="每日"
+                    label="每日限制"
                     :limit="key.dailyCostLimit"
                     type="daily"
+                    variant="compact"
                   />
 
-                  <!-- Opus 周费用限制 -->
+                  <!-- 总费用限制（无每日限制时展示） -->
                   <LimitProgressBar
-                    v-if="key.weeklyOpusCostLimit > 0"
-                    :current="key.weeklyOpusCost || 0"
-                    label="Opus"
-                    :limit="key.weeklyOpusCostLimit"
-                    type="opus"
-                  />
-
-                  <!-- 时间窗口限制 -->
-                  <WindowLimitBar
-                    v-if="key.rateLimitWindow > 0"
-                    :cost-limit="key.rateLimitCost || 0"
-                    :current-cost="key.currentWindowCost || 0"
-                    :current-requests="key.currentWindowRequests || 0"
-                    :current-tokens="key.currentWindowTokens || 0"
-                    :rate-limit-window="key.rateLimitWindow"
-                    :remaining-seconds="key.windowRemainingSeconds || 0"
-                    :request-limit="key.rateLimitRequests || 0"
-                    :token-limit="key.tokenLimit || 0"
+                    v-else-if="key.totalCostLimit > 0"
+                    :current="key.usage?.total?.cost || 0"
+                    label="总费用限制"
+                    :limit="key.totalCostLimit"
+                    type="total"
+                    variant="compact"
                   />
 
                   <!-- 无限制显示 -->
                   <div
-                    v-if="!key.dailyCostLimit && !key.weeklyOpusCostLimit && !key.rateLimitWindow"
-                    class="dark:to-gray-750 relative h-7 w-full overflow-hidden rounded-md border border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 dark:border-gray-700 dark:from-gray-800"
+                    v-else
+                    class="flex items-center justify-center gap-1.5 py-2 text-gray-500 dark:text-gray-400"
                   >
-                    <div class="flex h-full items-center justify-center gap-1.5">
-                      <i class="fas fa-infinity text-xs text-gray-400 dark:text-gray-500" />
-                      <span class="text-xs font-medium text-gray-400 dark:text-gray-500">
-                        无限制
-                      </span>
-                    </div>
+                    <i class="fas fa-infinity text-base" />
+                    <span class="text-xs font-medium">无限制</span>
                   </div>
                 </div>
               </div>
@@ -1800,7 +1766,6 @@ import BatchEditApiKeyModal from '@/components/apikeys/BatchEditApiKeyModal.vue'
 import ExpiryEditModal from '@/components/apikeys/ExpiryEditModal.vue'
 import UsageDetailModal from '@/components/apikeys/UsageDetailModal.vue'
 import LimitProgressBar from '@/components/apikeys/LimitProgressBar.vue'
-import WindowLimitBar from '@/components/apikeys/WindowLimitBar.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 
 // 响应式数据
