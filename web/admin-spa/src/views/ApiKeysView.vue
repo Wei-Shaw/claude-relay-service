@@ -117,27 +117,45 @@
                 </div>
               </div>
 
-              <!-- 搜索框 -->
-              <div class="group relative min-w-[200px]">
-                <div
-                  class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-cyan-500 to-teal-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
-                ></div>
-                <div class="relative flex items-center">
-                  <input
-                    v-model="searchKeyword"
-                    class="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 pl-9 text-sm text-gray-700 placeholder-gray-400 shadow-sm transition-all duration-200 hover:border-gray-300 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 dark:hover:border-gray-500"
-                    :placeholder="isLdapEnabled ? '搜索名称或所有者...' : '搜索名称...'"
-                    type="text"
-                    @input="currentPage = 1"
+              <!-- 搜索模式与搜索框 -->
+              <div class="flex min-w-[240px] flex-col gap-2 sm:flex-row sm:items-center">
+                <div class="sm:w-44">
+                  <CustomDropdown
+                    v-model="searchMode"
+                    icon="fa-filter"
+                    icon-color="text-cyan-500"
+                    :options="searchModeOptions"
+                    placeholder="选择搜索类型"
+                    @change="currentPage = 1"
                   />
-                  <i class="fas fa-search absolute left-3 text-sm text-cyan-500" />
-                  <button
-                    v-if="searchKeyword"
-                    class="absolute right-2 flex h-5 w-5 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
-                    @click="clearSearch"
-                  >
-                    <i class="fas fa-times text-xs" />
-                  </button>
+                </div>
+                <div class="group relative flex-1">
+                  <div
+                    class="pointer-events-none absolute -inset-0.5 rounded-lg bg-gradient-to-r from-cyan-500 to-teal-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+                  ></div>
+                  <div class="relative flex items-center">
+                    <input
+                      v-model="searchKeyword"
+                      class="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 pl-9 text-sm text-gray-700 placeholder-gray-400 shadow-sm transition-all duration-200 hover:border-gray-300 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 dark:hover:border-gray-500"
+                      :placeholder="
+                        searchMode === 'bindingAccount'
+                          ? '搜索所属账号...'
+                          : isLdapEnabled
+                            ? '搜索名称或所有者...'
+                            : '搜索名称...'
+                      "
+                      type="text"
+                      @input="currentPage = 1"
+                    />
+                    <i class="fas fa-search absolute left-3 text-sm text-cyan-500" />
+                    <button
+                      v-if="searchKeyword"
+                      class="absolute right-2 flex h-5 w-5 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+                      @click="clearSearch"
+                    >
+                      <i class="fas fa-times text-xs" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1866,6 +1884,11 @@ const availableTags = ref([])
 
 // 搜索相关
 const searchKeyword = ref('')
+const searchMode = ref('apiKey')
+const searchModeOptions = computed(() => [
+  { value: 'apiKey', label: '按Key名称', icon: 'fa-key' },
+  { value: 'bindingAccount', label: '按所属账号', icon: 'fa-id-badge' }
+])
 
 const tagOptions = computed(() => {
   const options = [{ value: '', label: '所有标签', icon: 'fa-asterisk' }]
@@ -1910,6 +1933,65 @@ const renewingApiKey = ref(null)
 const newApiKeyData = ref(null)
 const batchApiKeyData = ref([])
 
+// 提取“所属账号”列直接展示的文本
+const getBindingDisplayStrings = (key) => {
+  const values = new Set()
+
+  const collect = (...items) => {
+    items.forEach((item) => {
+      if (typeof item !== 'string') return
+      const trimmed = item.trim()
+      if (trimmed) {
+        values.add(trimmed)
+      }
+    })
+  }
+
+  const sanitize = (text) => {
+    if (typeof text !== 'string') return ''
+    return text
+      .replace(/^⚠️\s*/, '')
+      .replace(/^🔒\s*/, '')
+      .trim()
+  }
+
+  const appendBindingRow = (label, info) => {
+    const infoSanitized = sanitize(info)
+    collect(label, info, infoSanitized)
+    if (infoSanitized) {
+      collect(`${label} ${infoSanitized}`)
+    }
+  }
+
+  if (key.claudeAccountId || key.claudeConsoleAccountId) {
+    appendBindingRow('Claude', getClaudeBindingInfo(key))
+  }
+
+  if (key.geminiAccountId) {
+    appendBindingRow('Gemini', getGeminiBindingInfo(key))
+  }
+
+  if (key.openaiAccountId) {
+    appendBindingRow('OpenAI', getOpenAIBindingInfo(key))
+  }
+
+  if (key.bedrockAccountId) {
+    appendBindingRow('Bedrock', getBedrockBindingInfo(key))
+  }
+
+  if (
+    !key.claudeAccountId &&
+    !key.claudeConsoleAccountId &&
+    !key.geminiAccountId &&
+    !key.openaiAccountId &&
+    !key.bedrockAccountId
+  ) {
+    collect('共享池')
+  }
+
+  return Array.from(values)
+}
+
 // 计算排序后的API Keys
 const sortedApiKeys = computed(() => {
   // 先进行标签筛选
@@ -1920,20 +2002,22 @@ const sortedApiKeys = computed(() => {
     )
   }
 
-  // 然后进行名称搜索（搜索API Key名称和所有者名称）
+  // 然后进行搜索过滤
   if (searchKeyword.value) {
     const keyword = searchKeyword.value.toLowerCase().trim()
     filteredKeys = filteredKeys.filter((key) => {
-      // 搜索API Key名称
+      if (searchMode.value === 'bindingAccount') {
+        const bindings = getBindingDisplayStrings(key)
+        if (bindings.length === 0) return false
+        return bindings.some((text) => text.toLowerCase().includes(keyword))
+      }
+
       const nameMatch = key.name && key.name.toLowerCase().includes(keyword)
-      // 如果启用了 LDAP，搜索所有者名称
       if (isLdapEnabled.value) {
         const ownerMatch =
           key.ownerDisplayName && key.ownerDisplayName.toLowerCase().includes(keyword)
-        // 如果API Key名称或所有者名称匹配，则包含该条目
         return nameMatch || ownerMatch
       }
-      // 未启用 LDAP 时只搜索名称
       return nameMatch
     })
   }
@@ -3668,6 +3752,12 @@ watch([selectedTagFilter, apiKeyStatsTimeRange], () => {
 watch(searchKeyword, () => {
   currentPage.value = 1
   // 不清空选中状态，允许跨搜索保持勾选
+  updateSelectAllState()
+})
+
+// 监听搜索模式变化，重置分页并更新选中状态
+watch(searchMode, () => {
+  currentPage.value = 1
   updateSelectAllState()
 })
 
