@@ -659,7 +659,7 @@
           <span
             v-if="accountUsageTrendData.topAccounts && accountUsageTrendData.topAccounts.length"
           >
-            显示成本前 {{ accountUsageTrendData.topAccounts.length }} 个账号
+            显示消耗排名前 {{ accountUsageTrendData.topAccounts.length }} 个账号
           </span>
         </div>
         <div

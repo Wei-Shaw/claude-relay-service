@@ -5669,7 +5669,7 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
 
     const topAccounts = Array.from(accountCostTotals.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 30)
+      .slice(0, 20)
       .map(([accountId]) => accountId)
 
     return res.json({
