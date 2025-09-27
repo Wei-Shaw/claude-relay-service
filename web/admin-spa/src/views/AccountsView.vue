@@ -7,7 +7,7 @@
             账户管理
           </h3>
           <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-base">
-            管理您的 Claude、Gemini、OpenAI、Azure OpenAI、OpenAI-Responses 与 CCR 账户及代理配置
+            管理 Claude、Gemini、OpenAI 等账户与代理配置
           </p>
         </div>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -58,6 +58,31 @@
               />
             </div>
 
+            <!-- 搜索框 -->
+            <div class="group relative min-w-[200px]">
+              <div
+                class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-cyan-500 to-teal-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+              ></div>
+              <div class="relative flex items-center">
+                <input
+                  v-model="searchKeyword"
+                  class="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 pl-9 text-sm text-gray-700 placeholder-gray-400 shadow-sm transition-all duration-200 hover:border-gray-300 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 dark:hover:border-gray-500"
+                  placeholder="搜索账户名称或邮箱..."
+                  type="text"
+                />
+                <i class="fas fa-search absolute left-3 text-sm text-cyan-500" />
+                <button
+                  v-if="searchKeyword"
+                  class="absolute right-2 flex h-5 w-5 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+                  @click="clearSearch"
+                >
+                  <i class="fas fa-times text-xs" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
             <!-- 刷新按钮 -->
             <div class="relative">
               <el-tooltip
@@ -85,16 +110,16 @@
                 </button>
               </el-tooltip>
             </div>
-          </div>
 
-          <!-- 添加账户按钮 -->
-          <button
-            class="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-green-500 to-green-600 px-5 py-2.5 text-sm font-medium text-white shadow-md transition-all duration-200 hover:from-green-600 hover:to-green-700 hover:shadow-lg sm:w-auto"
-            @click.stop="openCreateAccountModal"
-          >
-            <i class="fas fa-plus"></i>
-            <span>添加账户</span>
-          </button>
+            <!-- 添加账户按钮 -->
+            <button
+              class="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-green-500 to-green-600 px-5 py-2.5 text-sm font-medium text-white shadow-md transition-all duration-200 hover:from-green-600 hover:to-green-700 hover:shadow-lg sm:w-auto"
+              @click.stop="openCreateAccountModal"
+            >
+              <i class="fas fa-plus"></i>
+              <span>添加账户</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -284,7 +309,7 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200/50 dark:divide-gray-600/50">
-            <tr v-for="account in sortedAccounts" :key="account.id" class="table-row">
+            <tr v-for="account in paginatedAccounts" :key="account.id" class="table-row">
               <td class="px-3 py-4">
                 <div class="flex items-center">
                   <div
@@ -850,7 +875,7 @@
       <!-- 移动端卡片视图 -->
       <div v-if="!accountsLoading && sortedAccounts.length > 0" class="space-y-3 md:hidden">
         <div
-          v-for="account in sortedAccounts"
+          v-for="account in paginatedAccounts"
           :key="account.id"
           class="card p-4 transition-shadow hover:shadow-lg"
         >
@@ -1148,6 +1173,94 @@
       </div>
     </div>
 
+    <div
+      v-if="!accountsLoading && sortedAccounts.length > 0"
+      class="mt-4 flex flex-col items-center justify-between gap-4 sm:mt-6 sm:flex-row"
+    >
+      <div class="flex w-full flex-col items-center gap-3 sm:w-auto sm:flex-row">
+        <span class="text-xs text-gray-600 dark:text-gray-400 sm:text-sm">
+          共 {{ sortedAccounts.length }} 条记录
+        </span>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-gray-600 dark:text-gray-400 sm:text-sm">每页显示</span>
+          <select
+            v-model="pageSize"
+            class="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 transition-colors hover:border-gray-300 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 sm:text-sm"
+            @change="currentPage = 1"
+          >
+            <option v-for="size in pageSizeOptions" :key="size" :value="size">
+              {{ size }}
+            </option>
+          </select>
+          <span class="text-xs text-gray-600 dark:text-gray-400 sm:text-sm">条</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button
+          class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:py-1 sm:text-sm"
+          :disabled="currentPage === 1"
+          @click="currentPage--"
+        >
+          <i class="fas fa-chevron-left" />
+        </button>
+
+        <div class="flex items-center gap-1">
+          <button
+            v-if="shouldShowFirstPage"
+            class="hidden rounded-md border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:block"
+            @click="currentPage = 1"
+          >
+            1
+          </button>
+
+          <span
+            v-if="showLeadingEllipsis"
+            class="hidden px-2 text-sm text-gray-500 dark:text-gray-400 sm:block"
+          >
+            ...
+          </span>
+
+          <button
+            v-for="page in pageNumbers"
+            :key="page"
+            :class="[
+              'rounded-md border px-3 py-1 text-xs font-medium transition-colors sm:text-sm',
+              page === currentPage
+                ? 'border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-400 dark:bg-blue-500/10 dark:text-blue-300'
+                : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+            ]"
+            @click="currentPage = page"
+          >
+            {{ page }}
+          </button>
+
+          <span
+            v-if="showTrailingEllipsis"
+            class="hidden px-2 text-sm text-gray-500 dark:text-gray-400 sm:block"
+          >
+            ...
+          </span>
+
+          <button
+            v-if="shouldShowLastPage"
+            class="hidden rounded-md border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:block"
+            @click="currentPage = totalPages"
+          >
+            {{ totalPages }}
+          </button>
+        </div>
+
+        <button
+          class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:py-1 sm:text-sm"
+          :disabled="currentPage === totalPages || totalPages === 0"
+          @click="currentPage++"
+        >
+          <i class="fas fa-chevron-right" />
+        </button>
+      </div>
+    </div>
+
     <!-- 添加账户模态框 -->
     <AccountForm
       v-if="showCreateAccountModal && (!newAccountPlatform || newAccountPlatform !== 'ccr')"
@@ -1211,6 +1324,21 @@ const apiKeys = ref([])
 const accountGroups = ref([])
 const groupFilter = ref('all')
 const platformFilter = ref('all')
+const searchKeyword = ref('')
+const PAGE_SIZE_STORAGE_KEY = 'accountsPageSize'
+const getInitialPageSize = () => {
+  const saved = localStorage.getItem(PAGE_SIZE_STORAGE_KEY)
+  if (saved) {
+    const parsedSize = parseInt(saved, 10)
+    if ([10, 20, 50, 100].includes(parsedSize)) {
+      return parsedSize
+    }
+  }
+  return 10
+}
+const pageSizeOptions = [10, 20, 50, 100]
+const pageSize = ref(getInitialPageSize())
+const currentPage = ref(1)
 
 // 缓存状态标志
 const apiKeysLoaded = ref(false)
@@ -1265,9 +1393,78 @@ const newAccountPlatform = ref(null) // 跟踪新建账户选择的平台
 const showEditAccountModal = ref(false)
 const editingAccount = ref(null)
 
+const collectAccountSearchableStrings = (account) => {
+  const values = new Set()
+
+  const baseFields = [
+    account?.name,
+    account?.email,
+    account?.accountName,
+    account?.owner,
+    account?.ownerName,
+    account?.ownerDisplayName,
+    account?.displayName,
+    account?.username,
+    account?.identifier,
+    account?.alias,
+    account?.title,
+    account?.label
+  ]
+
+  baseFields.forEach((field) => {
+    if (typeof field === 'string') {
+      const trimmed = field.trim()
+      if (trimmed) {
+        values.add(trimmed)
+      }
+    }
+  })
+
+  if (Array.isArray(account?.groupInfos)) {
+    account.groupInfos.forEach((group) => {
+      if (group && typeof group.name === 'string') {
+        const trimmed = group.name.trim()
+        if (trimmed) {
+          values.add(trimmed)
+        }
+      }
+    })
+  }
+
+  Object.entries(account || {}).forEach(([key, value]) => {
+    if (typeof value === 'string') {
+      const lowerKey = key.toLowerCase()
+      if (lowerKey.includes('name') || lowerKey.includes('email')) {
+        const trimmed = value.trim()
+        if (trimmed) {
+          values.add(trimmed)
+        }
+      }
+    }
+  })
+
+  return Array.from(values)
+}
+
+const accountMatchesKeyword = (account, normalizedKeyword) => {
+  if (!normalizedKeyword) return true
+  return collectAccountSearchableStrings(account).some((value) =>
+    value.toLowerCase().includes(normalizedKeyword)
+  )
+}
+
 // 计算排序后的账户列表
 const sortedAccounts = computed(() => {
-  const sourceAccounts = accounts.value
+  let sourceAccounts = accounts.value
+
+  const keyword = searchKeyword.value.trim()
+  if (keyword) {
+    const normalizedKeyword = keyword.toLowerCase()
+    sourceAccounts = sourceAccounts.filter((account) =>
+      accountMatchesKeyword(account, normalizedKeyword)
+    )
+  }
+
   if (!accountsSortBy.value) return sourceAccounts
 
   const sorted = [...sourceAccounts].sort((a, b) => {
@@ -1304,6 +1501,68 @@ const sortedAccounts = computed(() => {
   })
 
   return sorted
+})
+
+const totalPages = computed(() => {
+  const total = sortedAccounts.value.length
+  return Math.ceil(total / pageSize.value) || 0
+})
+
+const pageNumbers = computed(() => {
+  const total = totalPages.value
+  const current = currentPage.value
+  const pages = []
+
+  if (total <= 7) {
+    for (let i = 1; i <= total; i++) {
+      pages.push(i)
+    }
+  } else {
+    let start = Math.max(1, current - 2)
+    let end = Math.min(total, current + 2)
+
+    if (current <= 3) {
+      end = 5
+    } else if (current >= total - 2) {
+      start = total - 4
+    }
+
+    for (let i = start; i <= end; i++) {
+      pages.push(i)
+    }
+  }
+
+  return pages
+})
+
+const shouldShowFirstPage = computed(() => {
+  const pages = pageNumbers.value
+  if (pages.length === 0) return false
+  return pages[0] > 1
+})
+
+const shouldShowLastPage = computed(() => {
+  const pages = pageNumbers.value
+  if (pages.length === 0) return false
+  return pages[pages.length - 1] < totalPages.value
+})
+
+const showLeadingEllipsis = computed(() => {
+  const pages = pageNumbers.value
+  if (pages.length === 0) return false
+  return shouldShowFirstPage.value && pages[0] > 2
+})
+
+const showTrailingEllipsis = computed(() => {
+  const pages = pageNumbers.value
+  if (pages.length === 0) return false
+  return shouldShowLastPage.value && pages[pages.length - 1] < totalPages.value - 1
+})
+
+const paginatedAccounts = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return sortedAccounts.value.slice(start, end)
 })
 
 // 加载账户列表
@@ -1628,6 +1887,11 @@ const formatLastUsed = (dateString) => {
   return date.toLocaleDateString('zh-CN')
 }
 
+const clearSearch = () => {
+  searchKeyword.value = ''
+  currentPage.value = 1
+}
+
 // 加载API Keys列表（缓存版本）
 const loadApiKeys = async (forceReload = false) => {
   if (!forceReload && apiKeysLoaded.value) {
@@ -1672,11 +1936,13 @@ const clearCache = () => {
 
 // 按平台筛选账户
 const filterByPlatform = () => {
+  currentPage.value = 1
   loadAccounts()
 }
 
 // 按分组筛选账户
 const filterByGroup = () => {
+  currentPage.value = 1
   loadAccounts()
 }
 
@@ -2404,6 +2670,23 @@ const calculateDailyCost = (account) => {
 // const toggleDispatch = async (account) => {
 //   await toggleSchedulable(account)
 // }
+
+watch(searchKeyword, () => {
+  currentPage.value = 1
+})
+
+watch(pageSize, (newSize) => {
+  localStorage.setItem(PAGE_SIZE_STORAGE_KEY, newSize.toString())
+})
+
+watch(
+  () => sortedAccounts.value.length,
+  () => {
+    if (currentPage.value > totalPages.value) {
+      currentPage.value = totalPages.value || 1
+    }
+  }
+)
 
 // 监听排序选择变化
 watch(accountSortBy, (newVal) => {

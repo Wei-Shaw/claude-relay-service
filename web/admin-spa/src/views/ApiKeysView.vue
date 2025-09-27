@@ -125,7 +125,7 @@
                 <div class="relative flex items-center">
                   <input
                     v-model="searchKeyword"
-                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 pl-9 text-sm text-gray-700 placeholder-gray-400 shadow-sm transition-all duration-200 hover:border-gray-300 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 dark:hover:border-gray-500"
+                    class="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 pl-9 text-sm text-gray-700 placeholder-gray-400 shadow-sm transition-all duration-200 hover:border-gray-300 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 dark:hover:border-gray-500"
                     :placeholder="isLdapEnabled ? '搜索名称或所有者...' : '搜索名称...'"
                     type="text"
                     @input="currentPage = 1"
