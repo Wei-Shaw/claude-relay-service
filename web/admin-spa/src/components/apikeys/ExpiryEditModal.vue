@@ -46,7 +46,9 @@
                     <i class="fas fa-pause-circle mr-1 text-blue-500" />
                     未激活
                     <span class="ml-2 text-xs font-normal text-gray-600">
-                      (激活后 {{ apiKey.activationDays || 30 }} 天过期)
+                      (激活后
+                      {{ apiKey.activationDays || (apiKey.activationUnit === 'hours' ? 24 : 30) }}
+                      {{ apiKey.activationUnit === 'hours' ? '小时' : '天' }}过期)
                     </span>
                   </template>
                   <!-- 已设置过期时间 -->
@@ -89,11 +91,15 @@
               @click="handleActivateNow"
             >
               <i class="fas fa-rocket mr-2" />
-              立即激活 (激活后 {{ apiKey.activationDays || 30 }} 天过期)
+              立即激活 (激活后
+              {{ apiKey.activationDays || (apiKey.activationUnit === 'hours' ? 24 : 30) }}
+              {{ apiKey.activationUnit === 'hours' ? '小时' : '天' }}过期)
             </button>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
               <i class="fas fa-info-circle mr-1" />
-              点击立即激活此 API Key，激活后将在 {{ apiKey.activationDays || 30 }} 天后过期
+              点击立即激活此 API Key，激活后将在
+              {{ apiKey.activationDays || (apiKey.activationUnit === 'hours' ? 24 : 30) }}
+              {{ apiKey.activationUnit === 'hours' ? '小时' : '天' }}后过期
             </p>
           </div>
 
@@ -400,14 +406,14 @@ const handleActivateNow = async () => {
   if (window.showConfirm) {
     confirmed = await window.showConfirm(
       '激活 API Key',
-      `确定要立即激活此 API Key 吗？激活后将在 ${props.apiKey.activationDays || 30} 天后自动过期。`,
+      `确定要立即激活此 API Key 吗？激活后将在 ${props.apiKey.activationDays || (props.apiKey.activationUnit === 'hours' ? 24 : 30)} ${props.apiKey.activationUnit === 'hours' ? '小时' : '天'}后自动过期。`,
       '确定激活',
       '取消'
     )
   } else {
     // 降级方案
     confirmed = confirm(
-      `确定要立即激活此 API Key 吗？激活后将在 ${props.apiKey.activationDays || 30} 天后自动过期。`
+      `确定要立即激活此 API Key 吗？激活后将在 ${props.apiKey.activationDays || (props.apiKey.activationUnit === 'hours' ? 24 : 30)} ${props.apiKey.activationUnit === 'hours' ? '小时' : '天'}后自动过期。`
     )
   }
 

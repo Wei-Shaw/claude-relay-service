@@ -123,7 +123,9 @@
             <i class="fas fa-pause-circle mr-1 text-xs md:text-sm" />
             未激活
             <span class="ml-1 text-xs text-gray-500 dark:text-gray-400"
-              >(首次使用后{{ statsData.activationDays || 30 }}天过期)</span
+              >(首次使用后
+              {{ statsData.activationDays || (statsData.activationUnit === 'hours' ? 24 : 30)
+              }}{{ statsData.activationUnit === 'hours' ? '小时' : '天' }}过期)</span
             >
           </div>
           <!-- 已设置过期时间 -->
