@@ -850,6 +850,15 @@
                     <span class="ml-1">{{ account.schedulable ? '调度' : '停用' }}</span>
                   </button>
                   <button
+                    v-if="canViewUsage(account)"
+                    class="rounded bg-indigo-100 px-2.5 py-1 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-200"
+                    :title="'查看使用详情'"
+                    @click="openAccountUsageModal(account)"
+                  >
+                    <i class="fas fa-chart-line" />
+                    <span class="ml-1">详情</span>
+                  </button>
+                  <button
                     class="rounded bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200"
                     :title="'编辑账户'"
                     @click="editAccount(account)"
@@ -1155,6 +1164,15 @@
             </button>
 
             <button
+              v-if="canViewUsage(account)"
+              class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-600 transition-colors hover:bg-indigo-100"
+              @click="openAccountUsageModal(account)"
+            >
+              <i class="fas fa-chart-line" />
+              详情
+            </button>
+
+            <button
               class="flex-1 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600 transition-colors hover:bg-gray-100"
               @click="editAccount(account)"
             >
@@ -1298,6 +1316,18 @@
       @cancel="handleCancel"
       @confirm="handleConfirm"
     />
+
+    <AccountUsageDetailModal
+      v-if="showAccountUsageModal"
+      :account="selectedAccountForUsage || {}"
+      :generated-at="accountUsageGeneratedAt"
+      :history="accountUsageHistory"
+      :loading="accountUsageLoading"
+      :overview="accountUsageOverview"
+      :show="showAccountUsageModal"
+      :summary="accountUsageSummary"
+      @close="closeAccountUsageModal"
+    />
   </div>
 </template>
 
@@ -1308,6 +1338,7 @@ import { apiClient } from '@/config/api'
 import { useConfirm } from '@/composables/useConfirm'
 import AccountForm from '@/components/accounts/AccountForm.vue'
 import CcrAccountForm from '@/components/accounts/CcrAccountForm.vue'
+import AccountUsageDetailModal from '@/components/accounts/AccountUsageDetailModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 
@@ -1339,6 +1370,17 @@ const getInitialPageSize = () => {
 const pageSizeOptions = [10, 20, 50, 100]
 const pageSize = ref(getInitialPageSize())
 const currentPage = ref(1)
+
+// 账号使用详情弹窗状态
+const showAccountUsageModal = ref(false)
+const accountUsageLoading = ref(false)
+const selectedAccountForUsage = ref(null)
+const accountUsageHistory = ref([])
+const accountUsageSummary = ref({})
+const accountUsageOverview = ref({})
+const accountUsageGeneratedAt = ref('')
+
+const supportedUsagePlatforms = ['claude', 'claude-console', 'openai', 'openai-responses', 'gemini']
 
 // 缓存状态标志
 const apiKeysLoaded = ref(false)
@@ -1451,6 +1493,50 @@ const accountMatchesKeyword = (account, normalizedKeyword) => {
   return collectAccountSearchableStrings(account).some((value) =>
     value.toLowerCase().includes(normalizedKeyword)
   )
+}
+
+const canViewUsage = (account) => !!account && supportedUsagePlatforms.includes(account.platform)
+
+const openAccountUsageModal = async (account) => {
+  if (!canViewUsage(account)) {
+    showToast('该账户类型暂不支持查看详情', 'warning')
+    return
+  }
+
+  selectedAccountForUsage.value = account
+  showAccountUsageModal.value = true
+  accountUsageLoading.value = true
+  accountUsageHistory.value = []
+  accountUsageSummary.value = {}
+  accountUsageOverview.value = {}
+  accountUsageGeneratedAt.value = ''
+
+  try {
+    const response = await apiClient.get(
+      `/admin/accounts/${account.id}/usage-history?platform=${account.platform}&days=30`
+    )
+
+    if (response.success) {
+      const data = response.data || {}
+      accountUsageHistory.value = data.history || []
+      accountUsageSummary.value = data.summary || {}
+      accountUsageOverview.value = data.overview || {}
+      accountUsageGeneratedAt.value = data.generatedAt || ''
+    } else {
+      showToast(response.error || '加载账号使用详情失败', 'error')
+    }
+  } catch (error) {
+    console.error('加载账号使用详情失败:', error)
+    showToast('加载账号使用详情失败', 'error')
+  } finally {
+    accountUsageLoading.value = false
+  }
+}
+
+const closeAccountUsageModal = () => {
+  showAccountUsageModal.value = false
+  accountUsageLoading.value = false
+  selectedAccountForUsage.value = null
 }
 
 // 计算排序后的账户列表

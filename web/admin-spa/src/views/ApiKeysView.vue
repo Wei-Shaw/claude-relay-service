@@ -408,7 +408,7 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[23%] min-w-[170px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                      class="operations-column sticky right-0 w-[23%] min-w-[200px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                     >
                       操作
                     </th>
@@ -703,7 +703,10 @@
                           </span>
                         </div>
                       </td>
-                      <td class="whitespace-nowrap px-3 py-3" style="font-size: 13px">
+                      <td
+                        class="operations-column operations-cell whitespace-nowrap px-3 py-3"
+                        style="font-size: 13px"
+                      >
                         <div class="flex gap-1">
                           <button
                             class="rounded px-2 py-1 text-xs font-medium text-purple-600 transition-colors hover:bg-purple-50 hover:text-purple-900 dark:hover:bg-purple-900/20"
@@ -1501,7 +1504,7 @@
                         最后使用
                       </th>
                       <th
-                        class="w-[15%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                        class="operations-column sticky right-0 w-[15%] min-w-[160px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                       >
                         操作
                       </th>
@@ -1657,7 +1660,7 @@
                         </span>
                         <span v-else class="text-gray-400" style="font-size: 13px">从未使用</span>
                       </td>
-                      <td class="px-3 py-3">
+                      <td class="operations-column operations-cell px-3 py-3">
                         <div class="flex items-center gap-2">
                           <button
                             v-if="key.canRestore"
@@ -3765,19 +3768,21 @@ onMounted(async () => {
   border-radius: 12px;
   border: 1px solid rgba(0, 0, 0, 0.05);
   width: 100%;
+  position: relative;
 }
 
 .table-container {
-  overflow-x: hidden;
+  overflow-x: auto;
   overflow-y: hidden;
   margin: 0;
   padding: 0;
   max-width: 100%;
+  position: relative;
 }
 
-/* 防止表格内容溢出 */
+/* 防止表格内容溢出，保证横向滚动 */
 .table-container table {
-  min-width: 100%;
+  min-width: 1200px;
   border-collapse: collapse;
 }
 
@@ -3809,6 +3814,27 @@ onMounted(async () => {
 
 .dark .table-row:hover {
   background-color: rgba(255, 255, 255, 0.02);
+}
+
+/* 固定操作列在右侧，兼容浅色和深色模式 */
+.operations-column {
+  position: sticky;
+  right: 0;
+  background: inherit;
+  background-color: inherit;
+  z-index: 12;
+}
+
+.table-container thead .operations-column {
+  z-index: 30;
+}
+
+.table-container tbody .operations-column {
+  box-shadow: -8px 0 12px -8px rgba(15, 23, 42, 0.16);
+}
+
+.dark .table-container tbody .operations-column {
+  box-shadow: -8px 0 12px -8px rgba(30, 41, 59, 0.45);
 }
 
 .loading-spinner {
