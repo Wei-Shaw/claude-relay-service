@@ -425,7 +425,7 @@
               <p class="mb-3 text-sm text-yellow-700">
                 在
                 <code class="rounded bg-yellow-100 px-1">~/.codex/config.toml</code>
-                文件中添加以下配置：
+                文件开头添加以下配置：
               </p>
               <div
                 class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
@@ -956,7 +956,7 @@
               <p class="mb-3 text-sm text-yellow-700">
                 在
                 <code class="rounded bg-yellow-100 px-1">~/.codex/config.toml</code>
-                文件中添加以下配置：
+                文件开头添加以下配置：
               </p>
               <div
                 class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
@@ -1478,7 +1478,7 @@
               <p class="mb-3 text-sm text-yellow-700">
                 在
                 <code class="rounded bg-yellow-100 px-1">~/.codex/config.toml</code>
-                文件中添加以下配置：
+                文件开头添加以下配置：
               </p>
               <div
                 class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
