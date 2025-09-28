@@ -3,6 +3,8 @@ const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const apiKeyService = require('../services/apiKeyService')
 const CostCalculator = require('../utils/costCalculator')
+const claudeAccountService = require('../services/claudeAccountService')
+const openaiAccountService = require('../services/openaiAccountService')
 
 const router = express.Router()
 
@@ -335,6 +337,50 @@ router.post('/api/user-stats', async (req, res) => {
       logger.warn(`Failed to get current usage for key ${keyId}:`, error)
     }
 
+    const boundAccountDetails = {}
+
+    const accountDetailTasks = []
+
+    if (fullKeyData.claudeAccountId) {
+      accountDetailTasks.push(
+        (async () => {
+          try {
+            const overview = await claudeAccountService.getAccountOverview(
+              fullKeyData.claudeAccountId
+            )
+
+            if (overview && overview.accountType === 'dedicated') {
+              boundAccountDetails.claude = overview
+            }
+          } catch (error) {
+            logger.warn(`⚠️ Failed to load Claude account overview for key ${keyId}:`, error)
+          }
+        })()
+      )
+    }
+
+    if (fullKeyData.openaiAccountId) {
+      accountDetailTasks.push(
+        (async () => {
+          try {
+            const overview = await openaiAccountService.getAccountOverview(
+              fullKeyData.openaiAccountId
+            )
+
+            if (overview && overview.accountType === 'dedicated') {
+              boundAccountDetails.openai = overview
+            }
+          } catch (error) {
+            logger.warn(`⚠️ Failed to load OpenAI account overview for key ${keyId}:`, error)
+          }
+        })()
+      )
+    }
+
+    if (accountDetailTasks.length > 0) {
+      await Promise.allSettled(accountDetailTasks)
+    }
+
     // 构建响应数据（只返回该API Key自己的信息，确保不泄露其他信息）
     const responseData = {
       id: keyId,
@@ -399,7 +445,12 @@ router.post('/api/user-stats', async (req, res) => {
         geminiAccountId:
           fullKeyData.geminiAccountId && fullKeyData.geminiAccountId !== ''
             ? fullKeyData.geminiAccountId
-            : null
+            : null,
+        openaiAccountId:
+          fullKeyData.openaiAccountId && fullKeyData.openaiAccountId !== ''
+            ? fullKeyData.openaiAccountId
+            : null,
+        details: Object.keys(boundAccountDetails).length > 0 ? boundAccountDetails : null
       },
 
       // 模型和客户端限制信息

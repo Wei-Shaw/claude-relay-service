@@ -518,6 +518,60 @@ class ClaudeAccountService {
     }
   }
 
+  // 📋 获取单个账号的概要信息（用于前端展示会话窗口等状态）
+  async getAccountOverview(accountId) {
+    try {
+      const accountData = await redis.getClaudeAccount(accountId)
+
+      if (!accountData || Object.keys(accountData).length === 0) {
+        return null
+      }
+
+      const [sessionWindowInfo, rateLimitInfo] = await Promise.all([
+        this.getSessionWindowInfo(accountId),
+        this.getAccountRateLimitInfo(accountId)
+      ])
+
+      const sessionWindow = sessionWindowInfo || {
+        hasActiveWindow: false,
+        windowStart: null,
+        windowEnd: null,
+        progress: 0,
+        remainingTime: null,
+        lastRequestTime: accountData.lastRequestTime || null,
+        sessionWindowStatus: accountData.sessionWindowStatus || null
+      }
+
+      const rateLimitStatus = rateLimitInfo
+        ? {
+            isRateLimited: !!rateLimitInfo.isRateLimited,
+            rateLimitedAt: rateLimitInfo.rateLimitedAt || null,
+            minutesRemaining: rateLimitInfo.minutesRemaining || 0,
+            rateLimitEndAt: rateLimitInfo.rateLimitEndAt || null
+          }
+        : {
+            isRateLimited: false,
+            rateLimitedAt: null,
+            minutesRemaining: 0,
+            rateLimitEndAt: null
+          }
+
+      return {
+        id: accountData.id,
+        name: accountData.name,
+        accountType: accountData.accountType || 'shared',
+        platform: accountData.platform || 'claude',
+        isActive: accountData.isActive === 'true',
+        schedulable: accountData.schedulable !== 'false',
+        sessionWindow,
+        rateLimitStatus
+      }
+    } catch (error) {
+      logger.error(`❌ Failed to build Claude account overview for ${accountId}:`, error)
+      return null
+    }
+  }
+
   // 📝 更新Claude账户
   async updateAccount(accountId, updates) {
     try {
