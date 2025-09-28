@@ -1,7 +1,7 @@
 <template>
-  <div>
+  <div class="flex h-full flex-col gap-4 md:gap-6">
     <!-- 限制配置 / 聚合模式提示 -->
-    <div class="card p-4 md:p-6">
+    <div class="card flex h-full flex-col p-4 md:p-6">
       <h3
         class="mb-3 flex items-center text-lg font-bold text-gray-900 dark:text-gray-100 md:mb-4 md:text-xl"
       >
@@ -226,7 +226,7 @@
         </div>
 
         <!-- 其他限制信息 -->
-        <div class="space-y-2 border-t border-gray-100 pt-2 dark:border-gray-700">
+        <div class="space-y-4 border-t border-gray-100 pt-3 dark:border-gray-700">
           <div class="flex items-center justify-between">
             <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">并发限制</span>
             <span class="text-sm font-medium text-gray-900 md:text-base">
@@ -241,13 +241,7 @@
           <div class="flex items-center justify-between">
             <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">模型限制</span>
             <span class="text-sm font-medium text-gray-900 md:text-base">
-              <span
-                v-if="
-                  statsData.restrictions.enableModelRestriction &&
-                  statsData.restrictions.restrictedModels.length > 0
-                "
-                class="text-orange-600"
-              >
+              <span v-if="hasModelRestrictions" class="text-orange-600">
                 <i class="fas fa-exclamation-triangle mr-1 text-xs md:text-sm" />
                 限制 {{ statsData.restrictions.restrictedModels.length }} 个模型
               </span>
@@ -257,39 +251,40 @@
               </span>
             </span>
           </div>
-          <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">客户端限制</span>
-            <span class="text-sm font-medium text-gray-900 md:text-base">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">客户端限制</span>
+              <span class="text-sm font-medium text-gray-900 md:text-base">
+                <span v-if="hasClientRestrictions" class="text-orange-600">
+                  <i class="fas fa-exclamation-triangle mr-1 text-xs md:text-sm" />
+                  限 {{ statsData.restrictions.allowedClients.length }} 种客户端使用
+                </span>
+                <span v-else class="text-green-600">
+                  <i class="fas fa-check-circle mr-1 text-xs md:text-sm" />
+                  允许所有客户端
+                </span>
+              </span>
+            </div>
+            <div
+              v-if="hasClientRestrictions"
+              class="flex flex-wrap gap-2 rounded-lg bg-blue-50 p-2 dark:bg-blue-900/20 md:p-3"
+            >
               <span
-                v-if="
-                  statsData.restrictions.enableClientRestriction &&
-                  statsData.restrictions.allowedClients.length > 0
-                "
-                class="text-orange-600"
+                v-for="client in statsData.restrictions.allowedClients"
+                :key="client"
+                class="flex items-center gap-1 rounded-full bg-white px-2 py-1 text-xs text-blue-700 shadow-sm dark:bg-slate-900 dark:text-blue-300 md:text-sm"
               >
-                <i class="fas fa-exclamation-triangle mr-1 text-xs md:text-sm" />
-                限 {{ statsData.restrictions.allowedClients.length }} 种客户端使用
+                <i class="fas fa-id-badge" />
+                {{ client }}
               </span>
-              <span v-else class="text-green-600">
-                <i class="fas fa-check-circle mr-1 text-xs md:text-sm" />
-                允许所有客户端
-              </span>
-            </span>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
     <!-- 详细限制信息 -->
-    <div
-      v-if="
-        (statsData.restrictions.enableModelRestriction &&
-          statsData.restrictions.restrictedModels.length > 0) ||
-        (statsData.restrictions.enableClientRestriction &&
-          statsData.restrictions.allowedClients.length > 0)
-      "
-      class="card mt-4 p-4 md:mt-6 md:p-6"
-    >
+    <div v-if="hasModelRestrictions" class="card p-4 md:p-6">
       <h3
         class="mb-3 flex items-center text-lg font-bold text-gray-900 dark:text-gray-100 md:mb-4 md:text-xl"
       >
@@ -297,78 +292,62 @@
         详细限制信息
       </h3>
 
-      <div class="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
-        <!-- 模型限制详情 -->
-        <div
-          v-if="
-            statsData.restrictions.enableModelRestriction &&
-            statsData.restrictions.restrictedModels.length > 0
-          "
-          class="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20 md:p-4"
+      <div
+        class="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20 md:p-4"
+      >
+        <h4
+          class="mb-2 flex items-center text-sm font-bold text-amber-800 dark:text-amber-300 md:mb-3 md:text-base"
         >
-          <h4
-            class="mb-2 flex items-center text-sm font-bold text-amber-800 dark:text-amber-300 md:mb-3 md:text-base"
+          <i class="fas fa-robot mr-1 text-xs md:mr-2 md:text-sm" />
+          受限模型列表
+        </h4>
+        <div class="space-y-1 md:space-y-2">
+          <div
+            v-for="model in statsData.restrictions.restrictedModels"
+            :key="model"
+            class="rounded border border-amber-200 bg-white px-2 py-1 text-xs dark:border-amber-700 dark:bg-gray-800 md:px-3 md:py-2 md:text-sm"
           >
-            <i class="fas fa-robot mr-1 text-xs md:mr-2 md:text-sm" />
-            受限模型列表
-          </h4>
-          <div class="space-y-1 md:space-y-2">
-            <div
-              v-for="model in statsData.restrictions.restrictedModels"
-              :key="model"
-              class="rounded border border-amber-200 bg-white px-2 py-1 text-xs dark:border-amber-700 dark:bg-gray-800 md:px-3 md:py-2 md:text-sm"
-            >
-              <i class="fas fa-ban mr-1 text-xs text-red-500 md:mr-2" />
-              <span class="break-all text-gray-800 dark:text-gray-200">{{ model }}</span>
-            </div>
+            <i class="fas fa-ban mr-1 text-xs text-red-500 md:mr-2" />
+            <span class="break-all text-gray-800 dark:text-gray-200">{{ model }}</span>
           </div>
-          <p class="mt-2 text-xs text-amber-700 dark:text-amber-400 md:mt-3">
-            <i class="fas fa-info-circle mr-1" />
-            此 API Key 不能访问以上列出的模型
-          </p>
         </div>
-
-        <!-- 客户端限制详情 -->
-        <div
-          v-if="
-            statsData.restrictions.enableClientRestriction &&
-            statsData.restrictions.allowedClients.length > 0
-          "
-          class="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20 md:p-4"
-        >
-          <h4
-            class="mb-2 flex items-center text-sm font-bold text-blue-800 dark:text-blue-300 md:mb-3 md:text-base"
-          >
-            <i class="fas fa-desktop mr-1 text-xs md:mr-2 md:text-sm" />
-            允许的客户端
-          </h4>
-          <div class="space-y-1 md:space-y-2">
-            <div
-              v-for="client in statsData.restrictions.allowedClients"
-              :key="client"
-              class="rounded border border-blue-200 bg-white px-2 py-1 text-xs dark:border-blue-700 dark:bg-gray-800 md:px-3 md:py-2 md:text-sm"
-            >
-              <i class="fas fa-check mr-1 text-xs text-green-500 md:mr-2" />
-              <span class="break-all text-gray-800 dark:text-gray-200">{{ client }}</span>
-            </div>
-          </div>
-          <p class="mt-2 text-xs text-blue-700 dark:text-blue-400 md:mt-3">
-            <i class="fas fa-info-circle mr-1" />
-            此 API Key 只能被以上列出的客户端使用
-          </p>
-        </div>
+        <p class="mt-2 text-xs text-amber-700 dark:text-amber-400 md:mt-3">
+          <i class="fas fa-info-circle mr-1" />
+          此 API Key 不能访问以上列出的模型
+        </p>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
 import WindowCountdown from '@/components/apikeys/WindowCountdown.vue'
 
 const apiStatsStore = useApiStatsStore()
 const { statsData, multiKeyMode, aggregatedStats, invalidKeys } = storeToRefs(apiStatsStore)
+
+const hasModelRestrictions = computed(() => {
+  const restriction = statsData.value?.restrictions
+  if (!restriction) return false
+  return (
+    restriction.enableModelRestriction === true &&
+    Array.isArray(restriction.restrictedModels) &&
+    restriction.restrictedModels.length > 0
+  )
+})
+
+const hasClientRestrictions = computed(() => {
+  const restriction = statsData.value?.restrictions
+  if (!restriction) return false
+  return (
+    restriction.enableClientRestriction === true &&
+    Array.isArray(restriction.allowedClients) &&
+    restriction.allowedClients.length > 0
+  )
+})
 
 // 获取每日费用进度
 const getDailyCostProgress = () => {
