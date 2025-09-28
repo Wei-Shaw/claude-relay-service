@@ -6882,6 +6882,16 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
     const { platform, groupId } = req.query
     let accounts = await openaiAccountService.getAllAccounts()
 
+    // 缓存账户所属分组，避免重复查询
+    const accountGroupCache = new Map()
+    const fetchAccountGroups = async (accountId) => {
+      if (!accountGroupCache.has(accountId)) {
+        const groups = await accountGroupService.getAccountGroups(accountId)
+        accountGroupCache.set(accountId, groups || [])
+      }
+      return accountGroupCache.get(accountId)
+    }
+
     // 根据查询参数进行筛选
     if (platform && platform !== 'all' && platform !== 'openai') {
       // 如果指定了其他平台，返回空数组
@@ -6894,7 +6904,7 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
         // 筛选未分组账户
         const filteredAccounts = []
         for (const account of accounts) {
-          const groups = await accountGroupService.getAccountGroups(account.id)
+          const groups = await fetchAccountGroups(account.id)
           if (!groups || groups.length === 0) {
             filteredAccounts.push(account)
           }
@@ -6912,8 +6922,10 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
       accounts.map(async (account) => {
         try {
           const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
+          const groupInfos = await fetchAccountGroups(account.id)
           return {
             ...account,
+            groupInfos,
             usage: {
               daily: usageStats.daily,
               total: usageStats.total,
@@ -6922,8 +6934,10 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
           }
         } catch (error) {
           logger.debug(`Failed to get usage stats for OpenAI account ${account.id}:`, error)
+          const groupInfos = await fetchAccountGroups(account.id)
           return {
             ...account,
+            groupInfos,
             usage: {
               daily: { requests: 0, tokens: 0, allTokens: 0 },
               total: { requests: 0, tokens: 0, allTokens: 0 },
