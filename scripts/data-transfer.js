@@ -137,7 +137,7 @@ const CSV_FIELD_MAPPING = {
   tags: '标签',
   userId: '用户ID',
   userUsername: '用户名',
-  
+
   // 其他信息
   icon: '图标'
 }
