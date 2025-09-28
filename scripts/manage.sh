@@ -288,12 +288,12 @@ check_redis() {
     # 测试Redis连接
     print_info "测试 Redis 连接..."
     if command_exists redis-cli; then
-        local redis_test_cmd="redis-cli -h $REDIS_HOST -p $REDIS_PORT"
+        local redis_args=(-h "$REDIS_HOST" -p "$REDIS_PORT")
         if [ -n "$REDIS_PASSWORD" ]; then
-            redis_test_cmd="$redis_test_cmd -a '$REDIS_PASSWORD'"
+            redis_args+=(-a "$REDIS_PASSWORD")
         fi
-        
-        if $redis_test_cmd ping 2>/dev/null | grep -q "PONG"; then
+
+        if redis-cli "${redis_args[@]}" ping 2>/dev/null | grep -q "PONG"; then
             print_success "Redis 连接成功"
             return 0
         else
