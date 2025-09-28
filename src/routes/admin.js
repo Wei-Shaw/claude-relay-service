@@ -2275,7 +2275,7 @@ router.delete('/claude-accounts/:accountId', authenticateAdmin, async (req, res)
     // 获取账户信息以检查是否在分组中
     const account = await claudeAccountService.getAccount(accountId)
     if (account && account.accountType === 'group') {
-      const groups = await accountGroupService.getAccountGroup(accountId)
+      const groups = await accountGroupService.getAccountGroups(accountId)
       for (const group of groups) {
         await accountGroupService.removeAccountFromGroup(accountId, group.id)
       }
@@ -2665,7 +2665,7 @@ router.delete('/claude-console-accounts/:accountId', authenticateAdmin, async (r
     // 获取账户信息以检查是否在分组中
     const account = await claudeConsoleAccountService.getAccount(accountId)
     if (account && account.accountType === 'group') {
-      const groups = await accountGroupService.getAccountGroup(accountId)
+      const groups = await accountGroupService.getAccountGroups(accountId)
       for (const group of groups) {
         await accountGroupService.removeAccountFromGroup(accountId, group.id)
       }
@@ -3900,7 +3900,7 @@ router.delete('/gemini-accounts/:accountId', authenticateAdmin, async (req, res)
     // 获取账户信息以检查是否在分组中
     const account = await geminiAccountService.getAccount(accountId)
     if (account && account.accountType === 'group') {
-      const groups = await accountGroupService.getAccountGroup(accountId)
+      const groups = await accountGroupService.getAccountGroups(accountId)
       for (const group of groups) {
         await accountGroupService.removeAccountFromGroup(accountId, group.id)
       }
