@@ -660,7 +660,9 @@
                             style="font-size: 13px"
                           >
                             <i class="fas fa-pause-circle mr-1 text-xs" />
-                            未激活 ({{ key.activationDays || 30 }}天)
+                            未激活 (
+                            {{ key.activationDays || (key.activationUnit === 'hours' ? 24 : 30)
+                            }}{{ key.activationUnit === 'hours' ? '小时' : '天' }})
                           </span>
                           <!-- 已设置过期时间 -->
                           <span v-else-if="key.expiresAt">
@@ -3523,7 +3525,86 @@ const exportToExcel = () => {
 
       // 基础数据
       const baseData = {
+        ID: key.id || '',
         名称: key.name || '',
+        描述: key.description || '',
+        状态: key.isActive ? '启用' : '禁用',
+        API密钥: key.apiKey || '',
+
+        // 过期配置
+        过期模式:
+          key.expirationMode === 'activation'
+            ? '首次使用后激活'
+            : key.expirationMode === 'fixed'
+              ? '固定时间'
+              : '无',
+        激活期限: key.activationDays || '',
+        激活单位:
+          key.activationUnit === 'hours' ? '小时' : key.activationUnit === 'days' ? '天' : '',
+        已激活: key.isActivated ? '是' : '否',
+        激活时间: key.activatedAt ? formatDate(key.activatedAt) : '',
+        过期时间: key.expiresAt ? formatDate(key.expiresAt) : '',
+
+        // 权限配置
+        服务权限:
+          key.permissions === 'all'
+            ? '全部服务'
+            : key.permissions === 'claude'
+              ? '仅Claude'
+              : key.permissions === 'gemini'
+                ? '仅Gemini'
+                : key.permissions === 'openai'
+                  ? '仅OpenAI'
+                  : key.permissions || '',
+
+        // 限制配置
+        令牌限制: key.tokenLimit === '0' || key.tokenLimit === 0 ? '无限制' : key.tokenLimit || '',
+        并发限制:
+          key.concurrencyLimit === '0' || key.concurrencyLimit === 0
+            ? '无限制'
+            : key.concurrencyLimit || '',
+        '速率窗口(分钟)':
+          key.rateLimitWindow === '0' || key.rateLimitWindow === 0
+            ? '无限制'
+            : key.rateLimitWindow || '',
+        速率请求限制:
+          key.rateLimitRequests === '0' || key.rateLimitRequests === 0
+            ? '无限制'
+            : key.rateLimitRequests || '',
+        '日费用限制($)':
+          key.dailyCostLimit === '0' || key.dailyCostLimit === 0
+            ? '无限制'
+            : `$${key.dailyCostLimit}` || '',
+        '总费用限制($)':
+          key.totalCostLimit === '0' || key.totalCostLimit === 0
+            ? '无限制'
+            : `$${key.totalCostLimit}` || '',
+
+        // 账户绑定
+        Claude专属账户: key.claudeAccountId || '',
+        Claude控制台账户: key.claudeConsoleAccountId || '',
+        Gemini专属账户: key.geminiAccountId || '',
+        OpenAI专属账户: key.openaiAccountId || '',
+        'Azure OpenAI专属账户': key.azureOpenaiAccountId || '',
+        Bedrock专属账户: key.bedrockAccountId || '',
+
+        // 模型和客户端限制
+        启用模型限制: key.enableModelRestriction ? '是' : '否',
+        限制的模型:
+          key.restrictedModels && key.restrictedModels.length > 0
+            ? key.restrictedModels.join('; ')
+            : '',
+        启用客户端限制: key.enableClientRestriction ? '是' : '否',
+        允许的客户端:
+          key.allowedClients && key.allowedClients.length > 0 ? key.allowedClients.join('; ') : '',
+
+        // 创建信息
+        创建时间: key.createdAt ? formatDate(key.createdAt) : '',
+        创建者: key.createdBy || '',
+        用户ID: key.userId || '',
+        用户名: key.userUsername || '',
+
+        // 使用统计
         标签: key.tags && key.tags.length > 0 ? key.tags.join(', ') : '无',
         请求总数: periodRequests,
         '总费用($)': periodCost.toFixed(2),
@@ -3580,12 +3661,33 @@ const exportToExcel = () => {
     // 设置列宽
     const headers = Object.keys(exportData[0] || {})
     const columnWidths = headers.map((header) => {
+      // 基本信息字段
+      if (header === 'ID') return { wch: 40 }
       if (header === '名称') return { wch: 25 }
+      if (header === '描述') return { wch: 30 }
+      if (header === 'API密钥') return { wch: 45 }
       if (header === '标签') return { wch: 20 }
-      if (header === '最后使用时间') return { wch: 20 }
+
+      // 时间字段
+      if (header.includes('时间')) return { wch: 20 }
+
+      // 限制字段
+      if (header.includes('限制')) return { wch: 15 }
       if (header.includes('费用')) return { wch: 15 }
       if (header.includes('Token')) return { wch: 15 }
       if (header.includes('请求')) return { wch: 12 }
+
+      // 账户绑定字段
+      if (header.includes('账户')) return { wch: 30 }
+
+      // 权限配置字段
+      if (header.includes('权限') || header.includes('模型') || header.includes('客户端'))
+        return { wch: 20 }
+
+      // 激活配置字段
+      if (header.includes('激活') || header.includes('过期')) return { wch: 18 }
+
+      // 默认宽度
       return { wch: 15 }
     })
     ws['!cols'] = columnWidths
