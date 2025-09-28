@@ -111,6 +111,28 @@
               </el-tooltip>
             </div>
 
+            <!-- 选择/取消选择按钮 -->
+            <button
+              class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 hover:shadow-md dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+              @click="toggleSelectionMode"
+            >
+              <i :class="showCheckboxes ? 'fas fa-times' : 'fas fa-check-square'"></i>
+              <span>{{ showCheckboxes ? '取消选择' : '选择' }}</span>
+            </button>
+
+            <!-- 批量删除按钮 -->
+            <button
+              v-if="selectedAccounts.length > 0"
+              class="group relative flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 shadow-sm transition-all duration-200 hover:border-red-300 hover:bg-red-100 hover:shadow-md dark:border-red-700 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50 sm:w-auto"
+              @click="batchDeleteAccounts"
+            >
+              <div
+                class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-red-500 to-pink-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+              ></div>
+              <i class="fas fa-trash relative text-red-600 dark:text-red-400" />
+              <span class="relative">删除选中 ({{ selectedAccounts.length }})</span>
+            </button>
+
             <!-- 添加账户按钮 -->
             <button
               class="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-green-500 to-green-600 px-5 py-2.5 text-sm font-medium text-white shadow-md transition-all duration-200 hover:from-green-600 hover:to-green-700 hover:shadow-lg sm:w-auto"
@@ -143,6 +165,17 @@
         <table class="w-full table-fixed">
           <thead class="bg-gray-50/80 backdrop-blur-sm dark:bg-gray-700/80">
             <tr>
+              <th v-if="shouldShowCheckboxes" class="w-[50px] px-3 py-4 text-left">
+                <div class="flex items-center">
+                  <input
+                    v-model="selectAllChecked"
+                    class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    :indeterminate="isIndeterminate"
+                    type="checkbox"
+                    @change="handleSelectAll"
+                  />
+                </div>
+              </th>
               <th
                 class="w-[22%] min-w-[180px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                 @click="sortAccounts('name')"
@@ -310,6 +343,17 @@
           </thead>
           <tbody class="divide-y divide-gray-200/50 dark:divide-gray-600/50">
             <tr v-for="account in paginatedAccounts" :key="account.id" class="table-row">
+              <td v-if="shouldShowCheckboxes" class="px-3 py-3">
+                <div class="flex items-center">
+                  <input
+                    v-model="selectedAccounts"
+                    class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    type="checkbox"
+                    :value="account.id"
+                    @change="updateSelectAllState"
+                  />
+                </div>
+              </td>
               <td class="px-3 py-4">
                 <div class="flex items-center">
                   <div
@@ -891,6 +935,14 @@
           <!-- 卡片头部 -->
           <div class="mb-3 flex items-start justify-between">
             <div class="flex items-center gap-3">
+              <input
+                v-if="shouldShowCheckboxes"
+                v-model="selectedAccounts"
+                class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                type="checkbox"
+                :value="account.id"
+                @change="updateSelectAllState"
+              />
               <div
                 :class="[
                   'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg',
@@ -1371,6 +1423,12 @@ const pageSizeOptions = [10, 20, 50, 100]
 const pageSize = ref(getInitialPageSize())
 const currentPage = ref(1)
 
+// 多选状态
+const selectedAccounts = ref([])
+const selectAllChecked = ref(false)
+const isIndeterminate = ref(false)
+const showCheckboxes = ref(false)
+
 // 账号使用详情弹窗状态
 const showAccountUsageModal = ref(false)
 const accountUsageLoading = ref(false)
@@ -1428,6 +1486,8 @@ const groupOptions = computed(() => {
   })
   return options
 })
+
+const shouldShowCheckboxes = computed(() => showCheckboxes.value)
 
 // 模态框状态
 const showCreateAccountModal = ref(false)
@@ -1526,7 +1586,6 @@ const openAccountUsageModal = async (account) => {
       showToast(response.error || '加载账号使用详情失败', 'error')
     }
   } catch (error) {
-    console.error('加载账号使用详情失败:', error)
     showToast('加载账号使用详情失败', 'error')
   } finally {
     accountUsageLoading.value = false
@@ -1651,28 +1710,66 @@ const paginatedAccounts = computed(() => {
   return sortedAccounts.value.slice(start, end)
 })
 
+const updateSelectAllState = () => {
+  const currentIds = paginatedAccounts.value.map((account) => account.id)
+  const selectedInCurrentPage = currentIds.filter((id) =>
+    selectedAccounts.value.includes(id)
+  ).length
+  const totalInCurrentPage = currentIds.length
+
+  if (selectedInCurrentPage === 0) {
+    selectAllChecked.value = false
+    isIndeterminate.value = false
+  } else if (selectedInCurrentPage === totalInCurrentPage) {
+    selectAllChecked.value = true
+    isIndeterminate.value = false
+  } else {
+    selectAllChecked.value = false
+    isIndeterminate.value = true
+  }
+}
+
+const handleSelectAll = () => {
+  if (selectAllChecked.value) {
+    paginatedAccounts.value.forEach((account) => {
+      if (!selectedAccounts.value.includes(account.id)) {
+        selectedAccounts.value.push(account.id)
+      }
+    })
+  } else {
+    const currentIds = new Set(paginatedAccounts.value.map((account) => account.id))
+    selectedAccounts.value = selectedAccounts.value.filter((id) => !currentIds.has(id))
+  }
+  updateSelectAllState()
+}
+
+const toggleSelectionMode = () => {
+  showCheckboxes.value = !showCheckboxes.value
+  if (!showCheckboxes.value) {
+    selectedAccounts.value = []
+    selectAllChecked.value = false
+    isIndeterminate.value = false
+  } else {
+    updateSelectAllState()
+  }
+}
+
+const cleanupSelectedAccounts = () => {
+  const validIds = new Set(accounts.value.map((account) => account.id))
+  selectedAccounts.value = selectedAccounts.value.filter((id) => validIds.has(id))
+  updateSelectAllState()
+}
+
 // 加载账户列表
 const loadAccounts = async (forceReload = false) => {
   accountsLoading.value = true
   try {
-    // 检查是否选择了特定分组
-    if (groupFilter.value && groupFilter.value !== 'all' && groupFilter.value !== 'ungrouped') {
-      // 直接调用分组成员接口
-      const response = await apiClient.get(`/admin/account-groups/${groupFilter.value}/members`)
-      if (response.success) {
-        // 分组成员接口已经包含了完整的账户信息，直接使用
-        accounts.value = response.data
-        accountsLoading.value = false
-        return
-      }
-    }
-
     // 构建查询参数（用于其他筛选情况）
     const params = {}
     if (platformFilter.value !== 'all') {
       params.platform = platformFilter.value
     }
-    if (groupFilter.value === 'ungrouped') {
+    if (groupFilter.value !== 'all') {
       params.groupId = groupFilter.value
     }
 
@@ -1926,6 +2023,7 @@ const loadAccounts = async (forceReload = false) => {
     }
 
     accounts.value = filteredAccounts
+    cleanupSelectedAccounts()
   } catch (error) {
     showToast('加载账户失败', 'error')
   } finally {
@@ -2133,21 +2231,67 @@ const editAccount = (account) => {
   showEditAccountModal.value = true
 }
 
+const getBoundApiKeysForAccount = (account) => {
+  if (!account || !account.id) return []
+  return apiKeys.value.filter((key) => {
+    const accountId = account.id
+    return (
+      key.claudeAccountId === accountId ||
+      key.claudeConsoleAccountId === accountId ||
+      key.geminiAccountId === accountId ||
+      key.openaiAccountId === accountId ||
+      key.azureOpenaiAccountId === accountId ||
+      key.openaiAccountId === `responses:${accountId}`
+    )
+  })
+}
+
+const resolveAccountDeleteEndpoint = (account) => {
+  switch (account.platform) {
+    case 'claude':
+      return `/admin/claude-accounts/${account.id}`
+    case 'claude-console':
+      return `/admin/claude-console-accounts/${account.id}`
+    case 'bedrock':
+      return `/admin/bedrock-accounts/${account.id}`
+    case 'openai':
+      return `/admin/openai-accounts/${account.id}`
+    case 'azure_openai':
+      return `/admin/azure-openai-accounts/${account.id}`
+    case 'openai-responses':
+      return `/admin/openai-responses-accounts/${account.id}`
+    case 'ccr':
+      return `/admin/ccr-accounts/${account.id}`
+    case 'gemini':
+      return `/admin/gemini-accounts/${account.id}`
+    default:
+      return null
+  }
+}
+
+const performAccountDeletion = async (account) => {
+  const endpoint = resolveAccountDeleteEndpoint(account)
+  if (!endpoint) {
+    return { success: false, message: '不支持的账户类型' }
+  }
+
+  try {
+    const data = await apiClient.delete(endpoint)
+    if (data.success) {
+      return { success: true, data }
+    }
+    return { success: false, message: data.message || '删除失败' }
+  } catch (error) {
+    const message = error.response?.data?.message || error.message || '删除失败'
+    return { success: false, message }
+  }
+}
+
 // 删除账户
 const deleteAccount = async (account) => {
-  // 检查是否有API Key绑定到此账号
-  const boundKeys = apiKeys.value.filter(
-    (key) =>
-      key.claudeAccountId === account.id ||
-      key.claudeConsoleAccountId === account.id ||
-      key.geminiAccountId === account.id ||
-      key.openaiAccountId === account.id ||
-      key.azureOpenaiAccountId === account.id ||
-      key.openaiAccountId === `responses:${account.id}`
-  )
+  const boundKeys = getBoundApiKeysForAccount(account)
   const boundKeysCount = boundKeys.length
 
-  // 构建确认消息
   let confirmMessage = `确定要删除账户 "${account.name}" 吗？`
   if (boundKeysCount > 0) {
     confirmMessage += `\n\n⚠️ 注意：此账号有 ${boundKeysCount} 个 API Key 绑定。`
@@ -2159,47 +2303,110 @@ const deleteAccount = async (account) => {
 
   if (!confirmed) return
 
-  try {
-    let endpoint
-    if (account.platform === 'claude') {
-      endpoint = `/admin/claude-accounts/${account.id}`
-    } else if (account.platform === 'claude-console') {
-      endpoint = `/admin/claude-console-accounts/${account.id}`
-    } else if (account.platform === 'bedrock') {
-      endpoint = `/admin/bedrock-accounts/${account.id}`
-    } else if (account.platform === 'openai') {
-      endpoint = `/admin/openai-accounts/${account.id}`
-    } else if (account.platform === 'azure_openai') {
-      endpoint = `/admin/azure-openai-accounts/${account.id}`
-    } else if (account.platform === 'openai-responses') {
-      endpoint = `/admin/openai-responses-accounts/${account.id}`
-    } else if (account.platform === 'ccr') {
-      endpoint = `/admin/ccr-accounts/${account.id}`
-    } else {
-      endpoint = `/admin/gemini-accounts/${account.id}`
+  const result = await performAccountDeletion(account)
+
+  if (result.success) {
+    const data = result.data
+    let toastMessage = '账户已成功删除'
+    if (data?.unboundKeys > 0) {
+      toastMessage += `，${data.unboundKeys} 个 API Key 已切换为共享池模式`
     }
+    showToast(toastMessage, 'success')
 
-    const data = await apiClient.delete(endpoint)
+    selectedAccounts.value = selectedAccounts.value.filter((id) => id !== account.id)
+    updateSelectAllState()
 
-    if (data.success) {
-      // 根据解绑结果显示不同的消息
-      let toastMessage = '账户已成功删除'
-      if (data.unboundKeys > 0) {
-        toastMessage += `，${data.unboundKeys} 个 API Key 已切换为共享池模式`
-      }
-      showToast(toastMessage, 'success')
-
-      // 清空相关缓存
-      groupMembersLoaded.value = false
-      apiKeysLoaded.value = false // 重新加载API Keys以反映解绑变化
-      loadAccounts()
-      loadApiKeys(true) // 强制重新加载API Keys
-    } else {
-      showToast(data.message || '删除失败', 'error')
-    }
-  } catch (error) {
-    showToast('删除失败', 'error')
+    groupMembersLoaded.value = false
+    apiKeysLoaded.value = false
+    loadAccounts()
+    loadApiKeys(true)
+  } else {
+    showToast(result.message || '删除失败', 'error')
   }
+}
+
+// 批量删除账户
+const batchDeleteAccounts = async () => {
+  if (selectedAccounts.value.length === 0) {
+    showToast('请先选择要删除的账户', 'warning')
+    return
+  }
+
+  const accountsMap = new Map(accounts.value.map((item) => [item.id, item]))
+  const targets = selectedAccounts.value
+    .map((id) => accountsMap.get(id))
+    .filter((account) => !!account)
+
+  if (targets.length === 0) {
+    showToast('选中的账户已不存在', 'warning')
+    selectedAccounts.value = []
+    updateSelectAllState()
+    return
+  }
+
+  let confirmMessage = `确定要删除选中的 ${targets.length} 个账户吗？此操作不可恢复。`
+  const boundInfo = targets
+    .map((account) => ({ account, boundKeys: getBoundApiKeysForAccount(account) }))
+    .filter((item) => item.boundKeys.length > 0)
+
+  if (boundInfo.length > 0) {
+    confirmMessage += '\n\n⚠️ 以下账户存在绑定的 API Key，将自动解绑：'
+    boundInfo.forEach(({ account, boundKeys }) => {
+      const displayName = account.name || account.email || account.accountName || account.id
+      confirmMessage += `\n- ${displayName}: ${boundKeys.length} 个`
+    })
+    confirmMessage += '\n删除后，这些 API Key 将切换为共享池模式。'
+  }
+
+  confirmMessage += '\n\n请再次确认是否继续。'
+
+  const confirmed = await showConfirm('批量删除账户', confirmMessage, '删除', '取消')
+  if (!confirmed) return
+
+  let successCount = 0
+  let failedCount = 0
+  let totalUnboundKeys = 0
+  const failedDetails = []
+
+  for (const account of targets) {
+    const result = await performAccountDeletion(account)
+    if (result.success) {
+      successCount += 1
+      totalUnboundKeys += result.data?.unboundKeys || 0
+    } else {
+      failedCount += 1
+      failedDetails.push({
+        name: account.name || account.email || account.accountName || account.id,
+        message: result.message || '删除失败'
+      })
+    }
+  }
+
+  if (successCount > 0) {
+    let toastMessage = `成功删除 ${successCount} 个账户`
+    if (totalUnboundKeys > 0) {
+      toastMessage += `，${totalUnboundKeys} 个 API Key 已切换为共享池模式`
+    }
+    showToast(toastMessage, failedCount > 0 ? 'warning' : 'success')
+
+    selectedAccounts.value = []
+    selectAllChecked.value = false
+    isIndeterminate.value = false
+
+    groupMembersLoaded.value = false
+    apiKeysLoaded.value = false
+    await loadAccounts(true)
+  }
+
+  if (failedCount > 0) {
+    const detailMessage = failedDetails.map((item) => `${item.name}: ${item.message}`).join('\n')
+    showToast(
+      `有 ${failedCount} 个账户删除失败:\n${detailMessage}`,
+      successCount > 0 ? 'warning' : 'error'
+    )
+  }
+
+  updateSelectAllState()
 }
 
 // 重置账户状态
@@ -2759,10 +2966,12 @@ const calculateDailyCost = (account) => {
 
 watch(searchKeyword, () => {
   currentPage.value = 1
+  updateSelectAllState()
 })
 
 watch(pageSize, (newSize) => {
   localStorage.setItem(PAGE_SIZE_STORAGE_KEY, newSize.toString())
+  updateSelectAllState()
 })
 
 watch(
@@ -2771,6 +2980,7 @@ watch(
     if (currentPage.value > totalPages.value) {
       currentPage.value = totalPages.value || 1
     }
+    updateSelectAllState()
   }
 )
 
@@ -2787,6 +2997,18 @@ watch(accountSortBy, (newVal) => {
   if (fieldMap[newVal]) {
     sortAccounts(fieldMap[newVal])
   }
+})
+
+watch(currentPage, () => {
+  updateSelectAllState()
+})
+
+watch(paginatedAccounts, () => {
+  updateSelectAllState()
+})
+
+watch(accounts, () => {
+  cleanupSelectedAccounts()
 })
 
 onMounted(() => {

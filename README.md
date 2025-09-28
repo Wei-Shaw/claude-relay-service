@@ -17,14 +17,14 @@
 
 ---
 
-## 💎 Claude 拼车 - Claude Code 合租服务推荐
+## 💎 Claude/Codex 拼车服务推荐
 
 <div align="center">
 
-| 平台 | 类型 | 介绍 |
-|:---:|:---:|:---|
-| **[pincc.ai](https://pincc.ai/)** | 🏆 **官方运营** | 项目官方直营的Claude拼车服务<br>提供200刀 Claude Code Max 套餐共享服务 |
-| **[ctok.ai](https://ctok.ai/)** | 🤝 合作伙伴 | 社区认可的Claude拼车服务 |
+| 平台 | 类型 | 服务 | 介绍 |
+|:---|:---|:---|:---|
+| **[pincc.ai](https://pincc.ai/)** | 🏆 **官方运营** | <small>✅ Claude Code<br>✅ Codex CLI</small> | 项目直营，提供稳定的 Claude Code / Codex CLI 拼车服务 |
+| **[ctok.ai](https://ctok.ai/)** | 🤝 合作伙伴 | <small>✅ Claude Code<br>✅ Codex CLI</small> | 社区认证，提供 Claude Code / Codex CLI 拼车 |
 
 
 </div>
@@ -416,7 +416,7 @@ gemini  # 或其他 Gemini CLI 命令
 
 **Codex 配置：**
 
-在 `~/.codex/config.toml` 文件中添加以下配置：
+在 `~/.codex/config.toml` 文件**开头**添加以下配置：
 
 ```toml
 model_provider = "crs"

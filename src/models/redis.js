@@ -1538,18 +1538,55 @@ class RedisClient {
     }
   }
 
-  // 增加并发计数
-  async incrConcurrency(apiKeyId) {
+  // 获取并发配置
+  _getConcurrencyConfig() {
+    const defaults = {
+      leaseSeconds: 900,
+      cleanupGraceSeconds: 30
+    }
+    return {
+      ...defaults,
+      ...(config.concurrency || {})
+    }
+  }
+
+  // 增加并发计数（基于租约的有序集合）
+  async incrConcurrency(apiKeyId, requestId, leaseSeconds = null) {
+    if (!requestId) {
+      throw new Error('Request ID is required for concurrency tracking')
+    }
+
     try {
+      const { leaseSeconds: defaultLeaseSeconds, cleanupGraceSeconds } =
+        this._getConcurrencyConfig()
+      const lease = leaseSeconds || defaultLeaseSeconds
       const key = `concurrency:${apiKeyId}`
-      const count = await this.client.incr(key)
+      const now = Date.now()
+      const expireAt = now + lease * 1000
+      const ttl = Math.max((lease + cleanupGraceSeconds) * 1000, 60000)
 
-      // 设置过期时间为180秒（3分钟），防止计数器永远不清零
-      // 正常情况下请求会在完成时主动减少计数，这只是一个安全保障
-      // 180秒足够支持较长的流式请求
-      await this.client.expire(key, 180)
+      const luaScript = `
+        local key = KEYS[1]
+        local member = ARGV[1]
+        local expireAt = tonumber(ARGV[2])
+        local now = tonumber(ARGV[3])
+        local ttl = tonumber(ARGV[4])
 
-      logger.database(`🔢 Incremented concurrency for key ${apiKeyId}: ${count}`)
+        redis.call('ZREMRANGEBYSCORE', key, '-inf', now)
+        redis.call('ZADD', key, expireAt, member)
+
+        if ttl > 0 then
+          redis.call('PEXPIRE', key, ttl)
+        end
+
+        local count = redis.call('ZCARD', key)
+        return count
+      `
+
+      const count = await this.client.eval(luaScript, 1, key, requestId, expireAt, now, ttl)
+      logger.database(
+        `🔢 Incremented concurrency for key ${apiKeyId}: ${count} (request ${requestId})`
+      )
       return count
     } catch (error) {
       logger.error('❌ Failed to increment concurrency:', error)
@@ -1557,32 +1594,84 @@ class RedisClient {
     }
   }
 
-  // 减少并发计数
-  async decrConcurrency(apiKeyId) {
-    try {
-      const key = `concurrency:${apiKeyId}`
+  // 刷新并发租约，防止长连接提前过期
+  async refreshConcurrencyLease(apiKeyId, requestId, leaseSeconds = null) {
+    if (!requestId) {
+      return 0
+    }
 
-      // 使用Lua脚本确保原子性操作，防止计数器变成负数
+    try {
+      const { leaseSeconds: defaultLeaseSeconds, cleanupGraceSeconds } =
+        this._getConcurrencyConfig()
+      const lease = leaseSeconds || defaultLeaseSeconds
+      const key = `concurrency:${apiKeyId}`
+      const now = Date.now()
+      const expireAt = now + lease * 1000
+      const ttl = Math.max((lease + cleanupGraceSeconds) * 1000, 60000)
+
       const luaScript = `
         local key = KEYS[1]
-        local current = tonumber(redis.call('get', key) or "0")
+        local member = ARGV[1]
+        local expireAt = tonumber(ARGV[2])
+        local now = tonumber(ARGV[3])
+        local ttl = tonumber(ARGV[4])
 
-        if current <= 0 then
-          redis.call('del', key)
-          return 0
-        else
-          local new_value = redis.call('decr', key)
-          if new_value <= 0 then
-            redis.call('del', key)
-            return 0
-          else
-            return new_value
+        local exists = redis.call('ZSCORE', key, member)
+
+        redis.call('ZREMRANGEBYSCORE', key, '-inf', now)
+
+        if exists then
+          redis.call('ZADD', key, expireAt, member)
+          if ttl > 0 then
+            redis.call('PEXPIRE', key, ttl)
           end
+          return 1
         end
+
+        return 0
       `
 
-      const count = await this.client.eval(luaScript, 1, key)
-      logger.database(`🔢 Decremented concurrency for key ${apiKeyId}: ${count}`)
+      const refreshed = await this.client.eval(luaScript, 1, key, requestId, expireAt, now, ttl)
+      if (refreshed === 1) {
+        logger.debug(`🔄 Refreshed concurrency lease for key ${apiKeyId} (request ${requestId})`)
+      }
+      return refreshed
+    } catch (error) {
+      logger.error('❌ Failed to refresh concurrency lease:', error)
+      return 0
+    }
+  }
+
+  // 减少并发计数
+  async decrConcurrency(apiKeyId, requestId) {
+    try {
+      const key = `concurrency:${apiKeyId}`
+      const now = Date.now()
+
+      const luaScript = `
+        local key = KEYS[1]
+        local member = ARGV[1]
+        local now = tonumber(ARGV[2])
+
+        if member then
+          redis.call('ZREM', key, member)
+        end
+
+        redis.call('ZREMRANGEBYSCORE', key, '-inf', now)
+
+        local count = redis.call('ZCARD', key)
+        if count <= 0 then
+          redis.call('DEL', key)
+          return 0
+        end
+
+        return count
+      `
+
+      const count = await this.client.eval(luaScript, 1, key, requestId || '', now)
+      logger.database(
+        `🔢 Decremented concurrency for key ${apiKeyId}: ${count} (request ${requestId || 'n/a'})`
+      )
       return count
     } catch (error) {
       logger.error('❌ Failed to decrement concurrency:', error)
@@ -1594,7 +1683,17 @@ class RedisClient {
   async getConcurrency(apiKeyId) {
     try {
       const key = `concurrency:${apiKeyId}`
-      const count = await this.client.get(key)
+      const now = Date.now()
+
+      const luaScript = `
+        local key = KEYS[1]
+        local now = tonumber(ARGV[1])
+
+        redis.call('ZREMRANGEBYSCORE', key, '-inf', now)
+        return redis.call('ZCARD', key)
+      `
+
+      const count = await this.client.eval(luaScript, 1, key, now)
       return parseInt(count || 0)
     } catch (error) {
       logger.error('❌ Failed to get concurrency:', error)

@@ -123,12 +123,16 @@
           <StatsOverview />
 
           <!-- Token 分布和限制配置 -->
-          <div class="mb-6 grid grid-cols-1 gap-4 md:mb-8 md:gap-6 lg:grid-cols-2">
-            <TokenDistribution />
-            <!-- 单key模式下显示限制配置 -->
-            <LimitConfig v-if="!multiKeyMode" />
-            <!-- 多key模式下显示聚合统计卡片，填充右侧空白 -->
-            <AggregatedStatsCard v-if="multiKeyMode" />
+          <div
+            class="mb-6 mt-6 grid grid-cols-1 gap-4 md:mb-8 md:mt-8 md:gap-6 xl:grid-cols-2 xl:items-stretch"
+          >
+            <TokenDistribution class="h-full" />
+            <template v-if="multiKeyMode">
+              <AggregatedStatsCard class="h-full" />
+            </template>
+            <template v-else>
+              <LimitConfig class="h-full" />
+            </template>
           </div>
 
           <!-- 模型使用统计 -->

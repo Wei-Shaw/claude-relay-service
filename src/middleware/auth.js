@@ -1,3 +1,5 @@
+const { v4: uuidv4 } = require('uuid')
+const config = require('../../config/config')
 const apiKeyService = require('../services/apiKeyService')
 const userService = require('../services/userService')
 const logger = require('../utils/logger')
@@ -80,14 +82,33 @@ const authenticateApiKey = async (req, res, next) => {
     // 检查并发限制
     const concurrencyLimit = validation.keyData.concurrencyLimit || 0
     if (concurrencyLimit > 0) {
-      const currentConcurrency = await redis.incrConcurrency(validation.keyData.id)
+      const concurrencyConfig = config.concurrency || {}
+      const leaseSeconds = Math.max(concurrencyConfig.leaseSeconds || 900, 30)
+      const rawRenewInterval =
+        typeof concurrencyConfig.renewIntervalSeconds === 'number'
+          ? concurrencyConfig.renewIntervalSeconds
+          : 60
+      let renewIntervalSeconds = rawRenewInterval
+      if (renewIntervalSeconds > 0) {
+        const maxSafeRenew = Math.max(leaseSeconds - 5, 15)
+        renewIntervalSeconds = Math.min(Math.max(renewIntervalSeconds, 15), maxSafeRenew)
+      } else {
+        renewIntervalSeconds = 0
+      }
+      const requestId = uuidv4()
+
+      const currentConcurrency = await redis.incrConcurrency(
+        validation.keyData.id,
+        requestId,
+        leaseSeconds
+      )
       logger.api(
         `📈 Incremented concurrency for key: ${validation.keyData.id} (${validation.keyData.name}), current: ${currentConcurrency}, limit: ${concurrencyLimit}`
       )
 
       if (currentConcurrency > concurrencyLimit) {
         // 如果超过限制，立即减少计数
-        await redis.decrConcurrency(validation.keyData.id)
+        await redis.decrConcurrency(validation.keyData.id, requestId)
         logger.security(
           `🚦 Concurrency limit exceeded for key: ${validation.keyData.id} (${
             validation.keyData.name
@@ -101,14 +122,39 @@ const authenticateApiKey = async (req, res, next) => {
         })
       }
 
+      const renewIntervalMs =
+        renewIntervalSeconds > 0 ? Math.max(renewIntervalSeconds * 1000, 15000) : 0
+
       // 使用标志位确保只减少一次
       let concurrencyDecremented = false
+      let leaseRenewInterval = null
+
+      if (renewIntervalMs > 0) {
+        leaseRenewInterval = setInterval(() => {
+          redis
+            .refreshConcurrencyLease(validation.keyData.id, requestId, leaseSeconds)
+            .catch((error) => {
+              logger.error(
+                `Failed to refresh concurrency lease for key ${validation.keyData.id}:`,
+                error
+              )
+            })
+        }, renewIntervalMs)
+
+        if (typeof leaseRenewInterval.unref === 'function') {
+          leaseRenewInterval.unref()
+        }
+      }
 
       const decrementConcurrency = async () => {
         if (!concurrencyDecremented) {
           concurrencyDecremented = true
+          if (leaseRenewInterval) {
+            clearInterval(leaseRenewInterval)
+            leaseRenewInterval = null
+          }
           try {
-            const newCount = await redis.decrConcurrency(validation.keyData.id)
+            const newCount = await redis.decrConcurrency(validation.keyData.id, requestId)
             logger.api(
               `📉 Decremented concurrency for key: ${validation.keyData.id} (${validation.keyData.name}), new count: ${newCount}`
             )
@@ -147,6 +193,7 @@ const authenticateApiKey = async (req, res, next) => {
       req.concurrencyInfo = {
         apiKeyId: validation.keyData.id,
         apiKeyName: validation.keyData.name,
+        requestId,
         decrementConcurrency
       }
     }
