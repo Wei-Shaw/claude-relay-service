@@ -833,7 +833,6 @@ async function getAccountOverview(accountId) {
 
   return {
     id: accountData.id,
-    name: accountData.name,
     accountType: accountData.accountType || 'shared',
     platform: accountData.platform || 'openai',
     isActive: accountData.isActive === 'true',

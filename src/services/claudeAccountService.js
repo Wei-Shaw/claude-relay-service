@@ -558,7 +558,6 @@ class ClaudeAccountService {
 
       return {
         id: accountData.id,
-        name: accountData.name,
         accountType: accountData.accountType || 'shared',
         platform: accountData.platform || 'claude',
         isActive: accountData.isActive === 'true',
