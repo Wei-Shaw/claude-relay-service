@@ -1,7 +1,7 @@
 // Auto-generated from @anthropic-ai/claude-code v1.0.123
 // Prompts are sanitized with __PLACEHOLDER__ markers replacing dynamic content.
 
-import stringSimilarity from 'string-similarity'
+const stringSimilarity = require('string-similarity')
 
 /**
  * @typedef {Object} SimpleSimilarityResult
@@ -23,7 +23,7 @@ function normalize(value) {
  * @param {number} threshold
  * @returns {SimpleSimilarityResult}
  */
-export function simple(actual, expected, threshold) {
+function simple(actual, expected, threshold) {
   if (typeof expected !== 'string' || !expected.trim()) {
     throw new Error('Expected prompt text must be a non-empty string')
   }
@@ -38,7 +38,7 @@ export function simple(actual, expected, threshold) {
 
 const DEFAULT_SYSTEM_PROMPT_THRESHOLD = 0.5
 const parsedSystemPromptThreshold = Number(process.env.SYSTEM_PROMPT_THRESHOLD)
-export const SYSTEM_PROMPT_THRESHOLD = Number.isFinite(parsedSystemPromptThreshold)
+const SYSTEM_PROMPT_THRESHOLD = Number.isFinite(parsedSystemPromptThreshold)
   ? parsedSystemPromptThreshold
   : DEFAULT_SYSTEM_PROMPT_THRESHOLD
 
@@ -224,7 +224,7 @@ for (const category of [
 /**
  * @type {Record<PromptId, string>}
  */
-export const promptMap = Object.fromEntries(
+const promptMap = Object.fromEntries(
   Object.entries(PROMPT_DEFINITIONS).map(([id, definition]) => [id, definition.text])
 )
 
@@ -258,7 +258,7 @@ const toFlexibleWhitespacePattern = (value) =>
  * @param {unknown} value
  * @returns {string}
  */
-export function normalizePrompt(value) {
+function normalizePrompt(value) {
   if (typeof value !== 'string') {
     return ''
   }
@@ -268,14 +268,14 @@ export function normalizePrompt(value) {
 /**
  * @type {Record<PromptId, string>}
  */
-export const normalizedPromptMap = Object.fromEntries(
+const normalizedPromptMap = Object.fromEntries(
   Object.entries(promptMap).map(([id, text]) => [id, normalizePrompt(text)])
 )
 
 /**
  * @type {[PromptId, string][]}
  */
-export const normalizedPromptEntries = Object.entries(normalizedPromptMap)
+const normalizedPromptEntries = Object.entries(normalizedPromptMap)
 /**
  * @type {[PromptId, string][]}
  */
@@ -427,7 +427,7 @@ function matchesTemplateIgnoringPlaceholders(normalizedValue, parts) {
  * @param {unknown} value
  * @returns {TemplateSimilarityResult}
  */
-export function bestSimilarityByTemplates(value) {
+function bestSimilarityByTemplates(value) {
   const rawValue = typeof value === 'string' ? value : ''
   const normalizedValue = normalizePrompt(rawValue)
   let bestScore = 0
@@ -464,7 +464,7 @@ export function bestSimilarityByTemplates(value) {
  * @param {unknown} value
  * @returns {string}
  */
-export function normalizeSystemText(value) {
+function normalizeSystemText(value) {
   if (typeof value !== 'string') {
     return ''
   }
@@ -496,7 +496,19 @@ export function normalizeSystemText(value) {
  * @param {unknown} value
  * @returns {{bestScore: number}}
  */
-export function bestSimilarity(value) {
+function bestSimilarity(value) {
   const { bestScore } = bestSimilarityByTemplates(value)
   return { bestScore }
+}
+
+module.exports = {
+  simple,
+  SYSTEM_PROMPT_THRESHOLD,
+  promptMap,
+  normalizePrompt,
+  normalizedPromptMap,
+  normalizedPromptEntries,
+  bestSimilarityByTemplates,
+  normalizeSystemText,
+  bestSimilarity
 }
