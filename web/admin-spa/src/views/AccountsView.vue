@@ -2616,6 +2616,10 @@ const getSchedulableReason = (account) => {
     if (account.stoppedReason) {
       return account.stoppedReason
     }
+    // 检查5小时限制自动停止标志（备用方案）
+    if (account.fiveHourAutoStopped === 'true' || account.fiveHourAutoStopped === true) {
+      return '5小时使用量接近限制，已自动停止调度'
+    }
   }
 
   // OpenAI 账户的错误状态

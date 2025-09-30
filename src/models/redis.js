@@ -1886,11 +1886,9 @@ const redisClient = new RedisClient()
 // 分布式锁相关方法
 redisClient.setAccountLock = async function (lockKey, lockValue, ttlMs) {
   try {
-    // 使用SET NX EX实现原子性的锁获取
-    const result = await this.client.set(lockKey, lockValue, {
-      NX: true, // 只在键不存在时设置
-      PX: ttlMs // 毫秒级过期时间
-    })
+    // 使用SET NX PX实现原子性的锁获取
+    // ioredis语法: set(key, value, 'PX', milliseconds, 'NX')
+    const result = await this.client.set(lockKey, lockValue, 'PX', ttlMs, 'NX')
     return result === 'OK'
   } catch (error) {
     logger.error(`Failed to acquire lock ${lockKey}:`, error)
@@ -1908,10 +1906,8 @@ redisClient.releaseAccountLock = async function (lockKey, lockValue) {
         return 0
       end
     `
-    const result = await this.client.eval(script, {
-      keys: [lockKey],
-      arguments: [lockValue]
-    })
+    // ioredis语法: eval(script, numberOfKeys, key1, key2, ..., arg1, arg2, ...)
+    const result = await this.client.eval(script, 1, lockKey, lockValue)
     return result === 1
   } catch (error) {
     logger.error(`Failed to release lock ${lockKey}:`, error)

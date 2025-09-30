@@ -2270,6 +2270,8 @@ class ClaudeAccountService {
         // 使用独立的5小时限制自动停止标记
         accountData.fiveHourAutoStopped = 'true'
         accountData.fiveHourStoppedAt = new Date().toISOString()
+        // 设置停止原因，供前端显示
+        accountData.stoppedReason = '5小时使用量接近限制，已自动停止调度'
 
         // 发送Webhook通知
         try {
@@ -2502,6 +2504,7 @@ class ClaudeAccountService {
               updatedAccountData.schedulable = 'true'
               delete updatedAccountData.fiveHourAutoStopped
               delete updatedAccountData.fiveHourStoppedAt
+              delete updatedAccountData.stoppedReason
 
               // 更新会话窗口（如果有新窗口）
               if (newWindowStart && newWindowEnd) {
