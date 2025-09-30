@@ -278,6 +278,32 @@
           </div>
         </div>
 
+        <!-- VSCode 插件配置 -->
+        <div class="mt-6 rounded-lg border border-indigo-200 bg-indigo-50 p-3 sm:p-4">
+          <h6 class="mb-2 font-medium text-indigo-800 dark:text-indigo-300">
+            VSCode Claude 插件配置
+          </h6>
+          <p class="mb-3 text-sm text-indigo-700">
+            如果使用 VSCode 的 Claude 插件，需要在配置文件中进行设置：
+          </p>
+          <div class="mb-3 space-y-2">
+            <p class="text-sm text-indigo-700">
+              <strong>配置文件位置：</strong>
+              <code class="rounded bg-indigo-100 px-1"
+                >C:\Users\你的用户名\.claude\config.json</code
+              >
+            </p>
+            <p class="text-xs text-indigo-600">💡 如果该文件不存在，请手动创建。</p>
+          </div>
+          <div
+            class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+          >
+            <div class="whitespace-nowrap text-gray-300">{</div>
+            <div class="whitespace-nowrap text-gray-300">"primaryApiKey": "crs"</div>
+            <div class="whitespace-nowrap text-gray-300">}</div>
+          </div>
+        </div>
+
         <!-- 验证环境变量设置 -->
         <div class="mt-6 rounded-lg border border-blue-200 bg-blue-50 p-3 sm:p-4">
           <h6 class="mb-2 font-medium text-blue-800 dark:text-blue-300">验证环境变量设置</h6>
@@ -846,6 +872,30 @@
                 <div class="whitespace-nowrap text-gray-300">source ~/.bash_profile</div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- VSCode 插件配置 (macOS) -->
+        <div class="mt-6 rounded-lg border border-indigo-200 bg-indigo-50 p-3 sm:p-4">
+          <h6 class="mb-2 font-medium text-indigo-800 dark:text-indigo-300">
+            VSCode Claude 插件配置
+          </h6>
+          <p class="mb-3 text-sm text-indigo-700">
+            如果使用 VSCode 的 Claude 插件，需要在配置文件中进行设置：
+          </p>
+          <div class="mb-3 space-y-2">
+            <p class="text-sm text-indigo-700">
+              <strong>配置文件位置：</strong>
+              <code class="rounded bg-indigo-100 px-1">~/.claude/config.json</code>
+            </p>
+            <p class="text-xs text-indigo-600">💡 如果该文件不存在，请手动创建。</p>
+          </div>
+          <div
+            class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+          >
+            <div class="whitespace-nowrap text-gray-300">{</div>
+            <div class="whitespace-nowrap text-gray-300">"primaryApiKey": "crs"</div>
+            <div class="whitespace-nowrap text-gray-300">}</div>
           </div>
         </div>
 
@@ -1554,6 +1604,30 @@
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- VSCode 插件配置 (Linux) -->
+        <div class="mt-6 rounded-lg border border-indigo-200 bg-indigo-50 p-3 sm:p-4">
+          <h6 class="mb-2 font-medium text-indigo-800 dark:text-indigo-300">
+            VSCode Claude 插件配置
+          </h6>
+          <p class="mb-3 text-sm text-indigo-700">
+            如果使用 VSCode 的 Claude 插件，需要在配置文件中进行设置：
+          </p>
+          <div class="mb-3 space-y-2">
+            <p class="text-sm text-indigo-700">
+              <strong>配置文件位置：</strong>
+              <code class="rounded bg-indigo-100 px-1">~/.claude/config.json</code>
+            </p>
+            <p class="text-xs text-indigo-600">💡 如果该文件不存在，请手动创建。</p>
+          </div>
+          <div
+            class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+          >
+            <div class="whitespace-nowrap text-gray-300">{</div>
+            <div class="whitespace-nowrap text-gray-300">"primaryApiKey": "crs"</div>
+            <div class="whitespace-nowrap text-gray-300">}</div>
           </div>
         </div>
       </div>

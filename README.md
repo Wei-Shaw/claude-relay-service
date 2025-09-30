@@ -394,6 +394,18 @@ export ANTHROPIC_BASE_URL="http://127.0.0.1:3000/api/" # 根据实际填写你�
 export ANTHROPIC_AUTH_TOKEN="后台创建的API密钥"
 ```
 
+**VSCode Claude 插件配置：**
+
+如果使用 VSCode 的 Claude 插件，需要在 `~/.claude/config.json` 文件中配置：
+
+```json
+{
+    "primaryApiKey": "crs"
+}
+```
+
+如果该文件不存在，请手动创建。Windows 用户路径为 `C:\Users\你的用户名\.claude\config.json`。
+
 **Gemini CLI 设置环境变量：**
 
 ```bash
