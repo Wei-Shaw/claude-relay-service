@@ -10,6 +10,7 @@ const logger = require('../utils/logger')
 const config = require('../../config/config')
 const claudeCodeHeadersService = require('./claudeCodeHeadersService')
 const redis = require('../models/redis')
+const ClaudeCodeValidator = require('../validators/clients/claudeCodeValidator')
 
 class ClaudeRelayService {
   constructor() {
@@ -22,42 +23,16 @@ class ClaudeRelayService {
 
   // 🔍 判断是否是真实的 Claude Code 请求
   isRealClaudeCodeRequest(requestBody, clientHeaders) {
-    // 检查 user-agent 是否匹配 Claude Code 格式
-    const userAgent = clientHeaders?.['user-agent'] || clientHeaders?.['User-Agent'] || ''
-    const isClaudeCodeUserAgent = /^claude-cli\/[\d.]+\s+\(/i.test(userAgent)
-
-    // 检查系统提示词是否包含 Claude Code 标识（支持两种类型的提示词）
-    const hasClaudeCodeSystemPrompt = this._hasClaudeCodeSystemPrompt(requestBody)
-
-    // 只有当 user-agent 匹配且系统提示词正确时，才认为是真实的 Claude Code 请求
-    return isClaudeCodeUserAgent && hasClaudeCodeSystemPrompt
-  }
-
-  // 🔍 检查请求中是否包含 Claude Code 系统提示词
-  _hasClaudeCodeSystemPrompt(requestBody) {
-    if (!requestBody || !requestBody.system) {
-      return false
+    // 使用 claudeCodeValidator 来进行完整的验证
+    // 注意：claudeCodeValidator.validate() 需要一个完整的 req 对象
+    // 我们需要构造一个最小化的 req 对象来满足验证器的需求
+    const mockReq = {
+      headers: clientHeaders || {},
+      body: requestBody,
+      path: '/api/v1/messages'
     }
 
-    // 如果是字符串格式，一定不是真实的 Claude Code 请求
-    if (typeof requestBody.system === 'string') {
-      return false
-    }
-
-    // 处理数组格式 - 检查第一个元素
-    if (Array.isArray(requestBody.system) && requestBody.system.length > 0) {
-      const firstItem = requestBody.system[0]
-      // 检查第一个元素是否包含 Claude Code 相关的提示词
-      if (firstItem && firstItem.type === 'text' && firstItem.text) {
-        // Claude Code 的两种典型提示词开头
-        return (
-          firstItem.text.startsWith("You are Claude Code, Anthropic's official CLI for Claude.") ||
-          firstItem.text.startsWith('Analyze if this message indicates a new conversation topic')
-        )
-      }
-    }
-
-    return false
+    return ClaudeCodeValidator.validate(mockReq)
   }
 
   // 🚀 转发请求到Claude API
