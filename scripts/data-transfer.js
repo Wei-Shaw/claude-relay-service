@@ -118,6 +118,7 @@ const CSV_FIELD_MAPPING = {
   dailyCostLimit: '日费用限制(美元)',
   totalCostLimit: '总费用限制(美元)',
   weeklyOpusCostLimit: '周Opus费用限制(美元)',
+  dailyOpusCostLimit: '日Opus费用限制(美元)',
 
   // 账户绑定
   claudeAccountId: 'Claude专属账户',
@@ -222,6 +223,7 @@ function formatCSVValue(key, value, shouldSanitize = false) {
     case 'dailyCostLimit':
     case 'totalCostLimit':
     case 'weeklyOpusCostLimit':
+    case 'dailyOpusCostLimit':
       return value === '0' || value === 0 ? '无限制' : `$${value}`
 
     default:

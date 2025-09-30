@@ -265,6 +265,8 @@ export const useApiStatsStore = defineStore('apistats', () => {
         console.log('API Stats - limits data:', result.data.limits)
         console.log('API Stats - weeklyOpusCostLimit:', result.data.limits?.weeklyOpusCostLimit)
         console.log('API Stats - weeklyOpusCost:', result.data.limits?.weeklyOpusCost)
+        console.log('API Stats - dailyOpusCostLimit:', result.data.limits?.dailyOpusCostLimit)
+        console.log('API Stats - dailyOpusCost:', result.data.limits?.dailyOpusCost)
 
         // 同时加载今日和本月的统计数据
         await loadAllPeriodStats()

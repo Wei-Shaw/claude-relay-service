@@ -177,7 +177,20 @@
                   type="opus"
                 />
                 <div class="text-right text-xs text-gray-500 dark:text-gray-400">
-                  已使用 {{ Math.min(opusUsagePercentage, 100).toFixed(1) }}%
+                  已使用 {{ Math.min(opusWeeklyUsagePercentage, 100).toFixed(1) }}%
+                </div>
+              </div>
+
+              <div v-if="apiKey.dailyOpusCostLimit > 0" class="space-y-1.5">
+                <LimitProgressBar
+                  :current="dailyOpusCost"
+                  label="Opus 日费用限制"
+                  :limit="apiKey.dailyOpusCostLimit"
+                  :show-shine="true"
+                  type="opus"
+                />
+                <div class="text-right text-xs text-gray-500 dark:text-gray-400">
+                  已使用 {{ Math.min(opusDailyUsagePercentage, 100).toFixed(1) }}%
                 </div>
               </div>
 
@@ -268,6 +281,8 @@ const dailyCost = computed(() => props.apiKey.dailyCost || 0)
 const totalCostLimit = computed(() => props.apiKey.totalCostLimit || 0)
 const weeklyOpusCost = computed(() => props.apiKey.weeklyOpusCost || 0)
 const weeklyOpusCostLimit = computed(() => props.apiKey.weeklyOpusCostLimit || 0)
+const dailyOpusCost = computed(() => props.apiKey.dailyOpusCost || 0)
+const dailyOpusCostLimit = computed(() => props.apiKey.dailyOpusCostLimit || 0)
 const inputTokens = computed(() => props.apiKey.usage?.total?.inputTokens || 0)
 const outputTokens = computed(() => props.apiKey.usage?.total?.outputTokens || 0)
 const cacheCreateTokens = computed(() => props.apiKey.usage?.total?.cacheCreateTokens || 0)
@@ -281,6 +296,7 @@ const hasLimits = computed(() => {
     props.apiKey.totalCostLimit > 0 ||
     props.apiKey.concurrencyLimit > 0 ||
     props.apiKey.weeklyOpusCostLimit > 0 ||
+    props.apiKey.dailyOpusCostLimit > 0 ||
     props.apiKey.rateLimitWindow > 0 ||
     props.apiKey.tokenLimit > 0
   )
@@ -296,9 +312,14 @@ const totalUsagePercentage = computed(() => {
   return (totalCost.value / totalCostLimit.value) * 100
 })
 
-const opusUsagePercentage = computed(() => {
+const opusWeeklyUsagePercentage = computed(() => {
   if (!weeklyOpusCostLimit.value || weeklyOpusCostLimit.value === 0) return 0
   return (weeklyOpusCost.value / weeklyOpusCostLimit.value) * 100
+})
+
+const opusDailyUsagePercentage = computed(() => {
+  if (!dailyOpusCostLimit.value || dailyOpusCostLimit.value === 0) return 0
+  return (dailyOpusCost.value / dailyOpusCostLimit.value) * 100
 })
 
 // 方法

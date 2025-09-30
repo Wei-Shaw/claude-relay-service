@@ -792,6 +792,37 @@ class RedisClient {
     logger.debug(`💰 Opus cost incremented successfully, new weekly total: $${results[0][1]}`)
   }
 
+  // 💰 获取当日 Opus 费用
+  async getDailyOpusCost(keyId) {
+    const today = getDateStringInTimezone()
+    const costKey = `usage:opus:daily:${keyId}:${today}`
+    const cost = await this.client.get(costKey)
+    const result = parseFloat(cost || 0)
+    logger.debug(
+      `💰 Getting daily Opus cost for ${keyId}, date: ${today}, key: ${costKey}, value: ${cost}, result: ${result}`
+    )
+    return result
+  }
+
+  // 💰 增加当日 Opus 费用
+  async incrementDailyOpusCost(keyId, amount) {
+    const today = getDateStringInTimezone()
+    const dailyKey = `usage:opus:daily:${keyId}:${today}`
+    const totalKey = `usage:opus:total:${keyId}`
+
+    logger.debug(`💰 Incrementing daily Opus cost for ${keyId}, date: ${today}, amount: $${amount}`)
+
+    // 使用 pipeline 批量执行，提高性能
+    const pipeline = this.client.pipeline()
+    pipeline.incrbyfloat(dailyKey, amount)
+    pipeline.incrbyfloat(totalKey, amount)
+    // 设置日费用键的过期时间为 7 天
+    pipeline.expire(dailyKey, 7 * 24 * 3600)
+
+    const results = await pipeline.exec()
+    logger.debug(`💰 Opus cost incremented successfully, new daily total: $${results[0][1]}`)
+  }
+
   // 💰 计算账户的每日费用（基于模型使用）
   async getAccountDailyCost(accountId) {
     const CostCalculator = require('../utils/costCalculator')
