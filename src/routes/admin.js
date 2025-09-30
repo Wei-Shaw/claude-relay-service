@@ -2103,6 +2103,61 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
   }
 })
 
+// 批量获取 Claude 账户的 OAuth Usage 数据
+router.get('/claude-accounts/usage', authenticateAdmin, async (req, res) => {
+  try {
+    const accounts = await redis.getAllClaudeAccounts()
+
+    // 批量并发获取所有活跃 OAuth 账户的 Usage
+    const usagePromises = accounts.map(async (account) => {
+      // 检查是否为 OAuth 账户：scopes 包含 OAuth 相关权限
+      const scopes = account.scopes && account.scopes.trim() ? account.scopes.split(' ') : []
+      const isOAuth = scopes.includes('user:profile') && scopes.includes('user:inference')
+
+      // 仅为 OAuth 授权的活跃账户调用 usage API
+      if (
+        isOAuth &&
+        account.isActive === 'true' &&
+        account.accessToken &&
+        account.status === 'active'
+      ) {
+        try {
+          const usageData = await claudeAccountService.fetchOAuthUsage(account.id)
+          if (usageData) {
+            await claudeAccountService.updateClaudeUsageSnapshot(account.id, usageData)
+          }
+          // 重新读取更新后的数据
+          const updatedAccount = await redis.getClaudeAccount(account.id)
+          return {
+            accountId: account.id,
+            claudeUsage: claudeAccountService.buildClaudeUsageSnapshot(updatedAccount)
+          }
+        } catch (error) {
+          logger.debug(`Failed to fetch OAuth usage for ${account.id}:`, error.message)
+          return { accountId: account.id, claudeUsage: null }
+        }
+      }
+      // Setup Token 账户不调用 usage API，直接返回 null
+      return { accountId: account.id, claudeUsage: null }
+    })
+
+    const results = await Promise.allSettled(usagePromises)
+
+    // 转换为 { accountId: usage } 映射
+    const usageMap = {}
+    results.forEach((result) => {
+      if (result.status === 'fulfilled' && result.value) {
+        usageMap[result.value.accountId] = result.value.claudeUsage
+      }
+    })
+
+    res.json({ success: true, data: usageMap })
+  } catch (error) {
+    logger.error('❌ Failed to fetch Claude accounts usage:', error)
+    res.status(500).json({ error: 'Failed to fetch usage data', message: error.message })
+  }
+})
+
 // 创建新的Claude账户
 router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
   try {
