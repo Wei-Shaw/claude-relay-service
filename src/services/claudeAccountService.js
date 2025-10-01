@@ -1607,12 +1607,9 @@ class ClaudeAccountService {
         throw new Error('Account not found')
       }
 
-      // 如果没有提供 accessToken，使用账号存储的 token
+      // 如果没有提供 accessToken，使用 getValidAccessToken 自动检查过期并刷新
       if (!accessToken) {
-        accessToken = this._decryptSensitiveData(accountData.accessToken)
-        if (!accessToken) {
-          throw new Error('No access token available')
-        }
+        accessToken = await this.getValidAccessToken(accountId)
       }
 
       // 如果没有提供 agent，创建代理
