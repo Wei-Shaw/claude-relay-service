@@ -947,9 +947,46 @@ class ApiKeyService {
           await pricingService.initialize()
         }
         costInfo = pricingService.calculateCost(usageObject, model)
+
+        // 验证计算结果
+        if (!costInfo || typeof costInfo.totalCost !== 'number') {
+          logger.error(`❌ Invalid cost calculation result for model ${model}:`, costInfo)
+          // 使用 CostCalculator 作为后备
+          const CostCalculator = require('../utils/costCalculator')
+          const fallbackCost = CostCalculator.calculateCost(usageObject, model)
+          if (fallbackCost && fallbackCost.costs && fallbackCost.costs.total > 0) {
+            logger.warn(
+              `⚠️ Using fallback cost calculation for ${model}: $${fallbackCost.costs.total}`
+            )
+            costInfo = {
+              totalCost: fallbackCost.costs.total,
+              ephemeral5mCost: 0,
+              ephemeral1hCost: 0
+            }
+          } else {
+            costInfo = { totalCost: 0, ephemeral5mCost: 0, ephemeral1hCost: 0 }
+          }
+        }
       } catch (pricingError) {
-        logger.error('❌ Failed to calculate cost:', pricingError)
-        // 继续执行，不要因为费用计算失败而跳过统计记录
+        logger.error(`❌ Failed to calculate cost for model ${model}:`, pricingError)
+        logger.error(`   Usage object:`, JSON.stringify(usageObject))
+        // 使用 CostCalculator 作为后备
+        try {
+          const CostCalculator = require('../utils/costCalculator')
+          const fallbackCost = CostCalculator.calculateCost(usageObject, model)
+          if (fallbackCost && fallbackCost.costs && fallbackCost.costs.total > 0) {
+            logger.warn(
+              `⚠️ Using fallback cost calculation for ${model}: $${fallbackCost.costs.total}`
+            )
+            costInfo = {
+              totalCost: fallbackCost.costs.total,
+              ephemeral5mCost: 0,
+              ephemeral1hCost: 0
+            }
+          }
+        } catch (fallbackError) {
+          logger.error(`❌ Fallback cost calculation also failed:`, fallbackError)
+        }
       }
 
       // 提取详细的缓存创建数据
@@ -994,7 +1031,15 @@ class ApiKeyService {
           )
         }
       } else {
-        logger.debug(`💰 No cost recorded for ${keyId} - zero cost for model: ${model}`)
+        // 如果有 token 使用但费用为 0，记录警告
+        if (totalTokens > 0) {
+          logger.warn(
+            `⚠️ No cost recorded for ${keyId} - zero cost for model: ${model} (tokens: ${totalTokens})`
+          )
+          logger.warn(`   This may indicate a pricing issue or model not found in pricing data`)
+        } else {
+          logger.debug(`💰 No cost recorded for ${keyId} - zero tokens for model: ${model}`)
+        }
       }
 
       // 获取API Key数据以确定关联的账户

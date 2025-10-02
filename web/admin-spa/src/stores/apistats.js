@@ -92,8 +92,16 @@ export const useApiStatsStore = defineStore('apistats', () => {
       return queryBatchStats()
     }
 
-    if (!apiKey.value.trim()) {
+    const trimmedKey = apiKey.value.trim()
+
+    if (!trimmedKey) {
       error.value = '请输入 API Key'
+      return
+    }
+
+    // 验证 API Key 格式：长度应在 10-512 之间
+    if (trimmedKey.length < 10 || trimmedKey.length > 512) {
+      error.value = 'API Key 格式无效：长度应在 10-512 个字符之间'
       return
     }
 
@@ -105,7 +113,7 @@ export const useApiStatsStore = defineStore('apistats', () => {
 
     try {
       // 获取 API Key ID
-      const idResult = await apiStatsClient.getKeyId(apiKey.value)
+      const idResult = await apiStatsClient.getKeyId(trimmedKey)
 
       if (idResult.success) {
         apiId.value = idResult.data.id
@@ -431,7 +439,7 @@ export const useApiStatsStore = defineStore('apistats', () => {
     const keys = apiKey.value
       .split(/[,\n]+/)
       .map((key) => key.trim())
-      .filter((key) => key.length > 0)
+      .filter((key) => key.length >= 10 && key.length <= 512) // 验证 API Key 格式
 
     // 去重并限制最多30个
     const uniqueKeys = [...new Set(keys)]
