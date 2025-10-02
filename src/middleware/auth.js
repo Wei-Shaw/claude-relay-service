@@ -384,6 +384,47 @@ const authenticateApiKey = async (req, res, next) => {
       )
     }
 
+    // 检查 Opus 日费用限制（仅对 Opus 模型生效）
+    const dailyOpusCostLimit = validation.keyData.dailyOpusCostLimit || 0
+    if (dailyOpusCostLimit > 0) {
+      // 从请求中获取模型信息
+      const requestBody = req.body || {}
+      const model = requestBody.model || ''
+
+      // 判断是否为 Opus 模型
+      if (model && model.toLowerCase().includes('claude-opus')) {
+        const dailyOpusCost = validation.keyData.dailyOpusCost || 0
+
+        if (dailyOpusCost >= dailyOpusCostLimit) {
+          logger.security(
+            `💰 Daily Opus cost limit exceeded for key: ${validation.keyData.id} (${
+              validation.keyData.name
+            }), cost: $${dailyOpusCost.toFixed(2)}/$${dailyOpusCostLimit}`
+          )
+
+          // 计算明日 00:00 的重置时间
+          const tomorrow = new Date()
+          tomorrow.setDate(tomorrow.getDate() + 1)
+          tomorrow.setHours(0, 0, 0, 0)
+
+          return res.status(429).json({
+            error: 'Daily Opus cost limit exceeded',
+            message: `已达到 Opus 模型日费用限制 ($${dailyOpusCostLimit})`,
+            currentCost: dailyOpusCost,
+            costLimit: dailyOpusCostLimit,
+            resetAt: tomorrow.toISOString() // 明日 00:00 重置
+          })
+        }
+
+        // 记录当前 Opus 日费用使用情况
+        logger.api(
+          `💰 Opus daily cost usage for key: ${validation.keyData.id} (${
+            validation.keyData.name
+          }), current: $${dailyOpusCost.toFixed(2)}/$${dailyOpusCostLimit}`
+        )
+      }
+    }
+
     // 检查 Opus 周费用限制（仅对 Opus 模型生效）
     const weeklyOpusCostLimit = validation.keyData.weeklyOpusCostLimit || 0
     if (weeklyOpusCostLimit > 0) {

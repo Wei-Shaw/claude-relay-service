@@ -35,6 +35,7 @@ class ApiKeyService {
       dailyCostLimit = 0,
       totalCostLimit = 0,
       weeklyOpusCostLimit = 0,
+      dailyOpusCostLimit = 0,
       tags = [],
       activationDays = 0, // 新增：激活后有效天数（0表示不使用此功能）
       activationUnit = 'days', // 新增：激活时间单位 'hours' 或 'days'
@@ -72,6 +73,7 @@ class ApiKeyService {
       dailyCostLimit: String(dailyCostLimit || 0),
       totalCostLimit: String(totalCostLimit || 0),
       weeklyOpusCostLimit: String(weeklyOpusCostLimit || 0),
+      dailyOpusCostLimit: String(dailyOpusCostLimit || 0),
       tags: JSON.stringify(tags || []),
       activationDays: String(activationDays || 0), // 新增：激活后有效天数
       activationUnit: activationUnit || 'days', // 新增：激活时间单位
@@ -117,6 +119,7 @@ class ApiKeyService {
       dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
       totalCostLimit: parseFloat(keyData.totalCostLimit || 0),
       weeklyOpusCostLimit: parseFloat(keyData.weeklyOpusCostLimit || 0),
+      dailyOpusCostLimit: parseFloat(keyData.dailyOpusCostLimit || 0),
       tags: JSON.parse(keyData.tags || '[]'),
       activationDays: parseInt(keyData.activationDays || 0),
       activationUnit: keyData.activationUnit || 'days',
@@ -207,9 +210,11 @@ class ApiKeyService {
       const usage = await redis.getUsageStats(keyData.id)
 
       // 获取费用统计
-      const [dailyCost, costStats] = await Promise.all([
+      const [dailyCost, costStats, weeklyOpusCost, dailyOpusCost] = await Promise.all([
         redis.getDailyCost(keyData.id),
-        redis.getCostStats(keyData.id)
+        redis.getCostStats(keyData.id),
+        redis.getWeeklyOpusCost(keyData.id),
+        redis.getDailyOpusCost(keyData.id)
       ])
       const totalCost = costStats?.total || 0
 
@@ -269,9 +274,11 @@ class ApiKeyService {
           dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
           totalCostLimit: parseFloat(keyData.totalCostLimit || 0),
           weeklyOpusCostLimit: parseFloat(keyData.weeklyOpusCostLimit || 0),
+          dailyOpusCostLimit: parseFloat(keyData.dailyOpusCostLimit || 0),
           dailyCost: dailyCost || 0,
           totalCost,
-          weeklyOpusCost: (await redis.getWeeklyOpusCost(keyData.id)) || 0,
+          weeklyOpusCost: weeklyOpusCost || 0,
+          dailyOpusCost: dailyOpusCost || 0,
           tags,
           usage
         }
@@ -330,9 +337,11 @@ class ApiKeyService {
       }
 
       // 获取当日费用
-      const [dailyCost, costStats] = await Promise.all([
+      const [dailyCost, costStats, weeklyOpusCost, dailyOpusCost] = await Promise.all([
         redis.getDailyCost(keyData.id),
-        redis.getCostStats(keyData.id)
+        redis.getCostStats(keyData.id),
+        redis.getWeeklyOpusCost(keyData.id),
+        redis.getDailyOpusCost(keyData.id)
       ])
 
       // 获取使用统计
@@ -395,9 +404,11 @@ class ApiKeyService {
           dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
           totalCostLimit: parseFloat(keyData.totalCostLimit || 0),
           weeklyOpusCostLimit: parseFloat(keyData.weeklyOpusCostLimit || 0),
+          dailyOpusCostLimit: parseFloat(keyData.dailyOpusCostLimit || 0),
           dailyCost: dailyCost || 0,
           totalCost: costStats?.total || 0,
-          weeklyOpusCost: (await redis.getWeeklyOpusCost(keyData.id)) || 0,
+          weeklyOpusCost: weeklyOpusCost || 0,
+          dailyOpusCost: dailyOpusCost || 0,
           tags,
           usage
         }
@@ -443,8 +454,10 @@ class ApiKeyService {
         key.dailyCostLimit = parseFloat(key.dailyCostLimit || 0)
         key.totalCostLimit = parseFloat(key.totalCostLimit || 0)
         key.weeklyOpusCostLimit = parseFloat(key.weeklyOpusCostLimit || 0)
+        key.dailyOpusCostLimit = parseFloat(key.dailyOpusCostLimit || 0)
         key.dailyCost = (await redis.getDailyCost(key.id)) || 0
         key.weeklyOpusCost = (await redis.getWeeklyOpusCost(key.id)) || 0
+        key.dailyOpusCost = (await redis.getDailyOpusCost(key.id)) || 0
         key.activationDays = parseInt(key.activationDays || 0)
         key.activationUnit = key.activationUnit || 'days'
         key.expirationMode = key.expirationMode || 'fixed'
@@ -567,6 +580,7 @@ class ApiKeyService {
         'dailyCostLimit',
         'totalCostLimit',
         'weeklyOpusCostLimit',
+        'dailyOpusCostLimit',
         'tags',
         'userId', // 新增：用户ID（所有者变更）
         'userUsername', // 新增：用户名（所有者变更）
@@ -908,10 +922,13 @@ class ApiKeyService {
         return // 不是 claude 账户，直接返回
       }
 
-      // 记录 Opus 周费用
-      await redis.incrementWeeklyOpusCost(keyId, cost)
+      // 记录 Opus 周费用和日费用
+      await Promise.all([
+        redis.incrementWeeklyOpusCost(keyId, cost),
+        redis.incrementDailyOpusCost(keyId, cost)
+      ])
       logger.database(
-        `💰 Recorded Opus weekly cost for ${keyId}: $${cost.toFixed(
+        `💰 Recorded Opus cost for ${keyId}: $${cost.toFixed(
           6
         )}, model: ${model}, account type: ${accountType}`
       )

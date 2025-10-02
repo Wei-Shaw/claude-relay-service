@@ -188,6 +188,27 @@
           </div>
         </div>
 
+        <!-- Opus 模型日费用限制 -->
+        <div v-if="statsData.limits.dailyOpusCostLimit > 0">
+          <div class="mb-2 flex items-center justify-between">
+            <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base"
+              >Opus 模型日费用限制</span
+            >
+            <span class="text-xs text-gray-500 dark:text-gray-400 md:text-sm">
+              ${{ statsData.limits.dailyOpusCost.toFixed(4) }} / ${{
+                statsData.limits.dailyOpusCostLimit.toFixed(2)
+              }}
+            </span>
+          </div>
+          <div class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
+            <div
+              class="h-2 rounded-full transition-all duration-300"
+              :class="getOpusDailyCostProgressColor()"
+              :style="{ width: getOpusDailyCostProgress() + '%' }"
+            />
+          </div>
+        </div>
+
         <!-- 时间窗口限制 -->
         <div
           v-if="
@@ -401,6 +422,23 @@ const getOpusWeeklyCostProgressColor = () => {
   if (progress >= 100) return 'bg-red-500'
   if (progress >= 80) return 'bg-yellow-500'
   return 'bg-indigo-500' // 使用紫色表示Opus模型
+}
+
+// 获取Opus日费用进度
+const getOpusDailyCostProgress = () => {
+  if (!statsData.value.limits.dailyOpusCostLimit || statsData.value.limits.dailyOpusCostLimit === 0)
+    return 0
+  const percentage =
+    (statsData.value.limits.dailyOpusCost / statsData.value.limits.dailyOpusCostLimit) * 100
+  return Math.min(percentage, 100)
+}
+
+// 获取Opus日费用进度条颜色
+const getOpusDailyCostProgressColor = () => {
+  const progress = getOpusDailyCostProgress()
+  if (progress >= 100) return 'bg-red-500'
+  if (progress >= 80) return 'bg-yellow-500'
+  return 'bg-purple-500' // 使用紫色表示Opus模型日限额
 }
 
 // 格式化数字

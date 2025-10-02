@@ -423,6 +423,7 @@ router.post('/api/user-stats', async (req, res) => {
         dailyCostLimit: fullKeyData.dailyCostLimit || 0,
         totalCostLimit: fullKeyData.totalCostLimit || 0,
         weeklyOpusCostLimit: parseFloat(fullKeyData.weeklyOpusCostLimit) || 0, // Opus 周费用限制
+        dailyOpusCostLimit: parseFloat(fullKeyData.dailyOpusCostLimit) || 0, // Opus 日费用限制
         // 当前使用量
         currentWindowRequests,
         currentWindowTokens,
@@ -430,6 +431,7 @@ router.post('/api/user-stats', async (req, res) => {
         currentDailyCost,
         currentTotalCost: totalCost,
         weeklyOpusCost: (await redis.getWeeklyOpusCost(keyId)) || 0, // 当前 Opus 周费用
+        dailyOpusCost: (await redis.getDailyOpusCost(keyId)) || 0, // 当前 Opus 日费用
         // 时间窗口信息
         windowStartTime,
         windowEndTime,
