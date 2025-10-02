@@ -18,7 +18,17 @@ class WebhookConfigService {
         // 返回默认配置
         return this.getDefaultConfig()
       }
-      return JSON.parse(configStr)
+
+      const storedConfig = JSON.parse(configStr)
+      const defaultConfig = this.getDefaultConfig()
+
+      // 合并默认通知类型，确保新增类型有默认值
+      storedConfig.notificationTypes = {
+        ...defaultConfig.notificationTypes,
+        ...(storedConfig.notificationTypes || {})
+      }
+
+      return storedConfig
     } catch (error) {
       logger.error('获取webhook配置失败:', error)
       return this.getDefaultConfig()
@@ -30,6 +40,13 @@ class WebhookConfigService {
    */
   async saveConfig(config) {
     try {
+      const defaultConfig = this.getDefaultConfig()
+
+      config.notificationTypes = {
+        ...defaultConfig.notificationTypes,
+        ...(config.notificationTypes || {})
+      }
+
       // 验证配置
       this.validateConfig(config)
 
@@ -312,6 +329,7 @@ class WebhookConfigService {
         quotaWarning: true, // 配额警告
         systemError: true, // 系统错误
         securityAlert: true, // 安全警报
+        rateLimitRecovery: true, // 限流恢复
         test: true // 测试通知
       },
       retrySettings: {
