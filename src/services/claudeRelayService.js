@@ -429,7 +429,7 @@ class ClaudeRelayService {
     }
 
     // 处理统一的客户端标识
-    if (account && account.useUnifiedClientId && account.unifiedClientId) {
+    if (account && account.useUnifiedClientId === 'true' && account.unifiedClientId) {
       this._replaceClientId(processedBody, account.unifiedClientId)
     }
 
