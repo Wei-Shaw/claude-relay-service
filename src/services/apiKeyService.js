@@ -39,7 +39,11 @@ class ApiKeyService {
       activationDays = 0, // 新增：激活后有效天数（0表示不使用此功能）
       activationUnit = 'days', // 新增：激活时间单位 'hours' 或 'days'
       expirationMode = 'fixed', // 新增：过期模式 'fixed'(固定时间) 或 'activation'(首次使用后激活)
-      icon = '' // 新增：图标（base64编码）
+      icon = '', // 新增：图标（base64编码）
+      enableTimeRestriction = false, // 新增：是否启用时间限制
+      allowedTimeStart = 0, // 新增：允许使用的开始时间（小时，0-23）
+      allowedTimeEnd = 23, // 新增：允许使用的结束时间（小时，0-23）
+      timeRestrictionTimezone = 8 // 新增：时区偏移（默认+8中国时区）
     } = options
 
     // 生成简单的API Key (64字符十六进制)
@@ -84,7 +88,11 @@ class ApiKeyService {
       createdBy: options.createdBy || 'admin',
       userId: options.userId || '',
       userUsername: options.userUsername || '',
-      icon: icon || '' // 新增：图标（base64编码）
+      icon: icon || '', // 新增：图标（base64编码）
+      enableTimeRestriction: String(enableTimeRestriction || false), // 新增：是否启用时间限制
+      allowedTimeStart: String(allowedTimeStart ?? 0), // 新增：允许使用的开始时间
+      allowedTimeEnd: String(allowedTimeEnd ?? 23), // 新增：允许使用的结束时间
+      timeRestrictionTimezone: String(timeRestrictionTimezone ?? 8) // 新增：时区偏移
     }
 
     // 保存API Key数据并建立哈希映射
@@ -125,7 +133,11 @@ class ApiKeyService {
       activatedAt: keyData.activatedAt,
       createdAt: keyData.createdAt,
       expiresAt: keyData.expiresAt,
-      createdBy: keyData.createdBy
+      createdBy: keyData.createdBy,
+      enableTimeRestriction: keyData.enableTimeRestriction === 'true',
+      allowedTimeStart: parseInt(keyData.allowedTimeStart || 0),
+      allowedTimeEnd: parseInt(keyData.allowedTimeEnd || 23),
+      timeRestrictionTimezone: parseInt(keyData.timeRestrictionTimezone || 8)
     }
   }
 
@@ -187,6 +199,40 @@ class ApiKeyService {
       // 检查是否过期
       if (keyData.expiresAt && new Date() > new Date(keyData.expiresAt)) {
         return { valid: false, error: 'API key has expired' }
+      }
+
+      // 检查时间限制
+      if (keyData.enableTimeRestriction === 'true') {
+        const timezoneOffset = parseInt(keyData.timeRestrictionTimezone || 8)
+        const allowedStart = parseInt(keyData.allowedTimeStart || 0)
+        const allowedEnd = parseInt(keyData.allowedTimeEnd || 23)
+
+        // 获取当前时间（根据指定时区）
+        const now = new Date()
+        const utcHour = now.getUTCHours()
+        const currentHour = (utcHour + timezoneOffset + 24) % 24
+
+        // 判断是否在允许时间范围内
+        let isInAllowedTime = false
+        if (allowedStart <= allowedEnd) {
+          // 正常情况：例如 2-7 点
+          isInAllowedTime = currentHour >= allowedStart && currentHour < allowedEnd
+        } else {
+          // 跨天情况：例如 22-2 点（22点到次日2点）
+          isInAllowedTime = currentHour >= allowedStart || currentHour < allowedEnd
+        }
+
+        if (!isInAllowedTime) {
+          const formatHour = (h) => `${String(h).padStart(2, '0')}:00`
+          logger.security(
+            `🕒 Time restriction: API key ${keyData.id} (${keyData.name}) used outside allowed time. ` +
+              `Current hour: ${currentHour} (UTC+${timezoneOffset}), Allowed: ${formatHour(allowedStart)}-${formatHour(allowedEnd)}`
+          )
+          return {
+            valid: false,
+            error: `API key can only be used between ${formatHour(allowedStart)} and ${formatHour(allowedEnd)} (UTC+${timezoneOffset})`
+          }
+        }
       }
 
       // 如果API Key属于某个用户，检查用户是否被禁用
@@ -273,7 +319,11 @@ class ApiKeyService {
           totalCost,
           weeklyOpusCost: (await redis.getWeeklyOpusCost(keyData.id)) || 0,
           tags,
-          usage
+          usage,
+          enableTimeRestriction: keyData.enableTimeRestriction === 'true',
+          allowedTimeStart: parseInt(keyData.allowedTimeStart || 0),
+          allowedTimeEnd: parseInt(keyData.allowedTimeEnd || 23),
+          timeRestrictionTimezone: parseInt(keyData.timeRestrictionTimezone || 8)
         }
       }
     } catch (error) {
@@ -450,6 +500,10 @@ class ApiKeyService {
         key.expirationMode = key.expirationMode || 'fixed'
         key.isActivated = key.isActivated === 'true'
         key.activatedAt = key.activatedAt || null
+        key.enableTimeRestriction = key.enableTimeRestriction === 'true'
+        key.allowedTimeStart = parseInt(key.allowedTimeStart || 0)
+        key.allowedTimeEnd = parseInt(key.allowedTimeEnd || 23)
+        key.timeRestrictionTimezone = parseInt(key.timeRestrictionTimezone || 8)
 
         // 获取当前时间窗口的请求次数、Token使用量和费用
         if (key.rateLimitWindow > 0) {
@@ -570,7 +624,11 @@ class ApiKeyService {
         'tags',
         'userId', // 新增：用户ID（所有者变更）
         'userUsername', // 新增：用户名（所有者变更）
-        'createdBy' // 新增：创建者（所有者变更）
+        'createdBy', // 新增：创建者（所有者变更）
+        'enableTimeRestriction', // 新增：是否启用时间限制
+        'allowedTimeStart', // 新增：允许使用的开始时间
+        'allowedTimeEnd', // 新增：允许使用的结束时间
+        'timeRestrictionTimezone' // 新增：时区偏移
       ]
       const updatedData = { ...keyData }
 
@@ -582,7 +640,8 @@ class ApiKeyService {
           } else if (
             field === 'enableModelRestriction' ||
             field === 'enableClientRestriction' ||
-            field === 'isActivated'
+            field === 'isActivated' ||
+            field === 'enableTimeRestriction'
           ) {
             // 布尔值转字符串
             updatedData[field] = String(value)

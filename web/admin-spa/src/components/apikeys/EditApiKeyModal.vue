@@ -678,6 +678,157 @@
             </div>
           </div>
 
+          <!-- 时间限制设置 -->
+          <div>
+            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+              <i class="fas fa-clock mr-1 text-blue-500"></i>
+              时间限制
+            </label>
+            <div
+              class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800"
+            >
+              <div class="mb-3 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <label class="relative inline-flex cursor-pointer items-center">
+                    <input
+                      v-model="form.enableTimeRestriction"
+                      class="peer sr-only"
+                      type="checkbox"
+                    />
+                    <div
+                      class="peer h-6 w-11 rounded-full bg-gray-300 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800"
+                    ></div>
+                  </label>
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                    >启用时间段限制</span
+                  >
+                </div>
+                <span
+                  v-if="form.enableTimeRestriction"
+                  class="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+                  >已启用</span
+                >
+              </div>
+
+              <div v-if="form.enableTimeRestriction" class="space-y-3">
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                      >开始时间（小时）</label
+                    >
+                    <select
+                      v-model.number="form.allowedTimeStart"
+                      class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                    >
+                      <option v-for="h in 24" :key="h - 1" :value="h - 1">
+                        {{ String(h - 1).padStart(2, '0') }}:00
+                      </option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                      >结束时间（小时）</label
+                    >
+                    <select
+                      v-model.number="form.allowedTimeEnd"
+                      class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                    >
+                      <option v-for="h in 24" :key="h - 1" :value="h - 1">
+                        {{ String(h - 1).padStart(2, '0') }}:00
+                      </option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                    >时区</label
+                  >
+                  <select
+                    v-model.number="form.timeRestrictionTimezone"
+                    class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  >
+                    <option value="-12">UTC-12</option>
+                    <option value="-11">UTC-11</option>
+                    <option value="-10">UTC-10 (夏威夷)</option>
+                    <option value="-9">UTC-9 (阿拉斯加)</option>
+                    <option value="-8">UTC-8 (美国西部)</option>
+                    <option value="-7">UTC-7 (美国山区)</option>
+                    <option value="-6">UTC-6 (美国中部)</option>
+                    <option value="-5">UTC-5 (美国东部)</option>
+                    <option value="-4">UTC-4</option>
+                    <option value="-3">UTC-3</option>
+                    <option value="-2">UTC-2</option>
+                    <option value="-1">UTC-1</option>
+                    <option value="0">UTC+0 (伦敦)</option>
+                    <option value="1">UTC+1 (巴黎)</option>
+                    <option value="2">UTC+2</option>
+                    <option value="3">UTC+3 (莫斯科)</option>
+                    <option value="4">UTC+4</option>
+                    <option value="5">UTC+5</option>
+                    <option value="6">UTC+6</option>
+                    <option value="7">UTC+7</option>
+                    <option value="8">UTC+8 (北京、香港)</option>
+                    <option value="9">UTC+9 (东京、首尔)</option>
+                    <option value="10">UTC+10 (悉尼)</option>
+                    <option value="11">UTC+11</option>
+                    <option value="12">UTC+12</option>
+                    <option value="13">UTC+13</option>
+                    <option value="14">UTC+14</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                    >快捷设置</label
+                  >
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      class="rounded-md border border-gray-300 px-3 py-1 text-xs hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-700"
+                      type="button"
+                      @click="((form.allowedTimeStart = 2), (form.allowedTimeEnd = 7))"
+                    >
+                      凌晨 2-7 点
+                    </button>
+                    <button
+                      class="rounded-md border border-gray-300 px-3 py-1 text-xs hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-700"
+                      type="button"
+                      @click="((form.allowedTimeStart = 22), (form.allowedTimeEnd = 2))"
+                    >
+                      晚 10-凌晨 2 点
+                    </button>
+                    <button
+                      class="rounded-md border border-gray-300 px-3 py-1 text-xs hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-700"
+                      type="button"
+                      @click="((form.allowedTimeStart = 9), (form.allowedTimeEnd = 18))"
+                    >
+                      工作时间 9-18 点
+                    </button>
+                    <button
+                      class="rounded-md border border-gray-300 px-3 py-1 text-xs hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-700"
+                      type="button"
+                      @click="((form.allowedTimeStart = 0), (form.allowedTimeEnd = 6))"
+                    >
+                      深夜 0-6 点
+                    </button>
+                  </div>
+                </div>
+
+                <div class="rounded-md bg-blue-50 p-3 dark:bg-blue-900/20">
+                  <p class="flex items-start text-xs text-blue-700 dark:text-blue-300">
+                    <i class="fas fa-info-circle mr-2 mt-0.5 flex-shrink-0"></i>
+                    <span>{{ getTimeRestrictionDescription() }}</span>
+                  </p>
+                </div>
+              </div>
+
+              <p v-else class="text-center text-xs text-gray-500 dark:text-gray-400">
+                <i class="fas fa-clock mr-1"></i>
+                不限制使用时间段，API Key 可在任何时间使用
+              </p>
+            </div>
+          </div>
+
           <div class="flex gap-3 pt-4">
             <button
               class="flex-1 rounded-xl bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
@@ -776,7 +927,11 @@ const form = reactive({
   allowedClients: [],
   tags: [],
   isActive: true,
-  ownerId: '' // 新增：所有者ID
+  ownerId: '', // 新增：所有者ID
+  enableTimeRestriction: false,
+  allowedTimeStart: 2,
+  allowedTimeEnd: 7,
+  timeRestrictionTimezone: 8
 })
 
 // 添加限制的模型
@@ -946,6 +1101,14 @@ const updateApiKey = async () => {
       data.ownerId = form.ownerId
     }
 
+    // 时间限制
+    data.enableTimeRestriction = form.enableTimeRestriction
+    data.allowedTimeStart = form.enableTimeRestriction ? form.allowedTimeStart : undefined
+    data.allowedTimeEnd = form.enableTimeRestriction ? form.allowedTimeEnd : undefined
+    data.timeRestrictionTimezone = form.enableTimeRestriction
+      ? form.timeRestrictionTimezone
+      : undefined
+
     const result = await apiClient.put(`/admin/api-keys/${props.apiKey.id}`, data)
 
     if (result.success) {
@@ -958,6 +1121,29 @@ const updateApiKey = async () => {
     showToast('更新失败', 'error')
   } finally {
     loading.value = false
+  }
+}
+
+// 获取时间限制描述
+const getTimeRestrictionDescription = () => {
+  if (!form.enableTimeRestriction) {
+    return ''
+  }
+
+  const formatHour = (h) => String(h).padStart(2, '0') + ':00'
+  const start = formatHour(form.allowedTimeStart)
+  const end = formatHour(form.allowedTimeEnd)
+  const timezone =
+    form.timeRestrictionTimezone >= 0
+      ? `UTC+${form.timeRestrictionTimezone}`
+      : `UTC${form.timeRestrictionTimezone}`
+
+  if (form.allowedTimeStart < form.allowedTimeEnd) {
+    return `API Key 仅在每天 ${start} 到 ${end} (${timezone}) 可用。`
+  } else if (form.allowedTimeStart > form.allowedTimeEnd) {
+    return `API Key 仅在每天 ${start} 到次日 ${end} (${timezone}) 可用（跨天时段）。`
+  } else {
+    return `开始和结束时间相同，API Key 将在整个小时段内可用。`
   }
 }
 
@@ -1180,6 +1366,12 @@ onMounted(async () => {
 
   // 初始化所有者
   form.ownerId = props.apiKey.userId || 'admin'
+
+  // 时间限制
+  form.enableTimeRestriction = props.apiKey.enableTimeRestriction || false
+  form.allowedTimeStart = props.apiKey.allowedTimeStart || 2
+  form.allowedTimeEnd = props.apiKey.allowedTimeEnd || 7
+  form.timeRestrictionTimezone = props.apiKey.timeRestrictionTimezone || 8
 })
 </script>
 
