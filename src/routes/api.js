@@ -10,8 +10,27 @@ const { authenticateApiKey } = require('../middleware/auth')
 const logger = require('../utils/logger')
 const redis = require('../models/redis')
 const sessionHelper = require('../utils/sessionHelper')
+const openaiToClaude = require('../services/openaiToClaude')
+const claudeCodeHeadersService = require('../services/claudeCodeHeadersService')
 
 const router = express.Router()
+
+// 🔍 检测模型对应的后端服务
+function detectBackendFromModel(modelName) {
+  if (!modelName) {
+    return 'claude'
+  }
+  if (modelName.startsWith('claude-')) {
+    return 'claude'
+  }
+  if (modelName.startsWith('gpt-')) {
+    return 'openai'
+  }
+  if (modelName.startsWith('gemini-')) {
+    return 'gemini'
+  }
+  return 'claude' // 默认使用 Claude
+}
 
 // 🔧 共享的消息处理函数
 async function handleMessagesRequest(req, res) {
@@ -590,11 +609,12 @@ router.post('/v1/messages', authenticateApiKey, handleMessagesRequest)
 // 🚀 Claude API messages 端点 - /claude/v1/messages (别名)
 router.post('/claude/v1/messages', authenticateApiKey, handleMessagesRequest)
 
-// 📋 模型列表端点 - Claude Code 客户端需要
+// 📋 模型列表端点 - OpenAI 兼容，返回所有支持的模型
 router.get('/v1/models', authenticateApiKey, async (req, res) => {
   try {
-    // 返回支持的模型列表
+    // 返回支持的模型列表（Claude + OpenAI + Gemini）
     const models = [
+      // Claude 模型
       {
         id: 'claude-sonnet-4-5-20250929',
         object: 'model',
@@ -628,26 +648,82 @@ router.get('/v1/models', authenticateApiKey, async (req, res) => {
       {
         id: 'claude-3-5-sonnet-20241022',
         object: 'model',
-        created: 1669599635,
+        created: 1729036800,
         owned_by: 'anthropic'
       },
       {
         id: 'claude-3-5-haiku-20241022',
         object: 'model',
-        created: 1669599635,
+        created: 1729036800,
         owned_by: 'anthropic'
       },
       {
         id: 'claude-3-haiku-20240307',
         object: 'model',
-        created: 1669599635,
+        created: 1709251200,
         owned_by: 'anthropic'
       },
       {
         id: 'claude-3-opus-20240229',
         object: 'model',
-        created: 1669599635,
+        created: 1736726400,
         owned_by: 'anthropic'
+      },
+      {
+        id: 'claude-opus-4-20250514',
+        object: 'model',
+        created: 1736726400,
+        owned_by: 'anthropic'
+      },
+      // OpenAI 模型
+      {
+        id: 'gpt-4o',
+        object: 'model',
+        created: 1715367600,
+        owned_by: 'openai'
+      },
+      {
+        id: 'gpt-4o-mini',
+        object: 'model',
+        created: 1721088000,
+        owned_by: 'openai'
+      },
+      {
+        id: 'gpt-4-turbo',
+        object: 'model',
+        created: 1712102400,
+        owned_by: 'openai'
+      },
+      {
+        id: 'gpt-4',
+        object: 'model',
+        created: 1687132800,
+        owned_by: 'openai'
+      },
+      {
+        id: 'gpt-3.5-turbo',
+        object: 'model',
+        created: 1677649200,
+        owned_by: 'openai'
+      },
+      // Gemini 模型
+      {
+        id: 'gemini-1.5-pro',
+        object: 'model',
+        created: 1707868800,
+        owned_by: 'google'
+      },
+      {
+        id: 'gemini-1.5-flash',
+        object: 'model',
+        created: 1715990400,
+        owned_by: 'google'
+      },
+      {
+        id: 'gemini-2.0-flash-exp',
+        object: 'model',
+        created: 1733011200,
+        owned_by: 'google'
       }
     ]
 
@@ -871,5 +947,284 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
     })
   }
 })
+
+// 🚀 OpenAI 兼容的 chat/completions 处理器（智能路由）
+async function handleChatCompletions(req, res) {
+  const startTime = Date.now()
+  let abortController = null
+
+  try {
+    const apiKeyData = req.apiKey
+
+    // 验证必需参数
+    if (!req.body || !req.body.messages || !Array.isArray(req.body.messages)) {
+      return res.status(400).json({
+        error: {
+          message: 'Missing or invalid field: messages (must be an array)',
+          type: 'invalid_request_error',
+          code: 'invalid_request'
+        }
+      })
+    }
+
+    if (req.body.messages.length === 0) {
+      return res.status(400).json({
+        error: {
+          message: 'Messages array cannot be empty',
+          type: 'invalid_request_error',
+          code: 'invalid_request'
+        }
+      })
+    }
+
+    // 检测模型对应的后端
+    const requestedModel = req.body.model || 'claude-3-5-sonnet-20241022'
+    const backend = detectBackendFromModel(requestedModel)
+
+    logger.debug(
+      `📥 Received OpenAI format request for model: ${requestedModel}, backend: ${backend}`
+    )
+
+    // 根据后端选择处理逻辑
+    if (backend === 'claude') {
+      // 转换 OpenAI 请求为 Claude 格式
+      const claudeRequest = openaiToClaude.convertRequest(req.body)
+
+      // 检查模型限制
+      if (apiKeyData.enableModelRestriction && apiKeyData.restrictedModels?.length > 0) {
+        if (!apiKeyData.restrictedModels.includes(claudeRequest.model)) {
+          return res.status(403).json({
+            error: {
+              message: `Model ${requestedModel} is not allowed for this API key`,
+              type: 'invalid_request_error',
+              code: 'model_not_allowed'
+            }
+          })
+        }
+      }
+
+      // 生成会话哈希用于 sticky 会话
+      const sessionHash = sessionHelper.generateSessionHash(claudeRequest)
+
+      // 选择可用的 Claude 账户
+      const accountSelection = await unifiedClaudeScheduler.selectAccountForApiKey(
+        apiKeyData,
+        sessionHash,
+        claudeRequest.model
+      )
+      const { accountId } = accountSelection
+
+      // 获取该账号存储的 Claude Code headers
+      const claudeCodeHeaders = await claudeCodeHeadersService.getAccountHeaders(accountId)
+
+      // 处理流式请求
+      if (claudeRequest.stream) {
+        logger.info(`🌊 Processing OpenAI stream request for model: ${requestedModel}`)
+
+        // 设置 SSE 响应头
+        res.setHeader('Content-Type', 'text/event-stream')
+        res.setHeader('Cache-Control', 'no-cache')
+        res.setHeader('Connection', 'keep-alive')
+        res.setHeader('X-Accel-Buffering', 'no')
+
+        // 创建中止控制器
+        abortController = new AbortController()
+
+        // 处理客户端断开
+        req.on('close', () => {
+          if (abortController && !abortController.signal.aborted) {
+            logger.info('🔌 Client disconnected, aborting Claude request')
+            abortController.abort()
+          }
+        })
+
+        // 使用转换后的响应流
+        await claudeRelayService.relayStreamRequestWithUsageCapture(
+          claudeRequest,
+          apiKeyData,
+          res,
+          claudeCodeHeaders,
+          (usage) => {
+            // 记录使用统计
+            if (usage && usage.input_tokens !== undefined && usage.output_tokens !== undefined) {
+              const model = usage.model || claudeRequest.model
+
+              apiKeyService
+                .recordUsageWithDetails(apiKeyData.id, usage, model, accountId)
+                .catch((error) => {
+                  logger.error('❌ Failed to record usage:', error)
+                })
+            }
+          },
+          // 流转换器：将 Claude SSE 转换为 OpenAI SSE
+          (() => {
+            const sessionId = `chatcmpl-${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`
+            return (chunk) => openaiToClaude.convertStreamChunk(chunk, requestedModel, sessionId)
+          })(),
+          {
+            betaHeader:
+              'oauth-2025-04-20,claude-code-20250219,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14'
+          }
+        )
+      } else {
+        // 非流式请求
+        logger.info(`📄 Processing OpenAI non-stream request for model: ${requestedModel}`)
+
+        // 发送请求到 Claude
+        const claudeResponse = await claudeRelayService.relayRequest(
+          claudeRequest,
+          apiKeyData,
+          req,
+          res,
+          claudeCodeHeaders,
+          { betaHeader: 'oauth-2025-04-20' }
+        )
+
+        // 解析 Claude 响应
+        let claudeData
+        try {
+          claudeData = JSON.parse(claudeResponse.body)
+        } catch (error) {
+          logger.error('❌ Failed to parse Claude response:', error)
+          return res.status(502).json({
+            error: {
+              message: 'Invalid response from Claude API',
+              type: 'api_error',
+              code: 'invalid_response'
+            }
+          })
+        }
+
+        // 处理错误响应
+        if (claudeResponse.statusCode >= 400) {
+          return res.status(claudeResponse.statusCode).json({
+            error: {
+              message: claudeData.error?.message || 'Claude API error',
+              type: claudeData.error?.type || 'api_error',
+              code: claudeData.error?.code || 'unknown_error'
+            }
+          })
+        }
+
+        // 转换为 OpenAI 格式
+        const openaiResponse = openaiToClaude.convertResponse(claudeData, requestedModel)
+
+        // 记录使用统计
+        if (claudeData.usage) {
+          const { usage } = claudeData
+          apiKeyService
+            .recordUsageWithDetails(apiKeyData.id, usage, claudeRequest.model, accountId)
+            .catch((error) => {
+              logger.error('❌ Failed to record usage:', error)
+            })
+        }
+
+        // 返回 OpenAI 格式响应
+        res.json(openaiResponse)
+      }
+    } else if (backend === 'openai') {
+      // TODO: 实现 OpenAI/GPT 转发逻辑
+      return res.status(501).json({
+        error: {
+          message: 'OpenAI backend not yet implemented for this endpoint',
+          type: 'not_implemented',
+          code: 'not_implemented'
+        }
+      })
+    } else if (backend === 'gemini') {
+      // TODO: 实现 Gemini 转发逻辑
+      return res.status(501).json({
+        error: {
+          message: 'Gemini backend not yet implemented for this endpoint',
+          type: 'not_implemented',
+          code: 'not_implemented'
+        }
+      })
+    }
+
+    const duration = Date.now() - startTime
+    logger.info(`✅ OpenAI chat/completions request completed in ${duration}ms`)
+    return undefined
+  } catch (error) {
+    logger.error('❌ OpenAI chat/completions error:', error)
+
+    const status = error.status || 500
+    if (!res.headersSent) {
+      res.status(status).json({
+        error: {
+          message: error.message || 'Internal server error',
+          type: 'server_error',
+          code: 'internal_error'
+        }
+      })
+    }
+    return undefined
+  } finally {
+    // 清理资源
+    if (abortController) {
+      abortController = null
+    }
+  }
+}
+
+// 🔧 OpenAI 兼容的 completions 处理器（传统格式，转换为 chat 格式）
+async function handleCompletions(req, res) {
+  try {
+    // 验证必需参数
+    if (!req.body.prompt) {
+      return res.status(400).json({
+        error: {
+          message: 'Prompt is required',
+          type: 'invalid_request_error',
+          code: 'invalid_request'
+        }
+      })
+    }
+
+    // 将传统 completions 格式转换为 chat 格式
+    const chatRequest = {
+      model: req.body.model || 'claude-3-5-sonnet-20241022',
+      messages: [
+        {
+          role: 'user',
+          content: req.body.prompt
+        }
+      ],
+      max_tokens: req.body.max_tokens,
+      temperature: req.body.temperature,
+      top_p: req.body.top_p,
+      stream: req.body.stream,
+      stop: req.body.stop,
+      n: req.body.n || 1,
+      presence_penalty: req.body.presence_penalty,
+      frequency_penalty: req.body.frequency_penalty,
+      logit_bias: req.body.logit_bias,
+      user: req.body.user
+    }
+
+    // 使用 chat/completions 处理器
+    req.body = chatRequest
+    await handleChatCompletions(req, res)
+    return undefined
+  } catch (error) {
+    logger.error('❌ OpenAI completions error:', error)
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: {
+          message: 'Failed to process completion request',
+          type: 'server_error',
+          code: 'internal_error'
+        }
+      })
+    }
+    return undefined
+  }
+}
+
+// 📋 OpenAI 兼容的 chat/completions 端点
+router.post('/v1/chat/completions', authenticateApiKey, handleChatCompletions)
+
+// 🔧 OpenAI 兼容的 completions 端点（传统格式）
+router.post('/v1/completions', authenticateApiKey, handleCompletions)
 
 module.exports = router
