@@ -596,6 +596,36 @@ router.get('/v1/models', authenticateApiKey, async (req, res) => {
     // 返回支持的模型列表
     const models = [
       {
+        id: 'claude-sonnet-4-5-20250929',
+        object: 'model',
+        created: 1669599635,
+        owned_by: 'anthropic'
+      },
+      {
+        id: 'claude-opus-4-1-20250805',
+        object: 'model',
+        created: 1669599635,
+        owned_by: 'anthropic'
+      },
+      {
+        id: 'claude-sonnet-4-20250514',
+        object: 'model',
+        created: 1669599635,
+        owned_by: 'anthropic'
+      },
+      {
+        id: 'claude-opus-4-20250514',
+        object: 'model',
+        created: 1669599635,
+        owned_by: 'anthropic'
+      },
+      {
+        id: 'claude-3-7-sonnet-20250219',
+        object: 'model',
+        created: 1669599635,
+        owned_by: 'anthropic'
+      },
+      {
         id: 'claude-3-5-sonnet-20241022',
         object: 'model',
         created: 1669599635,
@@ -608,13 +638,13 @@ router.get('/v1/models', authenticateApiKey, async (req, res) => {
         owned_by: 'anthropic'
       },
       {
-        id: 'claude-3-opus-20240229',
+        id: 'claude-3-haiku-20240307',
         object: 'model',
         created: 1669599635,
         owned_by: 'anthropic'
       },
       {
-        id: 'claude-sonnet-4-20250514',
+        id: 'claude-3-opus-20240229',
         object: 'model',
         created: 1669599635,
         owned_by: 'anthropic'
