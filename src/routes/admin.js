@@ -549,7 +549,11 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       activationDays, // 新增：激活后有效天数
       activationUnit, // 新增：激活时间单位 (hours/days)
       expirationMode, // 新增：过期模式
-      icon // 新增：图标
+      icon, // 新增：图标
+      enableTimeRestriction, // 新增：是否启用时间限制
+      allowedTimeStart, // 新增：允许使用的开始时间（小时，0-23）
+      allowedTimeEnd, // 新增：允许使用的结束时间（小时，0-23）
+      timeRestrictionTimezone // 新增：时区偏移
     } = req.body
 
     // 输入验证
@@ -670,6 +674,46 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       }
     }
 
+    // 验证时间限制字段
+    if (enableTimeRestriction !== undefined && typeof enableTimeRestriction !== 'boolean') {
+      return res.status(400).json({ error: 'Enable time restriction must be a boolean' })
+    }
+
+    if (enableTimeRestriction) {
+      if (
+        allowedTimeStart === undefined ||
+        !Number.isInteger(Number(allowedTimeStart)) ||
+        Number(allowedTimeStart) < 0 ||
+        Number(allowedTimeStart) > 23
+      ) {
+        return res
+          .status(400)
+          .json({ error: 'Allowed time start must be an integer between 0 and 23' })
+      }
+
+      if (
+        allowedTimeEnd === undefined ||
+        !Number.isInteger(Number(allowedTimeEnd)) ||
+        Number(allowedTimeEnd) < 0 ||
+        Number(allowedTimeEnd) > 23
+      ) {
+        return res
+          .status(400)
+          .json({ error: 'Allowed time end must be an integer between 0 and 23' })
+      }
+
+      if (
+        timeRestrictionTimezone !== undefined &&
+        (!Number.isInteger(Number(timeRestrictionTimezone)) ||
+          Number(timeRestrictionTimezone) < -12 ||
+          Number(timeRestrictionTimezone) > 14)
+      ) {
+        return res
+          .status(400)
+          .json({ error: 'Timezone offset must be an integer between -12 and 14' })
+      }
+    }
+
     const newKey = await apiKeyService.generateApiKey({
       name,
       description,
@@ -696,7 +740,11 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       activationDays,
       activationUnit,
       expirationMode,
-      icon
+      icon,
+      enableTimeRestriction,
+      allowedTimeStart,
+      allowedTimeEnd,
+      timeRestrictionTimezone
     })
 
     logger.success(`🔑 Admin created new API key: ${name}`)
@@ -737,7 +785,11 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       activationDays,
       activationUnit,
       expirationMode,
-      icon
+      icon,
+      enableTimeRestriction,
+      allowedTimeStart,
+      allowedTimeEnd,
+      timeRestrictionTimezone
     } = req.body
 
     // 输入验证
@@ -788,7 +840,11 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
           activationDays,
           activationUnit,
           expirationMode,
-          icon
+          icon,
+          enableTimeRestriction,
+          allowedTimeStart,
+          allowedTimeEnd,
+          timeRestrictionTimezone
         })
 
         // 保留原始 API Key 供返回

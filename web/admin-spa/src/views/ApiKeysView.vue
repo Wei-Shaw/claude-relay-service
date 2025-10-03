@@ -288,12 +288,12 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[15%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                      class="w-[12%] min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                     >
                       所属账号
                     </th>
                     <th
-                      class="w-[10%] min-w-[80px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                      class="w-[8%] min-w-[70px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                     >
                       标签
                     </th>
@@ -328,7 +328,7 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[14%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                      class="w-[10%] min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                     >
                       限制
                     </th>
@@ -363,7 +363,7 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[8%] min-w-[70px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                      class="w-[7%] min-w-[65px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                       @click="sortApiKeys('lastUsedAt')"
                     >
                       最后使用
@@ -378,7 +378,7 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[8%] min-w-[70px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                      class="w-[7%] min-w-[65px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                       @click="sortApiKeys('createdAt')"
                     >
                       创建时间
@@ -393,7 +393,7 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[8%] min-w-[70px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                      class="w-[7%] min-w-[65px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                       @click="sortApiKeys('expiresAt')"
                     >
                       过期时间
@@ -408,7 +408,12 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="operations-column sticky right-0 w-[23%] min-w-[200px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                      class="w-[7%] min-w-[80px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      时间限制
+                    </th>
+                    <th
+                      class="operations-column sticky right-0 w-[20%] min-w-[180px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                     >
                       操作
                     </th>
@@ -704,6 +709,22 @@
                             永不过期
                           </span>
                         </div>
+                      </td>
+                      <!-- 时间限制列 -->
+                      <td class="whitespace-nowrap px-3 py-3" style="font-size: 13px">
+                        <div
+                          v-if="key.enableTimeRestriction"
+                          class="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400"
+                          :title="`仅限 ${String(key.allowedTimeStart || 0).padStart(2, '0')}:00-${String(key.allowedTimeEnd || 0).padStart(2, '0')}:00 (UTC${key.timeRestrictionTimezone >= 0 ? '+' : ''}${key.timeRestrictionTimezone || 8})`"
+                        >
+                          <i class="fas fa-clock text-xs"></i>
+                          <span>
+                            {{ String(key.allowedTimeStart || 0).padStart(2, '0') }}:00-{{
+                              String(key.allowedTimeEnd || 0).padStart(2, '0')
+                            }}:00
+                          </span>
+                        </div>
+                        <span v-else class="text-gray-400">-</span>
                       </td>
                       <td
                         class="operations-column operations-cell whitespace-nowrap px-3 py-3"
@@ -3544,6 +3565,18 @@ const exportToExcel = () => {
         已激活: key.isActivated ? '是' : '否',
         激活时间: key.activatedAt ? formatDate(key.activatedAt) : '',
         过期时间: key.expiresAt ? formatDate(key.expiresAt) : '',
+
+        // 时间限制
+        启用时间限制: key.enableTimeRestriction ? '是' : '否',
+        允许开始时间: key.enableTimeRestriction
+          ? `${String(key.allowedTimeStart || 0).padStart(2, '0')}:00`
+          : '',
+        允许结束时间: key.enableTimeRestriction
+          ? `${String(key.allowedTimeEnd || 0).padStart(2, '0')}:00`
+          : '',
+        时间限制时区: key.enableTimeRestriction
+          ? `UTC${key.timeRestrictionTimezone >= 0 ? '+' : ''}${key.timeRestrictionTimezone || 8}`
+          : '',
 
         // 权限配置
         服务权限:
