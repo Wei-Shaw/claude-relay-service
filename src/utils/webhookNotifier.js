@@ -59,6 +59,24 @@ class WebhookNotifier {
   }
 
   /**
+   * 发送账号事件通知
+   * @param {string} eventType - 事件类型 (account.created, account.updated, account.deleted, account.status_changed)
+   * @param {Object} data - 事件数据
+   */
+  async sendAccountEvent(eventType, data) {
+    try {
+      // 使用webhookService发送通知
+      await webhookService.sendNotification('accountEvent', {
+        eventType,
+        ...data,
+        timestamp: data.timestamp || getISOStringWithTimezone(new Date())
+      })
+    } catch (error) {
+      logger.error(`Failed to send account event (${eventType}):`, error)
+    }
+  }
+
+  /**
    * 获取错误代码映射
    * @param {string} platform - 平台类型
    * @param {string} status - 状态

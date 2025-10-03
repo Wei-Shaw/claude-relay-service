@@ -19,6 +19,7 @@ const webRoutes = require('./routes/web')
 const apiStatsRoutes = require('./routes/apiStats')
 const geminiRoutes = require('./routes/geminiRoutes')
 const openaiGeminiRoutes = require('./routes/openaiGeminiRoutes')
+const standardGeminiRoutes = require('./routes/standardGeminiRoutes')
 const openaiClaudeRoutes = require('./routes/openaiClaudeRoutes')
 const openaiRoutes = require('./routes/openaiRoutes')
 const userRoutes = require('./routes/userRoutes')
@@ -255,7 +256,9 @@ class Application {
       // 使用 web 路由（包含 auth 和页面重定向）
       this.app.use('/web', webRoutes)
       this.app.use('/apiStats', apiStatsRoutes)
-      this.app.use('/gemini', geminiRoutes)
+      // Gemini 路由：同时支持标准格式和原有格式
+      this.app.use('/gemini', standardGeminiRoutes) // 标准 Gemini API 格式路由
+      this.app.use('/gemini', geminiRoutes) // 保留原有路径以保持向后兼容
       this.app.use('/openai/gemini', openaiGeminiRoutes)
       this.app.use('/openai/claude', openaiClaudeRoutes)
       this.app.use('/openai', openaiRoutes)

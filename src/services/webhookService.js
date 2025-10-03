@@ -1,5 +1,8 @@
 const axios = require('axios')
 const crypto = require('crypto')
+const nodemailer = require('nodemailer')
+const { HttpsProxyAgent } = require('https-proxy-agent')
+const { SocksProxyAgent } = require('socks-proxy-agent')
 const logger = require('../utils/logger')
 const webhookConfigService = require('./webhookConfigService')
 const { getISOStringWithTimezone } = require('../utils/dateHelper')
@@ -13,8 +16,10 @@ class WebhookService {
       feishu: this.sendToFeishu.bind(this),
       slack: this.sendToSlack.bind(this),
       discord: this.sendToDiscord.bind(this),
+      telegram: this.sendToTelegram.bind(this),
       custom: this.sendToCustom.bind(this),
-      bark: this.sendToBark.bind(this)
+      bark: this.sendToBark.bind(this),
+      smtp: this.sendToSMTP.bind(this)
     }
     this.timezone = appConfig.system.timezone || 'Asia/Shanghai'
   }
@@ -217,6 +222,38 @@ class WebhookService {
   }
 
   /**
+   * Telegram Bot 通知
+   */
+  async sendToTelegram(platform, type, data) {
+    if (!platform.botToken) {
+      throw new Error('缺少 Telegram 机器人 Token')
+    }
+    if (!platform.chatId) {
+      throw new Error('缺少 Telegram Chat ID')
+    }
+
+    const baseUrl = this.normalizeTelegramApiBase(platform.apiBaseUrl)
+    const apiUrl = `${baseUrl}/bot${platform.botToken}/sendMessage`
+    const payload = {
+      chat_id: platform.chatId,
+      text: this.formatMessageForTelegram(type, data),
+      disable_web_page_preview: true
+    }
+
+    const axiosOptions = this.buildTelegramAxiosOptions(platform)
+
+    const response = await this.sendHttpRequest(
+      apiUrl,
+      payload,
+      platform.timeout || 10000,
+      axiosOptions
+    )
+    if (!response || response.ok !== true) {
+      throw new Error(`Telegram API 错误: ${response?.description || '未知错误'}`)
+    }
+  }
+
+  /**
    * Bark webhook
    */
   async sendToBark(platform, type, data) {
@@ -244,15 +281,64 @@ class WebhookService {
   }
 
   /**
+   * SMTP邮件通知
+   */
+  async sendToSMTP(platform, type, data) {
+    try {
+      // 创建SMTP传输器
+      const transporter = nodemailer.createTransport({
+        host: platform.host,
+        port: platform.port || 587,
+        secure: platform.secure || false, // true for 465, false for other ports
+        auth: {
+          user: platform.user,
+          pass: platform.pass
+        },
+        // 可选的TLS配置
+        tls: platform.ignoreTLS ? { rejectUnauthorized: false } : undefined,
+        // 连接超时
+        connectionTimeout: platform.timeout || 10000
+      })
+
+      // 构造邮件内容
+      const subject = this.getNotificationTitle(type)
+      const htmlContent = this.formatMessageForEmail(type, data)
+      const textContent = this.formatMessageForEmailText(type, data)
+
+      // 邮件选项
+      const mailOptions = {
+        from: platform.from || platform.user, // 发送者
+        to: platform.to, // 接收者（必填）
+        subject: `[Claude Relay Service] ${subject}`,
+        text: textContent,
+        html: htmlContent
+      }
+
+      // 发送邮件
+      const info = await transporter.sendMail(mailOptions)
+      logger.info(`✅ 邮件发送成功: ${info.messageId}`)
+
+      return info
+    } catch (error) {
+      logger.error('SMTP邮件发送失败:', error)
+      throw error
+    }
+  }
+
+  /**
    * 发送HTTP请求
    */
-  async sendHttpRequest(url, payload, timeout) {
+  async sendHttpRequest(url, payload, timeout, axiosOptions = {}) {
+    const headers = {
+      'Content-Type': 'application/json',
+      'User-Agent': 'claude-relay-service/2.0',
+      ...(axiosOptions.headers || {})
+    }
+
     const response = await axios.post(url, payload, {
       timeout,
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'claude-relay-service/2.0'
-      }
+      ...axiosOptions,
+      headers
     })
 
     if (response.status < 200 || response.status >= 300) {
@@ -345,6 +431,83 @@ class WebhookService {
     const details = this.formatNotificationDetails(data)
 
     return `*${title}*\n${details}`
+  }
+
+  /**
+   * 规范化Telegram基础地址
+   */
+  normalizeTelegramApiBase(baseUrl) {
+    const defaultBase = 'https://api.telegram.org'
+    if (!baseUrl) {
+      return defaultBase
+    }
+
+    try {
+      const parsed = new URL(baseUrl)
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        throw new Error('Telegram API 基础地址必须使用 http 或 https 协议')
+      }
+
+      // 移除结尾的 /
+      return parsed.href.replace(/\/$/, '')
+    } catch (error) {
+      logger.warn(`⚠️ Telegram API 基础地址无效，将使用默认值: ${error.message}`)
+      return defaultBase
+    }
+  }
+
+  /**
+   * 构建 Telegram 请求的 axios 选项（代理等）
+   */
+  buildTelegramAxiosOptions(platform) {
+    const options = {}
+
+    if (platform.proxyUrl) {
+      try {
+        const proxyUrl = new URL(platform.proxyUrl)
+        const { protocol } = proxyUrl
+
+        if (protocol.startsWith('socks')) {
+          const agent = new SocksProxyAgent(proxyUrl.toString())
+          options.httpAgent = agent
+          options.httpsAgent = agent
+          options.proxy = false
+        } else if (protocol === 'http:' || protocol === 'https:') {
+          const agent = new HttpsProxyAgent(proxyUrl.toString())
+          options.httpAgent = agent
+          options.httpsAgent = agent
+          options.proxy = false
+        } else {
+          logger.warn(`⚠️ 不支持的Telegram代理协议: ${protocol}`)
+        }
+      } catch (error) {
+        logger.warn(`⚠️ Telegram代理配置无效，将忽略: ${error.message}`)
+      }
+    }
+
+    return options
+  }
+
+  /**
+   * 格式化 Telegram 消息
+   */
+  formatMessageForTelegram(type, data) {
+    const title = this.getNotificationTitle(type)
+    const timestamp = new Date().toLocaleString('zh-CN', { timeZone: this.timezone })
+    const details = this.buildNotificationDetails(data)
+
+    const lines = [`${title}`, '服务: Claude Relay Service']
+
+    if (details.length > 0) {
+      lines.push('')
+      for (const detail of details) {
+        lines.push(`${detail.label}: ${detail.value}`)
+      }
+    }
+
+    lines.push('', `时间: ${timestamp}`)
+
+    return lines.join('\n')
   }
 
   /**
@@ -457,6 +620,121 @@ class WebhookService {
     lines.push(`时间: ${new Date().toLocaleString('zh-CN', { timeZone: this.timezone })}`)
 
     return lines.join('\n')
+  }
+
+  /**
+   * 构建通知详情数据
+   */
+  buildNotificationDetails(data) {
+    const details = []
+
+    if (data.accountName) {
+      details.push({ label: '账号', value: data.accountName })
+    }
+    if (data.platform) {
+      details.push({ label: '平台', value: data.platform })
+    }
+    if (data.status) {
+      details.push({ label: '状态', value: data.status, color: this.getStatusColor(data.status) })
+    }
+    if (data.errorCode) {
+      details.push({ label: '错误代码', value: data.errorCode, isCode: true })
+    }
+    if (data.reason) {
+      details.push({ label: '原因', value: data.reason })
+    }
+    if (data.message) {
+      details.push({ label: '消息', value: data.message })
+    }
+    if (data.quota) {
+      details.push({ label: '配额', value: `${data.quota.remaining}/${data.quota.total}` })
+    }
+    if (data.usage) {
+      details.push({ label: '使用率', value: `${data.usage}%` })
+    }
+
+    return details
+  }
+
+  /**
+   * 格式化邮件HTML内容
+   */
+  formatMessageForEmail(type, data) {
+    const title = this.getNotificationTitle(type)
+    const timestamp = new Date().toLocaleString('zh-CN', { timeZone: this.timezone })
+    const details = this.buildNotificationDetails(data)
+
+    let content = `
+      <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+          <h1 style="margin: 0; font-size: 24px;">${title}</h1>
+          <p style="margin: 10px 0 0 0; opacity: 0.9;">Claude Relay Service</p>
+        </div>
+        <div style="background: #f8f9fa; padding: 20px; border: 1px solid #e9ecef; border-top: none; border-radius: 0 0 8px 8px;">
+          <div style="background: white; padding: 16px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    `
+
+    // 使用统一的详情数据渲染
+    details.forEach((detail) => {
+      if (detail.isCode) {
+        content += `<p><strong>${detail.label}:</strong> <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 4px;">${detail.value}</code></p>`
+      } else if (detail.color) {
+        content += `<p><strong>${detail.label}:</strong> <span style="color: ${detail.color};">${detail.value}</span></p>`
+      } else {
+        content += `<p><strong>${detail.label}:</strong> ${detail.value}</p>`
+      }
+    })
+
+    content += `
+          </div>
+          <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid #e9ecef; font-size: 14px; color: #6c757d; text-align: center;">
+            <p>发送时间: ${timestamp}</p>
+            <p style="margin: 0;">此邮件由 Claude Relay Service 自动发送</p>
+          </div>
+        </div>
+      </div>
+    `
+
+    return content
+  }
+
+  /**
+   * 格式化邮件纯文本内容
+   */
+  formatMessageForEmailText(type, data) {
+    const title = this.getNotificationTitle(type)
+    const timestamp = new Date().toLocaleString('zh-CN', { timeZone: this.timezone })
+    const details = this.buildNotificationDetails(data)
+
+    let content = `${title}\n`
+    content += `=====================================\n\n`
+
+    // 使用统一的详情数据渲染
+    details.forEach((detail) => {
+      content += `${detail.label}: ${detail.value}\n`
+    })
+
+    content += `\n发送时间: ${timestamp}\n`
+    content += `服务: Claude Relay Service\n`
+    content += `=====================================\n`
+    content += `此邮件由系统自动发送，请勿回复。`
+
+    return content
+  }
+
+  /**
+   * 获取状态颜色
+   */
+  getStatusColor(status) {
+    const colors = {
+      error: '#dc3545',
+      unauthorized: '#fd7e14',
+      blocked: '#6f42c1',
+      disabled: '#6c757d',
+      active: '#28a745',
+      warning: '#ffc107'
+    }
+    return colors[status] || '#007bff'
   }
 
   /**

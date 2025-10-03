@@ -265,6 +265,15 @@ class PricingService {
       return this.pricingData[modelName]
     }
 
+    // 特殊处理：gpt-5-codex 回退到 gpt-5
+    if (modelName === 'gpt-5-codex' && !this.pricingData['gpt-5-codex']) {
+      const fallbackPricing = this.pricingData['gpt-5']
+      if (fallbackPricing) {
+        logger.info(`💰 Using gpt-5 pricing as fallback for ${modelName}`)
+        return fallbackPricing
+      }
+    }
+
     // 对于Bedrock区域前缀模型（如 us.anthropic.claude-sonnet-4-20250514-v1:0），
     // 尝试去掉区域前缀进行匹配
     if (modelName.includes('.anthropic.') || modelName.includes('.claude')) {

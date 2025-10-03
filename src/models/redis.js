@@ -20,7 +20,9 @@ function getDateInTimezone(date = new Date()) {
 function getDateStringInTimezone(date = new Date()) {
   const tzDate = getDateInTimezone(date)
   // 使用UTC方法获取偏移后的日期部分
-  return `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}-${String(tzDate.getUTCDate()).padStart(2, '0')}`
+  return `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}-${String(
+    tzDate.getUTCDate()
+  ).padStart(2, '0')}`
 }
 
 // 获取配置时区的小时 (0-23)
@@ -219,7 +221,10 @@ class RedisClient {
     const now = new Date()
     const today = getDateStringInTimezone(now)
     const tzDate = getDateInTimezone(now)
-    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
+      2,
+      '0'
+    )}`
     const currentHour = `${today}:${String(getHourInTimezone(now)).padStart(2, '0')}` // 新增小时级别
 
     const daily = `usage:daily:${keyId}:${today}`
@@ -414,7 +419,10 @@ class RedisClient {
     const now = new Date()
     const today = getDateStringInTimezone(now)
     const tzDate = getDateInTimezone(now)
-    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
+      2,
+      '0'
+    )}`
     const currentHour = `${today}:${String(getHourInTimezone(now)).padStart(2, '0')}`
 
     // 账户级别统计的键
@@ -551,7 +559,10 @@ class RedisClient {
     const today = getDateStringInTimezone()
     const dailyKey = `usage:daily:${keyId}:${today}`
     const tzDate = getDateInTimezone()
-    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
+      2,
+      '0'
+    )}`
     const monthlyKey = `usage:monthly:${keyId}:${currentMonth}`
 
     const [total, daily, monthly] = await Promise.all([
@@ -636,6 +647,48 @@ class RedisClient {
     }
   }
 
+  async addUsageRecord(keyId, record, maxRecords = 200) {
+    const listKey = `usage:records:${keyId}`
+    const client = this.getClientSafe()
+
+    try {
+      await client
+        .multi()
+        .lpush(listKey, JSON.stringify(record))
+        .ltrim(listKey, 0, Math.max(0, maxRecords - 1))
+        .expire(listKey, 86400 * 90) // 默认保留90天
+        .exec()
+    } catch (error) {
+      logger.error(`❌ Failed to append usage record for key ${keyId}:`, error)
+    }
+  }
+
+  async getUsageRecords(keyId, limit = 50) {
+    const listKey = `usage:records:${keyId}`
+    const client = this.getClient()
+
+    if (!client) {
+      return []
+    }
+
+    try {
+      const rawRecords = await client.lrange(listKey, 0, Math.max(0, limit - 1))
+      return rawRecords
+        .map((entry) => {
+          try {
+            return JSON.parse(entry)
+          } catch (error) {
+            logger.warn('⚠️ Failed to parse usage record entry:', error)
+            return null
+          }
+        })
+        .filter(Boolean)
+    } catch (error) {
+      logger.error(`❌ Failed to load usage records for key ${keyId}:`, error)
+      return []
+    }
+  }
+
   // 💰 获取当日费用
   async getDailyCost(keyId) {
     const today = getDateStringInTimezone()
@@ -652,7 +705,10 @@ class RedisClient {
   async incrementDailyCost(keyId, amount) {
     const today = getDateStringInTimezone()
     const tzDate = getDateInTimezone()
-    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
+      2,
+      '0'
+    )}`
     const currentHour = `${today}:${String(getHourInTimezone(new Date())).padStart(2, '0')}`
 
     const dailyKey = `usage:cost:daily:${keyId}:${today}`
@@ -682,7 +738,10 @@ class RedisClient {
   async getCostStats(keyId) {
     const today = getDateStringInTimezone()
     const tzDate = getDateInTimezone()
-    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
+      2,
+      '0'
+    )}`
     const currentHour = `${today}:${String(getHourInTimezone(new Date())).padStart(2, '0')}`
 
     const [daily, monthly, hourly, total] = await Promise.all([
@@ -780,12 +839,15 @@ class RedisClient {
   }
 
   // 📊 获取账户使用统计
-  async getAccountUsageStats(accountId) {
+  async getAccountUsageStats(accountId, accountType = null) {
     const accountKey = `account_usage:${accountId}`
     const today = getDateStringInTimezone()
     const accountDailyKey = `account_usage:daily:${accountId}:${today}`
     const tzDate = getDateInTimezone()
-    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
+      2,
+      '0'
+    )}`
     const accountMonthlyKey = `account_usage:monthly:${accountId}:${currentMonth}`
 
     const [total, daily, monthly] = await Promise.all([
@@ -794,8 +856,25 @@ class RedisClient {
       this.client.hgetall(accountMonthlyKey)
     ])
 
-    // 获取账户创建时间来计算平均值
-    const accountData = await this.client.hgetall(`claude_account:${accountId}`)
+    // 获取账户创建时间来计算平均值 - 支持不同类型的账号
+    let accountData = {}
+    if (accountType === 'openai') {
+      accountData = await this.client.hgetall(`openai:account:${accountId}`)
+    } else if (accountType === 'openai-responses') {
+      accountData = await this.client.hgetall(`openai_responses_account:${accountId}`)
+    } else {
+      // 尝试多个前缀
+      accountData = await this.client.hgetall(`claude_account:${accountId}`)
+      if (!accountData.createdAt) {
+        accountData = await this.client.hgetall(`openai:account:${accountId}`)
+      }
+      if (!accountData.createdAt) {
+        accountData = await this.client.hgetall(`openai_responses_account:${accountId}`)
+      }
+      if (!accountData.createdAt) {
+        accountData = await this.client.hgetall(`openai_account:${accountId}`)
+      }
+    }
     const createdAt = accountData.createdAt ? new Date(accountData.createdAt) : new Date()
     const now = new Date()
     const daysSinceCreated = Math.max(1, Math.ceil((now - createdAt) / (1000 * 60 * 60 * 24)))
@@ -1404,14 +1483,18 @@ class RedisClient {
       if (remainingTTL < renewalThreshold) {
         await this.client.expire(key, fullTTL)
         logger.debug(
-          `🔄 Renewed sticky session TTL: ${sessionHash} (was ${Math.round(remainingTTL / 60)}min, renewed to ${ttlHours}h)`
+          `🔄 Renewed sticky session TTL: ${sessionHash} (was ${Math.round(
+            remainingTTL / 60
+          )}min, renewed to ${ttlHours}h)`
         )
         return true
       }
 
       // 剩余时间充足，无需续期
       logger.debug(
-        `✅ Sticky session TTL sufficient: ${sessionHash} (remaining ${Math.round(remainingTTL / 60)}min)`
+        `✅ Sticky session TTL sufficient: ${sessionHash} (remaining ${Math.round(
+          remainingTTL / 60
+        )}min)`
       )
       return true
     } catch (error) {
@@ -1455,18 +1538,55 @@ class RedisClient {
     }
   }
 
-  // 增加并发计数
-  async incrConcurrency(apiKeyId) {
+  // 获取并发配置
+  _getConcurrencyConfig() {
+    const defaults = {
+      leaseSeconds: 900,
+      cleanupGraceSeconds: 30
+    }
+    return {
+      ...defaults,
+      ...(config.concurrency || {})
+    }
+  }
+
+  // 增加并发计数（基于租约的有序集合）
+  async incrConcurrency(apiKeyId, requestId, leaseSeconds = null) {
+    if (!requestId) {
+      throw new Error('Request ID is required for concurrency tracking')
+    }
+
     try {
+      const { leaseSeconds: defaultLeaseSeconds, cleanupGraceSeconds } =
+        this._getConcurrencyConfig()
+      const lease = leaseSeconds || defaultLeaseSeconds
       const key = `concurrency:${apiKeyId}`
-      const count = await this.client.incr(key)
+      const now = Date.now()
+      const expireAt = now + lease * 1000
+      const ttl = Math.max((lease + cleanupGraceSeconds) * 1000, 60000)
 
-      // 设置过期时间为180秒（3分钟），防止计数器永远不清零
-      // 正常情况下请求会在完成时主动减少计数，这只是一个安全保障
-      // 180秒足够支持较长的流式请求
-      await this.client.expire(key, 180)
+      const luaScript = `
+        local key = KEYS[1]
+        local member = ARGV[1]
+        local expireAt = tonumber(ARGV[2])
+        local now = tonumber(ARGV[3])
+        local ttl = tonumber(ARGV[4])
 
-      logger.database(`🔢 Incremented concurrency for key ${apiKeyId}: ${count}`)
+        redis.call('ZREMRANGEBYSCORE', key, '-inf', now)
+        redis.call('ZADD', key, expireAt, member)
+
+        if ttl > 0 then
+          redis.call('PEXPIRE', key, ttl)
+        end
+
+        local count = redis.call('ZCARD', key)
+        return count
+      `
+
+      const count = await this.client.eval(luaScript, 1, key, requestId, expireAt, now, ttl)
+      logger.database(
+        `🔢 Incremented concurrency for key ${apiKeyId}: ${count} (request ${requestId})`
+      )
       return count
     } catch (error) {
       logger.error('❌ Failed to increment concurrency:', error)
@@ -1474,32 +1594,84 @@ class RedisClient {
     }
   }
 
-  // 减少并发计数
-  async decrConcurrency(apiKeyId) {
-    try {
-      const key = `concurrency:${apiKeyId}`
+  // 刷新并发租约，防止长连接提前过期
+  async refreshConcurrencyLease(apiKeyId, requestId, leaseSeconds = null) {
+    if (!requestId) {
+      return 0
+    }
 
-      // 使用Lua脚本确保原子性操作，防止计数器变成负数
+    try {
+      const { leaseSeconds: defaultLeaseSeconds, cleanupGraceSeconds } =
+        this._getConcurrencyConfig()
+      const lease = leaseSeconds || defaultLeaseSeconds
+      const key = `concurrency:${apiKeyId}`
+      const now = Date.now()
+      const expireAt = now + lease * 1000
+      const ttl = Math.max((lease + cleanupGraceSeconds) * 1000, 60000)
+
       const luaScript = `
         local key = KEYS[1]
-        local current = tonumber(redis.call('get', key) or "0")
+        local member = ARGV[1]
+        local expireAt = tonumber(ARGV[2])
+        local now = tonumber(ARGV[3])
+        local ttl = tonumber(ARGV[4])
 
-        if current <= 0 then
-          redis.call('del', key)
-          return 0
-        else
-          local new_value = redis.call('decr', key)
-          if new_value <= 0 then
-            redis.call('del', key)
-            return 0
-          else
-            return new_value
+        local exists = redis.call('ZSCORE', key, member)
+
+        redis.call('ZREMRANGEBYSCORE', key, '-inf', now)
+
+        if exists then
+          redis.call('ZADD', key, expireAt, member)
+          if ttl > 0 then
+            redis.call('PEXPIRE', key, ttl)
           end
+          return 1
         end
+
+        return 0
       `
 
-      const count = await this.client.eval(luaScript, 1, key)
-      logger.database(`🔢 Decremented concurrency for key ${apiKeyId}: ${count}`)
+      const refreshed = await this.client.eval(luaScript, 1, key, requestId, expireAt, now, ttl)
+      if (refreshed === 1) {
+        logger.debug(`🔄 Refreshed concurrency lease for key ${apiKeyId} (request ${requestId})`)
+      }
+      return refreshed
+    } catch (error) {
+      logger.error('❌ Failed to refresh concurrency lease:', error)
+      return 0
+    }
+  }
+
+  // 减少并发计数
+  async decrConcurrency(apiKeyId, requestId) {
+    try {
+      const key = `concurrency:${apiKeyId}`
+      const now = Date.now()
+
+      const luaScript = `
+        local key = KEYS[1]
+        local member = ARGV[1]
+        local now = tonumber(ARGV[2])
+
+        if member then
+          redis.call('ZREM', key, member)
+        end
+
+        redis.call('ZREMRANGEBYSCORE', key, '-inf', now)
+
+        local count = redis.call('ZCARD', key)
+        if count <= 0 then
+          redis.call('DEL', key)
+          return 0
+        end
+
+        return count
+      `
+
+      const count = await this.client.eval(luaScript, 1, key, requestId || '', now)
+      logger.database(
+        `🔢 Decremented concurrency for key ${apiKeyId}: ${count} (request ${requestId || 'n/a'})`
+      )
       return count
     } catch (error) {
       logger.error('❌ Failed to decrement concurrency:', error)
@@ -1511,7 +1683,17 @@ class RedisClient {
   async getConcurrency(apiKeyId) {
     try {
       const key = `concurrency:${apiKeyId}`
-      const count = await this.client.get(key)
+      const now = Date.now()
+
+      const luaScript = `
+        local key = KEYS[1]
+        local now = tonumber(ARGV[1])
+
+        redis.call('ZREMRANGEBYSCORE', key, '-inf', now)
+        return redis.call('ZCARD', key)
+      `
+
+      const count = await this.client.eval(luaScript, 1, key, now)
       return parseInt(count || 0)
     } catch (error) {
       logger.error('❌ Failed to get concurrency:', error)
@@ -1700,6 +1882,38 @@ class RedisClient {
 }
 
 const redisClient = new RedisClient()
+
+// 分布式锁相关方法
+redisClient.setAccountLock = async function (lockKey, lockValue, ttlMs) {
+  try {
+    // 使用SET NX PX实现原子性的锁获取
+    // ioredis语法: set(key, value, 'PX', milliseconds, 'NX')
+    const result = await this.client.set(lockKey, lockValue, 'PX', ttlMs, 'NX')
+    return result === 'OK'
+  } catch (error) {
+    logger.error(`Failed to acquire lock ${lockKey}:`, error)
+    return false
+  }
+}
+
+redisClient.releaseAccountLock = async function (lockKey, lockValue) {
+  try {
+    // 使用Lua脚本确保只有持有锁的进程才能释放锁
+    const script = `
+      if redis.call("get", KEYS[1]) == ARGV[1] then
+        return redis.call("del", KEYS[1])
+      else
+        return 0
+      end
+    `
+    // ioredis语法: eval(script, numberOfKeys, key1, key2, ..., arg1, arg2, ...)
+    const result = await this.client.eval(script, 1, lockKey, lockValue)
+    return result === 1
+  } catch (error) {
+    logger.error(`Failed to release lock ${lockKey}:`, error)
+    return false
+  }
+}
 
 // 导出时区辅助函数
 redisClient.getDateInTimezone = getDateInTimezone

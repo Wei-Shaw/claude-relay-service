@@ -62,8 +62,10 @@ class WebhookConfigService {
         'feishu',
         'slack',
         'discord',
+        'telegram',
         'custom',
-        'bark'
+        'bark',
+        'smtp'
       ]
 
       for (const platform of config.platforms) {
@@ -71,8 +73,8 @@ class WebhookConfigService {
           throw new Error(`不支持的平台类型: ${platform.type}`)
         }
 
-        // Bark平台使用deviceKey而不是url
-        if (platform.type !== 'bark') {
+        // Bark和SMTP平台不使用标准URL
+        if (!['bark', 'smtp', 'telegram'].includes(platform.type)) {
           if (!platform.url || !this.isValidUrl(platform.url)) {
             throw new Error(`无效的webhook URL: ${platform.url}`)
           }
@@ -114,6 +116,43 @@ class WebhookConfigService {
         // Discord webhook URL格式检查
         if (!platform.url.includes('discord.com/api/webhooks')) {
           logger.warn('⚠️ Discord webhook URL格式可能不正确')
+        }
+        break
+      case 'telegram':
+        if (!platform.botToken) {
+          throw new Error('Telegram 平台必须提供机器人 Token')
+        }
+        if (!platform.chatId) {
+          throw new Error('Telegram 平台必须提供 Chat ID')
+        }
+
+        if (!platform.botToken.includes(':')) {
+          logger.warn('⚠️ Telegram 机器人 Token 格式可能不正确')
+        }
+
+        if (!/^[-\d]+$/.test(String(platform.chatId))) {
+          logger.warn('⚠️ Telegram Chat ID 应该是数字，如为频道请确认已获取正确ID')
+        }
+
+        if (platform.apiBaseUrl) {
+          if (!this.isValidUrl(platform.apiBaseUrl)) {
+            throw new Error('Telegram API 基础地址格式无效')
+          }
+          const { protocol } = new URL(platform.apiBaseUrl)
+          if (!['http:', 'https:'].includes(protocol)) {
+            throw new Error('Telegram API 基础地址仅支持 http 或 https 协议')
+          }
+        }
+
+        if (platform.proxyUrl) {
+          if (!this.isValidUrl(platform.proxyUrl)) {
+            throw new Error('Telegram 代理地址格式无效')
+          }
+          const proxyProtocol = new URL(platform.proxyUrl).protocol
+          const supportedProtocols = ['http:', 'https:', 'socks4:', 'socks4a:', 'socks5:']
+          if (!supportedProtocols.includes(proxyProtocol)) {
+            throw new Error('Telegram 代理仅支持 http/https/socks 协议')
+          }
         }
         break
       case 'custom':
@@ -201,6 +240,51 @@ class WebhookConfigService {
           logger.warn('⚠️ Bark点击跳转URL格式可能不正确')
         }
         break
+      case 'smtp': {
+        // 验证SMTP必需配置
+        if (!platform.host) {
+          throw new Error('SMTP平台必须提供主机地址')
+        }
+        if (!platform.user) {
+          throw new Error('SMTP平台必须提供用户名')
+        }
+        if (!platform.pass) {
+          throw new Error('SMTP平台必须提供密码')
+        }
+        if (!platform.to) {
+          throw new Error('SMTP平台必须提供接收邮箱')
+        }
+
+        // 验证端口
+        if (platform.port && (platform.port < 1 || platform.port > 65535)) {
+          throw new Error('SMTP端口必须在1-65535之间')
+        }
+
+        // 验证邮箱格式
+        // 支持两种格式：1. 纯邮箱 user@domain.com  2. 带名称 Name <user@domain.com>
+        const simpleEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+        // 验证接收邮箱
+        const toEmails = Array.isArray(platform.to) ? platform.to : [platform.to]
+        for (const email of toEmails) {
+          // 提取实际邮箱地址（如果是 Name <email> 格式）
+          const actualEmail = email.includes('<') ? email.match(/<([^>]+)>/)?.[1] : email
+          if (!actualEmail || !simpleEmailRegex.test(actualEmail)) {
+            throw new Error(`无效的接收邮箱格式: ${email}`)
+          }
+        }
+
+        // 验证发送邮箱（支持 Name <email> 格式）
+        if (platform.from) {
+          const actualFromEmail = platform.from.includes('<')
+            ? platform.from.match(/<([^>]+)>/)?.[1]
+            : platform.from
+          if (!actualFromEmail || !simpleEmailRegex.test(actualFromEmail)) {
+            throw new Error(`无效的发送邮箱格式: ${platform.from}`)
+          }
+        }
+        break
+      }
     }
   }
 

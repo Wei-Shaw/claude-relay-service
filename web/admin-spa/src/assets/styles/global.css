@@ -108,13 +108,13 @@ body::before {
 
 .glass {
   background: var(--glass-color);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  /* 降低模糊强度 */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--border-color);
   box-shadow:
-    0 20px 25px -5px rgba(0, 0, 0, 0.1),
-    0 10px 10px -5px rgba(0, 0, 0, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
   transition:
     background-color 0.3s ease,
     border-color 0.3s ease;
@@ -129,13 +129,12 @@ body::before {
 
 .glass-strong {
   background: var(--glass-strong-color);
-  backdrop-filter: blur(25px);
-  -webkit-backdrop-filter: blur(25px);
+  /* 降低模糊强度 */
+  /* 移除模糊效果 */
   border: 1px solid var(--border-color);
   box-shadow:
-    0 25px 50px -12px rgba(0, 0, 0, 0.25),
-    0 0 0 1px rgba(255, 255, 255, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
   transition:
     background-color 0.3s ease,
     border-color 0.3s ease;
@@ -269,8 +268,7 @@ body::before {
     background-color 0.3s ease,
     border-color 0.3s ease,
     box-shadow 0.3s ease;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  /* 移除模糊效果 */
 }
 
 .form-input:focus {
@@ -461,8 +459,7 @@ body::before {
     background-color 0.3s ease,
     border-color 0.3s ease,
     box-shadow 0.3s ease;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  /* 移除模糊效果 */
 }
 
 .form-input:focus {
@@ -511,8 +508,7 @@ body::before {
 }
 
 .modal {
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  /* 移除模糊效果 */
   background: var(--modal-bg);
   transition: background-color 0.3s ease;
 }
@@ -522,10 +518,9 @@ body::before {
   border-radius: 24px;
   border: 1px solid rgba(229, 231, 235, 0.8);
   box-shadow:
-    0 25px 50px -12px rgba(0, 0, 0, 0.25),
+    0 10px 25px -5px rgba(0, 0, 0, 0.15),
     0 0 0 1px rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  /* 移除模糊效果 */
   transition:
     background-color 0.3s ease,
     border-color 0.3s ease;
@@ -730,7 +725,12 @@ body::before {
 }
 
 .animate-pulse {
-  animation: pulse 2s infinite;
+  /* 移除无限脉冲动画，改为 hover 效果 */
+  transition: transform 0.2s ease;
+}
+
+.animate-pulse:hover {
+  animation: pulse 0.3s ease;
 }
 
 /* 用户菜单下拉框优化 */

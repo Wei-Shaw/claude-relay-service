@@ -3,8 +3,10 @@ const apiKeyService = require('../services/apiKeyService')
 const claudeAccountService = require('../services/claudeAccountService')
 const claudeConsoleAccountService = require('../services/claudeConsoleAccountService')
 const bedrockAccountService = require('../services/bedrockAccountService')
+const ccrAccountService = require('../services/ccrAccountService')
 const geminiAccountService = require('../services/geminiAccountService')
 const openaiAccountService = require('../services/openaiAccountService')
+const openaiResponsesAccountService = require('../services/openaiResponsesAccountService')
 const azureOpenaiAccountService = require('../services/azureOpenaiAccountService')
 const accountGroupService = require('../services/accountGroupService')
 const redis = require('../models/redis')
@@ -153,7 +155,10 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
       const currentDate = new Date(start)
       while (currentDate <= end) {
         const tzDate = redisClient.getDateInTimezone(currentDate)
-        const dateStr = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}-${String(tzDate.getUTCDate()).padStart(2, '0')}`
+        const dateStr = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
+          2,
+          '0'
+        )}-${String(tzDate.getUTCDate()).padStart(2, '0')}`
         searchPatterns.push(`usage:daily:*:${dateStr}`)
         currentDate.setDate(currentDate.getDate() + 1)
       }
@@ -161,7 +166,10 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
       // 今日 - 使用时区日期
       const redisClient = require('../models/redis')
       const tzDate = redisClient.getDateInTimezone(now)
-      const dateStr = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}-${String(tzDate.getUTCDate()).padStart(2, '0')}`
+      const dateStr = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
+        2,
+        '0'
+      )}-${String(tzDate.getUTCDate()).padStart(2, '0')}`
       searchPatterns.push(`usage:daily:*:${dateStr}`)
     } else if (timeRange === '7days') {
       // 最近7天
@@ -170,14 +178,20 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
         const date = new Date(now)
         date.setDate(date.getDate() - i)
         const tzDate = redisClient.getDateInTimezone(date)
-        const dateStr = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}-${String(tzDate.getUTCDate()).padStart(2, '0')}`
+        const dateStr = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
+          2,
+          '0'
+        )}-${String(tzDate.getUTCDate()).padStart(2, '0')}`
         searchPatterns.push(`usage:daily:*:${dateStr}`)
       }
     } else if (timeRange === 'monthly') {
       // 本月
       const redisClient = require('../models/redis')
       const tzDate = redisClient.getDateInTimezone(now)
-      const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
+      const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
+        2,
+        '0'
+      )}`
       searchPatterns.push(`usage:monthly:*:${currentMonth}`)
     }
 
@@ -297,7 +311,10 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
         const redisClient = require('../models/redis')
         const tzToday = redisClient.getDateStringInTimezone(now)
         const tzDate = redisClient.getDateInTimezone(now)
-        const tzMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
+        const tzMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
+          2,
+          '0'
+        )}`
 
         let modelKeys = []
         if (timeRange === 'custom' && startDate && endDate) {
@@ -308,7 +325,9 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
 
           while (currentDate <= end) {
             const tzDateForKey = redisClient.getDateInTimezone(currentDate)
-            const dateStr = `${tzDateForKey.getUTCFullYear()}-${String(tzDateForKey.getUTCMonth() + 1).padStart(2, '0')}-${String(tzDateForKey.getUTCDate()).padStart(2, '0')}`
+            const dateStr = `${tzDateForKey.getUTCFullYear()}-${String(
+              tzDateForKey.getUTCMonth() + 1
+            ).padStart(2, '0')}-${String(tzDateForKey.getUTCDate()).padStart(2, '0')}`
             const dayKeys = await client.keys(`usage:${apiKey.id}:model:daily:*:${dateStr}`)
             modelKeys = modelKeys.concat(dayKeys)
             currentDate.setDate(currentDate.getDate() + 1)
@@ -448,29 +467,22 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
   }
 })
 
-// 获取支持的客户端列表
+// 获取支持的客户端列表（使用新的验证器）
 router.get('/supported-clients', authenticateAdmin, async (req, res) => {
   try {
-    // 检查配置是否存在，如果不存在则使用默认值
-    const predefinedClients = config.clientRestrictions?.predefinedClients || [
-      {
-        id: 'claude_code',
-        name: 'ClaudeCode',
-        description: 'Official Claude Code CLI'
-      },
-      {
-        id: 'gemini_cli',
-        name: 'Gemini-CLI',
-        description: 'Gemini Command Line Interface'
-      }
-    ]
+    // 使用新的 ClientValidator 获取所有可用客户端
+    const ClientValidator = require('../validators/clientValidator')
+    const availableClients = ClientValidator.getAvailableClients()
 
-    const clients = predefinedClients.map((client) => ({
+    // 格式化返回数据
+    const clients = availableClients.map((client) => ({
       id: client.id,
       name: client.name,
-      description: client.description
+      description: client.description,
+      icon: client.icon
     }))
 
+    logger.info(`📱 Returning ${clients.length} supported clients`)
     return res.json({ success: true, data: clients })
   } catch (error) {
     logger.error('❌ Failed to get supported clients:', error)
@@ -531,9 +543,11 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       enableClientRestriction,
       allowedClients,
       dailyCostLimit,
+      totalCostLimit,
       weeklyOpusCostLimit,
       tags,
       activationDays, // 新增：激活后有效天数
+      activationUnit, // 新增：激活时间单位 (hours/days)
       expirationMode, // 新增：过期模式
       icon // 新增：图标
     } = req.body
@@ -613,6 +627,15 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'All tags must be non-empty strings' })
     }
 
+    if (
+      totalCostLimit !== undefined &&
+      totalCostLimit !== null &&
+      totalCostLimit !== '' &&
+      (Number.isNaN(Number(totalCostLimit)) || Number(totalCostLimit) < 0)
+    ) {
+      return res.status(400).json({ error: 'Total cost limit must be a non-negative number' })
+    }
+
     // 验证激活相关字段
     if (expirationMode && !['fixed', 'activation'].includes(expirationMode)) {
       return res
@@ -621,14 +644,23 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
     }
 
     if (expirationMode === 'activation') {
+      // 验证激活时间单位
+      if (!activationUnit || !['hours', 'days'].includes(activationUnit)) {
+        return res.status(400).json({
+          error: 'Activation unit must be either "hours" or "days" when using activation mode'
+        })
+      }
+
+      // 验证激活时间数值
       if (
         !activationDays ||
         !Number.isInteger(Number(activationDays)) ||
         Number(activationDays) < 1
       ) {
-        return res
-          .status(400)
-          .json({ error: 'Activation days must be a positive integer when using activation mode' })
+        const unitText = activationUnit === 'hours' ? 'hours' : 'days'
+        return res.status(400).json({
+          error: `Activation ${unitText} must be a positive integer when using activation mode`
+        })
       }
       // 激活模式下不应该设置固定过期时间
       if (expiresAt) {
@@ -658,9 +690,11 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       enableClientRestriction,
       allowedClients,
       dailyCostLimit,
+      totalCostLimit,
       weeklyOpusCostLimit,
       tags,
       activationDays,
+      activationUnit,
       expirationMode,
       icon
     })
@@ -686,18 +720,22 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       claudeConsoleAccountId,
       geminiAccountId,
       openaiAccountId,
+      bedrockAccountId,
       permissions,
       concurrencyLimit,
       rateLimitWindow,
       rateLimitRequests,
+      rateLimitCost,
       enableModelRestriction,
       restrictedModels,
       enableClientRestriction,
       allowedClients,
       dailyCostLimit,
+      totalCostLimit,
       weeklyOpusCostLimit,
       tags,
       activationDays,
+      activationUnit,
       expirationMode,
       icon
     } = req.body
@@ -733,18 +771,22 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
           claudeConsoleAccountId,
           geminiAccountId,
           openaiAccountId,
+          bedrockAccountId,
           permissions,
           concurrencyLimit,
           rateLimitWindow,
           rateLimitRequests,
+          rateLimitCost,
           enableModelRestriction,
           restrictedModels,
           enableClientRestriction,
           allowedClients,
           dailyCostLimit,
+          totalCostLimit,
           weeklyOpusCostLimit,
           tags,
           activationDays,
+          activationUnit,
           expirationMode,
           icon
         })
@@ -858,6 +900,9 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
         }
         if (updates.dailyCostLimit !== undefined) {
           finalUpdates.dailyCostLimit = updates.dailyCostLimit
+        }
+        if (updates.totalCostLimit !== undefined) {
+          finalUpdates.totalCostLimit = updates.totalCostLimit
         }
         if (updates.weeklyOpusCostLimit !== undefined) {
           finalUpdates.weeklyOpusCostLimit = updates.weeklyOpusCostLimit
@@ -987,6 +1032,7 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       allowedClients,
       expiresAt,
       dailyCostLimit,
+      totalCostLimit,
       weeklyOpusCostLimit,
       tags,
       ownerId // 新增：所有者ID字段
@@ -1136,6 +1182,14 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       updates.dailyCostLimit = costLimit
     }
 
+    if (totalCostLimit !== undefined && totalCostLimit !== null && totalCostLimit !== '') {
+      const costLimit = Number(totalCostLimit)
+      if (isNaN(costLimit) || costLimit < 0) {
+        return res.status(400).json({ error: 'Total cost limit must be a non-negative number' })
+      }
+      updates.totalCostLimit = costLimit
+    }
+
     // 处理 Opus 周费用限制
     if (
       weeklyOpusCostLimit !== undefined &&
@@ -1246,7 +1300,9 @@ router.patch('/api-keys/:keyId/expiration', authenticateAdmin, async (req, res) 
         updates.expiresAt = newExpiresAt.toISOString()
 
         logger.success(
-          `🔓 API key manually activated by admin: ${keyId} (${keyData.name}), expires at ${newExpiresAt.toISOString()}`
+          `🔓 API key manually activated by admin: ${keyId} (${
+            keyData.name
+          }), expires at ${newExpiresAt.toISOString()}`
         )
       } else {
         return res.status(400).json({
@@ -1311,7 +1367,11 @@ router.delete('/api-keys/batch', authenticateAdmin, async (req, res) => {
     // 参数验证
     if (!keyIds || !Array.isArray(keyIds) || keyIds.length === 0) {
       logger.warn(
-        `🚨 Invalid keyIds: ${JSON.stringify({ keyIds, type: typeof keyIds, isArray: Array.isArray(keyIds) })}`
+        `🚨 Invalid keyIds: ${JSON.stringify({
+          keyIds,
+          type: typeof keyIds,
+          isArray: Array.isArray(keyIds)
+        })}`
       )
       return res.status(400).json({
         error: 'Invalid request',
@@ -1946,7 +2006,7 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
         try {
-          const usageStats = await redis.getAccountUsageStats(account.id)
+          const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
           // 获取会话窗口使用统计（仅对有活跃窗口的账户）
@@ -2040,6 +2100,76 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
   } catch (error) {
     logger.error('❌ Failed to get Claude accounts:', error)
     return res.status(500).json({ error: 'Failed to get Claude accounts', message: error.message })
+  }
+})
+
+// 批量获取 Claude 账户的 OAuth Usage 数据
+router.get('/claude-accounts/usage', authenticateAdmin, async (req, res) => {
+  try {
+    const accounts = await redis.getAllClaudeAccounts()
+    const now = Date.now()
+    const usageCacheTtlMs = 300 * 1000
+
+    // 批量并发获取所有活跃 OAuth 账户的 Usage
+    const usagePromises = accounts.map(async (account) => {
+      // 检查是否为 OAuth 账户：scopes 包含 OAuth 相关权限
+      const scopes = account.scopes && account.scopes.trim() ? account.scopes.split(' ') : []
+      const isOAuth = scopes.includes('user:profile') && scopes.includes('user:inference')
+
+      // 仅为 OAuth 授权的活跃账户调用 usage API
+      if (
+        isOAuth &&
+        account.isActive === 'true' &&
+        account.accessToken &&
+        account.status === 'active'
+      ) {
+        // 若快照在 300 秒内更新，直接使用缓存避免频繁请求
+        const cachedUsage = claudeAccountService.buildClaudeUsageSnapshot(account)
+        const lastUpdatedAt = account.claudeUsageUpdatedAt
+          ? new Date(account.claudeUsageUpdatedAt).getTime()
+          : 0
+        const isCacheFresh = cachedUsage && lastUpdatedAt && now - lastUpdatedAt < usageCacheTtlMs
+        if (isCacheFresh) {
+          return {
+            accountId: account.id,
+            claudeUsage: cachedUsage
+          }
+        }
+
+        try {
+          const usageData = await claudeAccountService.fetchOAuthUsage(account.id)
+          if (usageData) {
+            await claudeAccountService.updateClaudeUsageSnapshot(account.id, usageData)
+          }
+          // 重新读取更新后的数据
+          const updatedAccount = await redis.getClaudeAccount(account.id)
+          return {
+            accountId: account.id,
+            claudeUsage: claudeAccountService.buildClaudeUsageSnapshot(updatedAccount)
+          }
+        } catch (error) {
+          logger.debug(`Failed to fetch OAuth usage for ${account.id}:`, error.message)
+          return { accountId: account.id, claudeUsage: null }
+        }
+      }
+      // Setup Token 账户不调用 usage API，直接返回 null
+      return { accountId: account.id, claudeUsage: null }
+    })
+
+    const results = await Promise.allSettled(usagePromises)
+
+    // 转换为 { accountId: usage } 映射
+    const usageMap = {}
+    results.forEach((result) => {
+      if (result.status === 'fulfilled' && result.value) {
+        usageMap[result.value.accountId] = result.value.claudeUsage
+      }
+    })
+
+    res.json({ success: true, data: usageMap })
+  } catch (error) {
+    logger.error('❌ Failed to fetch Claude accounts usage:', error)
+    res.status(500).json({ error: 'Failed to fetch usage data', message: error.message })
   }
 })
 
@@ -2209,10 +2339,13 @@ router.delete('/claude-accounts/:accountId', authenticateAdmin, async (req, res)
   try {
     const { accountId } = req.params
 
+    // 自动解绑所有绑定的 API Keys
+    const unboundCount = await apiKeyService.unbindAccountFromAllKeys(accountId, 'claude')
+
     // 获取账户信息以检查是否在分组中
     const account = await claudeAccountService.getAccount(accountId)
     if (account && account.accountType === 'group') {
-      const groups = await accountGroupService.getAccountGroup(accountId)
+      const groups = await accountGroupService.getAccountGroups(accountId)
       for (const group of groups) {
         await accountGroupService.removeAccountFromGroup(accountId, group.id)
       }
@@ -2220,8 +2353,17 @@ router.delete('/claude-accounts/:accountId', authenticateAdmin, async (req, res)
 
     await claudeAccountService.deleteAccount(accountId)
 
-    logger.success(`🗑️ Admin deleted Claude account: ${accountId}`)
-    return res.json({ success: true, message: 'Claude account deleted successfully' })
+    let message = 'Claude账号已成功删除'
+    if (unboundCount > 0) {
+      message += `，${unboundCount} 个 API Key 已切换为共享池模式`
+    }
+
+    logger.success(`🗑️ Admin deleted Claude account: ${accountId}, unbound ${unboundCount} keys`)
+    return res.json({
+      success: true,
+      message,
+      unboundKeys: unboundCount
+    })
   } catch (error) {
     logger.error('❌ Failed to delete Claude account:', error)
     return res
@@ -2332,7 +2474,9 @@ router.put(
       }
 
       logger.success(
-        `🔄 Admin toggled Claude account schedulable status: ${accountId} -> ${newSchedulable ? 'schedulable' : 'not schedulable'}`
+        `🔄 Admin toggled Claude account schedulable status: ${accountId} -> ${
+          newSchedulable ? 'schedulable' : 'not schedulable'
+        }`
       )
       return res.json({ success: true, schedulable: newSchedulable })
     } catch (error) {
@@ -2381,7 +2525,7 @@ router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
         try {
-          const usageStats = await redis.getAccountUsageStats(account.id)
+          const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
           return {
@@ -2497,9 +2641,9 @@ router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
       quotaResetTime: quotaResetTime || '00:00'
     })
 
-    // 如果是分组类型，将账户添加到分组
+    // 如果是分组类型，将账户添加到分组（CCR 归属 Claude 平台分组）
     if (accountType === 'group' && groupId) {
-      await accountGroupService.addAccountToGroup(newAccount.id, groupId)
+      await accountGroupService.addAccountToGroup(newAccount.id, groupId, 'claude')
     }
 
     logger.success(`🎮 Admin created Claude Console account: ${name}`)
@@ -2585,10 +2729,13 @@ router.delete('/claude-console-accounts/:accountId', authenticateAdmin, async (r
   try {
     const { accountId } = req.params
 
+    // 自动解绑所有绑定的 API Keys
+    const unboundCount = await apiKeyService.unbindAccountFromAllKeys(accountId, 'claude-console')
+
     // 获取账户信息以检查是否在分组中
     const account = await claudeConsoleAccountService.getAccount(accountId)
     if (account && account.accountType === 'group') {
-      const groups = await accountGroupService.getAccountGroup(accountId)
+      const groups = await accountGroupService.getAccountGroups(accountId)
       for (const group of groups) {
         await accountGroupService.removeAccountFromGroup(accountId, group.id)
       }
@@ -2596,8 +2743,19 @@ router.delete('/claude-console-accounts/:accountId', authenticateAdmin, async (r
 
     await claudeConsoleAccountService.deleteAccount(accountId)
 
-    logger.success(`🗑️ Admin deleted Claude Console account: ${accountId}`)
-    return res.json({ success: true, message: 'Claude Console account deleted successfully' })
+    let message = 'Claude Console账号已成功删除'
+    if (unboundCount > 0) {
+      message += `，${unboundCount} 个 API Key 已切换为共享池模式`
+    }
+
+    logger.success(
+      `🗑️ Admin deleted Claude Console account: ${accountId}, unbound ${unboundCount} keys`
+    )
+    return res.json({
+      success: true,
+      message,
+      unboundKeys: unboundCount
+    })
   } catch (error) {
     logger.error('❌ Failed to delete Claude Console account:', error)
     return res
@@ -2620,7 +2778,9 @@ router.put('/claude-console-accounts/:accountId/toggle', authenticateAdmin, asyn
     await claudeConsoleAccountService.updateAccount(accountId, { isActive: newStatus })
 
     logger.success(
-      `🔄 Admin toggled Claude Console account status: ${accountId} -> ${newStatus ? 'active' : 'inactive'}`
+      `🔄 Admin toggled Claude Console account status: ${accountId} -> ${
+        newStatus ? 'active' : 'inactive'
+      }`
     )
     return res.json({ success: true, isActive: newStatus })
   } catch (error) {
@@ -2661,7 +2821,9 @@ router.put(
       }
 
       logger.success(
-        `🔄 Admin toggled Claude Console account schedulable status: ${accountId} -> ${newSchedulable ? 'schedulable' : 'not schedulable'}`
+        `🔄 Admin toggled Claude Console account schedulable status: ${accountId} -> ${
+          newSchedulable ? 'schedulable' : 'not schedulable'
+        }`
       )
       return res.json({ success: true, schedulable: newSchedulable })
     } catch (error) {
@@ -2740,6 +2902,397 @@ router.post('/claude-console-accounts/reset-all-usage', authenticateAdmin, async
   }
 })
 
+// 🔧 CCR 账户管理
+
+// 获取所有CCR账户
+router.get('/ccr-accounts', authenticateAdmin, async (req, res) => {
+  try {
+    const { platform, groupId } = req.query
+    let accounts = await ccrAccountService.getAllAccounts()
+
+    // 根据查询参数进行筛选
+    if (platform && platform !== 'all' && platform !== 'ccr') {
+      // 如果指定了其他平台，返回空数组
+      accounts = []
+    }
+
+    // 如果指定了分组筛选
+    if (groupId && groupId !== 'all') {
+      if (groupId === 'ungrouped') {
+        // 筛选未分组账户
+        const filteredAccounts = []
+        for (const account of accounts) {
+          const groups = await accountGroupService.getAccountGroups(account.id)
+          if (!groups || groups.length === 0) {
+            filteredAccounts.push(account)
+          }
+        }
+        accounts = filteredAccounts
+      } else {
+        // 筛选特定分组的账户
+        const groupMembers = await accountGroupService.getGroupMembers(groupId)
+        accounts = accounts.filter((account) => groupMembers.includes(account.id))
+      }
+    }
+
+    // 为每个账户添加使用统计信息
+    const accountsWithStats = await Promise.all(
+      accounts.map(async (account) => {
+        try {
+          const usageStats = await redis.getAccountUsageStats(account.id)
+          const groupInfos = await accountGroupService.getAccountGroups(account.id)
+
+          return {
+            ...account,
+            // 转换schedulable为布尔值
+            schedulable: account.schedulable === 'true' || account.schedulable === true,
+            groupInfos,
+            usage: {
+              daily: usageStats.daily,
+              total: usageStats.total,
+              averages: usageStats.averages
+            }
+          }
+        } catch (statsError) {
+          logger.warn(
+            `⚠️ Failed to get usage stats for CCR account ${account.id}:`,
+            statsError.message
+          )
+          try {
+            const groupInfos = await accountGroupService.getAccountGroups(account.id)
+            return {
+              ...account,
+              // 转换schedulable为布尔值
+              schedulable: account.schedulable === 'true' || account.schedulable === true,
+              groupInfos,
+              usage: {
+                daily: { tokens: 0, requests: 0, allTokens: 0 },
+                total: { tokens: 0, requests: 0, allTokens: 0 },
+                averages: { rpm: 0, tpm: 0 }
+              }
+            }
+          } catch (groupError) {
+            logger.warn(
+              `⚠️ Failed to get group info for CCR account ${account.id}:`,
+              groupError.message
+            )
+            return {
+              ...account,
+              groupInfos: [],
+              usage: {
+                daily: { tokens: 0, requests: 0, allTokens: 0 },
+                total: { tokens: 0, requests: 0, allTokens: 0 },
+                averages: { rpm: 0, tpm: 0 }
+              }
+            }
+          }
+        }
+      })
+    )
+
+    return res.json({ success: true, data: accountsWithStats })
+  } catch (error) {
+    logger.error('❌ Failed to get CCR accounts:', error)
+    return res.status(500).json({ error: 'Failed to get CCR accounts', message: error.message })
+  }
+})
+
+// 创建新的CCR账户
+router.post('/ccr-accounts', authenticateAdmin, async (req, res) => {
+  try {
+    const {
+      name,
+      description,
+      apiUrl,
+      apiKey,
+      priority,
+      supportedModels,
+      userAgent,
+      rateLimitDuration,
+      proxy,
+      accountType,
+      groupId,
+      dailyQuota,
+      quotaResetTime
+    } = req.body
+
+    if (!name || !apiUrl || !apiKey) {
+      return res.status(400).json({ error: 'Name, API URL and API Key are required' })
+    }
+
+    // 验证priority的有效性（1-100）
+    if (priority !== undefined && (priority < 1 || priority > 100)) {
+      return res.status(400).json({ error: 'Priority must be between 1 and 100' })
+    }
+
+    // 验证accountType的有效性
+    if (accountType && !['shared', 'dedicated', 'group'].includes(accountType)) {
+      return res
+        .status(400)
+        .json({ error: 'Invalid account type. Must be "shared", "dedicated" or "group"' })
+    }
+
+    // 如果是分组类型，验证groupId
+    if (accountType === 'group' && !groupId) {
+      return res.status(400).json({ error: 'Group ID is required for group type accounts' })
+    }
+
+    const newAccount = await ccrAccountService.createAccount({
+      name,
+      description,
+      apiUrl,
+      apiKey,
+      priority: priority || 50,
+      supportedModels: supportedModels || [],
+      userAgent,
+      rateLimitDuration:
+        rateLimitDuration !== undefined && rateLimitDuration !== null ? rateLimitDuration : 60,
+      proxy,
+      accountType: accountType || 'shared',
+      dailyQuota: dailyQuota || 0,
+      quotaResetTime: quotaResetTime || '00:00'
+    })
+
+    // 如果是分组类型，将账户添加到分组
+    if (accountType === 'group' && groupId) {
+      await accountGroupService.addAccountToGroup(newAccount.id, groupId)
+    }
+
+    logger.success(`🔧 Admin created CCR account: ${name}`)
+    return res.json({ success: true, data: newAccount })
+  } catch (error) {
+    logger.error('❌ Failed to create CCR account:', error)
+    return res.status(500).json({ error: 'Failed to create CCR account', message: error.message })
+  }
+})
+
+// 更新CCR账户
+router.put('/ccr-accounts/:accountId', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+    const updates = req.body
+
+    // 验证priority的有效性（1-100）
+    if (updates.priority !== undefined && (updates.priority < 1 || updates.priority > 100)) {
+      return res.status(400).json({ error: 'Priority must be between 1 and 100' })
+    }
+
+    // 验证accountType的有效性
+    if (updates.accountType && !['shared', 'dedicated', 'group'].includes(updates.accountType)) {
+      return res
+        .status(400)
+        .json({ error: 'Invalid account type. Must be "shared", "dedicated" or "group"' })
+    }
+
+    // 如果更新为分组类型，验证groupId
+    if (updates.accountType === 'group' && !updates.groupId) {
+      return res.status(400).json({ error: 'Group ID is required for group type accounts' })
+    }
+
+    // 获取账户当前信息以处理分组变更
+    const currentAccount = await ccrAccountService.getAccount(accountId)
+    if (!currentAccount) {
+      return res.status(404).json({ error: 'Account not found' })
+    }
+
+    // 处理分组的变更
+    if (updates.accountType !== undefined) {
+      // 如果之前是分组类型，需要从所有分组中移除
+      if (currentAccount.accountType === 'group') {
+        const oldGroups = await accountGroupService.getAccountGroups(accountId)
+        for (const oldGroup of oldGroups) {
+          await accountGroupService.removeAccountFromGroup(accountId, oldGroup.id)
+        }
+      }
+      // 如果新类型是分组，处理多分组支持
+      if (updates.accountType === 'group') {
+        if (Object.prototype.hasOwnProperty.call(updates, 'groupIds')) {
+          // 如果明确提供了 groupIds 参数（包括空数组）
+          if (updates.groupIds && updates.groupIds.length > 0) {
+            // 设置新的多分组
+            await accountGroupService.setAccountGroups(accountId, updates.groupIds, 'claude')
+          } else {
+            // groupIds 为空数组，从所有分组中移除
+            await accountGroupService.removeAccountFromAllGroups(accountId)
+          }
+        } else if (updates.groupId) {
+          // 向后兼容：仅当没有 groupIds 但有 groupId 时使用单分组逻辑
+          await accountGroupService.addAccountToGroup(accountId, updates.groupId, 'claude')
+        }
+      }
+    }
+
+    await ccrAccountService.updateAccount(accountId, updates)
+
+    logger.success(`📝 Admin updated CCR account: ${accountId}`)
+    return res.json({ success: true, message: 'CCR account updated successfully' })
+  } catch (error) {
+    logger.error('❌ Failed to update CCR account:', error)
+    return res.status(500).json({ error: 'Failed to update CCR account', message: error.message })
+  }
+})
+
+// 删除CCR账户
+router.delete('/ccr-accounts/:accountId', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+
+    // 尝试自动解绑（CCR账户实际上不会绑定API Key，但保持代码一致性）
+    const unboundCount = await apiKeyService.unbindAccountFromAllKeys(accountId, 'ccr')
+
+    // 获取账户信息以检查是否在分组中
+    const account = await ccrAccountService.getAccount(accountId)
+    if (account && account.accountType === 'group') {
+      const groups = await accountGroupService.getAccountGroups(accountId)
+      for (const group of groups) {
+        await accountGroupService.removeAccountFromGroup(accountId, group.id)
+      }
+    }
+
+    await ccrAccountService.deleteAccount(accountId)
+
+    let message = 'CCR账号已成功删除'
+    if (unboundCount > 0) {
+      // 理论上不会发生，但保持消息格式一致
+      message += `，${unboundCount} 个 API Key 已切换为共享池模式`
+    }
+
+    logger.success(`🗑️ Admin deleted CCR account: ${accountId}`)
+    return res.json({
+      success: true,
+      message,
+      unboundKeys: unboundCount
+    })
+  } catch (error) {
+    logger.error('❌ Failed to delete CCR account:', error)
+    return res.status(500).json({ error: 'Failed to delete CCR account', message: error.message })
+  }
+})
+
+// 切换CCR账户状态
+router.put('/ccr-accounts/:accountId/toggle', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+
+    const account = await ccrAccountService.getAccount(accountId)
+    if (!account) {
+      return res.status(404).json({ error: 'Account not found' })
+    }
+
+    const newStatus = !account.isActive
+    await ccrAccountService.updateAccount(accountId, { isActive: newStatus })
+
+    logger.success(
+      `🔄 Admin toggled CCR account status: ${accountId} -> ${newStatus ? 'active' : 'inactive'}`
+    )
+    return res.json({ success: true, isActive: newStatus })
+  } catch (error) {
+    logger.error('❌ Failed to toggle CCR account status:', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to toggle account status', message: error.message })
+  }
+})
+
+// 切换CCR账户调度状态
+router.put('/ccr-accounts/:accountId/toggle-schedulable', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+
+    const account = await ccrAccountService.getAccount(accountId)
+    if (!account) {
+      return res.status(404).json({ error: 'Account not found' })
+    }
+
+    const newSchedulable = !account.schedulable
+    await ccrAccountService.updateAccount(accountId, { schedulable: newSchedulable })
+
+    // 如果账号被禁用，发送webhook通知
+    if (!newSchedulable) {
+      await webhookNotifier.sendAccountAnomalyNotification({
+        accountId: account.id,
+        accountName: account.name || 'CCR Account',
+        platform: 'ccr',
+        status: 'disabled',
+        errorCode: 'CCR_MANUALLY_DISABLED',
+        reason: '账号已被管理员手动禁用调度',
+        timestamp: new Date().toISOString()
+      })
+    }
+
+    logger.success(
+      `🔄 Admin toggled CCR account schedulable status: ${accountId} -> ${
+        newSchedulable ? 'schedulable' : 'not schedulable'
+      }`
+    )
+    return res.json({ success: true, schedulable: newSchedulable })
+  } catch (error) {
+    logger.error('❌ Failed to toggle CCR account schedulable status:', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to toggle schedulable status', message: error.message })
+  }
+})
+
+// 获取CCR账户的使用统计
+router.get('/ccr-accounts/:accountId/usage', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+    const usageStats = await ccrAccountService.getAccountUsageStats(accountId)
+
+    if (!usageStats) {
+      return res.status(404).json({ error: 'Account not found' })
+    }
+
+    return res.json(usageStats)
+  } catch (error) {
+    logger.error('❌ Failed to get CCR account usage stats:', error)
+    return res.status(500).json({ error: 'Failed to get usage stats', message: error.message })
+  }
+})
+
+// 手动重置CCR账户的每日使用量
+router.post('/ccr-accounts/:accountId/reset-usage', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+    await ccrAccountService.resetDailyUsage(accountId)
+
+    logger.success(`✅ Admin manually reset daily usage for CCR account: ${accountId}`)
+    return res.json({ success: true, message: 'Daily usage reset successfully' })
+  } catch (error) {
+    logger.error('❌ Failed to reset CCR account daily usage:', error)
+    return res.status(500).json({ error: 'Failed to reset daily usage', message: error.message })
+  }
+})
+
+// 重置CCR账户状态（清除所有异常状态）
+router.post('/ccr-accounts/:accountId/reset-status', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+    const result = await ccrAccountService.resetAccountStatus(accountId)
+    logger.success(`✅ Admin reset status for CCR account: ${accountId}`)
+    return res.json({ success: true, data: result })
+  } catch (error) {
+    logger.error('❌ Failed to reset CCR account status:', error)
+    return res.status(500).json({ error: 'Failed to reset status', message: error.message })
+  }
+})
+
+// 手动重置所有CCR账户的每日使用量
+router.post('/ccr-accounts/reset-all-usage', authenticateAdmin, async (req, res) => {
+  try {
+    await ccrAccountService.resetAllDailyUsage()
+
+    logger.success('✅ Admin manually reset daily usage for all CCR accounts')
+    return res.json({ success: true, message: 'All daily usage reset successfully' })
+  } catch (error) {
+    logger.error('❌ Failed to reset all CCR accounts daily usage:', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to reset all daily usage', message: error.message })
+  }
+})
+
 // ☁️ Bedrock 账户管理
 
 // 获取所有Bedrock账户
@@ -2784,7 +3337,7 @@ router.get('/bedrock-accounts', authenticateAdmin, async (req, res) => {
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
         try {
-          const usageStats = await redis.getAccountUsageStats(account.id)
+          const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
           return {
@@ -2953,6 +3506,9 @@ router.delete('/bedrock-accounts/:accountId', authenticateAdmin, async (req, res
   try {
     const { accountId } = req.params
 
+    // 自动解绑所有绑定的 API Keys
+    const unboundCount = await apiKeyService.unbindAccountFromAllKeys(accountId, 'bedrock')
+
     const result = await bedrockAccountService.deleteAccount(accountId)
 
     if (!result.success) {
@@ -2961,8 +3517,17 @@ router.delete('/bedrock-accounts/:accountId', authenticateAdmin, async (req, res
         .json({ error: 'Failed to delete Bedrock account', message: result.error })
     }
 
-    logger.success(`🗑️ Admin deleted Bedrock account: ${accountId}`)
-    return res.json({ success: true, message: 'Bedrock account deleted successfully' })
+    let message = 'Bedrock账号已成功删除'
+    if (unboundCount > 0) {
+      message += `，${unboundCount} 个 API Key 已切换为共享池模式`
+    }
+
+    logger.success(`🗑️ Admin deleted Bedrock account: ${accountId}, unbound ${unboundCount} keys`)
+    return res.json({
+      success: true,
+      message,
+      unboundKeys: unboundCount
+    })
   } catch (error) {
     logger.error('❌ Failed to delete Bedrock account:', error)
     return res
@@ -2993,7 +3558,9 @@ router.put('/bedrock-accounts/:accountId/toggle', authenticateAdmin, async (req,
     }
 
     logger.success(
-      `🔄 Admin toggled Bedrock account status: ${accountId} -> ${newStatus ? 'active' : 'inactive'}`
+      `🔄 Admin toggled Bedrock account status: ${accountId} -> ${
+        newStatus ? 'active' : 'inactive'
+      }`
     )
     return res.json({ success: true, isActive: newStatus })
   } catch (error) {
@@ -3042,7 +3609,9 @@ router.put(
       }
 
       logger.success(
-        `🔄 Admin toggled Bedrock account schedulable status: ${accountId} -> ${newSchedulable ? 'schedulable' : 'not schedulable'}`
+        `🔄 Admin toggled Bedrock account schedulable status: ${accountId} -> ${
+          newSchedulable ? 'schedulable' : 'not schedulable'
+        }`
       )
       return res.json({ success: true, schedulable: newSchedulable })
     } catch (error) {
@@ -3234,7 +3803,7 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
         try {
-          const usageStats = await redis.getAccountUsageStats(account.id)
+          const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
           return {
@@ -3395,10 +3964,13 @@ router.delete('/gemini-accounts/:accountId', authenticateAdmin, async (req, res)
   try {
     const { accountId } = req.params
 
+    // 自动解绑所有绑定的 API Keys
+    const unboundCount = await apiKeyService.unbindAccountFromAllKeys(accountId, 'gemini')
+
     // 获取账户信息以检查是否在分组中
     const account = await geminiAccountService.getAccount(accountId)
     if (account && account.accountType === 'group') {
-      const groups = await accountGroupService.getAccountGroup(accountId)
+      const groups = await accountGroupService.getAccountGroups(accountId)
       for (const group of groups) {
         await accountGroupService.removeAccountFromGroup(accountId, group.id)
       }
@@ -3406,8 +3978,17 @@ router.delete('/gemini-accounts/:accountId', authenticateAdmin, async (req, res)
 
     await geminiAccountService.deleteAccount(accountId)
 
-    logger.success(`🗑️ Admin deleted Gemini account: ${accountId}`)
-    return res.json({ success: true, message: 'Gemini account deleted successfully' })
+    let message = 'Gemini账号已成功删除'
+    if (unboundCount > 0) {
+      message += `，${unboundCount} 个 API Key 已切换为共享池模式`
+    }
+
+    logger.success(`🗑️ Admin deleted Gemini account: ${accountId}, unbound ${unboundCount} keys`)
+    return res.json({
+      success: true,
+      message,
+      unboundKeys: unboundCount
+    })
   } catch (error) {
     logger.error('❌ Failed to delete Gemini account:', error)
     return res.status(500).json({ error: 'Failed to delete account', message: error.message })
@@ -3465,7 +4046,9 @@ router.put(
       }
 
       logger.success(
-        `🔄 Admin toggled Gemini account schedulable status: ${accountId} -> ${actualSchedulable ? 'schedulable' : 'not schedulable'}`
+        `🔄 Admin toggled Gemini account schedulable status: ${accountId} -> ${
+          actualSchedulable ? 'schedulable' : 'not schedulable'
+        }`
       )
 
       // 返回实际的数据库值，确保前端状态与后端一致
@@ -3552,6 +4135,198 @@ router.get('/accounts/:accountId/usage-stats', authenticateAdmin, async (req, re
   }
 })
 
+// 获取账号近30天使用历史
+router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+    const { platform = 'claude', days = 30 } = req.query
+
+    const allowedPlatforms = ['claude', 'claude-console', 'openai', 'openai-responses', 'gemini']
+    if (!allowedPlatforms.includes(platform)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Unsupported account platform'
+      })
+    }
+
+    const accountTypeMap = {
+      openai: 'openai',
+      'openai-responses': 'openai-responses'
+    }
+
+    const fallbackModelMap = {
+      claude: 'claude-3-5-sonnet-20241022',
+      'claude-console': 'claude-3-5-sonnet-20241022',
+      openai: 'gpt-4o-mini-2024-07-18',
+      'openai-responses': 'gpt-4o-mini-2024-07-18',
+      gemini: 'gemini-1.5-flash'
+    }
+
+    const client = redis.getClientSafe()
+    const fallbackModel = fallbackModelMap[platform] || 'unknown'
+    const daysCount = Math.min(Math.max(parseInt(days, 10) || 30, 1), 60)
+
+    // 获取概览统计数据
+    const accountUsageStats = await redis.getAccountUsageStats(
+      accountId,
+      accountTypeMap[platform] || null
+    )
+
+    const history = []
+    let totalCost = 0
+    let totalRequests = 0
+    let totalTokens = 0
+
+    let highestCostDay = null
+    let highestRequestDay = null
+
+    const sumModelCostsForDay = async (dateKey) => {
+      const modelPattern = `account_usage:model:daily:${accountId}:*:${dateKey}`
+      const modelKeys = await client.keys(modelPattern)
+      let summedCost = 0
+
+      if (modelKeys.length === 0) {
+        return summedCost
+      }
+
+      for (const modelKey of modelKeys) {
+        const modelParts = modelKey.split(':')
+        const modelName = modelParts[4] || 'unknown'
+        const modelData = await client.hgetall(modelKey)
+        if (!modelData || Object.keys(modelData).length === 0) {
+          continue
+        }
+
+        const usage = {
+          input_tokens: parseInt(modelData.inputTokens) || 0,
+          output_tokens: parseInt(modelData.outputTokens) || 0,
+          cache_creation_input_tokens: parseInt(modelData.cacheCreateTokens) || 0,
+          cache_read_input_tokens: parseInt(modelData.cacheReadTokens) || 0
+        }
+
+        const costResult = CostCalculator.calculateCost(usage, modelName)
+        summedCost += costResult.costs.total
+      }
+
+      return summedCost
+    }
+
+    const today = new Date()
+
+    for (let offset = daysCount - 1; offset >= 0; offset--) {
+      const date = new Date(today)
+      date.setDate(date.getDate() - offset)
+
+      const tzDate = redis.getDateInTimezone(date)
+      const dateKey = redis.getDateStringInTimezone(date)
+      const monthLabel = String(tzDate.getUTCMonth() + 1).padStart(2, '0')
+      const dayLabel = String(tzDate.getUTCDate()).padStart(2, '0')
+      const label = `${monthLabel}/${dayLabel}`
+
+      const dailyKey = `account_usage:daily:${accountId}:${dateKey}`
+      const dailyData = await client.hgetall(dailyKey)
+
+      const inputTokens = parseInt(dailyData?.inputTokens) || 0
+      const outputTokens = parseInt(dailyData?.outputTokens) || 0
+      const cacheCreateTokens = parseInt(dailyData?.cacheCreateTokens) || 0
+      const cacheReadTokens = parseInt(dailyData?.cacheReadTokens) || 0
+      const allTokens =
+        parseInt(dailyData?.allTokens) ||
+        inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
+      const requests = parseInt(dailyData?.requests) || 0
+
+      let cost = await sumModelCostsForDay(dateKey)
+
+      if (cost === 0 && allTokens > 0) {
+        const fallbackUsage = {
+          input_tokens: inputTokens,
+          output_tokens: outputTokens,
+          cache_creation_input_tokens: cacheCreateTokens,
+          cache_read_input_tokens: cacheReadTokens
+        }
+        const fallbackResult = CostCalculator.calculateCost(fallbackUsage, fallbackModel)
+        cost = fallbackResult.costs.total
+      }
+
+      const normalizedCost = Math.round(cost * 1_000_000) / 1_000_000
+
+      totalCost += normalizedCost
+      totalRequests += requests
+      totalTokens += allTokens
+
+      if (!highestCostDay || normalizedCost > highestCostDay.cost) {
+        highestCostDay = {
+          date: dateKey,
+          label,
+          cost: normalizedCost,
+          formattedCost: CostCalculator.formatCost(normalizedCost)
+        }
+      }
+
+      if (!highestRequestDay || requests > highestRequestDay.requests) {
+        highestRequestDay = {
+          date: dateKey,
+          label,
+          requests
+        }
+      }
+
+      history.push({
+        date: dateKey,
+        label,
+        cost: normalizedCost,
+        formattedCost: CostCalculator.formatCost(normalizedCost),
+        requests,
+        tokens: allTokens
+      })
+    }
+
+    const avgDailyCost = daysCount > 0 ? totalCost / daysCount : 0
+    const avgDailyRequests = daysCount > 0 ? totalRequests / daysCount : 0
+    const avgDailyTokens = daysCount > 0 ? totalTokens / daysCount : 0
+
+    const todayData = history.length > 0 ? history[history.length - 1] : null
+
+    return res.json({
+      success: true,
+      data: {
+        history,
+        summary: {
+          days: daysCount,
+          totalCost,
+          totalCostFormatted: CostCalculator.formatCost(totalCost),
+          totalRequests,
+          totalTokens,
+          avgDailyCost,
+          avgDailyCostFormatted: CostCalculator.formatCost(avgDailyCost),
+          avgDailyRequests,
+          avgDailyTokens,
+          today: todayData
+            ? {
+                date: todayData.date,
+                cost: todayData.cost,
+                costFormatted: todayData.formattedCost,
+                requests: todayData.requests,
+                tokens: todayData.tokens
+              }
+            : null,
+          highestCostDay,
+          highestRequestDay
+        },
+        overview: accountUsageStats,
+        generatedAt: new Date().toISOString()
+      }
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get account usage history:', error)
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get account usage history',
+      message: error.message
+    })
+  }
+})
+
 // 📊 系统统计
 
 // 获取系统概览
@@ -3565,6 +4340,8 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       geminiAccounts,
       bedrockAccountsResult,
       openaiAccounts,
+      ccrAccounts,
+      openaiResponsesAccounts,
       todayStats,
       systemAverages,
       realtimeMetrics
@@ -3576,6 +4353,8 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       geminiAccountService.getAllAccounts(),
       bedrockAccountService.getAllAccounts(),
       redis.getAllOpenAIAccounts(),
+      ccrAccountService.getAllAccounts(),
+      openaiResponsesAccountService.getAllAccounts(true),
       redis.getTodayStats(),
       redis.getSystemAverages(),
       redis.getRealtimeSystemMetrics()
@@ -3746,6 +4525,62 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       (acc) => acc.rateLimitStatus && acc.rateLimitStatus.isRateLimited
     ).length
 
+    // CCR账户统计
+    const normalCcrAccounts = ccrAccounts.filter(
+      (acc) =>
+        acc.isActive &&
+        acc.status !== 'blocked' &&
+        acc.status !== 'unauthorized' &&
+        acc.schedulable !== false &&
+        !(acc.rateLimitStatus && acc.rateLimitStatus.isRateLimited)
+    ).length
+    const abnormalCcrAccounts = ccrAccounts.filter(
+      (acc) => !acc.isActive || acc.status === 'blocked' || acc.status === 'unauthorized'
+    ).length
+    const pausedCcrAccounts = ccrAccounts.filter(
+      (acc) =>
+        acc.schedulable === false &&
+        acc.isActive &&
+        acc.status !== 'blocked' &&
+        acc.status !== 'unauthorized'
+    ).length
+    const rateLimitedCcrAccounts = ccrAccounts.filter(
+      (acc) => acc.rateLimitStatus && acc.rateLimitStatus.isRateLimited
+    ).length
+
+    // OpenAI-Responses账户统计
+    // 注意：OpenAI-Responses账户的isActive和schedulable也是字符串类型
+    const normalOpenAIResponsesAccounts = openaiResponsesAccounts.filter(
+      (acc) =>
+        (acc.isActive === 'true' ||
+          acc.isActive === true ||
+          (!acc.isActive && acc.isActive !== 'false' && acc.isActive !== false)) &&
+        acc.status !== 'blocked' &&
+        acc.status !== 'unauthorized' &&
+        acc.schedulable !== 'false' &&
+        acc.schedulable !== false &&
+        !(acc.rateLimitStatus && acc.rateLimitStatus.isRateLimited)
+    ).length
+    const abnormalOpenAIResponsesAccounts = openaiResponsesAccounts.filter(
+      (acc) =>
+        acc.isActive === 'false' ||
+        acc.isActive === false ||
+        acc.status === 'blocked' ||
+        acc.status === 'unauthorized'
+    ).length
+    const pausedOpenAIResponsesAccounts = openaiResponsesAccounts.filter(
+      (acc) =>
+        (acc.schedulable === 'false' || acc.schedulable === false) &&
+        (acc.isActive === 'true' ||
+          acc.isActive === true ||
+          (!acc.isActive && acc.isActive !== 'false' && acc.isActive !== false)) &&
+        acc.status !== 'blocked' &&
+        acc.status !== 'unauthorized'
+    ).length
+    const rateLimitedOpenAIResponsesAccounts = openaiResponsesAccounts.filter(
+      (acc) => acc.rateLimitStatus && acc.rateLimitStatus.isRateLimited
+    ).length
+
     const dashboard = {
       overview: {
         totalApiKeys: apiKeys.length,
@@ -3756,31 +4591,41 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           claudeConsoleAccounts.length +
           geminiAccounts.length +
           bedrockAccounts.length +
-          openaiAccounts.length,
+          openaiAccounts.length +
+          openaiResponsesAccounts.length +
+          ccrAccounts.length,
         normalAccounts:
           normalClaudeAccounts +
           normalClaudeConsoleAccounts +
           normalGeminiAccounts +
           normalBedrockAccounts +
-          normalOpenAIAccounts,
+          normalOpenAIAccounts +
+          normalOpenAIResponsesAccounts +
+          normalCcrAccounts,
         abnormalAccounts:
           abnormalClaudeAccounts +
           abnormalClaudeConsoleAccounts +
           abnormalGeminiAccounts +
           abnormalBedrockAccounts +
-          abnormalOpenAIAccounts,
+          abnormalOpenAIAccounts +
+          abnormalOpenAIResponsesAccounts +
+          abnormalCcrAccounts,
         pausedAccounts:
           pausedClaudeAccounts +
           pausedClaudeConsoleAccounts +
           pausedGeminiAccounts +
           pausedBedrockAccounts +
-          pausedOpenAIAccounts,
+          pausedOpenAIAccounts +
+          pausedOpenAIResponsesAccounts +
+          pausedCcrAccounts,
         rateLimitedAccounts:
           rateLimitedClaudeAccounts +
           rateLimitedClaudeConsoleAccounts +
           rateLimitedGeminiAccounts +
           rateLimitedBedrockAccounts +
-          rateLimitedOpenAIAccounts,
+          rateLimitedOpenAIAccounts +
+          rateLimitedOpenAIResponsesAccounts +
+          rateLimitedCcrAccounts,
         // 各平台详细统计
         accountsByPlatform: {
           claude: {
@@ -3817,6 +4662,20 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
             abnormal: abnormalOpenAIAccounts,
             paused: pausedOpenAIAccounts,
             rateLimited: rateLimitedOpenAIAccounts
+          },
+          ccr: {
+            total: ccrAccounts.length,
+            normal: normalCcrAccounts,
+            abnormal: abnormalCcrAccounts,
+            paused: pausedCcrAccounts,
+            rateLimited: rateLimitedCcrAccounts
+          },
+          'openai-responses': {
+            total: openaiResponsesAccounts.length,
+            normal: normalOpenAIResponsesAccounts,
+            abnormal: abnormalOpenAIResponsesAccounts,
+            paused: pausedOpenAIResponsesAccounts,
+            rateLimited: rateLimitedOpenAIResponsesAccounts
           }
         },
         // 保留旧字段以兼容
@@ -3825,7 +4684,9 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           normalClaudeConsoleAccounts +
           normalGeminiAccounts +
           normalBedrockAccounts +
-          normalOpenAIAccounts,
+          normalOpenAIAccounts +
+          normalOpenAIResponsesAccounts +
+          normalCcrAccounts,
         totalClaudeAccounts: claudeAccounts.length + claudeConsoleAccounts.length,
         activeClaudeAccounts: normalClaudeAccounts + normalClaudeConsoleAccounts,
         rateLimitedClaudeAccounts: rateLimitedClaudeAccounts + rateLimitedClaudeConsoleAccounts,
@@ -3902,7 +4763,10 @@ router.get('/model-stats', authenticateAdmin, async (req, res) => {
     const { period = 'daily', startDate, endDate } = req.query // daily, monthly, 支持自定义时间范围
     const today = redis.getDateStringInTimezone()
     const tzDate = redis.getDateInTimezone()
-    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
+      2,
+      '0'
+    )}`
 
     logger.info(
       `📊 Getting global model stats, period: ${period}, startDate: ${startDate}, endDate: ${endDate}, today: ${today}, currentMonth: ${currentMonth}`
@@ -4373,7 +5237,10 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
     const client = redis.getClientSafe()
     const today = redis.getDateStringInTimezone()
     const tzDate = redis.getDateInTimezone()
-    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
+      2,
+      '0'
+    )}`
 
     let searchPatterns = []
 
@@ -4563,6 +5430,345 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
     return res
       .status(500)
       .json({ error: 'Failed to get API key model stats', message: error.message })
+  }
+})
+
+// 获取按账号分组的使用趋势
+router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
+  try {
+    const { granularity = 'day', group = 'claude', days = 7, startDate, endDate } = req.query
+
+    const allowedGroups = ['claude', 'openai', 'gemini']
+    if (!allowedGroups.includes(group)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid account group'
+      })
+    }
+
+    const groupLabels = {
+      claude: 'Claude账户',
+      openai: 'OpenAI账户',
+      gemini: 'Gemini账户'
+    }
+
+    // 拉取各平台账号列表
+    let accounts = []
+    if (group === 'claude') {
+      const [claudeAccounts, claudeConsoleAccounts] = await Promise.all([
+        claudeAccountService.getAllAccounts(),
+        claudeConsoleAccountService.getAllAccounts()
+      ])
+
+      accounts = [
+        ...claudeAccounts.map((account) => {
+          const id = String(account.id || '')
+          const shortId = id ? id.slice(0, 8) : '未知'
+          return {
+            id,
+            name: account.name || account.email || `Claude账号 ${shortId}`,
+            platform: 'claude'
+          }
+        }),
+        ...claudeConsoleAccounts.map((account) => {
+          const id = String(account.id || '')
+          const shortId = id ? id.slice(0, 8) : '未知'
+          return {
+            id,
+            name: account.name || `Console账号 ${shortId}`,
+            platform: 'claude-console'
+          }
+        })
+      ]
+    } else if (group === 'openai') {
+      const [openaiAccounts, openaiResponsesAccounts] = await Promise.all([
+        openaiAccountService.getAllAccounts(),
+        openaiResponsesAccountService.getAllAccounts(true)
+      ])
+
+      accounts = [
+        ...openaiAccounts.map((account) => {
+          const id = String(account.id || '')
+          const shortId = id ? id.slice(0, 8) : '未知'
+          return {
+            id,
+            name: account.name || account.email || `OpenAI账号 ${shortId}`,
+            platform: 'openai'
+          }
+        }),
+        ...openaiResponsesAccounts.map((account) => {
+          const id = String(account.id || '')
+          const shortId = id ? id.slice(0, 8) : '未知'
+          return {
+            id,
+            name: account.name || `Responses账号 ${shortId}`,
+            platform: 'openai-responses'
+          }
+        })
+      ]
+    } else if (group === 'gemini') {
+      const geminiAccounts = await geminiAccountService.getAllAccounts()
+      accounts = geminiAccounts.map((account) => {
+        const id = String(account.id || '')
+        const shortId = id ? id.slice(0, 8) : '未知'
+        return {
+          id,
+          name: account.name || account.email || `Gemini账号 ${shortId}`,
+          platform: 'gemini'
+        }
+      })
+    }
+
+    if (!accounts || accounts.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+        granularity,
+        group,
+        groupLabel: groupLabels[group],
+        topAccounts: [],
+        totalAccounts: 0
+      })
+    }
+
+    const accountMap = new Map()
+    const accountIdSet = new Set()
+    for (const account of accounts) {
+      accountMap.set(account.id, {
+        name: account.name,
+        platform: account.platform
+      })
+      accountIdSet.add(account.id)
+    }
+
+    const fallbackModelByGroup = {
+      claude: 'claude-3-5-sonnet-20241022',
+      openai: 'gpt-4o-mini-2024-07-18',
+      gemini: 'gemini-1.5-flash'
+    }
+    const fallbackModel = fallbackModelByGroup[group] || 'unknown'
+
+    const client = redis.getClientSafe()
+    const trendData = []
+    const accountCostTotals = new Map()
+
+    const sumModelCosts = async (accountId, period, timeKey) => {
+      const modelPattern = `account_usage:model:${period}:${accountId}:*:${timeKey}`
+      const modelKeys = await client.keys(modelPattern)
+      let totalCost = 0
+
+      for (const modelKey of modelKeys) {
+        const modelData = await client.hgetall(modelKey)
+        if (!modelData) {
+          continue
+        }
+
+        const parts = modelKey.split(':')
+        if (parts.length < 5) {
+          continue
+        }
+
+        const modelName = parts[4]
+        const usage = {
+          input_tokens: parseInt(modelData.inputTokens) || 0,
+          output_tokens: parseInt(modelData.outputTokens) || 0,
+          cache_creation_input_tokens: parseInt(modelData.cacheCreateTokens) || 0,
+          cache_read_input_tokens: parseInt(modelData.cacheReadTokens) || 0
+        }
+
+        const costResult = CostCalculator.calculateCost(usage, modelName)
+        totalCost += costResult.costs.total
+      }
+
+      return totalCost
+    }
+
+    if (granularity === 'hour') {
+      let startTime
+      let endTime
+
+      if (startDate && endDate) {
+        startTime = new Date(startDate)
+        endTime = new Date(endDate)
+      } else {
+        endTime = new Date()
+        startTime = new Date(endTime.getTime() - 24 * 60 * 60 * 1000)
+      }
+
+      const currentHour = new Date(startTime)
+      currentHour.setMinutes(0, 0, 0)
+
+      while (currentHour <= endTime) {
+        const tzCurrentHour = redis.getDateInTimezone(currentHour)
+        const dateStr = redis.getDateStringInTimezone(currentHour)
+        const hour = String(tzCurrentHour.getUTCHours()).padStart(2, '0')
+        const hourKey = `${dateStr}:${hour}`
+
+        const tzDateForLabel = redis.getDateInTimezone(currentHour)
+        const monthLabel = String(tzDateForLabel.getUTCMonth() + 1).padStart(2, '0')
+        const dayLabel = String(tzDateForLabel.getUTCDate()).padStart(2, '0')
+        const hourLabel = String(tzDateForLabel.getUTCHours()).padStart(2, '0')
+
+        const hourData = {
+          hour: currentHour.toISOString(),
+          label: `${monthLabel}/${dayLabel} ${hourLabel}:00`,
+          accounts: {}
+        }
+
+        const pattern = `account_usage:hourly:*:${hourKey}`
+        const keys = await client.keys(pattern)
+
+        for (const key of keys) {
+          const match = key.match(/account_usage:hourly:(.+?):\d{4}-\d{2}-\d{2}:\d{2}/)
+          if (!match) {
+            continue
+          }
+
+          const accountId = match[1]
+          if (!accountIdSet.has(accountId)) {
+            continue
+          }
+
+          const data = await client.hgetall(key)
+          if (!data) {
+            continue
+          }
+
+          const inputTokens = parseInt(data.inputTokens) || 0
+          const outputTokens = parseInt(data.outputTokens) || 0
+          const cacheCreateTokens = parseInt(data.cacheCreateTokens) || 0
+          const cacheReadTokens = parseInt(data.cacheReadTokens) || 0
+          const allTokens =
+            parseInt(data.allTokens) ||
+            inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
+          const requests = parseInt(data.requests) || 0
+
+          let cost = await sumModelCosts(accountId, 'hourly', hourKey)
+
+          if (cost === 0 && allTokens > 0) {
+            const fallbackUsage = {
+              input_tokens: inputTokens,
+              output_tokens: outputTokens,
+              cache_creation_input_tokens: cacheCreateTokens,
+              cache_read_input_tokens: cacheReadTokens
+            }
+            const fallbackResult = CostCalculator.calculateCost(fallbackUsage, fallbackModel)
+            cost = fallbackResult.costs.total
+          }
+
+          const formattedCost = CostCalculator.formatCost(cost)
+          const accountInfo = accountMap.get(accountId)
+
+          hourData.accounts[accountId] = {
+            name: accountInfo ? accountInfo.name : `账号 ${accountId.slice(0, 8)}`,
+            cost,
+            formattedCost,
+            requests
+          }
+
+          accountCostTotals.set(accountId, (accountCostTotals.get(accountId) || 0) + cost)
+        }
+
+        trendData.push(hourData)
+        currentHour.setHours(currentHour.getHours() + 1)
+      }
+    } else {
+      const daysCount = parseInt(days) || 7
+      const today = new Date()
+
+      for (let i = 0; i < daysCount; i++) {
+        const date = new Date(today)
+        date.setDate(date.getDate() - i)
+        const dateStr = redis.getDateStringInTimezone(date)
+
+        const dayData = {
+          date: dateStr,
+          accounts: {}
+        }
+
+        const pattern = `account_usage:daily:*:${dateStr}`
+        const keys = await client.keys(pattern)
+
+        for (const key of keys) {
+          const match = key.match(/account_usage:daily:(.+?):\d{4}-\d{2}-\d{2}/)
+          if (!match) {
+            continue
+          }
+
+          const accountId = match[1]
+          if (!accountIdSet.has(accountId)) {
+            continue
+          }
+
+          const data = await client.hgetall(key)
+          if (!data) {
+            continue
+          }
+
+          const inputTokens = parseInt(data.inputTokens) || 0
+          const outputTokens = parseInt(data.outputTokens) || 0
+          const cacheCreateTokens = parseInt(data.cacheCreateTokens) || 0
+          const cacheReadTokens = parseInt(data.cacheReadTokens) || 0
+          const allTokens =
+            parseInt(data.allTokens) ||
+            inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
+          const requests = parseInt(data.requests) || 0
+
+          let cost = await sumModelCosts(accountId, 'daily', dateStr)
+
+          if (cost === 0 && allTokens > 0) {
+            const fallbackUsage = {
+              input_tokens: inputTokens,
+              output_tokens: outputTokens,
+              cache_creation_input_tokens: cacheCreateTokens,
+              cache_read_input_tokens: cacheReadTokens
+            }
+            const fallbackResult = CostCalculator.calculateCost(fallbackUsage, fallbackModel)
+            cost = fallbackResult.costs.total
+          }
+
+          const formattedCost = CostCalculator.formatCost(cost)
+          const accountInfo = accountMap.get(accountId)
+
+          dayData.accounts[accountId] = {
+            name: accountInfo ? accountInfo.name : `账号 ${accountId.slice(0, 8)}`,
+            cost,
+            formattedCost,
+            requests
+          }
+
+          accountCostTotals.set(accountId, (accountCostTotals.get(accountId) || 0) + cost)
+        }
+
+        trendData.push(dayData)
+      }
+    }
+
+    if (granularity === 'hour') {
+      trendData.sort((a, b) => new Date(a.hour) - new Date(b.hour))
+    } else {
+      trendData.sort((a, b) => new Date(a.date) - new Date(b.date))
+    }
+
+    const topAccounts = Array.from(accountCostTotals.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 20)
+      .map(([accountId]) => accountId)
+
+    return res.json({
+      success: true,
+      data: trendData,
+      granularity,
+      group,
+      groupLabel: groupLabels[group],
+      topAccounts,
+      totalAccounts: accountCostTotals.size
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get account usage trend:', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to get account usage trend', message: error.message })
   }
 })
 
@@ -4904,7 +6110,10 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
     const client = redis.getClientSafe()
     const today = redis.getDateStringInTimezone()
     const tzDate = redis.getDateInTimezone()
-    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
+      2,
+      '0'
+    )}`
 
     let pattern
     if (period === 'today') {
@@ -4920,7 +6129,9 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
         const date = new Date()
         date.setDate(date.getDate() - i)
         const currentTzDate = redis.getDateInTimezone(date)
-        const dateStr = `${currentTzDate.getUTCFullYear()}-${String(currentTzDate.getUTCMonth() + 1).padStart(2, '0')}-${String(currentTzDate.getUTCDate()).padStart(2, '0')}`
+        const dateStr = `${currentTzDate.getUTCFullYear()}-${String(
+          currentTzDate.getUTCMonth() + 1
+        ).padStart(2, '0')}-${String(currentTzDate.getUTCDate()).padStart(2, '0')}`
         const dayPattern = `usage:model:daily:*:${dateStr}`
 
         const dayKeys = await client.keys(dayPattern)
@@ -4973,7 +6184,9 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
         totalCosts.totalCost += costResult.costs.total
 
         logger.info(
-          `💰 Model ${model} (7days): ${usage.inputTokens + usage.outputTokens + usage.cacheCreateTokens + usage.cacheReadTokens} tokens, cost: ${costResult.formatted.total}`
+          `💰 Model ${model} (7days): ${
+            usage.inputTokens + usage.outputTokens + usage.cacheCreateTokens + usage.cacheReadTokens
+          } tokens, cost: ${costResult.formatted.total}`
         )
 
         // 记录模型费用
@@ -5061,7 +6274,12 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
           totalCosts.totalCost += costResult.costs.total
 
           logger.info(
-            `💰 Model ${model}: ${usage.inputTokens + usage.outputTokens + usage.cacheCreateTokens + usage.cacheReadTokens} tokens, cost: ${costResult.formatted.total}`
+            `💰 Model ${model}: ${
+              usage.inputTokens +
+              usage.outputTokens +
+              usage.cacheCreateTokens +
+              usage.cacheReadTokens
+            } tokens, cost: ${costResult.formatted.total}`
           )
 
           // 记录模型费用
@@ -5656,6 +6874,7 @@ router.post('/openai-accounts/exchange-code', authenticateAdmin, async (req, res
     const proxyAgent = ProxyHelper.createProxyAgent(sessionData.proxy)
     if (proxyAgent) {
       axiosConfig.httpsAgent = proxyAgent
+      axiosConfig.proxy = false
     }
 
     // 交换 authorization code 获取 tokens
@@ -5733,6 +6952,16 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
     const { platform, groupId } = req.query
     let accounts = await openaiAccountService.getAllAccounts()
 
+    // 缓存账户所属分组，避免重复查询
+    const accountGroupCache = new Map()
+    const fetchAccountGroups = async (accountId) => {
+      if (!accountGroupCache.has(accountId)) {
+        const groups = await accountGroupService.getAccountGroups(accountId)
+        accountGroupCache.set(accountId, groups || [])
+      }
+      return accountGroupCache.get(accountId)
+    }
+
     // 根据查询参数进行筛选
     if (platform && platform !== 'all' && platform !== 'openai') {
       // 如果指定了其他平台，返回空数组
@@ -5745,7 +6974,7 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
         // 筛选未分组账户
         const filteredAccounts = []
         for (const account of accounts) {
-          const groups = await accountGroupService.getAccountGroups(account.id)
+          const groups = await fetchAccountGroups(account.id)
           if (!groups || groups.length === 0) {
             filteredAccounts.push(account)
           }
@@ -5762,9 +6991,11 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
         try {
-          const usageStats = await redis.getAccountUsageStats(account.id)
+          const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
+          const groupInfos = await fetchAccountGroups(account.id)
           return {
             ...account,
+            groupInfos,
             usage: {
               daily: usageStats.daily,
               total: usageStats.total,
@@ -5773,8 +7004,10 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
           }
         } catch (error) {
           logger.debug(`Failed to get usage stats for OpenAI account ${account.id}:`, error)
+          const groupInfos = await fetchAccountGroups(account.id)
           return {
             ...account,
+            groupInfos,
             usage: {
               daily: { requests: 0, tokens: 0, allTokens: 0 },
               total: { requests: 0, tokens: 0, allTokens: 0 },
@@ -6150,6 +7383,9 @@ router.delete('/openai-accounts/:id', authenticateAdmin, async (req, res) => {
       })
     }
 
+    // 自动解绑所有绑定的 API Keys
+    const unboundCount = await apiKeyService.unbindAccountFromAllKeys(id, 'openai')
+
     // 如果账户在分组中，从分组中移除
     if (account.accountType === 'group') {
       const group = await accountGroupService.getAccountGroup(id)
@@ -6160,11 +7396,19 @@ router.delete('/openai-accounts/:id', authenticateAdmin, async (req, res) => {
 
     await openaiAccountService.deleteAccount(id)
 
-    logger.success(`✅ 删除 OpenAI 账户成功: ${account.name} (ID: ${id})`)
+    let message = 'OpenAI账号已成功删除'
+    if (unboundCount > 0) {
+      message += `，${unboundCount} 个 API Key 已切换为共享池模式`
+    }
+
+    logger.success(
+      `✅ 删除 OpenAI 账户成功: ${account.name} (ID: ${id}), unbound ${unboundCount} keys`
+    )
 
     return res.json({
       success: true,
-      message: '账户删除成功'
+      message,
+      unboundKeys: unboundCount
     })
   } catch (error) {
     logger.error('删除 OpenAI 账户失败:', error)
@@ -6309,7 +7553,7 @@ router.get('/azure-openai-accounts', authenticateAdmin, async (req, res) => {
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
         try {
-          const usageStats = await redis.getAccountUsageStats(account.id)
+          const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
           return {
             ...account,
@@ -6423,7 +7667,9 @@ router.post('/azure-openai-accounts', authenticateAdmin, async (req, res) => {
 
     // 测试连接
     try {
-      const testUrl = `${azureEndpoint}/openai/deployments/${deploymentName}?api-version=${apiVersion || '2024-02-01'}`
+      const testUrl = `${azureEndpoint}/openai/deployments/${deploymentName}?api-version=${
+        apiVersion || '2024-02-01'
+      }`
       await axios.get(testUrl, {
         headers: {
           'api-key': apiKey
@@ -6511,11 +7757,22 @@ router.delete('/azure-openai-accounts/:id', authenticateAdmin, async (req, res) 
   try {
     const { id } = req.params
 
+    // 自动解绑所有绑定的 API Keys
+    const unboundCount = await apiKeyService.unbindAccountFromAllKeys(id, 'azure_openai')
+
     await azureOpenaiAccountService.deleteAccount(id)
+
+    let message = 'Azure OpenAI账号已成功删除'
+    if (unboundCount > 0) {
+      message += `，${unboundCount} 个 API Key 已切换为共享池模式`
+    }
+
+    logger.success(`🗑️ Admin deleted Azure OpenAI account: ${id}, unbound ${unboundCount} keys`)
 
     res.json({
       success: true,
-      message: 'Azure OpenAI account deleted successfully'
+      message,
+      unboundKeys: unboundCount
     })
   } catch (error) {
     logger.error('Failed to delete Azure OpenAI account:', error)
@@ -6704,6 +7961,352 @@ router.post('/claude-code-version/clear', authenticateAdmin, async (req, res) =>
     res.status(500).json({
       success: false,
       message: 'Failed to clear cache',
+      error: error.message
+    })
+  }
+})
+
+// ==================== OpenAI-Responses 账户管理 API ====================
+
+// 获取所有 OpenAI-Responses 账户
+router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => {
+  try {
+    const { platform, groupId } = req.query
+    let accounts = await openaiResponsesAccountService.getAllAccounts(true)
+
+    // 根据查询参数进行筛选
+    if (platform && platform !== 'openai-responses') {
+      accounts = []
+    }
+
+    // 根据分组ID筛选
+    if (groupId) {
+      const group = await accountGroupService.getGroup(groupId)
+      if (group && group.platform === 'openai' && group.memberIds && group.memberIds.length > 0) {
+        accounts = accounts.filter((account) => group.memberIds.includes(account.id))
+      } else {
+        accounts = []
+      }
+    }
+
+    // 处理额度信息、使用统计和绑定的 API Key 数量
+    const accountsWithStats = await Promise.all(
+      accounts.map(async (account) => {
+        try {
+          // 检查是否需要重置额度
+          const today = redis.getDateStringInTimezone()
+          if (account.lastResetDate !== today) {
+            // 今天还没重置过，需要重置
+            await openaiResponsesAccountService.updateAccount(account.id, {
+              dailyUsage: '0',
+              lastResetDate: today,
+              quotaStoppedAt: ''
+            })
+            account.dailyUsage = '0'
+            account.lastResetDate = today
+            account.quotaStoppedAt = ''
+          }
+
+          // 检查并清除过期的限流状态
+          await openaiResponsesAccountService.checkAndClearRateLimit(account.id)
+
+          // 获取使用统计信息
+          let usageStats
+          try {
+            usageStats = await redis.getAccountUsageStats(account.id, 'openai-responses')
+          } catch (error) {
+            logger.debug(
+              `Failed to get usage stats for OpenAI-Responses account ${account.id}:`,
+              error
+            )
+            usageStats = {
+              daily: { requests: 0, tokens: 0, allTokens: 0 },
+              total: { requests: 0, tokens: 0, allTokens: 0 },
+              monthly: { requests: 0, tokens: 0, allTokens: 0 }
+            }
+          }
+
+          // 计算绑定的API Key数量（支持 responses: 前缀）
+          const allKeys = await redis.getAllApiKeys()
+          let boundCount = 0
+
+          for (const key of allKeys) {
+            // 检查是否绑定了该账户（包括 responses: 前缀）
+            if (
+              key.openaiAccountId === account.id ||
+              key.openaiAccountId === `responses:${account.id}`
+            ) {
+              boundCount++
+            }
+          }
+
+          // 调试日志：检查绑定计数
+          if (boundCount > 0) {
+            logger.info(`OpenAI-Responses account ${account.id} has ${boundCount} bound API keys`)
+          }
+
+          return {
+            ...account,
+            boundApiKeysCount: boundCount,
+            usage: {
+              daily: usageStats.daily,
+              total: usageStats.total,
+              monthly: usageStats.monthly
+            }
+          }
+        } catch (error) {
+          logger.error(`Failed to process OpenAI-Responses account ${account.id}:`, error)
+          return {
+            ...account,
+            boundApiKeysCount: 0,
+            usage: {
+              daily: { requests: 0, tokens: 0, allTokens: 0 },
+              total: { requests: 0, tokens: 0, allTokens: 0 },
+              monthly: { requests: 0, tokens: 0, allTokens: 0 }
+            }
+          }
+        }
+      })
+    )
+
+    res.json({ success: true, data: accountsWithStats })
+  } catch (error) {
+    logger.error('Failed to get OpenAI-Responses accounts:', error)
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// 创建 OpenAI-Responses 账户
+router.post('/openai-responses-accounts', authenticateAdmin, async (req, res) => {
+  try {
+    const account = await openaiResponsesAccountService.createAccount(req.body)
+    res.json({ success: true, account })
+  } catch (error) {
+    logger.error('Failed to create OpenAI-Responses account:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// 更新 OpenAI-Responses 账户
+router.put('/openai-responses-accounts/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+    const updates = req.body
+
+    // 验证priority的有效性（1-100）
+    if (updates.priority !== undefined) {
+      const priority = parseInt(updates.priority)
+      if (isNaN(priority) || priority < 1 || priority > 100) {
+        return res.status(400).json({
+          success: false,
+          message: 'Priority must be a number between 1 and 100'
+        })
+      }
+      updates.priority = priority.toString()
+    }
+
+    const result = await openaiResponsesAccountService.updateAccount(id, updates)
+
+    if (!result.success) {
+      return res.status(400).json(result)
+    }
+
+    res.json({ success: true, ...result })
+  } catch (error) {
+    logger.error('Failed to update OpenAI-Responses account:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// 删除 OpenAI-Responses 账户
+router.delete('/openai-responses-accounts/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const account = await openaiResponsesAccountService.getAccount(id)
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        message: 'Account not found'
+      })
+    }
+
+    // 自动解绑所有绑定的 API Keys
+    const unboundCount = await apiKeyService.unbindAccountFromAllKeys(id, 'openai-responses')
+
+    // 检查是否在分组中
+    const groups = await accountGroupService.getAllGroups()
+    for (const group of groups) {
+      if (group.platform === 'openai' && group.memberIds && group.memberIds.includes(id)) {
+        await accountGroupService.removeMemberFromGroup(group.id, id)
+        logger.info(`Removed OpenAI-Responses account ${id} from group ${group.id}`)
+      }
+    }
+
+    const result = await openaiResponsesAccountService.deleteAccount(id)
+
+    let message = 'OpenAI-Responses账号已成功删除'
+    if (unboundCount > 0) {
+      message += `，${unboundCount} 个 API Key 已切换为共享池模式`
+    }
+
+    logger.success(`🗑️ Admin deleted OpenAI-Responses account: ${id}, unbound ${unboundCount} keys`)
+
+    res.json({
+      success: true,
+      ...result,
+      message,
+      unboundKeys: unboundCount
+    })
+  } catch (error) {
+    logger.error('Failed to delete OpenAI-Responses account:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// 切换 OpenAI-Responses 账户调度状态
+router.put(
+  '/openai-responses-accounts/:id/toggle-schedulable',
+  authenticateAdmin,
+  async (req, res) => {
+    try {
+      const { id } = req.params
+
+      const result = await openaiResponsesAccountService.toggleSchedulable(id)
+
+      if (!result.success) {
+        return res.status(400).json(result)
+      }
+
+      // 仅在停止调度时发送通知
+      if (!result.schedulable) {
+        await webhookNotifier.sendAccountEvent('account.status_changed', {
+          accountId: id,
+          platform: 'openai-responses',
+          schedulable: result.schedulable,
+          changedBy: 'admin',
+          action: 'stopped_scheduling'
+        })
+      }
+
+      res.json(result)
+    } catch (error) {
+      logger.error('Failed to toggle OpenAI-Responses account schedulable status:', error)
+      res.status(500).json({
+        success: false,
+        error: error.message
+      })
+    }
+  }
+)
+
+// 切换 OpenAI-Responses 账户激活状态
+router.put('/openai-responses-accounts/:id/toggle', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const account = await openaiResponsesAccountService.getAccount(id)
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        message: 'Account not found'
+      })
+    }
+
+    const newActiveStatus = account.isActive === 'true' ? 'false' : 'true'
+    await openaiResponsesAccountService.updateAccount(id, {
+      isActive: newActiveStatus
+    })
+
+    res.json({
+      success: true,
+      isActive: newActiveStatus === 'true'
+    })
+  } catch (error) {
+    logger.error('Failed to toggle OpenAI-Responses account status:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// 重置 OpenAI-Responses 账户限流状态
+router.post(
+  '/openai-responses-accounts/:id/reset-rate-limit',
+  authenticateAdmin,
+  async (req, res) => {
+    try {
+      const { id } = req.params
+
+      await openaiResponsesAccountService.updateAccount(id, {
+        rateLimitedAt: '',
+        rateLimitStatus: '',
+        status: 'active',
+        errorMessage: ''
+      })
+
+      logger.info(`🔄 Admin manually reset rate limit for OpenAI-Responses account ${id}`)
+
+      res.json({
+        success: true,
+        message: 'Rate limit reset successfully'
+      })
+    } catch (error) {
+      logger.error('Failed to reset OpenAI-Responses account rate limit:', error)
+      res.status(500).json({
+        success: false,
+        error: error.message
+      })
+    }
+  }
+)
+
+// 重置 OpenAI-Responses 账户状态（清除所有异常状态）
+router.post('/openai-responses-accounts/:id/reset-status', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const result = await openaiResponsesAccountService.resetAccountStatus(id)
+
+    logger.success(`✅ Admin reset status for OpenAI-Responses account: ${id}`)
+    return res.json({ success: true, data: result })
+  } catch (error) {
+    logger.error('❌ Failed to reset OpenAI-Responses account status:', error)
+    return res.status(500).json({ error: 'Failed to reset status', message: error.message })
+  }
+})
+
+// 手动重置 OpenAI-Responses 账户的每日使用量
+router.post('/openai-responses-accounts/:id/reset-usage', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    await openaiResponsesAccountService.updateAccount(id, {
+      dailyUsage: '0',
+      lastResetDate: redis.getDateStringInTimezone(),
+      quotaStoppedAt: ''
+    })
+
+    logger.success(`✅ Admin manually reset daily usage for OpenAI-Responses account ${id}`)
+
+    res.json({
+      success: true,
+      message: 'Daily usage reset successfully'
+    })
+  } catch (error) {
+    logger.error('Failed to reset OpenAI-Responses account usage:', error)
+    res.status(500).json({
+      success: false,
       error: error.message
     })
   }

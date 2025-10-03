@@ -167,7 +167,7 @@ const copyApiKey = async () => {
     await navigator.clipboard.writeText(key)
     showToast('API Key 已复制到剪贴板', 'success')
   } catch (error) {
-    console.error('Failed to copy:', error)
+    // console.error('Failed to copy:', error)
     // 降级方案：创建一个临时文本区域
     const textArea = document.createElement('textarea')
     textArea.value = key

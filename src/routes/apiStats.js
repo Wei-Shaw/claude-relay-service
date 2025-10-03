@@ -3,6 +3,8 @@ const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const apiKeyService = require('../services/apiKeyService')
 const CostCalculator = require('../utils/costCalculator')
+const claudeAccountService = require('../services/claudeAccountService')
+const openaiAccountService = require('../services/openaiAccountService')
 
 const router = express.Router()
 
@@ -114,6 +116,7 @@ router.post('/api/user-stats', async (req, res) => {
 
       // 获取当日费用统计
       const dailyCost = await redis.getDailyCost(keyId)
+      const costStats = await redis.getCostStats(keyId)
 
       // 处理数据格式，与 validateApiKey 返回的格式保持一致
       // 解析限制模型数据
@@ -140,7 +143,9 @@ router.post('/api/user-stats', async (req, res) => {
         rateLimitWindow: parseInt(keyData.rateLimitWindow) || 0,
         rateLimitRequests: parseInt(keyData.rateLimitRequests) || 0,
         dailyCostLimit: parseFloat(keyData.dailyCostLimit) || 0,
+        totalCostLimit: parseFloat(keyData.totalCostLimit) || 0,
         dailyCost: dailyCost || 0,
+        totalCost: costStats.total || 0,
         enableModelRestriction: keyData.enableModelRestriction === 'true',
         restrictedModels,
         enableClientRestriction: keyData.enableClientRestriction === 'true',
@@ -332,19 +337,63 @@ router.post('/api/user-stats', async (req, res) => {
       logger.warn(`Failed to get current usage for key ${keyId}:`, error)
     }
 
+    const boundAccountDetails = {}
+
+    const accountDetailTasks = []
+
+    if (fullKeyData.claudeAccountId) {
+      accountDetailTasks.push(
+        (async () => {
+          try {
+            const overview = await claudeAccountService.getAccountOverview(
+              fullKeyData.claudeAccountId
+            )
+
+            if (overview && overview.accountType === 'dedicated') {
+              boundAccountDetails.claude = overview
+            }
+          } catch (error) {
+            logger.warn(`⚠️ Failed to load Claude account overview for key ${keyId}:`, error)
+          }
+        })()
+      )
+    }
+
+    if (fullKeyData.openaiAccountId) {
+      accountDetailTasks.push(
+        (async () => {
+          try {
+            const overview = await openaiAccountService.getAccountOverview(
+              fullKeyData.openaiAccountId
+            )
+
+            if (overview && overview.accountType === 'dedicated') {
+              boundAccountDetails.openai = overview
+            }
+          } catch (error) {
+            logger.warn(`⚠️ Failed to load OpenAI account overview for key ${keyId}:`, error)
+          }
+        })()
+      )
+    }
+
+    if (accountDetailTasks.length > 0) {
+      await Promise.allSettled(accountDetailTasks)
+    }
+
     // 构建响应数据（只返回该API Key自己的信息，确保不泄露其他信息）
     const responseData = {
       id: keyId,
       name: fullKeyData.name,
-      description: keyData.description || '',
+      description: fullKeyData.description || keyData.description || '',
       isActive: true, // 如果能通过validateApiKey验证，说明一定是激活的
-      createdAt: keyData.createdAt,
-      expiresAt: keyData.expiresAt,
+      createdAt: fullKeyData.createdAt || keyData.createdAt,
+      expiresAt: fullKeyData.expiresAt || keyData.expiresAt,
       // 添加激活相关字段
-      expirationMode: keyData.expirationMode || 'fixed',
-      isActivated: keyData.isActivated === 'true',
-      activationDays: parseInt(keyData.activationDays || 0),
-      activatedAt: keyData.activatedAt || null,
+      expirationMode: fullKeyData.expirationMode || 'fixed',
+      isActivated: fullKeyData.isActivated === true || fullKeyData.isActivated === 'true',
+      activationDays: parseInt(fullKeyData.activationDays || 0),
+      activatedAt: fullKeyData.activatedAt || null,
       permissions: fullKeyData.permissions,
 
       // 使用统计（使用验证结果中的完整数据）
@@ -372,11 +421,15 @@ router.post('/api/user-stats', async (req, res) => {
         rateLimitRequests: fullKeyData.rateLimitRequests || 0,
         rateLimitCost: parseFloat(fullKeyData.rateLimitCost) || 0, // 新增：费用限制
         dailyCostLimit: fullKeyData.dailyCostLimit || 0,
+        totalCostLimit: fullKeyData.totalCostLimit || 0,
+        weeklyOpusCostLimit: parseFloat(fullKeyData.weeklyOpusCostLimit) || 0, // Opus 周费用限制
         // 当前使用量
         currentWindowRequests,
         currentWindowTokens,
         currentWindowCost, // 新增：当前窗口费用
         currentDailyCost,
+        currentTotalCost: totalCost,
+        weeklyOpusCost: (await redis.getWeeklyOpusCost(keyId)) || 0, // 当前 Opus 周费用
         // 时间窗口信息
         windowStartTime,
         windowEndTime,
@@ -392,7 +445,12 @@ router.post('/api/user-stats', async (req, res) => {
         geminiAccountId:
           fullKeyData.geminiAccountId && fullKeyData.geminiAccountId !== ''
             ? fullKeyData.geminiAccountId
-            : null
+            : null,
+        openaiAccountId:
+          fullKeyData.openaiAccountId && fullKeyData.openaiAccountId !== ''
+            ? fullKeyData.openaiAccountId
+            : null,
+        details: Object.keys(boundAccountDetails).length > 0 ? boundAccountDetails : null
       },
 
       // 模型和客户端限制信息

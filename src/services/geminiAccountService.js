@@ -394,6 +394,9 @@ async function createAccount(accountData) {
     // 项目 ID（Google Cloud/Workspace 账号需要）
     projectId: accountData.projectId || '',
 
+    // 临时项目 ID（从 loadCodeAssist 接口自动获取）
+    tempProjectId: accountData.tempProjectId || '',
+
     // 支持的模型列表（可选）
     supportedModels: accountData.supportedModels || [], // 空数组表示支持所有模型
 
@@ -1290,11 +1293,15 @@ async function generateContent(
   // 按照 gemini-cli 的转换格式构造请求
   const request = {
     model: requestData.model,
-    user_prompt_id: userPromptId,
     request: {
       ...requestData.request,
       session_id: sessionId
     }
+  }
+
+  // 只有当 userPromptId 存在时才添加
+  if (userPromptId) {
+    request.user_prompt_id = userPromptId
   }
 
   // 只有当projectId存在时才添加project字段
@@ -1307,6 +1314,12 @@ async function generateContent(
     userPromptId,
     projectId,
     sessionId
+  })
+
+  // 添加详细的请求日志
+  logger.info('📦 generateContent 请求详情', {
+    url: `${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:generateContent`,
+    requestBody: JSON.stringify(request, null, 2)
   })
 
   const axiosConfig = {
@@ -1356,11 +1369,15 @@ async function generateContentStream(
   // 按照 gemini-cli 的转换格式构造请求
   const request = {
     model: requestData.model,
-    user_prompt_id: userPromptId,
     request: {
       ...requestData.request,
       session_id: sessionId
     }
+  }
+
+  // 只有当 userPromptId 存在时才添加
+  if (userPromptId) {
+    request.user_prompt_id = userPromptId
   }
 
   // 只有当projectId存在时才添加project字段
@@ -1412,6 +1429,29 @@ async function generateContentStream(
   return response.data // 返回流对象
 }
 
+// 更新账户的临时项目 ID
+async function updateTempProjectId(accountId, tempProjectId) {
+  if (!tempProjectId) {
+    return
+  }
+
+  try {
+    const account = await getAccount(accountId)
+    if (!account) {
+      logger.warn(`Account ${accountId} not found when updating tempProjectId`)
+      return
+    }
+
+    // 只有在没有固定项目 ID 的情况下才更新临时项目 ID
+    if (!account.projectId && tempProjectId !== account.tempProjectId) {
+      await updateAccount(accountId, { tempProjectId })
+      logger.info(`Updated tempProjectId for account ${accountId}: ${tempProjectId}`)
+    }
+  } catch (error) {
+    logger.error(`Failed to update tempProjectId for account ${accountId}:`, error)
+  }
+}
+
 module.exports = {
   generateAuthUrl,
   pollAuthorizationStatus,
@@ -1440,6 +1480,7 @@ module.exports = {
   countTokens,
   generateContent,
   generateContentStream,
+  updateTempProjectId,
   OAUTH_CLIENT_ID,
   OAUTH_SCOPES
 }

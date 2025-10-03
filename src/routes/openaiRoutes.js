@@ -6,6 +6,8 @@ const config = require('../../config/config')
 const { authenticateApiKey } = require('../middleware/auth')
 const unifiedOpenAIScheduler = require('../services/unifiedOpenAIScheduler')
 const openaiAccountService = require('../services/openaiAccountService')
+const openaiResponsesAccountService = require('../services/openaiResponsesAccountService')
+const openaiResponsesRelayService = require('../services/openaiResponsesRelayService')
 const apiKeyService = require('../services/apiKeyService')
 const crypto = require('crypto')
 const ProxyHelper = require('../utils/proxyHelper')
@@ -13,6 +15,56 @@ const ProxyHelper = require('../utils/proxyHelper')
 // 创建代理 Agent（使用统一的代理工具）
 function createProxyAgent(proxy) {
   return ProxyHelper.createProxyAgent(proxy)
+}
+
+// 检查 API Key 是否具备 OpenAI 权限
+function checkOpenAIPermissions(apiKeyData) {
+  const permissions = apiKeyData?.permissions || 'all'
+  return permissions === 'all' || permissions === 'openai'
+}
+
+function normalizeHeaders(headers = {}) {
+  if (!headers || typeof headers !== 'object') {
+    return {}
+  }
+  const normalized = {}
+  for (const [key, value] of Object.entries(headers)) {
+    if (!key) {
+      continue
+    }
+    normalized[key.toLowerCase()] = Array.isArray(value) ? value[0] : value
+  }
+  return normalized
+}
+
+function toNumberSafe(value) {
+  if (value === undefined || value === null || value === '') {
+    return null
+  }
+  const num = Number(value)
+  return Number.isFinite(num) ? num : null
+}
+
+function extractCodexUsageHeaders(headers) {
+  const normalized = normalizeHeaders(headers)
+  if (!normalized || Object.keys(normalized).length === 0) {
+    return null
+  }
+
+  const snapshot = {
+    primaryUsedPercent: toNumberSafe(normalized['x-codex-primary-used-percent']),
+    primaryResetAfterSeconds: toNumberSafe(normalized['x-codex-primary-reset-after-seconds']),
+    primaryWindowMinutes: toNumberSafe(normalized['x-codex-primary-window-minutes']),
+    secondaryUsedPercent: toNumberSafe(normalized['x-codex-secondary-used-percent']),
+    secondaryResetAfterSeconds: toNumberSafe(normalized['x-codex-secondary-reset-after-seconds']),
+    secondaryWindowMinutes: toNumberSafe(normalized['x-codex-secondary-window-minutes']),
+    primaryOverSecondaryPercent: toNumberSafe(
+      normalized['x-codex-primary-over-secondary-limit-percent']
+    )
+  }
+
+  const hasData = Object.values(snapshot).some((value) => value !== null)
+  return hasData ? snapshot : null
 }
 
 // 使用统一调度器选择 OpenAI 账户
@@ -31,54 +83,96 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
     )
 
     if (!result || !result.accountId) {
-      throw new Error('No available OpenAI account found')
+      const error = new Error('No available OpenAI account found')
+      error.statusCode = 402 // Payment Required - 资源耗尽
+      throw error
     }
 
-    // 获取账户详情
-    let account = await openaiAccountService.getAccount(result.accountId)
-    if (!account || !account.accessToken) {
-      throw new Error(`OpenAI account ${result.accountId} has no valid accessToken`)
-    }
+    // 根据账户类型获取账户详情
+    let account,
+      accessToken,
+      proxy = null
 
-    // 检查 token 是否过期并自动刷新（双重保护）
-    if (openaiAccountService.isTokenExpired(account)) {
-      if (account.refreshToken) {
-        logger.info(`🔄 Token expired, auto-refreshing for account ${account.name} (fallback)`)
+    if (result.accountType === 'openai-responses') {
+      // 处理 OpenAI-Responses 账户
+      account = await openaiResponsesAccountService.getAccount(result.accountId)
+      if (!account || !account.apiKey) {
+        const error = new Error(`OpenAI-Responses account ${result.accountId} has no valid apiKey`)
+        error.statusCode = 403 // Forbidden - 账户配置错误
+        throw error
+      }
+
+      // OpenAI-Responses 账户不需要 accessToken，直接返回账户信息
+      accessToken = null // OpenAI-Responses 使用账户内的 apiKey
+
+      // 解析代理配置
+      if (account.proxy) {
         try {
-          await openaiAccountService.refreshAccountToken(result.accountId)
-          // 重新获取更新后的账户
-          account = await openaiAccountService.getAccount(result.accountId)
-          logger.info(`✅ Token refreshed successfully in route handler`)
-        } catch (refreshError) {
-          logger.error(`Failed to refresh token for ${account.name}:`, refreshError)
-          throw new Error(`Token expired and refresh failed: ${refreshError.message}`)
+          proxy = typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
+        } catch (e) {
+          logger.warn('Failed to parse proxy configuration:', e)
         }
-      } else {
-        throw new Error(`Token expired and no refresh token available for account ${account.name}`)
       }
-    }
 
-    // 解密 accessToken（account.accessToken 是加密的）
-    const accessToken = openaiAccountService.decrypt(account.accessToken)
-    if (!accessToken) {
-      throw new Error('Failed to decrypt OpenAI accessToken')
-    }
-
-    // 解析代理配置
-    let proxy = null
-    if (account.proxy) {
-      try {
-        proxy = typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
-      } catch (e) {
-        logger.warn('Failed to parse proxy configuration:', e)
+      logger.info(`Selected OpenAI-Responses account: ${account.name} (${result.accountId})`)
+    } else {
+      // 处理普通 OpenAI 账户
+      account = await openaiAccountService.getAccount(result.accountId)
+      if (!account || !account.accessToken) {
+        const error = new Error(`OpenAI account ${result.accountId} has no valid accessToken`)
+        error.statusCode = 403 // Forbidden - 账户配置错误
+        throw error
       }
+
+      // 检查 token 是否过期并自动刷新（双重保护）
+      if (openaiAccountService.isTokenExpired(account)) {
+        if (account.refreshToken) {
+          logger.info(`🔄 Token expired, auto-refreshing for account ${account.name} (fallback)`)
+          try {
+            await openaiAccountService.refreshAccountToken(result.accountId)
+            // 重新获取更新后的账户
+            account = await openaiAccountService.getAccount(result.accountId)
+            logger.info(`✅ Token refreshed successfully in route handler`)
+          } catch (refreshError) {
+            logger.error(`Failed to refresh token for ${account.name}:`, refreshError)
+            const error = new Error(`Token expired and refresh failed: ${refreshError.message}`)
+            error.statusCode = 403 // Forbidden - 认证失败
+            throw error
+          }
+        } else {
+          const error = new Error(
+            `Token expired and no refresh token available for account ${account.name}`
+          )
+          error.statusCode = 403 // Forbidden - 认证失败
+          throw error
+        }
+      }
+
+      // 解密 accessToken（account.accessToken 是加密的）
+      accessToken = openaiAccountService.decrypt(account.accessToken)
+      if (!accessToken) {
+        const error = new Error('Failed to decrypt OpenAI accessToken')
+        error.statusCode = 403 // Forbidden - 配置/权限错误
+        throw error
+      }
+
+      // 解析代理配置
+      if (account.proxy) {
+        try {
+          proxy = typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
+        } catch (e) {
+          logger.warn('Failed to parse proxy configuration:', e)
+        }
+      }
+
+      logger.info(`Selected OpenAI account: ${account.name} (${result.accountId})`)
     }
 
-    logger.info(`Selected OpenAI account: ${account.name} (${result.accountId})`)
     return {
       accessToken,
       accountId: result.accountId,
       accountName: account.name,
+      accountType: result.accountType,
       proxy,
       account
     }
@@ -91,9 +185,29 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
 // 主处理函数，供两个路由共享
 const handleResponses = async (req, res) => {
   let upstream = null
+  let accountId = null
+  let accountType = 'openai'
+  let sessionHash = null
+  let account = null
+  let proxy = null
+  let accessToken = null
+
   try {
     // 从中间件获取 API Key 数据
     const apiKeyData = req.apiKey || {}
+
+    if (!checkOpenAIPermissions(apiKeyData)) {
+      logger.security(
+        `🚫 API Key ${apiKeyData.id || 'unknown'} 缺少 OpenAI 权限，拒绝访问 ${req.originalUrl}`
+      )
+      return res.status(403).json({
+        error: {
+          message: 'This API key does not have permission to access OpenAI',
+          type: 'permission_denied',
+          code: 'permission_denied'
+        }
+      })
+    }
 
     // 从请求头或请求体中提取会话 ID
     const sessionId =
@@ -103,11 +217,13 @@ const handleResponses = async (req, res) => {
       req.body?.conversation_id ||
       null
 
+    sessionHash = sessionId ? crypto.createHash('sha256').update(sessionId).digest('hex') : null
+
     // 从请求体中提取模型和流式标志
     let requestedModel = req.body?.model || null
 
     // 如果模型是 gpt-5 开头且后面还有内容（如 gpt-5-2025-08-07），则覆盖为 gpt-5
-    if (requestedModel && requestedModel.startsWith('gpt-5-') && requestedModel !== 'gpt-5') {
+    if (requestedModel && requestedModel.startsWith('gpt-5-') && requestedModel !== 'gpt-5-codex') {
       logger.info(`📝 Model ${requestedModel} detected, normalizing to gpt-5 for Codex API`)
       requestedModel = 'gpt-5'
       req.body.model = 'gpt-5' // 同时更新请求体中的模型
@@ -147,13 +263,17 @@ const handleResponses = async (req, res) => {
     }
 
     // 使用调度器选择账户
-    const {
-      accessToken,
-      accountId,
-      accountName: _accountName,
-      proxy,
-      account
-    } = await getOpenAIAuthToken(apiKeyData, sessionId, requestedModel)
+    ;({ accessToken, accountId, accountType, proxy, account } = await getOpenAIAuthToken(
+      apiKeyData,
+      sessionId,
+      requestedModel
+    ))
+
+    // 如果是 OpenAI-Responses 账户，使用专门的中继服务处理
+    if (accountType === 'openai-responses') {
+      logger.info(`🔀 Using OpenAI-Responses relay service for account: ${account.name}`)
+      return await openaiResponsesRelayService.handleRequest(req, res, account, apiKeyData)
+    }
     // 基于白名单构造上游所需的请求头，确保键为小写且值受控
     const incoming = req.headers || {}
 
@@ -187,6 +307,7 @@ const handleResponses = async (req, res) => {
     // 如果有代理，添加代理配置
     if (proxyAgent) {
       axiosConfig.httpsAgent = proxyAgent
+      axiosConfig.proxy = false
       logger.info(`🌐 Using proxy for OpenAI request: ${ProxyHelper.getProxyDescription(proxy)}`)
     } else {
       logger.debug('🌐 No proxy configured for OpenAI request')
@@ -206,6 +327,15 @@ const handleResponses = async (req, res) => {
         req.body,
         axiosConfig
       )
+    }
+
+    const codexUsageSnapshot = extractCodexUsageHeaders(upstream.headers)
+    if (codexUsageSnapshot) {
+      try {
+        await openaiAccountService.updateCodexUsageSnapshot(accountId, codexUsageSnapshot)
+      } catch (codexError) {
+        logger.error('⚠️ 更新 Codex 使用统计失败:', codexError)
+      }
     }
 
     // 处理 429 限流错误
@@ -260,7 +390,7 @@ const handleResponses = async (req, res) => {
       await unifiedOpenAIScheduler.markAccountRateLimited(
         accountId,
         'openai',
-        sessionId ? crypto.createHash('sha256').update(sessionId).digest('hex') : null,
+        sessionHash,
         resetsInSeconds
       )
 
@@ -285,6 +415,86 @@ const handleResponses = async (req, res) => {
         res.status(429).json(errorResponse)
       }
 
+      return
+    } else if (upstream.status === 401 || upstream.status === 402) {
+      const unauthorizedStatus = upstream.status
+      const statusDescription = unauthorizedStatus === 401 ? 'Unauthorized' : 'Payment required'
+      logger.warn(
+        `🔐 ${statusDescription} error detected for OpenAI account ${accountId} (Codex API)`
+      )
+
+      let errorData = null
+
+      try {
+        if (isStream && upstream.data && typeof upstream.data.on === 'function') {
+          const chunks = []
+          await new Promise((resolve, reject) => {
+            upstream.data.on('data', (chunk) => chunks.push(chunk))
+            upstream.data.on('end', resolve)
+            upstream.data.on('error', reject)
+            setTimeout(resolve, 5000)
+          })
+
+          const fullResponse = Buffer.concat(chunks).toString()
+          try {
+            errorData = JSON.parse(fullResponse)
+          } catch (parseError) {
+            logger.error(`Failed to parse ${unauthorizedStatus} error response:`, parseError)
+            logger.debug(`Raw ${unauthorizedStatus} response:`, fullResponse)
+            errorData = { error: { message: fullResponse || 'Unauthorized' } }
+          }
+        } else {
+          errorData = upstream.data
+        }
+      } catch (parseError) {
+        logger.error(`⚠️ Failed to handle ${unauthorizedStatus} error response:`, parseError)
+      }
+
+      const statusLabel = unauthorizedStatus === 401 ? '401错误' : '402错误'
+      const extraHint = unauthorizedStatus === 402 ? '，可能欠费' : ''
+      let reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）`
+      if (errorData) {
+        const messageCandidate =
+          errorData.error &&
+          typeof errorData.error.message === 'string' &&
+          errorData.error.message.trim()
+            ? errorData.error.message.trim()
+            : typeof errorData.message === 'string' && errorData.message.trim()
+              ? errorData.message.trim()
+              : null
+        if (messageCandidate) {
+          reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）：${messageCandidate}`
+        }
+      }
+
+      try {
+        await unifiedOpenAIScheduler.markAccountUnauthorized(
+          accountId,
+          'openai',
+          sessionHash,
+          reason
+        )
+      } catch (markError) {
+        logger.error(
+          `❌ Failed to mark OpenAI account unauthorized after ${unauthorizedStatus}:`,
+          markError
+        )
+      }
+
+      let errorResponse = errorData
+      if (!errorResponse || typeof errorResponse !== 'object' || Buffer.isBuffer(errorResponse)) {
+        const fallbackMessage =
+          typeof errorData === 'string' && errorData.trim() ? errorData.trim() : 'Unauthorized'
+        errorResponse = {
+          error: {
+            message: fallbackMessage,
+            type: 'unauthorized',
+            code: 'unauthorized'
+          }
+        }
+      }
+
+      res.status(unauthorizedStatus).json(errorResponse)
       return
     } else if (upstream.status === 200 || upstream.status === 201) {
       // 请求成功，检查并移除限流状态
@@ -350,23 +560,24 @@ const handleResponses = async (req, res) => {
 
         // 记录使用统计
         if (usageData) {
-          const inputTokens = usageData.input_tokens || usageData.prompt_tokens || 0
+          const totalInputTokens = usageData.input_tokens || usageData.prompt_tokens || 0
           const outputTokens = usageData.output_tokens || usageData.completion_tokens || 0
-          const cacheCreateTokens = usageData.input_tokens_details?.cache_creation_tokens || 0
           const cacheReadTokens = usageData.input_tokens_details?.cached_tokens || 0
+          // 计算实际输入token（总输入减去缓存部分）
+          const actualInputTokens = Math.max(0, totalInputTokens - cacheReadTokens)
 
           await apiKeyService.recordUsage(
             apiKeyData.id,
-            inputTokens,
+            actualInputTokens, // 传递实际输入（不含缓存）
             outputTokens,
-            cacheCreateTokens,
+            0, // OpenAI没有cache_creation_tokens
             cacheReadTokens,
             actualModel,
             accountId
           )
 
           logger.info(
-            `📊 Recorded OpenAI non-stream usage - Input: ${inputTokens}, Output: ${outputTokens}, Total: ${usageData.total_tokens || inputTokens + outputTokens}, Model: ${actualModel}`
+            `📊 Recorded OpenAI non-stream usage - Input: ${totalInputTokens}(actual:${actualInputTokens}+cached:${cacheReadTokens}), Output: ${outputTokens}, Total: ${usageData.total_tokens || totalInputTokens + outputTokens}, Model: ${actualModel}`
           )
         }
 
@@ -466,26 +677,27 @@ const handleResponses = async (req, res) => {
       // 记录使用统计
       if (!usageReported && usageData) {
         try {
-          const inputTokens = usageData.input_tokens || 0
+          const totalInputTokens = usageData.input_tokens || 0
           const outputTokens = usageData.output_tokens || 0
-          const cacheCreateTokens = usageData.input_tokens_details?.cache_creation_tokens || 0
           const cacheReadTokens = usageData.input_tokens_details?.cached_tokens || 0
+          // 计算实际输入token（总输入减去缓存部分）
+          const actualInputTokens = Math.max(0, totalInputTokens - cacheReadTokens)
 
           // 使用响应中的真实 model，如果没有则使用请求中的 model，最后回退到默认值
           const modelToRecord = actualModel || requestedModel || 'gpt-4'
 
           await apiKeyService.recordUsage(
             apiKeyData.id,
-            inputTokens,
+            actualInputTokens, // 传递实际输入（不含缓存）
             outputTokens,
-            cacheCreateTokens,
+            0, // OpenAI没有cache_creation_tokens
             cacheReadTokens,
             modelToRecord,
             accountId
           )
 
           logger.info(
-            `📊 Recorded OpenAI usage - Input: ${inputTokens}, Output: ${outputTokens}, Total: ${usageData.total_tokens || inputTokens + outputTokens}, Model: ${modelToRecord} (actual: ${actualModel}, requested: ${requestedModel})`
+            `📊 Recorded OpenAI usage - Input: ${totalInputTokens}(actual:${actualInputTokens}+cached:${cacheReadTokens}), Output: ${outputTokens}, Total: ${usageData.total_tokens || totalInputTokens + outputTokens}, Model: ${modelToRecord} (actual: ${actualModel}, requested: ${requestedModel})`
           )
           usageReported = true
         } catch (error) {
@@ -499,7 +711,7 @@ const handleResponses = async (req, res) => {
         await unifiedOpenAIScheduler.markAccountRateLimited(
           accountId,
           'openai',
-          sessionId ? crypto.createHash('sha256').update(sessionId).digest('hex') : null,
+          sessionHash,
           rateLimitResetsInSeconds
         )
       } else if (upstream.status === 200) {
@@ -538,10 +750,55 @@ const handleResponses = async (req, res) => {
     req.on('aborted', cleanup)
   } catch (error) {
     logger.error('Proxy to ChatGPT codex/responses failed:', error)
-    const status = error.response?.status || 500
-    const message = error.response?.data || error.message || 'Internal server error'
+    // 优先使用主动设置的 statusCode，然后是上游响应的状态码，最后默认 500
+    const status = error.statusCode || error.response?.status || 500
+
+    if ((status === 401 || status === 402) && accountId) {
+      const statusLabel = status === 401 ? '401错误' : '402错误'
+      const extraHint = status === 402 ? '，可能欠费' : ''
+      let reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）`
+      const errorData = error.response?.data
+      if (errorData) {
+        if (typeof errorData === 'string' && errorData.trim()) {
+          reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）：${errorData.trim()}`
+        } else if (
+          errorData.error &&
+          typeof errorData.error.message === 'string' &&
+          errorData.error.message.trim()
+        ) {
+          reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）：${errorData.error.message.trim()}`
+        } else if (typeof errorData.message === 'string' && errorData.message.trim()) {
+          reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）：${errorData.message.trim()}`
+        }
+      } else if (error.message) {
+        reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）：${error.message}`
+      }
+
+      try {
+        await unifiedOpenAIScheduler.markAccountUnauthorized(
+          accountId,
+          accountType || 'openai',
+          sessionHash,
+          reason
+        )
+      } catch (markError) {
+        logger.error('❌ Failed to mark OpenAI account unauthorized in catch handler:', markError)
+      }
+    }
+
+    let responsePayload = error.response?.data
+    if (!responsePayload) {
+      responsePayload = { error: { message: error.message || 'Internal server error' } }
+    } else if (typeof responsePayload === 'string') {
+      responsePayload = { error: { message: responsePayload } }
+    } else if (typeof responsePayload === 'object' && !responsePayload.error) {
+      responsePayload = {
+        error: { message: responsePayload.message || error.message || 'Internal server error' }
+      }
+    }
+
     if (!res.headersSent) {
-      res.status(status).json({ error: { message } })
+      res.status(status).json(responsePayload)
     }
   }
 }

@@ -29,6 +29,26 @@ function checkPermissions(apiKeyData, requiredPermission = 'gemini') {
   return permissions === 'all' || permissions === requiredPermission
 }
 
+// 确保请求具有 Gemini 访问权限
+function ensureGeminiPermission(req, res) {
+  const apiKeyData = req.apiKey || {}
+  if (checkPermissions(apiKeyData, 'gemini')) {
+    return true
+  }
+
+  logger.security(
+    `🚫 API Key ${apiKeyData.id || 'unknown'} 缺少 Gemini 权限，拒绝访问 ${req.originalUrl}`
+  )
+
+  res.status(403).json({
+    error: {
+      message: 'This API key does not have permission to access Gemini',
+      type: 'permission_denied'
+    }
+  })
+  return false
+}
+
 // Gemini 消息处理端点
 router.post('/messages', authenticateApiKey, async (req, res) => {
   const startTime = Date.now()
@@ -309,6 +329,10 @@ router.get('/key-info', authenticateApiKey, async (req, res) => {
 // 共用的 loadCodeAssist 处理函数
 async function handleLoadCodeAssist(req, res) {
   try {
+    if (!ensureGeminiPermission(req, res)) {
+      return undefined
+    }
+
     const sessionHash = sessionHelper.generateSessionHash(req.body)
 
     // 从路径参数或请求体中获取模型名
@@ -366,6 +390,14 @@ async function handleLoadCodeAssist(req, res) {
       proxyConfig
     )
 
+    // 如果响应中包含 cloudaicompanionProject，保存到账户作为临时项目 ID
+    if (response.cloudaicompanionProject && !account.projectId) {
+      await geminiAccountService.updateTempProjectId(accountId, response.cloudaicompanionProject)
+      logger.info(
+        `📋 Cached temporary projectId from loadCodeAssist: ${response.cloudaicompanionProject}`
+      )
+    }
+
     res.json(response)
   } catch (error) {
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
@@ -380,6 +412,10 @@ async function handleLoadCodeAssist(req, res) {
 // 共用的 onboardUser 处理函数
 async function handleOnboardUser(req, res) {
   try {
+    if (!ensureGeminiPermission(req, res)) {
+      return undefined
+    }
+
     // 提取请求参数
     const { tierId, cloudaicompanionProject, metadata } = req.body
     const sessionHash = sessionHelper.generateSessionHash(req.body)
@@ -467,6 +503,10 @@ async function handleOnboardUser(req, res) {
 // 共用的 countTokens 处理函数
 async function handleCountTokens(req, res) {
   try {
+    if (!ensureGeminiPermission(req, res)) {
+      return undefined
+    }
+
     // 处理请求体结构，支持直接 contents 或 request.contents
     const requestData = req.body.request || req.body
     const { contents } = requestData
@@ -530,6 +570,10 @@ async function handleCountTokens(req, res) {
 // 共用的 generateContent 处理函数
 async function handleGenerateContent(req, res) {
   try {
+    if (!ensureGeminiPermission(req, res)) {
+      return undefined
+    }
+
     const { project, user_prompt_id, request: requestData } = req.body
     // 从路径参数或请求体中获取模型名
     const model = req.body.model || req.params.modelName || 'gemini-2.5-flash'
@@ -668,6 +712,10 @@ async function handleStreamGenerateContent(req, res) {
   let abortController = null
 
   try {
+    if (!ensureGeminiPermission(req, res)) {
+      return undefined
+    }
+
     const { project, user_prompt_id, request: requestData } = req.body
     // 从路径参数或请求体中获取模型名
     const model = req.body.model || req.params.modelName || 'gemini-2.5-flash'
@@ -961,4 +1009,10 @@ router.post(
   handleStreamGenerateContent
 )
 
+// 导出处理函数供标准路由使用
 module.exports = router
+module.exports.handleLoadCodeAssist = handleLoadCodeAssist
+module.exports.handleOnboardUser = handleOnboardUser
+module.exports.handleCountTokens = handleCountTokens
+module.exports.handleGenerateContent = handleGenerateContent
+module.exports.handleStreamGenerateContent = handleStreamGenerateContent

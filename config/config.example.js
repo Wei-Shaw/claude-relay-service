@@ -46,7 +46,14 @@ const config = {
     apiVersion: process.env.CLAUDE_API_VERSION || '2023-06-01',
     betaHeader:
       process.env.CLAUDE_BETA_HEADER ||
-      'claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14'
+      'claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14',
+    overloadHandling: {
+      enabled: (() => {
+        const minutes = parseInt(process.env.CLAUDE_OVERLOAD_HANDLING_MINUTES) || 0
+        // 验证配置值：限制在0-1440分钟(24小时)内
+        return Math.max(0, Math.min(minutes, 1440))
+      })()
+    }
   },
 
   // ☁️ Bedrock API配置
@@ -104,38 +111,6 @@ const config = {
     logoUrl: process.env.WEB_LOGO_URL || '/assets/logo.png',
     enableCors: process.env.ENABLE_CORS === 'true',
     sessionSecret: process.env.WEB_SESSION_SECRET || 'CHANGE-THIS-SESSION-SECRET'
-  },
-
-  // 🔒 客户端限制配置
-  clientRestrictions: {
-    // 预定义的客户端列表
-    predefinedClients: [
-      {
-        id: 'claude_code',
-        name: 'ClaudeCode',
-        description: 'Official Claude Code CLI',
-        // 匹配 Claude CLI 的 User-Agent
-        // 示例: claude-cli/1.0.58 (external, cli)
-        userAgentPattern: /^claude-cli\/[\d.]+\s+\(/i
-      },
-      {
-        id: 'gemini_cli',
-        name: 'Gemini-CLI',
-        description: 'Gemini Command Line Interface',
-        // 匹配 GeminiCLI 的 User-Agent
-        // 示例: GeminiCLI/v18.20.8 (darwin; arm64)
-        userAgentPattern: /^GeminiCLI\/v?[\d.]+\s+\(/i
-      }
-      // 添加自定义客户端示例：
-      // {
-      //   id: 'custom_client',
-      //   name: 'My Custom Client',
-      //   description: 'My custom API client',
-      //   userAgentPattern: /^MyClient\/[\d\.]+/i
-      // }
-    ],
-    // 是否允许自定义客户端（未来功能）
-    allowCustomClients: process.env.ALLOW_CUSTOM_CLIENTS === 'true'
   },
 
   // 🔐 LDAP 认证配置

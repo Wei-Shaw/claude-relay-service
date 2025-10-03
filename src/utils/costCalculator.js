@@ -15,6 +15,12 @@ const MODEL_PRICING = {
     cacheWrite: 3.75,
     cacheRead: 0.3
   },
+  'claude-sonnet-4-5-20250929': {
+    input: 3.0,
+    output: 15.0,
+    cacheWrite: 3.75,
+    cacheRead: 0.3
+  },
 
   // Claude 3.5 Haiku
   'claude-3-5-haiku-20241022': {
@@ -242,6 +248,14 @@ class CostCalculator {
    * @returns {Object} 定价信息
    */
   static getModelPricing(model = 'unknown') {
+    // 特殊处理：gpt-5-codex 回退到 gpt-5（如果没有专门定价）
+    if (model === 'gpt-5-codex' && !MODEL_PRICING['gpt-5-codex']) {
+      const gpt5Pricing = MODEL_PRICING['gpt-5']
+      if (gpt5Pricing) {
+        console.log(`Using gpt-5 pricing as fallback for ${model}`)
+        return gpt5Pricing
+      }
+    }
     return MODEL_PRICING[model] || MODEL_PRICING['unknown']
   }
 
@@ -285,7 +299,7 @@ class CostCalculator {
    * @returns {Object} 节省信息
    */
   static calculateCacheSavings(usage, model = 'unknown') {
-    const pricing = this.getModelPricing(model)
+    const pricing = this.getModelPricing(model) // 已包含 gpt-5-codex 回退逻辑
     const cacheReadTokens = usage.cache_read_input_tokens || 0
 
     // 如果这些token不使用缓存，需要按正常input价格计费

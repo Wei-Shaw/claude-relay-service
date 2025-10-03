@@ -38,7 +38,7 @@ class ProxyHelper {
 
       // 根据代理类型创建 Agent
       if (proxy.type === 'socks5') {
-        const socksUrl = `socks5://${auth}${proxy.host}:${proxy.port}`
+        const socksUrl = `socks5h://${auth}${proxy.host}:${proxy.port}`
         const socksOptions = {}
 
         // 设置 IP 协议族（如果指定）
