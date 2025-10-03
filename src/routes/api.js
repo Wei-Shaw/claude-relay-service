@@ -820,12 +820,6 @@ router.get('/v1/models', authenticateApiKey, async (req, res) => {
         created: 1736726400,
         owned_by: 'anthropic'
       },
-      {
-        id: 'claude-opus-4-20250514',
-        object: 'model',
-        created: 1736726400,
-        owned_by: 'anthropic'
-      },
       // OpenAI 模型
       {
         id: 'gpt-4o',
