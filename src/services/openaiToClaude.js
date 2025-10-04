@@ -31,10 +31,15 @@ class OpenAIToClaudeConverter {
       stream: openaiRequest.stream || false
     }
 
-    // Claude Code 必需的系统消息
-    const claudeCodeSystemMessage = "You are Claude Code, Anthropic's official CLI for Claude."
-
-    claudeRequest.system = claudeCodeSystemMessage
+    // 如果 OpenAI 请求中包含系统消息,提取并使用
+    const systemMessage = this._extractSystemMessage(openaiRequest.messages)
+    if (systemMessage) {
+      claudeRequest.system = systemMessage
+      logger.info('🔍 Xcode system prompt detected (length: %d chars)', systemMessage.length)
+      logger.debug('📋 System prompt content:', systemMessage.substring(0, 200) + '...')
+    } else {
+      logger.warn('⚠️ No system message found in OpenAI request - Xcode may not work correctly')
+    }
 
     // 处理停止序列
     if (openaiRequest.stop) {
