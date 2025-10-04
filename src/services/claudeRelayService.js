@@ -11,6 +11,7 @@ const config = require('../../config/config')
 const claudeCodeHeadersService = require('./claudeCodeHeadersService')
 const redis = require('../models/redis')
 const ClaudeCodeValidator = require('../validators/clients/claudeCodeValidator')
+const { formatDateWithTimezone } = require('../utils/dateHelper')
 
 class ClaudeRelayService {
   constructor() {
@@ -19,6 +20,14 @@ class ClaudeRelayService {
     this.betaHeader = config.claude.betaHeader
     this.systemPrompt = config.claude.systemPrompt
     this.claudeCodeSystemPrompt = "You are Claude Code, Anthropic's official CLI for Claude."
+  }
+
+  _buildOpusLimitMessage(resetTime) {
+    if (!resetTime) {
+      return '此专属账号的Opus模型已达到周使用限制，请尝试切换其他模型后再试。'
+    }
+    const formattedReset = formatDateWithTimezone(resetTime)
+    return `此专属账号的Opus模型已达到周使用限制，将于 ${formattedReset} 自动恢复，请尝试切换其他模型后再试。`
   }
 
   // 🔍 判断是否是真实的 Claude Code 请求
@@ -83,6 +92,7 @@ class ClaudeRelayService {
       }
 
       const isDedicatedOfficialAccount =
+        accountType === 'claude-official' &&
         apiKeyData.claudeAccountId &&
         !apiKeyData.claudeAccountId.startsWith('group:') &&
         apiKeyData.claudeAccountId === accountId
@@ -95,6 +105,7 @@ class ClaudeRelayService {
       }
 
       if (isOpusModelRequest && isDedicatedOfficialAccount && opusRateLimitActive) {
+        const limitMessage = this._buildOpusLimitMessage(opusRateLimitEndAt)
         logger.warn(
           `🚫 Dedicated account ${account?.name || accountId} is under Opus weekly limit until ${opusRateLimitEndAt}`
         )
@@ -103,7 +114,7 @@ class ClaudeRelayService {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             error: 'opus_weekly_limit',
-            message: '此专属账号的Opus模型已达到本周使用限制，请尝试切换其他模型后再试。'
+            message: limitMessage
           }),
           accountId
         }
@@ -226,6 +237,19 @@ class ClaudeRelayService {
             logger.warn(
               `🚫 Account ${accountId} hit Opus limit, resets at ${new Date(parsedResetTimestamp * 1000).toISOString()}`
             )
+
+            if (isDedicatedOfficialAccount) {
+              const limitMessage = this._buildOpusLimitMessage(parsedResetTimestamp)
+              return {
+                statusCode: 403,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  error: 'opus_weekly_limit',
+                  message: limitMessage
+                }),
+                accountId
+              }
+            }
           } else {
             isRateLimited = true
             if (!Number.isNaN(parsedResetTimestamp)) {
@@ -883,6 +907,7 @@ class ClaudeRelayService {
       }
 
       const isDedicatedOfficialAccount =
+        accountType === 'claude-official' &&
         apiKeyData.claudeAccountId &&
         !apiKeyData.claudeAccountId.startsWith('group:') &&
         apiKeyData.claudeAccountId === accountId
@@ -893,6 +918,7 @@ class ClaudeRelayService {
       }
 
       if (isOpusModelRequest && isDedicatedOfficialAccount && opusRateLimitActive) {
+        const limitMessage = this._buildOpusLimitMessage(account?.opusRateLimitEndAt)
         if (!responseStream.headersSent) {
           responseStream.status(403)
           responseStream.setHeader('Content-Type', 'application/json')
@@ -900,7 +926,7 @@ class ClaudeRelayService {
         responseStream.write(
           JSON.stringify({
             error: 'opus_weekly_limit',
-            message: '此专属账号的Opus模型已达到本周使用限制，请尝试切换其他模型后再试。'
+            message: limitMessage
           })
         )
         responseStream.end()
@@ -931,7 +957,8 @@ class ClaudeRelayService {
         accountType,
         sessionHash,
         streamTransformer,
-        options
+        options,
+        isDedicatedOfficialAccount
       )
     } catch (error) {
       logger.error(`❌ Claude stream relay with usage capture failed:`, error)
@@ -951,7 +978,8 @@ class ClaudeRelayService {
     accountType,
     sessionHash,
     streamTransformer = null,
-    requestOptions = {}
+    requestOptions = {},
+    isDedicatedOfficialAccount = false
   ) {
     // 获取账户信息用于统一 User-Agent
     const account = await claudeAccountService.getAccount(accountId)
@@ -1016,11 +1044,43 @@ class ClaudeRelayService {
         options.headers['anthropic-beta'] = betaHeader
       }
 
-      const req = https.request(options, (res) => {
+      const req = https.request(options, async (res) => {
         logger.debug(`🌊 Claude stream response status: ${res.statusCode}`)
 
         // 错误响应处理
         if (res.statusCode !== 200) {
+          if (res.statusCode === 429 && isOpusModelRequest) {
+            const resetHeader = res.headers
+              ? res.headers['anthropic-ratelimit-unified-reset']
+              : null
+            const parsedResetTimestamp = resetHeader ? parseInt(resetHeader, 10) : NaN
+
+            if (!Number.isNaN(parsedResetTimestamp)) {
+              await claudeAccountService.markAccountOpusRateLimited(accountId, parsedResetTimestamp)
+              logger.warn(
+                `🚫 [Stream] Account ${accountId} hit Opus limit, resets at ${new Date(parsedResetTimestamp * 1000).toISOString()}`
+              )
+            }
+
+            if (isDedicatedOfficialAccount) {
+              const limitMessage = this._buildOpusLimitMessage(parsedResetTimestamp)
+              if (!responseStream.headersSent) {
+                responseStream.status(403)
+                responseStream.setHeader('Content-Type', 'application/json')
+              }
+              responseStream.write(
+                JSON.stringify({
+                  error: 'opus_weekly_limit',
+                  message: limitMessage
+                })
+              )
+              responseStream.end()
+              res.resume()
+              resolve()
+              return
+            }
+          }
+
           // 将错误处理逻辑封装在一个异步函数中
           const handleErrorResponse = async () => {
             if (res.statusCode === 401) {
