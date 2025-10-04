@@ -206,11 +206,23 @@ async function handleChatCompletion(req, res, apiKeyData) {
     const sessionHash = sessionHelper.generateSessionHash(claudeRequest)
 
     // 选择可用的Claude账户
-    const accountSelection = await unifiedClaudeScheduler.selectAccountForApiKey(
-      apiKeyData,
-      sessionHash,
-      claudeRequest.model
-    )
+    let accountSelection
+    try {
+      accountSelection = await unifiedClaudeScheduler.selectAccountForApiKey(
+        apiKeyData,
+        sessionHash,
+        claudeRequest.model
+      )
+    } catch (error) {
+      if (error.code === 'CLAUDE_DEDICATED_RATE_LIMITED') {
+        const limitMessage = claudeRelayService._buildStandardRateLimitMessage(error.rateLimitEndAt)
+        return res.status(403).json({
+          error: 'upstream_rate_limited',
+          message: limitMessage
+        })
+      }
+      throw error
+    }
     const { accountId } = accountSelection
 
     // 获取该账号存储的 Claude Code headers

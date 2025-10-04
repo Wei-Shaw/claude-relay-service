@@ -159,25 +159,36 @@ class UnifiedClaudeScheduler {
 
         // 普通专属账户
         const boundAccount = await redis.getClaudeAccount(apiKeyData.claudeAccountId)
-        if (
-          boundAccount &&
-          boundAccount.isActive === 'true' &&
-          boundAccount.status !== 'error' &&
-          this._isSchedulable(boundAccount.schedulable)
-        ) {
-          if (isOpusRequest) {
-            await claudeAccountService.clearExpiredOpusRateLimit(boundAccount.id)
+        if (boundAccount && boundAccount.isActive === 'true' && boundAccount.status !== 'error') {
+          const isRateLimited = await claudeAccountService.isAccountRateLimited(boundAccount.id)
+          if (isRateLimited) {
+            const rateInfo = await claudeAccountService.getAccountRateLimitInfo(boundAccount.id)
+            const error = new Error('Dedicated Claude account is rate limited')
+            error.code = 'CLAUDE_DEDICATED_RATE_LIMITED'
+            error.accountId = boundAccount.id
+            error.rateLimitEndAt = rateInfo?.rateLimitEndAt || boundAccount.rateLimitEndAt || null
+            throw error
           }
-          logger.info(
-            `🎯 Using bound dedicated Claude OAuth account: ${boundAccount.name} (${apiKeyData.claudeAccountId}) for API key ${apiKeyData.name}`
-          )
-          return {
-            accountId: apiKeyData.claudeAccountId,
-            accountType: 'claude-official'
+
+          if (!this._isSchedulable(boundAccount.schedulable)) {
+            logger.warn(
+              `⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not schedulable (schedulable: ${boundAccount?.schedulable}), falling back to pool`
+            )
+          } else {
+            if (isOpusRequest) {
+              await claudeAccountService.clearExpiredOpusRateLimit(boundAccount.id)
+            }
+            logger.info(
+              `🎯 Using bound dedicated Claude OAuth account: ${boundAccount.name} (${apiKeyData.claudeAccountId}) for API key ${apiKeyData.name}`
+            )
+            return {
+              accountId: apiKeyData.claudeAccountId,
+              accountType: 'claude-official'
+            }
           }
         } else {
           logger.warn(
-            `⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not available (isActive: ${boundAccount?.isActive}, status: ${boundAccount?.status}, schedulable: ${boundAccount?.schedulable}), falling back to pool`
+            `⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not available (isActive: ${boundAccount?.isActive}, status: ${boundAccount?.status}), falling back to pool`
           )
         }
       }
@@ -334,11 +345,23 @@ class UnifiedClaudeScheduler {
         boundAccount.isActive === 'true' &&
         boundAccount.status !== 'error' &&
         boundAccount.status !== 'blocked' &&
-        boundAccount.status !== 'temp_error' &&
-        this._isSchedulable(boundAccount.schedulable)
+        boundAccount.status !== 'temp_error'
       ) {
         const isRateLimited = await claudeAccountService.isAccountRateLimited(boundAccount.id)
-        if (!isRateLimited) {
+        if (isRateLimited) {
+          const rateInfo = await claudeAccountService.getAccountRateLimitInfo(boundAccount.id)
+          const error = new Error('Dedicated Claude account is rate limited')
+          error.code = 'CLAUDE_DEDICATED_RATE_LIMITED'
+          error.accountId = boundAccount.id
+          error.rateLimitEndAt = rateInfo?.rateLimitEndAt || boundAccount.rateLimitEndAt || null
+          throw error
+        }
+
+        if (!this._isSchedulable(boundAccount.schedulable)) {
+          logger.warn(
+            `⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not schedulable (schedulable: ${boundAccount?.schedulable})`
+          )
+        } else {
           logger.info(
             `🎯 Using bound dedicated Claude OAuth account: ${boundAccount.name} (${apiKeyData.claudeAccountId})`
           )
@@ -354,7 +377,7 @@ class UnifiedClaudeScheduler {
         }
       } else {
         logger.warn(
-          `⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not available (isActive: ${boundAccount?.isActive}, status: ${boundAccount?.status}, schedulable: ${boundAccount?.schedulable})`
+          `⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not available (isActive: ${boundAccount?.isActive}, status: ${boundAccount?.status})`
         )
       }
     }
