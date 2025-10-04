@@ -55,6 +55,9 @@ class ClaudeRelayService {
         requestedModel: requestBody.model
       })
 
+      const isOpusModelRequest =
+        typeof requestBody?.model === 'string' && requestBody.model.toLowerCase().includes('opus')
+
       // 生成会话哈希用于sticky会话
       const sessionHash = sessionHelper.generateSessionHash(requestBody)
 
@@ -71,11 +74,43 @@ class ClaudeRelayService {
         `📤 Processing API request for key: ${apiKeyData.name || apiKeyData.id}, account: ${accountId} (${accountType})${sessionHash ? `, session: ${sessionHash}` : ''}`
       )
 
+      // 获取账户信息
+      let account = await claudeAccountService.getAccount(accountId)
+
+      if (isOpusModelRequest) {
+        await claudeAccountService.clearExpiredOpusRateLimit(accountId)
+        account = await claudeAccountService.getAccount(accountId)
+      }
+
+      const isDedicatedOfficialAccount =
+        apiKeyData.claudeAccountId &&
+        !apiKeyData.claudeAccountId.startsWith('group:') &&
+        apiKeyData.claudeAccountId === accountId
+
+      let opusRateLimitActive = false
+      let opusRateLimitEndAt = null
+      if (isOpusModelRequest) {
+        opusRateLimitActive = await claudeAccountService.isAccountOpusRateLimited(accountId)
+        opusRateLimitEndAt = account?.opusRateLimitEndAt || null
+      }
+
+      if (isOpusModelRequest && isDedicatedOfficialAccount && opusRateLimitActive) {
+        logger.warn(
+          `🚫 Dedicated account ${account?.name || accountId} is under Opus weekly limit until ${opusRateLimitEndAt}`
+        )
+        return {
+          statusCode: 403,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            error: 'opus_weekly_limit',
+            message: '此专属账号的Opus模型已达到本周使用限制，请尝试切换其他模型后再试。'
+          }),
+          accountId
+        }
+      }
+
       // 获取有效的访问token
       const accessToken = await claudeAccountService.getValidAccessToken(accountId)
-
-      // 获取账户信息
-      const account = await claudeAccountService.getAccount(accountId)
 
       // 处理请求体（传递 clientHeaders 以判断是否需要设置 Claude Code 系统提示词）
       const processedBody = this._processRequestBody(requestBody, clientHeaders, account)
@@ -181,16 +216,24 @@ class ClaudeRelayService {
         }
         // 检查是否为429状态码
         else if (response.statusCode === 429) {
-          isRateLimited = true
+          const resetHeader = response.headers
+            ? response.headers['anthropic-ratelimit-unified-reset']
+            : null
+          const parsedResetTimestamp = resetHeader ? parseInt(resetHeader, 10) : NaN
 
-          // 提取限流重置时间戳
-          if (response.headers && response.headers['anthropic-ratelimit-unified-reset']) {
-            rateLimitResetTimestamp = parseInt(
-              response.headers['anthropic-ratelimit-unified-reset']
+          if (isOpusModelRequest && !Number.isNaN(parsedResetTimestamp)) {
+            await claudeAccountService.markAccountOpusRateLimited(accountId, parsedResetTimestamp)
+            logger.warn(
+              `🚫 Account ${accountId} hit Opus limit, resets at ${new Date(parsedResetTimestamp * 1000).toISOString()}`
             )
-            logger.info(
-              `🕐 Extracted rate limit reset timestamp: ${rateLimitResetTimestamp} (${new Date(rateLimitResetTimestamp * 1000).toISOString()})`
-            )
+          } else {
+            isRateLimited = true
+            if (!Number.isNaN(parsedResetTimestamp)) {
+              rateLimitResetTimestamp = parsedResetTimestamp
+              logger.info(
+                `🕐 Extracted rate limit reset timestamp: ${rateLimitResetTimestamp} (${new Date(rateLimitResetTimestamp * 1000).toISOString()})`
+              )
+            }
           }
         } else {
           // 检查响应体中的错误信息
@@ -812,6 +855,9 @@ class ClaudeRelayService {
         requestedModel: requestBody.model
       })
 
+      const isOpusModelRequest =
+        typeof requestBody?.model === 'string' && requestBody.model.toLowerCase().includes('opus')
+
       // 生成会话哈希用于sticky会话
       const sessionHash = sessionHelper.generateSessionHash(requestBody)
 
@@ -828,11 +874,41 @@ class ClaudeRelayService {
         `📡 Processing streaming API request with usage capture for key: ${apiKeyData.name || apiKeyData.id}, account: ${accountId} (${accountType})${sessionHash ? `, session: ${sessionHash}` : ''}`
       )
 
+      // 获取账户信息
+      let account = await claudeAccountService.getAccount(accountId)
+
+      if (isOpusModelRequest) {
+        await claudeAccountService.clearExpiredOpusRateLimit(accountId)
+        account = await claudeAccountService.getAccount(accountId)
+      }
+
+      const isDedicatedOfficialAccount =
+        apiKeyData.claudeAccountId &&
+        !apiKeyData.claudeAccountId.startsWith('group:') &&
+        apiKeyData.claudeAccountId === accountId
+
+      let opusRateLimitActive = false
+      if (isOpusModelRequest) {
+        opusRateLimitActive = await claudeAccountService.isAccountOpusRateLimited(accountId)
+      }
+
+      if (isOpusModelRequest && isDedicatedOfficialAccount && opusRateLimitActive) {
+        if (!responseStream.headersSent) {
+          responseStream.status(403)
+          responseStream.setHeader('Content-Type', 'application/json')
+        }
+        responseStream.write(
+          JSON.stringify({
+            error: 'opus_weekly_limit',
+            message: '此专属账号的Opus模型已达到本周使用限制，请尝试切换其他模型后再试。'
+          })
+        )
+        responseStream.end()
+        return
+      }
+
       // 获取有效的访问token
       const accessToken = await claudeAccountService.getValidAccessToken(accountId)
-
-      // 获取账户信息
-      const account = await claudeAccountService.getAccount(accountId)
 
       // 处理请求体（传递 clientHeaders 以判断是否需要设置 Claude Code 系统提示词）
       const processedBody = this._processRequestBody(requestBody, clientHeaders, account)
@@ -879,6 +955,9 @@ class ClaudeRelayService {
   ) {
     // 获取账户信息用于统一 User-Agent
     const account = await claudeAccountService.getAccount(accountId)
+
+    const isOpusModelRequest =
+      typeof body?.model === 'string' && body.model.toLowerCase().includes('opus')
 
     // 获取统一的 User-Agent
     const unifiedUA = await this.captureAndGetUnifiedUserAgent(clientHeaders, account)
@@ -1291,22 +1370,34 @@ class ClaudeRelayService {
 
           // 处理限流状态
           if (rateLimitDetected || res.statusCode === 429) {
-            // 提取限流重置时间戳
-            let rateLimitResetTimestamp = null
-            if (res.headers && res.headers['anthropic-ratelimit-unified-reset']) {
-              rateLimitResetTimestamp = parseInt(res.headers['anthropic-ratelimit-unified-reset'])
-              logger.info(
-                `🕐 Extracted rate limit reset timestamp from stream: ${rateLimitResetTimestamp} (${new Date(rateLimitResetTimestamp * 1000).toISOString()})`
+            const resetHeader = res.headers
+              ? res.headers['anthropic-ratelimit-unified-reset']
+              : null
+            const parsedResetTimestamp = resetHeader ? parseInt(resetHeader, 10) : NaN
+
+            if (isOpusModelRequest && !Number.isNaN(parsedResetTimestamp)) {
+              await claudeAccountService.markAccountOpusRateLimited(accountId, parsedResetTimestamp)
+              logger.warn(
+                `🚫 [Stream] Account ${accountId} hit Opus limit, resets at ${new Date(parsedResetTimestamp * 1000).toISOString()}`
+              )
+            } else {
+              const rateLimitResetTimestamp = Number.isNaN(parsedResetTimestamp)
+                ? null
+                : parsedResetTimestamp
+
+              if (!Number.isNaN(parsedResetTimestamp)) {
+                logger.info(
+                  `🕐 Extracted rate limit reset timestamp from stream: ${parsedResetTimestamp} (${new Date(parsedResetTimestamp * 1000).toISOString()})`
+                )
+              }
+
+              await unifiedClaudeScheduler.markAccountRateLimited(
+                accountId,
+                accountType,
+                sessionHash,
+                rateLimitResetTimestamp
               )
             }
-
-            // 标记账号为限流状态并删除粘性会话映射
-            await unifiedClaudeScheduler.markAccountRateLimited(
-              accountId,
-              accountType,
-              sessionHash,
-              rateLimitResetTimestamp
-            )
           } else if (res.statusCode === 200) {
             // 请求成功，清除401和500错误计数
             await this.clearUnauthorizedErrors(accountId)

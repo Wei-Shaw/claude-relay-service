@@ -1286,6 +1286,121 @@ class ClaudeAccountService {
     }
   }
 
+  // 🚫 标记账号的 Opus 限流状态（不影响其他模型调度）
+  async markAccountOpusRateLimited(accountId, rateLimitResetTimestamp = null) {
+    try {
+      const accountData = await redis.getClaudeAccount(accountId)
+      if (!accountData || Object.keys(accountData).length === 0) {
+        throw new Error('Account not found')
+      }
+
+      const updatedAccountData = { ...accountData }
+      const now = new Date()
+      updatedAccountData.opusRateLimitedAt = now.toISOString()
+
+      if (rateLimitResetTimestamp) {
+        const resetTime = new Date(rateLimitResetTimestamp * 1000)
+        updatedAccountData.opusRateLimitEndAt = resetTime.toISOString()
+        logger.warn(
+          `🚫 Account ${accountData.name} (${accountId}) reached Opus weekly cap, resets at ${resetTime.toISOString()}`
+        )
+      } else {
+        // 如果缺少准确时间戳，保留现有值但记录警告，便于后续人工干预
+        logger.warn(
+          `⚠️ Account ${accountData.name} (${accountId}) reported Opus limit without reset timestamp`
+        )
+      }
+
+      await redis.setClaudeAccount(accountId, updatedAccountData)
+      return { success: true }
+    } catch (error) {
+      logger.error(`❌ Failed to mark Opus rate limit for account: ${accountId}`, error)
+      throw error
+    }
+  }
+
+  // ✅ 清除账号的 Opus 限流状态
+  async clearAccountOpusRateLimit(accountId) {
+    try {
+      const accountData = await redis.getClaudeAccount(accountId)
+      if (!accountData || Object.keys(accountData).length === 0) {
+        return { success: true }
+      }
+
+      const updatedAccountData = { ...accountData }
+      delete updatedAccountData.opusRateLimitedAt
+      delete updatedAccountData.opusRateLimitEndAt
+
+      await redis.setClaudeAccount(accountId, updatedAccountData)
+
+      const redisKey = `claude:account:${accountId}`
+      if (redis.client && typeof redis.client.hdel === 'function') {
+        await redis.client.hdel(redisKey, 'opusRateLimitedAt', 'opusRateLimitEndAt')
+      }
+
+      logger.info(`✅ Cleared Opus rate limit state for account ${accountId}`)
+      return { success: true }
+    } catch (error) {
+      logger.error(`❌ Failed to clear Opus rate limit for account: ${accountId}`, error)
+      throw error
+    }
+  }
+
+  // 🔍 检查账号是否处于 Opus 限流状态（自动清理过期标记）
+  async isAccountOpusRateLimited(accountId) {
+    try {
+      const accountData = await redis.getClaudeAccount(accountId)
+      if (!accountData || Object.keys(accountData).length === 0) {
+        return false
+      }
+
+      if (!accountData.opusRateLimitEndAt) {
+        return false
+      }
+
+      const resetTime = new Date(accountData.opusRateLimitEndAt)
+      if (Number.isNaN(resetTime.getTime())) {
+        await this.clearAccountOpusRateLimit(accountId)
+        return false
+      }
+
+      const now = new Date()
+      if (now >= resetTime) {
+        await this.clearAccountOpusRateLimit(accountId)
+        return false
+      }
+
+      return true
+    } catch (error) {
+      logger.error(`❌ Failed to check Opus rate limit status for account: ${accountId}`, error)
+      return false
+    }
+  }
+
+  // ♻️ 检查并清理已过期的 Opus 限流标记
+  async clearExpiredOpusRateLimit(accountId) {
+    try {
+      const accountData = await redis.getClaudeAccount(accountId)
+      if (!accountData || Object.keys(accountData).length === 0) {
+        return { success: true }
+      }
+
+      if (!accountData.opusRateLimitEndAt) {
+        return { success: true }
+      }
+
+      const resetTime = new Date(accountData.opusRateLimitEndAt)
+      if (Number.isNaN(resetTime.getTime()) || new Date() >= resetTime) {
+        await this.clearAccountOpusRateLimit(accountId)
+      }
+
+      return { success: true }
+    } catch (error) {
+      logger.error(`❌ Failed to clear expired Opus rate limit for account: ${accountId}`, error)
+      throw error
+    }
+  }
+
   // ✅ 移除账号的限流状态
   async removeAccountRateLimit(accountId) {
     try {
