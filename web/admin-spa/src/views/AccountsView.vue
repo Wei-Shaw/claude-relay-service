@@ -607,8 +607,18 @@
                     >
                   </span>
                   <span
+                    v-if="isOpusRateLimited(account)"
+                    class="inline-flex items-center whitespace-nowrap rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-800 dark:bg-orange-900/30 dark:text-orange-300"
+                  >
+                    <i class="fas fa-gem mr-1 flex-shrink-0" />
+                    <span class="flex-shrink-0">Opus限流</span>
+                    <span v-if="account.opusRateLimitEndAt" class="ml-1 flex-shrink-0">
+                      ({{ formatOpusLimitEndTime(account.opusRateLimitEndAt) }})
+                    </span>
+                  </span>
+                  <span
                     v-if="account.schedulable === false"
-                    class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700"
+                    class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700 dark:bg-gray-700 dark:text-gray-300"
                   >
                     <i class="fas fa-pause-circle mr-1" />
                     不可调度
@@ -2489,6 +2499,54 @@ const formatRateLimitTime = (minutes) => {
     // 不到1小时，只显示分钟
     return `${mins}分钟`
   }
+}
+
+// 检查账户是否处于 Opus 限流状态
+const isOpusRateLimited = (account) => {
+  if (!account.opusRateLimitEndAt) {
+    return false
+  }
+  const endTime = new Date(account.opusRateLimitEndAt)
+  const now = new Date()
+  return endTime > now
+}
+
+// 格式化 Opus 限流结束时间
+const formatOpusLimitEndTime = (endTimeStr) => {
+  if (!endTimeStr) return ''
+
+  const endTime = new Date(endTimeStr)
+  const now = new Date()
+
+  // 如果已经过期，返回"已解除"
+  if (endTime <= now) {
+    return '已解除'
+  }
+
+  // 计算剩余时间（毫秒）
+  const remainingMs = endTime - now
+  const remainingMinutes = Math.floor(remainingMs / (1000 * 60))
+
+  // 计算天数、小时和分钟
+  const days = Math.floor(remainingMinutes / 1440)
+  const remainingAfterDays = remainingMinutes % 1440
+  const hours = Math.floor(remainingAfterDays / 60)
+  const mins = remainingAfterDays % 60
+
+  // 格式化显示
+  const parts = []
+  if (days > 0) {
+    parts.push(`${days}天`)
+  }
+  if (hours > 0) {
+    parts.push(`${hours}小时`)
+  }
+  if (mins > 0 && days === 0) {
+    // 只有在天数为0时才显示分钟
+    parts.push(`${mins}分钟`)
+  }
+
+  return parts.join('')
 }
 
 // 打开创建账户模态框

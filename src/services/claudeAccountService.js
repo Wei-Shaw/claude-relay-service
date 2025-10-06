@@ -528,7 +528,10 @@ class ClaudeAccountService {
             useUnifiedClientId: account.useUnifiedClientId === 'true', // 默认为false
             unifiedClientId: account.unifiedClientId || '', // 统一的客户端标识
             // 添加停止原因
-            stoppedReason: account.stoppedReason || null
+            stoppedReason: account.stoppedReason || null,
+            // 添加 Opus 限流信息
+            opusRateLimitedAt: account.opusRateLimitedAt || null,
+            opusRateLimitEndAt: account.opusRateLimitEndAt || null
           }
         })
       )
