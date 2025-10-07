@@ -102,11 +102,32 @@ async function handleMessagesRequest(req, res) {
 
       // 使用统一调度选择账号（传递请求的模型）
       const requestedModel = req.body.model
-      const { accountId, accountType } = await unifiedClaudeScheduler.selectAccountForApiKey(
-        req.apiKey,
-        sessionHash,
-        requestedModel
-      )
+      let accountId
+      let accountType
+      try {
+        const selection = await unifiedClaudeScheduler.selectAccountForApiKey(
+          req.apiKey,
+          sessionHash,
+          requestedModel
+        )
+        ;({ accountId, accountType } = selection)
+      } catch (error) {
+        if (error.code === 'CLAUDE_DEDICATED_RATE_LIMITED') {
+          const limitMessage = claudeRelayService._buildStandardRateLimitMessage(
+            error.rateLimitEndAt
+          )
+          res.status(403)
+          res.setHeader('Content-Type', 'application/json')
+          res.end(
+            JSON.stringify({
+              error: 'upstream_rate_limited',
+              message: limitMessage
+            })
+          )
+          return
+        }
+        throw error
+      }
 
       // 根据账号类型选择对应的转发服务并调用
       if (accountType === 'claude-official') {
@@ -513,11 +534,27 @@ async function handleMessagesRequest(req, res) {
 
       // 使用统一调度选择账号（传递请求的模型）
       const requestedModel = req.body.model
-      const { accountId, accountType } = await unifiedClaudeScheduler.selectAccountForApiKey(
-        req.apiKey,
-        sessionHash,
-        requestedModel
-      )
+      let accountId
+      let accountType
+      try {
+        const selection = await unifiedClaudeScheduler.selectAccountForApiKey(
+          req.apiKey,
+          sessionHash,
+          requestedModel
+        )
+        ;({ accountId, accountType } = selection)
+      } catch (error) {
+        if (error.code === 'CLAUDE_DEDICATED_RATE_LIMITED') {
+          const limitMessage = claudeRelayService._buildStandardRateLimitMessage(
+            error.rateLimitEndAt
+          )
+          return res.status(403).json({
+            error: 'upstream_rate_limited',
+            message: limitMessage
+          })
+        }
+        throw error
+      }
 
       // 根据账号类型选择对应的转发服务
       let response

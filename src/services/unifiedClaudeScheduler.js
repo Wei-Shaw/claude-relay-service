@@ -131,6 +131,10 @@ class UnifiedClaudeScheduler {
       logger.debug(
         `🔍 Model parsing - Original: ${requestedModel}, Vendor: ${vendor}, Effective: ${effectiveModel}`
       )
+      const isOpusRequest =
+        effectiveModel && typeof effectiveModel === 'string'
+          ? effectiveModel.toLowerCase().includes('opus')
+          : false
 
       // 如果是 CCR 前缀，只在 CCR 账户池中选择
       if (vendor === 'ccr') {
@@ -155,22 +159,36 @@ class UnifiedClaudeScheduler {
 
         // 普通专属账户
         const boundAccount = await redis.getClaudeAccount(apiKeyData.claudeAccountId)
-        if (
-          boundAccount &&
-          boundAccount.isActive === 'true' &&
-          boundAccount.status !== 'error' &&
-          this._isSchedulable(boundAccount.schedulable)
-        ) {
-          logger.info(
-            `🎯 Using bound dedicated Claude OAuth account: ${boundAccount.name} (${apiKeyData.claudeAccountId}) for API key ${apiKeyData.name}`
-          )
-          return {
-            accountId: apiKeyData.claudeAccountId,
-            accountType: 'claude-official'
+        if (boundAccount && boundAccount.isActive === 'true' && boundAccount.status !== 'error') {
+          const isRateLimited = await claudeAccountService.isAccountRateLimited(boundAccount.id)
+          if (isRateLimited) {
+            const rateInfo = await claudeAccountService.getAccountRateLimitInfo(boundAccount.id)
+            const error = new Error('Dedicated Claude account is rate limited')
+            error.code = 'CLAUDE_DEDICATED_RATE_LIMITED'
+            error.accountId = boundAccount.id
+            error.rateLimitEndAt = rateInfo?.rateLimitEndAt || boundAccount.rateLimitEndAt || null
+            throw error
+          }
+
+          if (!this._isSchedulable(boundAccount.schedulable)) {
+            logger.warn(
+              `⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not schedulable (schedulable: ${boundAccount?.schedulable}), falling back to pool`
+            )
+          } else {
+            if (isOpusRequest) {
+              await claudeAccountService.clearExpiredOpusRateLimit(boundAccount.id)
+            }
+            logger.info(
+              `🎯 Using bound dedicated Claude OAuth account: ${boundAccount.name} (${apiKeyData.claudeAccountId}) for API key ${apiKeyData.name}`
+            )
+            return {
+              accountId: apiKeyData.claudeAccountId,
+              accountType: 'claude-official'
+            }
           }
         } else {
           logger.warn(
-            `⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not available (isActive: ${boundAccount?.isActive}, status: ${boundAccount?.status}, schedulable: ${boundAccount?.schedulable}), falling back to pool`
+            `⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not available (isActive: ${boundAccount?.isActive}, status: ${boundAccount?.status}), falling back to pool`
           )
         }
       }
@@ -313,6 +331,10 @@ class UnifiedClaudeScheduler {
   // 📋 获取所有可用账户（合并官方和Console）
   async _getAllAvailableAccounts(apiKeyData, requestedModel = null, includeCcr = false) {
     const availableAccounts = []
+    const isOpusRequest =
+      requestedModel && typeof requestedModel === 'string'
+        ? requestedModel.toLowerCase().includes('opus')
+        : false
 
     // 如果API Key绑定了专属账户，优先返回
     // 1. 检查Claude OAuth账户绑定
@@ -323,11 +345,23 @@ class UnifiedClaudeScheduler {
         boundAccount.isActive === 'true' &&
         boundAccount.status !== 'error' &&
         boundAccount.status !== 'blocked' &&
-        boundAccount.status !== 'temp_error' &&
-        this._isSchedulable(boundAccount.schedulable)
+        boundAccount.status !== 'temp_error'
       ) {
         const isRateLimited = await claudeAccountService.isAccountRateLimited(boundAccount.id)
-        if (!isRateLimited) {
+        if (isRateLimited) {
+          const rateInfo = await claudeAccountService.getAccountRateLimitInfo(boundAccount.id)
+          const error = new Error('Dedicated Claude account is rate limited')
+          error.code = 'CLAUDE_DEDICATED_RATE_LIMITED'
+          error.accountId = boundAccount.id
+          error.rateLimitEndAt = rateInfo?.rateLimitEndAt || boundAccount.rateLimitEndAt || null
+          throw error
+        }
+
+        if (!this._isSchedulable(boundAccount.schedulable)) {
+          logger.warn(
+            `⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not schedulable (schedulable: ${boundAccount?.schedulable})`
+          )
+        } else {
           logger.info(
             `🎯 Using bound dedicated Claude OAuth account: ${boundAccount.name} (${apiKeyData.claudeAccountId})`
           )
@@ -343,7 +377,7 @@ class UnifiedClaudeScheduler {
         }
       } else {
         logger.warn(
-          `⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not available (isActive: ${boundAccount?.isActive}, status: ${boundAccount?.status}, schedulable: ${boundAccount?.schedulable})`
+          `⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not available (isActive: ${boundAccount?.isActive}, status: ${boundAccount?.status})`
         )
       }
     }
@@ -447,15 +481,27 @@ class UnifiedClaudeScheduler {
 
         // 检查是否被限流
         const isRateLimited = await claudeAccountService.isAccountRateLimited(account.id)
-        if (!isRateLimited) {
-          availableAccounts.push({
-            ...account,
-            accountId: account.id,
-            accountType: 'claude-official',
-            priority: parseInt(account.priority) || 50, // 默认优先级50
-            lastUsedAt: account.lastUsedAt || '0'
-          })
+        if (isRateLimited) {
+          continue
         }
+
+        if (isOpusRequest) {
+          const isOpusRateLimited = await claudeAccountService.isAccountOpusRateLimited(account.id)
+          if (isOpusRateLimited) {
+            logger.info(
+              `🚫 Skipping account ${account.name} (${account.id}) due to active Opus limit`
+            )
+            continue
+          }
+        }
+
+        availableAccounts.push({
+          ...account,
+          accountId: account.id,
+          accountType: 'claude-official',
+          priority: parseInt(account.priority) || 50, // 默认优先级50
+          lastUsedAt: account.lastUsedAt || '0'
+        })
       }
     }
 
@@ -665,7 +711,23 @@ class UnifiedClaudeScheduler {
         // 检查是否限流或过载
         const isRateLimited = await claudeAccountService.isAccountRateLimited(accountId)
         const isOverloaded = await claudeAccountService.isAccountOverloaded(accountId)
-        return !isRateLimited && !isOverloaded
+        if (isRateLimited || isOverloaded) {
+          return false
+        }
+
+        if (
+          requestedModel &&
+          typeof requestedModel === 'string' &&
+          requestedModel.toLowerCase().includes('opus')
+        ) {
+          const isOpusRateLimited = await claudeAccountService.isAccountOpusRateLimited(accountId)
+          if (isOpusRateLimited) {
+            logger.info(`🚫 Account ${accountId} skipped due to active Opus limit (session check)`)
+            return false
+          }
+        }
+
+        return true
       } else if (accountType === 'claude-console') {
         const account = await claudeConsoleAccountService.getAccount(accountId)
         if (!account || !account.isActive) {
@@ -1056,6 +1118,10 @@ class UnifiedClaudeScheduler {
       }
 
       const availableAccounts = []
+      const isOpusRequest =
+        requestedModel && typeof requestedModel === 'string'
+          ? requestedModel.toLowerCase().includes('opus')
+          : false
 
       // 获取所有成员账户的详细信息
       for (const memberId of memberIds) {
@@ -1115,15 +1181,29 @@ class UnifiedClaudeScheduler {
 
           // 检查是否被限流
           const isRateLimited = await this.isAccountRateLimited(account.id, accountType)
-          if (!isRateLimited) {
-            availableAccounts.push({
-              ...account,
-              accountId: account.id,
-              accountType,
-              priority: parseInt(account.priority) || 50,
-              lastUsedAt: account.lastUsedAt || '0'
-            })
+          if (isRateLimited) {
+            continue
           }
+
+          if (accountType === 'claude-official' && isOpusRequest) {
+            const isOpusRateLimited = await claudeAccountService.isAccountOpusRateLimited(
+              account.id
+            )
+            if (isOpusRateLimited) {
+              logger.info(
+                `🚫 Skipping group member ${account.name} (${account.id}) due to active Opus limit`
+              )
+              continue
+            }
+          }
+
+          availableAccounts.push({
+            ...account,
+            accountId: account.id,
+            accountType,
+            priority: parseInt(account.priority) || 50,
+            lastUsedAt: account.lastUsedAt || '0'
+          })
         }
       }
 

@@ -21,6 +21,17 @@ class ClaudeAccountService {
   constructor() {
     this.claudeApiUrl = 'https://console.anthropic.com/v1/oauth/token'
     this.claudeOauthClientId = '9d1c250a-e61b-44d9-88ed-5944d1962f5e'
+    let maxWarnings = parseInt(process.env.CLAUDE_5H_WARNING_MAX_NOTIFICATIONS || '', 10)
+
+    if (Number.isNaN(maxWarnings) && config.claude?.fiveHourWarning) {
+      maxWarnings = parseInt(config.claude.fiveHourWarning.maxNotificationsPerWindow, 10)
+    }
+
+    if (Number.isNaN(maxWarnings) || maxWarnings < 1) {
+      maxWarnings = 1
+    }
+
+    this.maxFiveHourWarningsPerWindow = Math.min(maxWarnings, 10)
 
     // 加密相关常量
     this.ENCRYPTION_ALGORITHM = 'aes-256-cbc'
@@ -683,6 +694,8 @@ class ClaudeAccountService {
         delete updatedData.stoppedReason
         shouldClearAutoStopFields = true
 
+        await this._clearFiveHourWarningMetadata(accountId, updatedData)
+
         // 如果是手动启用调度，记录日志
         if (updates.schedulable === true || updates.schedulable === 'true') {
           logger.info(`✅ Manually enabled scheduling for account ${accountId}`)
@@ -1273,6 +1286,121 @@ class ClaudeAccountService {
     }
   }
 
+  // 🚫 标记账号的 Opus 限流状态（不影响其他模型调度）
+  async markAccountOpusRateLimited(accountId, rateLimitResetTimestamp = null) {
+    try {
+      const accountData = await redis.getClaudeAccount(accountId)
+      if (!accountData || Object.keys(accountData).length === 0) {
+        throw new Error('Account not found')
+      }
+
+      const updatedAccountData = { ...accountData }
+      const now = new Date()
+      updatedAccountData.opusRateLimitedAt = now.toISOString()
+
+      if (rateLimitResetTimestamp) {
+        const resetTime = new Date(rateLimitResetTimestamp * 1000)
+        updatedAccountData.opusRateLimitEndAt = resetTime.toISOString()
+        logger.warn(
+          `🚫 Account ${accountData.name} (${accountId}) reached Opus weekly cap, resets at ${resetTime.toISOString()}`
+        )
+      } else {
+        // 如果缺少准确时间戳，保留现有值但记录警告，便于后续人工干预
+        logger.warn(
+          `⚠️ Account ${accountData.name} (${accountId}) reported Opus limit without reset timestamp`
+        )
+      }
+
+      await redis.setClaudeAccount(accountId, updatedAccountData)
+      return { success: true }
+    } catch (error) {
+      logger.error(`❌ Failed to mark Opus rate limit for account: ${accountId}`, error)
+      throw error
+    }
+  }
+
+  // ✅ 清除账号的 Opus 限流状态
+  async clearAccountOpusRateLimit(accountId) {
+    try {
+      const accountData = await redis.getClaudeAccount(accountId)
+      if (!accountData || Object.keys(accountData).length === 0) {
+        return { success: true }
+      }
+
+      const updatedAccountData = { ...accountData }
+      delete updatedAccountData.opusRateLimitedAt
+      delete updatedAccountData.opusRateLimitEndAt
+
+      await redis.setClaudeAccount(accountId, updatedAccountData)
+
+      const redisKey = `claude:account:${accountId}`
+      if (redis.client && typeof redis.client.hdel === 'function') {
+        await redis.client.hdel(redisKey, 'opusRateLimitedAt', 'opusRateLimitEndAt')
+      }
+
+      logger.info(`✅ Cleared Opus rate limit state for account ${accountId}`)
+      return { success: true }
+    } catch (error) {
+      logger.error(`❌ Failed to clear Opus rate limit for account: ${accountId}`, error)
+      throw error
+    }
+  }
+
+  // 🔍 检查账号是否处于 Opus 限流状态（自动清理过期标记）
+  async isAccountOpusRateLimited(accountId) {
+    try {
+      const accountData = await redis.getClaudeAccount(accountId)
+      if (!accountData || Object.keys(accountData).length === 0) {
+        return false
+      }
+
+      if (!accountData.opusRateLimitEndAt) {
+        return false
+      }
+
+      const resetTime = new Date(accountData.opusRateLimitEndAt)
+      if (Number.isNaN(resetTime.getTime())) {
+        await this.clearAccountOpusRateLimit(accountId)
+        return false
+      }
+
+      const now = new Date()
+      if (now >= resetTime) {
+        await this.clearAccountOpusRateLimit(accountId)
+        return false
+      }
+
+      return true
+    } catch (error) {
+      logger.error(`❌ Failed to check Opus rate limit status for account: ${accountId}`, error)
+      return false
+    }
+  }
+
+  // ♻️ 检查并清理已过期的 Opus 限流标记
+  async clearExpiredOpusRateLimit(accountId) {
+    try {
+      const accountData = await redis.getClaudeAccount(accountId)
+      if (!accountData || Object.keys(accountData).length === 0) {
+        return { success: true }
+      }
+
+      if (!accountData.opusRateLimitEndAt) {
+        return { success: true }
+      }
+
+      const resetTime = new Date(accountData.opusRateLimitEndAt)
+      if (Number.isNaN(resetTime.getTime()) || new Date() >= resetTime) {
+        await this.clearAccountOpusRateLimit(accountId)
+      }
+
+      return { success: true }
+    } catch (error) {
+      logger.error(`❌ Failed to clear expired Opus rate limit for account: ${accountId}`, error)
+      throw error
+    }
+  }
+
   // ✅ 移除账号的限流状态
   async removeAccountRateLimit(accountId) {
     try {
@@ -1284,14 +1412,17 @@ class ClaudeAccountService {
       const accountKey = `claude:account:${accountId}`
 
       // 清除限流状态
+      const redisKey = `claude:account:${accountId}`
+      await redis.client.hdel(redisKey, 'rateLimitedAt', 'rateLimitStatus', 'rateLimitEndAt')
       delete accountData.rateLimitedAt
       delete accountData.rateLimitStatus
       delete accountData.rateLimitEndAt // 清除限流结束时间
 
+      const hadAutoStop = accountData.rateLimitAutoStopped === 'true'
+
       // 只恢复因限流而自动停止的账户
-      if (accountData.rateLimitAutoStopped === 'true' && accountData.schedulable === 'false') {
+      if (hadAutoStop && accountData.schedulable === 'false') {
         accountData.schedulable = 'true'
-        delete accountData.rateLimitAutoStopped
         logger.info(`✅ Auto-resuming scheduling for account ${accountId} after rate limit cleared`)
         logger.info(
           `📊 Account ${accountId} state after recovery: schedulable=${accountData.schedulable}`
@@ -1300,6 +1431,11 @@ class ClaudeAccountService {
         logger.info(
           `ℹ️ Account ${accountId} did not need auto-resume: autoStopped=${accountData.rateLimitAutoStopped}, schedulable=${accountData.schedulable}`
         )
+      }
+
+      if (hadAutoStop) {
+        await redis.client.hdel(redisKey, 'rateLimitAutoStopped')
+        delete accountData.rateLimitAutoStopped
       }
       await redis.setClaudeAccount(accountId, accountData)
 
@@ -1467,6 +1603,7 @@ class ClaudeAccountService {
       if (accountData.sessionWindowStatus) {
         delete accountData.sessionWindowStatus
         delete accountData.sessionWindowStatusUpdatedAt
+        await this._clearFiveHourWarningMetadata(accountId, accountData)
         shouldClearSessionStatus = true
       }
 
@@ -1478,6 +1615,7 @@ class ClaudeAccountService {
         accountData.schedulable = 'true'
         delete accountData.fiveHourAutoStopped
         delete accountData.fiveHourStoppedAt
+        await this._clearFiveHourWarningMetadata(accountId, accountData)
         shouldClearFiveHourFlags = true
 
         // 发送Webhook通知
@@ -1535,6 +1673,29 @@ class ClaudeAccountService {
     const endTime = new Date(startTime)
     endTime.setHours(endTime.getHours() + 5) // 加5小时
     return endTime
+  }
+
+  async _clearFiveHourWarningMetadata(accountId, accountData = null) {
+    if (accountData) {
+      delete accountData.fiveHourWarningWindow
+      delete accountData.fiveHourWarningCount
+      delete accountData.fiveHourWarningLastSentAt
+    }
+
+    try {
+      if (redis.client && typeof redis.client.hdel === 'function') {
+        await redis.client.hdel(
+          `claude:account:${accountId}`,
+          'fiveHourWarningWindow',
+          'fiveHourWarningCount',
+          'fiveHourWarningLastSentAt'
+        )
+      }
+    } catch (error) {
+      logger.warn(
+        `⚠️ Failed to clear five-hour warning metadata for account ${accountId}: ${error.message}`
+      )
+    }
   }
 
   // 📊 获取会话窗口信息
@@ -2145,6 +2306,9 @@ class ClaudeAccountService {
       delete updatedAccountData.fiveHourAutoStopped
       delete updatedAccountData.fiveHourStoppedAt
       delete updatedAccountData.tempErrorAutoStopped
+      delete updatedAccountData.fiveHourWarningWindow
+      delete updatedAccountData.fiveHourWarningCount
+      delete updatedAccountData.fiveHourWarningLastSentAt
       // 兼容旧的标记
       delete updatedAccountData.autoStoppedAt
       delete updatedAccountData.stoppedReason
@@ -2178,6 +2342,9 @@ class ClaudeAccountService {
         'rateLimitAutoStopped',
         'fiveHourAutoStopped',
         'fiveHourStoppedAt',
+        'fiveHourWarningWindow',
+        'fiveHourWarningCount',
+        'fiveHourWarningLastSentAt',
         'tempErrorAutoStopped',
         // 兼容旧的标记
         'autoStoppedAt',
@@ -2445,36 +2612,75 @@ class ClaudeAccountService {
         return
       }
 
+      const now = new Date()
+      const nowIso = now.toISOString()
+
       // 更新会话窗口状态
       accountData.sessionWindowStatus = status
-      accountData.sessionWindowStatusUpdatedAt = new Date().toISOString()
+      accountData.sessionWindowStatusUpdatedAt = nowIso
 
       // 如果状态是 allowed_warning 且账户设置了自动停止调度
       if (status === 'allowed_warning' && accountData.autoStopOnWarning === 'true') {
-        logger.warn(
-          `⚠️ Account ${accountData.name} (${accountId}) approaching 5h limit, auto-stopping scheduling`
-        )
-        accountData.schedulable = 'false'
-        // 使用独立的5小时限制自动停止标记
-        accountData.fiveHourAutoStopped = 'true'
-        accountData.fiveHourStoppedAt = new Date().toISOString()
-        // 设置停止原因，供前端显示
-        accountData.stoppedReason = '5小时使用量接近限制，已自动停止调度'
+        const alreadyAutoStopped =
+          accountData.schedulable === 'false' && accountData.fiveHourAutoStopped === 'true'
 
-        // 发送Webhook通知
-        try {
-          const webhookNotifier = require('../utils/webhookNotifier')
-          await webhookNotifier.sendAccountAnomalyNotification({
-            accountId,
-            accountName: accountData.name || 'Claude Account',
-            platform: 'claude',
-            status: 'warning',
-            errorCode: 'CLAUDE_5H_LIMIT_WARNING',
-            reason: '5小时使用量接近限制，已自动停止调度',
-            timestamp: getISOStringWithTimezone(new Date())
-          })
-        } catch (webhookError) {
-          logger.error('Failed to send webhook notification:', webhookError)
+        if (!alreadyAutoStopped) {
+          const windowIdentifier =
+            accountData.sessionWindowEnd || accountData.sessionWindowStart || 'unknown'
+
+          let warningCount = 0
+          if (accountData.fiveHourWarningWindow === windowIdentifier) {
+            const parsedCount = parseInt(accountData.fiveHourWarningCount || '0', 10)
+            warningCount = Number.isNaN(parsedCount) ? 0 : parsedCount
+          }
+
+          const maxWarningsPerWindow = this.maxFiveHourWarningsPerWindow
+
+          logger.warn(
+            `⚠️ Account ${accountData.name} (${accountId}) approaching 5h limit, auto-stopping scheduling`
+          )
+          accountData.schedulable = 'false'
+          // 使用独立的5小时限制自动停止标记
+          accountData.fiveHourAutoStopped = 'true'
+          accountData.fiveHourStoppedAt = nowIso
+          // 设置停止原因，供前端显示
+          accountData.stoppedReason = '5小时使用量接近限制，已自动停止调度'
+
+          const canSendWarning = warningCount < maxWarningsPerWindow
+          let updatedWarningCount = warningCount
+
+          accountData.fiveHourWarningWindow = windowIdentifier
+          if (canSendWarning) {
+            updatedWarningCount += 1
+            accountData.fiveHourWarningLastSentAt = nowIso
+          }
+          accountData.fiveHourWarningCount = updatedWarningCount.toString()
+
+          if (canSendWarning) {
+            // 发送Webhook通知
+            try {
+              const webhookNotifier = require('../utils/webhookNotifier')
+              await webhookNotifier.sendAccountAnomalyNotification({
+                accountId,
+                accountName: accountData.name || 'Claude Account',
+                platform: 'claude',
+                status: 'warning',
+                errorCode: 'CLAUDE_5H_LIMIT_WARNING',
+                reason: '5小时使用量接近限制，已自动停止调度',
+                timestamp: getISOStringWithTimezone(now)
+              })
+            } catch (webhookError) {
+              logger.error('Failed to send webhook notification:', webhookError)
+            }
+          } else {
+            logger.debug(
+              `⚠️ Account ${accountData.name} (${accountId}) reached max ${maxWarningsPerWindow} warning notifications for current 5h window, skipping webhook`
+            )
+          }
+        } else {
+          logger.debug(
+            `⚠️ Account ${accountData.name} (${accountId}) already auto-stopped for 5h limit, skipping duplicate warning`
+          )
         }
       }
 
@@ -2692,6 +2898,7 @@ class ClaudeAccountService {
               updatedAccountData.schedulable = 'true'
               delete updatedAccountData.fiveHourAutoStopped
               delete updatedAccountData.fiveHourStoppedAt
+              await this._clearFiveHourWarningMetadata(account.id, updatedAccountData)
               delete updatedAccountData.stoppedReason
 
               // 更新会话窗口（如果有新窗口）
