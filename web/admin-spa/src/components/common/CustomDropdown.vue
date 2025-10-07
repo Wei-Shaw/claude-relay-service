@@ -3,8 +3,12 @@
     <!-- 触发器 -->
     <div
       ref="triggerRef"
-      class="relative flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm transition-all duration-200 hover:shadow-md dark:border-gray-600 dark:bg-gray-800"
-      :class="[isOpen && 'border-blue-400 shadow-md']"
+      :aria-disabled="isDropdownDisabled"
+      class="relative flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm transition-all duration-200 hover:shadow-md dark:border-gray-600 dark:bg-gray-800"
+      :class="[
+        isOpen && !isDropdownDisabled ? 'border-blue-400 shadow-md' : '',
+        isDropdownDisabled ? 'cursor-not-allowed opacity-60 hover:shadow-none' : 'cursor-pointer'
+      ]"
       @click="toggleDropdown"
     >
       <i v-if="icon" :class="['fas', icon, 'text-sm', iconColor]"></i>
@@ -37,9 +41,31 @@
           class="fixed z-[9999] min-w-max overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-800"
           :style="dropdownStyle"
         >
+          <div v-if="searchable" class="border-b border-gray-100 px-3 py-2 dark:border-gray-700">
+            <div class="relative">
+              <i
+                class="fas fa-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 dark:text-gray-500"
+              ></i>
+              <input
+                ref="searchInputRef"
+                v-model="searchTerm"
+                class="w-full rounded-md border border-gray-200 bg-white py-1.5 pl-9 pr-3 text-sm text-gray-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
+                :placeholder="searchPlaceholder"
+                type="text"
+                @click.stop
+                @keydown.stop
+              />
+            </div>
+          </div>
           <div class="max-h-60 overflow-y-auto py-1">
             <div
-              v-for="option in options"
+              v-if="!filteredOptions.length"
+              class="px-3 py-6 text-center text-xs text-gray-400 dark:text-gray-500"
+            >
+              暂无匹配选项
+            </div>
+            <div
+              v-for="option in filteredOptions"
               :key="option.value"
               class="flex cursor-pointer items-center gap-2 whitespace-nowrap px-3 py-2 text-sm transition-colors duration-150"
               :class="[
@@ -86,6 +112,18 @@ const props = defineProps({
   iconColor: {
     type: String,
     default: 'text-gray-500'
+  },
+  searchable: {
+    type: Boolean,
+    default: false
+  },
+  searchPlaceholder: {
+    type: String,
+    default: '搜索...'
+  },
+  disabled: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -95,22 +133,50 @@ const isOpen = ref(false)
 const triggerRef = ref(null)
 const dropdownRef = ref(null)
 const dropdownStyle = ref({})
+const searchInputRef = ref(null)
+const searchTerm = ref('')
 
 const selectedLabel = computed(() => {
   const selected = props.options.find((opt) => opt.value === props.modelValue)
   return selected ? selected.label : ''
 })
 
+const isDropdownDisabled = computed(() => props.disabled || props.options.length === 0)
+
+const filteredOptions = computed(() => {
+  if (!props.searchable) {
+    return props.options
+  }
+
+  const term = searchTerm.value.trim().toLowerCase()
+  if (!term) {
+    return props.options
+  }
+
+  return props.options.filter((option) =>
+    typeof option.label === 'string' ? option.label.toLowerCase().includes(term) : false
+  )
+})
+
 const toggleDropdown = async () => {
+  if (isDropdownDisabled.value) {
+    return
+  }
+
   isOpen.value = !isOpen.value
   if (isOpen.value) {
     await nextTick()
+    searchTerm.value = ''
     updateDropdownPosition()
+    if (props.searchable && searchInputRef.value) {
+      searchInputRef.value.focus()
+    }
   }
 }
 
 const closeDropdown = () => {
   isOpen.value = false
+  searchTerm.value = ''
 }
 
 const selectOption = (option) => {

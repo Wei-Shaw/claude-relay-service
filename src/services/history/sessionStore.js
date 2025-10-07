@@ -191,36 +191,89 @@ const setSessionTitle = async (sessionId, title) => {
   await client.hset(sessionMetaKey(sessionId), 'title', title)
 }
 
-const listSessions = async (apiKeyId, { page = 1, pageSize = 20 } = {}) => {
+const listSessions = async (apiKeyId, { page = 1, pageSize = 20, keyword } = {}) => {
   const client = ensureClient()
   const indexKey = sessionsIndexKey(apiKeyId)
-  const offset = Math.max(0, (Number(page) - 1) * Number(pageSize))
-  const stop = offset + Number(pageSize) - 1
+  const normalizedKeyword =
+    typeof keyword === 'string' && keyword.trim().length > 0
+      ? keyword.trim().toLowerCase()
+      : ''
 
-  const [sessionIds, total] = await Promise.all([
-    client.zrevrange(indexKey, offset, stop),
-    client.zcard(indexKey)
-  ])
+  const fetchSessionMetas = async (sessionIds) => {
+    if (!sessionIds.length) {
+      return []
+    }
 
-  if (!sessionIds.length) {
+    const pipeline = client.multi()
+    sessionIds.forEach((sessionId) => {
+      pipeline.hgetall(sessionMetaKey(sessionId))
+    })
+    const results = await pipeline.exec()
+
+    return sessionIds.map((sessionId, index) => {
+      const [, meta] = results[index]
+      return {
+        sessionId,
+        meta: meta || {}
+      }
+    })
+  }
+
+  if (!normalizedKeyword) {
+    const offset = Math.max(0, (Number(page) - 1) * Number(pageSize))
+    const stop = offset + Number(pageSize) - 1
+
+    const [sessionIds, total] = await Promise.all([
+      client.zrevrange(indexKey, offset, stop),
+      client.zcard(indexKey)
+    ])
+
+    if (!sessionIds.length) {
+      return { sessions: [], total }
+    }
+
+    const sessions = await fetchSessionMetas(sessionIds)
+    return { sessions, total }
+  }
+
+  // Keyword search path: fetch all sessions for the API Key and filter in-memory
+  const allSessionIds = await client.zrevrange(indexKey, 0, -1)
+  if (!allSessionIds.length) {
+    return { sessions: [], total: 0 }
+  }
+
+  const allSessions = await fetchSessionMetas(allSessionIds)
+
+  const keywordMatches = allSessions.filter(({ sessionId, meta }) => {
+    const title = typeof meta.title === 'string' ? meta.title.toLowerCase() : ''
+    if (title.includes(normalizedKeyword)) {
+      return true
+    }
+
+    // Fallback to sessionId and raw metadata string search for robustness
+    if (sessionId && sessionId.toLowerCase().includes(normalizedKeyword)) {
+      return true
+    }
+
+    if (meta.metadata && typeof meta.metadata === 'string') {
+      return meta.metadata.toLowerCase().includes(normalizedKeyword)
+    }
+
+    return false
+  })
+
+  const total = keywordMatches.length
+  if (!total) {
     return { sessions: [], total }
   }
 
-  const pipeline = client.multi()
-  sessionIds.forEach((sessionId) => {
-    pipeline.hgetall(sessionMetaKey(sessionId))
-  })
-  const results = await pipeline.exec()
+  const numericPage = Math.max(1, Number(page) || 1)
+  const numericPageSize = Math.max(1, Number(pageSize) || 20)
+  const start = (numericPage - 1) * numericPageSize
+  const end = start + numericPageSize
+  const paginated = keywordMatches.slice(start, end)
 
-  const sessions = sessionIds.map((sessionId, index) => {
-    const [, meta] = results[index]
-    return {
-      sessionId,
-      meta: meta || {}
-    }
-  })
-
-  return { sessions, total }
+  return { sessions: paginated, total }
 }
 
 const getSessionMessages = async (sessionId, { start = 0, stop = -1 } = {}) => {

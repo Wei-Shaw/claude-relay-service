@@ -15,7 +15,7 @@ router.get('/sessions', async (req, res) => {
     })
   }
 
-  const { apiKeyId, page = 1, pageSize = 20 } = req.query
+  const { apiKeyId, page = 1, pageSize = 20, keyword } = req.query
 
   if (!apiKeyId) {
     return res.status(400).json({
@@ -30,7 +30,8 @@ router.get('/sessions', async (req, res) => {
   const result = await historyService.listSessions({
     apiKeyId,
     page: numericPage,
-    pageSize: numericPageSize
+    pageSize: numericPageSize,
+    keyword: typeof keyword === 'string' ? keyword.trim() : ''
   })
 
   return res.json({

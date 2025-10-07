@@ -684,13 +684,17 @@ const recordAssistantFromJson = async ({ recorder, responseJson, usage, modelOve
   })
 }
 
-const listSessions = async ({ apiKeyId, page = 1, pageSize = 20 }) => {
+const listSessions = async ({ apiKeyId, page = 1, pageSize = 20, keyword = '' }) => {
   if (!config.enabled) {
     return { sessions: [], total: 0 }
   }
 
   try {
-    const result = await sessionStore.listSessions(apiKeyId, { page, pageSize })
+    const result = await sessionStore.listSessions(apiKeyId, {
+      page,
+      pageSize,
+      keyword
+    })
     const sessions = result.sessions.map(({ sessionId, meta }) => {
       const metadata = parseJsonSafe(meta.metadata)
       return {

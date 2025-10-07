@@ -46,30 +46,84 @@
         </div>
       </div>
 
-      <div v-else class="grid gap-4 lg:grid-cols-[320px_1fr]">
-        <div class="space-y-4">
-          <section
-            class="rounded-xl border border-gray-200 bg-white/60 p-4 shadow-sm backdrop-blur-sm dark:border-gray-700 dark:bg-gray-800/60"
-          >
-            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-              >选择 API Key</label
-            >
-            <select
-              v-model="selectedApiKeyId"
-              class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm transition-all duration-200 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
-            >
-              <option disabled value="">请选择 API Key</option>
-              <option v-for="key in apiKeyOptions" :key="key.id" :value="key.id">
-                {{ key.display }}
-              </option>
-            </select>
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              列表按最近活跃时间倒序，可使用下方操作加载更多或清除会话。
-            </p>
-          </section>
+      <div v-else class="space-y-4">
+        <section
+          class="rounded-xl border border-gray-200 bg-white/70 p-4 shadow-sm backdrop-blur-sm dark:border-gray-700 dark:bg-gray-900/60"
+        >
+          <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div class="flex flex-col gap-2 sm:max-w-xs">
+              <span class="text-xs font-semibold text-purple-600 dark:text-purple-300"
+                >标签筛选</span
+              >
+              <CustomDropdown
+                v-model="selectedTag"
+                icon="fa-tags"
+                icon-color="text-purple-500"
+                :options="tagOptions"
+                placeholder="全部标签"
+              />
+            </div>
+            <div class="flex flex-col gap-2 xl:max-w-md xl:flex-1">
+              <span class="text-xs font-semibold text-blue-600 dark:text-blue-300"
+                >选择 API Key</span
+              >
+              <CustomDropdown
+                v-model="selectedApiKeyId"
+                :disabled="!filteredApiKeyOptions.length"
+                :options="filteredApiKeyOptions"
+                placeholder="请选择 API Key"
+                search-placeholder="搜索 API Key..."
+                :searchable="true"
+              />
+              <p
+                v-if="!filteredApiKeyOptions.length"
+                class="text-xs text-amber-600 dark:text-amber-300"
+              >
+                当前标签下暂无可用的 API Key，请调整标签筛选。
+              </p>
+            </div>
+            <div class="flex flex-col gap-2 xl:flex-1">
+              <span class="text-xs font-semibold text-gray-600 dark:text-gray-300"
+                >会话标题搜索</span
+              >
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div class="relative flex-1">
+                  <i
+                    class="fas fa-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 dark:text-gray-500"
+                  ></i>
+                  <input
+                    v-model="searchKeyword"
+                    class="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-700 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
+                    :disabled="isSearchDisabled"
+                    placeholder="输入标题关键字"
+                    @keydown.enter.prevent="handleKeywordSearch"
+                  />
+                </div>
+                <div class="flex gap-2 sm:w-auto">
+                  <button
+                    class="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-blue-500 dark:hover:bg-blue-600"
+                    :disabled="isSearchDisabled"
+                    @click="handleKeywordSearch"
+                  >
+                    <i class="fas fa-search"></i>
+                    搜索
+                  </button>
+                  <button
+                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-4 py-2 text-sm font-medium text-cyan-600 shadow-sm transition hover:border-cyan-300 hover:bg-cyan-100 dark:border-cyan-500/40 dark:bg-cyan-500/10 dark:text-cyan-300"
+                    @click="handleResetFilters"
+                  >
+                    <i class="fas fa-rotate-right"></i>
+                    重置
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
 
+        <div class="grid gap-4 lg:grid-cols-[360px_1fr] xl:grid-cols-[400px_1fr]">
           <section
-            class="rounded-xl border border-gray-200 bg-white/60 p-0 shadow-sm backdrop-blur-sm dark:border-gray-700 dark:bg-gray-800/60"
+            class="rounded-xl border border-gray-200 bg-white/70 p-0 shadow-sm backdrop-blur-sm dark:border-gray-700 dark:bg-gray-900/60"
           >
             <header
               class="flex items-center justify-between border-b border-gray-200 px-4 py-3 text-sm font-medium text-gray-600 dark:border-gray-700 dark:text-gray-300"
@@ -148,145 +202,145 @@
               </button>
             </footer>
           </section>
-        </div>
-
-        <div
-          class="flex flex-col rounded-xl border border-gray-200 bg-white/70 p-4 shadow-sm backdrop-blur-sm dark:border-gray-700 dark:bg-gray-900/70"
-        >
-          <template v-if="selectedSession">
-            <div
-              class="mb-4 flex flex-col gap-3 rounded-lg border border-gray-100 bg-white/80 p-4 text-sm text-gray-600 shadow-inner dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-300"
-            >
-              <div class="flex flex-wrap items-center gap-2 text-sm">
-                <span class="font-semibold text-gray-900 dark:text-gray-100">会话 ID：</span>
-                <span class="break-all text-xs text-gray-500 dark:text-gray-400">{{
-                  selectedSession.id
-                }}</span>
-              </div>
-              <div class="grid gap-2 text-xs sm:grid-cols-2 sm:text-sm">
-                <div>
-                  <span class="text-gray-500 dark:text-gray-400">创建时间：</span>
-                  <span class="text-gray-800 dark:text-gray-200">{{
-                    formatDate(selectedSession.createdAt)
-                  }}</span>
-                </div>
-                <div>
-                  <span class="text-gray-500 dark:text-gray-400">最近活跃：</span>
-                  <span class="text-gray-800 dark:text-gray-200">{{
-                    formatDate(selectedSession.lastActivity)
-                  }}</span>
-                </div>
-                <div>
-                  <span class="text-gray-500 dark:text-gray-400">消息数量：</span>
-                  <span class="text-gray-800 dark:text-gray-200">{{
-                    selectedSession.messageCount
-                  }}</span>
-                </div>
-                <div>
-                  <span class="text-gray-500 dark:text-gray-400">Token 统计：</span>
-                  <span class="text-gray-800 dark:text-gray-200">
-                    {{ selectedSession.usage?.inputTokens ?? 0 }} /
-                    {{ selectedSession.usage?.outputTokens ?? 0 }}
-                  </span>
-                </div>
-                <div v-if="selectedSession.metadata?.userAgent">
-                  <span class="text-gray-500 dark:text-gray-400">User-Agent：</span>
-                  <span class="break-all text-gray-800 dark:text-gray-200">{{
-                    selectedSession.metadata.userAgent
-                  }}</span>
-                </div>
-                <div v-if="selectedSession.metadata?.requestId">
-                  <span class="text-gray-500 dark:text-gray-400">请求 ID：</span>
-                  <span class="text-gray-800 dark:text-gray-200">{{
-                    selectedSession.metadata.requestId
-                  }}</span>
-                </div>
-              </div>
-              <div class="flex justify-end gap-2 pt-2">
-                <button
-                  class="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-600 transition-all hover:border-red-300 hover:bg-red-100 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300"
-                  @click="handleDeleteSession"
-                >
-                  <i class="fas fa-trash-alt"></i>
-                  删除会话
-                </button>
-              </div>
-            </div>
-
-            <div class="flex-1 space-y-4 overflow-y-auto overflow-x-hidden">
-              <div
-                v-for="message in messages"
-                :key="message.storedAt"
-                :class="[
-                  'w-full min-w-0 rounded-xl border px-4 py-3 shadow-sm transition-all duration-150',
-                  message.role === 'assistant'
-                    ? 'border-indigo-200 bg-indigo-50/70 dark:border-indigo-500/40 dark:bg-indigo-500/10'
-                    : 'border-gray-200 bg-white/80 dark:border-gray-700 dark:bg-gray-800/70'
-                ]"
-              >
-                <div
-                  class="mb-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
-                >
-                  <span
-                    class="font-semibold"
-                    :class="
-                      message.role === 'assistant'
-                        ? 'text-indigo-600 dark:text-indigo-200'
-                        : 'text-gray-600 dark:text-gray-300'
-                    "
-                  >
-                    {{ message.role === 'assistant' ? 'Claude' : '用户' }}
-                  </span>
-                  <span>{{ formatDate(message.createdAt || message.storedAt) }}</span>
-                </div>
-                <div
-                  class="markdown-view whitespace-pre-wrap break-words text-sm text-gray-800 dark:text-gray-100"
-                  v-html="renderMarkdown(message.content)"
-                />
-                <div v-if="message.role === 'assistant'" class="mt-2 flex justify-end">
-                  <button class="copy-btn" title="复制消息" @click="copyMessage(message.content)">
-                    <i class="fas fa-copy"></i>
-                    复制
-                  </button>
-                </div>
-                <div
-                  class="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400"
-                >
-                  <span v-if="message.model">模型：{{ message.model }}</span>
-                  <span v-if="typeof message.tokens === 'number'"
-                    >Tokens：{{ message.tokens }}</span
-                  >
-                  <span v-if="message.metadata?.finishReason"
-                    >结束原因：{{ message.metadata.finishReason }}</span
-                  >
-                  <span v-if="message.metadata?.error" class="text-red-500 dark:text-red-400"
-                    >错误：{{ message.metadata.error }}</span
-                  >
-                </div>
-              </div>
-
-              <div
-                v-if="messagesLoading"
-                class="flex items-center justify-center rounded-lg border border-gray-200 bg-white/60 p-4 text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
-              >
-                <i class="fas fa-spinner fa-spin mr-2" />
-                加载消息中...
-              </div>
-
-              <div
-                v-if="messagesError"
-                class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-500 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300"
-              >
-                {{ messagesError }}
-              </div>
-            </div>
-          </template>
 
           <div
-            v-else
-            class="flex flex-1 items-center justify-center rounded-xl border border-dashed border-gray-300 bg-white/60 p-6 text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-800/60 dark:text-gray-400"
+            class="flex flex-col rounded-xl border border-gray-200 bg-white/70 p-4 shadow-sm backdrop-blur-sm dark:border-gray-700 dark:bg-gray-900/70"
           >
-            请选择左侧会话查看消息详情
+            <template v-if="selectedSession">
+              <div
+                class="mb-4 flex flex-col gap-3 rounded-lg border border-gray-100 bg-white/80 p-4 text-sm text-gray-600 shadow-inner dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-300"
+              >
+                <div class="flex flex-wrap items-center gap-2 text-sm">
+                  <span class="font-semibold text-gray-900 dark:text-gray-100">会话 ID：</span>
+                  <span class="break-all text-xs text-gray-500 dark:text-gray-400">{{
+                    selectedSession.id
+                  }}</span>
+                </div>
+                <div class="grid gap-2 text-xs sm:grid-cols-2 sm:text-sm">
+                  <div>
+                    <span class="text-gray-500 dark:text-gray-400">创建时间：</span>
+                    <span class="text-gray-800 dark:text-gray-200">{{
+                      formatDate(selectedSession.createdAt)
+                    }}</span>
+                  </div>
+                  <div>
+                    <span class="text-gray-500 dark:text-gray-400">最近活跃：</span>
+                    <span class="text-gray-800 dark:text-gray-200">{{
+                      formatDate(selectedSession.lastActivity)
+                    }}</span>
+                  </div>
+                  <div>
+                    <span class="text-gray-500 dark:text-gray-400">消息数量：</span>
+                    <span class="text-gray-800 dark:text-gray-200">{{
+                      selectedSession.messageCount
+                    }}</span>
+                  </div>
+                  <div>
+                    <span class="text-gray-500 dark:text-gray-400">Token 统计：</span>
+                    <span class="text-gray-800 dark:text-gray-200">
+                      {{ selectedSession.usage?.inputTokens ?? 0 }} /
+                      {{ selectedSession.usage?.outputTokens ?? 0 }}
+                    </span>
+                  </div>
+                  <div v-if="selectedSession.metadata?.userAgent">
+                    <span class="text-gray-500 dark:text-gray-400">User-Agent：</span>
+                    <span class="break-all text-gray-800 dark:text-gray-200">{{
+                      selectedSession.metadata.userAgent
+                    }}</span>
+                  </div>
+                  <div v-if="selectedSession.metadata?.requestId">
+                    <span class="text-gray-500 dark:text-gray-400">请求 ID：</span>
+                    <span class="text-gray-800 dark:text-gray-200">{{
+                      selectedSession.metadata.requestId
+                    }}</span>
+                  </div>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                  <button
+                    class="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-600 transition-all hover:border-red-300 hover:bg-red-100 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300"
+                    @click="handleDeleteSession"
+                  >
+                    <i class="fas fa-trash-alt"></i>
+                    删除会话
+                  </button>
+                </div>
+              </div>
+
+              <div class="flex-1 space-y-4 overflow-y-auto overflow-x-hidden">
+                <div
+                  v-for="message in messages"
+                  :key="message.storedAt"
+                  :class="[
+                    'w-full min-w-0 rounded-xl border px-4 py-3 shadow-sm transition-all duration-150',
+                    message.role === 'assistant'
+                      ? 'border-indigo-200 bg-indigo-50/70 dark:border-indigo-500/40 dark:bg-indigo-500/10'
+                      : 'border-gray-200 bg-white/80 dark:border-gray-700 dark:bg-gray-800/70'
+                  ]"
+                >
+                  <div
+                    class="mb-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
+                  >
+                    <span
+                      class="font-semibold"
+                      :class="
+                        message.role === 'assistant'
+                          ? 'text-indigo-600 dark:text-indigo-200'
+                          : 'text-gray-600 dark:text-gray-300'
+                      "
+                    >
+                      {{ message.role === 'assistant' ? 'Claude' : '用户' }}
+                    </span>
+                    <span>{{ formatDate(message.createdAt || message.storedAt) }}</span>
+                  </div>
+                  <div
+                    class="markdown-view whitespace-pre-wrap break-words text-sm text-gray-800 dark:text-gray-100"
+                    v-html="renderMarkdown(message.content)"
+                  />
+                  <div v-if="message.role === 'assistant'" class="mt-2 flex justify-end">
+                    <button class="copy-btn" title="复制消息" @click="copyMessage(message.content)">
+                      <i class="fas fa-copy"></i>
+                      复制
+                    </button>
+                  </div>
+                  <div
+                    class="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400"
+                  >
+                    <span v-if="message.model">模型：{{ message.model }}</span>
+                    <span v-if="typeof message.tokens === 'number'"
+                      >Tokens：{{ message.tokens }}</span
+                    >
+                    <span v-if="message.metadata?.finishReason"
+                      >结束原因：{{ message.metadata.finishReason }}</span
+                    >
+                    <span v-if="message.metadata?.error" class="text-red-500 dark:text-red-400"
+                      >错误：{{ message.metadata.error }}</span
+                    >
+                  </div>
+                </div>
+
+                <div
+                  v-if="messagesLoading"
+                  class="flex items-center justify-center rounded-lg border border-gray-200 bg-white/60 p-4 text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400"
+                >
+                  <i class="fas fa-spinner fa-spin mr-2" />
+                  加载消息中...
+                </div>
+
+                <div
+                  v-if="messagesError"
+                  class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-500 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300"
+                >
+                  {{ messagesError }}
+                </div>
+              </div>
+            </template>
+
+            <div
+              v-else
+              class="flex flex-1 items-center justify-center rounded-xl border border-dashed border-gray-300 bg-white/60 p-6 text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-800/60 dark:text-gray-400"
+            >
+              请选择左侧会话查看消息详情
+            </div>
           </div>
         </div>
       </div>
@@ -295,7 +349,8 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import CustomDropdown from '@/components/common/CustomDropdown.vue'
 import { useApiKeysStore } from '@/stores/apiKeys'
 import { apiClient } from '@/config/api'
 import { formatDate, formatRelativeTime } from '@/utils/format'
@@ -303,7 +358,7 @@ import { showToast } from '@/utils/toast'
 
 const apiKeysStore = useApiKeysStore()
 
-const apiKeyOptions = computed(() =>
+const normalizedApiKeys = computed(() =>
   (apiKeysStore.apiKeys || [])
     .map((item) => {
       const id = item.id || item.keyId || item.apiKeyId || item.apiKey || item.key
@@ -311,12 +366,41 @@ const apiKeyOptions = computed(() =>
         return null
       }
       const name = item.name || item.alias || item.label
+      const tags = Array.isArray(item.tags)
+        ? item.tags
+            .map((tag) => (typeof tag === 'string' ? tag.trim() : ''))
+            .filter((tag) => tag.length > 0)
+        : []
       return {
         id,
-        display: name ? `${name} (${id})` : id
+        name,
+        display: name ? `${name} (${id})` : id,
+        tags
       }
     })
     .filter(Boolean)
+)
+
+const tagOptions = computed(() => {
+  const tagSet = new Set()
+  normalizedApiKeys.value.forEach((key) => {
+    key.tags.forEach((tag) => tagSet.add(tag))
+  })
+  const sorted = Array.from(tagSet).sort((a, b) => a.localeCompare(b))
+  return [{ value: '', label: '全部标签' }, ...sorted.map((tag) => ({ value: tag, label: tag }))]
+})
+
+const selectedTag = ref('')
+
+const filteredApiKeys = computed(() => {
+  if (!selectedTag.value) {
+    return normalizedApiKeys.value
+  }
+  return normalizedApiKeys.value.filter((key) => key.tags.includes(selectedTag.value))
+})
+
+const filteredApiKeyOptions = computed(() =>
+  filteredApiKeys.value.map((key) => ({ value: key.id, label: key.display }))
 )
 
 const apiKeysLoading = computed(() => apiKeysStore.loading)
@@ -332,6 +416,8 @@ const pageSize = 20
 const messages = ref([])
 const messagesLoading = ref(false)
 const messagesError = ref('')
+const searchKeyword = ref('')
+const appliedKeyword = ref('')
 
 const hasMoreSessions = computed(
   () => sessions.value.length < totalSessions.value && sessions.value.length >= pageSize
@@ -339,6 +425,10 @@ const hasMoreSessions = computed(
 
 const selectedSession = computed(
   () => sessions.value.find((item) => item.id === selectedSessionId.value) || null
+)
+
+const isSearchDisabled = computed(
+  () => !selectedApiKeyId.value || !filteredApiKeyOptions.value.length
 )
 
 const formatRelative = (value) => formatRelativeTime(value)
@@ -352,8 +442,15 @@ const ensureApiKeys = async () => {
     }
   }
 
-  if (!selectedApiKeyId.value && apiKeyOptions.value.length > 0) {
-    selectedApiKeyId.value = apiKeyOptions.value[0].id
+  const availableTagValues = tagOptions.value.map((item) => item.value)
+  if (!availableTagValues.includes(selectedTag.value)) {
+    selectedTag.value = ''
+  }
+
+  await nextTick()
+
+  if (!selectedApiKeyId.value && filteredApiKeyOptions.value.length > 0) {
+    selectedApiKeyId.value = filteredApiKeyOptions.value[0].value
   }
 }
 
@@ -382,13 +479,16 @@ const loadSessions = async (reset = true, options = {}) => {
 
   sessionsLoading.value = true
   try {
-    const response = await apiClient.get('/api/history/sessions', {
-      params: {
-        apiKeyId: selectedApiKeyId.value,
-        page: page.value,
-        pageSize
-      }
-    })
+    const params = {
+      apiKeyId: selectedApiKeyId.value,
+      page: page.value,
+      pageSize
+    }
+    if (appliedKeyword.value) {
+      params.keyword = appliedKeyword.value
+    }
+
+    const response = await apiClient.get('/api/history/sessions', { params })
 
     const { sessions: fetchedSessions = [], total = 0 } = response
 
@@ -526,7 +626,7 @@ const selectSession = (sessionId) => {
 }
 
 const loadMoreSessions = async () => {
-  if (sessionsLoading.value || !hasMoreSessions.value) {
+  if (sessionsLoading.value || !hasMoreSessions.value || !selectedApiKeyId.value) {
     return
   }
   page.value += 1
@@ -561,8 +661,64 @@ const handleDeleteSession = async () => {
   }
 }
 
-watch(selectedApiKeyId, () => {
-  loadSessions(true)
+const handleKeywordSearch = async () => {
+  if (!selectedApiKeyId.value) {
+    showToast('请先选择 API Key', 'warning')
+    return
+  }
+  appliedKeyword.value = searchKeyword.value.trim()
+  await loadSessions(true)
+}
+
+const handleResetFilters = async () => {
+  selectedTag.value = ''
+  searchKeyword.value = ''
+  appliedKeyword.value = ''
+  page.value = 1
+  await nextTick()
+  if (filteredApiKeyOptions.value.length) {
+    selectedApiKeyId.value = filteredApiKeyOptions.value[0].value
+  } else {
+    selectedApiKeyId.value = ''
+    await loadSessions(true)
+  }
+}
+
+watch(selectedApiKeyId, async (newId, oldId) => {
+  if (newId === oldId) {
+    return
+  }
+  if (!newId) {
+    sessions.value = []
+    totalSessions.value = 0
+    selectedSessionId.value = ''
+    messages.value = []
+    return
+  }
+  await loadSessions(true)
+})
+
+watch(selectedTag, async (newTag, oldTag) => {
+  if (newTag === oldTag) {
+    return
+  }
+  await nextTick()
+  if (!filteredApiKeyOptions.value.length) {
+    selectedApiKeyId.value = ''
+    sessions.value = []
+    totalSessions.value = 0
+    selectedSessionId.value = ''
+    messages.value = []
+    return
+  }
+  const exists = filteredApiKeyOptions.value.some(
+    (option) => option.value === selectedApiKeyId.value
+  )
+  if (!exists) {
+    selectedApiKeyId.value = filteredApiKeyOptions.value[0].value
+  } else {
+    await loadSessions(true)
+  }
 })
 
 watch(selectedSessionId, (newId, oldId) => {
