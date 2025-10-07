@@ -74,16 +74,7 @@ class ClaudeCodeValidator {
       const userAgent = req.headers['user-agent'] || ''
       const path = req.path || ''
 
-      // 1. 先检查是否是 Claude Code 的 User-Agent
-      // 支持的格式:
-      // - claude-cli/1.0.86 (external, cli) - 原有 CLI 格式
-      // - claude-cli/2.0.0 (external, claude-vscode) - VSCode 插件格式
-      // - claude-cli/x.x.x (external, sdk-py) - Python SDK 格式
-      // - claude-cli/x.x.x (external, sdk-js) - JavaScript SDK 格式
-      // - 其他 (external, claude-xxx) 或 (external, sdk-xxx) 格式
-
-      const claudeCodePattern =
-        /^claude-cli\/[\d.]+(?:[-\w]*)?\s+\(external,\s*(?:cli|claude-[\w-]+|sdk-[\w-]+)\)$/i
+      const claudeCodePattern = /^claude-cli\/\d+\.\d+\.\d+/i;
 
       if (!claudeCodePattern.test(userAgent)) {
         // 不是 Claude Code 的请求，此验证器不处理

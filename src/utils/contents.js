@@ -74,6 +74,11 @@ const PROMPT_DEFINITIONS = {
     title: 'Claude Agent SDK System Prompt',
     text: "You are a Claude agent, built on Anthropic's Claude Agent SDK."
   },
+  claudeOtherSystemPrompt4: {
+    category: 'system',
+    title: 'Claude Code Compact System Prompt Agent SDK2',
+    text: "You are Claude Code, Anthropic's official CLI for Claude, running within the Claude Agent SDK."
+  },
   claudeOtherSystemPromptCompact: {
     category: 'system',
     title: 'Claude Code Compact System Prompt',
