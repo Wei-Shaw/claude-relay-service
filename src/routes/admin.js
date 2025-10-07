@@ -4162,6 +4162,36 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
       gemini: 'gemini-1.5-flash'
     }
 
+    // 获取账户信息以获取创建时间
+    let accountData = null
+    let accountCreatedAt = null
+
+    try {
+      switch (platform) {
+        case 'claude':
+          accountData = await claudeAccountService.getAccount(accountId)
+          break
+        case 'claude-console':
+          accountData = await claudeConsoleAccountService.getAccount(accountId)
+          break
+        case 'openai':
+          accountData = await openaiAccountService.getAccount(accountId)
+          break
+        case 'openai-responses':
+          accountData = await openaiResponsesAccountService.getAccount(accountId)
+          break
+        case 'gemini':
+          accountData = await geminiAccountService.getAccount(accountId)
+          break
+      }
+
+      if (accountData && accountData.createdAt) {
+        accountCreatedAt = new Date(accountData.createdAt)
+      }
+    } catch (error) {
+      logger.warn(`Failed to get account data for avgDailyCost calculation: ${error.message}`)
+    }
+
     const client = redis.getClientSafe()
     const fallbackModel = fallbackModelMap[platform] || 'unknown'
     const daysCount = Math.min(Math.max(parseInt(days, 10) || 30, 1), 60)
@@ -4281,9 +4311,22 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
       })
     }
 
-    const avgDailyCost = daysCount > 0 ? totalCost / daysCount : 0
-    const avgDailyRequests = daysCount > 0 ? totalRequests / daysCount : 0
-    const avgDailyTokens = daysCount > 0 ? totalTokens / daysCount : 0
+    // 计算实际使用天数（从账户创建到现在）
+    let actualDaysForAvg = daysCount
+    if (accountCreatedAt) {
+      const now = new Date()
+      const diffTime = Math.abs(now - accountCreatedAt)
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      // 使用实际使用天数，但不超过请求的天数范围
+      actualDaysForAvg = Math.min(diffDays, daysCount)
+      // 至少为1天，避免除零
+      actualDaysForAvg = Math.max(actualDaysForAvg, 1)
+    }
+
+    // 使用实际天数计算日均值
+    const avgDailyCost = actualDaysForAvg > 0 ? totalCost / actualDaysForAvg : 0
+    const avgDailyRequests = actualDaysForAvg > 0 ? totalRequests / actualDaysForAvg : 0
+    const avgDailyTokens = actualDaysForAvg > 0 ? totalTokens / actualDaysForAvg : 0
 
     const todayData = history.length > 0 ? history[history.length - 1] : null
 
@@ -4293,6 +4336,8 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
         history,
         summary: {
           days: daysCount,
+          actualDaysUsed: actualDaysForAvg, // 实际使用的天数（用于计算日均值）
+          accountCreatedAt: accountCreatedAt ? accountCreatedAt.toISOString() : null,
           totalCost,
           totalCostFormatted: CostCalculator.formatCost(totalCost),
           totalRequests,
