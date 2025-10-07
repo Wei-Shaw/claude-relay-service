@@ -446,9 +446,10 @@ const primaryMetrics = computed(() => [
     key: 'avgCost',
     label: '日均费用',
     value: props.summary?.avgDailyCostFormatted || formatCost(props.summary?.avgDailyCost || 0),
-    subtitle: props.summary?.actualDaysUsed && props.summary?.actualDaysUsed < props.summary?.days
-      ? `基于 ${props.summary.actualDaysUsed} 天实际使用`
-      : '平均每日成本',
+    subtitle:
+      props.summary?.actualDaysUsed && props.summary?.actualDaysUsed < props.summary?.days
+        ? `基于 ${props.summary.actualDaysUsed} 天实际使用`
+        : '平均每日成本',
     icon: 'fa-wave-square',
     iconClass: 'text-purple-500'
   },
