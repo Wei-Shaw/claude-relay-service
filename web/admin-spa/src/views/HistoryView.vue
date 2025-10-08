@@ -50,9 +50,9 @@
         <section
           class="rounded-xl border border-gray-200 bg-white/70 p-4 shadow-sm backdrop-blur-sm dark:border-gray-700 dark:bg-gray-900/60"
         >
-          <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <div class="flex flex-col gap-2 sm:max-w-xs">
-              <span class="text-xs font-semibold text-purple-600 dark:text-purple-300"
+          <div class="flex flex-wrap items-end gap-3">
+            <div class="min-w-[160px]">
+              <span class="mb-2 block text-xs font-semibold text-purple-600 dark:text-purple-300"
                 >标签筛选</span
               >
               <CustomDropdown
@@ -60,11 +60,11 @@
                 icon="fa-tags"
                 icon-color="text-purple-500"
                 :options="tagOptions"
-                placeholder="全部标签"
+                placeholder="所有标签"
               />
             </div>
-            <div class="flex flex-col gap-2 xl:max-w-md xl:flex-1">
-              <span class="text-xs font-semibold text-blue-600 dark:text-blue-300"
+            <div class="min-w-[240px] flex-1 sm:max-w-sm">
+              <span class="mb-2 block text-xs font-semibold text-blue-600 dark:text-blue-300"
                 >选择 API Key</span
               >
               <CustomDropdown
@@ -77,17 +77,17 @@
               />
               <p
                 v-if="!filteredApiKeyOptions.length"
-                class="text-xs text-amber-600 dark:text-amber-300"
+                class="mt-1 text-xs text-amber-600 dark:text-amber-300"
               >
                 当前标签下暂无可用的 API Key，请调整标签筛选。
               </p>
             </div>
-            <div class="flex flex-col gap-2 xl:flex-1">
-              <span class="text-xs font-semibold text-gray-600 dark:text-gray-300"
+            <div class="flex-1">
+              <span class="mb-2 block text-xs font-semibold text-gray-600 dark:text-gray-300"
                 >会话标题搜索</span
               >
               <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div class="relative flex-1">
+                <div class="relative min-w-[200px] flex-1">
                   <i
                     class="fas fa-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 dark:text-gray-500"
                   ></i>
@@ -95,7 +95,7 @@
                     v-model="searchKeyword"
                     class="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-700 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:ring-blue-900/40"
                     :disabled="isSearchDisabled"
-                    placeholder="输入标题关键字"
+                    placeholder="输入会话标题关键字"
                     @keydown.enter.prevent="handleKeywordSearch"
                   />
                 </div>
@@ -365,7 +365,7 @@ const normalizedApiKeys = computed(() =>
       if (!id) {
         return null
       }
-      const name = item.name || item.alias || item.label
+      const name = item.name || item.alias || item.label || ''
       const tags = Array.isArray(item.tags)
         ? item.tags
             .map((tag) => (typeof tag === 'string' ? tag.trim() : ''))
@@ -374,7 +374,7 @@ const normalizedApiKeys = computed(() =>
       return {
         id,
         name,
-        display: name ? `${name} (${id})` : id,
+        display: name || id,
         tags
       }
     })
@@ -387,7 +387,10 @@ const tagOptions = computed(() => {
     key.tags.forEach((tag) => tagSet.add(tag))
   })
   const sorted = Array.from(tagSet).sort((a, b) => a.localeCompare(b))
-  return [{ value: '', label: '全部标签' }, ...sorted.map((tag) => ({ value: tag, label: tag }))]
+  return [
+    { value: '', label: '所有标签', icon: 'fa-asterisk' },
+    ...sorted.map((tag) => ({ value: tag, label: tag, icon: 'fa-tag' }))
+  ]
 })
 
 const selectedTag = ref('')
@@ -400,7 +403,11 @@ const filteredApiKeys = computed(() => {
 })
 
 const filteredApiKeyOptions = computed(() =>
-  filteredApiKeys.value.map((key) => ({ value: key.id, label: key.display }))
+  filteredApiKeys.value.map((key) => ({
+    value: key.id,
+    label: key.display,
+    tags: key.tags
+  }))
 )
 
 const apiKeysLoading = computed(() => apiKeysStore.loading)

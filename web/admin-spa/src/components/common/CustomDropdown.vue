@@ -12,11 +12,22 @@
       @click="toggleDropdown"
     >
       <i v-if="icon" :class="['fas', icon, 'text-sm', iconColor]"></i>
-      <span
-        class="select-none whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200"
-      >
-        {{ selectedLabel || placeholder }}
-      </span>
+      <div class="flex flex-wrap items-center gap-1">
+        <span
+          class="select-none whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200"
+        >
+          {{ selectedLabel || placeholder }}
+        </span>
+        <template v-if="selectedLabel && selectedTags.length">
+          <span
+            v-for="tag in selectedTags"
+            :key="`${selectedLabel}-${tag}`"
+            class="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+          >
+            {{ tag }}
+          </span>
+        </template>
+      </div>
       <i
         :class="[
           'fas fa-chevron-down ml-auto text-xs text-gray-400 transition-transform duration-200 dark:text-gray-500',
@@ -67,7 +78,7 @@
             <div
               v-for="option in filteredOptions"
               :key="option.value"
-              class="flex cursor-pointer items-center gap-2 whitespace-nowrap px-3 py-2 text-sm transition-colors duration-150"
+              class="flex cursor-pointer items-start justify-between gap-3 whitespace-nowrap px-3 py-2 text-sm transition-colors duration-150"
               :class="[
                 option.value === modelValue
                   ? 'bg-blue-50 font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
@@ -75,12 +86,22 @@
               ]"
               @click="selectOption(option)"
             >
-              <i v-if="option.icon" :class="['fas', option.icon, 'text-xs']"></i>
-              <span>{{ option.label }}</span>
-              <i
-                v-if="option.value === modelValue"
-                class="fas fa-check ml-auto pl-3 text-xs text-blue-600"
-              ></i>
+              <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-2">
+                  <i v-if="option.icon" :class="['fas', option.icon, 'text-xs']"></i>
+                  <span>{{ option.label }}</span>
+                </div>
+                <div v-if="optionTags(option).length" class="flex flex-wrap items-center gap-1">
+                  <span
+                    v-for="tag in optionTags(option)"
+                    :key="`${option.value}-${tag}`"
+                    class="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                  >
+                    {{ tag }}
+                  </span>
+                </div>
+              </div>
+              <i v-if="option.value === modelValue" class="fas fa-check text-xs text-blue-600"></i>
             </div>
           </div>
         </div>
@@ -136,10 +157,9 @@ const dropdownStyle = ref({})
 const searchInputRef = ref(null)
 const searchTerm = ref('')
 
-const selectedLabel = computed(() => {
-  const selected = props.options.find((opt) => opt.value === props.modelValue)
-  return selected ? selected.label : ''
-})
+const selectedOption = computed(() => props.options.find((opt) => opt.value === props.modelValue))
+const selectedLabel = computed(() => (selectedOption.value ? selectedOption.value.label : ''))
+const selectedTags = computed(() => optionTags(selectedOption.value))
 
 const isDropdownDisabled = computed(() => props.disabled || props.options.length === 0)
 
@@ -154,7 +174,9 @@ const filteredOptions = computed(() => {
   }
 
   return props.options.filter((option) =>
-    typeof option.label === 'string' ? option.label.toLowerCase().includes(term) : false
+    typeof option.label === 'string'
+      ? [option.label, ...optionTags(option)].join(' ').toLowerCase().includes(term)
+      : false
   )
 })
 
@@ -183,6 +205,13 @@ const selectOption = (option) => {
   emit('update:modelValue', option.value)
   emit('change', option.value)
   closeDropdown()
+}
+
+function optionTags(option) {
+  if (!option || !Array.isArray(option.tags)) {
+    return []
+  }
+  return option.tags.filter((tag) => typeof tag === 'string' && tag.trim().length > 0)
 }
 
 const updateDropdownPosition = () => {
