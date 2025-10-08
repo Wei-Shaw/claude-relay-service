@@ -1028,97 +1028,167 @@
 
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >模型映射表 (可选)</label
+                  >模型限制 (可选)</label
                 >
-                <div class="mb-3 rounded-lg bg-blue-50 p-3 dark:bg-blue-900/30">
-                  <p class="text-xs text-blue-700 dark:text-blue-400">
-                    <i class="fas fa-info-circle mr-1" />
-                    留空表示支持所有模型且不修改请求。配置映射后，左侧模型会被识别为支持的模型，右侧是实际发送的模型。
+
+                <!-- 模式切换 -->
+                <div class="mb-4 flex gap-2">
+                  <button
+                    class="flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-all"
+                    :class="
+                      modelRestrictionMode === 'whitelist'
+                        ? 'bg-blue-500 text-white shadow-md'
+                        : 'border border-gray-300 text-gray-600 hover:border-blue-300 dark:border-gray-600 dark:text-gray-400 dark:hover:border-blue-500'
+                    "
+                    type="button"
+                    @click="modelRestrictionMode = 'whitelist'"
+                  >
+                    <i class="fas fa-check-circle mr-2" />
+                    模型白名单
+                  </button>
+                  <button
+                    class="flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-all"
+                    :class="
+                      modelRestrictionMode === 'mapping'
+                        ? 'bg-purple-500 text-white shadow-md'
+                        : 'border border-gray-300 text-gray-600 hover:border-purple-300 dark:border-gray-600 dark:text-gray-400 dark:hover:border-purple-500'
+                    "
+                    type="button"
+                    @click="modelRestrictionMode = 'mapping'"
+                  >
+                    <i class="fas fa-random mr-2" />
+                    模型映射
+                  </button>
+                </div>
+
+                <!-- 白名单模式 -->
+                <div v-if="modelRestrictionMode === 'whitelist'">
+                  <div class="mb-3 rounded-lg bg-blue-50 p-3 dark:bg-blue-900/30">
+                    <p class="text-xs text-blue-700 dark:text-blue-400">
+                      <i class="fas fa-info-circle mr-1" />
+                      选择允许使用此账户的模型。留空表示支持所有模型。
+                    </p>
+                  </div>
+
+                  <!-- 模型复选框列表 -->
+                  <div class="mb-3 grid grid-cols-2 gap-2">
+                    <label
+                      v-for="model in commonModels"
+                      :key="model.value"
+                      class="flex cursor-pointer items-center rounded-lg border p-3 transition-all hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700"
+                      :class="
+                        allowedModels.includes(model.value)
+                          ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30'
+                          : 'border-gray-300'
+                      "
+                    >
+                      <input
+                        v-model="allowedModels"
+                        class="mr-2 text-blue-600 focus:ring-blue-500"
+                        type="checkbox"
+                        :value="model.value"
+                      />
+                      <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
+                        model.label
+                      }}</span>
+                    </label>
+                  </div>
+
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                    已选择 {{ allowedModels.length }} 个模型
+                    <span v-if="allowedModels.length === 0">（支持所有模型）</span>
                   </p>
                 </div>
 
-                <!-- 模型映射表 -->
-                <div class="mb-3 space-y-2">
-                  <div
-                    v-for="(mapping, index) in modelMappings"
-                    :key="index"
-                    class="flex items-center gap-2"
-                  >
-                    <input
-                      v-model="mapping.from"
-                      class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                      placeholder="原始模型名称"
-                      type="text"
-                    />
-                    <i class="fas fa-arrow-right text-gray-400 dark:text-gray-500" />
-                    <input
-                      v-model="mapping.to"
-                      class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                      placeholder="映射后的模型名称"
-                      type="text"
-                    />
-                    <button
-                      class="rounded-lg p-2 text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
-                      type="button"
-                      @click="removeModelMapping(index)"
+                <!-- 映射模式 -->
+                <div v-else>
+                  <div class="mb-3 rounded-lg bg-purple-50 p-3 dark:bg-purple-900/30">
+                    <p class="text-xs text-purple-700 dark:text-purple-400">
+                      <i class="fas fa-info-circle mr-1" />
+                      配置模型映射关系。左侧是客户端请求的模型，右侧是实际发送给API的模型。
+                    </p>
+                  </div>
+
+                  <!-- 模型映射表 -->
+                  <div class="mb-3 space-y-2">
+                    <div
+                      v-for="(mapping, index) in modelMappings"
+                      :key="index"
+                      class="flex items-center gap-2"
                     >
-                      <i class="fas fa-trash" />
+                      <input
+                        v-model="mapping.from"
+                        class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                        placeholder="原始模型名称"
+                        type="text"
+                      />
+                      <i class="fas fa-arrow-right text-gray-400 dark:text-gray-500" />
+                      <input
+                        v-model="mapping.to"
+                        class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                        placeholder="映射后的模型名称"
+                        type="text"
+                      />
+                      <button
+                        class="rounded-lg p-2 text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
+                        type="button"
+                        @click="removeModelMapping(index)"
+                      >
+                        <i class="fas fa-trash" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- 添加映射按钮 -->
+                  <button
+                    class="w-full rounded-lg border-2 border-dashed border-gray-300 px-4 py-2 text-gray-600 transition-colors hover:border-gray-400 hover:text-gray-700 dark:border-gray-600 dark:text-gray-400 dark:hover:border-gray-500 dark:hover:text-gray-300"
+                    type="button"
+                    @click="addModelMapping"
+                  >
+                    <i class="fas fa-plus mr-2" />
+                    添加模型映射
+                  </button>
+
+                  <!-- 快捷添加按钮 -->
+                  <div class="mt-3 flex flex-wrap gap-2">
+                    <button
+                      class="rounded-lg bg-blue-100 px-3 py-1 text-xs text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
+                      type="button"
+                      @click="
+                        addPresetMapping('claude-sonnet-4-20250514', 'claude-sonnet-4-20250514')
+                      "
+                    >
+                      + Sonnet 4
+                    </button>
+                    <button
+                      class="rounded-lg bg-purple-100 px-3 py-1 text-xs text-purple-700 transition-colors hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50"
+                      type="button"
+                      @click="
+                        addPresetMapping('claude-opus-4-1-20250805', 'claude-opus-4-1-20250805')
+                      "
+                    >
+                      + Opus 4.1
+                    </button>
+                    <button
+                      class="rounded-lg bg-green-100 px-3 py-1 text-xs text-green-700 transition-colors hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
+                      type="button"
+                      @click="
+                        addPresetMapping('claude-3-5-haiku-20241022', 'claude-3-5-haiku-20241022')
+                      "
+                    >
+                      + Haiku 3.5
+                    </button>
+                    <button
+                      class="rounded-lg bg-orange-100 px-3 py-1 text-xs text-orange-700 transition-colors hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:hover:bg-orange-900/50"
+                      type="button"
+                      @click="
+                        addPresetMapping('claude-opus-4-1-20250805', 'claude-sonnet-4-20250514')
+                      "
+                    >
+                      + Opus → Sonnet
                     </button>
                   </div>
                 </div>
-
-                <!-- 添加映射按钮 -->
-                <button
-                  class="w-full rounded-lg border-2 border-dashed border-gray-300 px-4 py-2 text-gray-600 transition-colors hover:border-gray-400 hover:text-gray-700 dark:border-gray-600 dark:text-gray-400 dark:hover:border-gray-500 dark:hover:text-gray-300"
-                  type="button"
-                  @click="addModelMapping"
-                >
-                  <i class="fas fa-plus mr-2" />
-                  添加模型映射
-                </button>
-
-                <!-- 快捷添加按钮 -->
-                <div class="mt-3 flex flex-wrap gap-2">
-                  <button
-                    class="rounded-lg bg-blue-100 px-3 py-1 text-xs text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
-                    type="button"
-                    @click="
-                      addPresetMapping('claude-sonnet-4-20250514', 'claude-sonnet-4-20250514')
-                    "
-                  >
-                    + Sonnet 4
-                  </button>
-                  <button
-                    class="rounded-lg bg-purple-100 px-3 py-1 text-xs text-purple-700 transition-colors hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50"
-                    type="button"
-                    @click="
-                      addPresetMapping('claude-opus-4-1-20250805', 'claude-opus-4-1-20250805')
-                    "
-                  >
-                    + Opus 4.1
-                  </button>
-                  <button
-                    class="rounded-lg bg-green-100 px-3 py-1 text-xs text-green-700 transition-colors hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
-                    type="button"
-                    @click="
-                      addPresetMapping('claude-3-5-haiku-20241022', 'claude-3-5-haiku-20241022')
-                    "
-                  >
-                    + Haiku 3.5
-                  </button>
-                  <button
-                    class="rounded-lg bg-orange-100 px-3 py-1 text-xs text-orange-700 transition-colors hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:hover:bg-orange-900/50"
-                    type="button"
-                    @click="
-                      addPresetMapping('claude-opus-4-1-20250805', 'claude-sonnet-4-20250514')
-                    "
-                  >
-                    + Opus 4.1 → Sonnet 4
-                  </button>
-                </div>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  留空表示支持所有模型。如果指定模型，请求中的模型不在列表内将不会调度到此账号
-                </p>
               </div>
 
               <div>
@@ -2184,92 +2254,168 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700"
-                >模型映射表 (可选)</label
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >模型限制 (可选)</label
               >
-              <div class="mb-3 rounded-lg bg-blue-50 p-3">
-                <p class="text-xs text-blue-700">
-                  <i class="fas fa-info-circle mr-1" />
-                  留空表示支持所有模型且不修改请求。配置映射后，左侧模型会被识别为支持的模型，右侧是实际发送的模型。
+
+              <!-- 模式切换 -->
+              <div class="mb-4 flex gap-2">
+                <button
+                  class="flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-all"
+                  :class="
+                    modelRestrictionMode === 'whitelist'
+                      ? 'bg-blue-500 text-white shadow-md'
+                      : 'border border-gray-300 text-gray-600 hover:border-blue-300 dark:border-gray-600 dark:text-gray-400 dark:hover:border-blue-500'
+                  "
+                  type="button"
+                  @click="modelRestrictionMode = 'whitelist'"
+                >
+                  <i class="fas fa-check-circle mr-2" />
+                  模型白名单
+                </button>
+                <button
+                  class="flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-all"
+                  :class="
+                    modelRestrictionMode === 'mapping'
+                      ? 'bg-purple-500 text-white shadow-md'
+                      : 'border border-gray-300 text-gray-600 hover:border-purple-300 dark:border-gray-600 dark:text-gray-400 dark:hover:border-purple-500'
+                  "
+                  type="button"
+                  @click="modelRestrictionMode = 'mapping'"
+                >
+                  <i class="fas fa-random mr-2" />
+                  模型映射
+                </button>
+              </div>
+
+              <!-- 白名单模式 -->
+              <div v-if="modelRestrictionMode === 'whitelist'">
+                <div class="mb-3 rounded-lg bg-blue-50 p-3 dark:bg-blue-900/30">
+                  <p class="text-xs text-blue-700 dark:text-blue-400">
+                    <i class="fas fa-info-circle mr-1" />
+                    选择允许使用此账户的模型。留空表示支持所有模型。
+                  </p>
+                </div>
+
+                <!-- 模型复选框列表 -->
+                <div class="mb-3 grid grid-cols-2 gap-2">
+                  <label
+                    v-for="model in commonModels"
+                    :key="model.value"
+                    class="flex cursor-pointer items-center rounded-lg border p-3 transition-all hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700"
+                    :class="
+                      allowedModels.includes(model.value)
+                        ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30'
+                        : 'border-gray-300'
+                    "
+                  >
+                    <input
+                      v-model="allowedModels"
+                      class="mr-2 text-blue-600 focus:ring-blue-500"
+                      type="checkbox"
+                      :value="model.value"
+                    />
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
+                      model.label
+                    }}</span>
+                  </label>
+                </div>
+
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  已选择 {{ allowedModels.length }} 个模型
+                  <span v-if="allowedModels.length === 0">（支持所有模型）</span>
                 </p>
               </div>
 
-              <!-- 模型映射表 -->
-              <div class="mb-3 space-y-2">
-                <div
-                  v-for="(mapping, index) in modelMappings"
-                  :key="index"
-                  class="flex items-center gap-2"
-                >
-                  <input
-                    v-model="mapping.from"
-                    class="form-input flex-1"
-                    placeholder="原始模型名称"
-                    type="text"
-                  />
-                  <i class="fas fa-arrow-right text-gray-400" />
-                  <input
-                    v-model="mapping.to"
-                    class="form-input flex-1"
-                    placeholder="映射后的模型名称"
-                    type="text"
-                  />
-                  <button
-                    class="rounded-lg p-2 text-red-500 transition-colors hover:bg-red-50"
-                    type="button"
-                    @click="removeModelMapping(index)"
+              <!-- 映射模式 -->
+              <div v-else>
+                <div class="mb-3 rounded-lg bg-purple-50 p-3 dark:bg-purple-900/30">
+                  <p class="text-xs text-purple-700 dark:text-purple-400">
+                    <i class="fas fa-info-circle mr-1" />
+                    配置模型映射关系。左侧是客户端请求的模型，右侧是实际发送给API的模型。
+                  </p>
+                </div>
+
+                <!-- 模型映射表 -->
+                <div class="mb-3 space-y-2">
+                  <div
+                    v-for="(mapping, index) in modelMappings"
+                    :key="index"
+                    class="flex items-center gap-2"
                   >
-                    <i class="fas fa-trash" />
+                    <input
+                      v-model="mapping.from"
+                      class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                      placeholder="原始模型名称"
+                      type="text"
+                    />
+                    <i class="fas fa-arrow-right text-gray-400 dark:text-gray-500" />
+                    <input
+                      v-model="mapping.to"
+                      class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                      placeholder="映射后的模型名称"
+                      type="text"
+                    />
+                    <button
+                      class="rounded-lg p-2 text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
+                      type="button"
+                      @click="removeModelMapping(index)"
+                    >
+                      <i class="fas fa-trash" />
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 添加映射按钮 -->
+                <button
+                  class="w-full rounded-lg border-2 border-dashed border-gray-300 px-4 py-2 text-gray-600 transition-colors hover:border-gray-400 hover:text-gray-700 dark:border-gray-600 dark:text-gray-400 dark:hover:border-gray-500"
+                  type="button"
+                  @click="addModelMapping"
+                >
+                  <i class="fas fa-plus mr-2" />
+                  添加模型映射
+                </button>
+
+                <!-- 快捷添加按钮 -->
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <button
+                    class="rounded-lg bg-blue-100 px-3 py-1 text-xs text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
+                    type="button"
+                    @click="
+                      addPresetMapping('claude-sonnet-4-20250514', 'claude-sonnet-4-20250514')
+                    "
+                  >
+                    + Sonnet 4
+                  </button>
+                  <button
+                    class="rounded-lg bg-purple-100 px-3 py-1 text-xs text-purple-700 transition-colors hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50"
+                    type="button"
+                    @click="
+                      addPresetMapping('claude-opus-4-1-20250805', 'claude-opus-4-1-20250805')
+                    "
+                  >
+                    + Opus 4.1
+                  </button>
+                  <button
+                    class="rounded-lg bg-green-100 px-3 py-1 text-xs text-green-700 transition-colors hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
+                    type="button"
+                    @click="
+                      addPresetMapping('claude-3-5-haiku-20241022', 'claude-3-5-haiku-20241022')
+                    "
+                  >
+                    + Haiku 3.5
+                  </button>
+                  <button
+                    class="rounded-lg bg-orange-100 px-3 py-1 text-xs text-orange-700 transition-colors hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:hover:bg-orange-900/50"
+                    type="button"
+                    @click="
+                      addPresetMapping('claude-opus-4-1-20250805', 'claude-sonnet-4-20250514')
+                    "
+                  >
+                    + Opus → Sonnet
                   </button>
                 </div>
               </div>
-
-              <!-- 添加映射按钮 -->
-              <button
-                class="w-full rounded-lg border-2 border-dashed border-gray-300 px-4 py-2 text-gray-600 transition-colors hover:border-gray-400 hover:text-gray-700"
-                type="button"
-                @click="addModelMapping"
-              >
-                <i class="fas fa-plus mr-2" />
-                添加模型映射
-              </button>
-
-              <!-- 快捷添加按钮 -->
-              <div class="mt-3 flex flex-wrap gap-2">
-                <button
-                  class="rounded-lg bg-blue-100 px-3 py-1 text-xs text-blue-700 transition-colors hover:bg-blue-200"
-                  type="button"
-                  @click="addPresetMapping('claude-sonnet-4-20250514', 'claude-sonnet-4-20250514')"
-                >
-                  + Sonnet 4
-                </button>
-                <button
-                  class="rounded-lg bg-purple-100 px-3 py-1 text-xs text-purple-700 transition-colors hover:bg-purple-200"
-                  type="button"
-                  @click="addPresetMapping('claude-opus-4-1-20250805', 'claude-opus-4-1-20250805')"
-                >
-                  + Opus 4.1
-                </button>
-                <button
-                  class="rounded-lg bg-green-100 px-3 py-1 text-xs text-green-700 transition-colors hover:bg-green-200"
-                  type="button"
-                  @click="
-                    addPresetMapping('claude-3-5-haiku-20241022', 'claude-3-5-haiku-20241022')
-                  "
-                >
-                  + Haiku 3.5
-                </button>
-                <button
-                  class="rounded-lg bg-orange-100 px-3 py-1 text-xs text-orange-700 transition-colors hover:bg-orange-200"
-                  type="button"
-                  @click="addPresetMapping('claude-opus-4-1-20250805', 'claude-sonnet-4-20250514')"
-                >
-                  + Opus 4.1 → Sonnet 4
-                </button>
-              </div>
-              <p class="mt-1 text-xs text-gray-500">
-                留空表示支持所有模型。如果指定模型，请求中的模型不在列表内将不会调度到此账号
-              </p>
             </div>
 
             <div>
@@ -2857,6 +3003,24 @@ const form = ref({
   deploymentName: props.account?.deploymentName || ''
 })
 
+// 模型限制配置
+const modelRestrictionMode = ref('whitelist') // 'whitelist' 或 'mapping'
+const allowedModels = ref([
+  // 默认勾选所有 Sonnet 和 Haiku 模型
+  'claude-sonnet-4-20250514',
+  'claude-sonnet-4-5-20250929',
+  'claude-3-5-haiku-20241022'
+]) // 白名单模式下选中的模型列表
+
+// 常用模型列表
+const commonModels = [
+  { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4', color: 'blue' },
+  { value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5', color: 'indigo' },
+  { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku', color: 'green' },
+  { value: 'claude-opus-4-20250514', label: 'Claude Opus 4', color: 'purple' },
+  { value: 'claude-opus-4-1-20250805', label: 'Claude Opus 4.1', color: 'purple' }
+]
+
 // 模型映射表数据
 const modelMappings = ref([])
 
@@ -2868,16 +3032,26 @@ const initModelMappings = () => {
       typeof props.account.supportedModels === 'object' &&
       !Array.isArray(props.account.supportedModels)
     ) {
-      modelMappings.value = Object.entries(props.account.supportedModels).map(([from, to]) => ({
-        from,
-        to
-      }))
+      const entries = Object.entries(props.account.supportedModels)
+      modelMappings.value = entries.map(([from, to]) => ({ from, to }))
+
+      // 判断是白名单模式还是映射模式
+      // 如果所有映射都是"映射到自己"，则视为白名单模式
+      const isWhitelist = entries.every(([from, to]) => from === to)
+      if (isWhitelist) {
+        modelRestrictionMode.value = 'whitelist'
+        allowedModels.value = entries.map(([from]) => from)
+      } else {
+        modelRestrictionMode.value = 'mapping'
+      }
     } else if (Array.isArray(props.account.supportedModels)) {
-      // 如果是数组格式（旧格式），转换为映射表
+      // 如果是数组格式（旧格式），转换为白名单模式
       modelMappings.value = props.account.supportedModels.map((model) => ({
         from: model,
         to: model
       }))
+      modelRestrictionMode.value = 'whitelist'
+      allowedModels.value = props.account.supportedModels
     }
   }
 }
@@ -4062,14 +4236,24 @@ const addPresetMapping = (from, to) => {
   showToast(`已添加映射: ${from} → ${to}`, 'success')
 }
 
-// 将模型映射表转换为对象格式
+// 将模型映射表转换为对象格式（根据当前模式）
 const convertMappingsToObject = () => {
   const mapping = {}
-  modelMappings.value.forEach((item) => {
-    if (item.from && item.to) {
-      mapping[item.from] = item.to
-    }
-  })
+
+  if (modelRestrictionMode.value === 'whitelist') {
+    // 白名单模式：将选中的模型映射到自己
+    allowedModels.value.forEach((model) => {
+      mapping[model] = model
+    })
+  } else {
+    // 映射模式：使用手动配置的映射表
+    modelMappings.value.forEach((item) => {
+      if (item.from && item.to) {
+        mapping[item.from] = item.to
+      }
+    })
+  }
+
   return Object.keys(mapping).length > 0 ? mapping : null
 }
 
@@ -4301,6 +4485,11 @@ const handleUnifiedClientIdChange = () => {
 onMounted(() => {
   // 初始化平台分组
   platformGroup.value = determinePlatformGroup(form.value.platform)
+
+  // 初始化模型映射表（如果是编辑模式）
+  if (isEdit.value) {
+    initModelMappings()
+  }
 
   // 获取Claude Code统一User-Agent信息
   fetchUnifiedUserAgent()
