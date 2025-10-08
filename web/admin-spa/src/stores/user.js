@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
 import { showToast } from '@/utils/toast'
+import { API_PREFIX } from '@/config/api'
 
-const API_BASE = '/users'
+const API_BASE = `${API_PREFIX}/users`
 
 export const useUserStore = defineStore('user', {
   state: () => ({

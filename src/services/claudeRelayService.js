@@ -39,17 +39,8 @@ class ClaudeRelayService {
   }
 
   // 🔍 判断是否是真实的 Claude Code 请求
-  isRealClaudeCodeRequest(requestBody, clientHeaders) {
-    // 使用 claudeCodeValidator 来进行完整的验证
-    // 注意：claudeCodeValidator.validate() 需要一个完整的 req 对象
-    // 我们需要构造一个最小化的 req 对象来满足验证器的需求
-    const mockReq = {
-      headers: clientHeaders || {},
-      body: requestBody,
-      path: '/api/v1/messages'
-    }
-
-    return ClaudeCodeValidator.validate(mockReq)
+  isRealClaudeCodeRequest(requestBody) {
+    return ClaudeCodeValidator.hasClaudeCodeSystemPrompt(requestBody)
   }
 
   // 🚀 转发请求到Claude API
@@ -151,8 +142,7 @@ class ClaudeRelayService {
       // 获取有效的访问token
       const accessToken = await claudeAccountService.getValidAccessToken(accountId)
 
-      // 处理请求体（传递 clientHeaders 以判断是否需要设置 Claude Code 系统提示词）
-      const processedBody = this._processRequestBody(requestBody, clientHeaders, account)
+      const processedBody = this._processRequestBody(requestBody, account)
 
       // 获取代理配置
       const proxyAgent = await this._getProxyAgent(accountId)
@@ -397,7 +387,7 @@ class ClaudeRelayService {
         if (
           clientHeaders &&
           Object.keys(clientHeaders).length > 0 &&
-          this.isRealClaudeCodeRequest(requestBody, clientHeaders)
+          this.isRealClaudeCodeRequest(requestBody)
         ) {
           await claudeCodeHeadersService.storeAccountHeaders(accountId, clientHeaders)
         }
@@ -444,7 +434,7 @@ class ClaudeRelayService {
   }
 
   // 🔄 处理请求体
-  _processRequestBody(body, clientHeaders = {}, account = null) {
+  _processRequestBody(body, account = null) {
     if (!body) {
       return body
     }
@@ -459,7 +449,7 @@ class ClaudeRelayService {
     this._stripTtlFromCacheControl(processedBody)
 
     // 判断是否是真实的 Claude Code 请求
-    const isRealClaudeCode = this.isRealClaudeCodeRequest(processedBody, clientHeaders)
+    const isRealClaudeCode = this.isRealClaudeCodeRequest(processedBody)
 
     // 如果不是真实的 Claude Code 请求，需要设置 Claude Code 系统提示词
     if (!isRealClaudeCode) {
@@ -760,7 +750,7 @@ class ClaudeRelayService {
     const filteredHeaders = this._filterClientHeaders(clientHeaders)
 
     // 判断是否是真实的 Claude Code 请求
-    const isRealClaudeCode = this.isRealClaudeCodeRequest(body, clientHeaders)
+    const isRealClaudeCode = this.isRealClaudeCodeRequest(body)
 
     // 如果不是真实的 Claude Code 请求，需要使用从账户获取的 Claude Code headers
     const finalHeaders = { ...filteredHeaders }
@@ -1007,8 +997,7 @@ class ClaudeRelayService {
       // 获取有效的访问token
       const accessToken = await claudeAccountService.getValidAccessToken(accountId)
 
-      // 处理请求体（传递 clientHeaders 以判断是否需要设置 Claude Code 系统提示词）
-      const processedBody = this._processRequestBody(requestBody, clientHeaders, account)
+      const processedBody = this._processRequestBody(requestBody, account)
 
       // 获取代理配置
       const proxyAgent = await this._getProxyAgent(accountId)
@@ -1065,7 +1054,7 @@ class ClaudeRelayService {
     const filteredHeaders = this._filterClientHeaders(clientHeaders)
 
     // 判断是否是真实的 Claude Code 请求
-    const isRealClaudeCode = this.isRealClaudeCodeRequest(body, clientHeaders)
+    const isRealClaudeCode = this.isRealClaudeCodeRequest(body)
 
     // 如果不是真实的 Claude Code 请求，需要使用从账户获取的 Claude Code headers
     const finalHeaders = { ...filteredHeaders }
@@ -1595,7 +1584,7 @@ class ClaudeRelayService {
             if (
               clientHeaders &&
               Object.keys(clientHeaders).length > 0 &&
-              this.isRealClaudeCodeRequest(body, clientHeaders)
+              this.isRealClaudeCodeRequest(body)
             ) {
               await claudeCodeHeadersService.storeAccountHeaders(accountId, clientHeaders)
             }
