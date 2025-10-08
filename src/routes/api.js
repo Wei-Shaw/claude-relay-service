@@ -34,8 +34,6 @@ function detectBackendFromModel(modelName) {
 
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 
-const router = express.Router()
-
 function queueRateLimitUpdate(rateLimitInfo, usageSummary, model, context = '') {
   if (!rateLimitInfo) {
     return Promise.resolve({ totalTokens: 0, totalCost: 0 })
