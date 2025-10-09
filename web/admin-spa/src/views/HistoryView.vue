@@ -497,7 +497,7 @@ const features = ref({
   thinkingCollapse: true,
   systemMessageFilter: true
 })
-const displayMode = ref('simple')
+const displayMode = ref('detailed')
 const displayModeOptions = [
   {
     value: 'simple',
