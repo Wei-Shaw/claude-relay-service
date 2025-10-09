@@ -516,6 +516,60 @@ const hasMessageInGroup = async (
   return false
 }
 
+const hasMessageWithContent = async (
+  sessionId,
+  content,
+  { roles = [], searchWindow = 200, normalized = true } = {}
+) => {
+  if (!sessionId || !content || typeof content !== 'string') {
+    return false
+  }
+
+  const trimmed = normalized ? content.trim() : content
+  if (!trimmed) {
+    return false
+  }
+
+  const client = ensureClient()
+  const listKey = sessionMessagesKey(sessionId)
+  const messages = await client.lrange(listKey, -searchWindow, -1)
+  if (!messages || !messages.length) {
+    return false
+  }
+
+  const roleSet =
+    Array.isArray(roles) && roles.length
+      ? new Set(roles.map((roleValue) => String(roleValue)))
+      : null
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const raw = messages[index]
+    if (!raw) {
+      continue
+    }
+
+    try {
+      const parsed = JSON.parse(raw)
+      if (!parsed) {
+        continue
+      }
+      if (roleSet && !roleSet.has(parsed.role)) {
+        continue
+      }
+
+      const candidate =
+        typeof parsed.content === 'string' && normalized ? parsed.content.trim() : parsed.content
+      if (candidate && candidate === trimmed) {
+        return true
+      }
+    } catch (error) {
+      logger.debug('⚠️ Failed to parse history message during content lookup:', error.message)
+    }
+  }
+
+  return false
+}
+
 const getStickySession = async (apiKeyId, stickyId) => {
   if (!stickyId) {
     return null
@@ -557,6 +611,7 @@ module.exports = {
   getLastMessageGroupId,
   findMessageGroupIdByRequestIds,
   hasMessageInGroup,
+  hasMessageWithContent,
   deleteSession,
   getStickySession,
   setStickySession,
