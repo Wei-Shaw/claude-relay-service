@@ -594,6 +594,47 @@
                             variant="compact"
                           />
 
+                          <!-- 时间窗口费用限制（无每日和总费用限制时展示） -->
+                          <div
+                            v-else-if="
+                              key.rateLimitWindow > 0 &&
+                              key.rateLimitCost > 0 &&
+                              (!key.dailyCostLimit || key.dailyCostLimit === 0) &&
+                              (!key.totalCostLimit || key.totalCostLimit === 0)
+                            "
+                            class="space-y-1.5"
+                          >
+                            <!-- 费用进度条 -->
+                            <LimitProgressBar
+                              :current="key.currentWindowCost || 0"
+                              label="窗口费用"
+                              :limit="key.rateLimitCost"
+                              type="window"
+                              variant="compact"
+                            />
+                            <!-- 重置倒计时 -->
+                            <div class="flex items-center justify-between text-[10px]">
+                              <div class="flex items-center gap-1 text-sky-600 dark:text-sky-300">
+                                <i class="fas fa-clock text-[10px]" />
+                                <span class="font-medium">{{ key.rateLimitWindow }}分钟窗口</span>
+                              </div>
+                              <span
+                                class="font-bold"
+                                :class="
+                                  key.windowRemainingSeconds > 0
+                                    ? 'text-sky-700 dark:text-sky-300'
+                                    : 'text-gray-400 dark:text-gray-500'
+                                "
+                              >
+                                {{
+                                  key.windowRemainingSeconds > 0
+                                    ? formatWindowTime(key.windowRemainingSeconds)
+                                    : '未激活'
+                                }}
+                              </span>
+                            </div>
+                          </div>
+
                           <!-- 如果没有任何限制 -->
                           <div
                             v-else
@@ -1220,6 +1261,47 @@
                     type="total"
                     variant="compact"
                   />
+
+                  <!-- 时间窗口费用限制（无每日和总费用限制时展示） -->
+                  <div
+                    v-else-if="
+                      key.rateLimitWindow > 0 &&
+                      key.rateLimitCost > 0 &&
+                      (!key.dailyCostLimit || key.dailyCostLimit === 0) &&
+                      (!key.totalCostLimit || key.totalCostLimit === 0)
+                    "
+                    class="space-y-2"
+                  >
+                    <!-- 费用进度条 -->
+                    <LimitProgressBar
+                      :current="key.currentWindowCost || 0"
+                      label="窗口费用"
+                      :limit="key.rateLimitCost"
+                      type="window"
+                      variant="compact"
+                    />
+                    <!-- 重置倒计时 -->
+                    <div class="flex items-center justify-between text-xs">
+                      <div class="flex items-center gap-1.5 text-sky-600 dark:text-sky-300">
+                        <i class="fas fa-clock text-xs" />
+                        <span class="font-medium">{{ key.rateLimitWindow }}分钟窗口</span>
+                      </div>
+                      <span
+                        class="font-bold"
+                        :class="
+                          key.windowRemainingSeconds > 0
+                            ? 'text-sky-700 dark:text-sky-300'
+                            : 'text-gray-400 dark:text-gray-500'
+                        "
+                      >
+                        {{
+                          key.windowRemainingSeconds > 0
+                            ? formatWindowTime(key.windowRemainingSeconds)
+                            : '未激活'
+                        }}
+                      </span>
+                    </div>
+                  </div>
 
                   <!-- 无限制显示 -->
                   <div
@@ -3430,6 +3512,23 @@ const formatDate = (dateString) => {
       minute: '2-digit'
     })
     .replace(/\//g, '-')
+}
+
+// 格式化时间窗口倒计时
+const formatWindowTime = (seconds) => {
+  if (seconds === null || seconds === undefined) return '--:--'
+
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const secs = seconds % 60
+
+  if (hours > 0) {
+    return `${hours}h${minutes}m`
+  } else if (minutes > 0) {
+    return `${minutes}m${secs}s`
+  } else {
+    return `${secs}s`
+  }
 }
 
 // 获取每日费用进度 - 已移到 LimitProgressBar 组件中
