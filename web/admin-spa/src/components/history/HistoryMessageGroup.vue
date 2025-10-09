@@ -366,7 +366,8 @@ const processItems = computed(() => {
       if (message.role === 'assistant') {
         switch (message.subtype) {
           case 'tool_use': {
-            label = message.metadata?.tool?.name || '工具调用'
+            const toolName = message.metadata?.tool?.name || message.metadata?.tool?.type
+            label = toolName ? `工具：${toolName}` : '工具调用'
             icon = 'fas fa-wrench'
             bodyType = 'pre'
             body = buildToolBody(message)
