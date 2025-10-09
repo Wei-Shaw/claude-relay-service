@@ -473,9 +473,11 @@
                     type="radio"
                     value="oauth"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300"
-                    >OAuth 授权 (用量可视化)</span
-                  >
+                  <span class="text-sm text-gray-700 dark:text-gray-300">
+                    OAuth 授权<span v-if="form.platform === 'claude' || form.platform === 'openai'">
+                      (用量可视化)</span
+                    >
+                  </span>
                 </label>
                 <label v-if="form.platform === 'claude'" class="flex cursor-pointer items-center">
                   <input
@@ -1448,6 +1450,12 @@
                     请输入有效的 OpenAI Access Token。如果您有 Refresh
                     Token，建议也一并填写以支持自动刷新。
                   </p>
+                  <p
+                    v-else-if="form.platform === 'droid'"
+                    class="mb-2 text-sm text-blue-800 dark:text-blue-300"
+                  >
+                    请输入有效的 Droid Access Token，并同时提供 Refresh Token 以支持自动刷新。
+                  </p>
                   <div
                     class="mb-2 mt-2 rounded-lg border border-blue-300 bg-white/80 p-3 dark:border-blue-600 dark:bg-gray-800/80"
                   >
@@ -1482,9 +1490,22 @@
                       请从已登录 OpenAI 账户的机器上获取认证凭证， 或通过 OAuth 授权流程获取 Access
                       Token。
                     </p>
+                    <p
+                      v-else-if="form.platform === 'droid'"
+                      class="text-xs text-blue-800 dark:text-blue-300"
+                    >
+                      请从已完成授权的 Droid CLI 或 Factory.ai 导出的凭证中获取 Access Token 与
+                      Refresh Token。
+                    </p>
                   </div>
-                  <p class="text-xs text-blue-600 dark:text-blue-400">
+                  <p
+                    v-if="form.platform !== 'droid'"
+                    class="text-xs text-blue-600 dark:text-blue-400"
+                  >
                     💡 如果未填写 Refresh Token，Token 过期后需要手动更新。
+                  </p>
+                  <p v-else class="text-xs text-red-600 dark:text-red-400">
+                    ⚠️ Droid 账户必须填写 Refresh Token，缺失将导致无法自动刷新 Access Token。
                   </p>
                 </div>
               </div>
@@ -1522,7 +1543,7 @@
                 </p>
               </div>
 
-              <div v-if="form.platform === 'openai'">
+              <div v-if="form.platform === 'openai' || form.platform === 'droid'">
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >Refresh Token *</label
                 >
@@ -1539,7 +1560,12 @@
                 </p>
                 <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                   <i class="fas fa-info-circle mr-1" />
-                  系统将使用 Refresh Token 自动获取 Access Token 和用户信息
+                  <template v-if="form.platform === 'openai'">
+                    系统将使用 Refresh Token 自动获取 Access Token 和用户信息
+                  </template>
+                  <template v-else>
+                    系统将使用 Refresh Token 自动刷新 Factory.ai 访问令牌，确保账户保持可用。
+                  </template>
                 </p>
               </div>
 
@@ -2769,6 +2795,8 @@ const determinePlatformGroup = (platform) => {
     return 'openai'
   } else if (platform === 'gemini') {
     return 'gemini'
+  } else if (platform === 'droid') {
+    return 'droid'
   }
   return ''
 }
@@ -2822,6 +2850,7 @@ const form = ref({
   apiUrl: props.account?.apiUrl || '',
   apiKey: props.account?.apiKey || '',
   priority: props.account?.priority || 50,
+  endpointType: props.account?.endpointType || 'anthropic',
   // OpenAI-Responses 特定字段
   baseApi: props.account?.baseApi || '',
   rateLimitDuration: props.account?.rateLimitDuration || 60,
@@ -3155,7 +3184,9 @@ const handleOAuthSuccess = async (tokenInfo) => {
         : null
     }
 
-    if (form.value.platform === 'claude') {
+    const currentPlatform = form.value.platform
+
+    if (currentPlatform === 'claude') {
       // Claude使用claudeAiOauth字段
       data.claudeAiOauth = tokenInfo.claudeAiOauth || tokenInfo
       data.priority = form.value.priority || 50
@@ -3170,7 +3201,7 @@ const handleOAuthSuccess = async (tokenInfo) => {
         hasClaudePro: form.value.subscriptionType === 'claude_pro',
         manuallySet: true // 标记为手动设置
       }
-    } else if (form.value.platform === 'gemini') {
+    } else if (currentPlatform === 'gemini') {
       // Gemini使用geminiOauth字段
       data.geminiOauth = tokenInfo.tokens || tokenInfo
       if (form.value.projectId) {
@@ -3178,17 +3209,85 @@ const handleOAuthSuccess = async (tokenInfo) => {
       }
       // 添加 Gemini 优先级
       data.priority = form.value.priority || 50
-    } else if (form.value.platform === 'openai') {
+    } else if (currentPlatform === 'openai') {
       data.openaiOauth = tokenInfo.tokens || tokenInfo
       data.accountInfo = tokenInfo.accountInfo
       data.priority = form.value.priority || 50
+    } else if (currentPlatform === 'droid') {
+      const rawTokens = tokenInfo.tokens || tokenInfo || {}
+
+      const normalizedTokens = {
+        accessToken: rawTokens.accessToken || rawTokens.access_token || '',
+        refreshToken: rawTokens.refreshToken || rawTokens.refresh_token || '',
+        expiresAt: rawTokens.expiresAt || rawTokens.expires_at || '',
+        expiresIn: rawTokens.expiresIn || rawTokens.expires_in || null,
+        tokenType: rawTokens.tokenType || rawTokens.token_type || 'Bearer',
+        organizationId: rawTokens.organizationId || rawTokens.organization_id || '',
+        authenticationMethod:
+          rawTokens.authenticationMethod || rawTokens.authentication_method || ''
+      }
+
+      if (!normalizedTokens.refreshToken) {
+        loading.value = false
+        showToast('授权成功但未返回 Refresh Token，请确认已授予离线访问权限后重试。', 'error')
+        return
+      }
+
+      data.refreshToken = normalizedTokens.refreshToken
+      data.accessToken = normalizedTokens.accessToken
+      data.expiresAt = normalizedTokens.expiresAt
+      if (normalizedTokens.expiresIn !== null && normalizedTokens.expiresIn !== undefined) {
+        data.expiresIn = normalizedTokens.expiresIn
+      }
+      data.priority = form.value.priority || 50
+      data.endpointType = form.value.endpointType || 'anthropic'
+      data.platform = 'droid'
+      data.tokenType = normalizedTokens.tokenType
+      data.authenticationMethod = normalizedTokens.authenticationMethod
+
+      if (normalizedTokens.organizationId) {
+        data.organizationId = normalizedTokens.organizationId
+      }
+
+      if (rawTokens.user) {
+        const user = rawTokens.user
+        const nameParts = []
+        if (typeof user.first_name === 'string' && user.first_name.trim()) {
+          nameParts.push(user.first_name.trim())
+        }
+        if (typeof user.last_name === 'string' && user.last_name.trim()) {
+          nameParts.push(user.last_name.trim())
+        }
+        const derivedName =
+          nameParts.join(' ').trim() ||
+          (typeof user.name === 'string' ? user.name.trim() : '') ||
+          (typeof user.display_name === 'string' ? user.display_name.trim() : '')
+
+        if (typeof user.email === 'string' && user.email.trim()) {
+          data.ownerEmail = user.email.trim()
+        }
+        if (derivedName) {
+          data.ownerName = derivedName
+          data.ownerDisplayName = derivedName
+        } else if (data.ownerEmail) {
+          data.ownerName = data.ownerName || data.ownerEmail
+          data.ownerDisplayName = data.ownerDisplayName || data.ownerEmail
+        }
+        if (typeof user.id === 'string' && user.id.trim()) {
+          data.userId = user.id.trim()
+        }
+      }
     }
 
     let result
-    if (form.value.platform === 'claude') {
+    if (currentPlatform === 'claude') {
       result = await accountsStore.createClaudeAccount(data)
-    } else if (form.value.platform === 'openai') {
+    } else if (currentPlatform === 'gemini') {
+      result = await accountsStore.createGeminiAccount(data)
+    } else if (currentPlatform === 'openai') {
       result = await accountsStore.createOpenAIAccount(data)
+    } else if (currentPlatform === 'droid') {
+      result = await accountsStore.createDroidAccount(data)
     } else {
       result = await accountsStore.createGeminiAccount(data)
     }
@@ -3227,6 +3326,7 @@ const createAccount = async () => {
   // 清除之前的错误
   errors.value.name = ''
   errors.value.accessToken = ''
+  errors.value.refreshToken = ''
   errors.value.apiUrl = ''
   errors.value.apiKey = ''
 
@@ -3312,6 +3412,15 @@ const createAccount = async () => {
       // Gemini 平台需要 Access Token
       if (!form.value.accessToken || form.value.accessToken.trim() === '') {
         errors.value.accessToken = '请填写 Access Token'
+        hasError = true
+      }
+    } else if (form.value.platform === 'droid') {
+      if (!form.value.accessToken || form.value.accessToken.trim() === '') {
+        errors.value.accessToken = '请填写 Access Token'
+        hasError = true
+      }
+      if (!form.value.refreshToken || form.value.refreshToken.trim() === '') {
+        errors.value.refreshToken = '请填写 Refresh Token'
         hasError = true
       }
     } else if (form.value.platform === 'claude') {
@@ -3443,6 +3552,20 @@ const createAccount = async () => {
       data.needsImmediateRefresh = true
       data.requireRefreshSuccess = true // 必须刷新成功才能创建账户
       data.priority = form.value.priority || 50
+    } else if (form.value.platform === 'droid') {
+      const accessToken = form.value.accessToken?.trim() || ''
+      const refreshToken = form.value.refreshToken?.trim() || ''
+      const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString()
+
+      data.accessToken = accessToken
+      data.refreshToken = refreshToken
+      data.expiresAt = expiresAt
+      data.expiresIn = 8 * 60 * 60
+      data.priority = form.value.priority || 50
+      data.endpointType = form.value.endpointType || 'anthropic'
+      data.platform = 'droid'
+      data.tokenType = 'Bearer'
+      data.authenticationMethod = 'manual'
     } else if (form.value.platform === 'claude-console' || form.value.platform === 'ccr') {
       // Claude Console 和 CCR 账户特定数据（CCR 使用 Claude Console 的后端逻辑）
       data.apiUrl = form.value.apiUrl
@@ -3497,6 +3620,8 @@ const createAccount = async () => {
     } else if (form.value.platform === 'claude-console' || form.value.platform === 'ccr') {
       // CCR 使用 Claude Console 的后端 API
       result = await accountsStore.createClaudeConsoleAccount(data)
+    } else if (form.value.platform === 'droid') {
+      result = await accountsStore.createDroidAccount(data)
     } else if (form.value.platform === 'openai-responses') {
       result = await accountsStore.createOpenAIResponsesAccount(data)
     } else if (form.value.platform === 'bedrock') {
@@ -3606,6 +3731,9 @@ const updateAccount = async () => {
 
     // 只有非空时才更新token
     if (form.value.accessToken || form.value.refreshToken) {
+      const trimmedAccessToken = form.value.accessToken?.trim() || ''
+      const trimmedRefreshToken = form.value.refreshToken?.trim() || ''
+
       if (props.account.platform === 'claude') {
         // Claude需要构建claudeAiOauth对象
         const expiresInMs = form.value.refreshToken
@@ -3613,8 +3741,8 @@ const updateAccount = async () => {
           : 365 * 24 * 60 * 60 * 1000 // 1年
 
         data.claudeAiOauth = {
-          accessToken: form.value.accessToken || '',
-          refreshToken: form.value.refreshToken || '',
+          accessToken: trimmedAccessToken || '',
+          refreshToken: trimmedRefreshToken || '',
           expiresAt: Date.now() + expiresInMs,
           scopes: props.account.scopes || [] // 保持原有的 scopes，如果没有则为空数组
         }
@@ -3625,8 +3753,8 @@ const updateAccount = async () => {
           : 365 * 24 * 60 * 60 * 1000 // 1年
 
         data.geminiOauth = {
-          access_token: form.value.accessToken || '',
-          refresh_token: form.value.refreshToken || '',
+          access_token: trimmedAccessToken || '',
+          refresh_token: trimmedRefreshToken || '',
           scope: 'https://www.googleapis.com/auth/cloud-platform',
           token_type: 'Bearer',
           expiry_date: Date.now() + expiresInMs
@@ -3639,21 +3767,33 @@ const updateAccount = async () => {
 
         data.openaiOauth = {
           idToken: '', // 不需要用户输入
-          accessToken: form.value.accessToken || '',
-          refreshToken: form.value.refreshToken || '',
+          accessToken: trimmedAccessToken || '',
+          refreshToken: trimmedRefreshToken || '',
           expires_in: Math.floor(expiresInMs / 1000) // 转换为秒
         }
 
         // 编辑 OpenAI 账户时，如果更新了 Refresh Token，也需要验证
-        if (form.value.refreshToken && form.value.refreshToken !== props.account.refreshToken) {
+        if (trimmedRefreshToken && trimmedRefreshToken !== props.account.refreshToken) {
           data.needsImmediateRefresh = true
           data.requireRefreshSuccess = true
+        }
+      } else if (props.account.platform === 'droid') {
+        if (trimmedAccessToken) {
+          data.accessToken = trimmedAccessToken
+        }
+        if (trimmedRefreshToken) {
+          data.refreshToken = trimmedRefreshToken
         }
       }
     }
 
     if (props.account.platform === 'gemini') {
       data.projectId = form.value.projectId || ''
+    }
+
+    if (props.account.platform === 'droid') {
+      data.priority = form.value.priority || 50
+      data.endpointType = form.value.endpointType || 'anthropic'
     }
 
     // Claude 官方账号优先级和订阅类型更新
@@ -3771,6 +3911,8 @@ const updateAccount = async () => {
       await accountsStore.updateAzureOpenAIAccount(props.account.id, data)
     } else if (props.account.platform === 'gemini') {
       await accountsStore.updateGeminiAccount(props.account.id, data)
+    } else if (props.account.platform === 'droid') {
+      await accountsStore.updateDroidAccount(props.account.id, data)
     } else {
       throw new Error(`不支持的平台: ${props.account.platform}`)
     }
@@ -3820,6 +3962,16 @@ watch(
   () => {
     if (errors.value.accessToken && form.value.accessToken?.trim()) {
       errors.value.accessToken = ''
+    }
+  }
+)
+
+// 监听Refresh Token变化，清除错误
+watch(
+  () => form.value.refreshToken,
+  () => {
+    if (errors.value.refreshToken && form.value.refreshToken?.trim()) {
+      errors.value.refreshToken = ''
     }
   }
 )

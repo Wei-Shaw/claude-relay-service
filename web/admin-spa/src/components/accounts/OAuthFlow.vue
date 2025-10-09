@@ -464,6 +464,170 @@
       </div>
     </div>
 
+    <!-- Droid OAuth流程 -->
+    <div v-else-if="platform === 'droid'">
+      <div
+        class="rounded-lg border border-cyan-200 bg-cyan-50 p-6 dark:border-cyan-700 dark:bg-cyan-900/30"
+      >
+        <div class="flex items-start gap-4">
+          <div
+            class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-cyan-500"
+          >
+            <i class="fas fa-robot text-white" />
+          </div>
+          <div class="flex-1">
+            <h4 class="mb-3 font-semibold text-cyan-900 dark:text-cyan-200">Droid 账户授权</h4>
+            <p class="mb-4 text-sm text-cyan-800 dark:text-cyan-300">
+              请按照以下步骤完成 Factory (Droid) 账户的授权：
+            </p>
+
+            <div class="space-y-4">
+              <!-- 步骤1: 生成授权链接 -->
+              <div
+                class="rounded-lg border border-cyan-300 bg-white/80 p-4 dark:border-cyan-600 dark:bg-gray-800/80"
+              >
+                <div class="flex items-start gap-3">
+                  <div
+                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-cyan-600 text-xs font-bold text-white"
+                  >
+                    1
+                  </div>
+                  <div class="flex-1">
+                    <p class="mb-2 font-medium text-cyan-900 dark:text-cyan-200">
+                      点击下方按钮生成授权链接
+                    </p>
+                    <button
+                      v-if="!authUrl"
+                      class="btn btn-primary px-4 py-2 text-sm"
+                      :disabled="loading"
+                      @click="generateAuthUrl"
+                    >
+                      <i v-if="!loading" class="fas fa-link mr-2" />
+                      <div v-else class="loading-spinner mr-2" />
+                      {{ loading ? '生成中...' : '生成授权链接' }}
+                    </button>
+                    <div v-else class="space-y-4">
+                      <div class="space-y-2">
+                        <label class="text-xs font-semibold text-gray-600 dark:text-gray-300"
+                          >授权链接</label
+                        >
+                        <div
+                          class="flex flex-col gap-2 rounded-md border border-cyan-200 bg-white p-3 dark:border-cyan-700 dark:bg-gray-800"
+                        >
+                          <div class="flex items-center gap-2">
+                            <input
+                              class="form-input flex-1 bg-gray-50 font-mono text-xs dark:bg-gray-700"
+                              readonly
+                              type="text"
+                              :value="authUrl"
+                            />
+                            <button
+                              class="rounded-lg bg-gray-100 px-3 py-2 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
+                              title="复制链接"
+                              @click="copyAuthUrl"
+                            >
+                              <i :class="copied ? 'fas fa-check text-green-500' : 'fas fa-copy'" />
+                            </button>
+                          </div>
+                          <div class="flex flex-wrap items-center gap-2">
+                            <button
+                              class="inline-flex items-center gap-1 rounded-md border border-cyan-200 bg-white px-3 py-1.5 text-xs font-medium text-cyan-600 shadow-sm transition-colors hover:border-cyan-300 hover:bg-cyan-50 dark:border-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-200 dark:hover:border-cyan-500 dark:hover:bg-cyan-900/60"
+                              @click="openVerificationPage"
+                            >
+                              <i class="fas fa-external-link-alt text-xs" /> 在新标签中打开
+                            </button>
+                            <button
+                              class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium text-cyan-600 transition-colors hover:text-cyan-700 dark:text-cyan-300 dark:hover:text-cyan-200"
+                              @click="regenerateAuthUrl"
+                            >
+                              <i class="fas fa-sync-alt text-xs" />重新生成
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="space-y-2">
+                        <label class="text-xs font-semibold text-gray-600 dark:text-gray-300"
+                          >授权验证码</label
+                        >
+                        <div
+                          class="flex items-center justify-between rounded-md border border-cyan-200 bg-cyan-50 px-4 py-3 dark:border-cyan-700 dark:bg-cyan-900/30"
+                        >
+                          <span
+                            class="font-mono text-xl font-semibold text-cyan-700 dark:text-cyan-200"
+                          >
+                            {{ userCode || '------' }}
+                          </span>
+                          <button
+                            class="rounded-lg bg-white px-3 py-1 text-sm text-cyan-600 transition-colors hover:bg-cyan-100 dark:bg-cyan-800 dark:text-cyan-200 dark:hover:bg-cyan-700"
+                            @click="copyUserCode"
+                          >
+                            <i class="fas fa-copy mr-1" />复制
+                          </button>
+                        </div>
+                      </div>
+                      <div
+                        class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
+                      >
+                        <span>
+                          <i class="fas fa-hourglass-half mr-1 text-cyan-500" />
+                          剩余有效期：{{ formattedCountdown }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 步骤2: 访问链接并授权 -->
+              <div
+                class="rounded-lg border border-cyan-300 bg-white/80 p-4 dark:border-cyan-600 dark:bg-gray-800/80"
+              >
+                <div class="flex items-start gap-3">
+                  <div
+                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-cyan-600 text-xs font-bold text-white"
+                  >
+                    2
+                  </div>
+                  <div class="flex-1">
+                    <p class="mb-2 font-medium text-cyan-900 dark:text-cyan-200">
+                      在浏览器中打开链接并完成授权
+                    </p>
+                    <div class="space-y-2 text-sm text-cyan-700 dark:text-cyan-300">
+                      <p>
+                        在浏览器中打开授权页面，输入上方验证码并登录 Factory / Droid
+                        账户，最后点击允许授权。
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 步骤3: 输入授权结果 -->
+              <div
+                class="rounded-lg border border-cyan-300 bg-white/80 p-4 dark:border-cyan-600 dark:bg-gray-800/80"
+              >
+                <div class="flex items-start gap-3">
+                  <div
+                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-cyan-600 text-xs font-bold text-white"
+                  >
+                    3
+                  </div>
+                  <div class="flex-1">
+                    <p class="mb-2 font-medium text-cyan-900 dark:text-cyan-200">
+                      完成授权后点击下方“完成授权”按钮，系统会自动获取访问令牌。
+                    </p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                      若提示授权仍在等待确认，请稍候片刻后系统会自动重试。
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="flex gap-3 pt-4">
       <button
         class="flex-1 rounded-xl bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
@@ -486,7 +650,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { showToast } from '@/utils/toast'
 import { useAccountsStore } from '@/stores/accounts'
 
@@ -512,14 +676,59 @@ const authUrl = ref('')
 const authCode = ref('')
 const copied = ref(false)
 const sessionId = ref('') // 保存sessionId用于后续交换
+const userCode = ref('')
+const verificationUri = ref('')
+const verificationUriComplete = ref('')
+const pollInterval = ref(5)
+const remainingSeconds = ref(0)
+let countdownTimer = null
+let pendingTimer = null
 
 // 计算是否可以交换code
 const canExchange = computed(() => {
+  if (props.platform === 'droid') {
+    return !!sessionId.value
+  }
   return authUrl.value && authCode.value.trim()
 })
 
+const formattedCountdown = computed(() => {
+  if (!remainingSeconds.value || remainingSeconds.value <= 0) {
+    return '00:00'
+  }
+  const minutes = Math.floor(remainingSeconds.value / 60)
+  const seconds = remainingSeconds.value % 60
+  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+})
+
+const startCountdown = (seconds) => {
+  stopCountdown()
+  if (!seconds || seconds <= 0) {
+    remainingSeconds.value = 0
+    return
+  }
+
+  remainingSeconds.value = Math.floor(seconds)
+  countdownTimer = setInterval(() => {
+    if (remainingSeconds.value <= 1) {
+      remainingSeconds.value = 0
+      stopCountdown()
+    } else {
+      remainingSeconds.value -= 1
+    }
+  }, 1000)
+}
+
+const stopCountdown = () => {
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+    countdownTimer = null
+  }
+}
+
 // 监听授权码输入，自动提取URL中的code参数
 watch(authCode, (newValue) => {
+  if (props.platform === 'droid') return
   if (!newValue || typeof newValue !== 'string') return
 
   const trimmedValue = newValue.trim()
@@ -579,6 +788,20 @@ watch(authCode, (newValue) => {
 
 // 生成授权URL
 const generateAuthUrl = async () => {
+  if (pendingTimer) {
+    clearTimeout(pendingTimer)
+    pendingTimer = null
+  }
+  stopCountdown()
+  authUrl.value = ''
+  authCode.value = ''
+  userCode.value = ''
+  verificationUri.value = ''
+  verificationUriComplete.value = ''
+  remainingSeconds.value = 0
+  sessionId.value = ''
+  pollInterval.value = 5
+  copied.value = false
   loading.value = true
   try {
     const proxyConfig = props.proxy?.enabled
@@ -605,6 +828,15 @@ const generateAuthUrl = async () => {
       const result = await accountsStore.generateOpenAIAuthUrl(proxyConfig)
       authUrl.value = result.authUrl
       sessionId.value = result.sessionId
+    } else if (props.platform === 'droid') {
+      const result = await accountsStore.generateDroidAuthUrl(proxyConfig)
+      authUrl.value = result.verificationUriComplete || result.verificationUri
+      verificationUri.value = result.verificationUri
+      verificationUriComplete.value = result.verificationUriComplete || result.verificationUri
+      userCode.value = result.userCode
+      pollInterval.value = Number(result.interval || 5) || 5
+      startCountdown(result.expiresIn || 300)
+      sessionId.value = result.sessionId
     }
   } catch (error) {
     showToast(error.message || '生成授权链接失败', 'error')
@@ -615,13 +847,27 @@ const generateAuthUrl = async () => {
 
 // 重新生成授权URL
 const regenerateAuthUrl = () => {
+  stopCountdown()
+  if (pendingTimer) {
+    clearTimeout(pendingTimer)
+    pendingTimer = null
+  }
   authUrl.value = ''
   authCode.value = ''
+  userCode.value = ''
+  verificationUri.value = ''
+  verificationUriComplete.value = ''
+  remainingSeconds.value = 0
+  sessionId.value = ''
   generateAuthUrl()
 }
 
 // 复制授权URL
 const copyAuthUrl = async () => {
+  if (!authUrl.value) {
+    showToast('请先生成授权链接', 'warning')
+    return
+  }
   try {
     await navigator.clipboard.writeText(authUrl.value)
     copied.value = true
@@ -642,6 +888,33 @@ const copyAuthUrl = async () => {
     setTimeout(() => {
       copied.value = false
     }, 2000)
+  }
+}
+
+const copyUserCode = async () => {
+  if (!userCode.value) {
+    showToast('请先生成授权验证码', 'warning')
+    return
+  }
+  try {
+    await navigator.clipboard.writeText(userCode.value)
+    showToast('验证码已复制', 'success')
+  } catch (error) {
+    const input = document.createElement('input')
+    input.value = userCode.value
+    document.body.appendChild(input)
+    input.select()
+    document.execCommand('copy')
+    document.body.removeChild(input)
+    showToast('验证码已复制', 'success')
+  }
+}
+
+const openVerificationPage = () => {
+  if (verificationUriComplete.value) {
+    window.open(verificationUriComplete.value, '_blank', 'noopener')
+  } else if (verificationUri.value) {
+    window.open(verificationUri.value, '_blank', 'noopener')
   }
 }
 
@@ -671,6 +944,10 @@ const exchangeCode = async () => {
         code: authCode.value.trim(),
         sessionId: sessionId.value
       }
+    } else if (props.platform === 'droid') {
+      data = {
+        sessionId: sessionId.value
+      }
     }
 
     // 添加代理配置（如果启用）
@@ -691,6 +968,38 @@ const exchangeCode = async () => {
       tokenInfo = await accountsStore.exchangeGeminiCode(data)
     } else if (props.platform === 'openai') {
       tokenInfo = await accountsStore.exchangeOpenAICode(data)
+    } else if (props.platform === 'droid') {
+      const response = await accountsStore.exchangeDroidCode(data)
+      if (!response.success) {
+        if (response.pending) {
+          const retrySeconds = Number(response.retryAfter || pollInterval.value || 5)
+          const message = response.message || '授权尚未完成，请在浏览器确认后稍候再次尝试。'
+          showToast(message, 'info')
+          if (typeof response.expiresIn === 'number' && response.expiresIn >= 0) {
+            startCountdown(response.expiresIn)
+          }
+          // 等待建议的轮询间隔后自动重试
+          if (Number.isFinite(retrySeconds) && retrySeconds > 0) {
+            if (pendingTimer) {
+              clearTimeout(pendingTimer)
+            }
+            pendingTimer = setTimeout(() => {
+              pendingTimer = null
+              if (!exchanging.value) {
+                exchangeCode()
+              }
+            }, retrySeconds * 1000)
+          }
+          return
+        }
+        throw new Error(response.message || '授权失败，请重试')
+      }
+      tokenInfo = response.data
+      stopCountdown()
+      if (pendingTimer) {
+        clearTimeout(pendingTimer)
+        pendingTimer = null
+      }
     }
 
     emit('success', tokenInfo)
@@ -700,4 +1009,12 @@ const exchangeCode = async () => {
     exchanging.value = false
   }
 }
+
+onBeforeUnmount(() => {
+  stopCountdown()
+  if (pendingTimer) {
+    clearTimeout(pendingTimer)
+    pendingTimer = null
+  }
+})
 </script>

@@ -1066,6 +1066,35 @@ class RedisClient {
     const key = `claude:account:${accountId}`
     return await this.client.del(key)
   }
+
+  // 🤖 Droid 账户相关操作
+  async setDroidAccount(accountId, accountData) {
+    const key = `droid:account:${accountId}`
+    await this.client.hset(key, accountData)
+  }
+
+  async getDroidAccount(accountId) {
+    const key = `droid:account:${accountId}`
+    return await this.client.hgetall(key)
+  }
+
+  async getAllDroidAccounts() {
+    const keys = await this.client.keys('droid:account:*')
+    const accounts = []
+    for (const key of keys) {
+      const accountData = await this.client.hgetall(key)
+      if (accountData && Object.keys(accountData).length > 0) {
+        accounts.push({ id: key.replace('droid:account:', ''), ...accountData })
+      }
+    }
+    return accounts
+  }
+
+  async deleteDroidAccount(accountId) {
+    const key = `droid:account:${accountId}`
+    return await this.client.del(key)
+  }
+
   async setOpenAiAccount(accountId, accountData) {
     const key = `openai:account:${accountId}`
     await this.client.hset(key, accountData)
