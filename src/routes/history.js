@@ -65,7 +65,12 @@ router.get('/sessions/:sessionId/messages', async (req, res) => {
   return res.json({
     success: true,
     sessionId,
-    messages
+    messages,
+    features: {
+      messageGrouping: true,
+      thinkingCollapse: true,
+      systemMessageFilter: true
+    }
   })
 })
 

@@ -266,57 +266,123 @@
                 </div>
               </div>
 
-              <div class="flex-1 space-y-4 overflow-y-auto overflow-x-hidden">
-                <div
-                  v-for="message in messages"
-                  :key="message.storedAt"
-                  :class="[
-                    'w-full min-w-0 rounded-xl border px-4 py-3 shadow-sm transition-all duration-150',
-                    message.role === 'assistant'
-                      ? 'border-indigo-200 bg-indigo-50/70 dark:border-indigo-500/40 dark:bg-indigo-500/10'
-                      : 'border-gray-200 bg-white/80 dark:border-gray-700 dark:bg-gray-800/70'
-                  ]"
-                >
+              <div v-if="useMessageGrouping" class="mb-4 flex flex-wrap gap-3">
+                <div class="flex flex-1 flex-col gap-2">
                   <div
-                    class="mb-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
+                    class="inline-flex w-fit overflow-hidden rounded-lg border border-gray-200 bg-white p-1 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-800"
                   >
-                    <span
-                      class="font-semibold"
+                    <button
+                      v-for="mode in displayModeOptions"
+                      :key="mode.value"
+                      class="rounded-md px-3 py-1.5 font-medium transition"
                       :class="
-                        message.role === 'assistant'
-                          ? 'text-indigo-600 dark:text-indigo-200'
-                          : 'text-gray-600 dark:text-gray-300'
+                        displayMode === mode.value
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
                       "
+                      :title="displayModeDescriptions[mode.value]"
+                      @click="displayMode = mode.value"
                     >
-                      {{ message.role === 'assistant' ? 'Claude' : '用户' }}
-                    </span>
-                    <span>{{ formatDate(message.createdAt || message.storedAt) }}</span>
-                  </div>
-                  <div
-                    class="markdown-view whitespace-pre-wrap break-words text-sm text-gray-800 dark:text-gray-100"
-                    v-html="renderMarkdown(message.content)"
-                  />
-                  <div v-if="message.role === 'assistant'" class="mt-2 flex justify-end">
-                    <button class="copy-btn" title="复制消息" @click="copyMessage(message.content)">
-                      <i class="fas fa-copy"></i>
-                      复制
+                      {{ mode.label }}
                     </button>
                   </div>
-                  <div
-                    class="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400"
-                  >
-                    <span v-if="message.model">模型：{{ message.model }}</span>
-                    <span v-if="typeof message.tokens === 'number'"
-                      >Tokens：{{ message.tokens }}</span
-                    >
-                    <span v-if="message.metadata?.finishReason"
-                      >结束原因：{{ message.metadata.finishReason }}</span
-                    >
-                    <span v-if="message.metadata?.error" class="text-red-500 dark:text-red-400"
-                      >错误：{{ message.metadata.error }}</span
-                    >
-                  </div>
                 </div>
+                <div class="flex items-center gap-4 text-xs sm:text-sm">
+                  <label
+                    v-if="features.systemMessageFilter !== false"
+                    class="inline-flex items-center gap-2 text-gray-600 dark:text-gray-300"
+                  >
+                    <input
+                      v-model="showSystemMessages"
+                      class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      type="checkbox"
+                    />
+                    显示系统消息
+                  </label>
+                </div>
+              </div>
+
+              <div class="flex-1 space-y-4 overflow-y-auto overflow-x-hidden">
+                <template v-if="useMessageGrouping">
+                  <HistoryMessageGroup
+                    v-for="(group, idx) in messageGroups"
+                    :key="group.id || idx"
+                    :collapse-thinking="shouldCollapseThinking"
+                    :copy-message="copyMessage"
+                    :display-mode="displayMode"
+                    :expanded="isGroupExpanded(group.id)"
+                    :format-date="formatDate"
+                    :group="group"
+                    :index="idx + 1"
+                    :render-markdown="renderMarkdown"
+                    :show-system-messages="showSystemMessages"
+                    @toggle-thinking="toggleThinkingGroup"
+                  />
+
+                  <div
+                    v-if="!messageGroups.length && !messagesLoading"
+                    class="rounded-lg border border-dashed border-gray-300 bg-white/70 p-6 text-center text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-800/60 dark:text-gray-400"
+                  >
+                    暂无消息
+                  </div>
+                </template>
+
+                <template v-else>
+                  <div
+                    v-for="(message, index) in messages"
+                    :key="message.storedAt || message.createdAt || message.messageGroupId || index"
+                    :class="[
+                      'w-full min-w-0 rounded-xl border px-4 py-3 shadow-sm transition-all duration-150',
+                      message.role === 'assistant'
+                        ? 'border-indigo-200 bg-indigo-50/70 dark:border-indigo-500/40 dark:bg-indigo-500/10'
+                        : 'border-gray-200 bg-white/80 dark:border-gray-700 dark:bg-gray-800/70'
+                    ]"
+                  >
+                    <div
+                      class="mb-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
+                    >
+                      <span
+                        class="font-semibold"
+                        :class="
+                          message.role === 'assistant'
+                            ? 'text-indigo-600 dark:text-indigo-200'
+                            : 'text-gray-600 dark:text-gray-300'
+                        "
+                      >
+                        {{ message.role === 'assistant' ? 'Claude' : '用户' }}
+                      </span>
+                      <span>{{ formatDate(message.createdAt || message.storedAt) }}</span>
+                    </div>
+                    <div
+                      class="markdown-view whitespace-pre-wrap break-words text-sm text-gray-800 dark:text-gray-100"
+                      v-html="renderMarkdown(message.content)"
+                    />
+                    <div v-if="message.role === 'assistant'" class="mt-2 flex justify-end">
+                      <button
+                        class="copy-btn"
+                        title="复制消息"
+                        @click="copyMessage(message.content)"
+                      >
+                        <i class="fas fa-copy"></i>
+                        复制
+                      </button>
+                    </div>
+                    <div
+                      class="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400"
+                    >
+                      <span v-if="message.model">模型：{{ message.model }}</span>
+                      <span v-if="typeof message.tokens === 'number'">
+                        Tokens：{{ message.tokens }}
+                      </span>
+                      <span v-if="message.metadata?.finishReason">
+                        结束原因：{{ message.metadata.finishReason }}
+                      </span>
+                      <span v-if="message.metadata?.error" class="text-red-500 dark:text-red-400">
+                        错误：{{ message.metadata.error }}
+                      </span>
+                    </div>
+                  </div>
+                </template>
 
                 <div
                   v-if="messagesLoading"
@@ -351,6 +417,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
+import HistoryMessageGroup from '@/components/history/HistoryMessageGroup.vue'
 import { useApiKeysStore } from '@/stores/apiKeys'
 import { apiClient } from '@/config/api'
 import { formatDate, formatRelativeTime } from '@/utils/format'
@@ -425,7 +492,41 @@ const messagesLoading = ref(false)
 const messagesError = ref('')
 const searchKeyword = ref('')
 const appliedKeyword = ref('')
-
+const features = ref({
+  messageGrouping: true,
+  thinkingCollapse: true,
+  systemMessageFilter: true
+})
+const displayMode = ref('simple')
+const displayModeOptions = [
+  {
+    value: 'simple',
+    label: '精简',
+    description: '显示用户消息与可见的助手最终回复，隐藏系统提醒、policy 校验、思考过程与工具调用。'
+  },
+  {
+    value: 'detailed',
+    label: '详细',
+    description:
+      '显示用户消息与可见助手回复，可在折叠面板中按需查看 AI 思考过程和工具调用，policy 与系统消息默认仍隐藏。'
+  },
+  {
+    value: 'debug',
+    label: '调试',
+    description:
+      '展示整轮全部消息：用户、助手各子类型（含 policy）、系统提醒、思考过程与工具调用都会展开，适合排查。'
+  }
+]
+const showSystemMessages = ref(false)
+const expandedGroups = ref(new Set())
+const displayModeDescriptions = computed(() => {
+  return displayModeOptions.reduce((acc, item) => {
+    if (item?.value) {
+      acc[item.value] = item.description || ''
+    }
+    return acc
+  }, {})
+})
 const hasMoreSessions = computed(
   () => sessions.value.length < totalSessions.value && sessions.value.length >= pageSize
 )
@@ -439,6 +540,198 @@ const isSearchDisabled = computed(
 )
 
 const formatRelative = (value) => formatRelativeTime(value)
+
+const hasStructuredGroups = computed(() =>
+  messages.value.some(
+    (message) =>
+      message &&
+      typeof message.messageGroupId === 'string' &&
+      message.messageGroupId.startsWith('group_')
+  )
+)
+
+const messageGroups = computed(() => {
+  if (!messages.value.length) {
+    return []
+  }
+
+  const messageOrderMap = new WeakMap()
+  const orderedIds = []
+  const groups = new Map()
+
+  const ensureGroup = (groupId) => {
+    if (!groups.has(groupId)) {
+      groups.set(groupId, {
+        id: groupId,
+        userMessages: [],
+        assistantMessages: [],
+        thinkingMessages: [],
+        toolMessages: [],
+        systemMessages: [],
+        rawMessages: [],
+        firstTimestamp: null,
+        lastTimestamp: null
+      })
+      orderedIds.push(groupId)
+    }
+    return groups.get(groupId)
+  }
+
+  messages.value.forEach((message, index) => {
+    if (!message) {
+      return
+    }
+    messageOrderMap.set(message, index)
+    const groupId =
+      message.messageGroupId ||
+      `legacy_${selectedSessionId.value || 'session'}_${message.requestId || index}`
+    const group = ensureGroup(groupId)
+    group.rawMessages.push(message)
+
+    const timestamp = message.createdAt || message.storedAt || null
+    if (timestamp) {
+      if (!group.firstTimestamp || timestamp < group.firstTimestamp) {
+        group.firstTimestamp = timestamp
+      }
+      if (!group.lastTimestamp || timestamp > group.lastTimestamp) {
+        group.lastTimestamp = timestamp
+      }
+    }
+
+    if (message.role === 'user') {
+      group.userMessages.push(message)
+    } else if (message.role === 'system') {
+      group.systemMessages.push(message)
+    } else if (message.role === 'assistant') {
+      if (message.subtype === 'thinking') {
+        group.thinkingMessages.push(message)
+      } else if (message.subtype === 'tool_use') {
+        group.toolMessages.push(message)
+      } else {
+        group.assistantMessages.push(message)
+      }
+    }
+  })
+
+  const toTimestamp = (message) => {
+    if (!message) {
+      return 0
+    }
+    const candidates = [message.createdAt, message.storedAt]
+    for (const value of candidates) {
+      if (!value) {
+        continue
+      }
+      const parsed = new Date(value).getTime()
+      if (Number.isFinite(parsed)) {
+        return parsed
+      }
+    }
+    const fallback = messageOrderMap.get(message)
+    return typeof fallback === 'number' ? fallback : 0
+  }
+
+  const dedupeAndSort = (list) => {
+    if (!Array.isArray(list) || !list.length) {
+      return []
+    }
+    const seen = new Set()
+    const result = []
+    list.forEach((item) => {
+      if (!item) {
+        return
+      }
+      const key = [
+        item.role || '',
+        item.subtype || '',
+        item.requestId || '',
+        item.createdAt || '',
+        item.storedAt || '',
+        typeof item.content === 'string' ? item.content : ''
+      ].join('|')
+      if (seen.has(key)) {
+        return
+      }
+      seen.add(key)
+      result.push(item)
+    })
+    return result.sort((a, b) => toTimestamp(a) - toTimestamp(b))
+  }
+
+  return orderedIds.map((groupId, order) => {
+    const group = groups.get(groupId)
+    const userMessages = dedupeAndSort(group.userMessages)
+    const systemMessages = dedupeAndSort(group.systemMessages)
+    const thinkingMessages = dedupeAndSort(group.thinkingMessages)
+    const toolMessages = dedupeAndSort(group.toolMessages)
+    const assistantMessages = dedupeAndSort(group.assistantMessages)
+    const visibleAssistantMessages = assistantMessages.filter((item) => item.isVisible !== false)
+    const finalMessages = assistantMessages.length ? assistantMessages : thinkingMessages
+    const finalMessage = finalMessages.length ? finalMessages[finalMessages.length - 1] : null
+    const timestampCandidates = [
+      ...userMessages,
+      ...assistantMessages,
+      ...thinkingMessages,
+      ...toolMessages,
+      ...systemMessages
+    ]
+      .map((item) => item?.createdAt || item?.storedAt)
+      .filter(Boolean)
+      .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+
+    return {
+      id: groupId,
+      order,
+      userMessages,
+      systemMessages,
+      thinkingMessages,
+      toolMessages,
+      assistantMessages,
+      rawMessages: group.rawMessages,
+      firstTimestamp: timestampCandidates[0] || group.firstTimestamp,
+      lastTimestamp: timestampCandidates[timestampCandidates.length - 1] || group.lastTimestamp,
+      finalMessage,
+      visibleAssistantMessages,
+      hasAssistantReply: visibleAssistantMessages.length > 0,
+      requestId:
+        finalMessage?.requestId ||
+        userMessages[0]?.requestId ||
+        userMessages[0]?.metadata?.requestId ||
+        null
+    }
+  })
+})
+
+const useMessageGrouping = computed(
+  () => features.value.messageGrouping !== false && hasStructuredGroups.value
+)
+
+const shouldCollapseThinking = computed(() => features.value.thinkingCollapse !== false)
+
+const toggleThinkingGroup = (groupId) => {
+  const next = new Set(expandedGroups.value)
+  if (next.has(groupId)) {
+    next.delete(groupId)
+  } else {
+    next.add(groupId)
+  }
+  expandedGroups.value = next
+}
+
+const isGroupExpanded = (groupId) => {
+  if (!shouldCollapseThinking.value) {
+    return true
+  }
+  return expandedGroups.value.has(groupId)
+}
+
+const expandAllGroups = () => {
+  expandedGroups.value = new Set(messageGroups.value.map((group) => group.id))
+}
+
+const collapseAllGroups = () => {
+  expandedGroups.value = new Set()
+}
 
 const ensureApiKeys = async () => {
   if (!apiKeysStore.apiKeys.length) {
@@ -553,7 +846,30 @@ const loadMessages = async () => {
     const response = await apiClient.get(
       `/api/history/sessions/${selectedSessionId.value}/messages`
     )
-    messages.value = response.messages || []
+    const { messages: fetchedMessages = [], features: responseFeatures } = response || {}
+    messages.value = Array.isArray(fetchedMessages) ? fetchedMessages : []
+
+    const nextFeatures = {
+      messageGrouping:
+        typeof responseFeatures?.messageGrouping === 'boolean'
+          ? responseFeatures.messageGrouping
+          : features.value.messageGrouping,
+      thinkingCollapse:
+        typeof responseFeatures?.thinkingCollapse === 'boolean'
+          ? responseFeatures.thinkingCollapse
+          : features.value.thinkingCollapse,
+      systemMessageFilter:
+        typeof responseFeatures?.systemMessageFilter === 'boolean'
+          ? responseFeatures.systemMessageFilter
+          : features.value.systemMessageFilter
+    }
+    features.value = nextFeatures
+
+    if (nextFeatures.systemMessageFilter === false) {
+      showSystemMessages.value = true
+    } else if (displayMode.value === 'simple') {
+      showSystemMessages.value = false
+    }
   } catch (error) {
     messagesError.value = error.message || '加载消息失败'
     showToast(messagesError.value, 'error')
@@ -566,9 +882,38 @@ const copyMessage = async (text) => {
   if (!text) {
     return
   }
+
+  // 方法 1：尝试现代 Clipboard API（HTTPS 或 localhost）
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text)
+      showToast('消息已复制', 'success')
+      return
+    } catch (error) {
+      console.warn('Clipboard API 失败，尝试降级方案:', error)
+    }
+  }
+
+  // 方法 2：降级到传统方法（兼容 HTTP）
   try {
-    await navigator.clipboard.writeText(text)
-    showToast('消息已复制', 'success')
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.style.position = 'fixed'
+    textarea.style.left = '-9999px'
+    textarea.style.top = '-9999px'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.focus()
+    textarea.select()
+
+    const successful = document.execCommand('copy')
+    document.body.removeChild(textarea)
+
+    if (successful) {
+      showToast('消息已复制', 'success')
+    } else {
+      throw new Error('execCommand 返回 false')
+    }
   } catch (error) {
     console.error('复制失败:', error)
     showToast('复制失败，请手动复制', 'error')
@@ -735,6 +1080,76 @@ watch(selectedSessionId, (newId, oldId) => {
     messages.value = []
   }
 })
+
+watch(displayMode, (mode) => {
+  if (!useMessageGrouping.value) {
+    collapseAllGroups()
+    return
+  }
+
+  if (mode === 'debug') {
+    expandAllGroups()
+    showSystemMessages.value = true
+    return
+  }
+
+  if (mode === 'simple') {
+    collapseAllGroups()
+    if (features.value.systemMessageFilter !== false) {
+      showSystemMessages.value = false
+    }
+    return
+  }
+
+  if (!shouldCollapseThinking.value) {
+    expandAllGroups()
+  } else {
+    collapseAllGroups()
+  }
+})
+
+watch(shouldCollapseThinking, (collapse) => {
+  if (!useMessageGrouping.value) {
+    collapseAllGroups()
+    return
+  }
+
+  if (!collapse) {
+    expandAllGroups()
+  } else if (displayMode.value !== 'debug') {
+    collapseAllGroups()
+  }
+})
+
+watch(
+  messages,
+  () => {
+    if (!useMessageGrouping.value) {
+      collapseAllGroups()
+      return
+    }
+
+    if (!messages.value.length) {
+      collapseAllGroups()
+      return
+    }
+    if (displayMode.value === 'debug' || !shouldCollapseThinking.value) {
+      expandAllGroups()
+    } else {
+      collapseAllGroups()
+    }
+  },
+  { immediate: false }
+)
+
+watch(
+  () => features.value.systemMessageFilter,
+  (flag) => {
+    if (flag === false) {
+      showSystemMessages.value = true
+    }
+  }
+)
 
 onMounted(async () => {
   await ensureApiKeys()

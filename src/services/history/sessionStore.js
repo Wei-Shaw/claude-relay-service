@@ -10,8 +10,7 @@ const PREFIX = config.redisPrefix || 'chat'
 const sessionsIndexKey = (apiKeyId) => `${PREFIX}:sessions:${apiKeyId}`
 const sessionMetaKey = (sessionId) => `${PREFIX}:session:${sessionId}`
 const sessionMessagesKey = (sessionId) => `${PREFIX}:messages:${sessionId}`
-const stickySessionKey = (apiKeyId, stickyId) =>
-  `${PREFIX}:sticky:${apiKeyId}:${stickyId}`
+const stickySessionKey = (apiKeyId, stickyId) => `${PREFIX}:sticky:${apiKeyId}:${stickyId}`
 
 const ensureClient = () => {
   try {
@@ -75,7 +74,11 @@ const ensureSession = async (apiKeyId, providedSessionId, options = {}) => {
       const pipeline = client.multi()
       pipeline.hset(sessionMetaKey(sessionId), 'lastActivity', String(now))
       pipeline.zadd(sessionsIndexKey(apiKeyId), now, sessionId)
-      applyTtl(pipeline, [sessionMetaKey(sessionId), sessionMessagesKey(sessionId), sessionsIndexKey(apiKeyId)])
+      applyTtl(pipeline, [
+        sessionMetaKey(sessionId),
+        sessionMessagesKey(sessionId),
+        sessionsIndexKey(apiKeyId)
+      ])
       await pipeline.exec()
       return { sessionId, isNew: false, meta }
     }
@@ -111,7 +114,11 @@ const ensureSession = async (apiKeyId, providedSessionId, options = {}) => {
   const pipeline = client.multi()
   pipeline.hset(sessionMetaKey(sessionId), baseMeta)
   pipeline.zadd(sessionsIndexKey(apiKeyId), now, sessionId)
-  applyTtl(pipeline, [sessionMetaKey(sessionId), sessionMessagesKey(sessionId), sessionsIndexKey(apiKeyId)])
+  applyTtl(pipeline, [
+    sessionMetaKey(sessionId),
+    sessionMessagesKey(sessionId),
+    sessionsIndexKey(apiKeyId)
+  ])
 
   await pipeline.exec()
   await enforceSessionLimit(client, apiKeyId)
@@ -195,9 +202,7 @@ const listSessions = async (apiKeyId, { page = 1, pageSize = 20, keyword } = {})
   const client = ensureClient()
   const indexKey = sessionsIndexKey(apiKeyId)
   const normalizedKeyword =
-    typeof keyword === 'string' && keyword.trim().length > 0
-      ? keyword.trim().toLowerCase()
-      : ''
+    typeof keyword === 'string' && keyword.trim().length > 0 ? keyword.trim().toLowerCase() : ''
 
   const fetchSessionMetas = async (sessionIds) => {
     if (!sessionIds.length) {
@@ -276,11 +281,46 @@ const listSessions = async (apiKeyId, { page = 1, pageSize = 20, keyword } = {})
   return { sessions: paginated, total }
 }
 
+const assignDefaultsToMessage = (sessionId, index, message) => {
+  if (!message || typeof message !== 'object') {
+    return null
+  }
+
+  const subtype =
+    message.subtype ||
+    (message.role === 'assistant' ? 'message' : message.role === 'system' ? 'reminder' : 'message')
+
+  const messageGroupId =
+    message.messageGroupId ||
+    `legacy_${sessionId}_${message.requestId || message.storedAt || index}`
+
+  const metadata =
+    typeof message.metadata === 'object' && message.metadata !== null ? message.metadata : {}
+
+  return {
+    ...message,
+    subtype,
+    messageGroupId,
+    metadata,
+    isVisible: typeof message.isVisible === 'boolean' ? message.isVisible : true
+  }
+}
+
 const getSessionMessages = async (sessionId, { start = 0, stop = -1 } = {}) => {
   const client = ensureClient()
   const listKey = sessionMessagesKey(sessionId)
   const messages = await client.lrange(listKey, start, stop)
   return messages
+    .map((raw, index) => {
+      try {
+        const parsed = JSON.parse(raw)
+        return assignDefaultsToMessage(sessionId, index, parsed)
+      } catch (error) {
+        logger.warn('⚠️ Failed to parse stored history message:', error.message)
+        return null
+      }
+    })
+    .filter(Boolean)
 }
 
 const deleteSession = async (sessionId) => {
@@ -301,6 +341,179 @@ const deleteSession = async (sessionId) => {
 
   await pipeline.exec()
   return true
+}
+
+const getLastMessageGroupId = async (sessionId) => {
+  const client = ensureClient()
+  const listKey = sessionMessagesKey(sessionId)
+  const messages = await client.lrange(listKey, -1, -1)
+  if (!messages || !messages.length) {
+    return null
+  }
+
+  try {
+    const parsed = JSON.parse(messages[0])
+    return parsed?.messageGroupId || null
+  } catch (error) {
+    logger.debug('⚠️ Failed to parse last history message:', error.message)
+    return null
+  }
+}
+
+const findMessageGroupIdByRequestIds = async (
+  sessionId,
+  requestIds,
+  { searchWindow = 120 } = {}
+) => {
+  if (!Array.isArray(requestIds) || !requestIds.length) {
+    return null
+  }
+
+  const client = ensureClient()
+  const listKey = sessionMessagesKey(sessionId)
+  const messages = await client.lrange(listKey, -searchWindow, -1)
+  if (!messages || !messages.length) {
+    return null
+  }
+
+  const requestIdSet = new Set(requestIds.filter((id) => typeof id === 'string' && id))
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const raw = messages[index]
+    if (!raw) {
+      continue
+    }
+
+    try {
+      const parsed = JSON.parse(raw)
+      const candidateIds = [
+        parsed?.requestId,
+        parsed?.metadata?.requestId,
+        parsed?.metadata?.relatedRequestId
+      ].filter(Boolean)
+
+      const matched = candidateIds.find((id) => requestIdSet.has(id))
+      if (matched) {
+        return parsed?.messageGroupId || parsed?.metadata?.messageGroupId || null
+      }
+    } catch (error) {
+      logger.debug('⚠️ Failed to parse history message during group lookup:', error.message)
+    }
+  }
+
+  return null
+}
+
+const findMessageGroupIdByUserContent = async (
+  sessionId,
+  content,
+  { searchWindow = 200, normalized = true } = {}
+) => {
+  if (!content || typeof content !== 'string') {
+    return null
+  }
+
+  const trimmed = normalized ? content.trim() : content
+  if (!trimmed) {
+    return null
+  }
+
+  const client = ensureClient()
+  const listKey = sessionMessagesKey(sessionId)
+  const messages = await client.lrange(listKey, -searchWindow, -1)
+  if (!messages || !messages.length) {
+    return null
+  }
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const raw = messages[index]
+    if (!raw) {
+      continue
+    }
+    try {
+      const parsed = JSON.parse(raw)
+      if (!parsed || parsed.role !== 'user') {
+        continue
+      }
+      if (parsed.metadata?.assistantGenerated) {
+        continue
+      }
+      const candidateContent =
+        typeof parsed.content === 'string' && normalized ? parsed.content.trim() : parsed.content
+      if (!candidateContent) {
+        continue
+      }
+      if (candidateContent === trimmed) {
+        return parsed.messageGroupId || null
+      }
+    } catch (error) {
+      logger.debug('⚠️ Failed to parse history message during duplicate lookup:', error.message)
+    }
+  }
+
+  return null
+}
+
+const hasMessageInGroup = async (
+  sessionId,
+  messageGroupId,
+  {
+    role,
+    subtype,
+    content,
+    searchWindow = 120,
+    normalized = true
+  } = {}
+) => {
+  if (!sessionId || !messageGroupId) {
+    return false
+  }
+
+  const client = ensureClient()
+  const listKey = sessionMessagesKey(sessionId)
+  const messages = await client.lrange(listKey, -searchWindow, -1)
+  if (!messages || !messages.length) {
+    return false
+  }
+
+  const normalizedContent =
+    normalized && typeof content === 'string' ? content.trim() : content ?? null
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const raw = messages[index]
+    if (!raw) {
+      continue
+    }
+    try {
+      const parsed = JSON.parse(raw)
+      if (!parsed) {
+        continue
+      }
+      if (parsed.messageGroupId !== messageGroupId) {
+        continue
+      }
+      if (role !== undefined && role !== null && parsed.role !== role) {
+        continue
+      }
+      if (subtype !== undefined && subtype !== null && parsed.subtype !== subtype) {
+        continue
+      }
+      if (normalizedContent) {
+        const candidate =
+          normalized && typeof parsed.content === 'string'
+            ? parsed.content.trim()
+            : parsed.content ?? null
+        if (candidate !== normalizedContent) {
+          continue
+        }
+      }
+      return true
+    } catch (error) {
+      logger.debug('⚠️ Failed to parse history message during duplication check:', error.message)
+    }
+  }
+
+  return false
 }
 
 const getStickySession = async (apiKeyId, stickyId) => {
@@ -340,6 +553,10 @@ module.exports = {
   listSessions,
   getSessionMeta,
   getSessionMessages,
+  findMessageGroupIdByUserContent,
+  getLastMessageGroupId,
+  findMessageGroupIdByRequestIds,
+  hasMessageInGroup,
   deleteSession,
   getStickySession,
   setStickySession,
