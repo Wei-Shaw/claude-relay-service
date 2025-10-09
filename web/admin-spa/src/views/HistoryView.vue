@@ -502,19 +502,17 @@ const displayModeOptions = [
   {
     value: 'simple',
     label: '精简',
-    description: '显示用户消息与可见的助手最终回复，隐藏系统提醒、policy 校验、思考过程与工具调用。'
+    description: '用户消息 + AI 最终回复。'
   },
   {
     value: 'detailed',
     label: '详细',
-    description:
-      '显示用户消息与可见助手回复，可在折叠面板中按需查看 AI 思考过程和工具调用，policy 与系统消息默认仍隐藏。'
+    description: '用户消息 + 中间过程（默认折叠）+ AI 最终回复。'
   },
   {
     value: 'debug',
     label: '调试',
-    description:
-      '展示整轮全部消息：用户、助手各子类型（含 policy）、系统提醒、思考过程与工具调用都会展开，适合排查。'
+    description: '用户消息 + 中间过程（默认展开）+ AI 最终回复。'
   }
 ]
 const showSystemMessages = ref(false)
