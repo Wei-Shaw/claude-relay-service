@@ -670,13 +670,17 @@ redis-cli ping
 
 ## 🛠️ 进阶
 
-### 生产环境部署建议（重要！）
+### 反向代理部署指南
 
-**强烈建议使用Caddy反向代理（自动HTTPS）**
+在生产环境中，建议通过反向代理进行连接，以便使用自动 HTTPS、安全头部和性能优化。下面提供两种常用方案： **Caddy** 和 **Nginx Proxy Manager (NPM)**。
 
-建议使用Caddy作为反向代理，它会自动申请和更新SSL证书，配置更简单：
+---
 
-**1. 安装Caddy**
+## Caddy 方案
+
+Caddy 是一款自动管理 HTTPS 证书的 Web 服务器，配置简单、性能优秀，很适合不需要 Docker 环境的部署方案。
+
+**1. 安装 Caddy**
 
 ```bash
 # Ubuntu/Debian
@@ -692,23 +696,23 @@ sudo yum copr enable @caddy/caddy
 sudo yum install caddy
 ```
 
-**2. Caddy配置（超简单！）**
+**2. Caddy 配置**
 
-编辑 `/etc/caddy/Caddyfile`：
+编辑 `/etc/caddy/Caddyfile` ：
 
-```
+```caddy
 your-domain.com {
     # 反向代理到本地服务
     reverse_proxy 127.0.0.1:3000 {
-        # 支持流式响应（SSE）
+        # 支持流式响应或 SSE
         flush_interval -1
 
-        # 传递真实IP
+        # 传递真实 IP
         header_up X-Real-IP {remote_host}
         header_up X-Forwarded-For {remote_host}
         header_up X-Forwarded-Proto {scheme}
 
-        # 超时设置（适合长连接）
+        # 长读/写超时配置
         transport http {
             read_timeout 300s
             write_timeout 300s
@@ -726,42 +730,132 @@ your-domain.com {
 }
 ```
 
-**3. 启动Caddy**
+**3. 启动 Caddy**
 
 ```bash
-# 测试配置
 sudo caddy validate --config /etc/caddy/Caddyfile
-
-# 启动服务
 sudo systemctl start caddy
 sudo systemctl enable caddy
-
-# 查看状态
 sudo systemctl status caddy
 ```
 
-**4. 更新服务配置**
+**4. 服务配置**
 
-修改你的服务配置，让它只监听本地：
+Caddy 会自动管理 HTTPS，因此可以将服务限制在本地进行监听：
 
 ```javascript
 // config/config.js
 module.exports = {
   server: {
     port: 3000,
-    host: '127.0.0.1' // 只监听本地，通过nginx代理
+    host: '127.0.0.1' // 只监听本地
   }
-  // ... 其他配置
 }
 ```
 
-**Caddy优势：**
+**Caddy 特点**
 
-- 🔒 **自动HTTPS**: 自动申请和续期Let's Encrypt证书，零配置
-- 🛡️ **安全默认**: 默认启用现代安全协议和加密套件
-- 🚀 **流式支持**: 原生支持SSE/WebSocket等流式传输
-- 📊 **简单配置**: 配置文件极其简洁，易于维护
-- ⚡ **HTTP/2**: 默认启用HTTP/2，提升传输性能
+* 🔒 自动 HTTPS，零配置证书管理
+* 🛡️ 安全默认配置，启用现代 TLS 套件
+* ⚡ HTTP/2 和流式传输支持
+* 🔧 配置文件简洁，易于维护
+
+---
+
+## Nginx Proxy Manager (NPM) 方案
+
+Nginx Proxy Manager 通过图形化界面管理反向代理和 HTTPS 证书，並以 Docker 容器部署。
+
+**1. 在 NPM 创建新的 Proxy Host**
+
+Details 配置如下：
+
+| 项目                    | 设置                      |
+| --------------------- | ----------------------- |
+| Domain Names          | relay.example.com       |
+| Scheme                | http                    |
+| Forward Hostname / IP | 192.168.0.1 (docker 机器 IP) |
+| Forward Port          | 3000                    |
+| Block Common Exploits | ☑️                      |
+| Websockets Support    | ❌ **关闭**                |
+| Cache Assets          | ❌ **关闭**                |
+| Access List           | Publicly Accessible     |
+
+> 注意：
+> - 请确保 Claude Relay Service **监听 host 为 `0.0.0.0` 、容器 IP 或本机 IP**，以便 NPM 实现内网连接。
+> - **Websockets Support 和 Cache Assets 必须关闭**，否则会导致 SSE / 流式响应失败。
+
+**2. Custom locations**
+
+無需添加任何内容，保持为空。
+
+**3. SSL 设置**
+
+* **SSL Certificate**: Request a new SSL Certificate (Let's Encrypt) 或已有证书
+* ☑️ **Force SSL**
+* ☑️ **HTTP/2 Support**
+* ☑️ **HSTS Enabled**
+* ☑️ **HSTS Subdomains**
+
+**4. Advanced 配置**
+
+Custom Nginx Configuration 中添加以下内容：
+
+```nginx
+# 传递真实用户 IP
+proxy_set_header X-Real-IP $remote_addr;
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+proxy_set_header X-Forwarded-Proto $scheme;
+
+# 支持 WebSocket / SSE 等流式通信
+proxy_http_version 1.1;
+proxy_set_header Upgrade $http_upgrade;
+proxy_set_header Connection "upgrade";
+proxy_buffering off;
+
+# 长连接 / 超时设置（适合 AI 聊天流式传输）
+proxy_read_timeout 300s;
+proxy_send_timeout 300s;
+proxy_connect_timeout 30s;
+
+# ---- 安全性设置 ----
+# 严格 HTTPS 策略 (HSTS)
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+# 阻挡点击劫持与内容嗅探
+add_header X-Frame-Options "DENY" always;
+add_header X-Content-Type-Options "nosniff" always;
+
+# Referrer / Permissions 限制策略
+add_header Referrer-Policy "no-referrer-when-downgrade" always;
+add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
+# 隐藏服务器信息（等效于 Caddy 的 `-Server`）
+proxy_hide_header Server;
+
+# ---- 性能微调 ----
+# 关闭代理端缓存，确保即时响应（SSE / Streaming）
+proxy_cache_bypass $http_upgrade;
+proxy_no_cache $http_upgrade;
+proxy_request_buffering off;
+```
+
+**4. 启动和验证**
+
+* 保存后等待 NPM 自动申请 Let's Encrypt 证书（如果有）。
+* Dashboard 中查看 Proxy Host 状态，确保显示为 "Online"。
+* 访问 `https://relay.example.com`，如果显示绿色锁图标即表示 HTTPS 正常。
+
+**NPM 特点**
+
+* 🔒 自动申请和续期证书
+* 🔧 图形化界面，方便管理多服务
+* ⚡ 原生支持 HTTP/2 / HTTPS
+* 🚀 适合 Docker 容器部署
+
+---
+
+上述两种方案均可用于生产部署。
 
 ---
 
