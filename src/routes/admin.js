@@ -2243,7 +2243,8 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       autoStopOnWarning,
       useUnifiedUserAgent,
       useUnifiedClientId,
-      unifiedClientId
+      unifiedClientId,
+      expiresAt
     } = req.body
 
     if (!name) {
@@ -2286,7 +2287,8 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       autoStopOnWarning: autoStopOnWarning === true, // 默认为false
       useUnifiedUserAgent: useUnifiedUserAgent === true, // 默认为false
       useUnifiedClientId: useUnifiedClientId === true, // 默认为false
-      unifiedClientId: unifiedClientId || '' // 统一的客户端标识
+      unifiedClientId: unifiedClientId || '', // 统一的客户端标识
+      expiresAt: expiresAt || null // 账户订阅到期时间
     })
 
     // 如果是分组类型，将账户添加到分组
@@ -2373,7 +2375,14 @@ router.put('/claude-accounts/:accountId', authenticateAdmin, async (req, res) =>
       }
     }
 
-    await claudeAccountService.updateAccount(accountId, updates)
+    // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
+    const mappedUpdates = { ...updates }
+    if ('expiresAt' in mappedUpdates) {
+      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
+      delete mappedUpdates.expiresAt
+    }
+
+    await claudeAccountService.updateAccount(accountId, mappedUpdates)
 
     logger.success(`📝 Admin updated Claude account: ${accountId}`)
     return res.json({ success: true, message: 'Claude account updated successfully' })

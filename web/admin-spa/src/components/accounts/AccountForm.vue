@@ -641,6 +641,49 @@
               </p>
             </div>
 
+            <!-- 到期时间 -->
+            <div>
+              <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >到期时间 (可选)</label
+              >
+              <div
+                class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800"
+              >
+                <select
+                  v-model="form.expireDuration"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  @change="updateAccountExpireAt"
+                >
+                  <option value="">永不过期</option>
+                  <option value="30d">30 天</option>
+                  <option value="90d">90 天</option>
+                  <option value="180d">180 天</option>
+                  <option value="365d">365 天</option>
+                  <option value="custom">自定义日期</option>
+                </select>
+                <div v-if="form.expireDuration === 'custom'" class="mt-3">
+                  <input
+                    v-model="form.customExpireDate"
+                    class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                    :min="minDateTime"
+                    type="datetime-local"
+                    @change="updateAccountCustomExpireAt"
+                  />
+                </div>
+                <p v-if="form.expiresAt" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  <i class="fas fa-calendar-alt mr-1" />
+                  将于 {{ formatExpireDate(form.expiresAt) }} 过期
+                </p>
+                <p v-else class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  <i class="fas fa-infinity mr-1" />
+                  账户永不过期
+                </p>
+              </div>
+              <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                设置 Claude Max/Pro 订阅的到期时间，到期后将停止调度此账户
+              </p>
+            </div>
+
             <!-- 分组选择器 -->
             <div v-if="form.accountType === 'group'">
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -2066,6 +2109,49 @@
             </p>
           </div>
 
+          <!-- 到期时间 -->
+          <div>
+            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >到期时间 (可选)</label
+            >
+            <div
+              class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800"
+            >
+              <select
+                v-model="form.expireDuration"
+                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                @change="updateAccountExpireAt"
+              >
+                <option value="">永不过期</option>
+                <option value="30d">30 天</option>
+                <option value="90d">90 天</option>
+                <option value="180d">180 天</option>
+                <option value="365d">365 天</option>
+                <option value="custom">自定义日期</option>
+              </select>
+              <div v-if="form.expireDuration === 'custom'" class="mt-3">
+                <input
+                  v-model="form.customExpireDate"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  :min="minDateTime"
+                  type="datetime-local"
+                  @change="updateAccountCustomExpireAt"
+                />
+              </div>
+              <p v-if="form.expiresAt" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                <i class="fas fa-calendar-alt mr-1" />
+                将于 {{ formatExpireDate(form.expiresAt) }} 过期
+              </p>
+              <p v-else class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                <i class="fas fa-infinity mr-1" />
+                账户永不过期
+              </p>
+            </div>
+            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              设置 Claude Max/Pro 订阅的到期时间，到期后将停止调度此账户
+            </p>
+          </div>
+
           <!-- 分组选择器 -->
           <div v-if="form.accountType === 'group'">
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -3222,7 +3308,11 @@ const form = ref({
   // Azure OpenAI 特定字段
   azureEndpoint: props.account?.azureEndpoint || '',
   apiVersion: props.account?.apiVersion || '',
-  deploymentName: props.account?.deploymentName || ''
+  deploymentName: props.account?.deploymentName || '',
+  // 到期时间字段
+  expireDuration: '',
+  customExpireDate: '',
+  expiresAt: props.account?.expiresAt || null
 })
 
 // 模型限制配置
@@ -3612,6 +3702,7 @@ const handleOAuthSuccess = async (tokenInfo) => {
       accountType: form.value.accountType,
       groupId: form.value.accountType === 'group' ? form.value.groupId : undefined,
       groupIds: form.value.accountType === 'group' ? form.value.groupIds : undefined,
+      expiresAt: form.value.expiresAt || undefined,
       proxy: form.value.proxy.enabled
         ? {
             type: form.value.proxy.type,
@@ -3909,6 +4000,7 @@ const createAccount = async () => {
       accountType: form.value.accountType,
       groupId: form.value.accountType === 'group' ? form.value.groupId : undefined,
       groupIds: form.value.accountType === 'group' ? form.value.groupIds : undefined,
+      expiresAt: form.value.expiresAt || undefined,
       proxy: form.value.proxy.enabled
         ? {
             type: form.value.proxy.type,
@@ -4174,6 +4266,7 @@ const updateAccount = async () => {
       accountType: form.value.accountType,
       groupId: form.value.accountType === 'group' ? form.value.groupId : undefined,
       groupIds: form.value.accountType === 'group' ? form.value.groupIds : undefined,
+      expiresAt: form.value.expiresAt || undefined,
       proxy: form.value.proxy.enabled
         ? {
             type: form.value.proxy.type,
@@ -4976,6 +5069,61 @@ const handleUnifiedClientIdChange = () => {
       form.value.unifiedClientId = generateClientId()
     }
   }
+}
+
+// 到期时间相关方法
+// 计算最小日期时间
+const minDateTime = computed(() => {
+  const now = new Date()
+  now.setMinutes(now.getMinutes() + 1)
+  return now.toISOString().slice(0, 16)
+})
+
+// 更新账户过期时间
+const updateAccountExpireAt = () => {
+  if (!form.value.expireDuration) {
+    form.value.expiresAt = null
+    return
+  }
+
+  if (form.value.expireDuration === 'custom') {
+    return
+  }
+
+  const now = new Date()
+  const duration = form.value.expireDuration
+  const match = duration.match(/(\d+)([d])/)
+
+  if (match) {
+    const [, value, unit] = match
+    const num = parseInt(value)
+
+    if (unit === 'd') {
+      now.setDate(now.getDate() + num)
+    }
+
+    form.value.expiresAt = now.toISOString()
+  }
+}
+
+// 更新自定义过期时间
+const updateAccountCustomExpireAt = () => {
+  if (form.value.customExpireDate) {
+    form.value.expiresAt = new Date(form.value.customExpireDate).toISOString()
+  }
+}
+
+// 格式化过期日期
+const formatExpireDate = (dateString) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
 }
 
 // 组件挂载时获取统一 User-Agent 信息
