@@ -35,8 +35,11 @@ securityContext: {}
 
 service:
   type: ClusterIP
-  port: 3000
-  targetPort: 3000
+  port: 80
+  annotations: {}
+  nodePort: ""
+  loadBalancerIP: ""
+  loadBalancerSourceRanges: []
 
 ingress:
   enabled: false
@@ -117,15 +120,6 @@ config:
   adminUsername: ""
   adminPassword: ""
   
-  # Claude API configuration (using application defaults)
-  
-  # Proxy configuration
-  defaultProxyTimeout: 60000
-  maxProxyRetries: 3
-  
-  # Usage limits
-  defaultTokenLimit: 1000000
-  
   # Logging configuration
   logLevel: "info"
   logMaxSize: "10m"
@@ -136,27 +130,29 @@ config:
   tokenUsageRetention: 2592000000
   healthCheckInterval: 60000
   timezoneOffset: 8
-  
-  # Web interface configuration (using application defaults)
-  
-  # Development configuration (using application defaults)
 
-# ServiceMonitor for Prometheus
+# ServiceMonitor for Prometheus monitoring
 serviceMonitor:
   enabled: false
   namespace: ""
   labels: {}
+  annotations: {}
   interval: 30s
   path: /prometheus
   port: http
   scrapeTimeout: 10s
+  relabelings: []
+  metricRelabelings: []
+  namespaceSelector: {}
 
 # Persistent Volume Claims
 persistence:
   enabled: true
   # storageClass: ""
-  accessMode: ReadWriteOnce
+  accessModes:
+    - ReadWriteOnce
   size: 1Gi
+  logsSize: 1Gi
   annotations: {}
 
 # Additional volumes and volume mounts
