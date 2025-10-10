@@ -858,7 +858,9 @@ class RedisClient {
 
     // 获取账户创建时间来计算平均值 - 支持不同类型的账号
     let accountData = {}
-    if (accountType === 'openai') {
+    if (accountType === 'droid') {
+      accountData = await this.client.hgetall(`droid:account:${accountId}`)
+    } else if (accountType === 'openai') {
       accountData = await this.client.hgetall(`openai:account:${accountId}`)
     } else if (accountType === 'openai-responses') {
       accountData = await this.client.hgetall(`openai_responses_account:${accountId}`)
@@ -873,6 +875,9 @@ class RedisClient {
       }
       if (!accountData.createdAt) {
         accountData = await this.client.hgetall(`openai_account:${accountId}`)
+      }
+      if (!accountData.createdAt) {
+        accountData = await this.client.hgetall(`droid:account:${accountId}`)
       }
     }
     const createdAt = accountData.createdAt ? new Date(accountData.createdAt) : new Date()
@@ -1066,6 +1071,35 @@ class RedisClient {
     const key = `claude:account:${accountId}`
     return await this.client.del(key)
   }
+
+  // 🤖 Droid 账户相关操作
+  async setDroidAccount(accountId, accountData) {
+    const key = `droid:account:${accountId}`
+    await this.client.hset(key, accountData)
+  }
+
+  async getDroidAccount(accountId) {
+    const key = `droid:account:${accountId}`
+    return await this.client.hgetall(key)
+  }
+
+  async getAllDroidAccounts() {
+    const keys = await this.client.keys('droid:account:*')
+    const accounts = []
+    for (const key of keys) {
+      const accountData = await this.client.hgetall(key)
+      if (accountData && Object.keys(accountData).length > 0) {
+        accounts.push({ id: key.replace('droid:account:', ''), ...accountData })
+      }
+    }
+    return accounts
+  }
+
+  async deleteDroidAccount(accountId) {
+    const key = `droid:account:${accountId}`
+    return await this.client.del(key)
+  }
+
   async setOpenAiAccount(accountId, accountData) {
     const key = `openai:account:${accountId}`
     await this.client.hset(key, accountData)

@@ -104,7 +104,9 @@
                     ? 'Claude OAuth 专属账号'
                     : platform === 'openai'
                       ? 'OpenAI 专属账号'
-                      : 'OAuth 专属账号'
+                      : platform === 'droid'
+                        ? 'Droid 专属账号'
+                        : 'OAuth 专属账号'
                 }}
               </div>
               <div
@@ -241,7 +243,7 @@ const props = defineProps({
   platform: {
     type: String,
     required: true,
-    validator: (value) => ['claude', 'gemini', 'openai', 'bedrock'].includes(value)
+    validator: (value) => ['claude', 'gemini', 'openai', 'bedrock', 'droid'].includes(value)
   },
   accounts: {
     type: Array,
@@ -383,6 +385,8 @@ const filteredOAuthAccounts = computed(() => {
   } else if (props.platform === 'openai') {
     // 对于 OpenAI，只显示 openai 类型的账号
     accounts = sortedAccounts.value.filter((a) => a.platform === 'openai')
+  } else if (props.platform === 'droid') {
+    accounts = sortedAccounts.value.filter((a) => a.platform === 'droid')
   } else {
     // 其他平台显示所有非特殊类型的账号
     accounts = sortedAccounts.value.filter(

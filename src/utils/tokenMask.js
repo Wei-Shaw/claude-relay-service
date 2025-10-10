@@ -17,8 +17,18 @@ function maskToken(token, visiblePercent = 70) {
   const { length } = token
 
   // 对于非常短的 token，至少隐藏一部分
+  if (length <= 2) {
+    return '*'.repeat(length)
+  }
+
+  if (length <= 5) {
+    return token.slice(0, 1) + '*'.repeat(length - 1)
+  }
+
   if (length <= 10) {
-    return token.slice(0, 5) + '*'.repeat(length - 5)
+    const visibleLength = Math.min(5, length - 2)
+    const front = token.slice(0, visibleLength)
+    return front + '*'.repeat(length - visibleLength)
   }
 
   // 计算可见字符数量

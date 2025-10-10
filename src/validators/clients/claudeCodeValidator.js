@@ -50,7 +50,11 @@ class ClaudeCodeValidator {
       return false
     }
 
-    const systemEntries = Array.isArray(body.system) ? body.system : []
+    const systemEntries = Array.isArray(body.system) ? body.system : null
+    if (!systemEntries) {
+      return false
+    }
+
     for (const entry of systemEntries) {
       const rawText = typeof entry?.text === 'string' ? entry.text : ''
       const { bestScore } = bestSimilarityByTemplates(rawText)

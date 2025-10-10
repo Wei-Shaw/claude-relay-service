@@ -26,6 +26,14 @@ const CLIENT_DEFINITIONS = {
     displayName: 'Codex Command Line Tool',
     description: 'Cursor/Codex command-line interface',
     icon: '🔷'
+  },
+
+  DROID_CLI: {
+    id: 'droid_cli',
+    name: 'Droid CLI',
+    displayName: 'Factory Droid CLI',
+    description: 'Factory Droid platform command-line interface',
+    icon: '🤖'
   }
 }
 
@@ -33,7 +41,8 @@ const CLIENT_DEFINITIONS = {
 const CLIENT_IDS = {
   CLAUDE_CODE: 'claude_code',
   GEMINI_CLI: 'gemini_cli',
-  CODEX_CLI: 'codex_cli'
+  CODEX_CLI: 'codex_cli',
+  DROID_CLI: 'droid_cli'
 }
 
 // 获取所有客户端定义
