@@ -1255,15 +1255,18 @@ const testingConnection = ref(false)
 const savingPlatform = ref(false)
 
 // Webhook 配置
+const DEFAULT_WEBHOOK_NOTIFICATION_TYPES = {
+  accountAnomaly: true,
+  quotaWarning: true,
+  systemError: true,
+  securityAlert: true,
+  rateLimitRecovery: true
+}
+
 const webhookConfig = ref({
   enabled: false,
   platforms: [],
-  notificationTypes: {
-    accountAnomaly: true,
-    quotaWarning: true,
-    systemError: true,
-    securityAlert: true
-  },
+  notificationTypes: { ...DEFAULT_WEBHOOK_NOTIFICATION_TYPES },
   retrySettings: {
     maxRetries: 3,
     retryDelay: 1000,
@@ -1475,7 +1478,14 @@ const loadWebhookConfig = async () => {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
-      webhookConfig.value = response.config
+      const config = response.config || {}
+      webhookConfig.value = {
+        ...config,
+        notificationTypes: {
+          ...DEFAULT_WEBHOOK_NOTIFICATION_TYPES,
+          ...(config.notificationTypes || {})
+        }
+      }
     }
   } catch (error) {
     if (error.name === 'AbortError') return
@@ -1489,10 +1499,19 @@ const loadWebhookConfig = async () => {
 const saveWebhookConfig = async () => {
   if (!isMounted.value) return
   try {
-    const response = await apiClient.post('/admin/webhook/config', webhookConfig.value, {
+    const payload = {
+      ...webhookConfig.value,
+      notificationTypes: {
+        ...DEFAULT_WEBHOOK_NOTIFICATION_TYPES,
+        ...(webhookConfig.value.notificationTypes || {})
+      }
+    }
+
+    const response = await apiClient.post('/admin/webhook/config', payload, {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
+      webhookConfig.value = payload
       showToast('配置已保存', 'success')
     }
   } catch (error) {
@@ -1930,6 +1949,7 @@ const getNotificationTypeName = (type) => {
     quotaWarning: '配额警告',
     systemError: '系统错误',
     securityAlert: '安全警报',
+    rateLimitRecovery: '限流恢复',
     test: '测试通知'
   }
   return names[type] || type
@@ -1941,6 +1961,7 @@ const getNotificationTypeDescription = (type) => {
     quotaWarning: 'API调用配额不足警告',
     systemError: '系统运行错误和故障',
     securityAlert: '安全相关的警报通知',
+    rateLimitRecovery: '限流状态恢复时发送提醒',
     test: '用于测试Webhook连接是否正常'
   }
   return descriptions[type] || ''

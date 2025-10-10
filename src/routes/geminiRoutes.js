@@ -8,6 +8,7 @@ const crypto = require('crypto')
 const sessionHelper = require('../utils/sessionHelper')
 const unifiedGeminiScheduler = require('../services/unifiedGeminiScheduler')
 const apiKeyService = require('../services/apiKeyService')
+const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 // const { OAuth2Client } = require('google-auth-library'); // OAuth2Client is not used in this file
 
 // 生成会话哈希
@@ -27,6 +28,51 @@ function generateSessionHash(req) {
 function checkPermissions(apiKeyData, requiredPermission = 'gemini') {
   const permissions = apiKeyData.permissions || 'all'
   return permissions === 'all' || permissions === requiredPermission
+}
+
+// 确保请求具有 Gemini 访问权限
+function ensureGeminiPermission(req, res) {
+  const apiKeyData = req.apiKey || {}
+  if (checkPermissions(apiKeyData, 'gemini')) {
+    return true
+  }
+
+  logger.security(
+    `🚫 API Key ${apiKeyData.id || 'unknown'} 缺少 Gemini 权限，拒绝访问 ${req.originalUrl}`
+  )
+
+  res.status(403).json({
+    error: {
+      message: 'This API key does not have permission to access Gemini',
+      type: 'permission_denied'
+    }
+  })
+  return false
+}
+
+async function applyRateLimitTracking(req, usageSummary, model, context = '') {
+  if (!req.rateLimitInfo) {
+    return
+  }
+
+  const label = context ? ` (${context})` : ''
+
+  try {
+    const { totalTokens, totalCost } = await updateRateLimitCounters(
+      req.rateLimitInfo,
+      usageSummary,
+      model
+    )
+
+    if (totalTokens > 0) {
+      logger.api(`📊 Updated rate limit token count${label}: +${totalTokens} tokens`)
+    }
+    if (typeof totalCost === 'number' && totalCost > 0) {
+      logger.api(`💰 Updated rate limit cost count${label}: +$${totalCost.toFixed(6)}`)
+    }
+  } catch (error) {
+    logger.error(`❌ Failed to update rate limit counters${label}:`, error)
+  }
 }
 
 // Gemini 消息处理端点
@@ -309,6 +355,10 @@ router.get('/key-info', authenticateApiKey, async (req, res) => {
 // 共用的 loadCodeAssist 处理函数
 async function handleLoadCodeAssist(req, res) {
   try {
+    if (!ensureGeminiPermission(req, res)) {
+      return undefined
+    }
+
     const sessionHash = sessionHelper.generateSessionHash(req.body)
 
     // 从路径参数或请求体中获取模型名
@@ -388,6 +438,10 @@ async function handleLoadCodeAssist(req, res) {
 // 共用的 onboardUser 处理函数
 async function handleOnboardUser(req, res) {
   try {
+    if (!ensureGeminiPermission(req, res)) {
+      return undefined
+    }
+
     // 提取请求参数
     const { tierId, cloudaicompanionProject, metadata } = req.body
     const sessionHash = sessionHelper.generateSessionHash(req.body)
@@ -475,6 +529,10 @@ async function handleOnboardUser(req, res) {
 // 共用的 countTokens 处理函数
 async function handleCountTokens(req, res) {
   try {
+    if (!ensureGeminiPermission(req, res)) {
+      return undefined
+    }
+
     // 处理请求体结构，支持直接 contents 或 request.contents
     const requestData = req.body.request || req.body
     const { contents } = requestData
@@ -538,6 +596,10 @@ async function handleCountTokens(req, res) {
 // 共用的 generateContent 处理函数
 async function handleGenerateContent(req, res) {
   try {
+    if (!ensureGeminiPermission(req, res)) {
+      return undefined
+    }
+
     const { project, user_prompt_id, request: requestData } = req.body
     // 从路径参数或请求体中获取模型名
     const model = req.body.model || req.params.modelName || 'gemini-2.5-flash'
@@ -643,6 +705,18 @@ async function handleGenerateContent(req, res) {
         logger.info(
           `📊 Recorded Gemini usage - Input: ${usage.promptTokenCount}, Output: ${usage.candidatesTokenCount}, Total: ${usage.totalTokenCount}`
         )
+
+        await applyRateLimitTracking(
+          req,
+          {
+            inputTokens: usage.promptTokenCount || 0,
+            outputTokens: usage.candidatesTokenCount || 0,
+            cacheCreateTokens: 0,
+            cacheReadTokens: 0
+          },
+          model,
+          'gemini-non-stream'
+        )
       } catch (error) {
         logger.error('Failed to record Gemini usage:', error)
       }
@@ -676,6 +750,10 @@ async function handleStreamGenerateContent(req, res) {
   let abortController = null
 
   try {
+    if (!ensureGeminiPermission(req, res)) {
+      return undefined
+    }
+
     const { project, user_prompt_id, request: requestData } = req.body
     // 从路径参数或请求体中获取模型名
     const model = req.body.model || req.params.modelName || 'gemini-2.5-flash'
@@ -894,6 +972,18 @@ async function handleStreamGenerateContent(req, res) {
           )
           logger.info(
             `📊 Recorded Gemini stream usage - Input: ${totalUsage.promptTokenCount}, Output: ${totalUsage.candidatesTokenCount}, Total: ${totalUsage.totalTokenCount}`
+          )
+
+          await applyRateLimitTracking(
+            req,
+            {
+              inputTokens: totalUsage.promptTokenCount || 0,
+              outputTokens: totalUsage.candidatesTokenCount || 0,
+              cacheCreateTokens: 0,
+              cacheReadTokens: 0
+            },
+            model,
+            'gemini-stream'
           )
         } catch (error) {
           logger.error('Failed to record Gemini usage:', error)

@@ -10,6 +10,8 @@ const logger = require('../utils/logger')
 const config = require('../../config/config')
 const claudeCodeHeadersService = require('./claudeCodeHeadersService')
 const redis = require('../models/redis')
+const ClaudeCodeValidator = require('../validators/clients/claudeCodeValidator')
+const { formatDateWithTimezone } = require('../utils/dateHelper')
 
 class ClaudeRelayService {
   constructor() {
@@ -20,43 +22,25 @@ class ClaudeRelayService {
     this.claudeCodeSystemPrompt = "You are Claude Code, Anthropic's official CLI for Claude."
   }
 
-  // 🔍 判断是否是真实的 Claude Code 请求
-  isRealClaudeCodeRequest(requestBody, clientHeaders) {
-    // 检查 user-agent 是否匹配 Claude Code 格式
-    const userAgent = clientHeaders?.['user-agent'] || clientHeaders?.['User-Agent'] || ''
-    const isClaudeCodeUserAgent = /^claude-cli\/[\d.]+\s+\(/i.test(userAgent)
-
-    // 检查系统提示词是否包含 Claude Code 标识
-    const hasClaudeCodeSystemPrompt = this._hasClaudeCodeSystemPrompt(requestBody)
-
-    // 只有当 user-agent 匹配且系统提示词正确时，才认为是真实的 Claude Code 请求
-    return isClaudeCodeUserAgent && hasClaudeCodeSystemPrompt
+  _buildStandardRateLimitMessage(resetTime) {
+    if (!resetTime) {
+      return '此专属账号已触发 Anthropic 限流控制。'
+    }
+    const formattedReset = formatDateWithTimezone(resetTime)
+    return `此专属账号已触发 Anthropic 限流控制，将于 ${formattedReset} 自动恢复。`
   }
 
-  // 🔍 检查请求中是否包含 Claude Code 系统提示词
-  _hasClaudeCodeSystemPrompt(requestBody) {
-    if (!requestBody || !requestBody.system) {
-      return false
+  _buildOpusLimitMessage(resetTime) {
+    if (!resetTime) {
+      return '此专属账号的Opus模型已达到周使用限制，请尝试切换其他模型后再试。'
     }
+    const formattedReset = formatDateWithTimezone(resetTime)
+    return `此专属账号的Opus模型已达到周使用限制，将于 ${formattedReset} 自动恢复，请尝试切换其他模型后再试。`
+  }
 
-    // 如果是字符串格式，一定不是真实的 Claude Code 请求
-    if (typeof requestBody.system === 'string') {
-      return false
-    }
-
-    // 处理数组格式
-    if (Array.isArray(requestBody.system) && requestBody.system.length > 0) {
-      const firstItem = requestBody.system[0]
-      // 检查第一个元素是否包含 Claude Code 提示词
-      return (
-        firstItem &&
-        firstItem.type === 'text' &&
-        firstItem.text &&
-        firstItem.text === this.claudeCodeSystemPrompt
-      )
-    }
-
-    return false
+  // 🔍 判断是否是真实的 Claude Code 请求
+  isRealClaudeCodeRequest(requestBody) {
+    return ClaudeCodeValidator.hasClaudeCodeSystemPrompt(requestBody)
   }
 
   // 🚀 转发请求到Claude API
@@ -79,15 +63,38 @@ class ClaudeRelayService {
         requestedModel: requestBody.model
       })
 
+      const isOpusModelRequest =
+        typeof requestBody?.model === 'string' && requestBody.model.toLowerCase().includes('opus')
+
       // 生成会话哈希用于sticky会话
       const sessionHash = sessionHelper.generateSessionHash(requestBody)
 
       // 选择可用的Claude账户（支持专属绑定和sticky会话）
-      const accountSelection = await unifiedClaudeScheduler.selectAccountForApiKey(
-        apiKeyData,
-        sessionHash,
-        requestBody.model
-      )
+      let accountSelection
+      try {
+        accountSelection = await unifiedClaudeScheduler.selectAccountForApiKey(
+          apiKeyData,
+          sessionHash,
+          requestBody.model
+        )
+      } catch (error) {
+        if (error.code === 'CLAUDE_DEDICATED_RATE_LIMITED') {
+          const limitMessage = this._buildStandardRateLimitMessage(error.rateLimitEndAt)
+          logger.warn(
+            `🚫 Dedicated account ${error.accountId} is rate limited for API key ${apiKeyData.name}, returning 403`
+          )
+          return {
+            statusCode: 403,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              error: 'upstream_rate_limited',
+              message: limitMessage
+            }),
+            accountId: error.accountId
+          }
+        }
+        throw error
+      }
       const { accountId } = accountSelection
       const { accountType } = accountSelection
 
@@ -95,14 +102,47 @@ class ClaudeRelayService {
         `📤 Processing API request for key: ${apiKeyData.name || apiKeyData.id}, account: ${accountId} (${accountType})${sessionHash ? `, session: ${sessionHash}` : ''}`
       )
 
+      // 获取账户信息
+      let account = await claudeAccountService.getAccount(accountId)
+
+      if (isOpusModelRequest) {
+        await claudeAccountService.clearExpiredOpusRateLimit(accountId)
+        account = await claudeAccountService.getAccount(accountId)
+      }
+
+      const isDedicatedOfficialAccount =
+        accountType === 'claude-official' &&
+        apiKeyData.claudeAccountId &&
+        !apiKeyData.claudeAccountId.startsWith('group:') &&
+        apiKeyData.claudeAccountId === accountId
+
+      let opusRateLimitActive = false
+      let opusRateLimitEndAt = null
+      if (isOpusModelRequest) {
+        opusRateLimitActive = await claudeAccountService.isAccountOpusRateLimited(accountId)
+        opusRateLimitEndAt = account?.opusRateLimitEndAt || null
+      }
+
+      if (isOpusModelRequest && isDedicatedOfficialAccount && opusRateLimitActive) {
+        const limitMessage = this._buildOpusLimitMessage(opusRateLimitEndAt)
+        logger.warn(
+          `🚫 Dedicated account ${account?.name || accountId} is under Opus weekly limit until ${opusRateLimitEndAt}`
+        )
+        return {
+          statusCode: 403,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            error: 'opus_weekly_limit',
+            message: limitMessage
+          }),
+          accountId
+        }
+      }
+
       // 获取有效的访问token
       const accessToken = await claudeAccountService.getValidAccessToken(accountId)
 
-      // 获取账户信息
-      const account = await claudeAccountService.getAccount(accountId)
-
-      // 处理请求体（传递 clientHeaders 以判断是否需要设置 Claude Code 系统提示词）
-      const processedBody = this._processRequestBody(requestBody, clientHeaders, account)
+      const processedBody = this._processRequestBody(requestBody, account)
 
       // 获取代理配置
       const proxyAgent = await this._getProxyAgent(accountId)
@@ -148,6 +188,7 @@ class ClaudeRelayService {
       if (response.statusCode !== 200 && response.statusCode !== 201) {
         let isRateLimited = false
         let rateLimitResetTimestamp = null
+        let dedicatedRateLimitMessage = null
 
         // 检查是否为401状态码（未授权）
         if (response.statusCode === 401) {
@@ -205,16 +246,42 @@ class ClaudeRelayService {
         }
         // 检查是否为429状态码
         else if (response.statusCode === 429) {
-          isRateLimited = true
+          const resetHeader = response.headers
+            ? response.headers['anthropic-ratelimit-unified-reset']
+            : null
+          const parsedResetTimestamp = resetHeader ? parseInt(resetHeader, 10) : NaN
 
-          // 提取限流重置时间戳
-          if (response.headers && response.headers['anthropic-ratelimit-unified-reset']) {
-            rateLimitResetTimestamp = parseInt(
-              response.headers['anthropic-ratelimit-unified-reset']
+          if (isOpusModelRequest && !Number.isNaN(parsedResetTimestamp)) {
+            await claudeAccountService.markAccountOpusRateLimited(accountId, parsedResetTimestamp)
+            logger.warn(
+              `🚫 Account ${accountId} hit Opus limit, resets at ${new Date(parsedResetTimestamp * 1000).toISOString()}`
             )
-            logger.info(
-              `🕐 Extracted rate limit reset timestamp: ${rateLimitResetTimestamp} (${new Date(rateLimitResetTimestamp * 1000).toISOString()})`
-            )
+
+            if (isDedicatedOfficialAccount) {
+              const limitMessage = this._buildOpusLimitMessage(parsedResetTimestamp)
+              return {
+                statusCode: 403,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  error: 'opus_weekly_limit',
+                  message: limitMessage
+                }),
+                accountId
+              }
+            }
+          } else {
+            isRateLimited = true
+            if (!Number.isNaN(parsedResetTimestamp)) {
+              rateLimitResetTimestamp = parsedResetTimestamp
+              logger.info(
+                `🕐 Extracted rate limit reset timestamp: ${rateLimitResetTimestamp} (${new Date(rateLimitResetTimestamp * 1000).toISOString()})`
+              )
+            }
+            if (isDedicatedOfficialAccount) {
+              dedicatedRateLimitMessage = this._buildStandardRateLimitMessage(
+                rateLimitResetTimestamp || account?.rateLimitEndAt
+              )
+            }
           }
         } else {
           // 检查响应体中的错误信息
@@ -241,6 +308,11 @@ class ClaudeRelayService {
         }
 
         if (isRateLimited) {
+          if (isDedicatedOfficialAccount && !dedicatedRateLimitMessage) {
+            dedicatedRateLimitMessage = this._buildStandardRateLimitMessage(
+              rateLimitResetTimestamp || account?.rateLimitEndAt
+            )
+          }
           logger.warn(
             `🚫 Rate limit detected for account ${accountId}, status: ${response.statusCode}`
           )
@@ -251,6 +323,18 @@ class ClaudeRelayService {
             sessionHash,
             rateLimitResetTimestamp
           )
+
+          if (dedicatedRateLimitMessage) {
+            return {
+              statusCode: 403,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                error: 'upstream_rate_limited',
+                message: dedicatedRateLimitMessage
+              }),
+              accountId
+            }
+          }
         }
       } else if (response.statusCode === 200 || response.statusCode === 201) {
         // 提取5小时会话窗口状态
@@ -303,7 +387,7 @@ class ClaudeRelayService {
         if (
           clientHeaders &&
           Object.keys(clientHeaders).length > 0 &&
-          this.isRealClaudeCodeRequest(requestBody, clientHeaders)
+          this.isRealClaudeCodeRequest(requestBody)
         ) {
           await claudeCodeHeadersService.storeAccountHeaders(accountId, clientHeaders)
         }
@@ -350,7 +434,7 @@ class ClaudeRelayService {
   }
 
   // 🔄 处理请求体
-  _processRequestBody(body, clientHeaders = {}, account = null) {
+  _processRequestBody(body, account = null) {
     if (!body) {
       return body
     }
@@ -365,7 +449,7 @@ class ClaudeRelayService {
     this._stripTtlFromCacheControl(processedBody)
 
     // 判断是否是真实的 Claude Code 请求
-    const isRealClaudeCode = this.isRealClaudeCodeRequest(processedBody, clientHeaders)
+    const isRealClaudeCode = this.isRealClaudeCodeRequest(processedBody)
 
     // 如果不是真实的 Claude Code 请求，需要设置 Claude Code 系统提示词
     if (!isRealClaudeCode) {
@@ -453,7 +537,7 @@ class ClaudeRelayService {
     }
 
     // 处理统一的客户端标识
-    if (account && account.useUnifiedClientId && account.unifiedClientId) {
+    if (account && account.useUnifiedClientId === 'true' && account.unifiedClientId) {
       this._replaceClientId(processedBody, account.unifiedClientId)
     }
 
@@ -666,7 +750,7 @@ class ClaudeRelayService {
     const filteredHeaders = this._filterClientHeaders(clientHeaders)
 
     // 判断是否是真实的 Claude Code 请求
-    const isRealClaudeCode = this.isRealClaudeCodeRequest(body, clientHeaders)
+    const isRealClaudeCode = this.isRealClaudeCodeRequest(body)
 
     // 如果不是真实的 Claude Code 请求，需要使用从账户获取的 Claude Code headers
     const finalHeaders = { ...filteredHeaders }
@@ -709,14 +793,12 @@ class ClaudeRelayService {
       }
 
       // 使用统一 User-Agent 或客户端提供的，最后使用默认值
-      if (!options.headers['User-Agent'] && !options.headers['user-agent']) {
-        const userAgent = unifiedUA || 'claude-cli/1.0.57 (external, cli)'
-        options.headers['User-Agent'] = userAgent
+      if (!options.headers['user-agent'] || unifiedUA !== null) {
+        const userAgent = unifiedUA || 'claude-cli/1.0.119 (external, cli)'
+        options.headers['user-agent'] = userAgent
       }
 
-      logger.info(
-        `🔗 指纹是这个: ${options.headers['User-Agent'] || options.headers['user-agent']}`
-      )
+      logger.info(`🔗 指纹是这个: ${options.headers['user-agent']}`)
 
       // 使用自定义的 betaHeader 或默认值
       const betaHeader =
@@ -838,15 +920,38 @@ class ClaudeRelayService {
         requestedModel: requestBody.model
       })
 
+      const isOpusModelRequest =
+        typeof requestBody?.model === 'string' && requestBody.model.toLowerCase().includes('opus')
+
       // 生成会话哈希用于sticky会话
       const sessionHash = sessionHelper.generateSessionHash(requestBody)
 
       // 选择可用的Claude账户（支持专属绑定和sticky会话）
-      const accountSelection = await unifiedClaudeScheduler.selectAccountForApiKey(
-        apiKeyData,
-        sessionHash,
-        requestBody.model
-      )
+      let accountSelection
+      try {
+        accountSelection = await unifiedClaudeScheduler.selectAccountForApiKey(
+          apiKeyData,
+          sessionHash,
+          requestBody.model
+        )
+      } catch (error) {
+        if (error.code === 'CLAUDE_DEDICATED_RATE_LIMITED') {
+          const limitMessage = this._buildStandardRateLimitMessage(error.rateLimitEndAt)
+          if (!responseStream.headersSent) {
+            responseStream.status(403)
+            responseStream.setHeader('Content-Type', 'application/json')
+          }
+          responseStream.write(
+            JSON.stringify({
+              error: 'upstream_rate_limited',
+              message: limitMessage
+            })
+          )
+          responseStream.end()
+          return
+        }
+        throw error
+      }
       const { accountId } = accountSelection
       const { accountType } = accountSelection
 
@@ -854,14 +959,45 @@ class ClaudeRelayService {
         `📡 Processing streaming API request with usage capture for key: ${apiKeyData.name || apiKeyData.id}, account: ${accountId} (${accountType})${sessionHash ? `, session: ${sessionHash}` : ''}`
       )
 
+      // 获取账户信息
+      let account = await claudeAccountService.getAccount(accountId)
+
+      if (isOpusModelRequest) {
+        await claudeAccountService.clearExpiredOpusRateLimit(accountId)
+        account = await claudeAccountService.getAccount(accountId)
+      }
+
+      const isDedicatedOfficialAccount =
+        accountType === 'claude-official' &&
+        apiKeyData.claudeAccountId &&
+        !apiKeyData.claudeAccountId.startsWith('group:') &&
+        apiKeyData.claudeAccountId === accountId
+
+      let opusRateLimitActive = false
+      if (isOpusModelRequest) {
+        opusRateLimitActive = await claudeAccountService.isAccountOpusRateLimited(accountId)
+      }
+
+      if (isOpusModelRequest && isDedicatedOfficialAccount && opusRateLimitActive) {
+        const limitMessage = this._buildOpusLimitMessage(account?.opusRateLimitEndAt)
+        if (!responseStream.headersSent) {
+          responseStream.status(403)
+          responseStream.setHeader('Content-Type', 'application/json')
+        }
+        responseStream.write(
+          JSON.stringify({
+            error: 'opus_weekly_limit',
+            message: limitMessage
+          })
+        )
+        responseStream.end()
+        return
+      }
+
       // 获取有效的访问token
       const accessToken = await claudeAccountService.getValidAccessToken(accountId)
 
-      // 获取账户信息
-      const account = await claudeAccountService.getAccount(accountId)
-
-      // 处理请求体（传递 clientHeaders 以判断是否需要设置 Claude Code 系统提示词）
-      const processedBody = this._processRequestBody(requestBody, clientHeaders, account)
+      const processedBody = this._processRequestBody(requestBody, account)
 
       // 获取代理配置
       const proxyAgent = await this._getProxyAgent(accountId)
@@ -881,7 +1017,8 @@ class ClaudeRelayService {
         accountType,
         sessionHash,
         streamTransformer,
-        options
+        options,
+        isDedicatedOfficialAccount
       )
     } catch (error) {
       logger.error(`❌ Claude stream relay with usage capture failed:`, error)
@@ -901,10 +1038,14 @@ class ClaudeRelayService {
     accountType,
     sessionHash,
     streamTransformer = null,
-    requestOptions = {}
+    requestOptions = {},
+    isDedicatedOfficialAccount = false
   ) {
     // 获取账户信息用于统一 User-Agent
     const account = await claudeAccountService.getAccount(accountId)
+
+    const isOpusModelRequest =
+      typeof body?.model === 'string' && body.model.toLowerCase().includes('opus')
 
     // 获取统一的 User-Agent
     const unifiedUA = await this.captureAndGetUnifiedUserAgent(clientHeaders, account)
@@ -913,7 +1054,7 @@ class ClaudeRelayService {
     const filteredHeaders = this._filterClientHeaders(clientHeaders)
 
     // 判断是否是真实的 Claude Code 请求
-    const isRealClaudeCode = this.isRealClaudeCodeRequest(body, clientHeaders)
+    const isRealClaudeCode = this.isRealClaudeCodeRequest(body)
 
     // 如果不是真实的 Claude Code 请求，需要使用从账户获取的 Claude Code headers
     const finalHeaders = { ...filteredHeaders }
@@ -950,14 +1091,12 @@ class ClaudeRelayService {
       }
 
       // 使用统一 User-Agent 或客户端提供的，最后使用默认值
-      if (!options.headers['User-Agent'] && !options.headers['user-agent']) {
-        const userAgent = unifiedUA || 'claude-cli/1.0.57 (external, cli)'
-        options.headers['User-Agent'] = userAgent
+      if (!options.headers['user-agent'] || unifiedUA !== null) {
+        const userAgent = unifiedUA || 'claude-cli/1.0.119 (external, cli)'
+        options.headers['user-agent'] = userAgent
       }
 
-      logger.info(
-        `🔗 指纹是这个: ${options.headers['User-Agent'] || options.headers['user-agent']}`
-      )
+      logger.info(`🔗 指纹是这个: ${options.headers['user-agent']}`)
       // 使用自定义的 betaHeader 或默认值
       const betaHeader =
         requestOptions?.betaHeader !== undefined ? requestOptions.betaHeader : this.betaHeader
@@ -965,11 +1104,79 @@ class ClaudeRelayService {
         options.headers['anthropic-beta'] = betaHeader
       }
 
-      const req = https.request(options, (res) => {
+      const req = https.request(options, async (res) => {
         logger.debug(`🌊 Claude stream response status: ${res.statusCode}`)
 
         // 错误响应处理
         if (res.statusCode !== 200) {
+          if (res.statusCode === 429) {
+            const resetHeader = res.headers
+              ? res.headers['anthropic-ratelimit-unified-reset']
+              : null
+            const parsedResetTimestamp = resetHeader ? parseInt(resetHeader, 10) : NaN
+
+            if (isOpusModelRequest) {
+              if (!Number.isNaN(parsedResetTimestamp)) {
+                await claudeAccountService.markAccountOpusRateLimited(
+                  accountId,
+                  parsedResetTimestamp
+                )
+                logger.warn(
+                  `🚫 [Stream] Account ${accountId} hit Opus limit, resets at ${new Date(parsedResetTimestamp * 1000).toISOString()}`
+                )
+              }
+
+              if (isDedicatedOfficialAccount) {
+                const limitMessage = this._buildOpusLimitMessage(parsedResetTimestamp)
+                if (!responseStream.headersSent) {
+                  responseStream.status(403)
+                  responseStream.setHeader('Content-Type', 'application/json')
+                }
+                responseStream.write(
+                  JSON.stringify({
+                    error: 'opus_weekly_limit',
+                    message: limitMessage
+                  })
+                )
+                responseStream.end()
+                res.resume()
+                resolve()
+                return
+              }
+            } else {
+              const rateLimitResetTimestamp = Number.isNaN(parsedResetTimestamp)
+                ? null
+                : parsedResetTimestamp
+              await unifiedClaudeScheduler.markAccountRateLimited(
+                accountId,
+                accountType,
+                sessionHash,
+                rateLimitResetTimestamp
+              )
+              logger.warn(`🚫 [Stream] Rate limit detected for account ${accountId}, status 429`)
+
+              if (isDedicatedOfficialAccount) {
+                const limitMessage = this._buildStandardRateLimitMessage(
+                  rateLimitResetTimestamp || account?.rateLimitEndAt
+                )
+                if (!responseStream.headersSent) {
+                  responseStream.status(403)
+                  responseStream.setHeader('Content-Type', 'application/json')
+                }
+                responseStream.write(
+                  JSON.stringify({
+                    error: 'upstream_rate_limited',
+                    message: limitMessage
+                  })
+                )
+                responseStream.end()
+                res.resume()
+                resolve()
+                return
+              }
+            }
+          }
+
           // 将错误处理逻辑封装在一个异步函数中
           const handleErrorResponse = async () => {
             if (res.statusCode === 401) {
@@ -1319,22 +1526,34 @@ class ClaudeRelayService {
 
           // 处理限流状态
           if (rateLimitDetected || res.statusCode === 429) {
-            // 提取限流重置时间戳
-            let rateLimitResetTimestamp = null
-            if (res.headers && res.headers['anthropic-ratelimit-unified-reset']) {
-              rateLimitResetTimestamp = parseInt(res.headers['anthropic-ratelimit-unified-reset'])
-              logger.info(
-                `🕐 Extracted rate limit reset timestamp from stream: ${rateLimitResetTimestamp} (${new Date(rateLimitResetTimestamp * 1000).toISOString()})`
+            const resetHeader = res.headers
+              ? res.headers['anthropic-ratelimit-unified-reset']
+              : null
+            const parsedResetTimestamp = resetHeader ? parseInt(resetHeader, 10) : NaN
+
+            if (isOpusModelRequest && !Number.isNaN(parsedResetTimestamp)) {
+              await claudeAccountService.markAccountOpusRateLimited(accountId, parsedResetTimestamp)
+              logger.warn(
+                `🚫 [Stream] Account ${accountId} hit Opus limit, resets at ${new Date(parsedResetTimestamp * 1000).toISOString()}`
+              )
+            } else {
+              const rateLimitResetTimestamp = Number.isNaN(parsedResetTimestamp)
+                ? null
+                : parsedResetTimestamp
+
+              if (!Number.isNaN(parsedResetTimestamp)) {
+                logger.info(
+                  `🕐 Extracted rate limit reset timestamp from stream: ${parsedResetTimestamp} (${new Date(parsedResetTimestamp * 1000).toISOString()})`
+                )
+              }
+
+              await unifiedClaudeScheduler.markAccountRateLimited(
+                accountId,
+                accountType,
+                sessionHash,
+                rateLimitResetTimestamp
               )
             }
-
-            // 标记账号为限流状态并删除粘性会话映射
-            await unifiedClaudeScheduler.markAccountRateLimited(
-              accountId,
-              accountType,
-              sessionHash,
-              rateLimitResetTimestamp
-            )
           } else if (res.statusCode === 200) {
             // 请求成功，清除401和500错误计数
             await this.clearUnauthorizedErrors(accountId)
@@ -1365,7 +1584,7 @@ class ClaudeRelayService {
             if (
               clientHeaders &&
               Object.keys(clientHeaders).length > 0 &&
-              this.isRealClaudeCodeRequest(body, clientHeaders)
+              this.isRealClaudeCodeRequest(body)
             ) {
               await claudeCodeHeadersService.storeAccountHeaders(accountId, clientHeaders)
             }
@@ -1618,7 +1837,7 @@ class ClaudeRelayService {
   }
 
   // 🛠️ 统一的错误处理方法
-  async _handleServerError(accountId, statusCode, sessionHash = null, context = '') {
+  async _handleServerError(accountId, statusCode, _sessionHash = null, context = '') {
     try {
       await claudeAccountService.recordServerError(accountId, statusCode)
       const errorCount = await claudeAccountService.getServerErrorCount(accountId)
@@ -1634,10 +1853,10 @@ class ClaudeRelayService {
 
       if (errorCount > threshold) {
         const errorTypeLabel = isTimeout ? 'timeout' : '5xx'
+        // ⚠️ 只记录5xx/504告警，不再自动停止调度，避免上游抖动导致误停
         logger.error(
-          `❌ ${prefix}Account ${accountId} exceeded ${errorTypeLabel} error threshold (${errorCount} errors), marking as temp_error`
+          `❌ ${prefix}Account ${accountId} exceeded ${errorTypeLabel} error threshold (${errorCount} errors), please investigate upstream stability`
         )
-        await claudeAccountService.markAccountTempError(accountId, sessionHash)
       }
     } catch (handlingError) {
       logger.error(`❌ Failed to handle ${context} server error:`, handlingError)

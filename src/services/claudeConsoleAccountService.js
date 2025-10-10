@@ -490,20 +490,29 @@ class ClaudeConsoleAccountService {
             errorMessage: ''
           }
 
+          const hadAutoStop = accountData.rateLimitAutoStopped === 'true'
+
           // 只恢复因限流而自动停止的账户
-          if (accountData.rateLimitAutoStopped === 'true' && accountData.schedulable === 'false') {
+          if (hadAutoStop && accountData.schedulable === 'false') {
             updateData.schedulable = 'true' // 恢复调度
-            // 删除限流自动停止标记
-            await client.hdel(accountKey, 'rateLimitAutoStopped')
             logger.info(
               `✅ Auto-resuming scheduling for Claude Console account ${accountId} after rate limit cleared`
             )
+          }
+
+          if (hadAutoStop) {
+            await client.hdel(accountKey, 'rateLimitAutoStopped')
           }
 
           await client.hset(accountKey, updateData)
           logger.success(`✅ Rate limit removed and account re-enabled: ${accountId}`)
         }
       } else {
+        if (await client.hdel(accountKey, 'rateLimitAutoStopped')) {
+          logger.info(
+            `ℹ️ Removed stale auto-stop flag for Claude Console account ${accountId} during rate limit recovery`
+          )
+        }
         logger.success(`✅ Rate limit removed for Claude Console account: ${accountId}`)
       }
 

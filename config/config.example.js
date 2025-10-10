@@ -113,38 +113,6 @@ const config = {
     sessionSecret: process.env.WEB_SESSION_SECRET || 'CHANGE-THIS-SESSION-SECRET'
   },
 
-  // 🔒 客户端限制配置
-  clientRestrictions: {
-    // 预定义的客户端列表
-    predefinedClients: [
-      {
-        id: 'claude_code',
-        name: 'ClaudeCode',
-        description: 'Official Claude Code CLI',
-        // 匹配 Claude CLI 的 User-Agent
-        // 示例: claude-cli/1.0.58 (external, cli)
-        userAgentPattern: /^claude-cli\/[\d.]+\s+\(/i
-      },
-      {
-        id: 'gemini_cli',
-        name: 'Gemini-CLI',
-        description: 'Gemini Command Line Interface',
-        // 匹配 GeminiCLI 的 User-Agent
-        // 示例: GeminiCLI/v18.20.8 (darwin; arm64)
-        userAgentPattern: /^GeminiCLI\/v?[\d.]+\s+\(/i
-      }
-      // 添加自定义客户端示例：
-      // {
-      //   id: 'custom_client',
-      //   name: 'My Custom Client',
-      //   description: 'My custom API client',
-      //   userAgentPattern: /^MyClient\/[\d\.]+/i
-      // }
-    ],
-    // 是否允许自定义客户端（未来功能）
-    allowCustomClients: process.env.ALLOW_CUSTOM_CLIENTS === 'true'
-  },
-
   // 🔐 LDAP 认证配置
   ldap: {
     enabled: process.env.LDAP_ENABLED === 'true',

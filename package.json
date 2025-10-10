@@ -72,6 +72,7 @@
     "table": "^6.8.1",
     "uuid": "^9.0.1",
     "winston": "^3.11.0",
+    "string-similarity": "^4.0.4",
     "winston-daily-rotate-file": "^4.7.1"
   },
   "devDependencies": {

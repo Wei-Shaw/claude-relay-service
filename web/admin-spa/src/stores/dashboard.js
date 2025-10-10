@@ -59,6 +59,13 @@ export const useDashboardStore = defineStore('dashboard', () => {
     topApiKeys: [],
     totalApiKeys: 0
   })
+  const accountUsageTrendData = ref({
+    data: [],
+    topAccounts: [],
+    totalAccounts: 0,
+    group: 'claude',
+    groupLabel: 'Claude账户'
+  })
 
   // 日期筛选
   const dateFilter = ref({
@@ -77,6 +84,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
   // 趋势图粒度
   const trendGranularity = ref('day') // 'day' 或 'hour'
   const apiKeysTrendMetric = ref('requests') // 'requests' 或 'tokens'
+  const accountUsageGroup = ref('claude') // claude | openai | gemini
 
   // 默认时间
   const defaultTime = ref([new Date(2000, 1, 1, 0, 0, 0), new Date(2000, 2, 1, 23, 59, 59)])
@@ -503,6 +511,97 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
   }
 
+  async function loadAccountUsageTrend(group = accountUsageGroup.value) {
+    try {
+      let url = '/admin/account-usage-trend?'
+      let days = 7
+
+      if (trendGranularity.value === 'hour') {
+        url += `granularity=hour`
+
+        if (dateFilter.value.customRange && dateFilter.value.customRange.length === 2) {
+          const convertToUTC = (systemTzTimeStr) => {
+            const systemTz = 8
+            const [datePart, timePart] = systemTzTimeStr.split(' ')
+            const [year, month, day] = datePart.split('-').map(Number)
+            const [hours, minutes, seconds] = timePart.split(':').map(Number)
+
+            const utcDate = new Date(
+              Date.UTC(year, month - 1, day, hours - systemTz, minutes, seconds)
+            )
+            return utcDate.toISOString()
+          }
+
+          url += `&startDate=${encodeURIComponent(convertToUTC(dateFilter.value.customRange[0]))}`
+          url += `&endDate=${encodeURIComponent(convertToUTC(dateFilter.value.customRange[1]))}`
+        } else {
+          const now = new Date()
+          let startTime
+          let endTime
+
+          if (dateFilter.value.type === 'preset') {
+            switch (dateFilter.value.preset) {
+              case 'last24h': {
+                endTime = new Date(now)
+                startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+                break
+              }
+              case 'yesterday': {
+                const yesterday = new Date()
+                yesterday.setDate(yesterday.getDate() - 1)
+                startTime = getSystemTimezoneDay(yesterday, true)
+                endTime = getSystemTimezoneDay(yesterday, false)
+                break
+              }
+              case 'dayBefore': {
+                const dayBefore = new Date()
+                dayBefore.setDate(dayBefore.getDate() - 2)
+                startTime = getSystemTimezoneDay(dayBefore, true)
+                endTime = getSystemTimezoneDay(dayBefore, false)
+                break
+              }
+              default: {
+                startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+                endTime = now
+              }
+            }
+          } else {
+            startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+            endTime = now
+          }
+
+          url += `&startDate=${encodeURIComponent(startTime.toISOString())}`
+          url += `&endDate=${encodeURIComponent(endTime.toISOString())}`
+        }
+      } else {
+        days =
+          dateFilter.value.type === 'preset'
+            ? dateFilter.value.preset === 'today'
+              ? 1
+              : dateFilter.value.preset === '7days'
+                ? 7
+                : 30
+            : calculateDaysBetween(dateFilter.value.customStart, dateFilter.value.customEnd)
+        url += `granularity=day&days=${days}`
+      }
+
+      url += `&group=${group}`
+
+      const response = await apiClient.get(url)
+      if (response.success) {
+        accountUsageTrendData.value = {
+          data: response.data || [],
+          topAccounts: response.topAccounts || [],
+          totalAccounts: response.totalAccounts || 0,
+          group: response.group || group,
+          groupLabel: response.groupLabel || ''
+        }
+      }
+    } catch (error) {
+      console.error('加载账号使用趋势失败:', error)
+    }
+  }
+
   // 日期筛选相关方法
   function setDateFilterPreset(preset) {
     dateFilter.value.type = 'preset'
@@ -748,8 +847,14 @@ export const useDashboardStore = defineStore('dashboard', () => {
     await Promise.all([
       loadUsageTrend(days, trendGranularity.value),
       loadModelStats(modelPeriod),
-      loadApiKeysTrend(apiKeysTrendMetric.value)
+      loadApiKeysTrend(apiKeysTrendMetric.value),
+      loadAccountUsageTrend(accountUsageGroup.value)
     ])
+  }
+
+  function setAccountUsageGroup(group) {
+    accountUsageGroup.value = group
+    return loadAccountUsageTrend(group)
   }
 
   function calculateDaysBetween(start, end) {
@@ -774,9 +879,11 @@ export const useDashboardStore = defineStore('dashboard', () => {
     trendData,
     dashboardModelStats,
     apiKeysTrendData,
+    accountUsageTrendData,
     dateFilter,
     trendGranularity,
     apiKeysTrendMetric,
+    accountUsageGroup,
     defaultTime,
 
     // 计算属性
@@ -787,10 +894,12 @@ export const useDashboardStore = defineStore('dashboard', () => {
     loadUsageTrend,
     loadModelStats,
     loadApiKeysTrend,
+    loadAccountUsageTrend,
     setDateFilterPreset,
     onCustomDateRangeChange,
     setTrendGranularity,
     refreshChartsData,
+    setAccountUsageGroup,
     disabledDate
   }
 })

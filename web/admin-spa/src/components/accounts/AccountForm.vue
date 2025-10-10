@@ -466,15 +466,6 @@
                 >添加方式</label
               >
               <div class="flex flex-wrap gap-4">
-                <label v-if="form.platform === 'claude'" class="flex cursor-pointer items-center">
-                  <input
-                    v-model="form.addType"
-                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                    type="radio"
-                    value="setup-token"
-                  />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">Setup Token (推荐)</span>
-                </label>
                 <label class="flex cursor-pointer items-center">
                   <input
                     v-model="form.addType"
@@ -482,7 +473,18 @@
                     type="radio"
                     value="oauth"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">OAuth 授权</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300"
+                    >OAuth 授权 (用量可视化)</span
+                  >
+                </label>
+                <label v-if="form.platform === 'claude'" class="flex cursor-pointer items-center">
+                  <input
+                    v-model="form.addType"
+                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="radio"
+                    value="setup-token"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">Setup Token (效期长)</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -2799,7 +2801,7 @@ const form = ref({
   addType: (() => {
     const platform = props.account?.platform || 'claude'
     if (platform === 'gemini' || platform === 'openai') return 'oauth'
-    if (platform === 'claude') return 'setup-token'
+    if (platform === 'claude') return 'oauth'
     return 'manual'
   })(),
   name: props.account?.name || '',
@@ -3924,8 +3926,8 @@ watch(
     ) {
       form.value.addType = 'manual' // Claude Console、CCR、Bedrock 和 OpenAI-Responses 只支持手动模式
     } else if (newPlatform === 'claude') {
-      // 切换到 Claude 时，使用 Setup Token 作为默认方式
-      form.value.addType = 'setup-token'
+      // 切换到 Claude 时，使用 oauth 作为默认方式
+      form.value.addType = 'oauth'
     } else if (newPlatform === 'gemini') {
       // 切换到 Gemini 时，使用 OAuth 作为默认方式
       form.value.addType = 'oauth'

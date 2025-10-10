@@ -293,6 +293,48 @@ class OpenAIResponsesAccountService {
     )
   }
 
+  // 🚫 标记账户为未授权状态（401错误）
+  async markAccountUnauthorized(accountId, reason = 'OpenAI Responses账号认证失败（401错误）') {
+    const account = await this.getAccount(accountId)
+    if (!account) {
+      return
+    }
+
+    const now = new Date().toISOString()
+    const currentCount = parseInt(account.unauthorizedCount || '0', 10)
+    const unauthorizedCount = Number.isFinite(currentCount) ? currentCount + 1 : 1
+
+    await this.updateAccount(accountId, {
+      status: 'unauthorized',
+      schedulable: 'false',
+      errorMessage: reason,
+      unauthorizedAt: now,
+      unauthorizedCount: unauthorizedCount.toString()
+    })
+
+    logger.warn(
+      `🚫 OpenAI-Responses account ${account.name || accountId} marked as unauthorized due to 401 error`
+    )
+
+    try {
+      const webhookNotifier = require('../utils/webhookNotifier')
+      await webhookNotifier.sendAccountAnomalyNotification({
+        accountId,
+        accountName: account.name || accountId,
+        platform: 'openai',
+        status: 'unauthorized',
+        errorCode: 'OPENAI_UNAUTHORIZED',
+        reason,
+        timestamp: now
+      })
+      logger.info(
+        `📢 Webhook notification sent for OpenAI-Responses account ${account.name || accountId} unauthorized state`
+      )
+    } catch (webhookError) {
+      logger.error('Failed to send unauthorized webhook notification:', webhookError)
+    }
+  }
+
   // 检查并清除过期的限流状态
   async checkAndClearRateLimit(accountId) {
     const account = await this.getAccount(accountId)

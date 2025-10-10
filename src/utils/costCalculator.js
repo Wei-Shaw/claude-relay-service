@@ -15,6 +15,12 @@ const MODEL_PRICING = {
     cacheWrite: 3.75,
     cacheRead: 0.3
   },
+  'claude-sonnet-4-5-20250929': {
+    input: 3.0,
+    output: 15.0,
+    cacheWrite: 3.75,
+    cacheRead: 0.3
+  },
 
   // Claude 3.5 Haiku
   'claude-3-5-haiku-20241022': {
