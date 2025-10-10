@@ -120,6 +120,19 @@
               <span>{{ showCheckboxes ? '取消选择' : '选择' }}</span>
             </button>
 
+            <!-- 批量设置代理按钮 -->
+            <button
+              v-if="selectedAccounts.length > 0"
+              class="group relative flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 shadow-sm transition-all duration-200 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md dark:border-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 sm:w-auto"
+              @click="openBatchProxyModal"
+            >
+              <div
+                class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+              ></div>
+              <i class="fas fa-server relative text-blue-600 dark:text-blue-400" />
+              <span class="relative">批量设置代理 ({{ selectedAccounts.length }})</span>
+            </button>
+
             <!-- 批量删除按钮 -->
             <button
               v-if="selectedAccounts.length > 0"
@@ -1628,6 +1641,14 @@
       :summary="accountUsageSummary"
       @close="closeAccountUsageModal"
     />
+
+    <!-- 批量设置代理模态框 -->
+    <BatchProxyModal
+      :selected-count="selectedAccounts.length"
+      :show="showBatchProxyModal"
+      @close="showBatchProxyModal = false"
+      @submit="handleBatchProxySubmit"
+    />
   </div>
 </template>
 
@@ -1639,6 +1660,7 @@ import { useConfirm } from '@/composables/useConfirm'
 import AccountForm from '@/components/accounts/AccountForm.vue'
 import CcrAccountForm from '@/components/accounts/CcrAccountForm.vue'
 import AccountUsageDetailModal from '@/components/accounts/AccountUsageDetailModal.vue'
+import BatchProxyModal from '@/components/accounts/BatchProxyModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 
@@ -1742,6 +1764,7 @@ const showCreateAccountModal = ref(false)
 const newAccountPlatform = ref(null) // 跟踪新建账户选择的平台
 const showEditAccountModal = ref(false)
 const editingAccount = ref(null)
+const showBatchProxyModal = ref(false)
 
 const collectAccountSearchableStrings = (account) => {
   const values = new Set()
@@ -2680,6 +2703,114 @@ const batchDeleteAccounts = async () => {
     const detailMessage = failedDetails.map((item) => `${item.name}: ${item.message}`).join('\n')
     showToast(
       `有 ${failedCount} 个账户删除失败:\n${detailMessage}`,
+      successCount > 0 ? 'warning' : 'error'
+    )
+  }
+
+  updateSelectAllState()
+}
+
+// 批量设置代理
+const openBatchProxyModal = () => {
+  if (selectedAccounts.value.length === 0) {
+    showToast('请先选择要设置代理的账户', 'warning')
+    return
+  }
+  showBatchProxyModal.value = true
+}
+
+// 解析账户更新端点
+const resolveAccountUpdateEndpoint = (account) => {
+  switch (account.platform) {
+    case 'claude':
+      return `/admin/claude-accounts/${account.id}`
+    case 'claude-console':
+      return `/admin/claude-console-accounts/${account.id}`
+    case 'bedrock':
+      return `/admin/bedrock-accounts/${account.id}`
+    case 'openai':
+      return `/admin/openai-accounts/${account.id}`
+    case 'azure_openai':
+      return `/admin/azure-openai-accounts/${account.id}`
+    case 'openai-responses':
+      return `/admin/openai-responses-accounts/${account.id}`
+    case 'ccr':
+      return `/admin/ccr-accounts/${account.id}`
+    case 'gemini':
+      return `/admin/gemini-accounts/${account.id}`
+    default:
+      return null
+  }
+}
+
+// 处理批量代理设置提交
+const handleBatchProxySubmit = async (proxyConfig) => {
+  if (selectedAccounts.value.length === 0) {
+    showToast('没有选中的账户', 'warning')
+    return
+  }
+
+  const accountsMap = new Map(accounts.value.map((item) => [item.id, item]))
+  const targets = selectedAccounts.value
+    .map((id) => accountsMap.get(id))
+    .filter((account) => !!account)
+
+  if (targets.length === 0) {
+    showToast('选中的账户已不存在', 'warning')
+    selectedAccounts.value = []
+    updateSelectAllState()
+    return
+  }
+
+  let successCount = 0
+  let failedCount = 0
+  const failedDetails = []
+
+  for (const account of targets) {
+    const endpoint = resolveAccountUpdateEndpoint(account)
+    if (!endpoint) {
+      failedCount += 1
+      failedDetails.push({
+        name: account.name || account.email || account.accountName || account.id,
+        message: '不支持的账户类型'
+      })
+      continue
+    }
+
+    try {
+      await apiClient.put(endpoint, { proxy: proxyConfig })
+      successCount += 1
+    } catch (error) {
+      failedCount += 1
+      const message = error.response?.data?.message || error.message || '更新失败'
+      failedDetails.push({
+        name: account.name || account.email || account.accountName || account.id,
+        message
+      })
+    }
+  }
+
+  // 关闭弹窗
+  showBatchProxyModal.value = false
+
+  // 显示结果
+  if (successCount > 0) {
+    const toastMessage = `成功为 ${successCount} 个账户设置代理`
+    showToast(toastMessage, failedCount > 0 ? 'warning' : 'success')
+
+    // 清空选择
+    selectedAccounts.value = []
+    selectAllChecked.value = false
+    isIndeterminate.value = false
+
+    // 刷新账户列表
+    await loadAccounts(true)
+  }
+
+  if (failedCount > 0) {
+    const detailMessage = failedDetails.map((item) => `${item.name}: ${item.message}`).join('\n')
+    showToast(
+      `有 ${failedCount} 个账户设置失败:\n${detailMessage}`,
       successCount > 0 ? 'warning' : 'error'
     )
   }
