@@ -16,7 +16,8 @@ const MODEL_REASONING_CONFIG = {
   'claude-sonnet-4-20250514': 'medium',
   'claude-sonnet-4-5-20250929': 'high',
   'gpt-5-2025-08-07': 'high',
-  'gpt-5-codex': 'off'
+  'gpt-5-codex': 'off',
+  'claude-3-5-haiku-20241022': 'off'
 }
 
 const VALID_REASONING_LEVELS = new Set(['low', 'medium', 'high'])
@@ -850,6 +851,10 @@ class DroidRelayService {
   _processRequestBody(requestBody, endpointType, options = {}) {
     const { disableStreaming = false } = options
     const processedBody = { ...requestBody }
+
+    if (processedBody && Object.prototype.hasOwnProperty.call(processedBody, 'metadata')) {
+      delete processedBody.metadata
+    }
 
     if (disableStreaming) {
       if ('stream' in processedBody) {
