@@ -37,6 +37,7 @@ class DroidRelayService {
     this.userAgent = 'factory-cli/0.19.4'
     this.systemPrompt = SYSTEM_PROMPT
     this.modelReasoningMap = new Map()
+    this.API_KEY_STICKY_PREFIX = 'droid_api_key'
 
     Object.entries(MODEL_REASONING_CONFIG).forEach(([modelId, level]) => {
       if (!modelId) {
@@ -87,6 +88,56 @@ class DroidRelayService {
     }
   }
 
+  _composeApiKeyStickyKey(accountId, endpointType, sessionHash) {
+    if (!accountId || !sessionHash) {
+      return null
+    }
+
+    const normalizedEndpoint = this._normalizeEndpointType(endpointType)
+    return `${this.API_KEY_STICKY_PREFIX}:${accountId}:${normalizedEndpoint}:${sessionHash}`
+  }
+
+  async _selectApiKey(account, endpointType, sessionHash) {
+    const entries = await droidAccountService.getDecryptedApiKeyEntries(account.id)
+    if (!entries || entries.length === 0) {
+      throw new Error(`Droid account ${account.id} 未配置任何 API Key`)
+    }
+
+    const stickyKey = this._composeApiKeyStickyKey(account.id, endpointType, sessionHash)
+
+    if (stickyKey) {
+      const mappedKeyId = await redis.getSessionAccountMapping(stickyKey)
+      if (mappedKeyId) {
+        const mappedEntry = entries.find((entry) => entry.id === mappedKeyId)
+        if (mappedEntry) {
+          await redis.extendSessionAccountMappingTTL(stickyKey)
+          await droidAccountService.touchApiKeyUsage(account.id, mappedEntry.id)
+          logger.info(`🔐 使用已绑定的 Droid API Key ${mappedEntry.id}（Account: ${account.id}）`)
+          return mappedEntry
+        }
+
+        await redis.deleteSessionAccountMapping(stickyKey)
+      }
+    }
+
+    const selectedEntry = entries[Math.floor(Math.random() * entries.length)]
+    if (!selectedEntry) {
+      throw new Error(`Droid account ${account.id} 没有可用的 API Key`)
+    }
+
+    if (stickyKey) {
+      await redis.setSessionAccountMapping(stickyKey, selectedEntry.id)
+    }
+
+    await droidAccountService.touchApiKeyUsage(account.id, selectedEntry.id)
+
+    logger.info(
+      `🔐 随机选取 Droid API Key ${selectedEntry.id}（Account: ${account.id}, Keys: ${entries.length}）`
+    )
+
+    return selectedEntry
+  }
+
   async relayRequest(
     requestBody,
     apiKeyData,
@@ -113,8 +164,19 @@ class DroidRelayService {
         throw new Error(`No available Droid account for endpoint type: ${normalizedEndpoint}`)
       }
 
-      // 获取有效的 access token（自动刷新）
-      const accessToken = await droidAccountService.getValidAccessToken(account.id)
+      // 获取认证凭据：支持 Access Token 和 API Key 两种模式
+      let selectedApiKey = null
+      let accessToken = null
+
+      if (
+        typeof account.authenticationMethod === 'string' &&
+        account.authenticationMethod.toLowerCase().trim() === 'api_key'
+      ) {
+        selectedApiKey = await this._selectApiKey(account, normalizedEndpoint, sessionHash)
+        accessToken = selectedApiKey.key
+      } else {
+        accessToken = await droidAccountService.getValidAccessToken(account.id)
+      }
 
       // 获取 Factory.ai API URL
       const endpoint = this.endpoints[normalizedEndpoint]
@@ -137,6 +199,12 @@ class DroidRelayService {
         normalizedEndpoint,
         clientHeaders
       )
+
+      if (selectedApiKey) {
+        logger.info(
+          `🔑 Forwarding request with Droid API Key ${selectedApiKey.id} (Account: ${account.id})`
+        )
+      }
 
       // 处理请求体（注入 system prompt 等）
       const processedBody = this._processRequestBody(requestBody, normalizedEndpoint)

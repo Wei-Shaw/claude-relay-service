@@ -133,6 +133,161 @@ class DroidAccountService {
     }
   }
 
+  _parseApiKeyEntries(rawEntries) {
+    if (!rawEntries) {
+      return []
+    }
+
+    if (Array.isArray(rawEntries)) {
+      return rawEntries
+    }
+
+    if (typeof rawEntries === 'string') {
+      try {
+        const parsed = JSON.parse(rawEntries)
+        return Array.isArray(parsed) ? parsed : []
+      } catch (error) {
+        logger.warn('⚠️ Failed to parse Droid API Key entries:', error.message)
+        return []
+      }
+    }
+
+    return []
+  }
+
+  _buildApiKeyEntries(apiKeys, existingEntries = [], clearExisting = false) {
+    const now = new Date().toISOString()
+    const normalizedExisting = Array.isArray(existingEntries) ? existingEntries : []
+
+    const entries = clearExisting
+      ? []
+      : normalizedExisting
+          .filter((entry) => entry && entry.id && entry.encryptedKey)
+          .map((entry) => ({ ...entry }))
+
+    const hashSet = new Set(entries.map((entry) => entry.hash).filter(Boolean))
+
+    if (!Array.isArray(apiKeys) || apiKeys.length === 0) {
+      return entries
+    }
+
+    for (const rawKey of apiKeys) {
+      if (typeof rawKey !== 'string') {
+        continue
+      }
+
+      const trimmed = rawKey.trim()
+      if (!trimmed) {
+        continue
+      }
+
+      const hash = crypto.createHash('sha256').update(trimmed).digest('hex')
+      if (hashSet.has(hash)) {
+        continue
+      }
+
+      hashSet.add(hash)
+
+      entries.push({
+        id: uuidv4(),
+        hash,
+        encryptedKey: this._encryptSensitiveData(trimmed),
+        createdAt: now,
+        lastUsedAt: '',
+        usageCount: '0'
+      })
+    }
+
+    return entries
+  }
+
+  _maskApiKeyEntries(entries) {
+    if (!Array.isArray(entries)) {
+      return []
+    }
+
+    return entries.map((entry) => ({
+      id: entry.id,
+      createdAt: entry.createdAt || '',
+      lastUsedAt: entry.lastUsedAt || '',
+      usageCount: entry.usageCount || '0'
+    }))
+  }
+
+  _decryptApiKeyEntry(entry) {
+    if (!entry || !entry.encryptedKey) {
+      return null
+    }
+
+    const apiKey = this._decryptSensitiveData(entry.encryptedKey)
+    if (!apiKey) {
+      return null
+    }
+
+    const usageCountNumber = Number(entry.usageCount)
+
+    return {
+      id: entry.id,
+      key: apiKey,
+      hash: entry.hash || '',
+      createdAt: entry.createdAt || '',
+      lastUsedAt: entry.lastUsedAt || '',
+      usageCount: Number.isFinite(usageCountNumber) && usageCountNumber >= 0 ? usageCountNumber : 0
+    }
+  }
+
+  async getDecryptedApiKeyEntries(accountId) {
+    if (!accountId) {
+      return []
+    }
+
+    const accountData = await redis.getDroidAccount(accountId)
+    if (!accountData) {
+      return []
+    }
+
+    const entries = this._parseApiKeyEntries(accountData.apiKeys)
+    return entries
+      .map((entry) => this._decryptApiKeyEntry(entry))
+      .filter((entry) => entry && entry.key)
+  }
+
+  async touchApiKeyUsage(accountId, keyId) {
+    if (!accountId || !keyId) {
+      return
+    }
+
+    try {
+      const accountData = await redis.getDroidAccount(accountId)
+      if (!accountData) {
+        return
+      }
+
+      const entries = this._parseApiKeyEntries(accountData.apiKeys)
+      const index = entries.findIndex((entry) => entry.id === keyId)
+
+      if (index === -1) {
+        return
+      }
+
+      const updatedEntry = { ...entries[index] }
+      updatedEntry.lastUsedAt = new Date().toISOString()
+      const usageCount = Number(updatedEntry.usageCount)
+      updatedEntry.usageCount = String(
+        Number.isFinite(usageCount) && usageCount >= 0 ? usageCount + 1 : 1
+      )
+
+      entries[index] = updatedEntry
+
+      accountData.apiKeys = JSON.stringify(entries)
+      accountData.apiKeyCount = String(entries.length)
+
+      await redis.setDroidAccount(accountId, accountData)
+    } catch (error) {
+      logger.warn(`⚠️ Failed to update API key usage for Droid account ${accountId}:`, error)
+    }
+  }
+
   /**
    * 使用 WorkOS Refresh Token 刷新并验证凭证
    */
@@ -275,7 +430,8 @@ class DroidAccountService {
       userId = '',
       tokenType = 'Bearer',
       authenticationMethod = '',
-      expiresIn = null
+      expiresIn = null,
+      apiKeys = []
     } = options
 
     const accountId = uuidv4()
@@ -296,15 +452,40 @@ class DroidAccountService {
     let lastRefreshAt = accessToken ? new Date().toISOString() : ''
     let status = accessToken ? 'active' : 'created'
 
-    const isManualProvision =
-      typeof authenticationMethod === 'string' &&
-      authenticationMethod.toLowerCase().trim() === 'manual'
+    const apiKeyEntries = this._buildApiKeyEntries(apiKeys)
+    const hasApiKeys = apiKeyEntries.length > 0
 
-    const provisioningMode = isManualProvision ? 'manual' : 'oauth'
+    if (hasApiKeys) {
+      normalizedAuthenticationMethod = 'api_key'
+      normalizedAccessToken = ''
+      normalizedRefreshToken = ''
+      normalizedExpiresAt = ''
+      normalizedExpiresIn = null
+      lastRefreshAt = ''
+      status = 'active'
+    }
 
-    logger.info(
-      `🔍 [Droid ${provisioningMode}] 初始令牌 - AccountName: ${name}, AccessToken: ${normalizedAccessToken || '[empty]'}, RefreshToken: ${normalizedRefreshToken || '[empty]'}`
-    )
+    const normalizedAuthMethod =
+      typeof normalizedAuthenticationMethod === 'string'
+        ? normalizedAuthenticationMethod.toLowerCase().trim()
+        : ''
+
+    const isApiKeyProvision = normalizedAuthMethod === 'api_key'
+    const isManualProvision = normalizedAuthMethod === 'manual'
+
+    const provisioningMode = isApiKeyProvision ? 'api_key' : isManualProvision ? 'manual' : 'oauth'
+
+    if (isApiKeyProvision) {
+      logger.info(
+        `🔍 [Droid api_key] 初始密钥 - AccountName: ${name}, KeyCount: ${apiKeyEntries.length}`
+      )
+    } else {
+      logger.info(
+        `🔍 [Droid ${provisioningMode}] 初始令牌 - AccountName: ${name}, AccessToken: ${
+          normalizedAccessToken || '[empty]'
+        }, RefreshToken: ${normalizedRefreshToken || '[empty]'}`
+      )
+    }
 
     let proxyConfig = null
     if (proxy && typeof proxy === 'object') {
@@ -318,7 +499,7 @@ class DroidAccountService {
       }
     }
 
-    if (normalizedRefreshToken && isManualProvision) {
+    if (!isApiKeyProvision && normalizedRefreshToken && isManualProvision) {
       try {
         const refreshed = await this._refreshTokensWithWorkOS(normalizedRefreshToken, proxyConfig)
 
@@ -381,7 +562,7 @@ class DroidAccountService {
         logger.error('❌ 使用 Refresh Token 验证 Droid 账户失败:', error)
         throw new Error(`Refresh Token 验证失败：${error.message}`)
       }
-    } else if (normalizedRefreshToken && !isManualProvision) {
+    } else if (!isApiKeyProvision && normalizedRefreshToken && !isManualProvision) {
       try {
         const orgIds = await this._fetchFactoryOrgIds(normalizedAccessToken, proxyConfig)
         const selectedOrgId =
@@ -460,7 +641,7 @@ class DroidAccountService {
       }
     }
 
-    if (!normalizedExpiresAt) {
+    if (!isApiKeyProvision && !normalizedExpiresAt) {
       let expiresInSeconds = null
       if (typeof normalizedExpiresIn === 'number' && Number.isFinite(normalizedExpiresIn)) {
         expiresInSeconds = normalizedExpiresIn
@@ -519,7 +700,10 @@ class DroidAccountService {
       expiresIn:
         normalizedExpiresIn !== null && normalizedExpiresIn !== undefined
           ? String(normalizedExpiresIn)
-          : ''
+          : '',
+      apiKeys: hasApiKeys ? JSON.stringify(apiKeyEntries) : '',
+      apiKeyCount: hasApiKeys ? String(apiKeyEntries.length) : '0',
+      apiKeyStrategy: hasApiKeys ? 'random_sticky' : ''
     }
 
     await redis.setDroidAccount(accountId, accountData)
@@ -551,12 +735,16 @@ class DroidAccountService {
     }
 
     // 解密敏感数据
+    const apiKeyEntries = this._parseApiKeyEntries(account.apiKeys)
+
     return {
       ...account,
       id: accountId,
       endpointType: this._sanitizeEndpointType(account.endpointType),
       refreshToken: this._decryptSensitiveData(account.refreshToken),
-      accessToken: this._decryptSensitiveData(account.accessToken)
+      accessToken: this._decryptSensitiveData(account.accessToken),
+      apiKeys: this._maskApiKeyEntries(apiKeyEntries),
+      apiKeyCount: apiKeyEntries.length
     }
   }
 
@@ -572,7 +760,15 @@ class DroidAccountService {
       refreshToken: account.refreshToken ? '***ENCRYPTED***' : '',
       accessToken: account.accessToken
         ? maskToken(this._decryptSensitiveData(account.accessToken))
-        : ''
+        : '',
+      apiKeyCount: (() => {
+        const parsedCount = this._parseApiKeyEntries(account.apiKeys).length
+        if (account.apiKeyCount === undefined || account.apiKeyCount === null) {
+          return parsedCount
+        }
+        const numeric = Number(account.apiKeyCount)
+        return Number.isFinite(numeric) && numeric >= 0 ? numeric : parsedCount
+      })()
     }))
   }
 
@@ -704,6 +900,46 @@ class DroidAccountService {
 
     if (sanitizedUpdates.proxy === undefined) {
       sanitizedUpdates.proxy = account.proxy || ''
+    }
+
+    const existingApiKeyEntries = this._parseApiKeyEntries(account.apiKeys)
+    const newApiKeysInput = Array.isArray(updates.apiKeys) ? updates.apiKeys : []
+    const wantsClearApiKeys = Boolean(updates.clearApiKeys)
+
+    if (sanitizedUpdates.apiKeys !== undefined) {
+      delete sanitizedUpdates.apiKeys
+    }
+    if (sanitizedUpdates.clearApiKeys !== undefined) {
+      delete sanitizedUpdates.clearApiKeys
+    }
+
+    if (wantsClearApiKeys || newApiKeysInput.length > 0) {
+      const mergedApiKeys = this._buildApiKeyEntries(
+        newApiKeysInput,
+        existingApiKeyEntries,
+        wantsClearApiKeys
+      )
+
+      const baselineCount = wantsClearApiKeys ? 0 : existingApiKeyEntries.length
+      const addedCount = Math.max(mergedApiKeys.length - baselineCount, 0)
+
+      sanitizedUpdates.apiKeys = mergedApiKeys.length ? JSON.stringify(mergedApiKeys) : ''
+      sanitizedUpdates.apiKeyCount = String(mergedApiKeys.length)
+
+      if (mergedApiKeys.length > 0) {
+        sanitizedUpdates.authenticationMethod = 'api_key'
+        sanitizedUpdates.status = sanitizedUpdates.status || 'active'
+        logger.info(
+          `🔑 Updated Droid API keys for ${accountId}: total ${mergedApiKeys.length} (added ${addedCount})`
+        )
+      } else {
+        logger.info(`🔑 Cleared all API keys for Droid account ${accountId}`)
+        // 如果完全移除 API Key，可根据是否仍有 token 来确定认证方式
+        if (!sanitizedUpdates.accessToken && !account.accessToken) {
+          sanitizedUpdates.authenticationMethod =
+            account.authenticationMethod === 'api_key' ? '' : account.authenticationMethod
+        }
+      }
     }
 
     const encryptedUpdates = { ...sanitizedUpdates }
@@ -864,6 +1100,13 @@ class DroidAccountService {
     let account = await this.getAccount(accountId)
     if (!account) {
       throw new Error(`Droid account not found: ${accountId}`)
+    }
+
+    if (
+      typeof account.authenticationMethod === 'string' &&
+      account.authenticationMethod.toLowerCase().trim() === 'api_key'
+    ) {
+      throw new Error(`Droid account ${accountId} 已配置为 API Key 模式，不能获取 Access Token`)
     }
 
     // 检查是否需要刷新
