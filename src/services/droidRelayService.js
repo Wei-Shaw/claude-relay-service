@@ -65,6 +65,30 @@ class DroidRelayService {
     return 'anthropic'
   }
 
+  _normalizeRequestBody(requestBody, endpointType) {
+    if (!requestBody || typeof requestBody !== 'object') {
+      return requestBody
+    }
+
+    const normalizedBody = { ...requestBody }
+
+    if (endpointType === 'openai' && typeof normalizedBody.model === 'string') {
+      const originalModel = normalizedBody.model
+      const trimmedModel = originalModel.trim()
+      const lowerModel = trimmedModel.toLowerCase()
+
+      if (lowerModel === 'gpt-5') {
+        const mappedModel = 'gpt-5-2025-08-07'
+        if (originalModel !== mappedModel) {
+          logger.info(`🔄 将请求模型从 ${originalModel} 映射为 ${mappedModel}`)
+        }
+        normalizedBody.model = mappedModel
+      }
+    }
+
+    return normalizedBody
+  }
+
   async _applyRateLimitTracking(rateLimitInfo, usageSummary, model, context = '') {
     if (!rateLimitInfo) {
       return
@@ -155,6 +179,7 @@ class DroidRelayService {
     } = options
     const keyInfo = apiKeyData || {}
     const normalizedEndpoint = this._normalizeEndpointType(endpointType)
+    const normalizedRequestBody = this._normalizeRequestBody(requestBody, normalizedEndpoint)
 
     try {
       logger.info(
@@ -205,7 +230,7 @@ class DroidRelayService {
       // 构建请求头
       const headers = this._buildHeaders(
         accessToken,
-        requestBody,
+        normalizedRequestBody,
         normalizedEndpoint,
         clientHeaders
       )
@@ -217,7 +242,7 @@ class DroidRelayService {
       }
 
       // 处理请求体（注入 system prompt 等）
-      const processedBody = this._processRequestBody(requestBody, normalizedEndpoint, {
+      const processedBody = this._processRequestBody(normalizedRequestBody, normalizedEndpoint, {
         disableStreaming
       })
 
@@ -236,7 +261,7 @@ class DroidRelayService {
           clientResponse,
           account,
           keyInfo,
-          requestBody,
+          normalizedRequestBody,
           normalizedEndpoint,
           skipUsageRecord
         )
@@ -264,7 +289,7 @@ class DroidRelayService {
           response,
           account,
           keyInfo,
-          requestBody,
+          normalizedRequestBody,
           clientRequest,
           normalizedEndpoint,
           skipUsageRecord
