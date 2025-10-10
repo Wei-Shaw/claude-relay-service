@@ -1094,7 +1094,7 @@ class HistoryRecorder {
       return
     }
 
-    logger.info('🔍 HistoryRecorder: stream event received', {
+    logger.debug('🔍 HistoryRecorder: stream event received', {
       type: event.type,
       hasDelta: Boolean(event.delta),
       hasMessage: Boolean(event.message),
@@ -1349,7 +1349,7 @@ class HistoryRecorder {
         finishReason === 'tool_output'
 
       if (isToolOnlyMessage) {
-        logger.info('ℹ️ HistoryRecorder: skip tool-only assistant message', {
+        logger.debug('ℹ️ HistoryRecorder: skip tool-only assistant message', {
           sessionId: this.sessionId,
           finishReason
         })
@@ -1362,7 +1362,7 @@ class HistoryRecorder {
     }
 
     if (!resolvedContent.trim()) {
-      logger.info('ℹ️ HistoryRecorder: skip empty assistant message', {
+      logger.debug('ℹ️ HistoryRecorder: skip empty assistant message', {
         sessionId: this.sessionId,
         finishReason,
         hasError: Boolean(error)
@@ -1510,7 +1510,7 @@ class HistoryRecorder {
       return
     }
 
-    logger.info('🔚 HistoryRecorder: finalizeStream invoked', {
+    logger.debug('🔚 HistoryRecorder: finalizeStream invoked', {
       hasAssistantText: Boolean(this.assistantText),
       streamBlocks: this.streamBlocks.size,
       lastMessageContentLength: this.lastMessageContent?.length || 0
