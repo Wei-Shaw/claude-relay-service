@@ -58,6 +58,10 @@
                   <input v-model="createForm.platform" class="mr-2" type="radio" value="openai" />
                   <span class="text-sm text-gray-700">OpenAI</span>
                 </label>
+                <label class="flex cursor-pointer items-center">
+                  <input v-model="createForm.platform" class="mr-2" type="radio" value="droid" />
+                  <span class="text-sm text-gray-700">Droid</span>
+                </label>
               </div>
             </div>
 
@@ -120,7 +124,9 @@
                         ? 'bg-purple-100 text-purple-700'
                         : group.platform === 'gemini'
                           ? 'bg-blue-100 text-blue-700'
-                          : 'bg-gray-100 text-gray-700'
+                          : group.platform === 'openai'
+                            ? 'bg-gray-100 text-gray-700'
+                            : 'bg-cyan-100 text-cyan-700'
                     ]"
                   >
                     {{
@@ -128,7 +134,9 @@
                         ? 'Claude'
                         : group.platform === 'gemini'
                           ? 'Gemini'
-                          : 'OpenAI'
+                          : group.platform === 'openai'
+                            ? 'OpenAI'
+                            : 'Droid'
                     }}
                   </span>
                 </div>

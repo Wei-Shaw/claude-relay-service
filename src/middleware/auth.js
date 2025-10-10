@@ -438,6 +438,7 @@ const authenticateApiKey = async (req, res, next) => {
       geminiAccountId: validation.keyData.geminiAccountId,
       openaiAccountId: validation.keyData.openaiAccountId, // 添加 OpenAI 账号ID
       bedrockAccountId: validation.keyData.bedrockAccountId, // 添加 Bedrock 账号ID
+      droidAccountId: validation.keyData.droidAccountId,
       permissions: validation.keyData.permissions,
       concurrencyLimit: validation.keyData.concurrencyLimit,
       rateLimitWindow: validation.keyData.rateLimitWindow,

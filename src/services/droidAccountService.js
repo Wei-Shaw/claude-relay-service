@@ -44,6 +44,25 @@ class DroidAccountService {
       },
       10 * 60 * 1000
     )
+
+    this.supportedEndpointTypes = new Set(['anthropic', 'openai'])
+  }
+
+  _sanitizeEndpointType(endpointType) {
+    if (!endpointType) {
+      return 'anthropic'
+    }
+
+    const normalized = String(endpointType).toLowerCase()
+    if (normalized === 'openai' || normalized === 'common') {
+      return 'openai'
+    }
+
+    if (this.supportedEndpointTypes.has(normalized)) {
+      return normalized
+    }
+
+    return 'anthropic'
   }
 
   /**
@@ -117,7 +136,7 @@ class DroidAccountService {
   /**
    * 使用 WorkOS Refresh Token 刷新并验证凭证
    */
-  async _refreshTokensWithWorkOS(refreshToken, proxyConfig = null) {
+  async _refreshTokensWithWorkOS(refreshToken, proxyConfig = null, organizationId = null) {
     if (!refreshToken || typeof refreshToken !== 'string') {
       throw new Error('Refresh Token 无效')
     }
@@ -126,6 +145,9 @@ class DroidAccountService {
     formData.append('grant_type', 'refresh_token')
     formData.append('refresh_token', refreshToken)
     formData.append('client_id', this.workosClientId)
+    if (organizationId) {
+      formData.append('organization_id', organizationId)
+    }
 
     const requestOptions = {
       method: 'POST',
@@ -185,6 +207,49 @@ class DroidAccountService {
   }
 
   /**
+   * 使用 Factory CLI 接口获取组织 ID 列表
+   */
+  async _fetchFactoryOrgIds(accessToken, proxyConfig = null) {
+    if (!accessToken) {
+      return []
+    }
+
+    const requestOptions = {
+      method: 'GET',
+      url: 'https://app.factory.ai/api/cli/org',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'x-factory-client': 'cli',
+        'User-Agent': this.userAgent
+      },
+      timeout: 15000
+    }
+
+    if (proxyConfig) {
+      const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+      if (proxyAgent) {
+        requestOptions.httpAgent = proxyAgent
+        requestOptions.httpsAgent = proxyAgent
+      }
+    }
+
+    try {
+      const response = await axios(requestOptions)
+      const data = response.data || {}
+      if (Array.isArray(data.workosOrgIds) && data.workosOrgIds.length > 0) {
+        return data.workosOrgIds
+      }
+      logger.warn('⚠️ 未从 Factory CLI 接口获取到 workosOrgIds')
+      return []
+    } catch (error) {
+      logger.warn('⚠️ 获取 Factory 组织信息失败:', error.message)
+      return []
+    }
+  }
+
+  /**
    * 创建 Droid 账户
    *
    * @param {Object} options - 账户配置选项
@@ -203,7 +268,7 @@ class DroidAccountService {
       platform = 'droid',
       priority = 50, // 调度优先级 (1-100)
       schedulable = true, // 是否可被调度
-      endpointType = 'anthropic', // 默认端点类型: 'anthropic', 'openai', 'common'
+      endpointType = 'anthropic', // 默认端点类型: 'anthropic' 或 'openai'
       organizationId = '',
       ownerEmail = '',
       ownerName = '',
@@ -214,6 +279,8 @@ class DroidAccountService {
     } = options
 
     const accountId = uuidv4()
+
+    const normalizedEndpointType = this._sanitizeEndpointType(endpointType)
 
     let normalizedRefreshToken = refreshToken
     let normalizedAccessToken = accessToken
@@ -229,21 +296,39 @@ class DroidAccountService {
     let lastRefreshAt = accessToken ? new Date().toISOString() : ''
     let status = accessToken ? 'active' : 'created'
 
-    if (normalizedRefreshToken) {
-      try {
-        let proxyConfig = null
-        if (proxy && typeof proxy === 'object') {
-          proxyConfig = proxy
-        } else if (typeof proxy === 'string' && proxy.trim()) {
-          try {
-            proxyConfig = JSON.parse(proxy)
-          } catch (error) {
-            logger.warn('⚠️ Droid 手动账号代理配置解析失败，已忽略:', error.message)
-            proxyConfig = null
-          }
-        }
+    const isManualProvision =
+      typeof authenticationMethod === 'string' &&
+      authenticationMethod.toLowerCase().trim() === 'manual'
 
+    const provisioningMode = isManualProvision ? 'manual' : 'oauth'
+
+    logger.info(
+      `🔍 [Droid ${provisioningMode}] 初始令牌 - AccountName: ${name}, AccessToken: ${normalizedAccessToken || '[empty]'}, RefreshToken: ${normalizedRefreshToken || '[empty]'}`
+    )
+
+    let proxyConfig = null
+    if (proxy && typeof proxy === 'object') {
+      proxyConfig = proxy
+    } else if (typeof proxy === 'string' && proxy.trim()) {
+      try {
+        proxyConfig = JSON.parse(proxy)
+      } catch (error) {
+        logger.warn('⚠️ Droid 代理配置解析失败，已忽略:', error.message)
+        proxyConfig = null
+      }
+    }
+
+    if (normalizedRefreshToken && isManualProvision) {
+      try {
         const refreshed = await this._refreshTokensWithWorkOS(normalizedRefreshToken, proxyConfig)
+
+        logger.info(
+          `🔍 [Droid manual] 刷新后令牌 - AccountName: ${name}, AccessToken: ${refreshed.accessToken || '[empty]'}, RefreshToken: ${refreshed.refreshToken || '[empty]'}, ExpiresAt: ${refreshed.expiresAt || '[empty]'}, ExpiresIn: ${
+            refreshed.expiresIn !== null && refreshed.expiresIn !== undefined
+              ? refreshed.expiresIn
+              : '[empty]'
+          }`
+        )
 
         normalizedAccessToken = refreshed.accessToken
         normalizedRefreshToken = refreshed.refreshToken
@@ -296,7 +381,112 @@ class DroidAccountService {
         logger.error('❌ 使用 Refresh Token 验证 Droid 账户失败:', error)
         throw new Error(`Refresh Token 验证失败：${error.message}`)
       }
+    } else if (normalizedRefreshToken && !isManualProvision) {
+      try {
+        const orgIds = await this._fetchFactoryOrgIds(normalizedAccessToken, proxyConfig)
+        const selectedOrgId =
+          normalizedOrganizationId ||
+          (Array.isArray(orgIds)
+            ? orgIds.find((id) => typeof id === 'string' && id.trim())
+            : null) ||
+          ''
+
+        if (!selectedOrgId) {
+          logger.warn(`⚠️ [Droid oauth] 未获取到组织ID，跳过 WorkOS 刷新: ${name} (${accountId})`)
+        } else {
+          const refreshed = await this._refreshTokensWithWorkOS(
+            normalizedRefreshToken,
+            proxyConfig,
+            selectedOrgId
+          )
+
+          logger.info(
+            `🔍 [Droid oauth] 组织刷新后令牌 - AccountName: ${name}, AccessToken: ${refreshed.accessToken || '[empty]'}, RefreshToken: ${refreshed.refreshToken || '[empty]'}, OrganizationId: ${
+              refreshed.organizationId || selectedOrgId
+            }, ExpiresAt: ${refreshed.expiresAt || '[empty]'}`
+          )
+
+          normalizedAccessToken = refreshed.accessToken
+          normalizedRefreshToken = refreshed.refreshToken
+          normalizedExpiresAt = refreshed.expiresAt || normalizedExpiresAt
+          normalizedTokenType = refreshed.tokenType || normalizedTokenType
+          normalizedAuthenticationMethod =
+            refreshed.authenticationMethod || normalizedAuthenticationMethod
+          if (refreshed.expiresIn !== null && refreshed.expiresIn !== undefined) {
+            normalizedExpiresIn = refreshed.expiresIn
+          }
+          if (refreshed.organizationId) {
+            normalizedOrganizationId = refreshed.organizationId
+          } else {
+            normalizedOrganizationId = selectedOrgId
+          }
+
+          if (refreshed.user) {
+            const userInfo = refreshed.user
+            if (typeof userInfo.email === 'string' && userInfo.email.trim()) {
+              normalizedOwnerEmail = userInfo.email.trim()
+            }
+            const nameParts = []
+            if (typeof userInfo.first_name === 'string' && userInfo.first_name.trim()) {
+              nameParts.push(userInfo.first_name.trim())
+            }
+            if (typeof userInfo.last_name === 'string' && userInfo.last_name.trim()) {
+              nameParts.push(userInfo.last_name.trim())
+            }
+            const derivedName =
+              nameParts.join(' ').trim() ||
+              (typeof userInfo.name === 'string' ? userInfo.name.trim() : '') ||
+              (typeof userInfo.display_name === 'string' ? userInfo.display_name.trim() : '')
+
+            if (derivedName) {
+              normalizedOwnerName = derivedName
+              normalizedOwnerDisplayName = derivedName
+            } else if (normalizedOwnerEmail) {
+              normalizedOwnerName = normalizedOwnerName || normalizedOwnerEmail
+              normalizedOwnerDisplayName =
+                normalizedOwnerDisplayName || normalizedOwnerEmail || normalizedOwnerName
+            }
+
+            if (typeof userInfo.id === 'string' && userInfo.id.trim()) {
+              normalizedUserId = userInfo.id.trim()
+            }
+          }
+
+          lastRefreshAt = new Date().toISOString()
+          status = 'active'
+        }
+      } catch (error) {
+        logger.warn(`⚠️ [Droid oauth] 初始化刷新失败: ${name} (${accountId}) - ${error.message}`)
+      }
     }
+
+    if (!normalizedExpiresAt) {
+      let expiresInSeconds = null
+      if (typeof normalizedExpiresIn === 'number' && Number.isFinite(normalizedExpiresIn)) {
+        expiresInSeconds = normalizedExpiresIn
+      } else if (
+        typeof normalizedExpiresIn === 'string' &&
+        normalizedExpiresIn.trim() &&
+        !Number.isNaN(Number(normalizedExpiresIn))
+      ) {
+        expiresInSeconds = Number(normalizedExpiresIn)
+      }
+
+      if (!Number.isFinite(expiresInSeconds) || expiresInSeconds <= 0) {
+        expiresInSeconds = this.tokenValidHours * 3600
+      }
+
+      normalizedExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString()
+      normalizedExpiresIn = expiresInSeconds
+    }
+
+    logger.info(
+      `🔍 [Droid ${provisioningMode}] 写入前令牌快照 - AccountName: ${name}, AccessToken: ${normalizedAccessToken || '[empty]'}, RefreshToken: ${normalizedRefreshToken || '[empty]'}, ExpiresAt: ${normalizedExpiresAt || '[empty]'}, ExpiresIn: ${
+        normalizedExpiresIn !== null && normalizedExpiresIn !== undefined
+          ? normalizedExpiresIn
+          : '[empty]'
+      }`
+    )
 
     const accountData = {
       id: accountId,
@@ -316,7 +506,7 @@ class DroidAccountService {
       status, // created, active, expired, error
       errorMessage: '',
       schedulable: schedulable.toString(),
-      endpointType, // anthropic, openai, common
+      endpointType: normalizedEndpointType, // anthropic 或 openai
       organizationId: normalizedOrganizationId || '',
       owner: normalizedOwnerName || normalizedOwnerEmail || '',
       ownerEmail: normalizedOwnerEmail || '',
@@ -334,7 +524,20 @@ class DroidAccountService {
 
     await redis.setDroidAccount(accountId, accountData)
 
-    logger.success(`🏢 Created Droid account: ${name} (${accountId}) - Endpoint: ${endpointType}`)
+    logger.success(
+      `🏢 Created Droid account: ${name} (${accountId}) - Endpoint: ${normalizedEndpointType}`
+    )
+
+    try {
+      const verifyAccount = await this.getAccount(accountId)
+      logger.info(
+        `🔍 [Droid ${provisioningMode}] Redis 写入后验证 - AccountName: ${name}, AccessToken: ${verifyAccount?.accessToken || '[empty]'}, RefreshToken: ${verifyAccount?.refreshToken || '[empty]'}, ExpiresAt: ${verifyAccount?.expiresAt || '[empty]'}`
+      )
+    } catch (verifyError) {
+      logger.warn(
+        `⚠️ [Droid ${provisioningMode}] 写入后验证失败: ${name} (${accountId}) - ${verifyError.message}`
+      )
+    }
     return { id: accountId, ...accountData }
   }
 
@@ -350,6 +553,8 @@ class DroidAccountService {
     // 解密敏感数据
     return {
       ...account,
+      id: accountId,
+      endpointType: this._sanitizeEndpointType(account.endpointType),
       refreshToken: this._decryptSensitiveData(account.refreshToken),
       accessToken: this._decryptSensitiveData(account.accessToken)
     }
@@ -362,6 +567,7 @@ class DroidAccountService {
     const accounts = await redis.getAllDroidAccounts()
     return accounts.map((account) => ({
       ...account,
+      endpointType: this._sanitizeEndpointType(account.endpointType),
       // 不解密完整 token，只返回掩码
       refreshToken: account.refreshToken ? '***ENCRYPTED***' : '',
       accessToken: account.accessToken
@@ -386,6 +592,10 @@ class DroidAccountService {
     }
     if (typeof sanitizedUpdates.refreshToken === 'string') {
       sanitizedUpdates.refreshToken = sanitizedUpdates.refreshToken.trim()
+    }
+
+    if (sanitizedUpdates.endpointType) {
+      sanitizedUpdates.endpointType = this._sanitizeEndpointType(sanitizedUpdates.endpointType)
     }
 
     const parseProxyConfig = (value) => {
@@ -547,7 +757,11 @@ class DroidAccountService {
 
     try {
       const proxy = proxyConfig || (account.proxy ? JSON.parse(account.proxy) : null)
-      const refreshed = await this._refreshTokensWithWorkOS(account.refreshToken, proxy)
+      const refreshed = await this._refreshTokensWithWorkOS(
+        account.refreshToken,
+        proxy,
+        account.organizationId || null
+      )
 
       // 更新账户信息
       await this.updateAccount(accountId, {
@@ -673,6 +887,8 @@ class DroidAccountService {
   async getSchedulableAccounts(endpointType = null) {
     const allAccounts = await redis.getAllDroidAccounts()
 
+    const normalizedFilter = endpointType ? this._sanitizeEndpointType(endpointType) : null
+
     return allAccounts
       .filter((account) => {
         // 基本过滤条件
@@ -681,15 +897,29 @@ class DroidAccountService {
           account.schedulable === 'true' &&
           account.status === 'active'
 
-        // 如果指定了端点类型，进一步过滤
-        if (endpointType) {
-          return isSchedulable && account.endpointType === endpointType
+        if (!isSchedulable) {
+          return false
         }
 
-        return isSchedulable
+        if (!normalizedFilter) {
+          return true
+        }
+
+        const accountEndpoint = this._sanitizeEndpointType(account.endpointType)
+
+        if (normalizedFilter === 'openai') {
+          return accountEndpoint === 'openai' || accountEndpoint === 'anthropic'
+        }
+
+        if (normalizedFilter === 'anthropic') {
+          return accountEndpoint === 'anthropic' || accountEndpoint === 'openai'
+        }
+
+        return accountEndpoint === normalizedFilter
       })
       .map((account) => ({
         ...account,
+        endpointType: this._sanitizeEndpointType(account.endpointType),
         priority: parseInt(account.priority, 10) || 50,
         // 解密 accessToken 用于使用
         accessToken: this._decryptSensitiveData(account.accessToken)
@@ -737,7 +967,7 @@ class DroidAccountService {
     })
 
     logger.info(
-      `✅ Selected Droid account: ${selectedAccount.name} (${selectedAccount.id}) - Endpoint: ${selectedAccount.endpointType}`
+      `✅ Selected Droid account: ${selectedAccount.name} (${selectedAccount.id}) - Endpoint: ${this._sanitizeEndpointType(selectedAccount.endpointType)}`
     )
 
     return selectedAccount
@@ -747,13 +977,26 @@ class DroidAccountService {
    * 获取 Factory.ai API 的完整 URL
    */
   getFactoryApiUrl(endpointType, endpoint) {
+    const normalizedType = this._sanitizeEndpointType(endpointType)
     const baseUrls = {
       anthropic: `${this.factoryApiBaseUrl}/a${endpoint}`,
-      openai: `${this.factoryApiBaseUrl}/o${endpoint}`,
-      common: `${this.factoryApiBaseUrl}/o${endpoint}`
+      openai: `${this.factoryApiBaseUrl}/o${endpoint}`
     }
 
-    return baseUrls[endpointType] || baseUrls.common
+    return baseUrls[normalizedType] || baseUrls.openai
+  }
+
+  async touchLastUsedAt(accountId) {
+    if (!accountId) {
+      return
+    }
+
+    try {
+      const client = redis.getClientSafe()
+      await client.hset(`droid:account:${accountId}`, 'lastUsedAt', new Date().toISOString())
+    } catch (error) {
+      logger.warn(`⚠️ Failed to update lastUsedAt for Droid account ${accountId}:`, error)
+    }
   }
 }
 

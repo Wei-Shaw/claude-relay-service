@@ -539,6 +539,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       geminiAccountId,
       openaiAccountId,
       bedrockAccountId,
+      droidAccountId,
       permissions,
       concurrencyLimit,
       rateLimitWindow,
@@ -676,6 +677,18 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       }
     }
 
+    // 验证服务权限字段
+    if (
+      permissions !== undefined &&
+      permissions !== null &&
+      permissions !== '' &&
+      !['claude', 'gemini', 'openai', 'droid', 'all'].includes(permissions)
+    ) {
+      return res.status(400).json({
+        error: 'Invalid permissions value. Must be claude, gemini, openai, droid, or all'
+      })
+    }
+
     const newKey = await apiKeyService.generateApiKey({
       name,
       description,
@@ -686,6 +699,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       geminiAccountId,
       openaiAccountId,
       bedrockAccountId,
+      droidAccountId,
       permissions,
       concurrencyLimit,
       rateLimitWindow,
@@ -727,6 +741,7 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       geminiAccountId,
       openaiAccountId,
       bedrockAccountId,
+      droidAccountId,
       permissions,
       concurrencyLimit,
       rateLimitWindow,
@@ -761,6 +776,17 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
         .json({ error: 'Base name must be less than 90 characters to allow for numbering' })
     }
 
+    if (
+      permissions !== undefined &&
+      permissions !== null &&
+      permissions !== '' &&
+      !['claude', 'gemini', 'openai', 'droid', 'all'].includes(permissions)
+    ) {
+      return res.status(400).json({
+        error: 'Invalid permissions value. Must be claude, gemini, openai, droid, or all'
+      })
+    }
+
     // 生成批量API Keys
     const createdKeys = []
     const errors = []
@@ -778,6 +804,7 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
           geminiAccountId,
           openaiAccountId,
           bedrockAccountId,
+          droidAccountId,
           permissions,
           concurrencyLimit,
           rateLimitWindow,
@@ -857,6 +884,15 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
       return res.status(400).json({
         error: 'Invalid input',
         message: 'updates must be an object'
+      })
+    }
+
+    if (
+      updates.permissions !== undefined &&
+      !['claude', 'gemini', 'openai', 'droid', 'all'].includes(updates.permissions)
+    ) {
+      return res.status(400).json({
+        error: 'Invalid permissions value. Must be claude, gemini, openai, droid, or all'
       })
     }
 
@@ -945,6 +981,9 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
         if (updates.bedrockAccountId !== undefined) {
           finalUpdates.bedrockAccountId = updates.bedrockAccountId
         }
+        if (updates.droidAccountId !== undefined) {
+          finalUpdates.droidAccountId = updates.droidAccountId || ''
+        }
 
         // 处理标签操作
         if (updates.tags !== undefined) {
@@ -1031,6 +1070,7 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       geminiAccountId,
       openaiAccountId,
       bedrockAccountId,
+      droidAccountId,
       permissions,
       enableModelRestriction,
       restrictedModels,
@@ -1122,12 +1162,17 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       updates.bedrockAccountId = bedrockAccountId || ''
     }
 
+    if (droidAccountId !== undefined) {
+      // 空字符串表示解绑，null或空字符串都设置为空字符串
+      updates.droidAccountId = droidAccountId || ''
+    }
+
     if (permissions !== undefined) {
       // 验证权限值
-      if (!['claude', 'gemini', 'openai', 'all'].includes(permissions)) {
-        return res
-          .status(400)
-          .json({ error: 'Invalid permissions value. Must be claude, gemini, openai, or all' })
+      if (!['claude', 'gemini', 'openai', 'droid', 'all'].includes(permissions)) {
+        return res.status(400).json({
+          error: 'Invalid permissions value. Must be claude, gemini, openai, droid, or all'
+        })
       }
       updates.permissions = permissions
     }
@@ -4393,6 +4438,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       openaiAccounts,
       ccrAccounts,
       openaiResponsesAccounts,
+      droidAccounts,
       todayStats,
       systemAverages,
       realtimeMetrics
@@ -4406,6 +4452,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       redis.getAllOpenAIAccounts(),
       ccrAccountService.getAllAccounts(),
       openaiResponsesAccountService.getAllAccounts(true),
+      droidAccountService.getAllAccounts(),
       redis.getTodayStats(),
       redis.getSystemAverages(),
       redis.getRealtimeSystemMetrics()
@@ -4413,6 +4460,42 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
 
     // 处理Bedrock账户数据
     const bedrockAccounts = bedrockAccountsResult.success ? bedrockAccountsResult.data : []
+    const normalizeBoolean = (value) => value === true || value === 'true'
+    const isRateLimitedFlag = (status) => {
+      if (!status) {
+        return false
+      }
+      if (typeof status === 'string') {
+        return status === 'limited'
+      }
+      if (typeof status === 'object') {
+        return status.isRateLimited === true
+      }
+      return false
+    }
+
+    const normalDroidAccounts = droidAccounts.filter(
+      (acc) =>
+        normalizeBoolean(acc.isActive) &&
+        acc.status !== 'blocked' &&
+        acc.status !== 'unauthorized' &&
+        normalizeBoolean(acc.schedulable) &&
+        !isRateLimitedFlag(acc.rateLimitStatus)
+    ).length
+    const abnormalDroidAccounts = droidAccounts.filter(
+      (acc) =>
+        !normalizeBoolean(acc.isActive) || acc.status === 'blocked' || acc.status === 'unauthorized'
+    ).length
+    const pausedDroidAccounts = droidAccounts.filter(
+      (acc) =>
+        !normalizeBoolean(acc.schedulable) &&
+        normalizeBoolean(acc.isActive) &&
+        acc.status !== 'blocked' &&
+        acc.status !== 'unauthorized'
+    ).length
+    const rateLimitedDroidAccounts = droidAccounts.filter((acc) =>
+      isRateLimitedFlag(acc.rateLimitStatus)
+    ).length
 
     // 计算使用统计（统一使用allTokens）
     const totalTokensUsed = apiKeys.reduce(
@@ -4660,7 +4743,8 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           abnormalBedrockAccounts +
           abnormalOpenAIAccounts +
           abnormalOpenAIResponsesAccounts +
-          abnormalCcrAccounts,
+          abnormalCcrAccounts +
+          abnormalDroidAccounts,
         pausedAccounts:
           pausedClaudeAccounts +
           pausedClaudeConsoleAccounts +
@@ -4668,7 +4752,8 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           pausedBedrockAccounts +
           pausedOpenAIAccounts +
           pausedOpenAIResponsesAccounts +
-          pausedCcrAccounts,
+          pausedCcrAccounts +
+          pausedDroidAccounts,
         rateLimitedAccounts:
           rateLimitedClaudeAccounts +
           rateLimitedClaudeConsoleAccounts +
@@ -4676,7 +4761,8 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           rateLimitedBedrockAccounts +
           rateLimitedOpenAIAccounts +
           rateLimitedOpenAIResponsesAccounts +
-          rateLimitedCcrAccounts,
+          rateLimitedCcrAccounts +
+          rateLimitedDroidAccounts,
         // 各平台详细统计
         accountsByPlatform: {
           claude: {
@@ -4727,6 +4813,13 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
             abnormal: abnormalOpenAIResponsesAccounts,
             paused: pausedOpenAIResponsesAccounts,
             rateLimited: rateLimitedOpenAIResponsesAccounts
+          },
+          droid: {
+            total: droidAccounts.length,
+            normal: normalDroidAccounts,
+            abnormal: abnormalDroidAccounts,
+            paused: pausedDroidAccounts,
+            rateLimited: rateLimitedDroidAccounts
           }
         },
         // 保留旧字段以兼容
@@ -4737,7 +4830,8 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           normalBedrockAccounts +
           normalOpenAIAccounts +
           normalOpenAIResponsesAccounts +
-          normalCcrAccounts,
+          normalCcrAccounts +
+          normalDroidAccounts,
         totalClaudeAccounts: claudeAccounts.length + claudeConsoleAccounts.length,
         activeClaudeAccounts: normalClaudeAccounts + normalClaudeConsoleAccounts,
         rateLimitedClaudeAccounts: rateLimitedClaudeAccounts + rateLimitedClaudeConsoleAccounts,
@@ -4775,6 +4869,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
         redisConnected: redis.isConnected,
         claudeAccountsHealthy: normalClaudeAccounts + normalClaudeConsoleAccounts > 0,
         geminiAccountsHealthy: normalGeminiAccounts > 0,
+        droidAccountsHealthy: normalDroidAccounts > 0,
         uptime: process.uptime()
       },
       systemTimezone: config.system.timezoneOffset || 8
@@ -8490,15 +8585,44 @@ router.post('/droid-accounts/exchange-code', authenticateAdmin, async (req, res)
 router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
   try {
     const accounts = await droidAccountService.getAllAccounts()
+    const allApiKeys = await redis.getAllApiKeys()
 
     // 添加使用统计
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
         try {
           const usageStats = await redis.getAccountUsageStats(account.id, 'droid')
+          let groupInfos = []
+          try {
+            groupInfos = await accountGroupService.getAccountGroups(account.id)
+          } catch (groupError) {
+            logger.debug(`Failed to get group infos for Droid account ${account.id}:`, groupError)
+            groupInfos = []
+          }
+
+          const groupIds = groupInfos.map((group) => group.id)
+          const boundApiKeysCount = allApiKeys.reduce((count, key) => {
+            const binding = key.droidAccountId
+            if (!binding) {
+              return count
+            }
+            if (binding === account.id) {
+              return count + 1
+            }
+            if (binding.startsWith('group:')) {
+              const groupId = binding.substring('group:'.length)
+              if (groupIds.includes(groupId)) {
+                return count + 1
+              }
+            }
+            return count
+          }, 0)
+
           return {
             ...account,
             schedulable: account.schedulable === 'true',
+            boundApiKeysCount,
+            groupInfos,
             usage: {
               daily: usageStats.daily,
               total: usageStats.total,
@@ -8509,6 +8633,8 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
           logger.warn(`Failed to get stats for Droid account ${account.id}:`, error.message)
           return {
             ...account,
+            boundApiKeysCount: 0,
+            groupInfos: [],
             usage: {
               daily: { tokens: 0, requests: 0 },
               total: { tokens: 0, requests: 0 },

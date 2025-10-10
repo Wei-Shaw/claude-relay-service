@@ -71,7 +71,7 @@
               <!-- 平台分组选择器 -->
               <div class="space-y-3">
                 <!-- 分组选择器 -->
-                <div class="grid grid-cols-3 gap-2">
+                <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <!-- Claude 分组 -->
                   <div
                     class="group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all duration-200"
@@ -171,6 +171,37 @@
                         Gemini
                       </h4>
                       <p class="text-xs text-gray-600 dark:text-gray-400">Google AI</p>
+                    </div>
+                  </div>
+
+                  <!-- Droid 分组 -->
+                  <div
+                    class="group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all duration-200"
+                    :class="[
+                      platformGroup === 'droid'
+                        ? 'border-rose-500 bg-gradient-to-br from-rose-50 to-orange-50 shadow-md dark:from-rose-900/20 dark:to-orange-900/20'
+                        : 'border-gray-200 bg-white hover:border-rose-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-rose-600'
+                    ]"
+                    @click="selectPlatformGroup('droid')"
+                  >
+                    <div class="p-3">
+                      <div class="flex items-center justify-between">
+                        <div
+                          class="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-rose-500 to-orange-500"
+                        >
+                          <i class="fas fa-robot text-sm text-white"></i>
+                        </div>
+                        <div
+                          v-if="platformGroup === 'droid'"
+                          class="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500"
+                        >
+                          <i class="fas fa-check text-xs text-white"></i>
+                        </div>
+                      </div>
+                      <h4 class="mt-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        Droid
+                      </h4>
+                      <p class="text-xs text-gray-600 dark:text-gray-400">Claude Droid</p>
                     </div>
                   </div>
                 </div>
@@ -442,6 +473,35 @@
                         <div
                           v-if="form.platform === 'gemini'"
                           class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500"
+                        >
+                          <i class="fas fa-check text-xs text-white"></i>
+                        </div>
+                      </label>
+                    </template>
+
+                    <!-- Droid 子选项 -->
+                    <template v-if="platformGroup === 'droid'">
+                      <label
+                        class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
+                        :class="[
+                          form.platform === 'droid'
+                            ? 'border-rose-500 bg-rose-50 dark:border-rose-400 dark:bg-rose-900/30'
+                            : 'border-gray-300 bg-white hover:border-rose-400 hover:bg-rose-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-rose-500 dark:hover:bg-rose-900/20'
+                        ]"
+                      >
+                        <input v-model="form.platform" class="sr-only" type="radio" value="droid" />
+                        <div class="flex items-center gap-2">
+                          <i class="fas fa-robot text-sm text-rose-600 dark:text-rose-400"></i>
+                          <div>
+                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
+                              >Droid 专属</span
+                            >
+                            <span class="text-xs text-gray-500 dark:text-gray-400">官方</span>
+                          </div>
+                        </div>
+                        <div
+                          v-if="form.platform === 'droid'"
+                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500"
                         >
                           <i class="fas fa-check text-xs text-white"></i>
                         </div>
@@ -2992,6 +3052,8 @@ const selectPlatformGroup = (group) => {
     form.value.platform = 'openai'
   } else if (group === 'gemini') {
     form.value.platform = 'gemini'
+  } else if (group === 'droid') {
+    form.value.platform = 'droid'
   }
 }
 

@@ -1740,13 +1740,15 @@ const groupOptions = computed(() => {
   accountGroups.value.forEach((group) => {
     options.push({
       value: group.id,
-      label: `${group.name} (${group.platform === 'claude' ? 'Claude' : group.platform === 'gemini' ? 'Gemini' : 'OpenAI'})`,
+      label: `${group.name} (${group.platform === 'claude' ? 'Claude' : group.platform === 'gemini' ? 'Gemini' : group.platform === 'openai' ? 'OpenAI' : 'Droid'})`,
       icon:
         group.platform === 'claude'
           ? 'fa-brain'
           : group.platform === 'gemini'
             ? 'fa-robot'
-            : 'fa-openai'
+            : group.platform === 'openai'
+              ? 'fa-openai'
+              : 'fa-robot'
     })
   })
   return options
@@ -2303,8 +2305,11 @@ const loadAccounts = async (forceReload = false) => {
     // Droid 账户
     if (droidData && droidData.success) {
       const droidAccounts = (droidData.data || []).map((acc) => {
-        // Droid 不支持 API Key 绑定，固定为 0
-        return { ...acc, platform: 'droid', boundApiKeysCount: 0 }
+        return {
+          ...acc,
+          platform: 'droid',
+          boundApiKeysCount: acc.boundApiKeysCount ?? 0
+        }
       })
       allAccounts.push(...droidAccounts)
     }

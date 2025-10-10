@@ -858,7 +858,9 @@ class RedisClient {
 
     // 获取账户创建时间来计算平均值 - 支持不同类型的账号
     let accountData = {}
-    if (accountType === 'openai') {
+    if (accountType === 'droid') {
+      accountData = await this.client.hgetall(`droid:account:${accountId}`)
+    } else if (accountType === 'openai') {
       accountData = await this.client.hgetall(`openai:account:${accountId}`)
     } else if (accountType === 'openai-responses') {
       accountData = await this.client.hgetall(`openai_responses_account:${accountId}`)
@@ -873,6 +875,9 @@ class RedisClient {
       }
       if (!accountData.createdAt) {
         accountData = await this.client.hgetall(`openai_account:${accountId}`)
+      }
+      if (!accountData.createdAt) {
+        accountData = await this.client.hgetall(`droid:account:${accountId}`)
       }
     }
     const createdAt = accountData.createdAt ? new Date(accountData.createdAt) : new Date()

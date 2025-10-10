@@ -511,6 +511,18 @@
                               {{ getBedrockBindingInfo(key) }}
                             </span>
                           </div>
+                          <!-- Droid 绑定 -->
+                          <div v-if="key.droidAccountId" class="flex items-center gap-1 text-xs">
+                            <span
+                              class="inline-flex items-center rounded bg-cyan-100 px-1.5 py-0.5 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300"
+                            >
+                              <i class="fas fa-robot mr-1 text-[10px]" />
+                              Droid
+                            </span>
+                            <span class="truncate text-gray-600 dark:text-gray-400">
+                              {{ getDroidBindingInfo(key) }}
+                            </span>
+                          </div>
                           <!-- 共享池 -->
                           <div
                             v-if="
@@ -518,7 +530,8 @@
                               !key.claudeConsoleAccountId &&
                               !key.geminiAccountId &&
                               !key.openaiAccountId &&
-                              !key.bedrockAccountId
+                              !key.bedrockAccountId &&
+                              !key.droidAccountId
                             "
                             class="text-xs text-gray-500 dark:text-gray-400"
                           >
@@ -1182,6 +1195,18 @@
                     {{ getBedrockBindingInfo(key) }}
                   </span>
                 </div>
+                <!-- Droid 绑定 -->
+                <div v-if="key.droidAccountId" class="flex flex-wrap items-center gap-1 text-xs">
+                  <span
+                    class="inline-flex items-center rounded bg-cyan-100 px-2 py-0.5 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300"
+                  >
+                    <i class="fas fa-robot mr-1" />
+                    Droid
+                  </span>
+                  <span class="text-gray-600 dark:text-gray-400">
+                    {{ getDroidBindingInfo(key) }}
+                  </span>
+                </div>
                 <!-- 无绑定时显示共享池 -->
                 <div
                   v-if="
@@ -1189,7 +1214,8 @@
                     !key.claudeConsoleAccountId &&
                     !key.geminiAccountId &&
                     !key.openaiAccountId &&
-                    !key.bedrockAccountId
+                    !key.bedrockAccountId &&
+                    !key.droidAccountId
                   "
                   class="text-xs text-gray-500 dark:text-gray-400"
                 >
@@ -1921,9 +1947,11 @@ const accounts = ref({
   openai: [],
   openaiResponses: [], // 添加 OpenAI-Responses 账号列表
   bedrock: [],
+  droid: [],
   claudeGroups: [],
   geminiGroups: [],
-  openaiGroups: []
+  openaiGroups: [],
+  droidGroups: []
 })
 const editingExpiryKey = ref(null)
 const expiryEditModalRef = ref(null)
@@ -2031,12 +2059,17 @@ const getBindingDisplayStrings = (key) => {
     appendBindingRow('Bedrock', getBedrockBindingInfo(key))
   }
 
+  if (key.droidAccountId) {
+    appendBindingRow('Droid', getDroidBindingInfo(key))
+  }
+
   if (
     !key.claudeAccountId &&
     !key.claudeConsoleAccountId &&
     !key.geminiAccountId &&
     !key.openaiAccountId &&
-    !key.bedrockAccountId
+    !key.bedrockAccountId &&
+    !key.droidAccountId
   ) {
     collect('共享池')
   }
@@ -2196,6 +2229,7 @@ const loadAccounts = async () => {
       openaiData,
       openaiResponsesData,
       bedrockData,
+      droidData,
       groupsData
     ] = await Promise.all([
       apiClient.get('/admin/claude-accounts'),
@@ -2204,6 +2238,7 @@ const loadAccounts = async () => {
       apiClient.get('/admin/openai-accounts'),
       apiClient.get('/admin/openai-responses-accounts'), // 加载 OpenAI-Responses 账号
       apiClient.get('/admin/bedrock-accounts'),
+      apiClient.get('/admin/droid-accounts'),
       apiClient.get('/admin/account-groups')
     ])
 
@@ -2260,12 +2295,21 @@ const loadAccounts = async () => {
       }))
     }
 
+    if (droidData.success) {
+      accounts.value.droid = (droidData.data || []).map((account) => ({
+        ...account,
+        platform: 'droid',
+        isDedicated: account.accountType === 'dedicated'
+      }))
+    }
+
     if (groupsData.success) {
       // 处理分组数据
       const allGroups = groupsData.data || []
       accounts.value.claudeGroups = allGroups.filter((g) => g.platform === 'claude')
       accounts.value.geminiGroups = allGroups.filter((g) => g.platform === 'gemini')
       accounts.value.openaiGroups = allGroups.filter((g) => g.platform === 'openai')
+      accounts.value.droidGroups = allGroups.filter((g) => g.platform === 'droid')
     }
   } catch (error) {
     // console.error('加载账户列表失败:', error)
@@ -2381,6 +2425,11 @@ const getBoundAccountName = (accountId) => {
       return `分组-${openaiGroup.name}`
     }
 
+    const droidGroup = accounts.value.droidGroups.find((g) => g.id === groupId)
+    if (droidGroup) {
+      return `分组-${droidGroup.name}`
+    }
+
     // 如果找不到分组，返回分组ID的前8位
     return `分组-${groupId.substring(0, 8)}`
   }
@@ -2426,6 +2475,11 @@ const getBoundAccountName = (accountId) => {
   const bedrockAccount = accounts.value.bedrock.find((acc) => acc.id === accountId)
   if (bedrockAccount) {
     return `${bedrockAccount.name}`
+  }
+
+  const droidAccount = accounts.value.droid.find((acc) => acc.id === accountId)
+  if (droidAccount) {
+    return `${droidAccount.name}`
   }
 
   // 如果找不到，返回账户ID的前8位
@@ -2519,6 +2573,24 @@ const getBedrockBindingInfo = (key) => {
     }
     // 检查账户是否存在
     const account = accounts.value.bedrock.find((acc) => acc.id === key.bedrockAccountId)
+    if (!account) {
+      return `⚠️ ${info} (账户不存在)`
+    }
+    if (account.accountType === 'dedicated') {
+      return `🔒 专属-${info}`
+    }
+    return info
+  }
+  return ''
+}
+
+const getDroidBindingInfo = (key) => {
+  if (key.droidAccountId) {
+    const info = getBoundAccountName(key.droidAccountId)
+    if (key.droidAccountId.startsWith('group:')) {
+      return info
+    }
+    const account = accounts.value.droid.find((acc) => acc.id === key.droidAccountId)
     if (!account) {
       return `⚠️ ${info} (账户不存在)`
     }
@@ -3654,7 +3726,9 @@ const exportToExcel = () => {
                 ? '仅Gemini'
                 : key.permissions === 'openai'
                   ? '仅OpenAI'
-                  : key.permissions || '',
+                  : key.permissions === 'droid'
+                    ? '仅Droid'
+                    : key.permissions || '',
 
         // 限制配置
         令牌限制: key.tokenLimit === '0' || key.tokenLimit === 0 ? '无限制' : key.tokenLimit || '',
@@ -3686,6 +3760,7 @@ const exportToExcel = () => {
         OpenAI专属账户: key.openaiAccountId || '',
         'Azure OpenAI专属账户': key.azureOpenaiAccountId || '',
         Bedrock专属账户: key.bedrockAccountId || '',
+        Droid专属账户: key.droidAccountId || '',
 
         // 模型和客户端限制
         启用模型限制: key.enableModelRestriction ? '是' : '否',
