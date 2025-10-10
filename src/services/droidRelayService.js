@@ -146,7 +146,13 @@ class DroidRelayService {
     clientHeaders,
     options = {}
   ) {
-    const { endpointType = 'anthropic', sessionHash = null } = options
+    const {
+      endpointType = 'anthropic',
+      sessionHash = null,
+      customPath = null,
+      skipUsageRecord = false,
+      disableStreaming = false
+    } = options
     const keyInfo = apiKeyData || {}
     const normalizedEndpoint = this._normalizeEndpointType(endpointType)
 
@@ -179,8 +185,12 @@ class DroidRelayService {
       }
 
       // 获取 Factory.ai API URL
-      const endpoint = this.endpoints[normalizedEndpoint]
-      const apiUrl = `${this.factoryApiBaseUrl}${endpoint}`
+      let endpointPath = this.endpoints[normalizedEndpoint]
+      if (typeof customPath === 'string' && customPath.trim()) {
+        endpointPath = customPath.startsWith('/') ? customPath : `/${customPath}`
+      }
+
+      const apiUrl = `${this.factoryApiBaseUrl}${endpointPath}`
 
       logger.info(`🌐 Forwarding to Factory.ai: ${apiUrl}`)
 
@@ -207,10 +217,12 @@ class DroidRelayService {
       }
 
       // 处理请求体（注入 system prompt 等）
-      const processedBody = this._processRequestBody(requestBody, normalizedEndpoint)
+      const processedBody = this._processRequestBody(requestBody, normalizedEndpoint, {
+        disableStreaming
+      })
 
       // 发送请求
-      const isStreaming = processedBody.stream !== false
+      const isStreaming = disableStreaming ? false : processedBody.stream !== false
 
       // 根据是否流式选择不同的处理方式
       if (isStreaming) {
@@ -225,7 +237,8 @@ class DroidRelayService {
           account,
           keyInfo,
           requestBody,
-          normalizedEndpoint
+          normalizedEndpoint,
+          skipUsageRecord
         )
       } else {
         // 非流式响应：使用 axios
@@ -253,7 +266,8 @@ class DroidRelayService {
           keyInfo,
           requestBody,
           clientRequest,
-          normalizedEndpoint
+          normalizedEndpoint,
+          skipUsageRecord
         )
       }
     } catch (error) {
@@ -298,7 +312,8 @@ class DroidRelayService {
     account,
     apiKeyData,
     requestBody,
-    endpointType
+    endpointType,
+    skipUsageRecord = false
   ) {
     return new Promise((resolve, reject) => {
       const url = new URL(apiUrl)
@@ -449,28 +464,34 @@ class DroidRelayService {
           clientResponse.end()
 
           // 记录 usage 数据
-          const normalizedUsage = await this._recordUsageFromStreamData(
-            currentUsageData,
-            apiKeyData,
-            account,
-            model
-          )
+          if (!skipUsageRecord) {
+            const normalizedUsage = await this._recordUsageFromStreamData(
+              currentUsageData,
+              apiKeyData,
+              account,
+              model
+            )
 
-          const usageSummary = {
-            inputTokens: normalizedUsage.input_tokens || 0,
-            outputTokens: normalizedUsage.output_tokens || 0,
-            cacheCreateTokens: normalizedUsage.cache_creation_input_tokens || 0,
-            cacheReadTokens: normalizedUsage.cache_read_input_tokens || 0
+            const usageSummary = {
+              inputTokens: normalizedUsage.input_tokens || 0,
+              outputTokens: normalizedUsage.output_tokens || 0,
+              cacheCreateTokens: normalizedUsage.cache_creation_input_tokens || 0,
+              cacheReadTokens: normalizedUsage.cache_read_input_tokens || 0
+            }
+
+            await this._applyRateLimitTracking(
+              clientRequest?.rateLimitInfo,
+              usageSummary,
+              model,
+              ' [stream]'
+            )
+
+            logger.success(`✅ Droid stream completed - Account: ${account.name}`)
+          } else {
+            logger.success(
+              `✅ Droid stream completed - Account: ${account.name}, usage recording skipped`
+            )
           }
-
-          await this._applyRateLimitTracking(
-            clientRequest?.rateLimitInfo,
-            usageSummary,
-            model,
-            ' [stream]'
-          )
-
-          logger.success(`✅ Droid stream completed - Account: ${account.name}`)
           resolveOnce({ statusCode: 200, streaming: true })
         })
 
@@ -801,11 +822,15 @@ class DroidRelayService {
   /**
    * 处理请求体（注入 system prompt 等）
    */
-  _processRequestBody(requestBody, endpointType) {
+  _processRequestBody(requestBody, endpointType, options = {}) {
+    const { disableStreaming = false } = options
     const processedBody = { ...requestBody }
 
-    // 确保 stream 字段存在
-    if (processedBody.stream === undefined) {
+    if (disableStreaming) {
+      if ('stream' in processedBody) {
+        delete processedBody.stream
+      }
+    } else if (processedBody.stream === undefined) {
       processedBody.stream = true
     }
 
@@ -896,7 +921,8 @@ class DroidRelayService {
     apiKeyData,
     requestBody,
     clientRequest,
-    endpointType
+    endpointType,
+    skipUsageRecord = false
   ) {
     const { data } = response
 
@@ -906,25 +932,34 @@ class DroidRelayService {
     const model = requestBody.model || 'unknown'
 
     const normalizedUsage = this._normalizeUsageSnapshot(usage)
-    await this._recordUsage(apiKeyData, account, model, normalizedUsage)
 
-    const totalTokens = this._getTotalTokens(normalizedUsage)
+    if (!skipUsageRecord) {
+      await this._recordUsage(apiKeyData, account, model, normalizedUsage)
 
-    const usageSummary = {
-      inputTokens: normalizedUsage.input_tokens || 0,
-      outputTokens: normalizedUsage.output_tokens || 0,
-      cacheCreateTokens: normalizedUsage.cache_creation_input_tokens || 0,
-      cacheReadTokens: normalizedUsage.cache_read_input_tokens || 0
+      const totalTokens = this._getTotalTokens(normalizedUsage)
+
+      const usageSummary = {
+        inputTokens: normalizedUsage.input_tokens || 0,
+        outputTokens: normalizedUsage.output_tokens || 0,
+        cacheCreateTokens: normalizedUsage.cache_creation_input_tokens || 0,
+        cacheReadTokens: normalizedUsage.cache_read_input_tokens || 0
+      }
+
+      await this._applyRateLimitTracking(
+        clientRequest?.rateLimitInfo,
+        usageSummary,
+        model,
+        endpointType === 'anthropic' ? ' [anthropic]' : ' [openai]'
+      )
+
+      logger.success(
+        `✅ Droid request completed - Account: ${account.name}, Tokens: ${totalTokens}`
+      )
+    } else {
+      logger.success(
+        `✅ Droid request completed - Account: ${account.name}, usage recording skipped`
+      )
     }
-
-    await this._applyRateLimitTracking(
-      clientRequest?.rateLimitInfo,
-      usageSummary,
-      model,
-      endpointType === 'anthropic' ? ' [anthropic]' : ' [openai]'
-    )
-
-    logger.success(`✅ Droid request completed - Account: ${account.name}, Tokens: ${totalTokens}`)
 
     return {
       statusCode: 200,

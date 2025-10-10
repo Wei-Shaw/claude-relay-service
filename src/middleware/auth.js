@@ -7,6 +7,37 @@ const redis = require('../models/redis')
 // const { RateLimiterRedis } = require('rate-limiter-flexible') // 暂时未使用
 const ClientValidator = require('../validators/clientValidator')
 
+const TOKEN_COUNT_PATHS = new Set([
+  '/v1/messages/count_tokens',
+  '/api/v1/messages/count_tokens',
+  '/claude/v1/messages/count_tokens',
+  '/droid/claude/v1/messages/count_tokens'
+])
+
+function normalizeRequestPath(value) {
+  if (!value) {
+    return '/'
+  }
+  const lower = value.split('?')[0].toLowerCase()
+  const collapsed = lower.replace(/\/{2,}/g, '/')
+  if (collapsed.length > 1 && collapsed.endsWith('/')) {
+    return collapsed.slice(0, -1)
+  }
+  return collapsed || '/'
+}
+
+function isTokenCountRequest(req) {
+  const combined = normalizeRequestPath(`${req.baseUrl || ''}${req.path || ''}`)
+  if (TOKEN_COUNT_PATHS.has(combined)) {
+    return true
+  }
+  const original = normalizeRequestPath(req.originalUrl || '')
+  if (TOKEN_COUNT_PATHS.has(original)) {
+    return true
+  }
+  return false
+}
+
 // 🔑 API Key验证中间件（优化版）
 const authenticateApiKey = async (req, res, next) => {
   const startTime = Date.now()
@@ -49,8 +80,11 @@ const authenticateApiKey = async (req, res, next) => {
       })
     }
 
+    const skipKeyRestrictions = isTokenCountRequest(req)
+
     // 🔒 检查客户端限制（使用新的验证器）
     if (
+      !skipKeyRestrictions &&
       validation.keyData.enableClientRestriction &&
       validation.keyData.allowedClients?.length > 0
     ) {
@@ -81,7 +115,7 @@ const authenticateApiKey = async (req, res, next) => {
 
     // 检查并发限制
     const concurrencyLimit = validation.keyData.concurrencyLimit || 0
-    if (concurrencyLimit > 0) {
+    if (!skipKeyRestrictions && concurrencyLimit > 0) {
       const concurrencyConfig = config.concurrency || {}
       const leaseSeconds = Math.max(concurrencyConfig.leaseSeconds || 900, 30)
       const rawRenewInterval =
