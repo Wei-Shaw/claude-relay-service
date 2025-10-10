@@ -1,0 +1,173 @@
+# Default values for claude-relay
+replicaCount: 1
+
+image:
+  repository: ghcr.io/wei-shaw/claude-relay-service
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 3000
+  targetPort: 3000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: claude-relay.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: claude-relay-tls
+  #    hosts:
+  #      - claude-relay.local
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Redis configuration
+redis:
+  enabled: true
+  auth:
+    enabled: false
+    password: ""
+  persistence:
+    enabled: true
+    size: 1Gi
+  resources:
+    limits:
+      cpu: 250m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# External Redis configuration (when redis.enabled=false)
+externalRedis:
+  host: ""
+  port: 6379
+  password: ""
+  database: 0
+  tls: false
+
+# Application configuration
+config:
+  # Server configuration
+  nodeEnv: production
+  port: 3000
+  host: "0.0.0.0"
+  
+  # Security configuration (required)
+  jwtSecret: ""
+  encryptionKey: ""
+  adminSessionTimeout: 86400000
+  apiKeyPrefix: "cr_"
+  
+  # Admin credentials (optional)
+  adminUsername: ""
+  adminPassword: ""
+  
+  # Claude API configuration (using application defaults)
+  
+  # Proxy configuration
+  defaultProxyTimeout: 60000
+  maxProxyRetries: 3
+  
+  # Usage limits
+  defaultTokenLimit: 1000000
+  
+  # Logging configuration
+  logLevel: "info"
+  logMaxSize: "10m"
+  logMaxFiles: 5
+  
+  # System configuration
+  cleanupInterval: 3600000
+  tokenUsageRetention: 2592000000
+  healthCheckInterval: 60000
+  timezoneOffset: 8
+  
+  # Web interface configuration (using application defaults)
+  
+  # Development configuration (using application defaults)
+
+# ServiceMonitor for Prometheus
+serviceMonitor:
+  enabled: false
+  namespace: ""
+  labels: {}
+  interval: 30s
+  path: /prometheus
+  port: http
+  scrapeTimeout: 10s
+
+# Persistent Volume Claims
+persistence:
+  enabled: true
+  # storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  annotations: {}
+
+# Additional volumes and volume mounts
+extraVolumes: []
+extraVolumeMounts: []
+
+# Additional environment variables
+extraEnv: []
+
+# Additional containers
+extraContainers: []
+
+# Init containers
+initContainers: []

@@ -1,0 +1,47 @@
+{{- if .Values.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "claude-relay.fullname" . }}-data
+  labels:
+    {{- include "claude-relay.labels" . | nindent 4 }}
+    app.kubernetes.io/component: data
+spec:
+  accessModes:
+    {{- range .Values.persistence.accessModes }}
+    - {{ . | quote }}
+    {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size | quote }}
+  {{- if .Values.persistence.storageClass }}
+  {{- if (eq "-" .Values.persistence.storageClass) }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: {{ .Values.persistence.storageClass | quote }}
+  {{- end }}
+  {{- end }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "claude-relay.fullname" . }}-logs
+  labels:
+    {{- include "claude-relay.labels" . | nindent 4 }}
+    app.kubernetes.io/component: logs
+spec:
+  accessModes:
+    {{- range .Values.persistence.accessModes }}
+    - {{ . | quote }}
+    {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.logsSize | quote }}
+  {{- if .Values.persistence.storageClass }}
+  {{- if (eq "-" .Values.persistence.storageClass) }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: {{ .Values.persistence.storageClass | quote }}
+  {{- end }}
+  {{- end }}
+{{- end }}
