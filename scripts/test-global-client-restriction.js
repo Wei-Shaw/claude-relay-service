@@ -13,9 +13,18 @@ console.log()
 // 1. 检查环境变量
 console.log('📋 当前环境变量:')
 console.log('-'.repeat(80))
-console.log('  GLOBAL_CLIENT_RESTRICTION_ENABLED = ', process.env.GLOBAL_CLIENT_RESTRICTION_ENABLED || '(未设置)')
-console.log('  GLOBAL_ALLOWED_CLIENTS             = ', process.env.GLOBAL_ALLOWED_CLIENTS || '(未设置)')
-console.log('  FORCE_GLOBAL_CLIENT_RESTRICTION    = ', process.env.FORCE_GLOBAL_CLIENT_RESTRICTION || '(未设置)')
+console.log(
+  '  GLOBAL_CLIENT_RESTRICTION_ENABLED = ',
+  process.env.GLOBAL_CLIENT_RESTRICTION_ENABLED || '(未设置)'
+)
+console.log(
+  '  GLOBAL_ALLOWED_CLIENTS             = ',
+  process.env.GLOBAL_ALLOWED_CLIENTS || '(未设置)'
+)
+console.log(
+  '  FORCE_GLOBAL_CLIENT_RESTRICTION    = ',
+  process.env.FORCE_GLOBAL_CLIENT_RESTRICTION || '(未设置)'
+)
 console.log()
 
 // 模拟配置解析
@@ -105,12 +114,14 @@ const testScenarios = [
 testScenarios.forEach((scenario, index) => {
   console.log(`${index + 1}. ${scenario.name}`)
   console.log('   配置:')
-  console.log('     - 全局: enabled=%s, forceGlobal=%s, clients=%s',
+  console.log(
+    '     - 全局: enabled=%s, forceGlobal=%s, clients=%s',
     scenario.globalConfig.globalEnabled,
     scenario.globalConfig.forceGlobal,
     JSON.stringify(scenario.globalConfig.globalAllowedClients)
   )
-  console.log('     - API Key: enabled=%s, clients=%s',
+  console.log(
+    '     - API Key: enabled=%s, clients=%s',
     scenario.apiKeyConfig.enableClientRestriction,
     JSON.stringify(scenario.apiKeyConfig.allowedClients)
   )
@@ -154,14 +165,13 @@ testScenarios.forEach((scenario, index) => {
 
   // 验证结果
   const sourceMatch = effectiveRestriction.source === scenario.expectedSource
-  const clientsMatch = JSON.stringify(effectiveRestriction.allowedClients) === JSON.stringify(scenario.expectedClients)
+  const clientsMatch =
+    JSON.stringify(effectiveRestriction.allowedClients) === JSON.stringify(scenario.expectedClients)
 
   console.log('   结果:')
-  console.log('     - 配置来源: %s %s',
-    effectiveRestriction.source,
-    sourceMatch ? '✅' : '❌'
-  )
-  console.log('     - 允许客户端: %s %s',
+  console.log('     - 配置来源: %s %s', effectiveRestriction.source, sourceMatch ? '✅' : '❌')
+  console.log(
+    '     - 允许客户端: %s %s',
     JSON.stringify(effectiveRestriction.allowedClients),
     clientsMatch ? '✅' : '❌'
   )
