@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "claude-relay.fullname" . }}-config
+  labels:
+    {{- include "claude-relay.labels" . | nindent 4 }}
+data:
+  # Server configuration
+  NODE_ENV: {{ .Values.config.nodeEnv | quote }}
+  PORT: {{ .Values.config.port | quote }}
+  HOST: {{ .Values.config.host | quote }}
+  
+  # Security configuration
+  ADMIN_SESSION_TIMEOUT: {{ .Values.config.adminSessionTimeout | quote }}
+  API_KEY_PREFIX: {{ .Values.config.apiKeyPrefix | quote }}
+  
+  # Redis configuration
+  REDIS_HOST: {{ include "claude-relay.redisHost" . | quote }}
+  REDIS_PORT: {{ include "claude-relay.redisPort" . | quote }}
+  REDIS_DB: {{ include "claude-relay.redisDatabase" . | quote }}
+  REDIS_ENABLE_TLS: {{ include "claude-relay.redisTLS" . | quote }}
+
+  # Proxy configuration
+  DEFAULT_PROXY_TIMEOUT: {{ .Values.config.defaultProxyTimeout | quote }}
+  MAX_PROXY_RETRIES: {{ .Values.config.maxProxyRetries | quote }}
+  
+  # Usage limits
+  DEFAULT_TOKEN_LIMIT: {{ .Values.config.defaultTokenLimit | quote }}
+  
+  # Logging configuration
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  LOG_MAX_SIZE: {{ .Values.config.logMaxSize | quote }}
+  LOG_MAX_FILES: {{ .Values.config.logMaxFiles | quote }}
+  
+  # System configuration
+  CLEANUP_INTERVAL: {{ .Values.config.cleanupInterval | quote }}
+  TOKEN_USAGE_RETENTION: {{ .Values.config.tokenUsageRetention | quote }}
+  HEALTH_CHECK_INTERVAL: {{ .Values.config.healthCheckInterval | quote }}
+  TIMEZONE_OFFSET: {{ .Values.config.timezoneOffset | quote }}
+  
+  # Web interface configuration (using application defaults)
+  
+  # Development configuration (using application defaults)

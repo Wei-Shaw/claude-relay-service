@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Claude Relay Service Docker Compose 配置
 # 所有配置通过环境变量设置，无需映射 .env 文件
 

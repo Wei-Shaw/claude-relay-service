@@ -1,0 +1,27 @@
+apiVersion: v2
+name: claude-relay
+description: A Helm chart for Claude Relay Service - Independent versioning
+type: application
+version: 0.1.0
+appVersion: v1.1.165
+
+dependencies:
+  - name: redis
+    version: "0.6.3"
+    repository: "oci://registry-1.docker.io/cloudpirates"
+    condition: redis.enabled
+
+maintainers:
+  - name: Claude Relay Team
+    email: support@claude-relay.com
+
+keywords:
+  - claude
+  - api
+  - relay
+  - ai
+  - anthropic
+
+home: https://github.com/Wei-Shaw/claude-relay-service
+sources:
+  - https://github.com/Wei-Shaw/claude-relay-service

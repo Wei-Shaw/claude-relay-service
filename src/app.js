@@ -5,6 +5,7 @@ const compression = require('compression')
 const path = require('path')
 const fs = require('fs')
 const bcrypt = require('bcryptjs')
+const promClient = require('prom-client')
 
 const config = require('../config/config')
 const logger = require('./utils/logger')
@@ -42,6 +43,40 @@ class Application {
   constructor() {
     this.app = express()
     this.server = null
+    this.initPrometheusMetrics()
+  }
+
+  initPrometheusMetrics() {
+    // Create a Registry to register the metrics
+    this.register = new promClient.Registry()
+    
+    // Add default metrics (CPU, memory, etc.)
+    promClient.collectDefaultMetrics({ register: this.register })
+    
+    // Custom metrics for Claude Relay Service
+    this.totalApiKeysGauge = new promClient.Gauge({
+      name: 'claude_relay_total_api_keys',
+      help: 'Total number of API keys in the system',
+      registers: [this.register]
+    })
+    
+    this.totalClaudeAccountsGauge = new promClient.Gauge({
+      name: 'claude_relay_total_claude_accounts',
+      help: 'Total number of Claude accounts in the system',
+      registers: [this.register]
+    })
+    
+    this.totalUsageRecordsGauge = new promClient.Gauge({
+      name: 'claude_relay_total_usage_records',
+      help: 'Total number of usage records in the system',
+      registers: [this.register]
+    })
+    
+    this.uptimeGauge = new promClient.Gauge({
+      name: 'claude_relay_uptime_seconds',
+      help: 'Application uptime in seconds',
+      registers: [this.register]
+    })
   }
 
   async initialize() {
@@ -337,7 +372,7 @@ class Application {
         }
       })
 
-      // 📊 指标端点
+      // 📊 指标端点 (JSON格式)
       this.app.get('/metrics', async (req, res) => {
         try {
           const stats = await redis.getSystemStats()
@@ -352,6 +387,26 @@ class Application {
         } catch (error) {
           logger.error('❌ Metrics collection failed:', error)
           res.status(500).json({ error: 'Failed to collect metrics' })
+        }
+      })
+
+      // 📊 Prometheus指标端点 (OpenMetrics格式)
+      this.app.get('/prometheus', async (req, res) => {
+        try {
+          // Update custom metrics with current values
+          const stats = await redis.getSystemStats()
+          
+          this.totalApiKeysGauge.set(stats.totalApiKeys || 0)
+          this.totalClaudeAccountsGauge.set(stats.totalClaudeAccounts || 0)
+          this.totalUsageRecordsGauge.set(stats.totalUsageRecords || 0)
+          this.uptimeGauge.set(process.uptime())
+
+          // Return metrics in Prometheus format
+          res.set('Content-Type', this.register.contentType)
+          res.end(await this.register.metrics())
+        } catch (error) {
+          logger.error('❌ Prometheus metrics collection failed:', error)
+          res.status(500).send('# Error collecting metrics\n')
         }
       })
 

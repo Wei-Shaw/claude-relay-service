@@ -1,0 +1,208 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "claude-relay.fullname" . }}
+  labels:
+    {{- include "claude-relay.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "claude-relay.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "claude-relay.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "claude-relay.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.initContainers }}
+      initContainers:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.config.port }}
+              protocol: TCP
+          env:
+            # Server configuration
+            - name: NODE_ENV
+              value: {{ .Values.config.nodeEnv | quote }}
+            - name: PORT
+              value: {{ .Values.config.port | quote }}
+            - name: HOST
+              value: {{ .Values.config.host | quote }}
+            
+            # Security configuration
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "claude-relay.fullname" . }}-secret
+                  key: jwt-secret
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "claude-relay.fullname" . }}-secret
+                  key: encryption-key
+            - name: ADMIN_SESSION_TIMEOUT
+              value: {{ .Values.config.adminSessionTimeout | quote }}
+            - name: API_KEY_PREFIX
+              value: {{ .Values.config.apiKeyPrefix | quote }}
+            
+            # Admin credentials
+            {{- if .Values.config.adminUsername }}
+            - name: ADMIN_USERNAME
+              value: {{ .Values.config.adminUsername | quote }}
+            {{- end }}
+            {{- if .Values.config.adminPassword }}
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "claude-relay.fullname" . }}-secret
+                  key: admin-password
+            {{- end }}
+            
+            # Redis configuration
+            - name: REDIS_HOST
+              value: {{ include "claude-relay.redisHost" . | quote }}
+            - name: REDIS_PORT
+              value: {{ include "claude-relay.redisPort" . | quote }}
+            {{- if include "claude-relay.redisPassword" . }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "claude-relay.fullname" . }}-secret
+                  key: redis-password
+            {{- end }}
+            - name: REDIS_DB
+              value: {{ include "claude-relay.redisDatabase" . | quote }}
+            - name: REDIS_ENABLE_TLS
+              value: {{ include "claude-relay.redisTLS" . | quote }}
+            
+            # Claude API configuration
+            - name: CLAUDE_API_URL
+              value: {{ .Values.config.claudeApiUrl | quote }}
+            - name: CLAUDE_API_VERSION
+              value: {{ .Values.config.claudeApiVersion | quote }}
+            - name: CLAUDE_BETA_HEADER
+              value: {{ .Values.config.claudeBetaHeader | quote }}
+            
+            # Proxy configuration
+            - name: DEFAULT_PROXY_TIMEOUT
+              value: {{ .Values.config.defaultProxyTimeout | quote }}
+            - name: MAX_PROXY_RETRIES
+              value: {{ .Values.config.maxProxyRetries | quote }}
+            
+            # Usage limits
+            - name: DEFAULT_TOKEN_LIMIT
+              value: {{ .Values.config.defaultTokenLimit | quote }}
+            
+            # Logging configuration
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            - name: LOG_MAX_SIZE
+              value: {{ .Values.config.logMaxSize | quote }}
+            - name: LOG_MAX_FILES
+              value: {{ .Values.config.logMaxFiles | quote }}
+            
+            # System configuration
+            - name: CLEANUP_INTERVAL
+              value: {{ .Values.config.cleanupInterval | quote }}
+            - name: TOKEN_USAGE_RETENTION
+              value: {{ .Values.config.tokenUsageRetention | quote }}
+            - name: HEALTH_CHECK_INTERVAL
+              value: {{ .Values.config.healthCheckInterval | quote }}
+            - name: TIMEZONE_OFFSET
+              value: {{ .Values.config.timezoneOffset | quote }}
+            
+            # Web interface configuration
+            - name: WEB_TITLE
+              value: {{ .Values.config.webTitle | quote }}
+            - name: WEB_DESCRIPTION
+              value: {{ .Values.config.webDescription | quote }}
+            - name: WEB_LOGO_URL
+              value: {{ .Values.config.webLogoUrl | quote }}
+            
+            # Development configuration
+            - name: DEBUG
+              value: {{ .Values.config.debug | quote }}
+            - name: ENABLE_CORS
+              value: {{ .Values.config.enableCors | quote }}
+            - name: TRUST_PROXY
+              value: {{ .Values.config.trustProxy | quote }}
+            
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            {{- if .Values.persistence.enabled }}
+            - name: data
+              mountPath: /app/data
+            - name: logs
+              mountPath: /app/logs
+            {{- end }}
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+        {{- with .Values.extraContainers }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      volumes:
+        {{- if .Values.persistence.enabled }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "claude-relay.fullname" . }}-data
+        - name: logs
+          persistentVolumeClaim:
+            claimName: {{ include "claude-relay.fullname" . }}-logs
+        {{- end }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
