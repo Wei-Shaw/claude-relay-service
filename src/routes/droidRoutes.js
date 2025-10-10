@@ -104,41 +104,44 @@ router.post('/claude/v1/messages/count_tokens', authenticateApiKey, async (req, 
 })
 
 // OpenAI 端点 - /v1/responses
-router.post('/openai/v1/responses', authenticateApiKey, async (req, res) => {
-  try {
-    const sessionId =
-      req.headers['session_id'] ||
-      req.headers['x-session-id'] ||
-      req.body?.session_id ||
-      req.body?.conversation_id ||
-      null
+router.post(
+  ['/openai/v1/responses', '/openai/responses'],
+  authenticateApiKey,
+  async (req, res) => {
+    try {
+      const sessionId =
+        req.headers['session_id'] ||
+        req.headers['x-session-id'] ||
+        req.body?.session_id ||
+        req.body?.conversation_id ||
+        null
 
-    const sessionHash = sessionId
-      ? crypto.createHash('sha256').update(String(sessionId)).digest('hex')
-      : null
+      const sessionHash = sessionId
+        ? crypto.createHash('sha256').update(String(sessionId)).digest('hex')
+        : null
 
-    if (!hasDroidPermission(req.apiKey)) {
-      logger.security(
-        `🚫 API Key ${req.apiKey?.id || 'unknown'} 缺少 Droid 权限，拒绝访问 ${req.originalUrl}`
+      if (!hasDroidPermission(req.apiKey)) {
+        logger.security(
+          `🚫 API Key ${req.apiKey?.id || 'unknown'} 缺少 Droid 权限，拒绝访问 ${req.originalUrl}`
+        )
+        return res.status(403).json({
+          error: 'permission_denied',
+          message: '此 API Key 未启用 Droid 权限'
+        })
+      }
+
+      const result = await droidRelayService.relayRequest(
+        req.body,
+        req.apiKey,
+        req,
+        res,
+        req.headers,
+        { endpointType: 'openai', sessionHash }
       )
-      return res.status(403).json({
-        error: 'permission_denied',
-        message: '此 API Key 未启用 Droid 权限'
-      })
-    }
 
-    const result = await droidRelayService.relayRequest(
-      req.body,
-      req.apiKey,
-      req,
-      res,
-      req.headers,
-      { endpointType: 'openai', sessionHash }
-    )
-
-    if (result.streaming) {
-      return
-    }
+      if (result.streaming) {
+        return
+      }
 
     res.status(result.statusCode).set(result.headers).send(result.body)
   } catch (error) {
@@ -148,7 +151,8 @@ router.post('/openai/v1/responses', authenticateApiKey, async (req, res) => {
       message: error.message
     })
   }
-})
+  }
+)
 
 // 模型列表端点（兼容性）
 router.get('/*/v1/models', authenticateApiKey, async (req, res) => {

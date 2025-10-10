@@ -16,8 +16,7 @@ const MODEL_REASONING_CONFIG = {
   'claude-sonnet-4-20250514': 'medium',
   'claude-sonnet-4-5-20250929': 'high',
   'gpt-5-2025-08-07': 'high',
-  'gpt-5-codex': 'off',
-  'claude-3-5-haiku-20241022': 'off'
+  'gpt-5-codex': 'off'
 }
 
 const VALID_REASONING_LEVELS = new Set(['low', 'medium', 'high'])
@@ -72,6 +71,21 @@ class DroidRelayService {
     }
 
     const normalizedBody = { ...requestBody }
+
+    if (endpointType === 'anthropic' && typeof normalizedBody.model === 'string') {
+      const originalModel = normalizedBody.model
+      const trimmedModel = originalModel.trim()
+      const lowerModel = trimmedModel.toLowerCase()
+
+      if (lowerModel.includes('haiku')) {
+        const mappedModel = 'claude-sonnet-4-20250514'
+        if (originalModel !== mappedModel) {
+          logger.info(`🔄 将请求模型从 ${originalModel} 映射为 ${mappedModel}`)
+        }
+        normalizedBody.model = mappedModel
+        normalizedBody.__forceDisableThinking = true
+      }
+    }
 
     if (endpointType === 'openai' && typeof normalizedBody.model === 'string') {
       const originalModel = normalizedBody.model
@@ -212,6 +226,7 @@ class DroidRelayService {
 
       // 获取 Factory.ai API URL
       let endpointPath = this.endpoints[normalizedEndpoint]
+
       if (typeof customPath === 'string' && customPath.trim()) {
         endpointPath = customPath.startsWith('/') ? customPath : `/${customPath}`
       }
@@ -313,14 +328,12 @@ class DroidRelayService {
         }
       }
 
-      // 网络错误或其他错误
+      // 网络错误或其他错误（统一返回 4xx）
+      const mappedStatus = this._mapNetworkErrorStatus(error)
       return {
-        statusCode: 500,
+        statusCode: mappedStatus,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          error: 'relay_error',
-          message: error.message
-        })
+        body: JSON.stringify(this._buildNetworkErrorBody(error))
       }
     }
   }
@@ -393,10 +406,36 @@ class DroidRelayService {
           }
 
           logger.error('❌ Droid stream error:', error)
-          if (!clientResponse.destroyed && !clientResponse.writableEnded) {
-            clientResponse.end()
+          const mappedStatus = this._mapNetworkErrorStatus(error)
+          const errorBody = this._buildNetworkErrorBody(error)
+
+          if (!clientResponse.destroyed) {
+            if (!clientResponse.writableEnded) {
+              const canUseJson =
+                !hasForwardedData &&
+                typeof clientResponse.status === 'function' &&
+                typeof clientResponse.json === 'function'
+
+              if (canUseJson) {
+                clientResponse.status(mappedStatus).json(errorBody)
+              } else {
+                const errorPayload = JSON.stringify(errorBody)
+
+                if (!hasForwardedData) {
+                  if (typeof clientResponse.setHeader === 'function') {
+                    clientResponse.setHeader('Content-Type', 'application/json')
+                  }
+                  clientResponse.write(errorPayload)
+                  clientResponse.end()
+                } else {
+                  clientResponse.write(`event: error\ndata: ${errorPayload}\n\n`)
+                  clientResponse.end()
+                }
+              }
+            }
           }
-          resolveOnce({ statusCode: 500, streaming: true, error })
+
+          resolveOnce({ statusCode: mappedStatus, streaming: true, error })
         } else {
           rejectOnce(error)
         }
@@ -852,6 +891,17 @@ class DroidRelayService {
     const { disableStreaming = false } = options
     const processedBody = { ...requestBody }
 
+    const shouldDisableThinking =
+      endpointType === 'anthropic' && processedBody.__forceDisableThinking === true
+
+    if ('__forceDisableThinking' in processedBody) {
+      delete processedBody.__forceDisableThinking
+    }
+
+    if (requestBody && '__forceDisableThinking' in requestBody) {
+      delete requestBody.__forceDisableThinking
+    }
+
     if (processedBody && Object.prototype.hasOwnProperty.call(processedBody, 'metadata')) {
       delete processedBody.metadata
     }
@@ -880,7 +930,7 @@ class DroidRelayService {
         }
       }
 
-      const reasoningLevel = this._getReasoningLevel(requestBody)
+      const reasoningLevel = shouldDisableThinking ? null : this._getReasoningLevel(requestBody)
       if (reasoningLevel) {
         const budgetTokens = {
           low: 4096,
@@ -893,6 +943,12 @@ class DroidRelayService {
         }
       } else {
         delete processedBody.thinking
+      }
+
+      if (shouldDisableThinking) {
+        if ('thinking' in processedBody) {
+          delete processedBody.thinking
+        }
       }
     }
 
@@ -1037,6 +1093,48 @@ class DroidRelayService {
     } catch (error) {
       logger.error('❌ Failed to record Droid usage:', error)
     }
+  }
+
+  _mapNetworkErrorStatus(error) {
+    const code = (error && error.code ? String(error.code) : '').toUpperCase()
+
+    if (code === 'ECONNABORTED' || code === 'ETIMEDOUT') {
+      return 408
+    }
+
+    if (code === 'ECONNRESET' || code === 'EPIPE') {
+      return 424
+    }
+
+    if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') {
+      return 424
+    }
+
+    if (typeof error === 'object' && error !== null) {
+      const message = (error.message || '').toLowerCase()
+      if (message.includes('timeout')) {
+        return 408
+      }
+    }
+
+    return 424
+  }
+
+  _buildNetworkErrorBody(error) {
+    const body = {
+      error: 'relay_upstream_failure',
+      message: error?.message || '上游请求失败'
+    }
+
+    if (error?.code) {
+      body.code = error.code
+    }
+
+    if (error?.config?.url) {
+      body.upstream = error.config.url
+    }
+
+    return body
   }
 
   /**
