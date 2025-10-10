@@ -8,6 +8,7 @@ const { CLIENT_DEFINITIONS, getAllClientDefinitions } = require('./clientDefinit
 const ClaudeCodeValidator = require('./clients/claudeCodeValidator')
 const GeminiCliValidator = require('./clients/geminiCliValidator')
 const CodexCliValidator = require('./clients/codexCliValidator')
+const DroidCliValidator = require('./clients/droidCliValidator')
 
 /**
  * 客户端验证器类
@@ -26,6 +27,8 @@ class ClientValidator {
         return GeminiCliValidator
       case 'codex_cli':
         return CodexCliValidator
+      case 'droid_cli':
+        return DroidCliValidator
       default:
         logger.warn(`Unknown client ID: ${clientId}`)
         return null
@@ -37,7 +40,7 @@ class ClientValidator {
    * @returns {Array<string>} 客户端ID列表
    */
   static getSupportedClients() {
-    return ['claude_code', 'gemini_cli', 'codex_cli']
+    return ['claude_code', 'gemini_cli', 'codex_cli', 'droid_cli']
   }
 
   /**

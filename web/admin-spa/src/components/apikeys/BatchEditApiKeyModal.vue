@@ -311,6 +311,10 @@
                 <input v-model="form.permissions" class="mr-2" type="radio" value="openai" />
                 <span class="text-sm text-gray-700">仅 OpenAI</span>
               </label>
+              <label class="flex cursor-pointer items-center">
+                <input v-model="form.permissions" class="mr-2" type="radio" value="droid" />
+                <span class="text-sm text-gray-700">仅 Droid</span>
+              </label>
             </div>
           </div>
 
@@ -345,7 +349,7 @@
                 <select
                   v-model="form.claudeAccountId"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                  :disabled="form.permissions === 'gemini' || form.permissions === 'openai'"
+                  :disabled="form.permissions && !['all', 'claude'].includes(form.permissions)"
                 >
                   <option value="">不修改</option>
                   <option value="SHARED_POOL">使用共享账号池</option>
@@ -380,7 +384,7 @@
                 <select
                   v-model="form.geminiAccountId"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                  :disabled="form.permissions === 'claude' || form.permissions === 'openai'"
+                  :disabled="form.permissions && !['all', 'gemini'].includes(form.permissions)"
                 >
                   <option value="">不修改</option>
                   <option value="SHARED_POOL">使用共享账号池</option>
@@ -411,7 +415,7 @@
                 <select
                   v-model="form.openaiAccountId"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                  :disabled="form.permissions === 'claude' || form.permissions === 'gemini'"
+                  :disabled="form.permissions && !['all', 'openai'].includes(form.permissions)"
                 >
                   <option value="">不修改</option>
                   <option value="SHARED_POOL">使用共享账号池</option>
@@ -442,13 +446,44 @@
                 <select
                   v-model="form.bedrockAccountId"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                  :disabled="form.permissions === 'gemini' || form.permissions === 'openai'"
+                  :disabled="form.permissions && !['all', 'openai'].includes(form.permissions)"
                 >
                   <option value="">不修改</option>
                   <option value="SHARED_POOL">使用共享账号池</option>
                   <optgroup v-if="localAccounts.bedrock.length > 0" label="专属账号">
                     <option
                       v-for="account in localAccounts.bedrock"
+                      :key="account.id"
+                      :value="account.id"
+                    >
+                      {{ account.name }}
+                    </option>
+                  </optgroup>
+                </select>
+              </div>
+              <div>
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
+                  >Droid 专属账号</label
+                >
+                <select
+                  v-model="form.droidAccountId"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                  :disabled="form.permissions && !['all', 'droid'].includes(form.permissions)"
+                >
+                  <option value="">不修改</option>
+                  <option value="SHARED_POOL">使用共享账号池</option>
+                  <optgroup v-if="localAccounts.droidGroups.length > 0" label="账号分组">
+                    <option
+                      v-for="group in localAccounts.droidGroups"
+                      :key="group.id"
+                      :value="`group:${group.id}`"
+                    >
+                      分组 - {{ group.name }}
+                    </option>
+                  </optgroup>
+                  <optgroup v-if="localAccounts.droid.length > 0" label="专属账号">
+                    <option
+                      v-for="account in localAccounts.droid"
                       :key="account.id"
                       :value="account.id"
                     >
@@ -497,7 +532,17 @@ const props = defineProps({
   },
   accounts: {
     type: Object,
-    default: () => ({ claude: [], gemini: [], openai: [], bedrock: [] })
+    default: () => ({
+      claude: [],
+      gemini: [],
+      openai: [],
+      bedrock: [],
+      droid: [],
+      claudeGroups: [],
+      geminiGroups: [],
+      openaiGroups: [],
+      droidGroups: []
+    })
   }
 })
 
@@ -511,9 +556,11 @@ const localAccounts = ref({
   gemini: [],
   openai: [],
   bedrock: [],
+  droid: [],
   claudeGroups: [],
   geminiGroups: [],
-  openaiGroups: []
+  openaiGroups: [],
+  droidGroups: []
 })
 
 // 标签相关
@@ -542,6 +589,7 @@ const form = reactive({
   geminiAccountId: '',
   openaiAccountId: '',
   bedrockAccountId: '',
+  droidAccountId: '',
   tags: [],
   isActive: null // null表示不修改
 })
@@ -571,15 +619,23 @@ const removeTag = (index) => {
 const refreshAccounts = async () => {
   accountsLoading.value = true
   try {
-    const [claudeData, claudeConsoleData, geminiData, openaiData, bedrockData, groupsData] =
-      await Promise.all([
-        apiClient.get('/admin/claude-accounts'),
-        apiClient.get('/admin/claude-console-accounts'),
-        apiClient.get('/admin/gemini-accounts'),
-        apiClient.get('/admin/openai-accounts'),
-        apiClient.get('/admin/bedrock-accounts'),
-        apiClient.get('/admin/account-groups')
-      ])
+    const [
+      claudeData,
+      claudeConsoleData,
+      geminiData,
+      openaiData,
+      bedrockData,
+      droidData,
+      groupsData
+    ] = await Promise.all([
+      apiClient.get('/admin/claude-accounts'),
+      apiClient.get('/admin/claude-console-accounts'),
+      apiClient.get('/admin/gemini-accounts'),
+      apiClient.get('/admin/openai-accounts'),
+      apiClient.get('/admin/bedrock-accounts'),
+      apiClient.get('/admin/droid-accounts'),
+      apiClient.get('/admin/account-groups')
+    ])
 
     // 合并Claude OAuth账户和Claude Console账户
     const claudeAccounts = []
@@ -627,12 +683,21 @@ const refreshAccounts = async () => {
       }))
     }
 
+    if (droidData.success) {
+      localAccounts.value.droid = (droidData.data || []).map((account) => ({
+        ...account,
+        platform: 'droid',
+        isDedicated: account.accountType === 'dedicated'
+      }))
+    }
+
     // 处理分组数据
     if (groupsData.success) {
       const allGroups = groupsData.data || []
       localAccounts.value.claudeGroups = allGroups.filter((g) => g.platform === 'claude')
       localAccounts.value.geminiGroups = allGroups.filter((g) => g.platform === 'gemini')
       localAccounts.value.openaiGroups = allGroups.filter((g) => g.platform === 'openai')
+      localAccounts.value.droidGroups = allGroups.filter((g) => g.platform === 'droid')
     }
 
     showToast('账号列表已刷新', 'success')
@@ -720,6 +785,14 @@ const batchUpdateApiKeys = async () => {
       }
     }
 
+    if (form.droidAccountId !== '') {
+      if (form.droidAccountId === 'SHARED_POOL') {
+        updates.droidAccountId = null
+      } else {
+        updates.droidAccountId = form.droidAccountId
+      }
+    }
+
     // 激活状态
     if (form.isActive !== null) {
       updates.isActive = form.isActive
@@ -774,9 +847,11 @@ onMounted(async () => {
       gemini: props.accounts.gemini || [],
       openai: props.accounts.openai || [],
       bedrock: props.accounts.bedrock || [],
+      droid: props.accounts.droid || [],
       claudeGroups: props.accounts.claudeGroups || [],
       geminiGroups: props.accounts.geminiGroups || [],
-      openaiGroups: props.accounts.openaiGroups || []
+      openaiGroups: props.accounts.openaiGroups || [],
+      droidGroups: props.accounts.droidGroups || []
     }
   }
 })

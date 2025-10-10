@@ -389,8 +389,17 @@ docker-compose.yml 已包含：
 
 **Claude Code 设置环境变量：**
 
+默认使用标准 Claude 账号池：
+
 ```bash
 export ANTHROPIC_BASE_URL="http://127.0.0.1:3000/api/" # 根据实际填写你服务器的ip地址或者域名
+export ANTHROPIC_AUTH_TOKEN="后台创建的API密钥"
+```
+
+如果后台添加了 Droid 类型账号池，请将基础地址改为：
+
+```bash
+export ANTHROPIC_BASE_URL="http://127.0.0.1:3000/droid/claude" # 根据实际情况替换域名/IP
 export ANTHROPIC_AUTH_TOKEN="后台创建的API密钥"
 ```
 
@@ -445,6 +454,8 @@ requires_openai_auth = true
 env_key = "CRS_OAI_KEY"
 ```
 
+如需通过 Droid 类型账号池访问 Codex CLI，只需将 `base_url` 改为 `http://127.0.0.1:3000/droid/openai`（其余配置保持不变）。
+
 在 `~/.codex/auth.json` 文件中配置API密钥为 null：
 
 ```json
@@ -460,6 +471,35 @@ export CRS_OAI_KEY="后台创建的API密钥"
 ```
 
 > ⚠️ 在通过 Nginx 反向代理 CRS 服务并使用 Codex CLI 时，需要在 http 块中添加 underscores_in_headers on;。因为 Nginx 默认会移除带下划线的请求头（如 session_id），一旦该头被丢弃，多账号环境下的粘性会话功能将失效。
+
+**Droid CLI 配置：**
+
+Droid CLI 读取 `~/.factory/config.json`。可以在该文件中添加自定义模型以指向本服务的新端点：
+
+```json
+{
+  "custom_models": [
+    {
+      "model_display_name": "Sonnet 4.5 [Custom]",
+      "model": "claude-sonnet-4-5-20250929",
+      "base_url": "http://127.0.0.1:3000/droid/claude",
+      "api_key": "后台创建的API密钥",
+      "provider": "anthropic",
+      "max_tokens": 8192
+    },
+    {
+      "model_display_name": "GPT5-Codex [Custom]",
+      "model": "gpt-5-codex",
+      "base_url": "http://127.0.0.1:3000/droid/openai",
+      "api_key": "后台创建的API密钥",
+      "provider": "openai",
+      "max_tokens": 16384
+    }
+  ]
+}
+```
+
+> 💡 将示例中的 `http://127.0.0.1:3000` 替换为你的服务域名或公网地址，并写入后台生成的 API 密钥（cr_ 开头）。
 
 ### 5. 第三方工具API接入
 
@@ -515,6 +555,23 @@ gpt-5                      # Codex使用固定模型ID
 - API地址填入：`http://你的服务器:3000/openai`
 - API Key填入：后台创建的API密钥（cr_开头）
 - **重要**：Codex只支持Openai-Response标准
+- 💡 如果希望在 Cherry Studio 中使用 Droid 类型账号，请改填 `http://你的服务器:3000/droid/openai`，并保持其他设置不变。
+
+**4. Droid账号接入：**
+
+```
+# Claude Code / Droid CLI 使用的 API 地址
+http://你的服务器:3000/droid/claude
+
+# Codex CLI 使用的 API 地址
+http://你的服务器:3000/droid/openai
+```
+
+配置步骤：
+- 供应商类型选择"Anthropic"或"Openai-Response"（根据模型类型）
+- API地址填入：`http://你的服务器:3000/droid/claude` 或 `http://你的服务器:3000/droid/openai`
+- API Key填入：后台创建的API密钥（cr_开头）
+- 建议自定义模型名称以区分 Droid 账号池
 
 **Cherry Studio 地址格式重要说明：**
 
@@ -530,8 +587,10 @@ gpt-5                      # Codex使用固定模型ID
 - 所有账号类型都使用相同的API密钥（在后台统一创建）
 - 根据不同的路由前缀自动识别账号类型
 - `/claude/` - 使用Claude账号池
+- `/droid/claude/` - 使用Droid类型Claude账号池（服务于 Claude Code / Droid CLI）
 - `/gemini/` - 使用Gemini账号池  
 - `/openai/` - 使用Codex账号（只支持Openai-Response格式）
+- `/droid/openai/` - 使用Droid类型OpenAI兼容账号池（服务于 Codex CLI）
 - 支持所有标准API端点（messages、models等）
 
 **重要说明：**
@@ -670,13 +729,17 @@ redis-cli ping
 
 ## 🛠️ 进阶
 
-### 生产环境部署建议（重要！）
+### 反向代理部署指南
 
-**强烈建议使用Caddy反向代理（自动HTTPS）**
+在生产环境中，建议通过反向代理进行连接，以便使用自动 HTTPS、安全头部和性能优化。下面提供两种常用方案： **Caddy** 和 **Nginx Proxy Manager (NPM)**。
 
-建议使用Caddy作为反向代理，它会自动申请和更新SSL证书，配置更简单：
+---
 
-**1. 安装Caddy**
+## Caddy 方案
+
+Caddy 是一款自动管理 HTTPS 证书的 Web 服务器，配置简单、性能优秀，很适合不需要 Docker 环境的部署方案。
+
+**1. 安装 Caddy**
 
 ```bash
 # Ubuntu/Debian
@@ -692,23 +755,23 @@ sudo yum copr enable @caddy/caddy
 sudo yum install caddy
 ```
 
-**2. Caddy配置（超简单！）**
+**2. Caddy 配置**
 
-编辑 `/etc/caddy/Caddyfile`：
+编辑 `/etc/caddy/Caddyfile` ：
 
-```
+```caddy
 your-domain.com {
     # 反向代理到本地服务
     reverse_proxy 127.0.0.1:3000 {
-        # 支持流式响应（SSE）
+        # 支持流式响应或 SSE
         flush_interval -1
 
-        # 传递真实IP
+        # 传递真实 IP
         header_up X-Real-IP {remote_host}
         header_up X-Forwarded-For {remote_host}
         header_up X-Forwarded-Proto {scheme}
 
-        # 超时设置（适合长连接）
+        # 长读/写超时配置
         transport http {
             read_timeout 300s
             write_timeout 300s
@@ -726,42 +789,132 @@ your-domain.com {
 }
 ```
 
-**3. 启动Caddy**
+**3. 启动 Caddy**
 
 ```bash
-# 测试配置
 sudo caddy validate --config /etc/caddy/Caddyfile
-
-# 启动服务
 sudo systemctl start caddy
 sudo systemctl enable caddy
-
-# 查看状态
 sudo systemctl status caddy
 ```
 
-**4. 更新服务配置**
+**4. 服务配置**
 
-修改你的服务配置，让它只监听本地：
+Caddy 会自动管理 HTTPS，因此可以将服务限制在本地进行监听：
 
 ```javascript
 // config/config.js
 module.exports = {
   server: {
     port: 3000,
-    host: '127.0.0.1' // 只监听本地，通过nginx代理
+    host: '127.0.0.1' // 只监听本地
   }
-  // ... 其他配置
 }
 ```
 
-**Caddy优势：**
+**Caddy 特点**
 
-- 🔒 **自动HTTPS**: 自动申请和续期Let's Encrypt证书，零配置
-- 🛡️ **安全默认**: 默认启用现代安全协议和加密套件
-- 🚀 **流式支持**: 原生支持SSE/WebSocket等流式传输
-- 📊 **简单配置**: 配置文件极其简洁，易于维护
-- ⚡ **HTTP/2**: 默认启用HTTP/2，提升传输性能
+* 🔒 自动 HTTPS，零配置证书管理
+* 🛡️ 安全默认配置，启用现代 TLS 套件
+* ⚡ HTTP/2 和流式传输支持
+* 🔧 配置文件简洁，易于维护
+
+---
+
+## Nginx Proxy Manager (NPM) 方案
+
+Nginx Proxy Manager 通过图形化界面管理反向代理和 HTTPS 证书，並以 Docker 容器部署。
+
+**1. 在 NPM 创建新的 Proxy Host**
+
+Details 配置如下：
+
+| 项目                    | 设置                      |
+| --------------------- | ----------------------- |
+| Domain Names          | relay.example.com       |
+| Scheme                | http                    |
+| Forward Hostname / IP | 192.168.0.1 (docker 机器 IP) |
+| Forward Port          | 3000                    |
+| Block Common Exploits | ☑️                      |
+| Websockets Support    | ❌ **关闭**                |
+| Cache Assets          | ❌ **关闭**                |
+| Access List           | Publicly Accessible     |
+
+> 注意：
+> - 请确保 Claude Relay Service **监听 host 为 `0.0.0.0` 、容器 IP 或本机 IP**，以便 NPM 实现内网连接。
+> - **Websockets Support 和 Cache Assets 必须关闭**，否则会导致 SSE / 流式响应失败。
+
+**2. Custom locations**
+
+無需添加任何内容，保持为空。
+
+**3. SSL 设置**
+
+* **SSL Certificate**: Request a new SSL Certificate (Let's Encrypt) 或已有证书
+* ☑️ **Force SSL**
+* ☑️ **HTTP/2 Support**
+* ☑️ **HSTS Enabled**
+* ☑️ **HSTS Subdomains**
+
+**4. Advanced 配置**
+
+Custom Nginx Configuration 中添加以下内容：
+
+```nginx
+# 传递真实用户 IP
+proxy_set_header X-Real-IP $remote_addr;
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+proxy_set_header X-Forwarded-Proto $scheme;
+
+# 支持 WebSocket / SSE 等流式通信
+proxy_http_version 1.1;
+proxy_set_header Upgrade $http_upgrade;
+proxy_set_header Connection "upgrade";
+proxy_buffering off;
+
+# 长连接 / 超时设置（适合 AI 聊天流式传输）
+proxy_read_timeout 300s;
+proxy_send_timeout 300s;
+proxy_connect_timeout 30s;
+
+# ---- 安全性设置 ----
+# 严格 HTTPS 策略 (HSTS)
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+# 阻挡点击劫持与内容嗅探
+add_header X-Frame-Options "DENY" always;
+add_header X-Content-Type-Options "nosniff" always;
+
+# Referrer / Permissions 限制策略
+add_header Referrer-Policy "no-referrer-when-downgrade" always;
+add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
+# 隐藏服务器信息（等效于 Caddy 的 `-Server`）
+proxy_hide_header Server;
+
+# ---- 性能微调 ----
+# 关闭代理端缓存，确保即时响应（SSE / Streaming）
+proxy_cache_bypass $http_upgrade;
+proxy_no_cache $http_upgrade;
+proxy_request_buffering off;
+```
+
+**4. 启动和验证**
+
+* 保存后等待 NPM 自动申请 Let's Encrypt 证书（如果有）。
+* Dashboard 中查看 Proxy Host 状态，确保显示为 "Online"。
+* 访问 `https://relay.example.com`，如果显示绿色锁图标即表示 HTTPS 正常。
+
+**NPM 特点**
+
+* 🔒 自动申请和续期证书
+* 🔧 图形化界面，方便管理多服务
+* ⚡ 原生支持 HTTP/2 / HTTPS
+* 🚀 适合 Docker 容器部署
+
+---
+
+上述两种方案均可用于生产部署。
 
 ---
 

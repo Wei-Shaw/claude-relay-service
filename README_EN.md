@@ -327,13 +327,18 @@ redis-cli ping
 
 ## 🛠️ Advanced Usage
 
-### Production Deployment Recommendations (Important!)
+### Reverse Proxy Deployment Guide
 
-**Strongly recommend using Caddy reverse proxy (Automatic HTTPS)**
+For production environments, it is recommended to use a reverse proxy for automatic HTTPS, security headers, and performance optimization. Two common solutions are provided below: **Caddy** and **Nginx Proxy Manager (NPM)**.
 
-Recommend using Caddy as reverse proxy, it will automatically apply and renew SSL certificates with simpler configuration:
+---
+
+## Caddy Solution
+
+Caddy is a web server that automatically manages HTTPS certificates, with simple configuration and excellent performance, ideal for deployments without Docker environments.
 
 **1. Install Caddy**
+
 ```bash
 # Ubuntu/Debian
 sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
@@ -348,29 +353,30 @@ sudo yum copr enable @caddy/caddy
 sudo yum install caddy
 ```
 
-**2. Caddy Configuration (Super Simple!)**
+**2. Caddy Configuration**
 
 Edit `/etc/caddy/Caddyfile`:
-```
+
+```caddy
 your-domain.com {
     # Reverse proxy to local service
     reverse_proxy 127.0.0.1:3000 {
-        # Support streaming responses (SSE)
+        # Support streaming responses or SSE
         flush_interval -1
-        
+
         # Pass real IP
         header_up X-Real-IP {remote_host}
         header_up X-Forwarded-For {remote_host}
         header_up X-Forwarded-Proto {scheme}
-        
-        # Timeout settings (suitable for long connections)
+
+        # Long read/write timeout configuration
         transport http {
             read_timeout 300s
             write_timeout 300s
             dial_timeout 30s
         }
     }
-    
+
     # Security headers
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
@@ -382,38 +388,131 @@ your-domain.com {
 ```
 
 **3. Start Caddy**
-```bash
-# Test configuration
-sudo caddy validate --config /etc/caddy/Caddyfile
 
-# Start service
+```bash
+sudo caddy validate --config /etc/caddy/Caddyfile
 sudo systemctl start caddy
 sudo systemctl enable caddy
-
-# Check status
 sudo systemctl status caddy
 ```
 
-**4. Update service configuration**
+**4. Service Configuration**
 
-Modify your service configuration to listen only locally:
+Since Caddy automatically manages HTTPS, you can restrict the service to listen locally only:
+
 ```javascript
 // config/config.js
 module.exports = {
   server: {
     port: 3000,
-    host: '127.0.0.1'  // Listen only locally, proxy through nginx
+    host: '127.0.0.1' // Listen locally only
   }
-  // ... other configurations
 }
 ```
 
-**Caddy Advantages:**
-- 🔒 **Automatic HTTPS**: Automatically apply and renew Let's Encrypt certificates, zero configuration
-- 🛡️ **Secure by Default**: Modern security protocols and cipher suites enabled by default
-- 🚀 **Streaming Support**: Native support for SSE/WebSocket streaming
-- 📊 **Simple Configuration**: Extremely concise configuration files, easy to maintain
-- ⚡ **HTTP/2**: HTTP/2 enabled by default for improved performance
+**Caddy Features**
+
+* 🔒 Automatic HTTPS with zero-configuration certificate management
+* 🛡️ Secure default configuration with modern TLS suites
+* ⚡ HTTP/2 and streaming support
+* 🔧 Concise configuration files, easy to maintain
+
+---
+
+## Nginx Proxy Manager (NPM) Solution
+
+Nginx Proxy Manager manages reverse proxies and HTTPS certificates through a graphical interface, deployed as a Docker container.
+
+**1. Create a New Proxy Host in NPM**
+
+Configure the Details as follows:
+
+| Item                  | Setting                  |
+| --------------------- | ------------------------ |
+| Domain Names          | relay.example.com        |
+| Scheme                | http                     |
+| Forward Hostname / IP | 192.168.0.1 (docker host IP) |
+| Forward Port          | 3000                     |
+| Block Common Exploits | ☑️                       |
+| Websockets Support    | ❌ **Disable**            |
+| Cache Assets          | ❌ **Disable**            |
+| Access List           | Publicly Accessible      |
+
+> Note:
+> - Ensure Claude Relay Service **listens on `0.0.0.0`, container IP, or host IP** to allow NPM internal network connections.
+> - **Websockets Support and Cache Assets must be disabled**, otherwise SSE / streaming responses will fail.
+
+**2. Custom locations**
+
+No content needed, keep it empty.
+
+**3. SSL Settings**
+
+* **SSL Certificate**: Request a new SSL Certificate (Let's Encrypt) or existing certificate
+* ☑️ **Force SSL**
+* ☑️ **HTTP/2 Support**
+* ☑️ **HSTS Enabled**
+* ☑️ **HSTS Subdomains**
+
+**4. Advanced Configuration**
+
+Add the following to Custom Nginx Configuration:
+
+```nginx
+# Pass real user IP
+proxy_set_header X-Real-IP $remote_addr;
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+proxy_set_header X-Forwarded-Proto $scheme;
+
+# Support WebSocket / SSE streaming
+proxy_http_version 1.1;
+proxy_set_header Upgrade $http_upgrade;
+proxy_set_header Connection "upgrade";
+proxy_buffering off;
+
+# Long connection / timeout settings (for AI chat streaming)
+proxy_read_timeout 300s;
+proxy_send_timeout 300s;
+proxy_connect_timeout 30s;
+
+# ---- Security Settings ----
+# Strict HTTPS policy (HSTS)
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+# Block clickjacking and content sniffing
+add_header X-Frame-Options "DENY" always;
+add_header X-Content-Type-Options "nosniff" always;
+
+# Referrer / Permissions restriction policies
+add_header Referrer-Policy "no-referrer-when-downgrade" always;
+add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
+# Hide server information (equivalent to Caddy's `-Server`)
+proxy_hide_header Server;
+
+# ---- Performance Tuning ----
+# Disable proxy caching for real-time responses (SSE / Streaming)
+proxy_cache_bypass $http_upgrade;
+proxy_no_cache $http_upgrade;
+proxy_request_buffering off;
+```
+
+**5. Launch and Verify**
+
+* After saving, wait for NPM to automatically request Let's Encrypt certificate (if applicable).
+* Check Proxy Host status in Dashboard to ensure it shows "Online".
+* Visit `https://relay.example.com`, if the green lock icon appears, HTTPS is working properly.
+
+**NPM Features**
+
+* 🔒 Automatic certificate application and renewal
+* 🔧 Graphical interface for easy multi-service management
+* ⚡ Native HTTP/2 / HTTPS support
+* 🚀 Ideal for Docker container deployments
+
+---
+
+Both solutions are suitable for production deployment. If you use a Docker environment, **Nginx Proxy Manager is more convenient**; if you want to keep software lightweight and automated, **Caddy is a better choice**.
 
 ---
 

@@ -93,7 +93,7 @@
               </div>
             </div>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              点击眼睛图标切换显示模式，使用下方按钮复制完整 API Key
+              点击眼睛图标切换显示模式，使用下方按钮复制环境变量配置
             </p>
           </div>
         </div>
@@ -105,7 +105,7 @@
             @click="copyApiKey"
           >
             <i class="fas fa-copy" />
-            复制 API Key
+            复制配置信息
           </button>
           <button
             class="rounded-xl border border-gray-300 bg-gray-200 px-6 py-3 font-semibold text-gray-800 transition-colors hover:bg-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
@@ -120,7 +120,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { showToast } from '@/utils/toast'
 
 const props = defineProps({
@@ -133,6 +133,41 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const showFullKey = ref(false)
+
+// 获取 API Base URL 前缀
+const getBaseUrlPrefix = () => {
+  // 优先使用环境变量配置的自定义前缀
+  const customPrefix = import.meta.env.VITE_API_BASE_PREFIX
+  if (customPrefix) {
+    // 去除末尾的斜杠
+    return customPrefix.replace(/\/$/, '')
+  }
+
+  // 否则使用当前浏览器访问地址
+  if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol // http: 或 https:
+    const host = window.location.host // 域名和端口
+    // 提取协议和主机部分，去除路径
+    let origin = protocol + '//' + host
+
+    // 如果当前URL包含路径，只取协议+主机部分
+    const currentUrl = window.location.href
+    const pathStart = currentUrl.indexOf('/', 8) // 跳过 http:// 或 https://
+    if (pathStart !== -1) {
+      origin = currentUrl.substring(0, pathStart)
+    }
+
+    return origin
+  }
+
+  // 服务端渲染或其他情况的回退
+  return ''
+}
+
+// 计算完整的 API Base URL
+const currentBaseUrl = computed(() => {
+  return getBaseUrlPrefix() + '/api'
+})
 
 // 切换密钥可见性
 const toggleKeyVisibility = () => {
@@ -155,7 +190,7 @@ const getDisplayedApiKey = () => {
   }
 }
 
-// 复制 API Key
+// 复制配置信息（环境变量格式）
 const copyApiKey = async () => {
   const key = props.apiKey.apiKey || props.apiKey.key || ''
   if (!key) {
@@ -163,19 +198,23 @@ const copyApiKey = async () => {
     return
   }
 
+  // 构建环境变量配置格式
+  const configText = `ANTHROPIC_BASE_URL="${currentBaseUrl.value}"
+ANTHROPIC_AUTH_TOKEN="${key}"`
+
   try {
-    await navigator.clipboard.writeText(key)
-    showToast('API Key 已复制到剪贴板', 'success')
+    await navigator.clipboard.writeText(configText)
+    showToast('配置信息已复制到剪贴板', 'success')
   } catch (error) {
     // console.error('Failed to copy:', error)
     // 降级方案：创建一个临时文本区域
     const textArea = document.createElement('textarea')
-    textArea.value = key
+    textArea.value = configText
     document.body.appendChild(textArea)
     textArea.select()
     try {
       document.execCommand('copy')
-      showToast('API Key 已复制到剪贴板', 'success')
+      showToast('配置信息已复制到剪贴板', 'success')
     } catch (fallbackError) {
       showToast('复制失败，请手动复制', 'error')
     } finally {

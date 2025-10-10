@@ -352,7 +352,8 @@ const platformLabelMap = {
   'claude-console': 'Claude Console',
   openai: 'OpenAI',
   'openai-responses': 'OpenAI Responses',
-  gemini: 'Gemini'
+  gemini: 'Gemini',
+  droid: 'Droid'
 }
 
 const platformLabel = computed(() => platformLabelMap[props.account?.platform] || '未知平台')

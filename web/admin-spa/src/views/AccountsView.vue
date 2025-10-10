@@ -538,6 +538,17 @@
                     <span class="text-xs font-medium text-teal-700 dark:text-teal-300">Relay</span>
                   </div>
                   <div
+                    v-else-if="account.platform === 'droid'"
+                    class="flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-gradient-to-r from-cyan-100 to-sky-100 px-2.5 py-1 dark:border-cyan-700 dark:from-cyan-900/20 dark:to-sky-900/20"
+                  >
+                    <i class="fas fa-robot text-xs text-cyan-700 dark:text-cyan-400" />
+                    <span class="text-xs font-semibold text-cyan-800 dark:text-cyan-300"
+                      >Droid</span
+                    >
+                    <span class="mx-1 h-4 w-px bg-cyan-300 dark:bg-cyan-600" />
+                    <span class="text-xs font-medium text-cyan-700 dark:text-cyan-300">OAuth</span>
+                  </div>
+                  <div
                     v-else
                     class="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gradient-to-r from-gray-100 to-gray-200 px-2.5 py-1"
                   >
@@ -656,7 +667,8 @@
                     account.platform === 'openai' ||
                     account.platform === 'openai-responses' ||
                     account.platform === 'azure_openai' ||
-                    account.platform === 'ccr'
+                    account.platform === 'ccr' ||
+                    account.platform === 'droid'
                   "
                   class="flex items-center gap-2"
                 >
@@ -1108,7 +1120,9 @@
                           ? 'bg-gradient-to-br from-gray-600 to-gray-700'
                           : account.platform === 'ccr'
                             ? 'bg-gradient-to-br from-teal-500 to-emerald-600'
-                            : 'bg-gradient-to-br from-blue-500 to-blue-600'
+                            : account.platform === 'droid'
+                              ? 'bg-gradient-to-br from-cyan-500 to-sky-600'
+                              : 'bg-gradient-to-br from-blue-500 to-blue-600'
                 ]"
               >
                 <i
@@ -1124,7 +1138,9 @@
                             ? 'fas fa-openai'
                             : account.platform === 'ccr'
                               ? 'fas fa-code-branch'
-                              : 'fas fa-robot'
+                              : account.platform === 'droid'
+                                ? 'fas fa-robot'
+                                : 'fas fa-robot'
                   ]"
                 />
               </div>
@@ -1696,7 +1712,14 @@ const accountUsageSummary = ref({})
 const accountUsageOverview = ref({})
 const accountUsageGeneratedAt = ref('')
 
-const supportedUsagePlatforms = ['claude', 'claude-console', 'openai', 'openai-responses', 'gemini']
+const supportedUsagePlatforms = [
+  'claude',
+  'claude-console',
+  'openai',
+  'openai-responses',
+  'gemini',
+  'droid'
+]
 
 // 缓存状态标志
 const apiKeysLoaded = ref(false)
@@ -1722,7 +1745,8 @@ const platformOptions = ref([
   { value: 'azure_openai', label: 'Azure OpenAI', icon: 'fab fa-microsoft' },
   { value: 'bedrock', label: 'Bedrock', icon: 'fab fa-aws' },
   { value: 'openai-responses', label: 'OpenAI-Responses', icon: 'fa-server' },
-  { value: 'ccr', label: 'CCR', icon: 'fa-code-branch' }
+  { value: 'ccr', label: 'CCR', icon: 'fa-code-branch' },
+  { value: 'droid', label: 'Droid', icon: 'fa-robot' }
 ])
 
 const groupOptions = computed(() => {
@@ -1733,13 +1757,15 @@ const groupOptions = computed(() => {
   accountGroups.value.forEach((group) => {
     options.push({
       value: group.id,
-      label: `${group.name} (${group.platform === 'claude' ? 'Claude' : group.platform === 'gemini' ? 'Gemini' : 'OpenAI'})`,
+      label: `${group.name} (${group.platform === 'claude' ? 'Claude' : group.platform === 'gemini' ? 'Gemini' : group.platform === 'openai' ? 'OpenAI' : 'Droid'})`,
       icon:
         group.platform === 'claude'
           ? 'fa-brain'
           : group.platform === 'gemini'
             ? 'fa-robot'
-            : 'fa-openai'
+            : group.platform === 'openai'
+              ? 'fa-openai'
+              : 'fa-robot'
     })
   })
   return options
@@ -2044,7 +2070,8 @@ const loadAccounts = async (forceReload = false) => {
         apiClient.get('/admin/openai-accounts', { params }),
         apiClient.get('/admin/azure-openai-accounts', { params }),
         apiClient.get('/admin/openai-responses-accounts', { params }),
-        apiClient.get('/admin/ccr-accounts', { params })
+        apiClient.get('/admin/ccr-accounts', { params }),
+        apiClient.get('/admin/droid-accounts', { params })
       )
     } else {
       // 只请求指定平台，其他平台设为null占位
@@ -2057,7 +2084,9 @@ const loadAccounts = async (forceReload = false) => {
             Promise.resolve({ success: true, data: [] }), // gemini 占位
             Promise.resolve({ success: true, data: [] }), // openai 占位
             Promise.resolve({ success: true, data: [] }), // azure-openai 占位
-            Promise.resolve({ success: true, data: [] }) // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // ccr 占位
+            Promise.resolve({ success: true, data: [] }) // droid 占位
           )
           break
         case 'claude-console':
@@ -2068,7 +2097,9 @@ const loadAccounts = async (forceReload = false) => {
             Promise.resolve({ success: true, data: [] }), // gemini 占位
             Promise.resolve({ success: true, data: [] }), // openai 占位
             Promise.resolve({ success: true, data: [] }), // azure-openai 占位
-            Promise.resolve({ success: true, data: [] }) // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // ccr 占位
+            Promise.resolve({ success: true, data: [] }) // droid 占位
           )
           break
         case 'bedrock':
@@ -2079,7 +2110,9 @@ const loadAccounts = async (forceReload = false) => {
             Promise.resolve({ success: true, data: [] }), // gemini 占位
             Promise.resolve({ success: true, data: [] }), // openai 占位
             Promise.resolve({ success: true, data: [] }), // azure-openai 占位
-            Promise.resolve({ success: true, data: [] }) // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // ccr 占位
+            Promise.resolve({ success: true, data: [] }) // droid 占位
           )
           break
         case 'gemini':
@@ -2090,7 +2123,9 @@ const loadAccounts = async (forceReload = false) => {
             apiClient.get('/admin/gemini-accounts', { params }),
             Promise.resolve({ success: true, data: [] }), // openai 占位
             Promise.resolve({ success: true, data: [] }), // azure-openai 占位
-            Promise.resolve({ success: true, data: [] }) // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // ccr 占位
+            Promise.resolve({ success: true, data: [] }) // droid 占位
           )
           break
         case 'openai':
@@ -2101,7 +2136,9 @@ const loadAccounts = async (forceReload = false) => {
             Promise.resolve({ success: true, data: [] }), // gemini 占位
             apiClient.get('/admin/openai-accounts', { params }),
             Promise.resolve({ success: true, data: [] }), // azure-openai 占位
-            Promise.resolve({ success: true, data: [] }) // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // ccr 占位
+            Promise.resolve({ success: true, data: [] }) // droid 占位
           )
           break
         case 'azure_openai':
@@ -2112,7 +2149,9 @@ const loadAccounts = async (forceReload = false) => {
             Promise.resolve({ success: true, data: [] }), // gemini 占位
             Promise.resolve({ success: true, data: [] }), // openai 占位
             apiClient.get('/admin/azure-openai-accounts', { params }),
-            Promise.resolve({ success: true, data: [] }) // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // ccr 占位
+            Promise.resolve({ success: true, data: [] }) // droid 占位
           )
           break
         case 'openai-responses':
@@ -2123,7 +2162,9 @@ const loadAccounts = async (forceReload = false) => {
             Promise.resolve({ success: true, data: [] }), // gemini 占位
             Promise.resolve({ success: true, data: [] }), // openai 占位
             Promise.resolve({ success: true, data: [] }), // azure-openai 占位
-            apiClient.get('/admin/openai-responses-accounts', { params })
+            apiClient.get('/admin/openai-responses-accounts', { params }),
+            Promise.resolve({ success: true, data: [] }), // ccr 占位
+            Promise.resolve({ success: true, data: [] }) // droid 占位
           )
           break
         case 'ccr':
@@ -2134,12 +2175,29 @@ const loadAccounts = async (forceReload = false) => {
             Promise.resolve({ success: true, data: [] }), // gemini 占位
             Promise.resolve({ success: true, data: [] }), // openai 占位
             Promise.resolve({ success: true, data: [] }), // azure 占位
-            apiClient.get('/admin/ccr-accounts', { params })
+            Promise.resolve({ success: true, data: [] }), // openai-responses 占位
+            apiClient.get('/admin/ccr-accounts', { params }),
+            Promise.resolve({ success: true, data: [] }) // droid 占位
+          )
+          break
+        case 'droid':
+          requests.push(
+            Promise.resolve({ success: true, data: [] }), // claude 占位
+            Promise.resolve({ success: true, data: [] }), // claude-console 占位
+            Promise.resolve({ success: true, data: [] }), // bedrock 占位
+            Promise.resolve({ success: true, data: [] }), // gemini 占位
+            Promise.resolve({ success: true, data: [] }), // openai 占位
+            Promise.resolve({ success: true, data: [] }), // azure 占位
+            Promise.resolve({ success: true, data: [] }), // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // ccr 占位
+            apiClient.get('/admin/droid-accounts', { params })
           )
           break
         default:
           // 默认情况下返回空数组
           requests.push(
+            Promise.resolve({ success: true, data: [] }),
+            Promise.resolve({ success: true, data: [] }),
             Promise.resolve({ success: true, data: [] }),
             Promise.resolve({ success: true, data: [] }),
             Promise.resolve({ success: true, data: [] }),
@@ -2166,7 +2224,8 @@ const loadAccounts = async (forceReload = false) => {
       openaiData,
       azureOpenaiData,
       openaiResponsesData,
-      ccrData
+      ccrData,
+      droidData
     ] = await Promise.all(requests)
 
     const allAccounts = []
@@ -2258,6 +2317,18 @@ const loadAccounts = async (forceReload = false) => {
         return { ...acc, platform: 'ccr', boundApiKeysCount: 0 }
       })
       allAccounts.push(...ccrAccounts)
+    }
+
+    // Droid 账户
+    if (droidData && droidData.success) {
+      const droidAccounts = (droidData.data || []).map((acc) => {
+        return {
+          ...acc,
+          platform: 'droid',
+          boundApiKeysCount: acc.boundApiKeysCount ?? 0
+        }
+      })
+      allAccounts.push(...droidAccounts)
     }
 
     // 根据分组筛选器过滤账户
@@ -2600,6 +2671,8 @@ const resolveAccountDeleteEndpoint = (account) => {
       return `/admin/ccr-accounts/${account.id}`
     case 'gemini':
       return `/admin/gemini-accounts/${account.id}`
+    case 'droid':
+      return `/admin/droid-accounts/${account.id}`
     default:
       return null
   }
@@ -2778,6 +2851,8 @@ const resetAccountStatus = async (account) => {
       endpoint = `/admin/claude-console-accounts/${account.id}/reset-status`
     } else if (account.platform === 'ccr') {
       endpoint = `/admin/ccr-accounts/${account.id}/reset-status`
+    } else if (account.platform === 'droid') {
+      endpoint = `/admin/droid-accounts/${account.id}/reset-status`
     } else {
       showToast('不支持的账户类型', 'error')
       account.isResetting = false
@@ -2824,6 +2899,8 @@ const toggleSchedulable = async (account) => {
       endpoint = `/admin/openai-responses-accounts/${account.id}/toggle-schedulable`
     } else if (account.platform === 'ccr') {
       endpoint = `/admin/ccr-accounts/${account.id}/toggle-schedulable`
+    } else if (account.platform === 'droid') {
+      endpoint = `/admin/droid-accounts/${account.id}/toggle-schedulable`
     } else {
       showToast('该账户类型暂不支持调度控制', 'warning')
       return
