@@ -296,6 +296,15 @@
               </p>
             </div>
           </div>
+          <p class="mt-3 text-xs text-purple-700 dark:text-purple-300 sm:text-sm">
+            🚀 如果你在后台添加了 <strong>Droid</strong> 类型账号，请将上述命令中的
+            <code class="rounded bg-purple-100 px-1 dark:bg-purple-900">{{ currentBaseUrl }}</code>
+            替换为
+            <code class="rounded bg-purple-100 px-1 dark:bg-purple-900">{{
+              droidClaudeBaseUrl
+            }}</code
+            >，其余配置保持不变。
+          </p>
         </div>
 
         <!-- VSCode 插件配置 -->
@@ -505,6 +514,17 @@
                   {{ line }}
                 </div>
               </div>
+              <p class="mt-2 text-xs text-yellow-700 dark:text-yellow-300 sm:text-sm">
+                🚀 如果你要使用 <strong>Droid</strong> 类型账号池，请把配置中的
+                <code class="rounded bg-yellow-100 px-1 dark:bg-yellow-900">{{
+                  openaiBaseUrl
+                }}</code>
+                替换为
+                <code class="rounded bg-yellow-100 px-1 dark:bg-yellow-900">{{
+                  droidOpenaiBaseUrl
+                }}</code
+                >。
+              </p>
               <p class="mt-3 text-sm text-yellow-700 dark:text-yellow-300">
                 在
                 <code class="rounded bg-yellow-100 px-1 dark:bg-yellow-900"
@@ -570,6 +590,132 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Droid CLI 配置 -->
+      <div class="mt-8">
+        <h5
+          class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
+        >
+          <i class="fas fa-terminal mr-2 text-blue-600" />
+          配置 Droid CLI
+        </h5>
+        <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
+          Droid CLI 使用
+          <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">~/.factory/config.json</code>
+          保存自定义模型（Windows 路径为
+          <code class="rounded bg-gray-100 px-1 dark:bg-gray-800"
+            >C:\Users\你的用户名\.factory\config.json</code
+          >）。
+        </p>
+        <div
+          class="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-500/40 dark:bg-blue-950/30 sm:p-4"
+        >
+          <h6 class="mb-2 text-sm font-medium text-blue-800 dark:text-blue-200 sm:text-base">
+            配置文件示例
+          </h6>
+          <p class="mb-3 text-sm text-blue-700 dark:text-blue-200">
+            将以下内容追加到配置文件中，并替换示例中的域名和 API 密钥：
+          </p>
+          <div
+            class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+          >
+            <div
+              v-for="(line, index) in droidCliConfigLines"
+              :key="line + index"
+              class="whitespace-nowrap text-gray-300"
+            >
+              {{ line }}
+            </div>
+          </div>
+          <p class="mt-3 text-xs text-blue-700 dark:text-blue-200 sm:text-sm">
+            💡 在 Droid CLI 中选择自定义模型即可使用新的 Droid 账号池；确保服务地址可被本地访问。
+          </p>
+        </div>
+      </div>
+
+      <!-- Droid CLI 配置 -->
+      <div class="mt-8">
+        <h5
+          class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
+        >
+          <i class="fas fa-terminal mr-2 text-blue-600" />
+          配置 Droid CLI
+        </h5>
+        <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
+          Droid CLI 使用
+          <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">~/.factory/config.json</code>
+          保存自定义模型（Windows 路径为
+          <code class="rounded bg-gray-100 px-1 dark:bg-gray-800"
+            >C:\Users\你的用户名\.factory\config.json</code
+          >）。
+        </p>
+        <div
+          class="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-500/40 dark:bg-blue-950/30 sm:p-4"
+        >
+          <h6 class="mb-2 text-sm font-medium text-blue-800 dark:text-blue-200 sm:text-base">
+            配置文件示例
+          </h6>
+          <p class="mb-3 text-sm text-blue-700 dark:text-blue-200">
+            将以下内容追加到配置文件中，并替换示例中的域名和 API 密钥：
+          </p>
+          <div
+            class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+          >
+            <div
+              v-for="(line, index) in droidCliConfigLines"
+              :key="line + index"
+              class="whitespace-nowrap text-gray-300"
+            >
+              {{ line }}
+            </div>
+          </div>
+          <p class="mt-3 text-xs text-blue-700 dark:text-blue-200 sm:text-sm">
+            💡 在 Droid CLI 中选择自定义模型即可使用新的 Droid 账号池；确保服务地址可被本地访问。
+          </p>
+        </div>
+      </div>
+
+      <!-- Droid CLI 配置 -->
+      <div class="mt-8">
+        <h5
+          class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
+        >
+          <i class="fas fa-terminal mr-2 text-blue-600" />
+          配置 Droid CLI
+        </h5>
+        <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
+          Droid CLI 使用
+          <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">~/.factory/config.json</code>
+          保存自定义模型（Windows 路径为
+          <code class="rounded bg-gray-100 px-1 dark:bg-gray-800"
+            >C:\Users\你的用户名\.factory\config.json</code
+          >）。
+        </p>
+        <div
+          class="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-500/40 dark:bg-blue-950/30 sm:p-4"
+        >
+          <h6 class="mb-2 text-sm font-medium text-blue-800 dark:text-blue-200 sm:text-base">
+            配置文件示例
+          </h6>
+          <p class="mb-3 text-sm text-blue-700 dark:text-blue-200">
+            将以下内容追加到配置文件中，并替换示例中的域名和 API 密钥：
+          </p>
+          <div
+            class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+          >
+            <div
+              v-for="(line, index) in droidCliConfigLines"
+              :key="line + index"
+              class="whitespace-nowrap text-gray-300"
+            >
+              {{ line }}
+            </div>
+          </div>
+          <p class="mt-3 text-xs text-blue-700 dark:text-blue-200 sm:text-sm">
+            💡 在 Droid CLI 中选择自定义模型即可使用新的 Droid 账号池；确保服务地址可被本地访问。
+          </p>
         </div>
       </div>
 
@@ -948,6 +1094,15 @@
               </div>
             </div>
           </div>
+          <p class="mt-3 text-xs text-orange-700 dark:text-orange-300 sm:text-sm">
+            🚀 如果你创建了 <strong>Droid</strong> 类型账号，请把上述命令中的
+            <code class="rounded bg-orange-100 px-1 dark:bg-orange-900">{{ currentBaseUrl }}</code>
+            替换为
+            <code class="rounded bg-orange-100 px-1 dark:bg-orange-900">{{
+              droidClaudeBaseUrl
+            }}</code
+            >，其余配置保持不变。
+          </p>
         </div>
 
         <!-- VSCode 插件配置 (macOS) -->
@@ -1115,6 +1270,17 @@
                   {{ line }}
                 </div>
               </div>
+              <p class="mt-2 text-xs text-yellow-700 dark:text-yellow-300 sm:text-sm">
+                🚀 如果你要使用 <strong>Droid</strong> 类型账号池，请把配置中的
+                <code class="rounded bg-yellow-100 px-1 dark:bg-yellow-900">{{
+                  openaiBaseUrl
+                }}</code>
+                替换为
+                <code class="rounded bg-yellow-100 px-1 dark:bg-yellow-900">{{
+                  droidOpenaiBaseUrl
+                }}</code
+                >。
+              </p>
               <p class="mt-3 text-sm text-yellow-700 dark:text-yellow-300">
                 在
                 <code class="rounded bg-yellow-100 px-1 dark:bg-yellow-900"
@@ -1550,6 +1716,15 @@
               </div>
             </div>
           </div>
+          <p class="mt-3 text-xs text-orange-700 dark:text-orange-300 sm:text-sm">
+            🚀 如果你创建了 <strong>Droid</strong> 类型账号，请把上述命令中的
+            <code class="rounded bg-orange-100 px-1 dark:bg-orange-900">{{ currentBaseUrl }}</code>
+            替换为
+            <code class="rounded bg-orange-100 px-1 dark:bg-orange-900">{{
+              droidClaudeBaseUrl
+            }}</code
+            >，其余配置保持不变。
+          </p>
         </div>
 
         <!-- Gemini CLI 环境变量设置 -->
@@ -1685,6 +1860,17 @@
                   {{ line }}
                 </div>
               </div>
+              <p class="mt-2 text-xs text-yellow-700 dark:text-yellow-300 sm:text-sm">
+                🚀 如果你要使用 <strong>Droid</strong> 类型账号池，请把配置中的
+                <code class="rounded bg-yellow-100 px-1 dark:bg-yellow-900">{{
+                  openaiBaseUrl
+                }}</code>
+                替换为
+                <code class="rounded bg-yellow-100 px-1 dark:bg-yellow-900">{{
+                  droidOpenaiBaseUrl
+                }}</code
+                >。
+              </p>
               <p class="mt-3 text-sm text-yellow-700 dark:text-yellow-300">
                 在
                 <code class="rounded bg-yellow-100 px-1 dark:bg-yellow-900"
@@ -2017,6 +2203,15 @@ const openaiBaseUrl = computed(() => {
   return getBaseUrlPrefix() + '/openai'
 })
 
+// Droid 类型账号基础URL
+const droidClaudeBaseUrl = computed(() => {
+  return getBaseUrlPrefix() + '/droid/claude'
+})
+
+const droidOpenaiBaseUrl = computed(() => {
+  return getBaseUrlPrefix() + '/droid/openai'
+})
+
 // Codex 配置内容
 const codexConfigContent = computed(() => {
   // 根据当前激活的教程系统获取对应的环境变量设置说明
@@ -2094,6 +2289,8 @@ const codexConfigContent = computed(() => {
       '[model_providers.crs]',
       'name = "crs"',
       `base_url = "${openaiBaseUrl.value}"`,
+      '# 若使用 Droid 类型账号，请改为以下地址',
+      `# base_url = "${droidOpenaiBaseUrl.value}"`,
       'wire_api = "responses"',
       'requires_openai_auth = true',
       'env_key = "CRS_OAI_KEY"'
@@ -2102,6 +2299,30 @@ const codexConfigContent = computed(() => {
     authInstructions: getCurrentPlatformAuthInstructions()
   }
 })
+
+// Droid CLI 配置示例
+const droidCliConfigLines = computed(() => [
+  '{',
+  '  "custom_models": [',
+  '    {',
+  '      "model_display_name": "Sonnet 4.5 [Custom]",',
+  '      "model": "claude-sonnet-4-5-20250929",',
+  `      "base_url": "${droidClaudeBaseUrl.value}",`,
+  '      "api_key": "你的API密钥",',
+  '      "provider": "anthropic",',
+  '      "max_tokens": 8192',
+  '    },',
+  '    {',
+  '      "model_display_name": "GPT5-Codex [Custom]",',
+  '      "model": "gpt-5-codex",',
+  `      "base_url": "${droidOpenaiBaseUrl.value}",`,
+  '      "api_key": "你的API密钥",',
+  '      "provider": "openai",',
+  '      "max_tokens": 16384',
+  '    }',
+  '  ]',
+  '}'
+])
 </script>
 
 <style scoped>
