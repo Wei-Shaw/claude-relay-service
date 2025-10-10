@@ -1702,7 +1702,14 @@ const accountUsageSummary = ref({})
 const accountUsageOverview = ref({})
 const accountUsageGeneratedAt = ref('')
 
-const supportedUsagePlatforms = ['claude', 'claude-console', 'openai', 'openai-responses', 'gemini']
+const supportedUsagePlatforms = [
+  'claude',
+  'claude-console',
+  'openai',
+  'openai-responses',
+  'gemini',
+  'droid'
+]
 
 // 缓存状态标志
 const apiKeysLoaded = ref(false)

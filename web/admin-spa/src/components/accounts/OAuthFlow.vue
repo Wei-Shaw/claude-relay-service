@@ -679,10 +679,8 @@ const sessionId = ref('') // 保存sessionId用于后续交换
 const userCode = ref('')
 const verificationUri = ref('')
 const verificationUriComplete = ref('')
-const pollInterval = ref(5)
 const remainingSeconds = ref(0)
 let countdownTimer = null
-let pendingTimer = null
 
 // 计算是否可以交换code
 const canExchange = computed(() => {
@@ -788,10 +786,6 @@ watch(authCode, (newValue) => {
 
 // 生成授权URL
 const generateAuthUrl = async () => {
-  if (pendingTimer) {
-    clearTimeout(pendingTimer)
-    pendingTimer = null
-  }
   stopCountdown()
   authUrl.value = ''
   authCode.value = ''
@@ -800,7 +794,6 @@ const generateAuthUrl = async () => {
   verificationUriComplete.value = ''
   remainingSeconds.value = 0
   sessionId.value = ''
-  pollInterval.value = 5
   copied.value = false
   loading.value = true
   try {
@@ -834,7 +827,6 @@ const generateAuthUrl = async () => {
       verificationUri.value = result.verificationUri
       verificationUriComplete.value = result.verificationUriComplete || result.verificationUri
       userCode.value = result.userCode
-      pollInterval.value = Number(result.interval || 5) || 5
       startCountdown(result.expiresIn || 300)
       sessionId.value = result.sessionId
     }
@@ -848,10 +840,6 @@ const generateAuthUrl = async () => {
 // 重新生成授权URL
 const regenerateAuthUrl = () => {
   stopCountdown()
-  if (pendingTimer) {
-    clearTimeout(pendingTimer)
-    pendingTimer = null
-  }
   authUrl.value = ''
   authCode.value = ''
   userCode.value = ''
@@ -972,23 +960,10 @@ const exchangeCode = async () => {
       const response = await accountsStore.exchangeDroidCode(data)
       if (!response.success) {
         if (response.pending) {
-          const retrySeconds = Number(response.retryAfter || pollInterval.value || 5)
           const message = response.message || '授权尚未完成，请在浏览器确认后稍候再次尝试。'
           showToast(message, 'info')
           if (typeof response.expiresIn === 'number' && response.expiresIn >= 0) {
             startCountdown(response.expiresIn)
-          }
-          // 等待建议的轮询间隔后自动重试
-          if (Number.isFinite(retrySeconds) && retrySeconds > 0) {
-            if (pendingTimer) {
-              clearTimeout(pendingTimer)
-            }
-            pendingTimer = setTimeout(() => {
-              pendingTimer = null
-              if (!exchanging.value) {
-                exchangeCode()
-              }
-            }, retrySeconds * 1000)
           }
           return
         }
@@ -996,10 +971,6 @@ const exchangeCode = async () => {
       }
       tokenInfo = response.data
       stopCountdown()
-      if (pendingTimer) {
-        clearTimeout(pendingTimer)
-        pendingTimer = null
-      }
     }
 
     emit('success', tokenInfo)
@@ -1012,9 +983,5 @@ const exchangeCode = async () => {
 
 onBeforeUnmount(() => {
   stopCountdown()
-  if (pendingTimer) {
-    clearTimeout(pendingTimer)
-    pendingTimer = null
-  }
 })
 </script>
