@@ -604,10 +604,10 @@
         <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
           Droid CLI 使用
           <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">~/.factory/config.json</code>
-          保存自定义模型（Windows 路径为
+          保存自定义模型；在 Windows 中可直接编辑
           <code class="rounded bg-gray-100 px-1 dark:bg-gray-800"
             >C:\Users\你的用户名\.factory\config.json</code
-          >）。
+          >。
         </p>
         <div
           class="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-500/40 dark:bg-blue-950/30 sm:p-4"
@@ -624,7 +624,7 @@
             <div
               v-for="(line, index) in droidCliConfigLines"
               :key="line + index"
-              class="whitespace-nowrap text-gray-300"
+              class="whitespace-pre text-gray-300"
             >
               {{ line }}
             </div>
@@ -634,91 +634,6 @@
           </p>
         </div>
       </div>
-
-      <!-- Droid CLI 配置 -->
-      <div class="mt-8">
-        <h5
-          class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
-        >
-          <i class="fas fa-terminal mr-2 text-blue-600" />
-          配置 Droid CLI
-        </h5>
-        <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
-          Droid CLI 使用
-          <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">~/.factory/config.json</code>
-          保存自定义模型（Windows 路径为
-          <code class="rounded bg-gray-100 px-1 dark:bg-gray-800"
-            >C:\Users\你的用户名\.factory\config.json</code
-          >）。
-        </p>
-        <div
-          class="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-500/40 dark:bg-blue-950/30 sm:p-4"
-        >
-          <h6 class="mb-2 text-sm font-medium text-blue-800 dark:text-blue-200 sm:text-base">
-            配置文件示例
-          </h6>
-          <p class="mb-3 text-sm text-blue-700 dark:text-blue-200">
-            将以下内容追加到配置文件中，并替换示例中的域名和 API 密钥：
-          </p>
-          <div
-            class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
-          >
-            <div
-              v-for="(line, index) in droidCliConfigLines"
-              :key="line + index"
-              class="whitespace-nowrap text-gray-300"
-            >
-              {{ line }}
-            </div>
-          </div>
-          <p class="mt-3 text-xs text-blue-700 dark:text-blue-200 sm:text-sm">
-            💡 在 Droid CLI 中选择自定义模型即可使用新的 Droid 账号池；确保服务地址可被本地访问。
-          </p>
-        </div>
-      </div>
-
-      <!-- Droid CLI 配置 -->
-      <div class="mt-8">
-        <h5
-          class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
-        >
-          <i class="fas fa-terminal mr-2 text-blue-600" />
-          配置 Droid CLI
-        </h5>
-        <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
-          Droid CLI 使用
-          <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">~/.factory/config.json</code>
-          保存自定义模型（Windows 路径为
-          <code class="rounded bg-gray-100 px-1 dark:bg-gray-800"
-            >C:\Users\你的用户名\.factory\config.json</code
-          >）。
-        </p>
-        <div
-          class="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-500/40 dark:bg-blue-950/30 sm:p-4"
-        >
-          <h6 class="mb-2 text-sm font-medium text-blue-800 dark:text-blue-200 sm:text-base">
-            配置文件示例
-          </h6>
-          <p class="mb-3 text-sm text-blue-700 dark:text-blue-200">
-            将以下内容追加到配置文件中，并替换示例中的域名和 API 密钥：
-          </p>
-          <div
-            class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
-          >
-            <div
-              v-for="(line, index) in droidCliConfigLines"
-              :key="line + index"
-              class="whitespace-nowrap text-gray-300"
-            >
-              {{ line }}
-            </div>
-          </div>
-          <p class="mt-3 text-xs text-blue-700 dark:text-blue-200 sm:text-sm">
-            💡 在 Droid CLI 中选择自定义模型即可使用新的 Droid 账号池；确保服务地址可被本地访问。
-          </p>
-        </div>
-      </div>
-
       <!-- 第四步：开始使用 -->
       <div class="mb-6 sm:mb-8">
         <h4
@@ -1349,6 +1264,49 @@
         </div>
       </div>
 
+      <!-- Droid CLI 配置 -->
+      <div class="mt-8">
+        <h5
+          class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
+        >
+          <i class="fas fa-terminal mr-2 text-blue-600" />
+          配置 Droid CLI
+        </h5>
+        <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
+          Droid CLI 使用
+          <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">~/.factory/config.json</code>
+          保存自定义模型；你可以在 Finder 中按
+          <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">⌘ + Shift + G</code>
+          并输入路径，或运行
+          <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">open ~/.factory</code>
+          快速打开配置目录。
+        </p>
+        <div
+          class="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-500/40 dark:bg-blue-950/30 sm:p-4"
+        >
+          <h6 class="mb-2 text-sm font-medium text-blue-800 dark:text-blue-200 sm:text-base">
+            配置文件示例
+          </h6>
+          <p class="mb-3 text-sm text-blue-700 dark:text-blue-200">
+            将以下内容追加到配置文件中，并替换示例中的域名和 API 密钥：
+          </p>
+          <div
+            class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+          >
+            <div
+              v-for="(line, index) in droidCliConfigLines"
+              :key="line + index"
+              class="whitespace-pre text-gray-300"
+            >
+              {{ line }}
+            </div>
+          </div>
+          <p class="mt-3 text-xs text-blue-700 dark:text-blue-200 sm:text-sm">
+            💡 在 Droid CLI 中选择自定义模型即可使用新的 Droid 账号池；确保服务地址可被本地访问。
+          </p>
+        </div>
+      </div>
+
       <!-- 第四步：开始使用 -->
       <div class="mb-8">
         <h4
@@ -1937,7 +1895,6 @@
             </div>
           </div>
         </div>
-
         <!-- VSCode 插件配置 (Linux) -->
         <div
           class="mt-6 rounded-lg border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-500/40 dark:bg-indigo-950/30 sm:p-4"
@@ -1967,162 +1924,209 @@
             <div class="whitespace-nowrap text-gray-300">}</div>
           </div>
         </div>
-      </div>
 
-      <!-- 第四步：开始使用 -->
-      <div class="mb-8">
-        <h4
-          class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
-        >
-          <span
-            class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-yellow-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
-            >4</span
+        <!-- Droid CLI 配置 -->
+        <div class="mt-8">
+          <h5
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
           >
-          开始使用 Claude Code
-        </h4>
-        <div
-          class="rounded-xl border border-yellow-100 bg-gradient-to-r from-yellow-50 to-amber-50 p-4 dark:border-yellow-500/40 dark:from-yellow-950/30 dark:to-amber-950/30 sm:p-6"
-        >
+            <i class="fas fa-terminal mr-2 text-blue-600" />
+            配置 Droid CLI
+          </h5>
           <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
-            现在你可以开始使用 Claude Code 了！
+            Droid CLI 使用
+            <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">~/.factory/config.json</code>
+            保存自定义模型；在 Linux 或 WSL2 中，可直接编辑
+            <code class="rounded bg-gray-100 px-1 dark:bg-gray-800"
+              >/home/你的用户名/.factory/config.json</code
+            >
+            或在终端运行
+            <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">xdg-open ~/.factory</code>
+            打开目录。
           </p>
-
-          <div class="space-y-4">
-            <div>
-              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-300 sm:text-base">
-                启动 Claude Code
-              </h6>
+          <div
+            class="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-500/40 dark:bg-blue-950/30 sm:p-4"
+          >
+            <h6 class="mb-2 text-sm font-medium text-blue-800 dark:text-blue-200 sm:text-base">
+              配置文件示例
+            </h6>
+            <p class="mb-3 text-sm text-blue-700 dark:text-blue-200">
+              将以下内容追加到配置文件中，并替换示例中的域名和 API 密钥：
+            </p>
+            <div
+              class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+            >
               <div
-                class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+                v-for="(line, index) in droidCliConfigLines"
+                :key="line + index"
+                class="whitespace-pre text-gray-300"
               >
-                <div class="whitespace-nowrap text-gray-300">claude</div>
+                {{ line }}
               </div>
             </div>
+            <p class="mt-3 text-xs text-blue-700 dark:text-blue-200 sm:text-sm">
+              💡 在 Droid CLI 中选择自定义模型即可使用新的 Droid 账号池；确保服务地址可被本地访问。
+            </p>
+          </div>
+        </div>
 
-            <div>
-              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-300 sm:text-base">
-                在特定项目中使用
-              </h6>
-              <div
-                class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
-              >
-                <div class="mb-2"># 进入你的项目目录</div>
-                <div class="whitespace-nowrap text-gray-300">cd /path/to/your/project</div>
-                <div class="mb-2 mt-2"># 启动 Claude Code</div>
-                <div class="whitespace-nowrap text-gray-300">claude</div>
+        <!-- 第四步：开始使用 -->
+        <div class="mb-8">
+          <h4
+            class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
+          >
+            <span
+              class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-yellow-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
+              >4</span
+            >
+            开始使用 Claude Code
+          </h4>
+          <div
+            class="rounded-xl border border-yellow-100 bg-gradient-to-r from-yellow-50 to-amber-50 p-4 dark:border-yellow-500/40 dark:from-yellow-950/30 dark:to-amber-950/30 sm:p-6"
+          >
+            <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
+              现在你可以开始使用 Claude Code 了！
+            </p>
+
+            <div class="space-y-4">
+              <div>
+                <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-300 sm:text-base">
+                  启动 Claude Code
+                </h6>
+                <div
+                  class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+                >
+                  <div class="whitespace-nowrap text-gray-300">claude</div>
+                </div>
+              </div>
+
+              <div>
+                <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-300 sm:text-base">
+                  在特定项目中使用
+                </h6>
+                <div
+                  class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+                >
+                  <div class="mb-2"># 进入你的项目目录</div>
+                  <div class="whitespace-nowrap text-gray-300">cd /path/to/your/project</div>
+                  <div class="mb-2 mt-2"># 启动 Claude Code</div>
+                  <div class="whitespace-nowrap text-gray-300">claude</div>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Linux 故障排除 -->
-      <div class="mb-8">
-        <h4
-          class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
-        >
-          <i class="fas fa-wrench mr-2 text-red-600 sm:mr-3" />
-          Linux 常见问题解决
-        </h4>
-        <div class="space-y-4">
-          <details
-            class="rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
+        <!-- Linux 故障排除 -->
+        <div class="mb-8">
+          <h4
+            class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
           >
-            <summary
-              class="cursor-pointer p-3 text-sm font-medium text-gray-800 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 sm:p-4 sm:text-base"
+            <i class="fas fa-wrench mr-2 text-red-600 sm:mr-3" />
+            Linux 常见问题解决
+          </h4>
+          <div class="space-y-4">
+            <details
+              class="rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
             >
-              安装时提示权限错误
-            </summary>
-            <div class="px-3 pb-3 text-gray-600 dark:text-gray-400 sm:px-4 sm:pb-4">
-              <p class="mb-2">尝试以下解决方法：</p>
-              <ul class="list-inside list-disc space-y-1 text-sm">
-                <li>
-                  使用 sudo 安装：<code
-                    class="rounded bg-gray-200 px-1 text-xs dark:bg-gray-700 sm:text-sm"
-                    >sudo npm install -g @anthropic-ai/claude-code</code
-                  >
-                </li>
-                <li>
-                  或者配置 npm 使用用户目录：<code
-                    class="rounded bg-gray-200 px-1 text-xs dark:bg-gray-700 sm:text-sm"
-                    >npm config set prefix ~/.npm-global</code
-                  >
-                </li>
-                <li>
-                  然后添加到 PATH：<code
-                    class="rounded bg-gray-200 px-1 text-xs dark:bg-gray-700 sm:text-sm"
-                    >export PATH=~/.npm-global/bin:$PATH</code
-                  >
-                </li>
-              </ul>
-            </div>
-          </details>
-
-          <details
-            class="rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
-          >
-            <summary
-              class="cursor-pointer p-3 text-sm font-medium text-gray-800 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 sm:p-4 sm:text-base"
-            >
-              缺少依赖库
-            </summary>
-            <div class="px-3 pb-3 text-gray-600 dark:text-gray-400 sm:px-4 sm:pb-4">
-              <p class="mb-2">某些 Linux 发行版需要安装额外依赖：</p>
-              <div
-                class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              <summary
+                class="cursor-pointer p-3 text-sm font-medium text-gray-800 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 sm:p-4 sm:text-base"
               >
-                <div class="mb-2"># Ubuntu/Debian</div>
-                <div class="whitespace-nowrap text-gray-300">sudo apt install build-essential</div>
-                <div class="mb-2 mt-2"># CentOS/RHEL</div>
-                <div class="whitespace-nowrap text-gray-300">
-                  sudo dnf groupinstall "Development Tools"
+                安装时提示权限错误
+              </summary>
+              <div class="px-3 pb-3 text-gray-600 dark:text-gray-400 sm:px-4 sm:pb-4">
+                <p class="mb-2">尝试以下解决方法：</p>
+                <ul class="list-inside list-disc space-y-1 text-sm">
+                  <li>
+                    使用 sudo 安装：<code
+                      class="rounded bg-gray-200 px-1 text-xs dark:bg-gray-700 sm:text-sm"
+                      >sudo npm install -g @anthropic-ai/claude-code</code
+                    >
+                  </li>
+                  <li>
+                    或者配置 npm 使用用户目录：<code
+                      class="rounded bg-gray-200 px-1 text-xs dark:bg-gray-700 sm:text-sm"
+                      >npm config set prefix ~/.npm-global</code
+                    >
+                  </li>
+                  <li>
+                    然后添加到 PATH：<code
+                      class="rounded bg-gray-200 px-1 text-xs dark:bg-gray-700 sm:text-sm"
+                      >export PATH=~/.npm-global/bin:$PATH</code
+                    >
+                  </li>
+                </ul>
+              </div>
+            </details>
+
+            <details
+              class="rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
+            >
+              <summary
+                class="cursor-pointer p-3 text-sm font-medium text-gray-800 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 sm:p-4 sm:text-base"
+              >
+                缺少依赖库
+              </summary>
+              <div class="px-3 pb-3 text-gray-600 dark:text-gray-400 sm:px-4 sm:pb-4">
+                <p class="mb-2">某些 Linux 发行版需要安装额外依赖：</p>
+                <div
+                  class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+                >
+                  <div class="mb-2"># Ubuntu/Debian</div>
+                  <div class="whitespace-nowrap text-gray-300">
+                    sudo apt install build-essential
+                  </div>
+                  <div class="mb-2 mt-2"># CentOS/RHEL</div>
+                  <div class="whitespace-nowrap text-gray-300">
+                    sudo dnf groupinstall "Development Tools"
+                  </div>
                 </div>
               </div>
-            </div>
-          </details>
+            </details>
 
-          <details
-            class="rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
-          >
-            <summary
-              class="cursor-pointer p-3 text-sm font-medium text-gray-800 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 sm:p-4 sm:text-base"
+            <details
+              class="rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
             >
-              环境变量不生效
-            </summary>
-            <div class="px-3 pb-3 text-gray-600 dark:text-gray-400 sm:px-4 sm:pb-4">
-              <p class="mb-2">检查以下几点：</p>
-              <ul class="list-inside list-disc space-y-1 text-sm">
-                <li>确认修改了正确的配置文件（.bashrc 或 .zshrc）</li>
-                <li>
-                  重新启动终端或运行
-                  <code class="rounded bg-gray-200 px-1 text-xs dark:bg-gray-700 sm:text-sm"
-                    >source ~/.bashrc</code
-                  >
-                </li>
-                <li>
-                  验证设置：<code
-                    class="rounded bg-gray-200 px-1 text-xs dark:bg-gray-700 sm:text-sm"
-                    >echo $ANTHROPIC_BASE_URL</code
-                  >
-                </li>
-              </ul>
-            </div>
-          </details>
+              <summary
+                class="cursor-pointer p-3 text-sm font-medium text-gray-800 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 sm:p-4 sm:text-base"
+              >
+                环境变量不生效
+              </summary>
+              <div class="px-3 pb-3 text-gray-600 dark:text-gray-400 sm:px-4 sm:pb-4">
+                <p class="mb-2">检查以下几点：</p>
+                <ul class="list-inside list-disc space-y-1 text-sm">
+                  <li>确认修改了正确的配置文件（.bashrc 或 .zshrc）</li>
+                  <li>
+                    重新启动终端或运行
+                    <code class="rounded bg-gray-200 px-1 text-xs dark:bg-gray-700 sm:text-sm"
+                      >source ~/.bashrc</code
+                    >
+                  </li>
+                  <li>
+                    验证设置：<code
+                      class="rounded bg-gray-200 px-1 text-xs dark:bg-gray-700 sm:text-sm"
+                      >echo $ANTHROPIC_BASE_URL</code
+                    >
+                  </li>
+                </ul>
+              </div>
+            </details>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- 结尾 -->
-    <div
-      class="rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 p-4 text-center text-white sm:p-6"
-    >
-      <h5 class="mb-2 text-lg font-semibold sm:text-xl">🎉 恭喜你！</h5>
-      <p class="mb-3 text-sm text-blue-100 sm:mb-4 sm:text-base">
-        你已经成功安装并配置了 Claude Code，现在可以开始享受 AI 编程助手带来的便利了。
-      </p>
-      <p class="text-xs text-blue-200 sm:text-sm">
-        如果在使用过程中遇到任何问题，可以查看官方文档或社区讨论获取帮助。
-      </p>
+      <!-- 结尾 -->
+      <div
+        class="rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 p-4 text-center text-white sm:p-6"
+      >
+        <h5 class="mb-2 text-lg font-semibold sm:text-xl">🎉 恭喜你！</h5>
+        <p class="mb-3 text-sm text-blue-100 sm:mb-4 sm:text-base">
+          你已经成功安装并配置了 Claude Code，现在可以开始享受 AI 编程助手带来的便利了。
+        </p>
+        <p class="text-xs text-blue-200 sm:text-sm">
+          如果在使用过程中遇到任何问题，可以查看官方文档或社区讨论获取帮助。
+        </p>
+      </div>
     </div>
   </div>
 </template>
