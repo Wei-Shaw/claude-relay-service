@@ -500,6 +500,11 @@ const features = ref({
 const displayMode = ref('detailed')
 const displayModeOptions = [
   {
+    value: 'user',
+    label: '用户',
+    description: '仅展示用户消息。'
+  },
+  {
     value: 'simple',
     label: '精简',
     description: '用户消息 + AI 最终回复。'
@@ -865,7 +870,7 @@ const loadMessages = async () => {
 
     if (nextFeatures.systemMessageFilter === false) {
       showSystemMessages.value = true
-    } else if (displayMode.value === 'simple') {
+    } else if (displayMode.value === 'simple' || displayMode.value === 'user') {
       showSystemMessages.value = false
     }
   } catch (error) {
@@ -1090,8 +1095,7 @@ watch(displayMode, (mode) => {
     showSystemMessages.value = true
     return
   }
-
-  if (mode === 'simple') {
+  if (mode === 'simple' || mode === 'user') {
     collapseAllGroups()
     if (features.value.systemMessageFilter !== false) {
       showSystemMessages.value = false

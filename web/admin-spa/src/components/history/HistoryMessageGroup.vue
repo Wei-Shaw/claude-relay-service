@@ -21,138 +21,177 @@
     </header>
 
     <section class="space-y-4 p-4 text-sm">
-      <div
-        v-if="primaryUserMessage"
-        class="rounded-xl border border-gray-200 bg-white/80 p-4 text-gray-700 shadow-inner dark:border-gray-700 dark:bg-gray-800/70 dark:text-gray-200"
-      >
+      <template v-if="displayMode === 'user'">
         <div
-          class="mb-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
-        >
-          <span class="flex items-center gap-2 font-semibold text-gray-900 dark:text-gray-100">
-            <i class="fas fa-user-circle text-indigo-500 dark:text-indigo-300"></i>
-            用户
-          </span>
-          <span>{{ formatDate(primaryUserMessage.createdAt || primaryUserMessage.storedAt) }}</span>
-        </div>
-        <div
-          class="markdown-view whitespace-pre-wrap break-words text-sm text-gray-800 dark:text-gray-100"
-          v-html="renderMarkdown(primaryUserMessage.content)"
-        />
-      </div>
-
-      <template v-if="displayMode !== 'simple'">
-        <div
-          v-if="processItems.length"
-          class="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-500/40 dark:bg-indigo-500/10"
-        >
-          <button
-            v-if="canToggleThinking"
-            class="mb-3 flex w-full items-center justify-between text-xs font-medium text-indigo-600 transition hover:text-indigo-500 dark:text-indigo-200"
-            @click="handleToggleThinking"
-          >
-            <span class="flex items-center gap-2">
-              <i class="fas fa-layer-group"></i>
-              中间过程
-            </span>
-            <span class="text-[11px] uppercase tracking-wide">
-              {{ expanded ? '收起 ▲' : '展开 ▼' }}
-            </span>
-          </button>
-
-          <div v-if="expanded" class="space-y-3 text-xs">
-            <div
-              v-for="item in processItems"
-              :key="item.id"
-              :class="[
-                'rounded-lg border p-3',
-                item.kind === 'tool' || item.kind === 'thinking'
-                  ? 'border-indigo-200 bg-white/80 dark:border-indigo-500/30 dark:bg-indigo-500/5'
-                  : item.kind === 'system'
-                    ? 'border-amber-200 bg-amber-50/80 text-amber-700 dark:border-amber-400/40 dark:bg-amber-500/10 dark:text-amber-200'
-                    : 'border-gray-200 bg-white/80 text-gray-600 dark:border-gray-700 dark:bg-gray-800/70 dark:text-gray-300'
-              ]"
-            >
-              <div
-                class="mb-2 flex items-center justify-between text-indigo-600 dark:text-indigo-300"
-              >
-                <span class="flex items-center gap-2 font-semibold">
-                  <i :class="item.icon"></i>
-                  {{ item.label }}
-                </span>
-                <span v-if="item.timestamp" class="text-[11px] text-gray-400 dark:text-gray-500">
-                  {{ formatDate(item.timestamp) }}
-                </span>
-              </div>
-              <div
-                v-if="item.bodyType === 'markdown'"
-                class="markdown-view whitespace-pre-wrap break-words text-xs text-slate-700 dark:text-slate-200 sm:text-sm"
-                v-html="renderMarkdown(item.body)"
-              />
-              <pre
-                v-else
-                class="scrollbar-custom whitespace-pre-wrap break-words text-[12px] text-slate-700 dark:text-slate-200"
-                >{{ item.body }}
-              </pre>
-              <div v-if="item.copyText" class="mt-2 flex justify-end">
-                <button class="copy-btn" title="复制内容" @click="copyMessage(item.copyText)">
-                  <i class="fas fa-copy"></i>
-                  复制
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <p v-else class="text-xs text-gray-500 dark:text-gray-400">
-            中间过程包含 {{ processItems.length }} 条记录，点击上方按钮可展开查看详情。
-          </p>
-        </div>
-
-        <div
-          v-if="finalAssistantMessage"
-          class="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-500/40 dark:bg-indigo-500/10"
+          v-for="(userMessage, userIdx) in userMessagesToRender"
+          :key="userMessage.storedAt || userMessage.createdAt || `${group.id}_user_${userIdx}`"
+          class="rounded-xl border border-gray-200 bg-white/80 p-4 text-gray-700 shadow-inner dark:border-gray-700 dark:bg-gray-800/70 dark:text-gray-200"
         >
           <div
-            class="mb-2 flex items-center justify-between text-xs text-indigo-600 dark:text-indigo-200"
+            class="mb-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
           >
-            <span class="flex items-center gap-2 font-semibold">
-              <i class="fas fa-robot text-indigo-500 dark:text-indigo-200"></i>
-              Claude
+            <span class="flex items-center gap-2 font-semibold text-gray-900 dark:text-gray-100">
+              <i class="fas fa-user-circle text-indigo-500 dark:text-indigo-300"></i>
+              用户
             </span>
-            <span>{{
-              formatDate(finalAssistantMessage.createdAt || finalAssistantMessage.storedAt)
-            }}</span>
+            <span>{{ formatDate(userMessage.createdAt || userMessage.storedAt) }}</span>
           </div>
           <div
             class="markdown-view whitespace-pre-wrap break-words text-sm text-gray-800 dark:text-gray-100"
-            v-html="renderMarkdown(finalAssistantMessage.content)"
+            v-html="renderMarkdown(userMessage.content)"
           />
-          <div class="mt-2 flex justify-end">
-            <button
-              class="copy-btn"
-              title="复制消息"
-              @click="copyMessage(finalAssistantMessage.content)"
-            >
+          <div v-if="userMessage.content" class="mt-2 flex justify-end">
+            <button class="copy-btn" title="复制消息" @click="copyMessage(userMessage.content)">
               <i class="fas fa-copy"></i>
               复制
             </button>
           </div>
-          <footer
-            v-if="metaItems.length"
-            class="mt-3 flex flex-wrap items-center gap-2 border-t border-dashed border-gray-200 pt-3 text-[11px] text-gray-500 dark:border-gray-700 dark:text-gray-400"
-          >
-            <div
-              v-for="meta in metaItems"
-              :key="meta.label"
-              class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 dark:bg-gray-800/80"
-            >
-              <span class="font-semibold text-gray-700 dark:text-gray-200">{{ meta.label }}：</span>
-              <span class="break-all text-gray-600 dark:text-gray-300">{{ meta.value }}</span>
-            </div>
-          </footer>
+        </div>
+
+        <div
+          v-if="!userMessagesToRender.length"
+          class="rounded-xl border border-dashed border-gray-300 bg-white/70 p-6 text-center text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-800/60 dark:text-gray-400"
+        >
+          暂无用户消息
         </div>
       </template>
 
       <template v-else>
+        <div
+          v-if="primaryUserMessage"
+          class="rounded-xl border border-gray-200 bg-white/80 p-4 text-gray-700 shadow-inner dark:border-gray-700 dark:bg-gray-800/70 dark:text-gray-200"
+        >
+          <div
+            class="mb-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
+          >
+            <span class="flex items-center gap-2 font-semibold text-gray-900 dark:text-gray-100">
+              <i class="fas fa-user-circle text-indigo-500 dark:text-indigo-300"></i>
+              用户
+            </span>
+            <span>{{
+              formatDate(primaryUserMessage.createdAt || primaryUserMessage.storedAt)
+            }}</span>
+          </div>
+          <div
+            class="markdown-view whitespace-pre-wrap break-words text-sm text-gray-800 dark:text-gray-100"
+            v-html="renderMarkdown(primaryUserMessage.content)"
+          />
+        </div>
+
+        <template v-if="displayMode !== 'simple'">
+          <div
+            v-if="processItems.length"
+            class="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-500/40 dark:bg-indigo-500/10"
+          >
+            <button
+              v-if="canToggleThinking"
+              class="mb-3 flex w-full items-center justify-between text-xs font-medium text-indigo-600 transition hover:text-indigo-500 dark:text-indigo-200"
+              @click="handleToggleThinking"
+            >
+              <span class="flex items-center gap-2">
+                <i class="fas fa-layer-group"></i>
+                中间过程
+              </span>
+              <span class="text-[11px] uppercase tracking-wide">
+                {{ expanded ? '收起 ▲' : '展开 ▼' }}
+              </span>
+            </button>
+
+            <div v-if="expanded" class="space-y-3 text-xs">
+              <div
+                v-for="item in processItems"
+                :key="item.id"
+                :class="[
+                  'rounded-lg border p-3',
+                  item.kind === 'tool' || item.kind === 'thinking'
+                    ? 'border-indigo-200 bg-white/80 dark:border-indigo-500/30 dark:bg-indigo-500/5'
+                    : item.kind === 'system'
+                      ? 'border-amber-200 bg-amber-50/80 text-amber-700 dark:border-amber-400/40 dark:bg-amber-500/10 dark:text-amber-200'
+                      : 'border-gray-200 bg-white/80 text-gray-600 dark:border-gray-700 dark:bg-gray-800/70 dark:text-gray-300'
+                ]"
+              >
+                <div
+                  class="mb-2 flex items-center justify-between text-indigo-600 dark:text-indigo-300"
+                >
+                  <span class="flex items-center gap-2 font-semibold">
+                    <i :class="item.icon"></i>
+                    {{ item.label }}
+                  </span>
+                  <span v-if="item.timestamp" class="text-[11px] text-gray-400 dark:text-gray-500">
+                    {{ formatDate(item.timestamp) }}
+                  </span>
+                </div>
+                <div
+                  v-if="item.bodyType === 'markdown'"
+                  class="markdown-view whitespace-pre-wrap break-words text-xs text-slate-700 dark:text-slate-200 sm:text-sm"
+                  v-html="renderMarkdown(item.body)"
+                />
+                <pre
+                  v-else
+                  class="scrollbar-custom whitespace-pre-wrap break-words text-[12px] text-slate-700 dark:text-slate-200"
+                  >{{ item.body }}
+                </pre>
+                <div v-if="item.copyText" class="mt-2 flex justify-end">
+                  <button class="copy-btn" title="复制内容" @click="copyMessage(item.copyText)">
+                    <i class="fas fa-copy"></i>
+                    复制
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <p v-else class="text-xs text-gray-500 dark:text-gray-400">
+              中间过程包含 {{ processItems.length }} 条记录，点击上方按钮可展开查看详情。
+            </p>
+          </div>
+
+          <div
+            v-if="finalAssistantMessage"
+            class="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-500/40 dark:bg-indigo-500/10"
+          >
+            <div
+              class="mb-2 flex items-center justify-between text-xs text-indigo-600 dark:text-indigo-200"
+            >
+              <span class="flex items-center gap-2 font-semibold">
+                <i class="fas fa-robot text-indigo-500 dark:text-indigo-200"></i>
+                Claude
+              </span>
+              <span>{{
+                formatDate(finalAssistantMessage.createdAt || finalAssistantMessage.storedAt)
+              }}</span>
+            </div>
+            <div
+              class="markdown-view whitespace-pre-wrap break-words text-sm text-gray-800 dark:text-gray-100"
+              v-html="renderMarkdown(finalAssistantMessage.content)"
+            />
+            <div class="mt-2 flex justify-end">
+              <button
+                class="copy-btn"
+                title="复制消息"
+                @click="copyMessage(finalAssistantMessage.content)"
+              >
+                <i class="fas fa-copy"></i>
+                复制
+              </button>
+            </div>
+            <footer
+              v-if="metaItems.length"
+              class="mt-3 flex flex-wrap items-center gap-2 border-t border-dashed border-gray-200 pt-3 text-[11px] text-gray-500 dark:border-gray-700 dark:text-gray-400"
+            >
+              <div
+                v-for="meta in metaItems"
+                :key="meta.label"
+                class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 dark:bg-gray-800/80"
+              >
+                <span class="font-semibold text-gray-700 dark:text-gray-200">
+                  {{ meta.label }}：
+                </span>
+                <span class="break-all text-gray-600 dark:text-gray-300">{{ meta.value }}</span>
+              </div>
+            </footer>
+          </div>
+        </template>
+
         <div
           v-for="assistantMessage in assistantMessagesToRender"
           :key="assistantMessage.storedAt || assistantMessage.createdAt"
@@ -235,7 +274,12 @@ const renderMarkdown = props.renderMarkdown
 const copyMessage = props.copyMessage
 const formatDate = props.formatDate
 
-const primaryUserMessage = computed(() => props.group.userMessages?.[0] || null)
+const userMessagesToRender = computed(() => {
+  const list = Array.isArray(props.group.userMessages) ? props.group.userMessages : []
+  return list.filter((message) => message && !message.metadata?.assistantGenerated)
+})
+
+const primaryUserMessage = computed(() => userMessagesToRender.value[0] || null)
 
 const assistantMessagesToRender = computed(() => {
   const allAssistant = Array.isArray(props.group.assistantMessages)
