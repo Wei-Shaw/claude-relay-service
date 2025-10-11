@@ -3137,26 +3137,117 @@ const determinePlatformGroup = (platform) => {
   return ''
 }
 
-// 初始化代理配置
-const initProxyConfig = () => {
-  if (props.account?.proxy && props.account.proxy.host && props.account.proxy.port) {
-    return {
-      enabled: true,
-      type: props.account.proxy.type || 'socks5',
-      host: props.account.proxy.host,
-      port: props.account.proxy.port,
-      username: props.account.proxy.username || '',
-      password: props.account.proxy.password || ''
+const createDefaultProxyState = () => ({
+  enabled: false,
+  type: 'socks5',
+  host: '',
+  port: '',
+  username: '',
+  password: ''
+})
+
+const parseProxyResponse = (rawProxy) => {
+  if (!rawProxy) {
+    return null
+  }
+
+  let proxyObject = rawProxy
+  if (typeof rawProxy === 'string') {
+    try {
+      proxyObject = JSON.parse(rawProxy)
+    } catch (error) {
+      return null
     }
   }
-  return {
-    enabled: false,
-    type: 'socks5',
-    host: '',
-    port: '',
-    username: '',
-    password: ''
+
+  if (!proxyObject || typeof proxyObject !== 'object') {
+    return null
   }
+
+  const host =
+    typeof proxyObject.host === 'string'
+      ? proxyObject.host.trim()
+      : proxyObject.host !== undefined && proxyObject.host !== null
+        ? String(proxyObject.host).trim()
+        : ''
+
+  const port =
+    proxyObject.port !== undefined && proxyObject.port !== null
+      ? String(proxyObject.port).trim()
+      : ''
+
+  const type =
+    typeof proxyObject.type === 'string' && proxyObject.type.trim()
+      ? proxyObject.type.trim()
+      : 'socks5'
+
+  const username =
+    typeof proxyObject.username === 'string'
+      ? proxyObject.username
+      : proxyObject.username !== undefined && proxyObject.username !== null
+        ? String(proxyObject.username)
+        : ''
+
+  const password =
+    typeof proxyObject.password === 'string'
+      ? proxyObject.password
+      : proxyObject.password !== undefined && proxyObject.password !== null
+        ? String(proxyObject.password)
+        : ''
+
+  return {
+    type,
+    host,
+    port,
+    username,
+    password
+  }
+}
+
+const normalizeProxyFormState = (rawProxy) => {
+  const parsed = parseProxyResponse(rawProxy)
+
+  if (parsed && parsed.host && parsed.port) {
+    return {
+      enabled: true,
+      type: parsed.type || 'socks5',
+      host: parsed.host,
+      port: parsed.port,
+      username: parsed.username || '',
+      password: parsed.password || ''
+    }
+  }
+
+  return createDefaultProxyState()
+}
+
+const buildProxyPayload = (proxyState) => {
+  if (!proxyState || !proxyState.enabled) {
+    return null
+  }
+
+  const host = (proxyState.host || '').trim()
+  const portNumber = Number.parseInt(proxyState.port, 10)
+
+  if (!host || Number.isNaN(portNumber) || portNumber <= 0) {
+    return null
+  }
+
+  const username = proxyState.username ? proxyState.username.trim() : ''
+  const password = proxyState.password ? proxyState.password.trim() : ''
+
+  return {
+    type: proxyState.type || 'socks5',
+    host,
+    port: portNumber,
+    username: username || null,
+    password: password || null
+  }
+}
+
+// 初始化代理配置
+const initProxyConfig = () => {
+  return normalizeProxyFormState(props.account?.proxy)
 }
 
 // 表单数据
@@ -3488,17 +3579,8 @@ const nextStep = async () => {
 const generateSetupTokenAuthUrl = async () => {
   setupTokenLoading.value = true
   try {
-    const proxyConfig = form.value.proxy?.enabled
-      ? {
-          proxy: {
-            type: form.value.proxy.type,
-            host: form.value.proxy.host,
-            port: parseInt(form.value.proxy.port),
-            username: form.value.proxy.username || null,
-            password: form.value.proxy.password || null
-          }
-        }
-      : {}
+    const proxyPayload = buildProxyPayload(form.value.proxy)
+    const proxyConfig = proxyPayload ? { proxy: proxyPayload } : {}
 
     const result = await accountsStore.generateClaudeSetupTokenUrl(proxyConfig)
     setupTokenAuthUrl.value = result.authUrl
@@ -3567,14 +3649,9 @@ const exchangeSetupTokenCode = async () => {
     }
 
     // 添加代理配置（如果启用）
-    if (form.value.proxy?.enabled) {
-      data.proxy = {
-        type: form.value.proxy.type,
-        host: form.value.proxy.host,
-        port: parseInt(form.value.proxy.port),
-        username: form.value.proxy.username || null,
-        password: form.value.proxy.password || null
-      }
+    const proxyPayload = buildProxyPayload(form.value.proxy)
+    if (proxyPayload) {
+      data.proxy = proxyPayload
     }
 
     const tokenInfo = await accountsStore.exchangeClaudeSetupTokenCode(data)
@@ -3606,21 +3683,15 @@ const handleOAuthSuccess = async (tokenInfo) => {
       form.value.unifiedClientId = generateClientId()
     }
 
+    const proxyPayload = buildProxyPayload(form.value.proxy)
+
     const data = {
       name: form.value.name,
       description: form.value.description,
       accountType: form.value.accountType,
       groupId: form.value.accountType === 'group' ? form.value.groupId : undefined,
       groupIds: form.value.accountType === 'group' ? form.value.groupIds : undefined,
-      proxy: form.value.proxy.enabled
-        ? {
-            type: form.value.proxy.type,
-            host: form.value.proxy.host,
-            port: parseInt(form.value.proxy.port),
-            username: form.value.proxy.username || null,
-            password: form.value.proxy.password || null
-          }
-        : null
+      proxy: proxyPayload
     }
 
     const currentPlatform = form.value.platform
@@ -3903,21 +3974,15 @@ const createAccount = async () => {
 
   loading.value = true
   try {
+    const proxyPayload = buildProxyPayload(form.value.proxy)
+
     const data = {
       name: form.value.name,
       description: form.value.description,
       accountType: form.value.accountType,
       groupId: form.value.accountType === 'group' ? form.value.groupId : undefined,
       groupIds: form.value.accountType === 'group' ? form.value.groupIds : undefined,
-      proxy: form.value.proxy.enabled
-        ? {
-            type: form.value.proxy.type,
-            host: form.value.proxy.host,
-            port: parseInt(form.value.proxy.port),
-            username: form.value.proxy.username || null,
-            password: form.value.proxy.password || null
-          }
-        : null
+      proxy: proxyPayload
     }
 
     if (form.value.platform === 'claude') {
@@ -4168,21 +4233,15 @@ const updateAccount = async () => {
 
   loading.value = true
   try {
+    const proxyPayload = buildProxyPayload(form.value.proxy)
+
     const data = {
       name: form.value.name,
       description: form.value.description,
       accountType: form.value.accountType,
       groupId: form.value.accountType === 'group' ? form.value.groupId : undefined,
       groupIds: form.value.accountType === 'group' ? form.value.groupIds : undefined,
-      proxy: form.value.proxy.enabled
-        ? {
-            type: form.value.proxy.type,
-            host: form.value.proxy.host,
-            port: parseInt(form.value.proxy.port),
-            username: form.value.proxy.username || null,
-            password: form.value.proxy.password || null
-          }
-        : null
+      proxy: proxyPayload
     }
 
     // 只有非空时才更新token
@@ -4761,24 +4820,7 @@ watch(
     if (newAccount) {
       initModelMappings()
       // 重新初始化代理配置
-      const proxyConfig =
-        newAccount.proxy && newAccount.proxy.host && newAccount.proxy.port
-          ? {
-              enabled: true,
-              type: newAccount.proxy.type || 'socks5',
-              host: newAccount.proxy.host,
-              port: newAccount.proxy.port,
-              username: newAccount.proxy.username || '',
-              password: newAccount.proxy.password || ''
-            }
-          : {
-              enabled: false,
-              type: 'socks5',
-              host: '',
-              port: '',
-              username: '',
-              password: ''
-            }
+      const proxyConfig = normalizeProxyFormState(newAccount.proxy)
 
       // 获取分组ID - 可能来自 groupId 字段或 groupInfo 对象
       let groupId = ''

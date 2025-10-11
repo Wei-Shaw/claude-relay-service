@@ -781,6 +781,7 @@ class DroidAccountService {
       throw new Error(`Droid account not found: ${accountId}`)
     }
 
+    const storedAccount = await redis.getDroidAccount(accountId)
     const sanitizedUpdates = { ...updates }
 
     if (typeof sanitizedUpdates.accessToken === 'string') {
@@ -902,7 +903,12 @@ class DroidAccountService {
       sanitizedUpdates.proxy = account.proxy || ''
     }
 
-    const existingApiKeyEntries = this._parseApiKeyEntries(account.apiKeys)
+    // 使用 Redis 中的原始数据获取加密的 API Key 条目
+    const existingApiKeyEntries = this._parseApiKeyEntries(
+      storedAccount && Object.prototype.hasOwnProperty.call(storedAccount, 'apiKeys')
+        ? storedAccount.apiKeys
+        : ''
+    )
     const newApiKeysInput = Array.isArray(updates.apiKeys) ? updates.apiKeys : []
     const wantsClearApiKeys = Boolean(updates.clearApiKeys)
 

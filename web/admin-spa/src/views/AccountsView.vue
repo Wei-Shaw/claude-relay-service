@@ -2341,6 +2341,14 @@ const loadAccounts = async (forceReload = false) => {
       }
     }
 
+    filteredAccounts = filteredAccounts.map((account) => {
+      const proxyConfig = normalizeProxyData(account.proxyConfig || account.proxy)
+      return {
+        ...account,
+        proxyConfig: proxyConfig || null
+      }
+    })
+
     accounts.value = filteredAccounts
     cleanupSelectedAccounts()
 
@@ -2479,24 +2487,86 @@ const filterByGroup = () => {
   loadAccounts()
 }
 
+// 规范化代理配置，支持字符串与对象
+const normalizeProxyData = (proxy) => {
+  if (!proxy) {
+    return null
+  }
+
+  let proxyObject = proxy
+  if (typeof proxy === 'string') {
+    try {
+      proxyObject = JSON.parse(proxy)
+    } catch (error) {
+      return null
+    }
+  }
+
+  if (!proxyObject || typeof proxyObject !== 'object') {
+    return null
+  }
+
+  const candidate =
+    proxyObject.proxy && typeof proxyObject.proxy === 'object' ? proxyObject.proxy : proxyObject
+
+  const host =
+    typeof candidate.host === 'string'
+      ? candidate.host.trim()
+      : candidate.host !== undefined && candidate.host !== null
+        ? String(candidate.host).trim()
+        : ''
+
+  const port =
+    candidate.port !== undefined && candidate.port !== null ? String(candidate.port).trim() : ''
+
+  if (!host || !port) {
+    return null
+  }
+
+  const type =
+    typeof candidate.type === 'string' && candidate.type.trim() ? candidate.type.trim() : 'socks5'
+
+  const username =
+    typeof candidate.username === 'string'
+      ? candidate.username
+      : candidate.username !== undefined && candidate.username !== null
+        ? String(candidate.username)
+        : ''
+
+  const password =
+    typeof candidate.password === 'string'
+      ? candidate.password
+      : candidate.password !== undefined && candidate.password !== null
+        ? String(candidate.password)
+        : ''
+
+  return {
+    type,
+    host,
+    port,
+    username,
+    password
+  }
+}
+
 // 格式化代理信息显示
 const formatProxyDisplay = (proxy) => {
-  if (!proxy || !proxy.host || !proxy.port) return null
+  const parsed = normalizeProxyData(proxy)
+  if (!parsed) {
+    return null
+  }
 
-  // 缩短类型名称
-  const typeShort = proxy.type === 'socks5' ? 'S5' : proxy.type.toUpperCase()
+  const typeShort = parsed.type.toLowerCase() === 'socks5' ? 'S5' : parsed.type.toUpperCase()
 
-  // 缩短主机名（如果太长）
-  let host = proxy.host
+  let host = parsed.host
   if (host.length > 15) {
     host = host.substring(0, 12) + '...'
   }
 
-  let display = `${typeShort}://${host}:${proxy.port}`
+  let display = `${typeShort}://${host}:${parsed.port}`
 
-  // 如果有用户名密码，添加认证信息（部分隐藏）
-  if (proxy.username) {
-    display = `${typeShort}://***@${host}:${proxy.port}`
+  if (parsed.username) {
+    display = `${typeShort}://***@${host}:${parsed.port}`
   }
 
   return display
