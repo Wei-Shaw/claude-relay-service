@@ -8821,6 +8821,53 @@ router.put('/droid-accounts/:id', authenticateAdmin, async (req, res) => {
   }
 })
 
+// 切换 Droid 账户调度状态
+router.put('/droid-accounts/:id/toggle-schedulable', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const account = await droidAccountService.getAccount(id)
+    if (!account) {
+      return res.status(404).json({ error: 'Droid account not found' })
+    }
+
+    const currentSchedulable = account.schedulable === true || account.schedulable === 'true'
+    const newSchedulable = !currentSchedulable
+
+    await droidAccountService.updateAccount(id, { schedulable: newSchedulable ? 'true' : 'false' })
+
+    const updatedAccount = await droidAccountService.getAccount(id)
+    const actualSchedulable = updatedAccount
+      ? updatedAccount.schedulable === true || updatedAccount.schedulable === 'true'
+      : newSchedulable
+
+    if (!actualSchedulable) {
+      await webhookNotifier.sendAccountAnomalyNotification({
+        accountId: account.id,
+        accountName: account.name || 'Droid Account',
+        platform: 'droid',
+        status: 'disabled',
+        errorCode: 'DROID_MANUALLY_DISABLED',
+        reason: '账号已被管理员手动禁用调度',
+        timestamp: new Date().toISOString()
+      })
+    }
+
+    logger.success(
+      `🔄 Admin toggled Droid account schedulable status: ${id} -> ${
+        actualSchedulable ? 'schedulable' : 'not schedulable'
+      }`
+    )
+
+    return res.json({ success: true, schedulable: actualSchedulable })
+  } catch (error) {
+    logger.error('❌ Failed to toggle Droid account schedulable status:', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to toggle schedulable status', message: error.message })
+  }
+})
+
 // 删除 Droid 账户
 router.delete('/droid-accounts/:id', authenticateAdmin, async (req, res) => {
   try {

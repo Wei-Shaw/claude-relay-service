@@ -65,6 +65,26 @@ class DroidAccountService {
     return 'anthropic'
   }
 
+  _isTruthy(value) {
+    if (value === undefined || value === null) {
+      return false
+    }
+    if (typeof value === 'boolean') {
+      return value
+    }
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase()
+      if (normalized === 'true') {
+        return true
+      }
+      if (normalized === 'false') {
+        return false
+      }
+      return normalized.length > 0 && normalized !== '0' && normalized !== 'no'
+    }
+    return Boolean(value)
+  }
+
   /**
    * 生成加密密钥（缓存优化）
    */
@@ -1158,13 +1178,11 @@ class DroidAccountService {
 
     return allAccounts
       .filter((account) => {
-        // 基本过滤条件
-        const isSchedulable =
-          account.isActive === 'true' &&
-          account.schedulable === 'true' &&
-          account.status === 'active'
+        const isActive = this._isTruthy(account.isActive)
+        const isSchedulable = this._isTruthy(account.schedulable)
+        const status = typeof account.status === 'string' ? account.status.toLowerCase() : ''
 
-        if (!isSchedulable) {
+        if (!isActive || !isSchedulable || status !== 'active') {
           return false
         }
 
