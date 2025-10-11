@@ -40,7 +40,7 @@ class ClaudeCodeValidator {
    * @param {Object} body - 请求体
    * @returns {boolean} 是否包含 Claude Code 系统提示词
    */
-  static hasClaudeCodeSystemPrompt(body) {
+  static hasClaudeCodeSystemPrompt(body, customThreshold) {
     if (!body || typeof body !== 'object') {
       return false
     }
@@ -55,17 +55,70 @@ class ClaudeCodeValidator {
       return false
     }
 
+    const threshold =
+      typeof customThreshold === 'number' && Number.isFinite(customThreshold)
+        ? customThreshold
+        : SYSTEM_PROMPT_THRESHOLD
+
     for (const entry of systemEntries) {
       const rawText = typeof entry?.text === 'string' ? entry.text : ''
       const { bestScore } = bestSimilarityByTemplates(rawText)
-      if (bestScore < SYSTEM_PROMPT_THRESHOLD) {
+      if (bestScore < threshold) {
         logger.error(
-          `Claude system prompt similarity below threshold: score=${bestScore.toFixed(4)}, threshold=${SYSTEM_PROMPT_THRESHOLD}, prompt=${rawText}`
+          `Claude system prompt similarity below threshold: score=${bestScore.toFixed(4)}, threshold=${threshold}, prompt=${rawText}`
         )
         return false
       }
     }
     return true
+  }
+
+  /**
+   * 判断是否存在 Claude Code 系统提示词（存在即返回 true）
+   * @param {Object} body - 请求体
+   * @param {number} [customThreshold] - 自定义阈值
+   * @returns {boolean} 是否存在 Claude Code 系统提示词
+   */
+  static includesClaudeCodeSystemPrompt(body, customThreshold) {
+    if (!body || typeof body !== 'object') {
+      return false
+    }
+
+    const model = typeof body.model === 'string' ? body.model : null
+    if (!model) {
+      return false
+    }
+
+    const systemEntries = Array.isArray(body.system) ? body.system : null
+    if (!systemEntries) {
+      return false
+    }
+
+    const threshold =
+      typeof customThreshold === 'number' && Number.isFinite(customThreshold)
+        ? customThreshold
+        : SYSTEM_PROMPT_THRESHOLD
+
+    let bestMatchScore = 0
+
+    for (const entry of systemEntries) {
+      const rawText = typeof entry?.text === 'string' ? entry.text : ''
+      const { bestScore } = bestSimilarityByTemplates(rawText)
+
+      if (bestScore > bestMatchScore) {
+        bestMatchScore = bestScore
+      }
+
+      if (bestScore >= threshold) {
+        return true
+      }
+    }
+
+    logger.debug(
+      `Claude system prompt not detected: bestScore=${bestMatchScore.toFixed(4)}, threshold=${threshold}`
+    )
+
+    return false
   }
 
   /**
