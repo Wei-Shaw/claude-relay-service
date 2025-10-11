@@ -20,18 +20,18 @@ data:
         Name              tail
         Path              /app/logs/*.log
         Parser            json
-        Tag               claude-relay.*
+        Tag               app.logs.*
         Refresh_Interval  5
         Mem_Buf_Limit     5MB
         Skip_Long_Lines   On
 
     [FILTER]
         Name                kubernetes
-        Match               claude-relay.*
+        Match               app.logs.*
         Kube_URL            https://kubernetes.default.svc:443
         Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
         Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
-        Kube_Tag_Prefix     claude-relay.
+        Kube_Tag_Prefix     app.logs.
         Merge_Log           On
         Keep_Log            Off
         K8S-Logging.Parser  On
