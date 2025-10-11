@@ -309,6 +309,46 @@ class DroidAccountService {
   }
 
   /**
+   * 删除指定的 Droid API Key 条目
+   */
+  async removeApiKeyEntry(accountId, keyId) {
+    if (!accountId || !keyId) {
+      return { removed: false, remainingCount: 0 }
+    }
+
+    try {
+      const accountData = await redis.getDroidAccount(accountId)
+      if (!accountData) {
+        return { removed: false, remainingCount: 0 }
+      }
+
+      const entries = this._parseApiKeyEntries(accountData.apiKeys)
+      if (!entries || entries.length === 0) {
+        return { removed: false, remainingCount: 0 }
+      }
+
+      const filtered = entries.filter((entry) => entry && entry.id !== keyId)
+      if (filtered.length === entries.length) {
+        return { removed: false, remainingCount: entries.length }
+      }
+
+      accountData.apiKeys = filtered.length ? JSON.stringify(filtered) : ''
+      accountData.apiKeyCount = String(filtered.length)
+
+      await redis.setDroidAccount(accountId, accountData)
+
+      logger.warn(
+        `🚫 已删除 Droid API Key ${keyId}（Account: ${accountId}），剩余 ${filtered.length}`
+      )
+
+      return { removed: true, remainingCount: filtered.length }
+    } catch (error) {
+      logger.error(`❌ 删除 Droid API Key 失败：${keyId}（Account: ${accountId}）`, error)
+      return { removed: false, remainingCount: 0, error }
+    }
+  }
+
+  /**
    * 使用 WorkOS Refresh Token 刷新并验证凭证
    */
   async _refreshTokensWithWorkOS(refreshToken, proxyConfig = null, organizationId = null) {

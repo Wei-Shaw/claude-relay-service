@@ -1773,6 +1773,9 @@
                 <ul class="mt-1 list-disc space-y-1 pl-4">
                   <li>新会话将随机命中一个 Key，并在会话有效期内保持粘性。</li>
                   <li>若某 Key 失效，会自动切换到剩余可用 Key，最大化成功率。</li>
+                  <li>
+                    若上游返回 4xx 错误码，该 Key 会被自动移除；全部 Key 清空后账号将暂停调度。
+                  </li>
                 </ul>
               </div>
             </div>
