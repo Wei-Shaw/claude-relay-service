@@ -517,14 +517,55 @@ class ClaudeConsoleRelayService {
                         }
                       }
 
-                      if (
-                        data.type === 'message_delta' &&
-                        data.usage &&
-                        data.usage.output_tokens !== undefined
-                      ) {
-                        collectedUsageData.output_tokens = data.usage.output_tokens || 0
+                      if (data.type === 'message_delta' && data.usage) {
+                        // 提取所有usage字段，message_delta可能包含完整的usage信息
+                        if (data.usage.output_tokens !== undefined) {
+                          collectedUsageData.output_tokens = data.usage.output_tokens || 0
+                        }
 
-                        if (collectedUsageData.input_tokens !== undefined && !finalUsageReported) {
+                        // 提取input_tokens（如果存在）
+                        if (data.usage.input_tokens !== undefined) {
+                          collectedUsageData.input_tokens = data.usage.input_tokens || 0
+                        }
+
+                        // 提取cache相关的tokens
+                        if (data.usage.cache_creation_input_tokens !== undefined) {
+                          collectedUsageData.cache_creation_input_tokens =
+                            data.usage.cache_creation_input_tokens || 0
+                        }
+                        if (data.usage.cache_read_input_tokens !== undefined) {
+                          collectedUsageData.cache_read_input_tokens =
+                            data.usage.cache_read_input_tokens || 0
+                        }
+
+                        // 检查是否有详细的 cache_creation 对象
+                        if (
+                          data.usage.cache_creation &&
+                          typeof data.usage.cache_creation === 'object'
+                        ) {
+                          collectedUsageData.cache_creation = {
+                            ephemeral_5m_input_tokens:
+                              data.usage.cache_creation.ephemeral_5m_input_tokens || 0,
+                            ephemeral_1h_input_tokens:
+                              data.usage.cache_creation.ephemeral_1h_input_tokens || 0
+                          }
+                        }
+
+                        logger.info(
+                          '📊 [Console] Collected usage data from message_delta:',
+                          JSON.stringify(collectedUsageData)
+                        )
+
+                        // 如果已经收集到了完整数据，触发回调
+                        if (
+                          collectedUsageData.input_tokens !== undefined &&
+                          collectedUsageData.output_tokens !== undefined &&
+                          !finalUsageReported
+                        ) {
+                          logger.info(
+                            '🎯 [Console] Complete usage data collected:',
+                            JSON.stringify(collectedUsageData)
+                          )
                           usageCallback({ ...collectedUsageData, accountId })
                           finalUsageReported = true
                         }
@@ -566,6 +607,41 @@ class ClaudeConsoleRelayService {
                   }
                 } else {
                   responseStream.write(buffer)
+                }
+              }
+
+              // 🔧 兜底逻辑：确保所有未保存的usage数据都不会丢失
+              if (!finalUsageReported) {
+                if (
+                  collectedUsageData.input_tokens !== undefined ||
+                  collectedUsageData.output_tokens !== undefined
+                ) {
+                  // 补全缺失的字段
+                  if (collectedUsageData.input_tokens === undefined) {
+                    collectedUsageData.input_tokens = 0
+                    logger.warn(
+                      '⚠️ [Console] message_delta missing input_tokens, setting to 0. This may indicate incomplete usage data.'
+                    )
+                  }
+                  if (collectedUsageData.output_tokens === undefined) {
+                    collectedUsageData.output_tokens = 0
+                    logger.warn(
+                      '⚠️ [Console] message_delta missing output_tokens, setting to 0. This may indicate incomplete usage data.'
+                    )
+                  }
+                  // 确保有 model 字段
+                  if (!collectedUsageData.model) {
+                    collectedUsageData.model = body.model
+                  }
+                  logger.info(
+                    `📊 [Console] Saving incomplete usage data via fallback: ${JSON.stringify(collectedUsageData)}`
+                  )
+                  usageCallback({ ...collectedUsageData, accountId })
+                  finalUsageReported = true
+                } else {
+                  logger.warn(
+                    '⚠️ [Console] Stream completed but no usage data was captured! This indicates a problem with SSE parsing or API response format.'
+                  )
                 }
               }
 
