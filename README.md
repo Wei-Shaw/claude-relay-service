@@ -480,7 +480,7 @@ Droid CLI 读取 `~/.factory/config.json`。可以在该文件中添加自定义
 {
   "custom_models": [
     {
-      "model_display_name": "Sonnet 4.5 [Custom]",
+      "model_display_name": "Sonnet 4.5 [crs]",
       "model": "claude-sonnet-4-5-20250929",
       "base_url": "http://127.0.0.1:3000/droid/claude",
       "api_key": "后台创建的API密钥",
@@ -488,7 +488,7 @@ Droid CLI 读取 `~/.factory/config.json`。可以在该文件中添加自定义
       "max_tokens": 8192
     },
     {
-      "model_display_name": "GPT5-Codex [Custom]",
+      "model_display_name": "GPT5-Codex [crs]",
       "model": "gpt-5-codex",
       "base_url": "http://127.0.0.1:3000/droid/openai",
       "api_key": "后台创建的API密钥",
