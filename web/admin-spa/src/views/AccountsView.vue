@@ -546,7 +546,9 @@
                       >Droid</span
                     >
                     <span class="mx-1 h-4 w-px bg-cyan-300 dark:bg-cyan-600" />
-                    <span class="text-xs font-medium text-cyan-700 dark:text-cyan-300">OAuth</span>
+                    <span class="text-xs font-medium text-cyan-700 dark:text-cyan-300">
+                      {{ getDroidAuthType(account) }}
+                    </span>
                   </div>
                   <div
                     v-else
@@ -2969,6 +2971,52 @@ const getGeminiAuthType = () => {
 // 获取 OpenAI 账号的添加方式
 const getOpenAIAuthType = () => {
   // OpenAI 统一显示 OAuth
+  return 'OAuth'
+}
+
+// 获取 Droid 账号的认证方式
+const getDroidAuthType = (account) => {
+  if (!account || typeof account !== 'object') {
+    return 'OAuth'
+  }
+
+  const apiKeyModeFlag =
+    account.isApiKeyMode ?? account.is_api_key_mode ?? account.apiKeyMode ?? account.api_key_mode
+
+  if (
+    apiKeyModeFlag === true ||
+    apiKeyModeFlag === 'true' ||
+    apiKeyModeFlag === 1 ||
+    apiKeyModeFlag === '1'
+  ) {
+    return 'API Key'
+  }
+
+  const methodCandidate =
+    account.authenticationMethod ||
+    account.authMethod ||
+    account.authentication_mode ||
+    account.authenticationMode ||
+    account.authentication_method ||
+    account.auth_type ||
+    account.authType ||
+    account.authentication_type ||
+    account.authenticationType ||
+    account.droidAuthType ||
+    account.droidAuthenticationMethod ||
+    account.method ||
+    account.auth ||
+    ''
+
+  if (typeof methodCandidate === 'string') {
+    const normalized = methodCandidate.trim().toLowerCase()
+    const compacted = normalized.replace(/[\s_-]/g, '')
+
+    if (compacted === 'apikey') {
+      return 'API Key'
+    }
+  }
+
   return 'OAuth'
 }
 
