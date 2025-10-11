@@ -549,6 +549,13 @@
                     <span class="text-xs font-medium text-cyan-700 dark:text-cyan-300">
                       {{ getDroidAuthType(account) }}
                     </span>
+                    <span
+                      v-if="isDroidApiKeyMode(account)"
+                      :class="getDroidApiKeyBadgeClasses(account)"
+                    >
+                      <i class="fas fa-key text-[9px]" />
+                      <span>x{{ getDroidApiKeyCount(account) }}</span>
+                    </span>
                   </div>
                   <div
                     v-else
@@ -3018,6 +3025,66 @@ const getDroidAuthType = (account) => {
   }
 
   return 'OAuth'
+}
+
+// 判断是否为 API Key 模式的 Droid 账号
+const isDroidApiKeyMode = (account) => getDroidAuthType(account) === 'API Key'
+
+// 获取 Droid 账号的 API Key 数量
+const getDroidApiKeyCount = (account) => {
+  if (!account || typeof account !== 'object') {
+    return 0
+  }
+
+  const candidates = [
+    account.apiKeyCount,
+    account.api_key_count,
+    account.apiKeysCount,
+    account.api_keys_count
+  ]
+
+  for (const candidate of candidates) {
+    const value = Number(candidate)
+    if (Number.isFinite(value) && value >= 0) {
+      return value
+    }
+  }
+
+  if (Array.isArray(account.apiKeys)) {
+    return account.apiKeys.length
+  }
+
+  if (typeof account.apiKeys === 'string' && account.apiKeys.trim()) {
+    try {
+      const parsed = JSON.parse(account.apiKeys)
+      if (Array.isArray(parsed)) {
+        return parsed.length
+      }
+    } catch (error) {
+      // 忽略解析错误，维持默认值
+    }
+  }
+
+  return 0
+}
+
+// 根据数量返回徽标样式
+const getDroidApiKeyBadgeClasses = (account) => {
+  const count = getDroidApiKeyCount(account)
+  const baseClass =
+    'ml-1 inline-flex items-center gap-1 rounded-md border px-1.5 py-[1px] text-[10px] font-medium shadow-sm backdrop-blur-sm'
+
+  if (count > 0) {
+    return [
+      baseClass,
+      'border-cyan-200 bg-cyan-50/90 text-cyan-700 dark:border-cyan-500/40 dark:bg-cyan-900/40 dark:text-cyan-200'
+    ]
+  }
+
+  return [
+    baseClass,
+    'border-rose-200 bg-rose-50/90 text-rose-600 dark:border-rose-500/40 dark:bg-rose-900/40 dark:text-rose-200'
+  ]
 }
 
 // 获取 Claude 账号类型显示
