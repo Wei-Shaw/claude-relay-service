@@ -782,6 +782,8 @@ class DroidAccountService {
     }
 
     const storedAccount = await redis.getDroidAccount(accountId)
+    const hasStoredAccount =
+      storedAccount && typeof storedAccount === 'object' && Object.keys(storedAccount).length > 0
     const sanitizedUpdates = { ...updates }
 
     if (typeof sanitizedUpdates.accessToken === 'string') {
@@ -905,7 +907,7 @@ class DroidAccountService {
 
     // 使用 Redis 中的原始数据获取加密的 API Key 条目
     const existingApiKeyEntries = this._parseApiKeyEntries(
-      storedAccount && Object.prototype.hasOwnProperty.call(storedAccount, 'apiKeys')
+      hasStoredAccount && Object.prototype.hasOwnProperty.call(storedAccount, 'apiKeys')
         ? storedAccount.apiKeys
         : ''
     )
@@ -957,13 +959,29 @@ class DroidAccountService {
       encryptedUpdates.accessToken = this._encryptSensitiveData(sanitizedUpdates.accessToken)
     }
 
+    const baseAccountData = hasStoredAccount ? { ...storedAccount } : { id: accountId }
+
     const updatedData = {
-      ...account,
-      ...encryptedUpdates,
-      refreshToken:
-        encryptedUpdates.refreshToken || this._encryptSensitiveData(account.refreshToken),
-      accessToken: encryptedUpdates.accessToken || this._encryptSensitiveData(account.accessToken),
-      proxy: encryptedUpdates.proxy
+      ...baseAccountData,
+      ...encryptedUpdates
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(updatedData, 'refreshToken')) {
+      updatedData.refreshToken =
+        hasStoredAccount && Object.prototype.hasOwnProperty.call(storedAccount, 'refreshToken')
+          ? storedAccount.refreshToken
+          : this._encryptSensitiveData(account.refreshToken)
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(updatedData, 'accessToken')) {
+      updatedData.accessToken =
+        hasStoredAccount && Object.prototype.hasOwnProperty.call(storedAccount, 'accessToken')
+          ? storedAccount.accessToken
+          : this._encryptSensitiveData(account.accessToken)
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(updatedData, 'proxy')) {
+      updatedData.proxy = hasStoredAccount ? storedAccount.proxy || '' : account.proxy || ''
     }
 
     await redis.setDroidAccount(accountId, updatedData)

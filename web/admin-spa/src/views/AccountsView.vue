@@ -2488,7 +2488,7 @@ const filterByGroup = () => {
 }
 
 // 规范化代理配置，支持字符串与对象
-const normalizeProxyData = (proxy) => {
+function normalizeProxyData(proxy) {
   if (!proxy) {
     return null
   }

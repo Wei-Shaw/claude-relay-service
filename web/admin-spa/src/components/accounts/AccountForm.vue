@@ -3160,6 +3160,15 @@ const parseProxyResponse = (rawProxy) => {
     }
   }
 
+  if (
+    proxyObject &&
+    typeof proxyObject === 'object' &&
+    proxyObject.proxy &&
+    typeof proxyObject.proxy === 'object'
+  ) {
+    proxyObject = proxyObject.proxy
+  }
+
   if (!proxyObject || typeof proxyObject !== 'object') {
     return null
   }
