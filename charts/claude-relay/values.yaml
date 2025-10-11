@@ -120,9 +120,13 @@ config:
   
   # System configuration
   cleanupInterval: 3600000
+  rateLimitCleanupInterval: 5
   tokenUsageRetention: 2592000000
   healthCheckInterval: 60000
   timezoneOffset: 8
+  
+  # Usage limits
+  defaultTokenLimit: 1000000
 
 # ServiceMonitor for Prometheus monitoring
 serviceMonitor:

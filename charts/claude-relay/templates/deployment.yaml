@@ -82,7 +82,7 @@ spec:
                   name: {{ include "claude-relay.fullname" . }}-secret
                   key: encryption-key
             - name: ADMIN_SESSION_TIMEOUT
-              value: {{ .Values.config.adminSessionTimeout | quote }}
+              value: "{{ printf "%.0f" .Values.config.adminSessionTimeout }}"
             - name: API_KEY_PREFIX
               value: {{ .Values.config.apiKeyPrefix | quote }}
             
@@ -132,7 +132,7 @@ spec:
             
             # Usage limits
             - name: DEFAULT_TOKEN_LIMIT
-              value: {{ .Values.config.defaultTokenLimit | quote }}
+              value: "{{ printf "%.0f" .Values.config.defaultTokenLimit }}"
             
             # Logging configuration
             - name: LOG_LEVEL
@@ -144,11 +144,13 @@ spec:
             
             # System configuration
             - name: CLEANUP_INTERVAL
-              value: {{ .Values.config.cleanupInterval | quote }}
+              value: "{{ printf "%.0f" .Values.config.cleanupInterval }}"
+            - name: RATE_LIMIT_CLEANUP_INTERVAL
+              value: "{{ printf "%.0f" .Values.config.rateLimitCleanupInterval }}"
             - name: TOKEN_USAGE_RETENTION
-              value: {{ .Values.config.tokenUsageRetention | quote }}
+              value: "{{ printf "%.0f" .Values.config.tokenUsageRetention }}"
             - name: HEALTH_CHECK_INTERVAL
-              value: {{ .Values.config.healthCheckInterval | quote }}
+              value: "{{ printf "%.0f" .Values.config.healthCheckInterval }}"
             - name: TIMEZONE_OFFSET
               value: {{ .Values.config.timezoneOffset | quote }}
             
@@ -207,6 +209,19 @@ spec:
         - name: fluent-bit
           image: "{{ .Values.storage.logs.fluentbit.image.repository }}:{{ .Values.storage.logs.fluentbit.image.tag }}"
           imagePullPolicy: {{ .Values.storage.logs.fluentbit.image.pullPolicy }}
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
           volumeMounts:
             - name: logs
               mountPath: /app/logs
