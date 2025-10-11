@@ -257,12 +257,15 @@ class DroidRelayService {
       }
 
       // 处理请求体（注入 system prompt 等）
+      const streamRequested = !disableStreaming && this._isStreamRequested(normalizedRequestBody)
+
       const processedBody = this._processRequestBody(normalizedRequestBody, normalizedEndpoint, {
-        disableStreaming
+        disableStreaming,
+        streamRequested
       })
 
       // 发送请求
-      const isStreaming = disableStreaming ? false : processedBody.stream !== false
+      const isStreaming = streamRequested
 
       // 根据是否流式选择不同的处理方式
       if (isStreaming) {
@@ -287,7 +290,7 @@ class DroidRelayService {
           url: apiUrl,
           headers,
           data: processedBody,
-          timeout: 120000, // 2分钟超时
+          timeout: 600 * 1000, // 10分钟超时
           responseType: 'json',
           ...(proxyAgent && {
             httpAgent: proxyAgent,
@@ -447,7 +450,7 @@ class DroidRelayService {
         method: 'POST',
         headers: requestHeaders,
         agent: proxyAgent,
-        timeout: 120000
+        timeout: 600 * 1000
       }
 
       const req = https.request(options, (res) => {
@@ -884,11 +887,35 @@ class DroidRelayService {
   }
 
   /**
+   * 判断请求是否要求流式响应
+   */
+  _isStreamRequested(requestBody) {
+    if (!requestBody || typeof requestBody !== 'object') {
+      return false
+    }
+
+    const value = requestBody.stream
+
+    if (value === true) {
+      return true
+    }
+
+    if (typeof value === 'string') {
+      return value.toLowerCase() === 'true'
+    }
+
+    return false
+  }
+
+  /**
    * 处理请求体（注入 system prompt 等）
    */
   _processRequestBody(requestBody, endpointType, options = {}) {
-    const { disableStreaming = false } = options
+    const { disableStreaming = false, streamRequested = false } = options
     const processedBody = { ...requestBody }
+
+    const hasStreamField =
+      requestBody && Object.prototype.hasOwnProperty.call(requestBody, 'stream')
 
     const shouldDisableThinking =
       endpointType === 'anthropic' && processedBody.__forceDisableThinking === true
@@ -905,11 +932,13 @@ class DroidRelayService {
       delete processedBody.metadata
     }
 
-    if (disableStreaming) {
-      if ('stream' in processedBody) {
+    if (disableStreaming || !streamRequested) {
+      if (hasStreamField) {
+        processedBody.stream = false
+      } else if ('stream' in processedBody) {
         delete processedBody.stream
       }
-    } else if (processedBody.stream === undefined) {
+    } else {
       processedBody.stream = true
     }
 
