@@ -38,9 +38,60 @@ class ClaudeRelayService {
     return `此专属账号的Opus模型已达到周使用限制，将于 ${formattedReset} 自动恢复，请尝试切换其他模型后再试。`
   }
 
+  // 🧾 提取错误消息文本
+  _extractErrorMessage(body) {
+    if (!body) {
+      return ''
+    }
+
+    if (typeof body === 'string') {
+      const trimmed = body.trim()
+      if (!trimmed) {
+        return ''
+      }
+      try {
+        const parsed = JSON.parse(trimmed)
+        return this._extractErrorMessage(parsed)
+      } catch (error) {
+        return trimmed
+      }
+    }
+
+    if (typeof body === 'object') {
+      if (typeof body.error === 'string') {
+        return body.error
+      }
+      if (body.error && typeof body.error === 'object') {
+        if (typeof body.error.message === 'string') {
+          return body.error.message
+        }
+        if (typeof body.error.error === 'string') {
+          return body.error.error
+        }
+      }
+      if (typeof body.message === 'string') {
+        return body.message
+      }
+    }
+
+    return ''
+  }
+
+  // 🚫 检查是否为组织被禁用错误
+  _isOrganizationDisabledError(statusCode, body) {
+    if (statusCode !== 400) {
+      return false
+    }
+    const message = this._extractErrorMessage(body)
+    if (!message) {
+      return false
+    }
+    return message.toLowerCase().includes('this organization has been disabled')
+  }
+
   // 🔍 判断是否是真实的 Claude Code 请求
   isRealClaudeCodeRequest(requestBody) {
-    return ClaudeCodeValidator.hasClaudeCodeSystemPrompt(requestBody)
+    return ClaudeCodeValidator.includesClaudeCodeSystemPrompt(requestBody, 1)
   }
 
   // 🚀 转发请求到Claude API
@@ -189,6 +240,10 @@ class ClaudeRelayService {
         let isRateLimited = false
         let rateLimitResetTimestamp = null
         let dedicatedRateLimitMessage = null
+        const organizationDisabledError = this._isOrganizationDisabledError(
+          response.statusCode,
+          response.body
+        )
 
         // 检查是否为401状态码（未授权）
         if (response.statusCode === 401) {
@@ -218,6 +273,13 @@ class ClaudeRelayService {
         else if (response.statusCode === 403) {
           logger.error(
             `🚫 Forbidden error (403) detected for account ${accountId}, marking as blocked`
+          )
+          await unifiedClaudeScheduler.markAccountBlocked(accountId, accountType, sessionHash)
+        }
+        // 检查是否返回组织被禁用错误（400状态码）
+        else if (organizationDisabledError) {
+          logger.error(
+            `🚫 Organization disabled error (400) detected for account ${accountId}, marking as blocked`
           )
           await unifiedClaudeScheduler.markAccountBlocked(accountId, accountType, sessionHash)
         }
@@ -499,6 +561,8 @@ class ClaudeRelayService {
       }
     }
 
+    this._enforceCacheControlLimit(processedBody)
+
     // 处理原有的系统提示（如果配置了）
     if (this.systemPrompt && this.systemPrompt.trim()) {
       const systemPrompt = {
@@ -642,6 +706,107 @@ class ClaudeRelayService {
           processContentArray(message.content)
         }
       })
+    }
+  }
+
+  // ⚖️ 限制带缓存控制的内容数量
+  _enforceCacheControlLimit(body) {
+    const MAX_CACHE_CONTROL_BLOCKS = 4
+
+    if (!body || typeof body !== 'object') {
+      return
+    }
+
+    const countCacheControlBlocks = () => {
+      let total = 0
+
+      if (Array.isArray(body.messages)) {
+        body.messages.forEach((message) => {
+          if (!message || !Array.isArray(message.content)) {
+            return
+          }
+          message.content.forEach((item) => {
+            if (item && item.cache_control) {
+              total += 1
+            }
+          })
+        })
+      }
+
+      if (Array.isArray(body.system)) {
+        body.system.forEach((item) => {
+          if (item && item.cache_control) {
+            total += 1
+          }
+        })
+      }
+
+      return total
+    }
+
+    const removeFromMessages = () => {
+      if (!Array.isArray(body.messages)) {
+        return false
+      }
+
+      for (let messageIndex = 0; messageIndex < body.messages.length; messageIndex += 1) {
+        const message = body.messages[messageIndex]
+        if (!message || !Array.isArray(message.content)) {
+          continue
+        }
+
+        for (let contentIndex = 0; contentIndex < message.content.length; contentIndex += 1) {
+          const contentItem = message.content[contentIndex]
+          if (contentItem && contentItem.cache_control) {
+            message.content.splice(contentIndex, 1)
+
+            if (message.content.length === 0) {
+              body.messages.splice(messageIndex, 1)
+            }
+
+            return true
+          }
+        }
+      }
+
+      return false
+    }
+
+    const removeFromSystem = () => {
+      if (!Array.isArray(body.system)) {
+        return false
+      }
+
+      for (let index = 0; index < body.system.length; index += 1) {
+        const systemItem = body.system[index]
+        if (systemItem && systemItem.cache_control) {
+          body.system.splice(index, 1)
+
+          if (body.system.length === 0) {
+            delete body.system
+          }
+
+          return true
+        }
+      }
+
+      return false
+    }
+
+    let total = countCacheControlBlocks()
+
+    while (total > MAX_CACHE_CONTROL_BLOCKS) {
+      if (removeFromMessages()) {
+        total -= 1
+        continue
+      }
+
+      if (removeFromSystem()) {
+        total -= 1
+        continue
+      }
+
+      break
     }
   }
 
@@ -1253,6 +1418,25 @@ class ClaudeRelayService {
               `❌ Claude API error response (Account: ${account?.name || accountId}):`,
               errorData
             )
+            if (this._isOrganizationDisabledError(res.statusCode, errorData)) {
+              ;(async () => {
+                try {
+                  logger.error(
+                    `🚫 [Stream] Organization disabled error (400) detected for account ${accountId}, marking as blocked`
+                  )
+                  await unifiedClaudeScheduler.markAccountBlocked(
+                    accountId,
+                    accountType,
+                    sessionHash
+                  )
+                } catch (markError) {
+                  logger.error(
+                    `❌ [Stream] Failed to mark account ${accountId} as blocked after organization disabled error:`,
+                    markError
+                  )
+                }
+              })()
+            }
             if (!responseStream.destroyed) {
               // 发送错误事件
               responseStream.write('event: error\n')

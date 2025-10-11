@@ -561,7 +561,16 @@
                       >Droid</span
                     >
                     <span class="mx-1 h-4 w-px bg-cyan-300 dark:bg-cyan-600" />
-                    <span class="text-xs font-medium text-cyan-700 dark:text-cyan-300">OAuth</span>
+                    <span class="text-xs font-medium text-cyan-700 dark:text-cyan-300">
+                      {{ getDroidAuthType(account) }}
+                    </span>
+                    <span
+                      v-if="isDroidApiKeyMode(account)"
+                      :class="getDroidApiKeyBadgeClasses(account)"
+                    >
+                      <i class="fas fa-key text-[9px]" />
+                      <span>x{{ getDroidApiKeyCount(account) }}</span>
+                    </span>
                   </div>
                   <div
                     v-else
@@ -2413,6 +2422,14 @@ const loadAccounts = async (forceReload = false) => {
       }
     }
 
+    filteredAccounts = filteredAccounts.map((account) => {
+      const proxyConfig = normalizeProxyData(account.proxyConfig || account.proxy)
+      return {
+        ...account,
+        proxyConfig: proxyConfig || null
+      }
+    })
+
     accounts.value = filteredAccounts
     cleanupSelectedAccounts()
 
@@ -2551,24 +2568,86 @@ const filterByGroup = () => {
   loadAccounts()
 }
 
+// 规范化代理配置，支持字符串与对象
+function normalizeProxyData(proxy) {
+  if (!proxy) {
+    return null
+  }
+
+  let proxyObject = proxy
+  if (typeof proxy === 'string') {
+    try {
+      proxyObject = JSON.parse(proxy)
+    } catch (error) {
+      return null
+    }
+  }
+
+  if (!proxyObject || typeof proxyObject !== 'object') {
+    return null
+  }
+
+  const candidate =
+    proxyObject.proxy && typeof proxyObject.proxy === 'object' ? proxyObject.proxy : proxyObject
+
+  const host =
+    typeof candidate.host === 'string'
+      ? candidate.host.trim()
+      : candidate.host !== undefined && candidate.host !== null
+        ? String(candidate.host).trim()
+        : ''
+
+  const port =
+    candidate.port !== undefined && candidate.port !== null ? String(candidate.port).trim() : ''
+
+  if (!host || !port) {
+    return null
+  }
+
+  const type =
+    typeof candidate.type === 'string' && candidate.type.trim() ? candidate.type.trim() : 'socks5'
+
+  const username =
+    typeof candidate.username === 'string'
+      ? candidate.username
+      : candidate.username !== undefined && candidate.username !== null
+        ? String(candidate.username)
+        : ''
+
+  const password =
+    typeof candidate.password === 'string'
+      ? candidate.password
+      : candidate.password !== undefined && candidate.password !== null
+        ? String(candidate.password)
+        : ''
+
+  return {
+    type,
+    host,
+    port,
+    username,
+    password
+  }
+}
+
 // 格式化代理信息显示
 const formatProxyDisplay = (proxy) => {
-  if (!proxy || !proxy.host || !proxy.port) return null
+  const parsed = normalizeProxyData(proxy)
+  if (!parsed) {
+    return null
+  }
 
-  // 缩短类型名称
-  const typeShort = proxy.type === 'socks5' ? 'S5' : proxy.type.toUpperCase()
+  const typeShort = parsed.type.toLowerCase() === 'socks5' ? 'S5' : parsed.type.toUpperCase()
 
-  // 缩短主机名（如果太长）
-  let host = proxy.host
+  let host = parsed.host
   if (host.length > 15) {
     host = host.substring(0, 12) + '...'
   }
 
-  let display = `${typeShort}://${host}:${proxy.port}`
+  let display = `${typeShort}://${host}:${parsed.port}`
 
-  // 如果有用户名密码，添加认证信息（部分隐藏）
-  if (proxy.username) {
-    display = `${typeShort}://***@${host}:${proxy.port}`
+  if (parsed.username) {
+    display = `${typeShort}://***@${host}:${parsed.port}`
   }
 
   return display
@@ -2972,6 +3051,112 @@ const getGeminiAuthType = () => {
 const getOpenAIAuthType = () => {
   // OpenAI 统一显示 OAuth
   return 'OAuth'
+}
+
+// 获取 Droid 账号的认证方式
+const getDroidAuthType = (account) => {
+  if (!account || typeof account !== 'object') {
+    return 'OAuth'
+  }
+
+  const apiKeyModeFlag =
+    account.isApiKeyMode ?? account.is_api_key_mode ?? account.apiKeyMode ?? account.api_key_mode
+
+  if (
+    apiKeyModeFlag === true ||
+    apiKeyModeFlag === 'true' ||
+    apiKeyModeFlag === 1 ||
+    apiKeyModeFlag === '1'
+  ) {
+    return 'API Key'
+  }
+
+  const methodCandidate =
+    account.authenticationMethod ||
+    account.authMethod ||
+    account.authentication_mode ||
+    account.authenticationMode ||
+    account.authentication_method ||
+    account.auth_type ||
+    account.authType ||
+    account.authentication_type ||
+    account.authenticationType ||
+    account.droidAuthType ||
+    account.droidAuthenticationMethod ||
+    account.method ||
+    account.auth ||
+    ''
+
+  if (typeof methodCandidate === 'string') {
+    const normalized = methodCandidate.trim().toLowerCase()
+    const compacted = normalized.replace(/[\s_-]/g, '')
+
+    if (compacted === 'apikey') {
+      return 'API Key'
+    }
+  }
+
+  return 'OAuth'
+}
+
+// 判断是否为 API Key 模式的 Droid 账号
+const isDroidApiKeyMode = (account) => getDroidAuthType(account) === 'API Key'
+
+// 获取 Droid 账号的 API Key 数量
+const getDroidApiKeyCount = (account) => {
+  if (!account || typeof account !== 'object') {
+    return 0
+  }
+
+  const candidates = [
+    account.apiKeyCount,
+    account.api_key_count,
+    account.apiKeysCount,
+    account.api_keys_count
+  ]
+
+  for (const candidate of candidates) {
+    const value = Number(candidate)
+    if (Number.isFinite(value) && value >= 0) {
+      return value
+    }
+  }
+
+  if (Array.isArray(account.apiKeys)) {
+    return account.apiKeys.length
+  }
+
+  if (typeof account.apiKeys === 'string' && account.apiKeys.trim()) {
+    try {
+      const parsed = JSON.parse(account.apiKeys)
+      if (Array.isArray(parsed)) {
+        return parsed.length
+      }
+    } catch (error) {
+      // 忽略解析错误，维持默认值
+    }
+  }
+
+  return 0
+}
+
+// 根据数量返回徽标样式
+const getDroidApiKeyBadgeClasses = (account) => {
+  const count = getDroidApiKeyCount(account)
+  const baseClass =
+    'ml-1 inline-flex items-center gap-1 rounded-md border px-1.5 py-[1px] text-[10px] font-medium shadow-sm backdrop-blur-sm'
+
+  if (count > 0) {
+    return [
+      baseClass,
+      'border-cyan-200 bg-cyan-50/90 text-cyan-700 dark:border-cyan-500/40 dark:bg-cyan-900/40 dark:text-cyan-200'
+    ]
+  }
+
+  return [
+    baseClass,
+    'border-rose-200 bg-rose-50/90 text-rose-600 dark:border-rose-500/40 dark:bg-rose-900/40 dark:text-rose-200'
+  ]
 }
 
 // 获取 Claude 账号类型显示
