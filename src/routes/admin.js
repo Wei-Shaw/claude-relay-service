@@ -1745,30 +1745,53 @@ router.delete('/account-groups/:groupId', authenticateAdmin, async (req, res) =>
 router.get('/account-groups/:groupId/members', authenticateAdmin, async (req, res) => {
   try {
     const { groupId } = req.params
+    const group = await accountGroupService.getGroup(groupId)
+
+    if (!group) {
+      return res.status(404).json({ error: '分组不存在' })
+    }
+
     const memberIds = await accountGroupService.getGroupMembers(groupId)
 
     // 获取成员详细信息
     const members = []
     for (const memberId of memberIds) {
-      // 尝试从不同的服务获取账户信息
+      // 根据分组平台优先查找对应账户
       let account = null
+      switch (group.platform) {
+        case 'droid':
+          account = await droidAccountService.getAccount(memberId)
+          break
+        case 'gemini':
+          account = await geminiAccountService.getAccount(memberId)
+          break
+        case 'openai':
+          account = await openaiAccountService.getAccount(memberId)
+          break
+        case 'claude':
+        default:
+          account = await claudeAccountService.getAccount(memberId)
+          if (!account) {
+            account = await claudeConsoleAccountService.getAccount(memberId)
+          }
+          break
+      }
 
-      // 先尝试Claude OAuth账户
-      account = await claudeAccountService.getAccount(memberId)
-
-      // 如果找不到，尝试Claude Console账户
+      // 兼容旧数据：若按平台未找到，则继续尝试其他平台
+      if (!account) {
+        account = await claudeAccountService.getAccount(memberId)
+      }
       if (!account) {
         account = await claudeConsoleAccountService.getAccount(memberId)
       }
-
-      // 如果还找不到，尝试Gemini账户
       if (!account) {
         account = await geminiAccountService.getAccount(memberId)
       }
-
-      // 如果还找不到，尝试OpenAI账户
       if (!account) {
         account = await openaiAccountService.getAccount(memberId)
+      }
+      if (!account && group.platform !== 'droid') {
+        account = await droidAccountService.getAccount(memberId)
       }
 
       if (account) {
@@ -8667,7 +8690,52 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
 // 创建 Droid 账户
 router.post('/droid-accounts', authenticateAdmin, async (req, res) => {
   try {
-    const account = await droidAccountService.createAccount(req.body)
+    const { accountType: rawAccountType = 'shared', groupId, groupIds } = req.body
+
+    const normalizedAccountType = rawAccountType || 'shared'
+
+    if (!['shared', 'dedicated', 'group'].includes(normalizedAccountType)) {
+      return res.status(400).json({ error: '账户类型必须是 shared、dedicated 或 group' })
+    }
+
+    const normalizedGroupIds = Array.isArray(groupIds)
+      ? groupIds.filter((id) => typeof id === 'string' && id.trim())
+      : []
+
+    if (
+      normalizedAccountType === 'group' &&
+      normalizedGroupIds.length === 0 &&
+      (!groupId || typeof groupId !== 'string' || !groupId.trim())
+    ) {
+      return res.status(400).json({ error: '分组调度账户必须至少选择一个分组' })
+    }
+
+    const accountPayload = {
+      ...req.body,
+      accountType: normalizedAccountType
+    }
+
+    delete accountPayload.groupId
+    delete accountPayload.groupIds
+
+    const account = await droidAccountService.createAccount(accountPayload)
+
+    if (normalizedAccountType === 'group') {
+      try {
+        if (normalizedGroupIds.length > 0) {
+          await accountGroupService.setAccountGroups(account.id, normalizedGroupIds, 'droid')
+        } else if (typeof groupId === 'string' && groupId.trim()) {
+          await accountGroupService.addAccountToGroup(account.id, groupId, 'droid')
+        }
+      } catch (groupError) {
+        logger.error(`Failed to attach Droid account ${account.id} to groups:`, groupError)
+        return res.status(500).json({
+          error: 'Failed to bind Droid account to groups',
+          message: groupError.message
+        })
+      }
+    }
+
     logger.success(`Created Droid account: ${account.name} (${account.id})`)
     return res.json({ success: true, data: account })
   } catch (error) {
@@ -8680,7 +8748,72 @@ router.post('/droid-accounts', authenticateAdmin, async (req, res) => {
 router.put('/droid-accounts/:id', authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params
-    const account = await droidAccountService.updateAccount(id, req.body)
+    const updates = { ...req.body }
+    const { accountType: rawAccountType, groupId, groupIds } = updates
+
+    if (rawAccountType && !['shared', 'dedicated', 'group'].includes(rawAccountType)) {
+      return res.status(400).json({ error: '账户类型必须是 shared、dedicated 或 group' })
+    }
+
+    if (
+      rawAccountType === 'group' &&
+      (!groupId || typeof groupId !== 'string' || !groupId.trim()) &&
+      (!Array.isArray(groupIds) || groupIds.length === 0)
+    ) {
+      return res.status(400).json({ error: '分组调度账户必须至少选择一个分组' })
+    }
+
+    const currentAccount = await droidAccountService.getAccount(id)
+    if (!currentAccount) {
+      return res.status(404).json({ error: 'Droid account not found' })
+    }
+
+    const normalizedGroupIds = Array.isArray(groupIds)
+      ? groupIds.filter((gid) => typeof gid === 'string' && gid.trim())
+      : []
+    const hasGroupIdsField = Object.prototype.hasOwnProperty.call(updates, 'groupIds')
+    const hasGroupIdField = Object.prototype.hasOwnProperty.call(updates, 'groupId')
+    const targetAccountType = rawAccountType || currentAccount.accountType || 'shared'
+
+    delete updates.groupId
+    delete updates.groupIds
+
+    if (rawAccountType) {
+      updates.accountType = targetAccountType
+    }
+
+    const account = await droidAccountService.updateAccount(id, updates)
+
+    try {
+      if (currentAccount.accountType === 'group' && targetAccountType !== 'group') {
+        await accountGroupService.removeAccountFromAllGroups(id)
+      } else if (targetAccountType === 'group') {
+        if (hasGroupIdsField) {
+          if (normalizedGroupIds.length > 0) {
+            await accountGroupService.setAccountGroups(id, normalizedGroupIds, 'droid')
+          } else {
+            await accountGroupService.removeAccountFromAllGroups(id)
+          }
+        } else if (hasGroupIdField && typeof groupId === 'string' && groupId.trim()) {
+          await accountGroupService.setAccountGroups(id, [groupId], 'droid')
+        }
+      }
+    } catch (groupError) {
+      logger.error(`Failed to update Droid account ${id} groups:`, groupError)
+      return res.status(500).json({
+        error: 'Failed to update Droid account groups',
+        message: groupError.message
+      })
+    }
+
+    if (targetAccountType === 'group') {
+      try {
+        account.groupInfos = await accountGroupService.getAccountGroups(id)
+      } catch (groupFetchError) {
+        logger.debug(`Failed to fetch group infos for Droid account ${id}:`, groupFetchError)
+      }
+    }
+
     return res.json({ success: true, data: account })
   } catch (error) {
     logger.error(`Failed to update Droid account ${req.params.id}:`, error)
