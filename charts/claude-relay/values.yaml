@@ -8,8 +8,6 @@ image:
   tag: ""
 
 imagePullSecrets: []
-nameOverride: ""
-fullnameOverride: ""
 
 serviceAccount:
   # Specifies whether a service account should be created
@@ -36,10 +34,6 @@ securityContext: {}
 service:
   type: ClusterIP
   port: 80
-  annotations: {}
-  nodePort: ""
-  loadBalancerIP: ""
-  loadBalancerSourceRanges: []
 
 ingress:
   enabled: false
@@ -72,10 +66,9 @@ autoscaling:
   targetCPUUtilizationPercentage: 80
   # targetMemoryUtilizationPercentage: 80
 
+# Kubernetes scheduling configuration
 nodeSelector: {}
-
 tolerations: []
-
 affinity: {}
 
 # Redis configuration
@@ -145,16 +138,6 @@ serviceMonitor:
   metricRelabelings: []
   namespaceSelector: {}
 
-# Persistent Volume Claims
-persistence:
-  enabled: true
-  # storageClass: ""
-  accessModes:
-    - ReadWriteOnce
-  size: 1Gi
-  logsSize: 1Gi
-  annotations: {}
-
 # Additional volumes and volume mounts
 extraVolumes: []
 extraVolumeMounts: []
@@ -162,8 +145,122 @@ extraVolumeMounts: []
 # Additional environment variables
 extraEnv: []
 
-# Additional containers
+# Additional containers and init containers
 extraContainers: []
-
-# Init containers
 initContainers: []
+
+# Storage configuration
+storage:
+  # Data storage configuration
+  data:
+    # Use emptyDir for data (no persistence needed)
+    type: emptyDir
+    # Optional: external storage configuration
+    external:
+      enabled: false
+      # When enabled, mount external storage for data
+      # storageClass: ""
+      # size: 1Gi
+      # accessMode: ReadWriteOnce
+
+  # Log processing configuration
+  logs:
+    # Log storage mode: fluentbit (default, stdout), forward (fluentbit with forwarding), pvc (file storage)
+    mode: fluentbit
+    
+    # Fluent Bit configuration
+    fluentbit:
+      enabled: true
+      image:
+        repository: fluent/fluent-bit
+        tag: "2.2.0"
+        pullPolicy: IfNotPresent
+      resources:
+        limits:
+          cpu: 100m
+          memory: 128Mi
+        requests:
+          cpu: 50m
+          memory: 64Mi
+      output:
+        # Output type: stdout (default), forward, elasticsearch, http, loki, s3, kafka, etc.
+        type: stdout
+        
+        # Raw output configuration - any valid Fluent Bit output configuration
+        # This will be directly rendered into the [OUTPUT] section
+        config: {}
+        
+        # Example configurations (uncomment and modify as needed):
+        
+        # Forward to Fluentd/Fluent Bit
+        # type: forward
+        # config:
+        #   Host: "fluentd.logging.svc.cluster.local"
+        #   Port: 24224
+        #   Shared_Key: "your-shared-key"
+        #   Self_Hostname: "claude-relay"
+        
+        # Elasticsearch output
+        # type: es
+        # config:
+        #   Host: "elasticsearch.logging.svc.cluster.local"
+        #   Port: 9200
+        #   Index: "claude-relay"
+        #   Type: "_doc"
+        #   Logstash_Format: "On"
+        #   Logstash_Prefix: "claude-relay"
+        #   Logstash_DateFormat: "%Y.%m.%d"
+        #   HTTP_User: "elastic"
+        #   HTTP_Passwd: "password"
+        #   tls: "On"
+        #   tls.verify: "Off"
+        
+        # HTTP output (generic webhook)
+        # type: http
+        # config:
+        #   Host: "log-collector.example.com"
+        #   Port: 443
+        #   URI: "/api/v1/logs"
+        #   Format: "json"
+        #   tls: "On"
+        #   tls.verify: "On"
+        #   Header: "Authorization Bearer your-token"
+        
+        # Grafana Loki output
+        # type: loki
+        # config:
+        #   Host: "loki.monitoring.svc.cluster.local"
+        #   Port: 3100
+        #   URI: "/loki/api/v1/push"
+        #   Labels: "job=claude-relay,environment=production"
+        #   BatchWait: 1
+        #   BatchSize: 1001024
+        #   LineFormat: "json"
+        
+        # Amazon S3 output
+        # type: s3
+        # config:
+        #   bucket: "my-log-bucket"
+        #   region: "us-west-2"
+        #   total_file_size: "50M"
+        #   upload_timeout: "10m"
+        #   use_put_object: "On"
+        #   s3_key_format: "/logs/year=%Y/month=%m/day=%d/hour=%H/%Y%m%d%H%M%S_$UUID.gz"
+        #   s3_key_format_tag_delimiters: "."
+        
+        # Apache Kafka output
+        # type: kafka
+        # config:
+        #   Brokers: "kafka-broker-1:9092,kafka-broker-2:9092"
+        #   Topics: "claude-relay-logs"
+        #   Timestamp_Key: "@timestamp"
+        #   Retry_Limit: 1
+        #   rdkafka.client.id: "claude-relay"
+        #   rdkafka.request.required.acks: 1
+    
+    # Log persistence (for pvc mode)
+    persistence:
+      enabled: false
+      storageClass: ""
+      accessMode: ReadWriteOnce
+      size: 10Gi
