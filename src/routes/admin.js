@@ -552,6 +552,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       dailyCostLimit,
       totalCostLimit,
       weeklyOpusCostLimit,
+      dailyOpusCostLimit,
       tags,
       activationDays, // 新增：激活后有效天数
       activationUnit, // 新增：激活时间单位 (hours/days)
@@ -712,6 +713,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       dailyCostLimit,
       totalCostLimit,
       weeklyOpusCostLimit,
+      dailyOpusCostLimit,
       tags,
       activationDays,
       activationUnit,
@@ -754,6 +756,7 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       dailyCostLimit,
       totalCostLimit,
       weeklyOpusCostLimit,
+      dailyOpusCostLimit,
       tags,
       activationDays,
       activationUnit,
@@ -817,6 +820,7 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
           dailyCostLimit,
           totalCostLimit,
           weeklyOpusCostLimit,
+          dailyOpusCostLimit,
           tags,
           activationDays,
           activationUnit,
@@ -949,6 +953,9 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
         if (updates.weeklyOpusCostLimit !== undefined) {
           finalUpdates.weeklyOpusCostLimit = updates.weeklyOpusCostLimit
         }
+        if (updates.dailyOpusCostLimit !== undefined) {
+          finalUpdates.dailyOpusCostLimit = updates.dailyOpusCostLimit
+        }
         if (updates.permissions !== undefined) {
           finalUpdates.permissions = updates.permissions
         }
@@ -1080,6 +1087,7 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       dailyCostLimit,
       totalCostLimit,
       weeklyOpusCostLimit,
+      dailyOpusCostLimit,
       tags,
       ownerId // 新增：所有者ID字段
     } = req.body
@@ -1255,6 +1263,22 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
           .json({ error: 'Weekly Opus cost limit must be a non-negative number' })
       }
       updates.weeklyOpusCostLimit = costLimit
+    }
+
+    // 处理 Opus 日费用限制
+    if (
+      dailyOpusCostLimit !== undefined &&
+      dailyOpusCostLimit !== null &&
+      dailyOpusCostLimit !== ''
+    ) {
+      const costLimit = Number(dailyOpusCostLimit)
+      // 明确验证非负数（0 表示禁用，负数无意义）
+      if (isNaN(costLimit) || costLimit < 0) {
+        return res
+          .status(400)
+          .json({ error: 'Daily Opus cost limit must be a non-negative number' })
+      }
+      updates.dailyOpusCostLimit = costLimit
     }
 
     // 处理标签

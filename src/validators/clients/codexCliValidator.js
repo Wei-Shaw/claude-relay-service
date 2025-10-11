@@ -42,7 +42,7 @@ class CodexCliValidator {
       // Codex CLI 的 UA 格式:
       // - codex_vscode/0.35.0 (Windows 10.0.26100; x86_64) unknown (Cursor; 0.4.10)
       // - codex_cli_rs/0.38.0 (Ubuntu 22.4.0; x86_64) WindowsTerminal
-      const codexCliPattern = /^(codex_vscode|codex_cli_rs)\/[\d\.]+/i
+      const codexCliPattern = /^(codex_vscode|codex_cli_rs)\/[\d.]+/i
       const uaMatch = userAgent.match(codexCliPattern)
 
       if (!uaMatch) {
@@ -53,7 +53,8 @@ class CodexCliValidator {
       // 2. 对于特定路径，进行额外的严格验证
       // 对于 /openai 和 /azure 路径需要完整验证
       const strictValidationPaths = ['/openai', '/azure']
-      const needsStrictValidation = req.path && strictValidationPaths.some(path => req.path.startsWith(path))
+      const needsStrictValidation =
+        req.path && strictValidationPaths.some((path) => req.path.startsWith(path))
 
       if (!needsStrictValidation) {
         // 其他路径，只要 User-Agent 匹配就认为是 Codex CLI
@@ -124,8 +125,12 @@ class CodexCliValidator {
       const part1 = parts1[i] || 0
       const part2 = parts2[i] || 0
 
-      if (part1 < part2) return -1
-      if (part1 > part2) return 1
+      if (part1 < part2) {
+        return -1
+      }
+      if (part1 > part2) {
+        return 1
+      }
     }
 
     return 0
