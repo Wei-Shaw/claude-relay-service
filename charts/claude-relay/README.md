@@ -145,6 +145,37 @@ serviceMonitor:
   scrapeTimeout: 10s
 ```
 
+### Sidecar Log Aggregation
+
+Enable sidecar container for log aggregation to eliminate the need for persistent volumes for logs:
+
+```yaml
+sidecar:
+  enabled: true
+  image:
+    repository: busybox
+    tag: "1.36"
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+# When sidecar is enabled, logs use emptyDir instead of PVC
+persistence:
+  enabled: true  # Still needed for data directory
+  size: 1Gi
+```
+
+The sidecar container provides:
+- **Real-time log aggregation** from multiple log files
+- **Log rotation handling** with automatic detection of new files
+- **Color-coded output** with log type identification
+- **Zero persistent storage** requirement for logs
+
 ### Autoscaling Configuration
 
 ```yaml
@@ -239,6 +270,24 @@ helm install claude-relay-dev ./charts/claude-relay \
   --set resources.requests.cpu="100m" \
   --set resources.requests.memory="128Mi" \
   --set redis.persistence.size="1Gi"
+```
+
+### Installation with Sidecar Log Aggregation
+
+```bash
+helm install claude-relay ./charts/claude-relay \
+  --set config.jwtSecret="$(openssl rand -base64 32)" \
+  --set config.encryptionKey="$(openssl rand -base64 32)" \
+  --set config.adminUsername="admin" \
+  --set config.adminPassword="secure-password" \
+  --set sidecar.enabled=true \
+  --set persistence.enabled=true
+```
+
+Or using the provided values file:
+
+```bash
+helm install claude-relay ./charts/claude-relay -f values-sidecar.yaml
 ```
 
 ## Upgrading

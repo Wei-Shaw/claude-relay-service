@@ -27,10 +27,30 @@ spec:
       serviceAccountName: {{ include "claude-relay.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      {{- with .Values.initContainers }}
       initContainers:
+        - name: wait-for-redis
+          image: "busybox:1.36"
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for Redis TCP connection..."
+              until nc -z {{ include "claude-relay.redisHost" . }} {{ include "claude-relay.redisPort" . }}; do
+                echo "Redis is not ready yet. Retrying in 2 seconds..."
+                sleep 2
+              done
+              echo "Redis TCP connection is ready!"
+          resources:
+            limits:
+              cpu: 50m
+              memory: 64Mi
+            requests:
+              cpu: 10m
+              memory: 32Mi
+        {{- with .Values.initContainers }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
@@ -170,26 +190,60 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
-            {{- if .Values.persistence.enabled }}
             - name: data
               mountPath: /app/data
+            {{- if or (eq .Values.storage.logs.mode "fluentbit") (eq .Values.storage.logs.mode "forward") (eq .Values.storage.logs.mode "pvc") }}
             - name: logs
               mountPath: /app/logs
+            {{- end }}
+            {{- if .Values.storage.data.external.enabled }}
+            - name: external-data
+              mountPath: /app/external-data
             {{- end }}
             {{- with .Values.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+        {{- if or (eq .Values.storage.logs.mode "fluentbit") (eq .Values.storage.logs.mode "forward") }}
+        - name: fluent-bit
+          image: "{{ .Values.storage.logs.fluentbit.image.repository }}:{{ .Values.storage.logs.fluentbit.image.tag }}"
+          imagePullPolicy: {{ .Values.storage.logs.fluentbit.image.pullPolicy }}
+          volumeMounts:
+            - name: logs
+              mountPath: /app/logs
+              readOnly: true
+            - name: fluent-bit-config
+              mountPath: /fluent-bit/etc
+              readOnly: true
+          resources:
+            {{- toYaml .Values.storage.logs.fluentbit.resources | nindent 12 }}
+        {{- end }}
         {{- with .Values.extraContainers }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
       volumes:
-        {{- if .Values.persistence.enabled }}
         - name: data
+          {{- if eq .Values.storage.data.type "emptyDir" }}
+          emptyDir: {}
+          {{- end }}
+        {{- if .Values.storage.data.external.enabled }}
+        - name: external-data
           persistentVolumeClaim:
-            claimName: {{ include "claude-relay.fullname" . }}-data
+            claimName: {{ include "claude-relay.fullname" . }}-external-data
+        {{- end }}
+        {{- if or (eq .Values.storage.logs.mode "fluentbit") (eq .Values.storage.logs.mode "forward") }}
+        - name: logs
+          emptyDir: {}
+        - name: fluent-bit-config
+          configMap:
+            name: {{ include "claude-relay.fullname" . }}-fluent-bit-config
+            defaultMode: 0644
+        {{- else if eq .Values.storage.logs.mode "pvc" }}
         - name: logs
           persistentVolumeClaim:
             claimName: {{ include "claude-relay.fullname" . }}-logs
+        {{- else if eq .Values.storage.logs.mode "emptyDir" }}
+        - name: logs
+          emptyDir: {}
         {{- end }}
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}
