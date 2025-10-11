@@ -82,40 +82,91 @@ const authenticateApiKey = async (req, res, next) => {
 
     const skipKeyRestrictions = isTokenCountRequest(req)
 
-    // 🔒 检查客户端限制（使用新的验证器）
-    if (
+    // 🔒 检查客户端限制（支持全局配置和三级优先级）
+    const globalRestriction = config.clientRestriction || {}
+
+    // 确定有效的客户端限制配置（三级优先级）
+    let effectiveRestriction = {
+      enabled: false,
+      allowedClients: [],
+      source: 'none' // 记录配置来源: 'force_global' | 'api_key' | 'global_default' | 'none'
+    }
+
+    // 如果是 token count 请求，跳过客户端限制检查
+    if (!skipKeyRestrictions && globalRestriction.forceGlobal && globalRestriction.globalEnabled) {
+      // 优先级 1: 强制使用全局配置（最高优先级）
+      if (globalRestriction.globalAllowedClients?.length > 0) {
+        effectiveRestriction = {
+          enabled: true,
+          allowedClients: globalRestriction.globalAllowedClients,
+          source: 'force_global'
+        }
+        logger.api(
+          `🌐 Using force global client restriction for key: ${validation.keyData.id} (${validation.keyData.name})`
+        )
+      }
+    } else if (
       !skipKeyRestrictions &&
       validation.keyData.enableClientRestriction &&
       validation.keyData.allowedClients?.length > 0
     ) {
+      // 优先级 2: 使用 API Key 级别配置
+      effectiveRestriction = {
+        enabled: true,
+        allowedClients: validation.keyData.allowedClients,
+        source: 'api_key'
+      }
+      logger.api(
+        `🔑 Using API key level client restriction for key: ${validation.keyData.id} (${validation.keyData.name})`
+      )
+    } else if (
+      globalRestriction.globalEnabled &&
+      globalRestriction.globalAllowedClients?.length > 0
+    ) {
+      // 优先级 3: 使用全局默认配置（最低优先级）
+      effectiveRestriction = {
+        enabled: true,
+        allowedClients: globalRestriction.globalAllowedClients,
+        source: 'global_default'
+      }
+      logger.api(
+        `🌐 Using global default client restriction for key: ${validation.keyData.id} (${validation.keyData.name})`
+      )
+    }
+
+    // 执行客户端验证
+    if (effectiveRestriction.enabled) {
       // 使用新的 ClientValidator 进行验证
       const validationResult = ClientValidator.validateRequest(
-        validation.keyData.allowedClients,
+        effectiveRestriction.allowedClients,
         req
       )
 
       if (!validationResult.allowed) {
         const clientIP = req.ip || req.connection?.remoteAddress || 'unknown'
         logger.security(
-          `🚫 Client restriction failed for key: ${validation.keyData.id} (${validation.keyData.name}) from ${clientIP}`
+          `🚫 Client restriction failed for key: ${validation.keyData.id} (${
+            validation.keyData.name
+          }) from ${clientIP} [source: ${effectiveRestriction.source}]`
         )
         return res.status(403).json({
           error: 'Client not allowed',
           message: 'Your client is not authorized to use this API key',
-          allowedClients: validation.keyData.allowedClients,
-          userAgent: validationResult.userAgent
+          allowedClients: effectiveRestriction.allowedClients,
+          userAgent: validationResult.userAgent,
+          restrictionSource: effectiveRestriction.source
         })
       }
 
       // 验证通过
       logger.api(
-        `✅ Client validated: ${validationResult.clientName} (${validationResult.matchedClient}) for key: ${validation.keyData.id} (${validation.keyData.name})`
+        `✅ Client validated: ${validationResult.clientName} (${validationResult.matchedClient}) for key: ${validation.keyData.id} (${validation.keyData.name}) [source: ${effectiveRestriction.source}]`
       )
     }
 
     // 检查并发限制
     const concurrencyLimit = validation.keyData.concurrencyLimit || 0
-    if (!skipKeyRestrictions && concurrencyLimit > 0) {
+    if (concurrencyLimit > 0) {
       const concurrencyConfig = config.concurrency || {}
       const leaseSeconds = Math.max(concurrencyConfig.leaseSeconds || 900, 30)
       const rawRenewInterval =
@@ -472,7 +523,7 @@ const authenticateApiKey = async (req, res, next) => {
       geminiAccountId: validation.keyData.geminiAccountId,
       openaiAccountId: validation.keyData.openaiAccountId, // 添加 OpenAI 账号ID
       bedrockAccountId: validation.keyData.bedrockAccountId, // 添加 Bedrock 账号ID
-      droidAccountId: validation.keyData.droidAccountId,
+      droidAccountId: validation.keyData.droidAccountId, // 添加 Droid 账号ID
       permissions: validation.keyData.permissions,
       concurrencyLimit: validation.keyData.concurrencyLimit,
       rateLimitWindow: validation.keyData.rateLimitWindow,

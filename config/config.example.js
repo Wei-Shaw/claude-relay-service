@@ -85,6 +85,20 @@ const config = {
     defaultTokenLimit: parseInt(process.env.DEFAULT_TOKEN_LIMIT) || 1000000
   },
 
+  // 🔒 全局客户端限制配置
+  clientRestriction: {
+    // 是否启用全局客户端限制 (优先级低于 API Key 级别配置)
+    globalEnabled: process.env.GLOBAL_CLIENT_RESTRICTION_ENABLED === 'true',
+    // 全局默认允许的客户端列表
+    // 支持的客户端: claude_code, gemini_cli, codex_cli
+    // 示例: export GLOBAL_ALLOWED_CLIENTS="claude_code,gemini_cli"
+    globalAllowedClients: process.env.GLOBAL_ALLOWED_CLIENTS
+      ? process.env.GLOBAL_ALLOWED_CLIENTS.split(',').map((c) => c.trim())
+      : [],
+    // 是否强制所有 API Key 使用全局配置 (覆盖 API Key 级别设置)
+    forceGlobal: process.env.FORCE_GLOBAL_CLIENT_RESTRICTION === 'true'
+  },
+
   // 📝 日志配置
   logging: {
     level: process.env.LOG_LEVEL || 'info',

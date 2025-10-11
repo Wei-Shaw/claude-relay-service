@@ -21,11 +21,10 @@
 
 <div align="center">
 
-| 平台 | 类型 | 服务 | 介绍 |
-|:---|:---|:---|:---|
+| 平台                              | 类型            | 服务                                          | 介绍                                                  |
+| :-------------------------------- | :-------------- | :-------------------------------------------- | :---------------------------------------------------- |
 | **[pincc.ai](https://pincc.ai/)** | 🏆 **官方运营** | <small>✅ Claude Code<br>✅ Codex CLI</small> | 项目直营，提供稳定的 Claude Code / Codex CLI 拼车服务 |
-| **[ctok.ai](https://ctok.ai/)** | 🤝 合作伙伴 | <small>✅ Claude Code<br>✅ Codex CLI</small> | 社区认证，提供 Claude Code / Codex CLI 拼车 |
-
+| **[ctok.ai](https://ctok.ai/)**   | 🤝 合作伙伴     | <small>✅ Claude Code<br>✅ Codex CLI</small> | 社区认证，提供 Claude Code / Codex CLI 拼车           |
 
 </div>
 
@@ -38,7 +37,6 @@
 🚨 **服务条款风险**: 使用本项目可能违反Anthropic的服务条款。请在使用前仔细阅读Anthropic的用户协议，使用本项目的一切风险由用户自行承担。
 
 📖 **免责声明**: 本项目仅供技术学习和研究使用，作者不对因使用本项目导致的账户封禁、服务中断或其他损失承担任何责任。
-
 
 ## 🤔 这个项目适合你吗？
 
@@ -287,11 +285,13 @@ npm run service:status
 ### Docker compose
 
 #### 第一步：下载构建docker-compose.yml文件的脚本并执行
+
 ```bash
 curl -fsSL https://pincc.ai/crs-compose.sh -o crs-compose.sh && chmod +x crs-compose.sh && ./crs-compose.sh
 ```
 
 #### 第二步：启动
+
 ```bash
 docker-compose up -d
 ```
@@ -409,7 +409,7 @@ export ANTHROPIC_AUTH_TOKEN="后台创建的API密钥"
 
 ```json
 {
-    "primaryApiKey": "crs"
+  "primaryApiKey": "crs"
 }
 ```
 
@@ -460,7 +460,7 @@ env_key = "CRS_OAI_KEY"
 
 ```json
 {
-    "OPENAI_API_KEY": null  
+  "OPENAI_API_KEY": null
 }
 ```
 
@@ -521,9 +521,10 @@ claude-opus-4-20250514     # Claude Opus 4
 ```
 
 配置步骤：
+
 - 供应商类型选择"Anthropic"
 - API地址填入：`http://你的服务器:3000/claude`
-- API Key填入：后台创建的API密钥（cr_开头）
+- API Key填入：后台创建的API密钥（cr\_开头）
 
 **2. Gemini账号接入：**
 
@@ -536,9 +537,10 @@ gemini-2.5-pro             # Gemini 2.5 Pro
 ```
 
 配置步骤：
+
 - 供应商类型选择"Gemini"
 - API地址填入：`http://你的服务器:3000/gemini`
-- API Key填入：后台创建的API密钥（cr_开头）
+- API Key填入：后台创建的API密钥（cr\_开头）
 
 **3. Codex接入：**
 
@@ -551,9 +553,10 @@ gpt-5                      # Codex使用固定模型ID
 ```
 
 配置步骤：
+
 - 供应商类型选择"Openai-Response"
 - API地址填入：`http://你的服务器:3000/openai`
-- API Key填入：后台创建的API密钥（cr_开头）
+- API Key填入：后台创建的API密钥（cr\_开头）
 - **重要**：Codex只支持Openai-Response标准
 - 💡 如果希望在 Cherry Studio 中使用 Droid 类型账号，请改填 `http://你的服务器:3000/droid/openai`，并保持其他设置不变。
 
@@ -588,7 +591,7 @@ http://你的服务器:3000/droid/openai
 - 根据不同的路由前缀自动识别账号类型
 - `/claude/` - 使用Claude账号池
 - `/droid/claude/` - 使用Droid类型Claude账号池（服务于 Claude Code / Droid CLI）
-- `/gemini/` - 使用Gemini账号池  
+- `/gemini/` - 使用Gemini账号池
 - `/openai/` - 使用Codex账号（只支持Openai-Response格式）
 - `/droid/openai/` - 使用Droid类型OpenAI兼容账号池（服务于 Codex CLI）
 - 支持所有标准API端点（messages、models等）
@@ -668,38 +671,131 @@ npm run service:status
 
 客户端限制功能允许你控制每个API Key可以被哪些客户端使用，通过User-Agent识别客户端，提高API的安全性。
 
+支持**两种配置方式**：
+
+- **API Key 级别**: 为单个 API Key 配置客户端限制
+- **全局配置**: 为所有 API Key 设置默认客户端限制
+
 ### 使用方法
+
+#### 方法 1: API Key 级别配置
 
 1. **在创建或编辑API Key时启用客户端限制**：
    - 勾选"启用客户端限制"
    - 选择允许的客户端（支持多选）
 
 2. **预定义客户端**：
-   - **ClaudeCode**: 官方Claude CLI（匹配 `claude-cli/x.x.x (external, cli)` 格式）
-   - **Gemini-CLI**: Gemini命令行工具（匹配 `GeminiCLI/vx.x.x (platform; arch)` 格式）
+   - **claude_code**: Claude Code 客户端
+   - **gemini_cli**: Gemini CLI 命令行工具
+   - **codex_cli**: Codex CLI 客户端
 
 3. **调试和诊断**：
    - 系统会在日志中记录所有请求的User-Agent
    - 客户端验证失败时会返回403错误并记录详细信息
    - 通过日志可以查看实际的User-Agent格式，方便配置自定义客户端
 
+#### 方法 2: 全局客户端限制配置（v1.1.164+）
+
+通过环境变量配置全局客户端限制，支持三级优先级策略：
+
+**配置环境变量**：
+
+```bash
+# 启用全局客户端限制
+GLOBAL_CLIENT_RESTRICTION_ENABLED=true
+
+# 允许的客户端列表（逗号分隔）
+GLOBAL_ALLOWED_CLIENTS=claude_code,gemini_cli
+
+# 是否强制所有 API Key 使用全局配置（可选）
+FORCE_GLOBAL_CLIENT_RESTRICTION=false
+```
+
+**优先级规则**（从高到低）：
+
+1. **强制全局配置** (`FORCE_GLOBAL_CLIENT_RESTRICTION=true`)
+   - 所有 API Key 强制使用全局配置
+   - 忽略 API Key 级别的客户端限制设置
+
+2. **API Key 级别配置**
+   - 如果 API Key 启用了客户端限制，使用其自己的配置
+
+3. **全局默认配置** (`GLOBAL_CLIENT_RESTRICTION_ENABLED=true`)
+   - 未配置客户端限制的 API Key 使用全局默认配置
+
+4. **无限制**
+   - 默认行为，所有客户端都可访问
+
+**使用场景示例**：
+
+```bash
+# 场景 1: 默认限制 + API Key 可自定义（推荐）
+GLOBAL_CLIENT_RESTRICTION_ENABLED=true
+GLOBAL_ALLOWED_CLIENTS=claude_code,gemini_cli
+FORCE_GLOBAL_CLIENT_RESTRICTION=false
+# 效果: 未配置的 API Key 只允许 claude_code 和 gemini_cli
+#       但可以为特定 API Key 自定义配置
+
+# 场景 2: 强制所有 API Key 使用统一限制（严格模式）
+GLOBAL_CLIENT_RESTRICTION_ENABLED=true
+GLOBAL_ALLOWED_CLIENTS=claude_code
+FORCE_GLOBAL_CLIENT_RESTRICTION=true
+# 效果: 所有 API Key 强制只允许 claude_code，无法自定义
+
+# 场景 3: 仅 API Key 级别限制（默认行为）
+GLOBAL_CLIENT_RESTRICTION_ENABLED=false
+# 效果: 只对启用了客户端限制的 API Key 生效
+```
+
+**测试全局配置**：
+
+```bash
+# 运行测试脚本验证配置
+node scripts/test-global-client-restriction.js
+```
 
 ### 日志示例
 
-认证成功时的日志：
+**认证成功时的日志**：
 
 ```
 🔓 Authenticated request from key: 测试Key (key-id) in 5ms
-   User-Agent: "claude-cli/1.0.58 (external, cli)"
+   User-Agent: "Claude Code/1.0.58"
 ```
 
-客户端限制检查日志：
+**使用全局配置的日志**：
 
 ```
-🔍 Checking client restriction for key: key-id (测试Key)
-   User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-   Allowed clients: claude_code, gemini_cli
-🚫 Client restriction failed for key: key-id (测试Key) from 127.0.0.1, User-Agent: Mozilla/5.0...
+🌐 Using force global client restriction for key: key-id (测试Key)
+✅ Client validated: Claude Code (claude_code) [source: force_global]
+```
+
+```
+🔑 Using API key level client restriction for key: key-id (测试Key)
+✅ Client validated: Gemini CLI (gemini_cli) [source: api_key]
+```
+
+```
+🌐 Using global default client restriction for key: key-id (测试Key)
+✅ Client validated: Claude Code (claude_code) [source: global_default]
+```
+
+**客户端验证失败的日志**：
+
+```
+🚫 Client restriction failed for key: key-id (测试Key) from 192.168.1.100 [source: force_global]
+```
+
+返回错误响应：
+
+```json
+{
+  "error": "Client not allowed",
+  "message": "Your client is not authorized to use this API key",
+  "allowedClients": ["claude_code"],
+  "userAgent": "Mozilla/5.0...",
+  "restrictionSource": "force_global"
+}
 ```
 
 ### 常见问题处理
