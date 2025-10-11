@@ -91,7 +91,7 @@ class ClaudeRelayService {
 
   // 🔍 判断是否是真实的 Claude Code 请求
   isRealClaudeCodeRequest(requestBody) {
-    return ClaudeCodeValidator.hasClaudeCodeSystemPrompt(requestBody)
+    return ClaudeCodeValidator.includesClaudeCodeSystemPrompt(requestBody, 1)
   }
 
   // 🚀 转发请求到Claude API
