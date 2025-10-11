@@ -538,6 +538,19 @@
                     <span class="text-xs font-medium text-teal-700 dark:text-teal-300">Relay</span>
                   </div>
                   <div
+                    v-else-if="account.platform === 'droid'"
+                    class="flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-gradient-to-r from-cyan-100 to-sky-100 px-2.5 py-1 dark:border-cyan-700 dark:from-cyan-900/20 dark:to-sky-900/20"
+                  >
+                    <i class="fas fa-robot text-xs text-cyan-700 dark:text-cyan-400" />
+                    <span class="text-xs font-semibold text-cyan-800 dark:text-cyan-300"
+                      >Droid</span
+                    >
+                    <span class="mx-1 h-4 w-px bg-cyan-300 dark:bg-cyan-600" />
+                    <span class="text-xs font-medium text-cyan-700 dark:text-cyan-300">
+                      {{ getDroidAuthType(account) }}
+                    </span>
+                  </div>
+                  <div
                     v-else
                     class="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gradient-to-r from-gray-100 to-gray-200 px-2.5 py-1"
                   >
@@ -646,7 +659,8 @@
                     account.platform === 'openai' ||
                     account.platform === 'openai-responses' ||
                     account.platform === 'azure_openai' ||
-                    account.platform === 'ccr'
+                    account.platform === 'ccr' ||
+                    account.platform === 'droid'
                   "
                   class="flex items-center gap-2"
                 >
@@ -1098,7 +1112,9 @@
                           ? 'bg-gradient-to-br from-gray-600 to-gray-700'
                           : account.platform === 'ccr'
                             ? 'bg-gradient-to-br from-teal-500 to-emerald-600'
-                            : 'bg-gradient-to-br from-blue-500 to-blue-600'
+                            : account.platform === 'droid'
+                              ? 'bg-gradient-to-br from-cyan-500 to-sky-600'
+                              : 'bg-gradient-to-br from-blue-500 to-blue-600'
                 ]"
               >
                 <i
@@ -1114,7 +1130,9 @@
                             ? 'fas fa-openai'
                             : account.platform === 'ccr'
                               ? 'fas fa-code-branch'
-                              : 'fas fa-robot'
+                              : account.platform === 'droid'
+                                ? 'fas fa-robot'
+                                : 'fas fa-robot'
                   ]"
                 />
               </div>
@@ -1686,7 +1704,14 @@ const accountUsageSummary = ref({})
 const accountUsageOverview = ref({})
 const accountUsageGeneratedAt = ref('')
 
-const supportedUsagePlatforms = ['claude', 'claude-console', 'openai', 'openai-responses', 'gemini']
+const supportedUsagePlatforms = [
+  'claude',
+  'claude-console',
+  'openai',
+  'openai-responses',
+  'gemini',
+  'droid'
+]
 
 // 缓存状态标志
 const apiKeysLoaded = ref(false)
@@ -1712,7 +1737,8 @@ const platformOptions = ref([
   { value: 'azure_openai', label: 'Azure OpenAI', icon: 'fab fa-microsoft' },
   { value: 'bedrock', label: 'Bedrock', icon: 'fab fa-aws' },
   { value: 'openai-responses', label: 'OpenAI-Responses', icon: 'fa-server' },
-  { value: 'ccr', label: 'CCR', icon: 'fa-code-branch' }
+  { value: 'ccr', label: 'CCR', icon: 'fa-code-branch' },
+  { value: 'droid', label: 'Droid', icon: 'fa-robot' }
 ])
 
 const groupOptions = computed(() => {
@@ -1723,13 +1749,15 @@ const groupOptions = computed(() => {
   accountGroups.value.forEach((group) => {
     options.push({
       value: group.id,
-      label: `${group.name} (${group.platform === 'claude' ? 'Claude' : group.platform === 'gemini' ? 'Gemini' : 'OpenAI'})`,
+      label: `${group.name} (${group.platform === 'claude' ? 'Claude' : group.platform === 'gemini' ? 'Gemini' : group.platform === 'openai' ? 'OpenAI' : 'Droid'})`,
       icon:
         group.platform === 'claude'
           ? 'fa-brain'
           : group.platform === 'gemini'
             ? 'fa-robot'
-            : 'fa-openai'
+            : group.platform === 'openai'
+              ? 'fa-openai'
+              : 'fa-robot'
     })
   })
   return options
@@ -2034,7 +2062,8 @@ const loadAccounts = async (forceReload = false) => {
         apiClient.get('/admin/openai-accounts', { params }),
         apiClient.get('/admin/azure-openai-accounts', { params }),
         apiClient.get('/admin/openai-responses-accounts', { params }),
-        apiClient.get('/admin/ccr-accounts', { params })
+        apiClient.get('/admin/ccr-accounts', { params }),
+        apiClient.get('/admin/droid-accounts', { params })
       )
     } else {
       // 只请求指定平台，其他平台设为null占位
@@ -2047,7 +2076,9 @@ const loadAccounts = async (forceReload = false) => {
             Promise.resolve({ success: true, data: [] }), // gemini 占位
             Promise.resolve({ success: true, data: [] }), // openai 占位
             Promise.resolve({ success: true, data: [] }), // azure-openai 占位
-            Promise.resolve({ success: true, data: [] }) // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // ccr 占位
+            Promise.resolve({ success: true, data: [] }) // droid 占位
           )
           break
         case 'claude-console':
@@ -2058,7 +2089,9 @@ const loadAccounts = async (forceReload = false) => {
             Promise.resolve({ success: true, data: [] }), // gemini 占位
             Promise.resolve({ success: true, data: [] }), // openai 占位
             Promise.resolve({ success: true, data: [] }), // azure-openai 占位
-            Promise.resolve({ success: true, data: [] }) // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // ccr 占位
+            Promise.resolve({ success: true, data: [] }) // droid 占位
           )
           break
         case 'bedrock':
@@ -2069,7 +2102,9 @@ const loadAccounts = async (forceReload = false) => {
             Promise.resolve({ success: true, data: [] }), // gemini 占位
             Promise.resolve({ success: true, data: [] }), // openai 占位
             Promise.resolve({ success: true, data: [] }), // azure-openai 占位
-            Promise.resolve({ success: true, data: [] }) // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // ccr 占位
+            Promise.resolve({ success: true, data: [] }) // droid 占位
           )
           break
         case 'gemini':
@@ -2080,7 +2115,9 @@ const loadAccounts = async (forceReload = false) => {
             apiClient.get('/admin/gemini-accounts', { params }),
             Promise.resolve({ success: true, data: [] }), // openai 占位
             Promise.resolve({ success: true, data: [] }), // azure-openai 占位
-            Promise.resolve({ success: true, data: [] }) // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // ccr 占位
+            Promise.resolve({ success: true, data: [] }) // droid 占位
           )
           break
         case 'openai':
@@ -2091,7 +2128,9 @@ const loadAccounts = async (forceReload = false) => {
             Promise.resolve({ success: true, data: [] }), // gemini 占位
             apiClient.get('/admin/openai-accounts', { params }),
             Promise.resolve({ success: true, data: [] }), // azure-openai 占位
-            Promise.resolve({ success: true, data: [] }) // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // ccr 占位
+            Promise.resolve({ success: true, data: [] }) // droid 占位
           )
           break
         case 'azure_openai':
@@ -2102,7 +2141,9 @@ const loadAccounts = async (forceReload = false) => {
             Promise.resolve({ success: true, data: [] }), // gemini 占位
             Promise.resolve({ success: true, data: [] }), // openai 占位
             apiClient.get('/admin/azure-openai-accounts', { params }),
-            Promise.resolve({ success: true, data: [] }) // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // ccr 占位
+            Promise.resolve({ success: true, data: [] }) // droid 占位
           )
           break
         case 'openai-responses':
@@ -2113,7 +2154,9 @@ const loadAccounts = async (forceReload = false) => {
             Promise.resolve({ success: true, data: [] }), // gemini 占位
             Promise.resolve({ success: true, data: [] }), // openai 占位
             Promise.resolve({ success: true, data: [] }), // azure-openai 占位
-            apiClient.get('/admin/openai-responses-accounts', { params })
+            apiClient.get('/admin/openai-responses-accounts', { params }),
+            Promise.resolve({ success: true, data: [] }), // ccr 占位
+            Promise.resolve({ success: true, data: [] }) // droid 占位
           )
           break
         case 'ccr':
@@ -2124,12 +2167,29 @@ const loadAccounts = async (forceReload = false) => {
             Promise.resolve({ success: true, data: [] }), // gemini 占位
             Promise.resolve({ success: true, data: [] }), // openai 占位
             Promise.resolve({ success: true, data: [] }), // azure 占位
-            apiClient.get('/admin/ccr-accounts', { params })
+            Promise.resolve({ success: true, data: [] }), // openai-responses 占位
+            apiClient.get('/admin/ccr-accounts', { params }),
+            Promise.resolve({ success: true, data: [] }) // droid 占位
+          )
+          break
+        case 'droid':
+          requests.push(
+            Promise.resolve({ success: true, data: [] }), // claude 占位
+            Promise.resolve({ success: true, data: [] }), // claude-console 占位
+            Promise.resolve({ success: true, data: [] }), // bedrock 占位
+            Promise.resolve({ success: true, data: [] }), // gemini 占位
+            Promise.resolve({ success: true, data: [] }), // openai 占位
+            Promise.resolve({ success: true, data: [] }), // azure 占位
+            Promise.resolve({ success: true, data: [] }), // openai-responses 占位
+            Promise.resolve({ success: true, data: [] }), // ccr 占位
+            apiClient.get('/admin/droid-accounts', { params })
           )
           break
         default:
           // 默认情况下返回空数组
           requests.push(
+            Promise.resolve({ success: true, data: [] }),
+            Promise.resolve({ success: true, data: [] }),
             Promise.resolve({ success: true, data: [] }),
             Promise.resolve({ success: true, data: [] }),
             Promise.resolve({ success: true, data: [] }),
@@ -2156,7 +2216,8 @@ const loadAccounts = async (forceReload = false) => {
       openaiData,
       azureOpenaiData,
       openaiResponsesData,
-      ccrData
+      ccrData,
+      droidData
     ] = await Promise.all(requests)
 
     const allAccounts = []
@@ -2250,6 +2311,18 @@ const loadAccounts = async (forceReload = false) => {
       allAccounts.push(...ccrAccounts)
     }
 
+    // Droid 账户
+    if (droidData && droidData.success) {
+      const droidAccounts = (droidData.data || []).map((acc) => {
+        return {
+          ...acc,
+          platform: 'droid',
+          boundApiKeysCount: acc.boundApiKeysCount ?? 0
+        }
+      })
+      allAccounts.push(...droidAccounts)
+    }
+
     // 根据分组筛选器过滤账户
     let filteredAccounts = allAccounts
     if (groupFilter.value !== 'all') {
@@ -2269,6 +2342,14 @@ const loadAccounts = async (forceReload = false) => {
         })
       }
     }
+
+    filteredAccounts = filteredAccounts.map((account) => {
+      const proxyConfig = normalizeProxyData(account.proxyConfig || account.proxy)
+      return {
+        ...account,
+        proxyConfig: proxyConfig || null
+      }
+    })
 
     accounts.value = filteredAccounts
     cleanupSelectedAccounts()
@@ -2408,24 +2489,86 @@ const filterByGroup = () => {
   loadAccounts()
 }
 
+// 规范化代理配置，支持字符串与对象
+function normalizeProxyData(proxy) {
+  if (!proxy) {
+    return null
+  }
+
+  let proxyObject = proxy
+  if (typeof proxy === 'string') {
+    try {
+      proxyObject = JSON.parse(proxy)
+    } catch (error) {
+      return null
+    }
+  }
+
+  if (!proxyObject || typeof proxyObject !== 'object') {
+    return null
+  }
+
+  const candidate =
+    proxyObject.proxy && typeof proxyObject.proxy === 'object' ? proxyObject.proxy : proxyObject
+
+  const host =
+    typeof candidate.host === 'string'
+      ? candidate.host.trim()
+      : candidate.host !== undefined && candidate.host !== null
+        ? String(candidate.host).trim()
+        : ''
+
+  const port =
+    candidate.port !== undefined && candidate.port !== null ? String(candidate.port).trim() : ''
+
+  if (!host || !port) {
+    return null
+  }
+
+  const type =
+    typeof candidate.type === 'string' && candidate.type.trim() ? candidate.type.trim() : 'socks5'
+
+  const username =
+    typeof candidate.username === 'string'
+      ? candidate.username
+      : candidate.username !== undefined && candidate.username !== null
+        ? String(candidate.username)
+        : ''
+
+  const password =
+    typeof candidate.password === 'string'
+      ? candidate.password
+      : candidate.password !== undefined && candidate.password !== null
+        ? String(candidate.password)
+        : ''
+
+  return {
+    type,
+    host,
+    port,
+    username,
+    password
+  }
+}
+
 // 格式化代理信息显示
 const formatProxyDisplay = (proxy) => {
-  if (!proxy || !proxy.host || !proxy.port) return null
+  const parsed = normalizeProxyData(proxy)
+  if (!parsed) {
+    return null
+  }
 
-  // 缩短类型名称
-  const typeShort = proxy.type === 'socks5' ? 'S5' : proxy.type.toUpperCase()
+  const typeShort = parsed.type.toLowerCase() === 'socks5' ? 'S5' : parsed.type.toUpperCase()
 
-  // 缩短主机名（如果太长）
-  let host = proxy.host
+  let host = parsed.host
   if (host.length > 15) {
     host = host.substring(0, 12) + '...'
   }
 
-  let display = `${typeShort}://${host}:${proxy.port}`
+  let display = `${typeShort}://${host}:${parsed.port}`
 
-  // 如果有用户名密码，添加认证信息（部分隐藏）
-  if (proxy.username) {
-    display = `${typeShort}://***@${host}:${proxy.port}`
+  if (parsed.username) {
+    display = `${typeShort}://***@${host}:${parsed.port}`
   }
 
   return display
@@ -2542,6 +2685,8 @@ const resolveAccountDeleteEndpoint = (account) => {
       return `/admin/ccr-accounts/${account.id}`
     case 'gemini':
       return `/admin/gemini-accounts/${account.id}`
+    case 'droid':
+      return `/admin/droid-accounts/${account.id}`
     default:
       return null
   }
@@ -2720,6 +2865,8 @@ const resetAccountStatus = async (account) => {
       endpoint = `/admin/claude-console-accounts/${account.id}/reset-status`
     } else if (account.platform === 'ccr') {
       endpoint = `/admin/ccr-accounts/${account.id}/reset-status`
+    } else if (account.platform === 'droid') {
+      endpoint = `/admin/droid-accounts/${account.id}/reset-status`
     } else {
       showToast('不支持的账户类型', 'error')
       account.isResetting = false
@@ -2766,6 +2913,8 @@ const toggleSchedulable = async (account) => {
       endpoint = `/admin/openai-responses-accounts/${account.id}/toggle-schedulable`
     } else if (account.platform === 'ccr') {
       endpoint = `/admin/ccr-accounts/${account.id}/toggle-schedulable`
+    } else if (account.platform === 'droid') {
+      endpoint = `/admin/droid-accounts/${account.id}/toggle-schedulable`
     } else {
       showToast('该账户类型暂不支持调度控制', 'warning')
       return
@@ -2822,6 +2971,52 @@ const getGeminiAuthType = () => {
 // 获取 OpenAI 账号的添加方式
 const getOpenAIAuthType = () => {
   // OpenAI 统一显示 OAuth
+  return 'OAuth'
+}
+
+// 获取 Droid 账号的认证方式
+const getDroidAuthType = (account) => {
+  if (!account || typeof account !== 'object') {
+    return 'OAuth'
+  }
+
+  const apiKeyModeFlag =
+    account.isApiKeyMode ?? account.is_api_key_mode ?? account.apiKeyMode ?? account.api_key_mode
+
+  if (
+    apiKeyModeFlag === true ||
+    apiKeyModeFlag === 'true' ||
+    apiKeyModeFlag === 1 ||
+    apiKeyModeFlag === '1'
+  ) {
+    return 'API Key'
+  }
+
+  const methodCandidate =
+    account.authenticationMethod ||
+    account.authMethod ||
+    account.authentication_mode ||
+    account.authenticationMode ||
+    account.authentication_method ||
+    account.auth_type ||
+    account.authType ||
+    account.authentication_type ||
+    account.authenticationType ||
+    account.droidAuthType ||
+    account.droidAuthenticationMethod ||
+    account.method ||
+    account.auth ||
+    ''
+
+  if (typeof methodCandidate === 'string') {
+    const normalized = methodCandidate.trim().toLowerCase()
+    const compacted = normalized.replace(/[\s_-]/g, '')
+
+    if (compacted === 'apikey') {
+      return 'API Key'
+    }
+  }
+
   return 'OAuth'
 }
 
