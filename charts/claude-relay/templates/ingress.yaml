@@ -39,6 +39,35 @@ spec:
     - host: {{ .host | quote }}
       http:
         paths:
+          # Block access to monitoring endpoints by routing to non-existent service
+          - path: /metrics
+            {{- if semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion }}
+            pathType: Exact
+            {{- end }}
+            backend:
+              {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
+              service:
+                name: blocked-service
+                port:
+                  number: 80
+              {{- else }}
+              serviceName: blocked-service
+              servicePort: 80
+              {{- end }}
+          - path: /prometheus
+            {{- if semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion }}
+            pathType: Exact
+            {{- end }}
+            backend:
+              {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
+              service:
+                name: blocked-service
+                port:
+                  number: 80
+              {{- else }}
+              serviceName: blocked-service
+              servicePort: 80
+              {{- end }}
           {{- range .paths }}
           - path: {{ .path }}
             {{- if and .pathType (semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion) }}
