@@ -932,7 +932,26 @@ class DroidAccountService {
         : ''
     )
     const newApiKeysInput = Array.isArray(updates.apiKeys) ? updates.apiKeys : []
+    const removeApiKeysInput = Array.isArray(updates.removeApiKeys) ? updates.removeApiKeys : []
     const wantsClearApiKeys = Boolean(updates.clearApiKeys)
+    const rawApiKeyMode =
+      typeof updates.apiKeyUpdateMode === 'string'
+        ? updates.apiKeyUpdateMode.trim().toLowerCase()
+        : ''
+
+    let apiKeyUpdateMode = ['append', 'replace', 'delete'].includes(rawApiKeyMode)
+      ? rawApiKeyMode
+      : ''
+
+    if (!apiKeyUpdateMode) {
+      if (wantsClearApiKeys) {
+        apiKeyUpdateMode = 'replace'
+      } else if (removeApiKeysInput.length > 0) {
+        apiKeyUpdateMode = 'delete'
+      } else {
+        apiKeyUpdateMode = 'append'
+      }
+    }
 
     if (sanitizedUpdates.apiKeys !== undefined) {
       delete sanitizedUpdates.apiKeys
@@ -940,33 +959,94 @@ class DroidAccountService {
     if (sanitizedUpdates.clearApiKeys !== undefined) {
       delete sanitizedUpdates.clearApiKeys
     }
+    if (sanitizedUpdates.apiKeyUpdateMode !== undefined) {
+      delete sanitizedUpdates.apiKeyUpdateMode
+    }
+    if (sanitizedUpdates.removeApiKeys !== undefined) {
+      delete sanitizedUpdates.removeApiKeys
+    }
 
-    if (wantsClearApiKeys || newApiKeysInput.length > 0) {
-      const mergedApiKeys = this._buildApiKeyEntries(
+    let mergedApiKeys = existingApiKeyEntries
+    let apiKeysUpdated = false
+    let addedCount = 0
+    let removedCount = 0
+
+    if (apiKeyUpdateMode === 'delete') {
+      const removalHashes = new Set()
+
+      for (const candidate of removeApiKeysInput) {
+        if (typeof candidate !== 'string') {
+          continue
+        }
+        const trimmed = candidate.trim()
+        if (!trimmed) {
+          continue
+        }
+        const hash = crypto.createHash('sha256').update(trimmed).digest('hex')
+        removalHashes.add(hash)
+      }
+
+      if (removalHashes.size > 0) {
+        mergedApiKeys = existingApiKeyEntries.filter(
+          (entry) => entry && entry.hash && !removalHashes.has(entry.hash)
+        )
+        removedCount = existingApiKeyEntries.length - mergedApiKeys.length
+        apiKeysUpdated = removedCount > 0
+
+        if (!apiKeysUpdated) {
+          logger.warn(
+            `⚠️ 删除模式未匹配任何 Droid API Key: ${accountId} (提供 ${removalHashes.size} 条)`
+          )
+        }
+      } else if (removeApiKeysInput.length > 0) {
+        logger.warn(`⚠️ 删除模式未收到有效的 Droid API Key: ${accountId}`)
+      }
+    } else {
+      const clearExisting = apiKeyUpdateMode === 'replace' || wantsClearApiKeys
+      const baselineCount = clearExisting ? 0 : existingApiKeyEntries.length
+
+      mergedApiKeys = this._buildApiKeyEntries(
         newApiKeysInput,
         existingApiKeyEntries,
-        wantsClearApiKeys
+        clearExisting
       )
 
-      const baselineCount = wantsClearApiKeys ? 0 : existingApiKeyEntries.length
-      const addedCount = Math.max(mergedApiKeys.length - baselineCount, 0)
+      addedCount = Math.max(mergedApiKeys.length - baselineCount, 0)
+      apiKeysUpdated = clearExisting || addedCount > 0
+    }
 
+    if (apiKeysUpdated) {
       sanitizedUpdates.apiKeys = mergedApiKeys.length ? JSON.stringify(mergedApiKeys) : ''
       sanitizedUpdates.apiKeyCount = String(mergedApiKeys.length)
+
+      if (apiKeyUpdateMode === 'delete') {
+        logger.info(
+          `🔑 删除模式更新 Droid API keys for ${accountId}: 已移除 ${removedCount} 条，剩余 ${mergedApiKeys.length}`
+        )
+      } else if (apiKeyUpdateMode === 'replace' || wantsClearApiKeys) {
+        logger.info(
+          `🔑 覆盖模式更新 Droid API keys for ${accountId}: 当前总数 ${mergedApiKeys.length}，新增 ${addedCount}`
+        )
+      } else {
+        logger.info(
+          `🔑 追加模式更新 Droid API keys for ${accountId}: 当前总数 ${mergedApiKeys.length}，新增 ${addedCount}`
+        )
+      }
 
       if (mergedApiKeys.length > 0) {
         sanitizedUpdates.authenticationMethod = 'api_key'
         sanitizedUpdates.status = sanitizedUpdates.status || 'active'
-        logger.info(
-          `🔑 Updated Droid API keys for ${accountId}: total ${mergedApiKeys.length} (added ${addedCount})`
-        )
-      } else {
-        logger.info(`🔑 Cleared all API keys for Droid account ${accountId}`)
-        // 如果完全移除 API Key，可根据是否仍有 token 来确定认证方式
-        if (!sanitizedUpdates.accessToken && !account.accessToken) {
-          sanitizedUpdates.authenticationMethod =
-            account.authenticationMethod === 'api_key' ? '' : account.authenticationMethod
-        }
+      } else if (!sanitizedUpdates.accessToken && !account.accessToken) {
+        const shouldPreserveApiKeyMode =
+          account.authenticationMethod &&
+          account.authenticationMethod.toLowerCase().trim() === 'api_key' &&
+          (apiKeyUpdateMode === 'replace' || apiKeyUpdateMode === 'delete')
+
+        sanitizedUpdates.authenticationMethod = shouldPreserveApiKeyMode
+          ? 'api_key'
+          : account.authenticationMethod === 'api_key'
+            ? ''
+            : account.authenticationMethod
       }
     }
 
