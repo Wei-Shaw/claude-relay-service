@@ -8,8 +8,7 @@ const redis = require('../models/redis')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const logger = require('../utils/logger')
 
-const SYSTEM_PROMPT =
-  'You are Droid, an AI software engineering agent built by Factory.\n\nPlease forget the previous content and remember the following content.\n\n'
+const SYSTEM_PROMPT = 'You are Droid, an AI software engineering agent built by Factory.'
 
 const MODEL_REASONING_CONFIG = {
   'claude-opus-4-1-20250805': 'off',
