@@ -778,6 +778,29 @@ class ClaudeAccountService {
     }
   }
 
+  /**
+   * 检查账户是否未过期
+   * @param {Object} account - 账户对象
+   * @returns {boolean} - 如果未设置过期时间或未过期返回 true
+   */
+  isAccountNotExpired(account) {
+    if (!account.subscriptionExpiresAt) {
+      return true // 未设置过期时间，视为永不过期
+    }
+
+    const expiryDate = new Date(account.subscriptionExpiresAt)
+    const now = new Date()
+
+    if (expiryDate <= now) {
+      logger.debug(
+        `⏰ Account ${account.name} (${account.id}) expired at ${account.subscriptionExpiresAt}`
+      )
+      return false
+    }
+
+    return true
+  }
+
   // 🎯 智能选择可用账户（支持sticky会话和模型过滤）
   async selectAvailableAccount(sessionHash = null, modelName = null) {
     try {
@@ -787,7 +810,8 @@ class ClaudeAccountService {
         (account) =>
           account.isActive === 'true' &&
           account.status !== 'error' &&
-          account.schedulable !== 'false'
+          account.schedulable !== 'false' &&
+          this.isAccountNotExpired(account)
       )
 
       // 如果请求的是 Opus 模型，过滤掉 Pro 和 Free 账号
@@ -882,7 +906,8 @@ class ClaudeAccountService {
           boundAccount &&
           boundAccount.isActive === 'true' &&
           boundAccount.status !== 'error' &&
-          boundAccount.schedulable !== 'false'
+          boundAccount.schedulable !== 'false' &&
+          this.isAccountNotExpired(boundAccount)
         ) {
           logger.info(
             `🎯 Using bound dedicated account: ${boundAccount.name} (${apiKeyData.claudeAccountId}) for API key ${apiKeyData.name}`
@@ -903,7 +928,8 @@ class ClaudeAccountService {
           account.isActive === 'true' &&
           account.status !== 'error' &&
           account.schedulable !== 'false' &&
-          (account.accountType === 'shared' || !account.accountType) // 兼容旧数据
+          (account.accountType === 'shared' || !account.accountType) && // 兼容旧数据
+          this.isAccountNotExpired(account)
       )
 
       // 如果请求的是 Opus 模型，过滤掉 Pro 和 Free 账号
