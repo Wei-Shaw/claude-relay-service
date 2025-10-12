@@ -207,6 +207,21 @@
                 <i v-else class="fas fa-sort ml-1 text-gray-400" />
               </th>
               <th
+                class="w-[12%] min-w-[110px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                @click="sortAccounts('expiresAt')"
+              >
+                到期时间
+                <i
+                  v-if="accountsSortBy === 'expiresAt'"
+                  :class="[
+                    'fas',
+                    accountsSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down',
+                    'ml-1'
+                  ]"
+                />
+                <i v-else class="fas fa-sort ml-1 text-gray-400" />
+              </th>
+              <th
                 class="w-[12%] min-w-[100px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                 @click="sortAccounts('status')"
               >
@@ -568,6 +583,49 @@
               </td>
               <td class="whitespace-nowrap px-3 py-4">
                 <div class="flex flex-col gap-1">
+                  <!-- 已设置过期时间 -->
+                  <span v-if="account.expiresAt">
+                    <span
+                      v-if="isExpired(account.expiresAt)"
+                      class="inline-flex cursor-pointer items-center text-red-600 hover:underline"
+                      style="font-size: 13px"
+                      @click.stop="startEditAccountExpiry(account)"
+                    >
+                      <i class="fas fa-exclamation-circle mr-1 text-xs" />
+                      已过期
+                    </span>
+                    <span
+                      v-else-if="isExpiringSoon(account.expiresAt)"
+                      class="inline-flex cursor-pointer items-center text-orange-600 hover:underline"
+                      style="font-size: 13px"
+                      @click.stop="startEditAccountExpiry(account)"
+                    >
+                      <i class="fas fa-clock mr-1 text-xs" />
+                      {{ formatExpireDate(account.expiresAt) }}
+                    </span>
+                    <span
+                      v-else
+                      class="cursor-pointer text-gray-600 hover:underline dark:text-gray-400"
+                      style="font-size: 13px"
+                      @click.stop="startEditAccountExpiry(account)"
+                    >
+                      {{ formatExpireDate(account.expiresAt) }}
+                    </span>
+                  </span>
+                  <!-- 永不过期 -->
+                  <span
+                    v-else
+                    class="inline-flex cursor-pointer items-center text-gray-400 hover:underline dark:text-gray-500"
+                    style="font-size: 13px"
+                    @click.stop="startEditAccountExpiry(account)"
+                  >
+                    <i class="fas fa-infinity mr-1 text-xs" />
+                    永不过期
+                  </span>
+                </div>
+              </td>
+              <td class="whitespace-nowrap px-3 py-4">
+                <div class="flex flex-col gap-1">
                   <span
                     :class="[
                       'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold',
@@ -627,18 +685,8 @@
                     >
                   </span>
                   <span
-                    v-if="isOpusRateLimited(account)"
-                    class="inline-flex items-center whitespace-nowrap rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-800 dark:bg-orange-900/30 dark:text-orange-300"
-                  >
-                    <i class="fas fa-gem mr-1 flex-shrink-0" />
-                    <span class="flex-shrink-0">Opus限流</span>
-                    <span v-if="account.opusRateLimitEndAt" class="ml-1 flex-shrink-0">
-                      ({{ formatOpusLimitEndTime(account.opusRateLimitEndAt) }})
-                    </span>
-                  </span>
-                  <span
                     v-if="account.schedulable === false"
-                    class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700 dark:bg-gray-700 dark:text-gray-300"
+                    class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700"
                   >
                     <i class="fas fa-pause-circle mr-1" />
                     不可调度
@@ -1663,6 +1711,15 @@
       :summary="accountUsageSummary"
       @close="closeAccountUsageModal"
     />
+
+    <!-- 账户过期时间编辑弹窗 -->
+    <AccountExpiryEditModal
+      ref="expiryEditModalRef"
+      :account="editingExpiryAccount || { id: null, expiresAt: null, name: '' }"
+      :show="!!editingExpiryAccount"
+      @close="closeAccountExpiryEdit"
+      @save="handleSaveAccountExpiry"
+    />
   </div>
 </template>
 
@@ -1674,6 +1731,7 @@ import { useConfirm } from '@/composables/useConfirm'
 import AccountForm from '@/components/accounts/AccountForm.vue'
 import CcrAccountForm from '@/components/accounts/CcrAccountForm.vue'
 import AccountUsageDetailModal from '@/components/accounts/AccountUsageDetailModal.vue'
+import AccountExpiryEditModal from '@/components/accounts/AccountExpiryEditModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 
@@ -1729,6 +1787,10 @@ const supportedUsagePlatforms = [
   'gemini',
   'droid'
 ]
+
+// 过期时间编辑弹窗状态
+const editingExpiryAccount = ref(null)
+const expiryEditModalRef = ref(null)
 
 // 缓存状态标志
 const apiKeysLoaded = ref(false)
@@ -2649,54 +2711,6 @@ const formatRateLimitTime = (minutes) => {
     // 不到1小时，只显示分钟
     return `${mins}分钟`
   }
-}
-
-// 检查账户是否处于 Opus 限流状态
-const isOpusRateLimited = (account) => {
-  if (!account.opusRateLimitEndAt) {
-    return false
-  }
-  const endTime = new Date(account.opusRateLimitEndAt)
-  const now = new Date()
-  return endTime > now
-}
-
-// 格式化 Opus 限流结束时间
-const formatOpusLimitEndTime = (endTimeStr) => {
-  if (!endTimeStr) return ''
-
-  const endTime = new Date(endTimeStr)
-  const now = new Date()
-
-  // 如果已经过期，返回"已解除"
-  if (endTime <= now) {
-    return '已解除'
-  }
-
-  // 计算剩余时间（毫秒）
-  const remainingMs = endTime - now
-  const remainingMinutes = Math.floor(remainingMs / (1000 * 60))
-
-  // 计算天数、小时和分钟
-  const days = Math.floor(remainingMinutes / 1440)
-  const remainingAfterDays = remainingMinutes % 1440
-  const hours = Math.floor(remainingAfterDays / 60)
-  const mins = remainingAfterDays % 60
-
-  // 格式化显示
-  const parts = []
-  if (days > 0) {
-    parts.push(`${days}天`)
-  }
-  if (hours > 0) {
-    parts.push(`${hours}小时`)
-  }
-  if (mins > 0 && days === 0) {
-    // 只有在天数为0时才显示分钟
-    parts.push(`${mins}分钟`)
-  }
-
-  return parts.join('')
 }
 
 // 打开创建账户模态框
@@ -3676,6 +3690,105 @@ watch(paginatedAccounts, () => {
 watch(accounts, () => {
   cleanupSelectedAccounts()
 })
+// 到期时间相关方法
+const formatExpireDate = (dateString) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  })
+}
+
+const isExpired = (expiresAt) => {
+  if (!expiresAt) return false
+  return new Date(expiresAt) < new Date()
+}
+
+const isExpiringSoon = (expiresAt) => {
+  if (!expiresAt) return false
+  const now = new Date()
+  const expireDate = new Date(expiresAt)
+  const daysUntilExpire = (expireDate - now) / (1000 * 60 * 60 * 24)
+  return daysUntilExpire > 0 && daysUntilExpire <= 7
+}
+
+// 开始编辑账户过期时间
+const startEditAccountExpiry = (account) => {
+  editingExpiryAccount.value = account
+}
+
+// 关闭账户过期时间编辑
+const closeAccountExpiryEdit = () => {
+  editingExpiryAccount.value = null
+}
+
+// 根据账户平台解析更新端点
+const resolveAccountUpdateEndpoint = (account) => {
+  switch (account.platform) {
+    case 'claude':
+      return `/admin/claude-accounts/${account.id}`
+    case 'claude-console':
+      return `/admin/claude-console-accounts/${account.id}`
+    case 'bedrock':
+      return `/admin/bedrock-accounts/${account.id}`
+    case 'openai':
+      return `/admin/openai-accounts/${account.id}`
+    case 'azure_openai':
+      return `/admin/azure-openai-accounts/${account.id}`
+    case 'openai-responses':
+      return `/admin/openai-responses-accounts/${account.id}`
+    case 'ccr':
+      return `/admin/ccr-accounts/${account.id}`
+    case 'gemini':
+      return `/admin/gemini-accounts/${account.id}`
+    case 'droid':
+      return `/admin/droid-accounts/${account.id}`
+    default:
+      throw new Error(`Unsupported platform: ${account.platform}`)
+  }
+}
+
+// 保存账户过期时间
+const handleSaveAccountExpiry = async ({ accountId, expiresAt }) => {
+  try {
+    // 找到对应的账户以获取平台信息
+    const account = accounts.value.find((acc) => acc.id === accountId)
+    if (!account) {
+      showToast('账户不存在', 'error')
+      if (expiryEditModalRef.value) {
+        expiryEditModalRef.value.resetSaving()
+      }
+      return
+    }
+
+    // 根据平台动态选择端点
+    const endpoint = resolveAccountUpdateEndpoint(account)
+    const data = await apiClient.put(endpoint, {
+      expiresAt: expiresAt || null
+    })
+
+    if (data.success) {
+      showToast('账户到期时间已更新', 'success')
+      // 更新本地数据
+      account.expiresAt = expiresAt || null
+      closeAccountExpiryEdit()
+    } else {
+      showToast(data.message || '更新失败', 'error')
+      // 重置保存状态
+      if (expiryEditModalRef.value) {
+        expiryEditModalRef.value.resetSaving()
+      }
+    }
+  } catch (error) {
+    showToast(error.message || '更新失败', 'error')
+    // 重置保存状态
+    if (expiryEditModalRef.value) {
+      expiryEditModalRef.value.resetSaving()
+    }
+  }
+}
 
 onMounted(() => {
   // 首次加载时强制刷新所有数据
@@ -3685,7 +3798,6 @@ onMounted(() => {
 
 <style scoped>
 .table-container {
-  overflow-x: auto;
   border-radius: 12px;
   border: 1px solid rgba(0, 0, 0, 0.05);
 }
@@ -3717,12 +3829,6 @@ onMounted(() => {
 }
 .accounts-container {
   min-height: calc(100vh - 300px);
-}
-
-.table-container {
-  overflow-x: auto;
-  border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .table-row {

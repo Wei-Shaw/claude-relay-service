@@ -31,25 +31,10 @@ class OpenAIToClaudeConverter {
       stream: openaiRequest.stream || false
     }
 
-    // 定义 Claude Code 的默认系统提示词
+    // Claude Code 必需的系统消息
     const claudeCodeSystemMessage = "You are Claude Code, Anthropic's official CLI for Claude."
 
-    // 如果 OpenAI 请求中包含系统消息,提取并检查
-    const systemMessage = this._extractSystemMessage(openaiRequest.messages)
-    if (systemMessage && systemMessage.includes('You are currently in Xcode')) {
-      // Xcode 系统提示词
-      claudeRequest.system = systemMessage
-      logger.info(
-        `🔍 Xcode request detected, using Xcode system prompt (${systemMessage.length} chars)`
-      )
-      logger.debug(`📋 System prompt preview: ${systemMessage.substring(0, 150)}...`)
-    } else {
-      // 使用 Claude Code 默认系统提示词
-      claudeRequest.system = claudeCodeSystemMessage
-      logger.debug(
-        `📋 Using Claude Code default system prompt${systemMessage ? ' (ignored custom prompt)' : ''}`
-      )
-    }
+    claudeRequest.system = claudeCodeSystemMessage
 
     // 处理停止序列
     if (openaiRequest.stop) {

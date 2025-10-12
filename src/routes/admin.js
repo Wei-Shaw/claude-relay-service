@@ -2266,7 +2266,8 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       autoStopOnWarning,
       useUnifiedUserAgent,
       useUnifiedClientId,
-      unifiedClientId
+      unifiedClientId,
+      expiresAt
     } = req.body
 
     if (!name) {
@@ -2309,7 +2310,8 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       autoStopOnWarning: autoStopOnWarning === true, // 默认为false
       useUnifiedUserAgent: useUnifiedUserAgent === true, // 默认为false
       useUnifiedClientId: useUnifiedClientId === true, // 默认为false
-      unifiedClientId: unifiedClientId || '' // 统一的客户端标识
+      unifiedClientId: unifiedClientId || '', // 统一的客户端标识
+      expiresAt: expiresAt || null // 账户订阅到期时间
     })
 
     // 如果是分组类型，将账户添加到分组
@@ -2396,7 +2398,14 @@ router.put('/claude-accounts/:accountId', authenticateAdmin, async (req, res) =>
       }
     }
 
-    await claudeAccountService.updateAccount(accountId, updates)
+    // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
+    const mappedUpdates = { ...updates }
+    if ('expiresAt' in mappedUpdates) {
+      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
+      delete mappedUpdates.expiresAt
+    }
+
+    await claudeAccountService.updateAccount(accountId, mappedUpdates)
 
     logger.success(`📝 Admin updated Claude account: ${accountId}`)
     return res.json({ success: true, message: 'Claude account updated successfully' })
@@ -2786,7 +2795,14 @@ router.put('/claude-console-accounts/:accountId', authenticateAdmin, async (req,
       }
     }
 
-    await claudeConsoleAccountService.updateAccount(accountId, updates)
+    // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
+    const mappedUpdates = { ...updates }
+    if ('expiresAt' in mappedUpdates) {
+      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
+      delete mappedUpdates.expiresAt
+    }
+
+    await claudeConsoleAccountService.updateAccount(accountId, mappedUpdates)
 
     logger.success(`📝 Admin updated Claude Console account: ${accountId}`)
     return res.json({ success: true, message: 'Claude Console account updated successfully' })
@@ -3196,7 +3212,14 @@ router.put('/ccr-accounts/:accountId', authenticateAdmin, async (req, res) => {
       }
     }
 
-    await ccrAccountService.updateAccount(accountId, updates)
+    // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
+    const mappedUpdates = { ...updates }
+    if ('expiresAt' in mappedUpdates) {
+      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
+      delete mappedUpdates.expiresAt
+    }
+
+    await ccrAccountService.updateAccount(accountId, mappedUpdates)
 
     logger.success(`📝 Admin updated CCR account: ${accountId}`)
     return res.json({ success: true, message: 'CCR account updated successfully' })
@@ -3557,7 +3580,14 @@ router.put('/bedrock-accounts/:accountId', authenticateAdmin, async (req, res) =
       })
     }
 
-    const result = await bedrockAccountService.updateAccount(accountId, updates)
+    // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
+    const mappedUpdates = { ...updates }
+    if ('expiresAt' in mappedUpdates) {
+      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
+      delete mappedUpdates.expiresAt
+    }
+
+    const result = await bedrockAccountService.updateAccount(accountId, mappedUpdates)
 
     if (!result.success) {
       return res
@@ -3882,6 +3912,8 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
 
           return {
             ...account,
+            // 映射字段：使用 subscriptionExpiresAt 作为前端显示的 expiresAt
+            expiresAt: account.subscriptionExpiresAt || null,
             groupInfos,
             usage: {
               daily: usageStats.daily,
@@ -3899,6 +3931,8 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
             const groupInfos = await accountGroupService.getAccountGroups(account.id)
             return {
               ...account,
+              // 映射字段：使用 subscriptionExpiresAt 作为前端显示的 expiresAt
+              expiresAt: account.subscriptionExpiresAt || null,
               groupInfos,
               usage: {
                 daily: { tokens: 0, requests: 0, allTokens: 0 },
@@ -4023,7 +4057,14 @@ router.put('/gemini-accounts/:accountId', authenticateAdmin, async (req, res) =>
       }
     }
 
-    const updatedAccount = await geminiAccountService.updateAccount(accountId, updates)
+    // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
+    const mappedUpdates = { ...updates }
+    if ('expiresAt' in mappedUpdates) {
+      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
+      delete mappedUpdates.expiresAt
+    }
+
+    const updatedAccount = await geminiAccountService.updateAccount(accountId, mappedUpdates)
 
     logger.success(`📝 Admin updated Gemini account: ${accountId}`)
     return res.json({ success: true, data: updatedAccount })
@@ -7530,6 +7571,13 @@ router.put('/openai-accounts/:id', authenticateAdmin, async (req, res) => {
           : currentAccount.emailVerified
     }
 
+    // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt (订阅过期时间)
+    // 注意：这里不影响上面 OAuth token 的 expiresAt 字段
+    if ('expiresAt' in updates && !updates.openaiOauth?.expires_in) {
+      updateData.subscriptionExpiresAt = updates.expiresAt
+      delete updateData.expiresAt
+    }
+
     const updatedAccount = await openaiAccountService.updateAccount(id, updateData)
 
     // 如果需要刷新但不强制成功（非关键更新）
@@ -7916,7 +7964,14 @@ router.put('/azure-openai-accounts/:id', authenticateAdmin, async (req, res) => 
     const { id } = req.params
     const updates = req.body
 
-    const account = await azureOpenaiAccountService.updateAccount(id, updates)
+    // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
+    const mappedUpdates = { ...updates }
+    if ('expiresAt' in mappedUpdates) {
+      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
+      delete mappedUpdates.expiresAt
+    }
+
+    const account = await azureOpenaiAccountService.updateAccount(id, mappedUpdates)
 
     res.json({
       success: true,
@@ -8289,7 +8344,14 @@ router.put('/openai-responses-accounts/:id', authenticateAdmin, async (req, res)
       updates.priority = priority.toString()
     }
 
-    const result = await openaiResponsesAccountService.updateAccount(id, updates)
+    // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
+    const mappedUpdates = { ...updates }
+    if ('expiresAt' in mappedUpdates) {
+      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
+      delete mappedUpdates.expiresAt
+    }
+
+    const result = await openaiResponsesAccountService.updateAccount(id, mappedUpdates)
 
     if (!result.success) {
       return res.status(400).json(result)
@@ -8655,6 +8717,9 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
 
           return {
             ...account,
+            // 映射字段：使用 subscriptionExpiresAt 作为前端显示的 expiresAt
+            // OAuth token 的原始 expiresAt 保留在内部使用
+            expiresAt: account.subscriptionExpiresAt || null,
             schedulable: account.schedulable === 'true',
             boundApiKeysCount,
             groupInfos,
@@ -8668,6 +8733,8 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
           logger.warn(`Failed to get stats for Droid account ${account.id}:`, error.message)
           return {
             ...account,
+            // 映射字段：使用 subscriptionExpiresAt 作为前端显示的 expiresAt
+            expiresAt: account.subscriptionExpiresAt || null,
             boundApiKeysCount: 0,
             groupInfos: [],
             usage: {
@@ -8782,7 +8849,14 @@ router.put('/droid-accounts/:id', authenticateAdmin, async (req, res) => {
       updates.accountType = targetAccountType
     }
 
-    const account = await droidAccountService.updateAccount(id, updates)
+    // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
+    const mappedUpdates = { ...updates }
+    if ('expiresAt' in mappedUpdates) {
+      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
+      delete mappedUpdates.expiresAt
+    }
+
+    const account = await droidAccountService.updateAccount(id, mappedUpdates)
 
     try {
       if (currentAccount.accountType === 'group' && targetAccountType !== 'group') {
