@@ -52,7 +52,9 @@ class ClaudeConsoleAccountService {
       accountType = 'shared', // 'dedicated' or 'shared'
       schedulable = true, // 是否可被调度
       dailyQuota = 0, // 每日额度限制（美元），0表示不限制
-      quotaResetTime = '00:00' // 额度重置时间（HH:mm格式）
+      quotaResetTime = '00:00', // 额度重置时间（HH:mm格式）
+      dailyLimit = 0, // 每日请求次数限制，0表示不限制
+      subscriptionExpiresAt = null // 账户到期时间（ISO 8601格式）
     } = options
 
     // 验证必填字段
@@ -91,10 +93,14 @@ class ClaudeConsoleAccountService {
       // 额度管理相关
       dailyQuota: dailyQuota.toString(), // 每日额度限制（美元）
       dailyUsage: '0', // 当日使用金额（美元）
+      dailyLimit: dailyLimit.toString(), // 每日请求次数限制
+      dailyRequestCount: '0', // 当日请求次数
       // 使用与统计一致的时区日期，避免边界问题
       lastResetDate: redis.getDateStringInTimezone(), // 最后重置日期（按配置时区）
       quotaResetTime, // 额度重置时间
-      quotaStoppedAt: '' // 因额度停用的时间
+      quotaStoppedAt: '', // 因额度停用的时间
+      // 订阅到期时间
+      subscriptionExpiresAt: subscriptionExpiresAt || '' // 账户到期时间（ISO 8601格式）
     }
 
     const client = redis.getClientSafe()
@@ -128,9 +134,13 @@ class ClaudeConsoleAccountService {
       createdAt: accountData.createdAt,
       dailyQuota,
       dailyUsage: 0,
+      dailyLimit,
+      dailyRequestCount: 0,
       lastResetDate: accountData.lastResetDate,
       quotaResetTime,
-      quotaStoppedAt: null
+      quotaStoppedAt: null,
+      subscriptionExpiresAt: subscriptionExpiresAt || null,
+      expiresAt: subscriptionExpiresAt || null // 前端使用的字段名
     }
   }
 
@@ -171,9 +181,14 @@ class ClaudeConsoleAccountService {
             // 额度管理相关
             dailyQuota: parseFloat(accountData.dailyQuota || '0'),
             dailyUsage: parseFloat(accountData.dailyUsage || '0'),
+            dailyLimit: parseInt(accountData.dailyLimit || '0'),
+            dailyRequestCount: parseInt(accountData.dailyRequestCount || '0'),
             lastResetDate: accountData.lastResetDate || '',
             quotaResetTime: accountData.quotaResetTime || '00:00',
-            quotaStoppedAt: accountData.quotaStoppedAt || null
+            quotaStoppedAt: accountData.quotaStoppedAt || null,
+            // 订阅到期时间
+            subscriptionExpiresAt: accountData.subscriptionExpiresAt || null,
+            expiresAt: accountData.subscriptionExpiresAt || null // 前端使用的字段名
           })
         }
       }
@@ -311,11 +326,21 @@ class ClaudeConsoleAccountService {
       if (updates.dailyUsage !== undefined) {
         updatedData.dailyUsage = updates.dailyUsage.toString()
       }
+      if (updates.dailyLimit !== undefined) {
+        updatedData.dailyLimit = updates.dailyLimit.toString()
+      }
+      if (updates.dailyRequestCount !== undefined) {
+        updatedData.dailyRequestCount = updates.dailyRequestCount.toString()
+      }
       if (updates.lastResetDate !== undefined) {
         updatedData.lastResetDate = updates.lastResetDate
       }
       if (updates.quotaStoppedAt !== undefined) {
         updatedData.quotaStoppedAt = updates.quotaStoppedAt
+      }
+      // 订阅到期时间字段
+      if (updates.subscriptionExpiresAt !== undefined) {
+        updatedData.subscriptionExpiresAt = updates.subscriptionExpiresAt || ''
       }
 
       // 处理账户类型变更

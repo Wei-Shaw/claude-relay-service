@@ -1142,6 +1142,23 @@
                 </div>
               </div>
 
+              <!-- 每日请求限制字段 -->
+              <div>
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  每日请求次数限制
+                </label>
+                <input
+                  v-model.number="form.dailyLimit"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  min="0"
+                  placeholder="0 表示不限制"
+                  type="number"
+                />
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  设置每日最大请求次数，0 表示不限制
+                </p>
+              </div>
+
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >模型限制 (可选)</label
@@ -2457,6 +2474,23 @@
               </div>
             </div>
 
+            <!-- 每日请求限制字段 -->
+            <div>
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                每日请求次数限制
+              </label>
+              <input
+                v-model.number="form.dailyLimit"
+                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                min="0"
+                placeholder="0 表示不限制"
+                type="number"
+              />
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                设置每日最大请求次数，0 表示不限制
+              </p>
+            </div>
+
             <!-- 当前使用情况（仅编辑模式显示） -->
             <div
               v-if="isEdit && form.dailyQuota > 0"
@@ -3427,6 +3461,7 @@ const form = ref({
   // 额度管理字段
   dailyQuota: props.account?.dailyQuota || 0,
   dailyUsage: props.account?.dailyUsage || 0,
+  dailyLimit: props.account?.dailyLimit || 0,
   quotaResetTime: props.account?.quotaResetTime || '00:00',
   // Bedrock 特定字段
   accessKeyId: props.account?.accessKeyId || '',
@@ -3450,8 +3485,14 @@ const form = ref({
   customExpireDate: (() => {
     // 编辑时根据expiresAt初始化customExpireDate
     if (props.account?.expiresAt) {
-      // 转换ISO时间为datetime-local格式 (YYYY-MM-DDTHH:mm)
-      return new Date(props.account.expiresAt).toISOString().slice(0, 16)
+      // 转换为本地时间字符串（YYYY-MM-DDTHH:mm格式）
+      const date = new Date(props.account.expiresAt)
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const hours = String(date.getHours()).padStart(2, '0')
+      const minutes = String(date.getMinutes()).padStart(2, '0')
+      return `${year}-${month}-${day}T${hours}:${minutes}`
     }
     return ''
   })(),
@@ -4289,7 +4330,10 @@ const createAccount = async () => {
       data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
       // 额度管理字段
       data.dailyQuota = form.value.dailyQuota || 0
+      data.dailyLimit = form.value.dailyLimit || 0
       data.quotaResetTime = form.value.quotaResetTime || '00:00'
+      // 到期时间
+      data.subscriptionExpiresAt = form.value.expiresAt || null
     } else if (form.value.platform === 'openai-responses') {
       // OpenAI-Responses 账户特定数据
       data.baseApi = form.value.baseApi
@@ -4298,6 +4342,7 @@ const createAccount = async () => {
       data.priority = form.value.priority || 50
       data.rateLimitDuration = 60 // 默认值60，不从用户输入获取
       data.dailyQuota = form.value.dailyQuota || 0
+      data.dailyLimit = form.value.dailyLimit || 0
       data.quotaResetTime = form.value.quotaResetTime || '00:00'
     } else if (form.value.platform === 'bedrock') {
       // Bedrock 账户特定数据 - 构造 awsCredentials 对象
@@ -4591,6 +4636,7 @@ const updateAccount = async () => {
       data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
       // 额度管理字段
       data.dailyQuota = form.value.dailyQuota || 0
+      data.dailyLimit = form.value.dailyLimit || 0
       data.quotaResetTime = form.value.quotaResetTime || '00:00'
     }
 
@@ -4604,6 +4650,7 @@ const updateAccount = async () => {
       data.priority = form.value.priority || 50
       // 编辑时不上传 rateLimitDuration，保持原值
       data.dailyQuota = form.value.dailyQuota || 0
+      data.dailyLimit = form.value.dailyLimit || 0
       data.quotaResetTime = form.value.quotaResetTime || '00:00'
     }
 
@@ -5278,11 +5325,16 @@ const handleUnifiedClientIdChange = () => {
 }
 
 // 到期时间相关方法
-// 计算最小日期时间
+// 计算最小日期时间（本地时间）
 const minDateTime = computed(() => {
   const now = new Date()
   now.setMinutes(now.getMinutes() + 1)
-  return now.toISOString().slice(0, 16)
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  const hours = String(now.getHours()).padStart(2, '0')
+  const minutes = String(now.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}`
 })
 
 // 更新账户过期时间

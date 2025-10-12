@@ -220,11 +220,16 @@ const quickOptions = [
   { value: '730d', label: '2 年' }
 ]
 
-// 计算最小日期时间
+// 计算最小日期时间（本地时间）
 const minDateTime = computed(() => {
   const now = new Date()
   now.setMinutes(now.getMinutes() + 1)
-  return now.toISOString().slice(0, 16)
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  const hours = String(now.getHours()).padStart(2, '0')
+  const minutes = String(now.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}`
 })
 
 // 监听显示状态，初始化表单
@@ -253,7 +258,14 @@ const initializeForm = () => {
 
   if (props.account.expiresAt) {
     localForm.expireDuration = 'custom'
-    localForm.customExpireDate = new Date(props.account.expiresAt).toISOString().slice(0, 16)
+    // 转换为本地时间字符串（YYYY-MM-DDTHH:mm格式）
+    const date = new Date(props.account.expiresAt)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    localForm.customExpireDate = `${year}-${month}-${day}T${hours}:${minutes}`
     localForm.expiresAt = props.account.expiresAt
   } else {
     localForm.expireDuration = ''

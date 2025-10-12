@@ -2684,7 +2684,9 @@ router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
       accountType,
       groupId,
       dailyQuota,
-      quotaResetTime
+      quotaResetTime,
+      dailyLimit,
+      subscriptionExpiresAt
     } = req.body
 
     if (!name || !apiUrl || !apiKey) {
@@ -2721,7 +2723,9 @@ router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
       proxy,
       accountType: accountType || 'shared',
       dailyQuota: dailyQuota || 0,
-      quotaResetTime: quotaResetTime || '00:00'
+      quotaResetTime: quotaResetTime || '00:00',
+      dailyLimit: dailyLimit || 0,
+      subscriptionExpiresAt: subscriptionExpiresAt || null
     })
 
     // 如果是分组类型，将账户添加到分组（CCR 归属 Claude 平台分组）
