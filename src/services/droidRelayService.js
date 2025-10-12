@@ -1012,24 +1012,19 @@ class DroidRelayService {
         if ('thinking' in processedBody) {
           delete processedBody.thinking
         }
-      } else if (
-        processedBody.thinking &&
-        processedBody.thinking.type === 'enabled' &&
-        hasTemperatureField
-      ) {
-        const parsedTemperature =
-          typeof processedBody.temperature === 'string'
-            ? parseFloat(processedBody.temperature)
-            : processedBody.temperature
+      } else if (processedBody.thinking && processedBody.thinking.type === 'enabled') {
+        if (hasTemperatureField) {
+          const parsedTemperature =
+            typeof processedBody.temperature === 'string'
+              ? parseFloat(processedBody.temperature)
+              : processedBody.temperature
 
-        if (typeof parsedTemperature === 'number' && !Number.isNaN(parsedTemperature)) {
-          if (parsedTemperature <= 0) {
-            // 当开启 thinking 时，temperature 不允许为 0
-            processedBody.temperature = 1
+          if (typeof parsedTemperature !== 'number' || Number.isNaN(parsedTemperature)) {
+            delete processedBody.temperature
           }
-        } else {
-          delete processedBody.temperature
         }
+
+        processedBody.temperature = 1
       }
     }
 
