@@ -641,8 +641,8 @@
               </p>
             </div>
 
-            <!-- 到期时间 -->
-            <div>
+            <!-- 到期时间 - 仅在创建账户时显示，编辑时使用独立的过期时间编辑弹窗 -->
+            <div v-if="!isEdit">
               <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >到期时间 (可选)</label
               >
@@ -2112,8 +2112,8 @@
             </p>
           </div>
 
-          <!-- 到期时间 -->
-          <div>
+          <!-- 到期时间 - 仅在创建账户时显示，编辑时使用独立的过期时间编辑弹窗 -->
+          <div v-if="!isEdit">
             <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
               >到期时间 (可选)</label
             >
