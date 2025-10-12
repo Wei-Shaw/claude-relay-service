@@ -73,7 +73,8 @@ class ClaudeAccountService {
       autoStopOnWarning = false, // 5小时使用量接近限制时自动停止调度
       useUnifiedUserAgent = false, // 是否使用统一Claude Code版本的User-Agent
       useUnifiedClientId = false, // 是否使用统一的客户端标识
-      unifiedClientId = '' // 统一的客户端标识
+      unifiedClientId = '', // 统一的客户端标识
+      expiresAt = null // 账户订阅到期时间
     } = options
 
     const accountId = uuidv4()
@@ -113,7 +114,9 @@ class ClaudeAccountService {
           ? JSON.stringify(subscriptionInfo)
           : claudeAiOauth.subscriptionInfo
             ? JSON.stringify(claudeAiOauth.subscriptionInfo)
-            : ''
+            : '',
+        // 账户订阅到期时间
+        subscriptionExpiresAt: expiresAt || ''
       }
     } else {
       // 兼容旧格式
@@ -141,7 +144,9 @@ class ClaudeAccountService {
         autoStopOnWarning: autoStopOnWarning.toString(), // 5小时使用量接近限制时自动停止调度
         useUnifiedUserAgent: useUnifiedUserAgent.toString(), // 是否使用统一Claude Code版本的User-Agent
         // 手动设置的订阅信息
-        subscriptionInfo: subscriptionInfo ? JSON.stringify(subscriptionInfo) : ''
+        subscriptionInfo: subscriptionInfo ? JSON.stringify(subscriptionInfo) : '',
+        // 账户订阅到期时间
+        subscriptionExpiresAt: expiresAt || ''
       }
     }
 
@@ -486,7 +491,7 @@ class ClaudeAccountService {
             createdAt: account.createdAt,
             lastUsedAt: account.lastUsedAt,
             lastRefreshAt: account.lastRefreshAt,
-            expiresAt: account.expiresAt,
+            expiresAt: account.subscriptionExpiresAt || null, // 账户订阅到期时间
             // 添加 scopes 字段用于判断认证方式
             // 处理空字符串的情况，避免返回 ['']
             scopes: account.scopes && account.scopes.trim() ? account.scopes.split(' ') : [],
@@ -618,7 +623,8 @@ class ClaudeAccountService {
         'autoStopOnWarning',
         'useUnifiedUserAgent',
         'useUnifiedClientId',
-        'unifiedClientId'
+        'unifiedClientId',
+        'subscriptionExpiresAt'
       ]
       const updatedData = { ...accountData }
       let shouldClearAutoStopFields = false
@@ -637,6 +643,9 @@ class ClaudeAccountService {
           } else if (field === 'subscriptionInfo') {
             // 处理订阅信息更新
             updatedData[field] = typeof value === 'string' ? value : JSON.stringify(value)
+          } else if (field === 'subscriptionExpiresAt') {
+            // 处理订阅到期时间，允许 null 值（永不过期）
+            updatedData[field] = value ? value.toString() : ''
           } else if (field === 'claudeAiOauth') {
             // 更新 Claude AI OAuth 数据
             if (value) {
@@ -650,7 +659,7 @@ class ClaudeAccountService {
               updatedData.lastRefreshAt = new Date().toISOString()
             }
           } else {
-            updatedData[field] = value.toString()
+            updatedData[field] = value !== null && value !== undefined ? value.toString() : ''
           }
         }
       }
