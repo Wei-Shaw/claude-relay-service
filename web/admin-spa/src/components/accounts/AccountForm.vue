@@ -1773,6 +1773,9 @@
                 <ul class="mt-1 list-disc space-y-1 pl-4">
                   <li>新会话将随机命中一个 Key，并在会话有效期内保持粘性。</li>
                   <li>若某 Key 失效，会自动切换到剩余可用 Key，最大化成功率。</li>
+                  <li>
+                    若上游返回 4xx 错误码，该 Key 会被自动移除；全部 Key 清空后账号将暂停调度。
+                  </li>
                 </ul>
               </div>
             </div>
@@ -2928,10 +2931,10 @@
                 </h5>
                 <p class="mb-1 text-sm text-purple-800 dark:text-purple-200">
                   当前已保存 <strong>{{ existingApiKeyCount }}</strong> 条 API Key。您可以追加新的
-                  Key 或使用下方选项清空后重新填写。
+                  Key，或通过下方模式快速覆盖、删除指定 Key。
                 </p>
                 <p class="text-xs text-purple-700 dark:text-purple-300">
-                  留空表示保留现有 Key 不变；填写内容后将覆盖或追加（视清空选项而定）。
+                  留空表示保留现有 Key 不变；根据所选模式决定是追加、覆盖还是删除输入的 Key。
                 </p>
               </div>
             </div>
@@ -2945,7 +2948,7 @@
                   v-model="form.apiKeysInput"
                   class="form-input w-full resize-none border-gray-300 font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                   :class="{ 'border-red-500': errors.apiKeys }"
-                  placeholder="留空表示不更新；每行一个 API Key"
+                  placeholder="根据模式填写；每行一个 API Key"
                   rows="6"
                 />
                 <p v-if="errors.apiKeys" class="mt-1 text-xs text-red-500">
@@ -2953,16 +2956,41 @@
                 </p>
               </div>
 
-              <label
-                class="flex cursor-pointer items-center gap-2 rounded-md border border-purple-200 bg-white/80 px-3 py-2 text-sm text-purple-800 transition-colors hover:border-purple-300 dark:border-purple-700 dark:bg-purple-800/20 dark:text-purple-100"
-              >
-                <input
-                  v-model="form.clearExistingApiKeys"
-                  class="rounded border-purple-300 text-purple-600 focus:ring-purple-500 dark:border-purple-500 dark:bg-purple-900"
-                  type="checkbox"
-                />
-                <span>清空已有 API Key 后再应用上方的 Key 列表</span>
-              </label>
+              <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-sm font-semibold text-purple-800 dark:text-purple-100"
+                    >API Key 更新模式</span
+                  >
+                  <span class="text-xs text-purple-600 dark:text-purple-300">
+                    {{ currentApiKeyModeLabel }}
+                  </span>
+                </div>
+                <div
+                  class="relative grid h-11 grid-cols-3 overflow-hidden rounded-2xl border border-purple-200/80 bg-gradient-to-r from-purple-50/80 via-white to-purple-50/80 shadow-inner dark:border-purple-700/70 dark:from-purple-900/40 dark:via-purple-900/20 dark:to-purple-900/40"
+                >
+                  <span
+                    class="pointer-events-none absolute inset-y-0 rounded-2xl bg-gradient-to-r from-purple-500/90 via-purple-600 to-indigo-500/90 shadow-lg ring-1 ring-purple-100/80 transition-all duration-300 ease-out dark:from-purple-500/70 dark:via-purple-600/70 dark:to-indigo-500/70 dark:ring-purple-400/30"
+                    :style="apiKeyModeSliderStyle"
+                  />
+                  <button
+                    v-for="option in apiKeyModeOptions"
+                    :key="option.value"
+                    class="relative z-10 flex items-center justify-center rounded-2xl px-2 text-xs font-semibold transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60 dark:focus-visible:ring-purple-400/60"
+                    :class="
+                      form.apiKeyUpdateMode === option.value
+                        ? 'text-white drop-shadow-sm'
+                        : 'text-purple-500/80 hover:text-purple-700 dark:text-purple-200/70 dark:hover:text-purple-100'
+                    "
+                    type="button"
+                    @click="form.apiKeyUpdateMode = option.value"
+                  >
+                    {{ option.label }}
+                  </button>
+                </div>
+                <p class="text-xs text-purple-700 dark:text-purple-300">
+                  {{ currentApiKeyModeDescription }}
+                </p>
+              </div>
 
               <div
                 class="rounded-lg border border-purple-200 bg-white/70 p-3 text-xs text-purple-800 dark:border-purple-700 dark:bg-purple-800/20 dark:text-purple-100"
@@ -2970,7 +2998,9 @@
                 <p class="font-medium"><i class="fas fa-lightbulb mr-1" />小提示</p>
                 <ul class="mt-1 list-disc space-y-1 pl-4">
                   <li>系统会为新的 Key 自动建立粘性映射，保持同一会话命中同一个 Key。</li>
-                  <li>勾选“清空”后保存即彻底移除旧 Key，可用于紧急轮换或封禁处理。</li>
+                  <li>追加模式会保留现有 Key 并在末尾追加新的 Key。</li>
+                  <li>覆盖模式会先清空旧 Key 再写入上方的新列表。</li>
+                  <li>删除模式会根据输入精准移除指定 Key，适合快速处理失效或被封禁的 Key。</li>
                 </ul>
               </div>
             </div>
@@ -3137,26 +3167,126 @@ const determinePlatformGroup = (platform) => {
   return ''
 }
 
-// 初始化代理配置
-const initProxyConfig = () => {
-  if (props.account?.proxy && props.account.proxy.host && props.account.proxy.port) {
-    return {
-      enabled: true,
-      type: props.account.proxy.type || 'socks5',
-      host: props.account.proxy.host,
-      port: props.account.proxy.port,
-      username: props.account.proxy.username || '',
-      password: props.account.proxy.password || ''
+const createDefaultProxyState = () => ({
+  enabled: false,
+  type: 'socks5',
+  host: '',
+  port: '',
+  username: '',
+  password: ''
+})
+
+const parseProxyResponse = (rawProxy) => {
+  if (!rawProxy) {
+    return null
+  }
+
+  let proxyObject = rawProxy
+  if (typeof rawProxy === 'string') {
+    try {
+      proxyObject = JSON.parse(rawProxy)
+    } catch (error) {
+      return null
     }
   }
-  return {
-    enabled: false,
-    type: 'socks5',
-    host: '',
-    port: '',
-    username: '',
-    password: ''
+
+  if (
+    proxyObject &&
+    typeof proxyObject === 'object' &&
+    proxyObject.proxy &&
+    typeof proxyObject.proxy === 'object'
+  ) {
+    proxyObject = proxyObject.proxy
   }
+
+  if (!proxyObject || typeof proxyObject !== 'object') {
+    return null
+  }
+
+  const host =
+    typeof proxyObject.host === 'string'
+      ? proxyObject.host.trim()
+      : proxyObject.host !== undefined && proxyObject.host !== null
+        ? String(proxyObject.host).trim()
+        : ''
+
+  const port =
+    proxyObject.port !== undefined && proxyObject.port !== null
+      ? String(proxyObject.port).trim()
+      : ''
+
+  const type =
+    typeof proxyObject.type === 'string' && proxyObject.type.trim()
+      ? proxyObject.type.trim()
+      : 'socks5'
+
+  const username =
+    typeof proxyObject.username === 'string'
+      ? proxyObject.username
+      : proxyObject.username !== undefined && proxyObject.username !== null
+        ? String(proxyObject.username)
+        : ''
+
+  const password =
+    typeof proxyObject.password === 'string'
+      ? proxyObject.password
+      : proxyObject.password !== undefined && proxyObject.password !== null
+        ? String(proxyObject.password)
+        : ''
+
+  return {
+    type,
+    host,
+    port,
+    username,
+    password
+  }
+}
+
+const normalizeProxyFormState = (rawProxy) => {
+  const parsed = parseProxyResponse(rawProxy)
+
+  if (parsed && parsed.host && parsed.port) {
+    return {
+      enabled: true,
+      type: parsed.type || 'socks5',
+      host: parsed.host,
+      port: parsed.port,
+      username: parsed.username || '',
+      password: parsed.password || ''
+    }
+  }
+
+  return createDefaultProxyState()
+}
+
+const buildProxyPayload = (proxyState) => {
+  if (!proxyState || !proxyState.enabled) {
+    return null
+  }
+
+  const host = (proxyState.host || '').trim()
+  const portNumber = Number.parseInt(proxyState.port, 10)
+
+  if (!host || Number.isNaN(portNumber) || portNumber <= 0) {
+    return null
+  }
+
+  const username = proxyState.username ? proxyState.username.trim() : ''
+  const password = proxyState.password ? proxyState.password.trim() : ''
+
+  return {
+    type: proxyState.type || 'socks5',
+    host,
+    port: portNumber,
+    username: username || null,
+    password: password || null
+  }
+}
+
+// 初始化代理配置
+const initProxyConfig = () => {
+  return normalizeProxyFormState(props.account?.proxy)
 }
 
 // 表单数据
@@ -3183,7 +3313,7 @@ const form = ref({
   accessToken: '',
   refreshToken: '',
   apiKeysInput: '',
-  clearExistingApiKeys: false,
+  apiKeyUpdateMode: 'append',
   proxy: initProxyConfig(),
   // Claude Console 特定字段
   apiUrl: props.account?.apiUrl || '',
@@ -3296,6 +3426,47 @@ const parseApiKeysInput = (input) => {
   const uniqueKeys = Array.from(new Set(segments))
   return uniqueKeys
 }
+
+const apiKeyModeOptions = [
+  {
+    value: 'append',
+    label: '追加模式',
+    description: '保留现有 Key，并在末尾追加新 Key 列表。'
+  },
+  {
+    value: 'replace',
+    label: '覆盖模式',
+    description: '先清空旧 Key，再写入上方的新 Key 列表。'
+  },
+  {
+    value: 'delete',
+    label: '删除模式',
+    description: '输入要移除的 Key，可精准删除失效或被封禁的 Key。'
+  }
+]
+
+const apiKeyModeSliderStyle = computed(() => {
+  const index = Math.max(
+    apiKeyModeOptions.findIndex((option) => option.value === form.value.apiKeyUpdateMode),
+    0
+  )
+  const widthPercent = 100 / apiKeyModeOptions.length
+
+  return {
+    width: `${widthPercent}%`,
+    left: `${index * widthPercent}%`
+  }
+})
+
+const currentApiKeyModeLabel = computed(() => {
+  const option = apiKeyModeOptions.find((item) => item.value === form.value.apiKeyUpdateMode)
+  return option ? option.label : apiKeyModeOptions[0].label
+})
+
+const currentApiKeyModeDescription = computed(() => {
+  const option = apiKeyModeOptions.find((item) => item.value === form.value.apiKeyUpdateMode)
+  return option ? option.description : apiKeyModeOptions[0].description
+})
 
 // 表单验证错误
 const errors = ref({
@@ -3488,17 +3659,8 @@ const nextStep = async () => {
 const generateSetupTokenAuthUrl = async () => {
   setupTokenLoading.value = true
   try {
-    const proxyConfig = form.value.proxy?.enabled
-      ? {
-          proxy: {
-            type: form.value.proxy.type,
-            host: form.value.proxy.host,
-            port: parseInt(form.value.proxy.port),
-            username: form.value.proxy.username || null,
-            password: form.value.proxy.password || null
-          }
-        }
-      : {}
+    const proxyPayload = buildProxyPayload(form.value.proxy)
+    const proxyConfig = proxyPayload ? { proxy: proxyPayload } : {}
 
     const result = await accountsStore.generateClaudeSetupTokenUrl(proxyConfig)
     setupTokenAuthUrl.value = result.authUrl
@@ -3567,14 +3729,9 @@ const exchangeSetupTokenCode = async () => {
     }
 
     // 添加代理配置（如果启用）
-    if (form.value.proxy?.enabled) {
-      data.proxy = {
-        type: form.value.proxy.type,
-        host: form.value.proxy.host,
-        port: parseInt(form.value.proxy.port),
-        username: form.value.proxy.username || null,
-        password: form.value.proxy.password || null
-      }
+    const proxyPayload = buildProxyPayload(form.value.proxy)
+    if (proxyPayload) {
+      data.proxy = proxyPayload
     }
 
     const tokenInfo = await accountsStore.exchangeClaudeSetupTokenCode(data)
@@ -3606,21 +3763,15 @@ const handleOAuthSuccess = async (tokenInfo) => {
       form.value.unifiedClientId = generateClientId()
     }
 
+    const proxyPayload = buildProxyPayload(form.value.proxy)
+
     const data = {
       name: form.value.name,
       description: form.value.description,
       accountType: form.value.accountType,
       groupId: form.value.accountType === 'group' ? form.value.groupId : undefined,
       groupIds: form.value.accountType === 'group' ? form.value.groupIds : undefined,
-      proxy: form.value.proxy.enabled
-        ? {
-            type: form.value.proxy.type,
-            host: form.value.proxy.host,
-            port: parseInt(form.value.proxy.port),
-            username: form.value.proxy.username || null,
-            password: form.value.proxy.password || null
-          }
-        : null
+      proxy: proxyPayload
     }
 
     const currentPlatform = form.value.platform
@@ -3903,21 +4054,15 @@ const createAccount = async () => {
 
   loading.value = true
   try {
+    const proxyPayload = buildProxyPayload(form.value.proxy)
+
     const data = {
       name: form.value.name,
       description: form.value.description,
       accountType: form.value.accountType,
       groupId: form.value.accountType === 'group' ? form.value.groupId : undefined,
       groupIds: form.value.accountType === 'group' ? form.value.groupIds : undefined,
-      proxy: form.value.proxy.enabled
-        ? {
-            type: form.value.proxy.type,
-            host: form.value.proxy.host,
-            port: parseInt(form.value.proxy.port),
-            username: form.value.proxy.username || null,
-            password: form.value.proxy.password || null
-          }
-        : null
+      proxy: proxyPayload
     }
 
     if (form.value.platform === 'claude') {
@@ -4168,21 +4313,15 @@ const updateAccount = async () => {
 
   loading.value = true
   try {
+    const proxyPayload = buildProxyPayload(form.value.proxy)
+
     const data = {
       name: form.value.name,
       description: form.value.description,
       accountType: form.value.accountType,
       groupId: form.value.accountType === 'group' ? form.value.groupId : undefined,
       groupIds: form.value.accountType === 'group' ? form.value.groupIds : undefined,
-      proxy: form.value.proxy.enabled
-        ? {
-            type: form.value.proxy.type,
-            host: form.value.proxy.host,
-            port: parseInt(form.value.proxy.port),
-            username: form.value.proxy.username || null,
-            password: form.value.proxy.password || null
-          }
-        : null
+      proxy: proxyPayload
     }
 
     // 只有非空时才更新token
@@ -4245,19 +4384,40 @@ const updateAccount = async () => {
 
     if (props.account.platform === 'droid') {
       const trimmedApiKeysInput = form.value.apiKeysInput?.trim() || ''
+      const apiKeyUpdateMode = form.value.apiKeyUpdateMode || 'append'
 
-      if (trimmedApiKeysInput) {
-        const apiKeys = parseApiKeysInput(trimmedApiKeysInput)
-        if (apiKeys.length === 0) {
-          errors.value.apiKeys = '请至少填写一个 API Key'
+      if (apiKeyUpdateMode === 'delete') {
+        if (!trimmedApiKeysInput) {
+          errors.value.apiKeys = '请填写需要删除的 API Key'
           loading.value = false
           return
         }
-        data.apiKeys = apiKeys
-      }
 
-      if (form.value.clearExistingApiKeys) {
-        data.clearApiKeys = true
+        const removeApiKeys = parseApiKeysInput(trimmedApiKeysInput)
+        if (removeApiKeys.length === 0) {
+          errors.value.apiKeys = '请填写需要删除的 API Key'
+          loading.value = false
+          return
+        }
+
+        data.removeApiKeys = removeApiKeys
+        data.apiKeyUpdateMode = 'delete'
+      } else {
+        if (trimmedApiKeysInput) {
+          const apiKeys = parseApiKeysInput(trimmedApiKeysInput)
+          if (apiKeys.length === 0) {
+            errors.value.apiKeys = '请至少填写一个 API Key'
+            loading.value = false
+            return
+          }
+          data.apiKeys = apiKeys
+        } else if (apiKeyUpdateMode === 'replace') {
+          data.apiKeys = []
+        }
+
+        if (apiKeyUpdateMode !== 'append' || trimmedApiKeysInput) {
+          data.apiKeyUpdateMode = apiKeyUpdateMode
+        }
       }
 
       if (isEditingDroidApiKey.value) {
@@ -4606,14 +4766,29 @@ watch(
       errors.value.accessToken = ''
       errors.value.refreshToken = ''
       form.value.authenticationMethod = 'api_key'
+      form.value.apiKeyUpdateMode = 'append'
     } else if (oldType === 'apikey') {
       // 切换离开 API Key 模式时重置 API Key 输入
       form.value.apiKeysInput = ''
-      form.value.clearExistingApiKeys = false
+      form.value.apiKeyUpdateMode = 'append'
       errors.value.apiKeys = ''
       if (!isEdit.value) {
         form.value.authenticationMethod = ''
       }
+    }
+  }
+)
+
+// 监听 API Key 更新模式切换，自动清理提示
+watch(
+  () => form.value.apiKeyUpdateMode,
+  (newMode, oldMode) => {
+    if (newMode === oldMode) {
+      return
+    }
+
+    if (errors.value.apiKeys) {
+      errors.value.apiKeys = ''
     }
   }
 )
@@ -4626,7 +4801,22 @@ watch(
       return
     }
 
-    if (parseApiKeysInput(newValue).length > 0) {
+    const parsed = parseApiKeysInput(newValue)
+    const mode = form.value.apiKeyUpdateMode
+
+    if (mode === 'append' && parsed.length > 0) {
+      errors.value.apiKeys = ''
+      return
+    }
+
+    if (mode === 'replace') {
+      if (parsed.length > 0 || !newValue || newValue.trim() === '') {
+        errors.value.apiKeys = ''
+      }
+      return
+    }
+
+    if (mode === 'delete' && parsed.length > 0) {
       errors.value.apiKeys = ''
     }
   }
@@ -4761,24 +4951,17 @@ watch(
     if (newAccount) {
       initModelMappings()
       // 重新初始化代理配置
-      const proxyConfig =
-        newAccount.proxy && newAccount.proxy.host && newAccount.proxy.port
-          ? {
-              enabled: true,
-              type: newAccount.proxy.type || 'socks5',
-              host: newAccount.proxy.host,
-              port: newAccount.proxy.port,
-              username: newAccount.proxy.username || '',
-              password: newAccount.proxy.password || ''
-            }
-          : {
-              enabled: false,
-              type: 'socks5',
-              host: '',
-              port: '',
-              username: '',
-              password: ''
-            }
+      const proxyConfig = normalizeProxyFormState(newAccount.proxy)
+      const normalizedAuthMethod =
+        typeof newAccount.authenticationMethod === 'string'
+          ? newAccount.authenticationMethod.trim().toLowerCase()
+          : ''
+      const derivedAddType =
+        normalizedAuthMethod === 'api_key'
+          ? 'apikey'
+          : normalizedAuthMethod === 'manual'
+            ? 'manual'
+            : 'oauth'
 
       // 获取分组ID - 可能来自 groupId 字段或 groupInfo 对象
       let groupId = ''
@@ -4807,7 +4990,7 @@ watch(
 
       form.value = {
         platform: newAccount.platform,
-        addType: 'oauth',
+        addType: derivedAddType,
         name: newAccount.name,
         description: newAccount.description || '',
         accountType: newAccount.accountType || 'shared',
@@ -4821,6 +5004,9 @@ watch(
         projectId: newAccount.projectId || '',
         accessToken: '',
         refreshToken: '',
+        authenticationMethod: newAccount.authenticationMethod || '',
+        apiKeysInput: '',
+        apiKeyUpdateMode: 'append',
         proxy: proxyConfig,
         // Claude Console 特定字段
         apiUrl: newAccount.apiUrl || '',
