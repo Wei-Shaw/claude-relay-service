@@ -99,18 +99,28 @@
         </div>
 
         <!-- 操作按钮 -->
-        <div class="flex gap-3">
+        <div class="flex flex-col gap-3 sm:gap-4">
+          <div class="flex flex-col gap-3 sm:flex-row sm:gap-4">
+            <button
+              class="flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-700 transition-colors hover:border-blue-300 hover:bg-blue-100 dark:border-blue-500/50 dark:bg-blue-500/10 dark:text-blue-200 dark:hover:bg-blue-500/20 sm:flex-1 sm:text-base"
+              @click="copyKeyOnly"
+            >
+              <i class="fas fa-key" />
+              仅复制密钥
+            </button>
+            <button
+              class="btn btn-primary flex w-full items-center justify-center gap-2 px-5 py-3 text-sm font-semibold sm:flex-1 sm:text-base"
+              @click="copyFullConfig"
+            >
+              <i class="fas fa-copy" />
+              复制Claude配置
+            </button>
+          </div>
           <button
-            class="btn btn-primary flex flex-1 items-center justify-center gap-2 px-6 py-3 font-semibold"
-            @click="copyApiKey"
-          >
-            <i class="fas fa-copy" />
-            复制配置信息
-          </button>
-          <button
-            class="rounded-xl border border-gray-300 bg-gray-200 px-6 py-3 font-semibold text-gray-800 transition-colors hover:bg-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+            class="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-300 bg-gray-200 px-5 py-3 text-sm font-semibold text-gray-800 transition-colors hover:border-gray-400 hover:bg-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 sm:text-base"
             @click="handleClose"
           >
+            <i class="fas fa-check-circle" />
             我已保存
           </button>
         </div>
@@ -190,8 +200,33 @@ const getDisplayedApiKey = () => {
   }
 }
 
-// 复制配置信息（环境变量格式）
-const copyApiKey = async () => {
+const droidEndpoint = computed(() => {
+  return getBaseUrlPrefix() + '/droid/claude'
+})
+
+// 通用复制工具，包含降级处理
+const copyTextWithFallback = async (text, successMessage) => {
+  try {
+    await navigator.clipboard.writeText(text)
+    showToast(successMessage, 'success')
+  } catch (error) {
+    const textArea = document.createElement('textarea')
+    textArea.value = text
+    document.body.appendChild(textArea)
+    textArea.select()
+    try {
+      document.execCommand('copy')
+      showToast(successMessage, 'success')
+    } catch (fallbackError) {
+      showToast('复制失败，请手动复制', 'error')
+    } finally {
+      document.body.removeChild(textArea)
+    }
+  }
+}
+
+// 复制完整配置（包含提示信息）
+const copyFullConfig = async () => {
   const key = props.apiKey.apiKey || props.apiKey.key || ''
   if (!key) {
     showToast('API Key 不存在', 'error')
@@ -200,27 +235,22 @@ const copyApiKey = async () => {
 
   // 构建环境变量配置格式
   const configText = `ANTHROPIC_BASE_URL="${currentBaseUrl.value}"
-ANTHROPIC_AUTH_TOKEN="${key}"`
+ANTHROPIC_AUTH_TOKEN="${key}"
 
-  try {
-    await navigator.clipboard.writeText(configText)
-    showToast('配置信息已复制到剪贴板', 'success')
-  } catch (error) {
-    // console.error('Failed to copy:', error)
-    // 降级方案：创建一个临时文本区域
-    const textArea = document.createElement('textarea')
-    textArea.value = configText
-    document.body.appendChild(textArea)
-    textArea.select()
-    try {
-      document.execCommand('copy')
-      showToast('配置信息已复制到剪贴板', 'success')
-    } catch (fallbackError) {
-      showToast('复制失败，请手动复制', 'error')
-    } finally {
-      document.body.removeChild(textArea)
-    }
+# 提示：如需调用 /droid/claude 端点（已在后台添加 Droid 账号），请将 ANTHROPIC_BASE_URL 改为 "${droidEndpoint.value}" 或根据实际环境调整。`
+
+  await copyTextWithFallback(configText, '配置信息已复制到剪贴板')
+}
+
+// 仅复制密钥
+const copyKeyOnly = async () => {
+  const key = props.apiKey.apiKey || props.apiKey.key || ''
+  if (!key) {
+    showToast('API Key 不存在', 'error')
+    return
   }
+
+  await copyTextWithFallback(key, 'API Key 已复制')
 }
 
 // 关闭弹窗（带确认）
