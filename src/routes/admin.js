@@ -2267,7 +2267,8 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       useUnifiedUserAgent,
       useUnifiedClientId,
       unifiedClientId,
-      expiresAt
+      expiresAt,
+      subscriptionExpiresAt
     } = req.body
 
     if (!name) {
@@ -2311,7 +2312,7 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       useUnifiedUserAgent: useUnifiedUserAgent === true, // 默认为false
       useUnifiedClientId: useUnifiedClientId === true, // 默认为false
       unifiedClientId: unifiedClientId || '', // 统一的客户端标识
-      expiresAt: expiresAt || null // 账户订阅到期时间
+      expiresAt: subscriptionExpiresAt ?? expiresAt ?? null // 账户订阅到期时间
     })
 
     // 如果是分组类型，将账户添加到分组
@@ -2400,8 +2401,12 @@ router.put('/claude-accounts/:accountId', authenticateAdmin, async (req, res) =>
 
     // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
     const mappedUpdates = { ...updates }
-    if ('expiresAt' in mappedUpdates) {
+    if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
+      mappedUpdates.subscriptionExpiresAt = updates.subscriptionExpiresAt
+    } else if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'expiresAt')) {
       mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
+    }
+    if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'subscriptionExpiresAt')) {
       delete mappedUpdates.expiresAt
     }
 
@@ -2797,8 +2802,12 @@ router.put('/claude-console-accounts/:accountId', authenticateAdmin, async (req,
 
     // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
     const mappedUpdates = { ...updates }
-    if ('expiresAt' in mappedUpdates) {
+    if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
+      mappedUpdates.subscriptionExpiresAt = updates.subscriptionExpiresAt
+    } else if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'expiresAt')) {
       mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
+    }
+    if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'subscriptionExpiresAt')) {
       delete mappedUpdates.expiresAt
     }
 
@@ -3214,8 +3223,12 @@ router.put('/ccr-accounts/:accountId', authenticateAdmin, async (req, res) => {
 
     // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
     const mappedUpdates = { ...updates }
-    if ('expiresAt' in mappedUpdates) {
+    if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
+      mappedUpdates.subscriptionExpiresAt = updates.subscriptionExpiresAt
+    } else if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'expiresAt')) {
       mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
+    }
+    if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'subscriptionExpiresAt')) {
       delete mappedUpdates.expiresAt
     }
 
@@ -3582,8 +3595,12 @@ router.put('/bedrock-accounts/:accountId', authenticateAdmin, async (req, res) =
 
     // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
     const mappedUpdates = { ...updates }
-    if ('expiresAt' in mappedUpdates) {
+    if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
+      mappedUpdates.subscriptionExpiresAt = updates.subscriptionExpiresAt
+    } else if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'expiresAt')) {
       mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
+    }
+    if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'subscriptionExpiresAt')) {
       delete mappedUpdates.expiresAt
     }
 
@@ -3912,8 +3929,11 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
 
           return {
             ...account,
-            // 映射字段：使用 subscriptionExpiresAt 作为前端显示的 expiresAt
-            expiresAt: account.subscriptionExpiresAt || null,
+            expiresAt: account.expiresAt || null,
+            subscriptionExpiresAt:
+              account.subscriptionExpiresAt && account.subscriptionExpiresAt !== ''
+                ? account.subscriptionExpiresAt
+                : null,
             groupInfos,
             usage: {
               daily: usageStats.daily,
@@ -3931,8 +3951,11 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
             const groupInfos = await accountGroupService.getAccountGroups(account.id)
             return {
               ...account,
-              // 映射字段：使用 subscriptionExpiresAt 作为前端显示的 expiresAt
-              expiresAt: account.subscriptionExpiresAt || null,
+              expiresAt: account.expiresAt || null,
+              subscriptionExpiresAt:
+                account.subscriptionExpiresAt && account.subscriptionExpiresAt !== ''
+                  ? account.subscriptionExpiresAt
+                  : null,
               groupInfos,
               usage: {
                 daily: { tokens: 0, requests: 0, allTokens: 0 },
@@ -3947,6 +3970,11 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
             )
             return {
               ...account,
+              expiresAt: account.expiresAt || null,
+              subscriptionExpiresAt:
+                account.subscriptionExpiresAt && account.subscriptionExpiresAt !== ''
+                  ? account.subscriptionExpiresAt
+                  : null,
               groupInfos: [],
               usage: {
                 daily: { tokens: 0, requests: 0, allTokens: 0 },
@@ -4059,8 +4087,12 @@ router.put('/gemini-accounts/:accountId', authenticateAdmin, async (req, res) =>
 
     // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
     const mappedUpdates = { ...updates }
-    if ('expiresAt' in mappedUpdates) {
+    if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
+      mappedUpdates.subscriptionExpiresAt = updates.subscriptionExpiresAt
+    } else if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'expiresAt')) {
       mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
+    }
+    if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'subscriptionExpiresAt')) {
       delete mappedUpdates.expiresAt
     }
 
@@ -7270,7 +7302,8 @@ router.post('/openai-accounts', authenticateAdmin, async (req, res) => {
       rateLimitDuration,
       priority,
       needsImmediateRefresh, // 是否需要立即刷新
-      requireRefreshSuccess // 是否必须刷新成功才能创建
+      requireRefreshSuccess, // 是否必须刷新成功才能创建
+      subscriptionExpiresAt
     } = req.body
 
     if (!name) {
@@ -7292,7 +7325,8 @@ router.post('/openai-accounts', authenticateAdmin, async (req, res) => {
       accountInfo: accountInfo || {},
       proxy: proxy || null,
       isActive: true,
-      schedulable: true
+      schedulable: true,
+      subscriptionExpiresAt: subscriptionExpiresAt || null
     }
 
     // 如果需要立即刷新且必须成功（OpenAI 手动模式）
@@ -7571,10 +7605,16 @@ router.put('/openai-accounts/:id', authenticateAdmin, async (req, res) => {
           : currentAccount.emailVerified
     }
 
-    // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt (订阅过期时间)
-    // 注意：这里不影响上面 OAuth token 的 expiresAt 字段
-    if ('expiresAt' in updates && !updates.openaiOauth?.expires_in) {
+    const hasOauthExpiry = Boolean(updates.openaiOauth?.expires_in)
+
+    // 处理订阅过期时间字段：优先使用 subscriptionExpiresAt，兼容旧版的 expiresAt
+    if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
+      updateData.subscriptionExpiresAt = updates.subscriptionExpiresAt
+    } else if (Object.prototype.hasOwnProperty.call(updates, 'expiresAt') && !hasOauthExpiry) {
       updateData.subscriptionExpiresAt = updates.expiresAt
+    }
+
+    if (!hasOauthExpiry && Object.prototype.hasOwnProperty.call(updateData, 'subscriptionExpiresAt')) {
       delete updateData.expiresAt
     }
 
@@ -7966,8 +8006,12 @@ router.put('/azure-openai-accounts/:id', authenticateAdmin, async (req, res) => 
 
     // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
     const mappedUpdates = { ...updates }
-    if ('expiresAt' in mappedUpdates) {
+    if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
+      mappedUpdates.subscriptionExpiresAt = updates.subscriptionExpiresAt
+    } else if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'expiresAt')) {
       mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
+    }
+    if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'subscriptionExpiresAt')) {
       delete mappedUpdates.expiresAt
     }
 
@@ -8346,8 +8390,12 @@ router.put('/openai-responses-accounts/:id', authenticateAdmin, async (req, res)
 
     // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
     const mappedUpdates = { ...updates }
-    if ('expiresAt' in mappedUpdates) {
+    if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
+      mappedUpdates.subscriptionExpiresAt = updates.subscriptionExpiresAt
+    } else if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'expiresAt')) {
       mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
+    }
+    if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'subscriptionExpiresAt')) {
       delete mappedUpdates.expiresAt
     }
 
@@ -8717,9 +8765,11 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
 
           return {
             ...account,
-            // 映射字段：使用 subscriptionExpiresAt 作为前端显示的 expiresAt
-            // OAuth token 的原始 expiresAt 保留在内部使用
-            expiresAt: account.subscriptionExpiresAt || null,
+            expiresAt: account.expiresAt || null,
+            subscriptionExpiresAt:
+              account.subscriptionExpiresAt && account.subscriptionExpiresAt !== ''
+                ? account.subscriptionExpiresAt
+                : null,
             schedulable: account.schedulable === 'true',
             boundApiKeysCount,
             groupInfos,
@@ -8733,8 +8783,11 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
           logger.warn(`Failed to get stats for Droid account ${account.id}:`, error.message)
           return {
             ...account,
-            // 映射字段：使用 subscriptionExpiresAt 作为前端显示的 expiresAt
-            expiresAt: account.subscriptionExpiresAt || null,
+            expiresAt: account.expiresAt || null,
+            subscriptionExpiresAt:
+              account.subscriptionExpiresAt && account.subscriptionExpiresAt !== ''
+                ? account.subscriptionExpiresAt
+                : null,
             boundApiKeysCount: 0,
             groupInfos: [],
             usage: {
@@ -8851,8 +8904,12 @@ router.put('/droid-accounts/:id', authenticateAdmin, async (req, res) => {
 
     // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
     const mappedUpdates = { ...updates }
-    if ('expiresAt' in mappedUpdates) {
+    if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
+      mappedUpdates.subscriptionExpiresAt = updates.subscriptionExpiresAt
+    } else if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'expiresAt')) {
       mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
+    }
+    if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'subscriptionExpiresAt')) {
       delete mappedUpdates.expiresAt
     }
 

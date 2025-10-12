@@ -185,6 +185,10 @@ class ClaudeAccountService {
       status: accountData.status,
       createdAt: accountData.createdAt,
       expiresAt: accountData.expiresAt,
+      subscriptionExpiresAt:
+        accountData.subscriptionExpiresAt && accountData.subscriptionExpiresAt !== ''
+          ? accountData.subscriptionExpiresAt
+          : null,
       scopes: claudeAiOauth ? claudeAiOauth.scopes : [],
       autoStopOnWarning,
       useUnifiedUserAgent,
@@ -491,7 +495,11 @@ class ClaudeAccountService {
             createdAt: account.createdAt,
             lastUsedAt: account.lastUsedAt,
             lastRefreshAt: account.lastRefreshAt,
-            expiresAt: account.subscriptionExpiresAt || null, // 账户订阅到期时间
+            expiresAt: account.expiresAt || null,
+            subscriptionExpiresAt:
+              account.subscriptionExpiresAt && account.subscriptionExpiresAt !== ''
+                ? account.subscriptionExpiresAt
+                : null,
             // 添加 scopes 字段用于判断认证方式
             // 处理空字符串的情况，避免返回 ['']
             scopes: account.scopes && account.scopes.trim() ? account.scopes.split(' ') : [],

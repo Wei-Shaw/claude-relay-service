@@ -5,6 +5,19 @@ const logger = require('../utils/logger')
 const config = require('../../config/config')
 const LRUCache = require('../utils/lruCache')
 
+function normalizeSubscriptionExpiresAt(value) {
+  if (value === undefined || value === null || value === '') {
+    return ''
+  }
+
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  return date.toISOString()
+}
+
 class OpenAIResponsesAccountService {
   constructor() {
     // 加密相关常量
@@ -49,7 +62,8 @@ class OpenAIResponsesAccountService {
       schedulable = true, // 是否可被调度
       dailyQuota = 0, // 每日额度限制（美元），0表示不限制
       quotaResetTime = '00:00', // 额度重置时间（HH:mm格式）
-      rateLimitDuration = 60 // 限流时间（分钟）
+      rateLimitDuration = 60, // 限流时间（分钟）
+      subscriptionExpiresAt = null
     } = options
 
     // 验证必填字段
@@ -88,7 +102,8 @@ class OpenAIResponsesAccountService {
       dailyUsage: '0',
       lastResetDate: redis.getDateStringInTimezone(),
       quotaResetTime,
-      quotaStoppedAt: ''
+      quotaStoppedAt: '',
+      subscriptionExpiresAt: normalizeSubscriptionExpiresAt(subscriptionExpiresAt)
     }
 
     // 保存到 Redis
@@ -98,6 +113,7 @@ class OpenAIResponsesAccountService {
 
     return {
       ...accountData,
+      subscriptionExpiresAt: accountData.subscriptionExpiresAt || null,
       apiKey: '***' // 返回时隐藏敏感信息
     }
   }
@@ -124,6 +140,11 @@ class OpenAIResponsesAccountService {
       }
     }
 
+    accountData.subscriptionExpiresAt =
+      accountData.subscriptionExpiresAt && accountData.subscriptionExpiresAt !== ''
+        ? accountData.subscriptionExpiresAt
+        : null
+
     return accountData
   }
 
@@ -149,6 +170,15 @@ class OpenAIResponsesAccountService {
       updates.baseApi = updates.baseApi.endsWith('/')
         ? updates.baseApi.slice(0, -1)
         : updates.baseApi
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
+      updates.subscriptionExpiresAt = normalizeSubscriptionExpiresAt(
+        updates.subscriptionExpiresAt
+      )
+    } else if (Object.prototype.hasOwnProperty.call(updates, 'expiresAt')) {
+      updates.subscriptionExpiresAt = normalizeSubscriptionExpiresAt(updates.expiresAt)
+      delete updates.expiresAt
     }
 
     // 更新 Redis
@@ -257,6 +287,10 @@ class OpenAIResponsesAccountService {
             accountData.schedulable = accountData.schedulable !== 'false'
             // 转换 isActive 字段为布尔值
             accountData.isActive = accountData.isActive === 'true'
+            accountData.subscriptionExpiresAt =
+              accountData.subscriptionExpiresAt && accountData.subscriptionExpiresAt !== ''
+                ? accountData.subscriptionExpiresAt
+                : null
 
             accounts.push(accountData)
           }

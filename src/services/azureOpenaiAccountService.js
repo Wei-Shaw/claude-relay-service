@@ -65,6 +65,19 @@ const AZURE_OPENAI_ACCOUNT_KEY_PREFIX = 'azure_openai:account:'
 const SHARED_AZURE_OPENAI_ACCOUNTS_KEY = 'shared_azure_openai_accounts'
 const ACCOUNT_SESSION_MAPPING_PREFIX = 'azure_openai_session_account_mapping:'
 
+function normalizeSubscriptionExpiresAt(value) {
+  if (value === undefined || value === null || value === '') {
+    return ''
+  }
+
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  return date.toISOString()
+}
+
 // 加密函数
 function encrypt(text) {
   if (!text) {
@@ -133,6 +146,9 @@ async function createAccount(accountData) {
     isActive: accountData.isActive !== false ? 'true' : 'false',
     status: 'active',
     schedulable: accountData.schedulable !== false ? 'true' : 'false',
+    subscriptionExpiresAt: normalizeSubscriptionExpiresAt(
+      accountData.subscriptionExpiresAt || ''
+    ),
     createdAt: now,
     updatedAt: now
   }
@@ -152,7 +168,10 @@ async function createAccount(accountData) {
   }
 
   logger.info(`Created Azure OpenAI account: ${accountId}`)
-  return account
+  return {
+    ...account,
+    subscriptionExpiresAt: account.subscriptionExpiresAt || null
+  }
 }
 
 // 获取账户
@@ -187,6 +206,11 @@ async function getAccount(accountId) {
     }
   }
 
+  accountData.subscriptionExpiresAt =
+    accountData.subscriptionExpiresAt && accountData.subscriptionExpiresAt !== ''
+      ? accountData.subscriptionExpiresAt
+      : null
+
   return accountData
 }
 
@@ -218,6 +242,15 @@ async function updateAccount(accountId, updates) {
         : JSON.stringify(updates.supportedModels)
   }
 
+  if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
+    updates.subscriptionExpiresAt = normalizeSubscriptionExpiresAt(
+      updates.subscriptionExpiresAt
+    )
+  } else if (Object.prototype.hasOwnProperty.call(updates, 'expiresAt')) {
+    updates.subscriptionExpiresAt = normalizeSubscriptionExpiresAt(updates.expiresAt)
+    delete updates.expiresAt
+  }
+
   // 更新账户类型时处理共享账户集合
   const client = redisClient.getClientSafe()
   if (updates.accountType && updates.accountType !== existingAccount.accountType) {
@@ -242,6 +275,10 @@ async function updateAccount(accountId, updates) {
     } catch (e) {
       updatedAccount.proxy = null
     }
+  }
+
+  if (!updatedAccount.subscriptionExpiresAt) {
+    updatedAccount.subscriptionExpiresAt = null
   }
 
   return updatedAccount
@@ -303,7 +340,8 @@ async function getAllAccounts() {
       accounts.push({
         ...accountData,
         isActive: accountData.isActive === 'true',
-        schedulable: accountData.schedulable !== 'false'
+        schedulable: accountData.schedulable !== 'false',
+        subscriptionExpiresAt: accountData.subscriptionExpiresAt || null
       })
     }
   }
