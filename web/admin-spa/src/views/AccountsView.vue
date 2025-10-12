@@ -3724,20 +3724,55 @@ const closeAccountExpiryEdit = () => {
   editingExpiryAccount.value = null
 }
 
+// 根据账户平台解析更新端点
+const resolveAccountUpdateEndpoint = (account) => {
+  switch (account.platform) {
+    case 'claude':
+      return `/admin/claude-accounts/${account.id}`
+    case 'claude-console':
+      return `/admin/claude-console-accounts/${account.id}`
+    case 'bedrock':
+      return `/admin/bedrock-accounts/${account.id}`
+    case 'openai':
+      return `/admin/openai-accounts/${account.id}`
+    case 'azure_openai':
+      return `/admin/azure-openai-accounts/${account.id}`
+    case 'openai-responses':
+      return `/admin/openai-responses-accounts/${account.id}`
+    case 'ccr':
+      return `/admin/ccr-accounts/${account.id}`
+    case 'gemini':
+      return `/admin/gemini-accounts/${account.id}`
+    case 'droid':
+      return `/admin/droid-accounts/${account.id}`
+    default:
+      throw new Error(`Unsupported platform: ${account.platform}`)
+  }
+}
+
 // 保存账户过期时间
 const handleSaveAccountExpiry = async ({ accountId, expiresAt }) => {
   try {
-    const data = await apiClient.put(`/admin/claude-accounts/${accountId}`, {
+    // 找到对应的账户以获取平台信息
+    const account = accounts.value.find((acc) => acc.id === accountId)
+    if (!account) {
+      showToast('账户不存在', 'error')
+      if (expiryEditModalRef.value) {
+        expiryEditModalRef.value.resetSaving()
+      }
+      return
+    }
+
+    // 根据平台动态选择端点
+    const endpoint = resolveAccountUpdateEndpoint(account)
+    const data = await apiClient.put(endpoint, {
       expiresAt: expiresAt || null
     })
 
     if (data.success) {
       showToast('账户到期时间已更新', 'success')
       // 更新本地数据
-      const account = accounts.value.find((acc) => acc.id === accountId)
-      if (account) {
-        account.expiresAt = expiresAt || null
-      }
+      account.expiresAt = expiresAt || null
       closeAccountExpiryEdit()
     } else {
       showToast(data.message || '更新失败', 'error')
@@ -3747,7 +3782,7 @@ const handleSaveAccountExpiry = async ({ accountId, expiresAt }) => {
       }
     }
   } catch (error) {
-    showToast('更新失败', 'error')
+    showToast(error.message || '更新失败', 'error')
     // 重置保存状态
     if (expiryEditModalRef.value) {
       expiryEditModalRef.value.resetSaving()
