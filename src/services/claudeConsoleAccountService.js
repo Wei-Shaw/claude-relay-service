@@ -186,14 +186,14 @@ class ClaudeConsoleAccountService {
             schedulable: accountData.schedulable !== 'false', // 默认为true，只有明确设置为false才不可调度
             // 额度管理相关
             dailyQuota: parseFloat(accountData.dailyQuota || '0'),
-          dailyUsage: parseFloat(accountData.dailyUsage || '0'),
-          lastResetDate: accountData.lastResetDate || '',
-          quotaResetTime: accountData.quotaResetTime || '00:00',
-          quotaStoppedAt: accountData.quotaStoppedAt || null,
-          expiresAt: accountData.expiresAt || null,
-          subscriptionExpiresAt: accountData.subscriptionExpiresAt || null
-        })
-      }
+            dailyUsage: parseFloat(accountData.dailyUsage || '0'),
+            lastResetDate: accountData.lastResetDate || '',
+            quotaResetTime: accountData.quotaResetTime || '00:00',
+            quotaStoppedAt: accountData.quotaStoppedAt || null,
+            expiresAt: accountData.expiresAt || null,
+            subscriptionExpiresAt: accountData.subscriptionExpiresAt || null
+          })
+        }
       }
 
       return accounts

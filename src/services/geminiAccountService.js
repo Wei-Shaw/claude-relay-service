@@ -504,9 +504,7 @@ async function updateAccount(accountId, updates) {
   updates.updatedAt = now
 
   if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
-    updates.subscriptionExpiresAt = normalizeSubscriptionExpiresAt(
-      updates.subscriptionExpiresAt
-    )
+    updates.subscriptionExpiresAt = normalizeSubscriptionExpiresAt(updates.subscriptionExpiresAt)
   }
 
   // 检查是否新增了 refresh token

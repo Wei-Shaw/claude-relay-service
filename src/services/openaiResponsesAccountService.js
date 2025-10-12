@@ -173,9 +173,7 @@ class OpenAIResponsesAccountService {
     }
 
     if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
-      updates.subscriptionExpiresAt = normalizeSubscriptionExpiresAt(
-        updates.subscriptionExpiresAt
-      )
+      updates.subscriptionExpiresAt = normalizeSubscriptionExpiresAt(updates.subscriptionExpiresAt)
     } else if (Object.prototype.hasOwnProperty.call(updates, 'expiresAt')) {
       updates.subscriptionExpiresAt = normalizeSubscriptionExpiresAt(updates.expiresAt)
       delete updates.expiresAt

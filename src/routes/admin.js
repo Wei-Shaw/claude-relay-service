@@ -7614,7 +7614,10 @@ router.put('/openai-accounts/:id', authenticateAdmin, async (req, res) => {
       updateData.subscriptionExpiresAt = updates.expiresAt
     }
 
-    if (!hasOauthExpiry && Object.prototype.hasOwnProperty.call(updateData, 'subscriptionExpiresAt')) {
+    if (
+      !hasOauthExpiry &&
+      Object.prototype.hasOwnProperty.call(updateData, 'subscriptionExpiresAt')
+    ) {
       delete updateData.expiresAt
     }
 

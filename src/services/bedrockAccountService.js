@@ -162,15 +162,15 @@ class BedrockAccountService {
             accountType: account.accountType,
             priority: account.priority,
             schedulable: account.schedulable,
-          credentialType: account.credentialType,
-          createdAt: account.createdAt,
-          updatedAt: account.updatedAt,
-          type: 'bedrock',
-          hasCredentials: !!account.awsCredentials,
-          expiresAt: account.expiresAt || null,
-          subscriptionExpiresAt: account.subscriptionExpiresAt || null
-        })
-      }
+            credentialType: account.credentialType,
+            createdAt: account.createdAt,
+            updatedAt: account.updatedAt,
+            type: 'bedrock',
+            hasCredentials: !!account.awsCredentials,
+            expiresAt: account.expiresAt || null,
+            subscriptionExpiresAt: account.subscriptionExpiresAt || null
+          })
+        }
       }
 
       // 按优先级和名称排序

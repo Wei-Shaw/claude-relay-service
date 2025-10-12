@@ -146,9 +146,7 @@ async function createAccount(accountData) {
     isActive: accountData.isActive !== false ? 'true' : 'false',
     status: 'active',
     schedulable: accountData.schedulable !== false ? 'true' : 'false',
-    subscriptionExpiresAt: normalizeSubscriptionExpiresAt(
-      accountData.subscriptionExpiresAt || ''
-    ),
+    subscriptionExpiresAt: normalizeSubscriptionExpiresAt(accountData.subscriptionExpiresAt || ''),
     createdAt: now,
     updatedAt: now
   }
@@ -243,9 +241,7 @@ async function updateAccount(accountId, updates) {
   }
 
   if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
-    updates.subscriptionExpiresAt = normalizeSubscriptionExpiresAt(
-      updates.subscriptionExpiresAt
-    )
+    updates.subscriptionExpiresAt = normalizeSubscriptionExpiresAt(updates.subscriptionExpiresAt)
   } else if (Object.prototype.hasOwnProperty.call(updates, 'expiresAt')) {
     updates.subscriptionExpiresAt = normalizeSubscriptionExpiresAt(updates.expiresAt)
     delete updates.expiresAt
