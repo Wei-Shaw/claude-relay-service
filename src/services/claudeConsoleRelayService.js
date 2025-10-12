@@ -453,7 +453,9 @@ class ClaudeConsoleRelayService {
 
           let buffer = ''
           let finalUsageReported = false
-          const collectedUsageData = {}
+          const collectedUsageData = {
+            model: body.model || account?.defaultModel || null
+          }
 
           // 处理流数据
           response.data.on('data', (chunk) => {
@@ -562,6 +564,9 @@ class ClaudeConsoleRelayService {
                           collectedUsageData.output_tokens !== undefined &&
                           !finalUsageReported
                         ) {
+                          if (!collectedUsageData.model) {
+                            collectedUsageData.model = body.model || account?.defaultModel || null
+                          }
                           logger.info(
                             '🎯 [Console] Complete usage data collected:',
                             JSON.stringify(collectedUsageData)
@@ -631,7 +636,7 @@ class ClaudeConsoleRelayService {
                   }
                   // 确保有 model 字段
                   if (!collectedUsageData.model) {
-                    collectedUsageData.model = body.model
+                    collectedUsageData.model = body.model || account?.defaultModel || null
                   }
                   logger.info(
                     `📊 [Console] Saving incomplete usage data via fallback: ${JSON.stringify(collectedUsageData)}`
