@@ -131,7 +131,7 @@ class ClaudeCodeValidator {
       const userAgent = req.headers['user-agent'] || ''
       const path = req.path || ''
 
-      const claudeCodePattern = /^claude-cli\/\d+\.\d+\.\d+/i;
+      const claudeCodePattern = /^claude-cli\/\d+\.\d+\.\d+/i
 
       if (!claudeCodePattern.test(userAgent)) {
         // 不是 Claude Code 的请求，此验证器不处理
