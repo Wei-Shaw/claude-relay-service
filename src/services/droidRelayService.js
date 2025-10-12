@@ -977,6 +977,16 @@ class DroidRelayService {
 
     // Anthropic 端点：处理 thinking 字段
     if (endpointType === 'anthropic') {
+      const hasTemperatureField = Object.prototype.hasOwnProperty.call(processedBody, 'temperature')
+      const hasValidTemperature =
+        processedBody.temperature !== undefined && processedBody.temperature !== null
+      const hasValidTopP = processedBody.top_p !== undefined && processedBody.top_p !== null
+
+      if (hasValidTemperature && hasValidTopP) {
+        // Claude API 仅允许 temperature 或 top_p 其一，同时优先保留 temperature
+        delete processedBody.top_p
+      }
+
       if (this.systemPrompt) {
         const promptBlock = { type: 'text', text: this.systemPrompt }
         if (Array.isArray(processedBody.system)) {
@@ -1009,6 +1019,24 @@ class DroidRelayService {
       if (shouldDisableThinking) {
         if ('thinking' in processedBody) {
           delete processedBody.thinking
+        }
+      } else if (
+        processedBody.thinking &&
+        processedBody.thinking.type === 'enabled' &&
+        hasTemperatureField
+      ) {
+        const parsedTemperature =
+          typeof processedBody.temperature === 'string'
+            ? parseFloat(processedBody.temperature)
+            : processedBody.temperature
+
+        if (typeof parsedTemperature === 'number' && !Number.isNaN(parsedTemperature)) {
+          if (parsedTemperature <= 0) {
+            // 当开启 thinking 时，temperature 不允许为 0
+            processedBody.temperature = 1
+          }
+        } else {
+          delete processedBody.temperature
         }
       }
     }
