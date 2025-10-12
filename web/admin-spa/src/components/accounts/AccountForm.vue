@@ -3440,8 +3440,21 @@ const form = ref({
   apiVersion: props.account?.apiVersion || '',
   deploymentName: props.account?.deploymentName || '',
   // 到期时间字段
-  expireDuration: '',
-  customExpireDate: '',
+  expireDuration: (() => {
+    // 编辑时根据expiresAt初始化expireDuration
+    if (props.account?.expiresAt) {
+      return 'custom' // 如果有过期时间，默认显示为自定义
+    }
+    return ''
+  })(),
+  customExpireDate: (() => {
+    // 编辑时根据expiresAt初始化customExpireDate
+    if (props.account?.expiresAt) {
+      // 转换ISO时间为datetime-local格式 (YYYY-MM-DDTHH:mm)
+      return new Date(props.account.expiresAt).toISOString().slice(0, 16)
+    }
+    return ''
+  })(),
   expiresAt: props.account?.expiresAt || null
 })
 
