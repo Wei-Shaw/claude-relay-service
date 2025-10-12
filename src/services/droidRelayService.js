@@ -975,18 +975,10 @@ class DroidRelayService {
       processedBody.stream = true
     }
 
+    const hasTemperatureField = Object.prototype.hasOwnProperty.call(processedBody, 'temperature')
+
     // Anthropic 端点：处理 thinking 字段
     if (endpointType === 'anthropic') {
-      const hasTemperatureField = Object.prototype.hasOwnProperty.call(processedBody, 'temperature')
-      const hasValidTemperature =
-        processedBody.temperature !== undefined && processedBody.temperature !== null
-      const hasValidTopP = processedBody.top_p !== undefined && processedBody.top_p !== null
-
-      if (hasValidTemperature && hasValidTopP) {
-        // Claude API 仅允许 temperature 或 top_p 其一，同时优先保留 temperature
-        delete processedBody.top_p
-      }
-
       if (this.systemPrompt) {
         const promptBlock = { type: 'text', text: this.systemPrompt }
         if (Array.isArray(processedBody.system)) {
@@ -1062,6 +1054,16 @@ class DroidRelayService {
       } else {
         delete processedBody.reasoning
       }
+    }
+
+    // 处理 temperature 和 top_p 参数
+    const hasValidTemperature =
+      processedBody.temperature !== undefined && processedBody.temperature !== null
+    const hasValidTopP = processedBody.top_p !== undefined && processedBody.top_p !== null
+
+    if (hasValidTemperature && hasValidTopP) {
+      // 仅允许 temperature 或 top_p 其一，同时优先保留 temperature
+      delete processedBody.top_p
     }
 
     return processedBody
