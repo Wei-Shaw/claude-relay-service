@@ -3370,7 +3370,8 @@ const commonModels = [
   { value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5', color: 'indigo' },
   { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku', color: 'green' },
   { value: 'claude-opus-4-20250514', label: 'Claude Opus 4', color: 'purple' },
-  { value: 'claude-opus-4-1-20250805', label: 'Claude Opus 4.1', color: 'purple' }
+  { value: 'claude-opus-4-1-20250805', label: 'Claude Opus 4.1', color: 'purple' },
+  { value: 'deepseek-chat', label: 'DeepSeek Chat', color: 'cyan' }
 ]
 
 // 模型映射表数据
@@ -3385,25 +3386,31 @@ const initModelMappings = () => {
       !Array.isArray(props.account.supportedModels)
     ) {
       const entries = Object.entries(props.account.supportedModels)
-      modelMappings.value = entries.map(([from, to]) => ({ from, to }))
 
       // 判断是白名单模式还是映射模式
       // 如果所有映射都是"映射到自己"，则视为白名单模式
       const isWhitelist = entries.every(([from, to]) => from === to)
       if (isWhitelist) {
         modelRestrictionMode.value = 'whitelist'
+        // 白名单模式：设置 allowedModels（显示勾选的模型）
         allowedModels.value = entries.map(([from]) => from)
+        // 同时保留 modelMappings（以便用户切换到映射模式时有初始数据）
+        modelMappings.value = entries.map(([from, to]) => ({ from, to }))
       } else {
         modelRestrictionMode.value = 'mapping'
+        // 映射模式：设置 modelMappings（显示映射表）
+        modelMappings.value = entries.map(([from, to]) => ({ from, to }))
+        // 不填充 allowedModels，因为映射模式不使用白名单复选框
       }
     } else if (Array.isArray(props.account.supportedModels)) {
       // 如果是数组格式（旧格式），转换为白名单模式
+      modelRestrictionMode.value = 'whitelist'
+      allowedModels.value = props.account.supportedModels
+      // 同时设置 modelMappings 为自映射
       modelMappings.value = props.account.supportedModels.map((model) => ({
         from: model,
         to: model
       }))
-      modelRestrictionMode.value = 'whitelist'
-      allowedModels.value = props.account.supportedModels
     }
   }
 }
