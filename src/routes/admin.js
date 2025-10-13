@@ -32,6 +32,36 @@ const ProxyHelper = require('../utils/proxyHelper')
 
 const router = express.Router()
 
+function normalizeNullableDate(value) {
+  if (value === undefined || value === null) {
+    return null
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed === '' ? null : trimmed
+  }
+  return value
+}
+
+function formatSubscriptionExpiry(account) {
+  if (!account || typeof account !== 'object') {
+    return account
+  }
+
+  const rawSubscription = account.subscriptionExpiresAt
+  const rawToken = account.tokenExpiresAt !== undefined ? account.tokenExpiresAt : account.expiresAt
+
+  const subscriptionExpiresAt = normalizeNullableDate(rawSubscription)
+  const tokenExpiresAt = normalizeNullableDate(rawToken)
+
+  return {
+    ...account,
+    subscriptionExpiresAt,
+    tokenExpiresAt,
+    expiresAt: subscriptionExpiresAt
+  }
+}
+
 // 👥 用户管理
 
 // 获取所有用户列表（用于API Key分配）
@@ -2082,6 +2112,7 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
         try {
           const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
+          const formattedAccount = formatSubscriptionExpiry(account)
 
           // 获取会话窗口使用统计（仅对有活跃窗口的账户）
           let sessionWindowUsage = null
@@ -2124,7 +2155,7 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
           }
 
           return {
-            ...account,
+            ...formattedAccount,
             // 转换schedulable为布尔值
             schedulable: account.schedulable === 'true' || account.schedulable === true,
             groupInfos,
@@ -2140,8 +2171,9 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
           // 如果获取统计失败，返回空统计
           try {
             const groupInfos = await accountGroupService.getAccountGroups(account.id)
+            const formattedAccount = formatSubscriptionExpiry(account)
             return {
-              ...account,
+              ...formattedAccount,
               groupInfos,
               usage: {
                 daily: { tokens: 0, requests: 0, allTokens: 0 },
@@ -2155,8 +2187,9 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
               `⚠️ Failed to get group info for account ${account.id}:`,
               groupError.message
             )
+            const formattedAccount = formatSubscriptionExpiry(account)
             return {
-              ...account,
+              ...formattedAccount,
               groupInfos: [],
               usage: {
                 daily: { tokens: 0, requests: 0, allTokens: 0 },
@@ -2170,7 +2203,8 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
       })
     )
 
-    return res.json({ success: true, data: accountsWithStats })
+    const formattedAccounts = accountsWithStats.map(formatSubscriptionExpiry)
+    return res.json({ success: true, data: formattedAccounts })
   } catch (error) {
     logger.error('❌ Failed to get Claude accounts:', error)
     return res.status(500).json({ error: 'Failed to get Claude accounts', message: error.message })
@@ -2327,7 +2361,8 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
     }
 
     logger.success(`🏢 Admin created new Claude account: ${name} (${accountType || 'shared'})`)
-    return res.json({ success: true, data: newAccount })
+    const responseAccount = formatSubscriptionExpiry(newAccount)
+    return res.json({ success: true, data: responseAccount })
   } catch (error) {
     logger.error('❌ Failed to create Claude account:', error)
     return res
@@ -2610,14 +2645,16 @@ router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
     }
 
     // 为每个账户添加使用统计信息
+
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
+        const formattedAccount = formatSubscriptionExpiry(account)
         try {
           const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
           return {
-            ...account,
+            ...formattedAccount,
             // 转换schedulable为布尔值
             schedulable: account.schedulable === 'true' || account.schedulable === true,
             groupInfos,
@@ -2635,7 +2672,7 @@ router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
           try {
             const groupInfos = await accountGroupService.getAccountGroups(account.id)
             return {
-              ...account,
+              ...formattedAccount,
               // 转换schedulable为布尔值
               schedulable: account.schedulable === 'true' || account.schedulable === true,
               groupInfos,
@@ -2651,7 +2688,7 @@ router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
               groupError.message
             )
             return {
-              ...account,
+              ...formattedAccount,
               groupInfos: [],
               usage: {
                 daily: { tokens: 0, requests: 0, allTokens: 0 },
@@ -2664,7 +2701,8 @@ router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
       })
     )
 
-    return res.json({ success: true, data: accountsWithStats })
+    const formattedAccounts = accountsWithStats.map(formatSubscriptionExpiry)
+    return res.json({ success: true, data: formattedAccounts })
   } catch (error) {
     logger.error('❌ Failed to get Claude Console accounts:', error)
     return res
@@ -2735,7 +2773,8 @@ router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
     }
 
     logger.success(`🎮 Admin created Claude Console account: ${name}`)
-    return res.json({ success: true, data: newAccount })
+    const responseAccount = formatSubscriptionExpiry(newAccount)
+    return res.json({ success: true, data: responseAccount })
   } catch (error) {
     logger.error('❌ Failed to create Claude Console account:', error)
     return res
@@ -3037,12 +3076,13 @@ router.get('/ccr-accounts', authenticateAdmin, async (req, res) => {
     // 为每个账户添加使用统计信息
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
+        const formattedAccount = formatSubscriptionExpiry(account)
         try {
           const usageStats = await redis.getAccountUsageStats(account.id)
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
           return {
-            ...account,
+            ...formattedAccount,
             // 转换schedulable为布尔值
             schedulable: account.schedulable === 'true' || account.schedulable === true,
             groupInfos,
@@ -3060,7 +3100,7 @@ router.get('/ccr-accounts', authenticateAdmin, async (req, res) => {
           try {
             const groupInfos = await accountGroupService.getAccountGroups(account.id)
             return {
-              ...account,
+              ...formattedAccount,
               // 转换schedulable为布尔值
               schedulable: account.schedulable === 'true' || account.schedulable === true,
               groupInfos,
@@ -3076,7 +3116,7 @@ router.get('/ccr-accounts', authenticateAdmin, async (req, res) => {
               groupError.message
             )
             return {
-              ...account,
+              ...formattedAccount,
               groupInfos: [],
               usage: {
                 daily: { tokens: 0, requests: 0, allTokens: 0 },
@@ -3089,7 +3129,8 @@ router.get('/ccr-accounts', authenticateAdmin, async (req, res) => {
       })
     )
 
-    return res.json({ success: true, data: accountsWithStats })
+    const formattedAccounts = accountsWithStats.map(formatSubscriptionExpiry)
+    return res.json({ success: true, data: formattedAccounts })
   } catch (error) {
     logger.error('❌ Failed to get CCR accounts:', error)
     return res.status(500).json({ error: 'Failed to get CCR accounts', message: error.message })
@@ -3158,7 +3199,8 @@ router.post('/ccr-accounts', authenticateAdmin, async (req, res) => {
     }
 
     logger.success(`🔧 Admin created CCR account: ${name}`)
-    return res.json({ success: true, data: newAccount })
+    const responseAccount = formatSubscriptionExpiry(newAccount)
+    return res.json({ success: true, data: responseAccount })
   } catch (error) {
     logger.error('❌ Failed to create CCR account:', error)
     return res.status(500).json({ error: 'Failed to create CCR account', message: error.message })
@@ -3446,12 +3488,13 @@ router.get('/bedrock-accounts', authenticateAdmin, async (req, res) => {
     // 为每个账户添加使用统计信息
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
+        const formattedAccount = formatSubscriptionExpiry(account)
         try {
           const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
           return {
-            ...account,
+            ...formattedAccount,
             groupInfos,
             usage: {
               daily: usageStats.daily,
@@ -3467,7 +3510,7 @@ router.get('/bedrock-accounts', authenticateAdmin, async (req, res) => {
           try {
             const groupInfos = await accountGroupService.getAccountGroups(account.id)
             return {
-              ...account,
+              ...formattedAccount,
               groupInfos,
               usage: {
                 daily: { tokens: 0, requests: 0, allTokens: 0 },
@@ -3481,7 +3524,7 @@ router.get('/bedrock-accounts', authenticateAdmin, async (req, res) => {
               groupError.message
             )
             return {
-              ...account,
+              ...formattedAccount,
               groupInfos: [],
               usage: {
                 daily: { tokens: 0, requests: 0, allTokens: 0 },
@@ -3494,7 +3537,8 @@ router.get('/bedrock-accounts', authenticateAdmin, async (req, res) => {
       })
     )
 
-    return res.json({ success: true, data: accountsWithStats })
+    const formattedAccounts = accountsWithStats.map(formatSubscriptionExpiry)
+    return res.json({ success: true, data: formattedAccounts })
   } catch (error) {
     logger.error('❌ Failed to get Bedrock accounts:', error)
     return res.status(500).json({ error: 'Failed to get Bedrock accounts', message: error.message })
@@ -3556,7 +3600,8 @@ router.post('/bedrock-accounts', authenticateAdmin, async (req, res) => {
     }
 
     logger.success(`☁️ Admin created Bedrock account: ${name}`)
-    return res.json({ success: true, data: result.data })
+    const responseAccount = formatSubscriptionExpiry(result.data)
+    return res.json({ success: true, data: responseAccount })
   } catch (error) {
     logger.error('❌ Failed to create Bedrock account:', error)
     return res
@@ -3923,17 +3968,13 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
     // 为每个账户添加使用统计信息（与Claude账户相同的逻辑）
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
+        const formattedAccount = formatSubscriptionExpiry(account)
         try {
           const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
           return {
-            ...account,
-            expiresAt: account.expiresAt || null,
-            subscriptionExpiresAt:
-              account.subscriptionExpiresAt && account.subscriptionExpiresAt !== ''
-                ? account.subscriptionExpiresAt
-                : null,
+            ...formattedAccount,
             groupInfos,
             usage: {
               daily: usageStats.daily,
@@ -3950,12 +3991,7 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
           try {
             const groupInfos = await accountGroupService.getAccountGroups(account.id)
             return {
-              ...account,
-              expiresAt: account.expiresAt || null,
-              subscriptionExpiresAt:
-                account.subscriptionExpiresAt && account.subscriptionExpiresAt !== ''
-                  ? account.subscriptionExpiresAt
-                  : null,
+              ...formattedAccount,
               groupInfos,
               usage: {
                 daily: { tokens: 0, requests: 0, allTokens: 0 },
@@ -3969,12 +4005,7 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
               groupError.message
             )
             return {
-              ...account,
-              expiresAt: account.expiresAt || null,
-              subscriptionExpiresAt:
-                account.subscriptionExpiresAt && account.subscriptionExpiresAt !== ''
-                  ? account.subscriptionExpiresAt
-                  : null,
+              ...formattedAccount,
               groupInfos: [],
               usage: {
                 daily: { tokens: 0, requests: 0, allTokens: 0 },
@@ -3987,7 +4018,8 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
       })
     )
 
-    return res.json({ success: true, data: accountsWithStats })
+    const formattedAccounts = accountsWithStats.map(formatSubscriptionExpiry)
+    return res.json({ success: true, data: formattedAccounts })
   } catch (error) {
     logger.error('❌ Failed to get Gemini accounts:', error)
     return res.status(500).json({ error: 'Failed to get accounts', message: error.message })
@@ -4027,7 +4059,8 @@ router.post('/gemini-accounts', authenticateAdmin, async (req, res) => {
     }
 
     logger.success(`🏢 Admin created new Gemini account: ${accountData.name}`)
-    return res.json({ success: true, data: newAccount })
+    const responseAccount = formatSubscriptionExpiry(newAccount)
+    return res.json({ success: true, data: responseAccount })
   } catch (error) {
     logger.error('❌ Failed to create Gemini account:', error)
     return res.status(500).json({ error: 'Failed to create account', message: error.message })
@@ -4099,7 +4132,8 @@ router.put('/gemini-accounts/:accountId', authenticateAdmin, async (req, res) =>
     const updatedAccount = await geminiAccountService.updateAccount(accountId, mappedUpdates)
 
     logger.success(`📝 Admin updated Gemini account: ${accountId}`)
-    return res.json({ success: true, data: updatedAccount })
+    const responseAccount = formatSubscriptionExpiry(updatedAccount)
+    return res.json({ success: true, data: responseAccount })
   } catch (error) {
     logger.error('❌ Failed to update Gemini account:', error)
     return res.status(500).json({ error: 'Failed to update account', message: error.message })
@@ -7247,8 +7281,9 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
         try {
           const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await fetchAccountGroups(account.id)
+          const formattedAccount = formatSubscriptionExpiry(account)
           return {
-            ...account,
+            ...formattedAccount,
             groupInfos,
             usage: {
               daily: usageStats.daily,
@@ -7259,8 +7294,9 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
         } catch (error) {
           logger.debug(`Failed to get usage stats for OpenAI account ${account.id}:`, error)
           const groupInfos = await fetchAccountGroups(account.id)
+          const formattedAccount = formatSubscriptionExpiry(account)
           return {
-            ...account,
+            ...formattedAccount,
             groupInfos,
             usage: {
               daily: { requests: 0, tokens: 0, allTokens: 0 },
@@ -7274,9 +7310,11 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
 
     logger.info(`获取 OpenAI 账户列表: ${accountsWithStats.length} 个账户`)
 
+    const formattedAccounts = accountsWithStats.map(formatSubscriptionExpiry)
+
     return res.json({
       success: true,
-      data: accountsWithStats
+      data: formattedAccounts
     })
   } catch (error) {
     logger.error('获取 OpenAI 账户列表失败:', error)
@@ -7362,9 +7400,11 @@ router.post('/openai-accounts', authenticateAdmin, async (req, res) => {
 
         logger.success(`✅ 创建并验证 OpenAI 账户成功: ${name} (ID: ${tempAccount.id})`)
 
+        const responseAccount = formatSubscriptionExpiry(refreshedAccount)
+
         return res.json({
           success: true,
-          data: refreshedAccount,
+          data: responseAccount,
           message: '账户创建成功，并已获取完整 token 信息'
         })
       } catch (refreshError) {
@@ -7426,9 +7466,11 @@ router.post('/openai-accounts', authenticateAdmin, async (req, res) => {
 
     logger.success(`✅ 创建 OpenAI 账户成功: ${name} (ID: ${createdAccount.id})`)
 
+    const responseAccount = formatSubscriptionExpiry(createdAccount)
+
     return res.json({
       success: true,
-      data: createdAccount
+      data: responseAccount
     })
   } catch (error) {
     logger.error('创建 OpenAI 账户失败:', error)
@@ -7635,7 +7677,8 @@ router.put('/openai-accounts/:id', authenticateAdmin, async (req, res) => {
     }
 
     logger.success(`📝 Admin updated OpenAI account: ${id}`)
-    return res.json({ success: true, data: updatedAccount })
+    const responseAccount = formatSubscriptionExpiry(updatedAccount)
+    return res.json({ success: true, data: responseAccount })
   } catch (error) {
     logger.error('❌ Failed to update OpenAI account:', error)
     return res.status(500).json({ error: 'Failed to update account', message: error.message })
@@ -7716,9 +7759,11 @@ router.put('/openai-accounts/:id/toggle', authenticateAdmin, async (req, res) =>
       `✅ ${account.enabled ? '启用' : '禁用'} OpenAI 账户: ${account.name} (ID: ${id})`
     )
 
+    const responseAccount = formatSubscriptionExpiry(account)
+
     return res.json({
       success: true,
-      data: account
+      data: responseAccount
     })
   } catch (error) {
     logger.error('切换 OpenAI 账户状态失败:', error)
@@ -7824,11 +7869,12 @@ router.get('/azure-openai-accounts', authenticateAdmin, async (req, res) => {
     // 为每个账户添加使用统计信息和分组信息
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
+        const formattedAccount = formatSubscriptionExpiry(account)
         try {
           const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
           return {
-            ...account,
+            ...formattedAccount,
             groupInfos,
             usage: {
               daily: usageStats.daily,
@@ -7841,7 +7887,7 @@ router.get('/azure-openai-accounts', authenticateAdmin, async (req, res) => {
           try {
             const groupInfos = await accountGroupService.getAccountGroups(account.id)
             return {
-              ...account,
+              ...formattedAccount,
               groupInfos,
               usage: {
                 daily: { requests: 0, tokens: 0, allTokens: 0 },
@@ -7852,7 +7898,7 @@ router.get('/azure-openai-accounts', authenticateAdmin, async (req, res) => {
           } catch (groupError) {
             logger.debug(`Failed to get group info for account ${account.id}:`, groupError)
             return {
-              ...account,
+              ...formattedAccount,
               groupInfos: [],
               usage: {
                 daily: { requests: 0, tokens: 0, allTokens: 0 },
@@ -7865,9 +7911,11 @@ router.get('/azure-openai-accounts', authenticateAdmin, async (req, res) => {
       })
     )
 
+    const formattedAccounts = accountsWithStats.map(formatSubscriptionExpiry)
+
     res.json({
       success: true,
-      data: accountsWithStats
+      data: formattedAccounts
     })
   } catch (error) {
     logger.error('Failed to fetch Azure OpenAI accounts:', error)
@@ -7986,9 +8034,11 @@ router.post('/azure-openai-accounts', authenticateAdmin, async (req, res) => {
       }
     }
 
+    const responseAccount = formatSubscriptionExpiry(account)
+
     res.json({
       success: true,
-      data: account,
+      data: responseAccount,
       message: 'Azure OpenAI account created successfully'
     })
   } catch (error) {
@@ -8019,10 +8069,11 @@ router.put('/azure-openai-accounts/:id', authenticateAdmin, async (req, res) => 
     }
 
     const account = await azureOpenaiAccountService.updateAccount(id, mappedUpdates)
+    const responseAccount = formatSubscriptionExpiry(account)
 
     res.json({
       success: true,
-      data: account,
+      data: responseAccount,
       message: 'Azure OpenAI account updated successfully'
     })
   } catch (error) {
@@ -8275,6 +8326,7 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
     // 处理额度信息、使用统计和绑定的 API Key 数量
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
+        const formattedAccount = formatSubscriptionExpiry(account)
         try {
           // 检查是否需要重置额度
           const today = redis.getDateStringInTimezone()
@@ -8329,7 +8381,7 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
           }
 
           return {
-            ...account,
+            ...formattedAccount,
             boundApiKeysCount: boundCount,
             usage: {
               daily: usageStats.daily,
@@ -8340,7 +8392,7 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
         } catch (error) {
           logger.error(`Failed to process OpenAI-Responses account ${account.id}:`, error)
           return {
-            ...account,
+            ...formattedAccount,
             boundApiKeysCount: 0,
             usage: {
               daily: { requests: 0, tokens: 0, allTokens: 0 },
@@ -8352,7 +8404,9 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
       })
     )
 
-    res.json({ success: true, data: accountsWithStats })
+    const formattedAccounts = accountsWithStats.map(formatSubscriptionExpiry)
+
+    res.json({ success: true, data: formattedAccounts })
   } catch (error) {
     logger.error('Failed to get OpenAI-Responses accounts:', error)
     res.status(500).json({ success: false, message: error.message })
@@ -8363,7 +8417,8 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
 router.post('/openai-responses-accounts', authenticateAdmin, async (req, res) => {
   try {
     const account = await openaiResponsesAccountService.createAccount(req.body)
-    res.json({ success: true, account })
+    const responseAccount = formatSubscriptionExpiry(account)
+    res.json({ success: true, data: responseAccount })
   } catch (error) {
     logger.error('Failed to create OpenAI-Responses account:', error)
     res.status(500).json({
@@ -8408,7 +8463,13 @@ router.put('/openai-responses-accounts/:id', authenticateAdmin, async (req, res)
       return res.status(400).json(result)
     }
 
-    res.json({ success: true, ...result })
+    const updatedAccountData = await openaiResponsesAccountService.getAccount(id)
+    if (updatedAccountData) {
+      updatedAccountData.apiKey = '***'
+    }
+    const responseAccount = formatSubscriptionExpiry(updatedAccountData)
+
+    res.json({ success: true, data: responseAccount })
   } catch (error) {
     logger.error('Failed to update OpenAI-Responses account:', error)
     res.status(500).json({
@@ -8738,6 +8799,7 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
     // 添加使用统计
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
+        const formattedAccount = formatSubscriptionExpiry(account)
         try {
           const usageStats = await redis.getAccountUsageStats(account.id, 'droid')
           let groupInfos = []
@@ -8767,12 +8829,7 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
           }, 0)
 
           return {
-            ...account,
-            expiresAt: account.expiresAt || null,
-            subscriptionExpiresAt:
-              account.subscriptionExpiresAt && account.subscriptionExpiresAt !== ''
-                ? account.subscriptionExpiresAt
-                : null,
+            ...formattedAccount,
             schedulable: account.schedulable === 'true',
             boundApiKeysCount,
             groupInfos,
@@ -8785,12 +8842,7 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
         } catch (error) {
           logger.warn(`Failed to get stats for Droid account ${account.id}:`, error.message)
           return {
-            ...account,
-            expiresAt: account.expiresAt || null,
-            subscriptionExpiresAt:
-              account.subscriptionExpiresAt && account.subscriptionExpiresAt !== ''
-                ? account.subscriptionExpiresAt
-                : null,
+            ...formattedAccount,
             boundApiKeysCount: 0,
             groupInfos: [],
             usage: {
@@ -8803,7 +8855,9 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
       })
     )
 
-    return res.json({ success: true, data: accountsWithStats })
+    const formattedAccounts = accountsWithStats.map(formatSubscriptionExpiry)
+
+    return res.json({ success: true, data: formattedAccounts })
   } catch (error) {
     logger.error('Failed to get Droid accounts:', error)
     return res.status(500).json({ error: 'Failed to get Droid accounts', message: error.message })
@@ -8860,7 +8914,8 @@ router.post('/droid-accounts', authenticateAdmin, async (req, res) => {
     }
 
     logger.success(`Created Droid account: ${account.name} (${account.id})`)
-    return res.json({ success: true, data: account })
+    const responseAccount = formatSubscriptionExpiry(account)
+    return res.json({ success: true, data: responseAccount })
   } catch (error) {
     logger.error('Failed to create Droid account:', error)
     return res.status(500).json({ error: 'Failed to create Droid account', message: error.message })
@@ -8948,7 +9003,8 @@ router.put('/droid-accounts/:id', authenticateAdmin, async (req, res) => {
       }
     }
 
-    return res.json({ success: true, data: account })
+    const responseAccount = formatSubscriptionExpiry(account)
+    return res.json({ success: true, data: responseAccount })
   } catch (error) {
     logger.error(`Failed to update Droid account ${req.params.id}:`, error)
     return res.status(500).json({ error: 'Failed to update Droid account', message: error.message })
