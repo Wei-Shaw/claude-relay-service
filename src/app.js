@@ -49,29 +49,29 @@ class Application {
   initPrometheusMetrics() {
     // Create a Registry to register the metrics
     this.register = new promClient.Registry()
-    
+
     // Add default metrics (CPU, memory, etc.)
     promClient.collectDefaultMetrics({ register: this.register })
-    
+
     // Custom metrics for Claude Relay Service
     this.totalApiKeysGauge = new promClient.Gauge({
       name: 'claude_relay_total_api_keys',
       help: 'Total number of API keys in the system',
       registers: [this.register]
     })
-    
+
     this.totalClaudeAccountsGauge = new promClient.Gauge({
       name: 'claude_relay_total_claude_accounts',
       help: 'Total number of Claude accounts in the system',
       registers: [this.register]
     })
-    
+
     this.totalUsageRecordsGauge = new promClient.Gauge({
       name: 'claude_relay_total_usage_records',
       help: 'Total number of usage records in the system',
       registers: [this.register]
     })
-    
+
     this.uptimeGauge = new promClient.Gauge({
       name: 'claude_relay_uptime_seconds',
       help: 'Application uptime in seconds',
@@ -395,7 +395,7 @@ class Application {
         try {
           // Update custom metrics with current values
           const stats = await redis.getSystemStats()
-          
+
           this.totalApiKeysGauge.set(stats.totalApiKeys || 0)
           this.totalClaudeAccountsGauge.set(stats.totalClaudeAccounts || 0)
           this.totalUsageRecordsGauge.set(stats.totalUsageRecords || 0)
