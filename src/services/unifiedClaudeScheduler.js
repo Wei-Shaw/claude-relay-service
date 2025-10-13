@@ -28,8 +28,25 @@ class UnifiedClaudeScheduler {
       return true // 没有指定模型时，默认支持
     }
 
-    // Claude OAuth 账户的 Opus 模型检查
+    // Claude OAuth 账户的模型检查
     if (accountType === 'claude-official') {
+      // 1. 首先检查是否为 Claude 官方支持的模型
+      // Claude Official API 只支持 Anthropic 自己的模型,不支持第三方模型(如 deepseek-chat)
+      const isClaudeOfficialModel =
+        requestedModel.startsWith('claude-') ||
+        requestedModel.includes('claude') ||
+        requestedModel.includes('sonnet') ||
+        requestedModel.includes('opus') ||
+        requestedModel.includes('haiku')
+
+      if (!isClaudeOfficialModel) {
+        logger.info(
+          `🚫 Claude official account ${account.name} does not support non-Claude model ${requestedModel}${context ? ` ${context}` : ''}`
+        )
+        return false
+      }
+
+      // 2. Opus 模型的订阅级别检查
       if (requestedModel.toLowerCase().includes('opus')) {
         if (account.subscriptionInfo) {
           try {
