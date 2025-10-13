@@ -3,7 +3,7 @@ name: claude-relay
 description: A Helm chart for Claude Relay Service - Independent versioning
 type: application
 version: 0.1.0
-appVersion: v1.1.165
+appVersion: v1.1.172
 
 dependencies:
   - name: redis
