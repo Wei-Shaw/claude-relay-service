@@ -261,7 +261,7 @@ const loadApiKeys = async () => {
     }
 
     // 转换为统一格式
-    apiKeys.value = parsedKeys.map((item) => {
+    const formattedKeys = parsedKeys.map((item) => {
       if (typeof item === 'string') {
         // 对于字符串类型的API Key，保持默认状态为active
         return {
@@ -289,6 +289,24 @@ const loadApiKeys = async () => {
         lastUsedAt: null,
         errorMessage: ''
       }
+    })
+
+    // 按最新使用时间排序（最近使用的在前，未使用的在后）
+    apiKeys.value = formattedKeys.sort((a, b) => {
+      // 如果都有 lastUsedAt，按时间降序排序
+      if (a.lastUsedAt && b.lastUsedAt) {
+        return new Date(b.lastUsedAt) - new Date(a.lastUsedAt)
+      }
+      // 如果 a 有时间，b 没有，a 排在前面
+      if (a.lastUsedAt && !b.lastUsedAt) {
+        return -1
+      }
+      // 如果 b 有时间，a 没有，b 排在前面
+      if (!a.lastUsedAt && b.lastUsedAt) {
+        return 1
+      }
+      // 如果都没有时间，按使用次数降序排序
+      return (b.usageCount || 0) - (a.usageCount || 0)
     })
   } catch (error) {
     console.error('Failed to load API keys:', error)
