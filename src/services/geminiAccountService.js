@@ -42,6 +42,19 @@ function generateEncryptionKey() {
   return _encryptionKeyCache
 }
 
+function normalizeSubscriptionExpiresAt(value) {
+  if (value === undefined || value === null || value === '') {
+    return ''
+  }
+
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  return date.toISOString()
+}
+
 // Gemini 账户键前缀
 const GEMINI_ACCOUNT_KEY_PREFIX = 'gemini_account:'
 const SHARED_GEMINI_ACCOUNTS_KEY = 'shared_gemini_accounts'
@@ -333,6 +346,10 @@ async function createAccount(accountData) {
   let refreshToken = ''
   let expiresAt = ''
 
+  const subscriptionExpiresAt = normalizeSubscriptionExpiresAt(
+    accountData.subscriptionExpiresAt || ''
+  )
+
   if (accountData.geminiOauth || accountData.accessToken) {
     // 如果提供了完整的 OAuth 数据
     if (accountData.geminiOauth) {
@@ -404,7 +421,8 @@ async function createAccount(accountData) {
     createdAt: now,
     updatedAt: now,
     lastUsedAt: '',
-    lastRefreshAt: ''
+    lastRefreshAt: '',
+    subscriptionExpiresAt
   }
 
   // 保存到 Redis
@@ -426,6 +444,10 @@ async function createAccount(accountData) {
     } catch (e) {
       returnAccount.proxy = null
     }
+  }
+
+  if (!returnAccount.subscriptionExpiresAt) {
+    returnAccount.subscriptionExpiresAt = null
   }
 
   return returnAccount
@@ -464,6 +486,10 @@ async function getAccount(accountId) {
   // 转换 schedulable 字符串为布尔值（与 claudeConsoleAccountService 保持一致）
   accountData.schedulable = accountData.schedulable !== 'false' // 默认为true，只有明确设置为'false'才为false
 
+  if (!accountData.subscriptionExpiresAt) {
+    accountData.subscriptionExpiresAt = null
+  }
+
   return accountData
 }
 
@@ -476,6 +502,10 @@ async function updateAccount(accountId, updates) {
 
   const now = new Date().toISOString()
   updates.updatedAt = now
+
+  if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
+    updates.subscriptionExpiresAt = normalizeSubscriptionExpiresAt(updates.subscriptionExpiresAt)
+  }
 
   // 检查是否新增了 refresh token
   // existingAccount.refreshToken 已经是解密后的值了（从 getAccount 返回）
@@ -586,6 +616,10 @@ async function updateAccount(accountId, updates) {
     }
   }
 
+  if (!updatedAccount.subscriptionExpiresAt) {
+    updatedAccount.subscriptionExpiresAt = null
+  }
+
   return updatedAccount
 }
 
@@ -649,6 +683,7 @@ async function getAllAccounts() {
         geminiOauth: accountData.geminiOauth ? '[ENCRYPTED]' : '',
         accessToken: accountData.accessToken ? '[ENCRYPTED]' : '',
         refreshToken: accountData.refreshToken ? '[ENCRYPTED]' : '',
+        subscriptionExpiresAt: accountData.subscriptionExpiresAt || null,
         // 添加 scopes 字段用于判断认证方式
         // 处理空字符串和默认值的情况
         scopes:

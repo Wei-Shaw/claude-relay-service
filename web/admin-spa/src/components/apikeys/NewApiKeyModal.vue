@@ -200,10 +200,6 @@ const getDisplayedApiKey = () => {
   }
 }
 
-const droidEndpoint = computed(() => {
-  return getBaseUrlPrefix() + '/droid/claude'
-})
-
 // 通用复制工具，包含降级处理
 const copyTextWithFallback = async (text, successMessage) => {
   try {
@@ -235,9 +231,7 @@ const copyFullConfig = async () => {
 
   // 构建环境变量配置格式
   const configText = `ANTHROPIC_BASE_URL="${currentBaseUrl.value}"
-ANTHROPIC_AUTH_TOKEN="${key}"
-
-# 提示：如需调用 /droid/claude 端点（已在后台添加 Droid 账号），请将 ANTHROPIC_BASE_URL 改为 "${droidEndpoint.value}" 或根据实际环境调整。`
+ANTHROPIC_AUTH_TOKEN="${key}"`
 
   await copyTextWithFallback(configText, '配置信息已复制到剪贴板')
 }

@@ -194,6 +194,19 @@ function buildCodexUsageSnapshot(accountData) {
   }
 }
 
+function normalizeSubscriptionExpiresAt(value) {
+  if (value === undefined || value === null || value === '') {
+    return ''
+  }
+
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  return date.toISOString()
+}
+
 // 刷新访问令牌
 async function refreshAccessToken(refreshToken, proxy = null) {
   try {
@@ -517,6 +530,13 @@ async function createAccount(accountData) {
   // 处理账户信息
   const accountInfo = accountData.accountInfo || {}
 
+  const tokenExpiresAt = oauthData.expires_in
+    ? new Date(Date.now() + oauthData.expires_in * 1000).toISOString()
+    : ''
+  const subscriptionExpiresAt = normalizeSubscriptionExpiresAt(
+    accountData.subscriptionExpiresAt || accountInfo.subscriptionExpiresAt || ''
+  )
+
   // 检查邮箱是否已经是加密格式（包含冒号分隔的32位十六进制字符）
   const isEmailEncrypted =
     accountInfo.email && accountInfo.email.length >= 33 && accountInfo.email.charAt(32) === ':'
@@ -553,9 +573,8 @@ async function createAccount(accountData) {
     email: isEmailEncrypted ? accountInfo.email : encrypt(accountInfo.email || ''),
     emailVerified: accountInfo.emailVerified === true ? 'true' : 'false',
     // 过期时间
-    expiresAt: oauthData.expires_in
-      ? new Date(Date.now() + oauthData.expires_in * 1000).toISOString()
-      : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 默认1年
+    expiresAt: tokenExpiresAt,
+    subscriptionExpiresAt,
     // 状态字段
     isActive: accountData.isActive !== false ? 'true' : 'false',
     status: 'active',
@@ -580,7 +599,10 @@ async function createAccount(accountData) {
   }
 
   logger.info(`Created OpenAI account: ${accountId}`)
-  return account
+  return {
+    ...account,
+    subscriptionExpiresAt: account.subscriptionExpiresAt || null
+  }
 }
 
 // 获取账户
@@ -623,6 +645,11 @@ async function getAccount(accountId) {
     }
   }
 
+  accountData.subscriptionExpiresAt =
+    accountData.subscriptionExpiresAt && accountData.subscriptionExpiresAt !== ''
+      ? accountData.subscriptionExpiresAt
+      : null
+
   return accountData
 }
 
@@ -656,6 +683,10 @@ async function updateAccount(accountId, updates) {
     updates.email = encrypt(updates.email)
   }
 
+  if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
+    updates.subscriptionExpiresAt = normalizeSubscriptionExpiresAt(updates.subscriptionExpiresAt)
+  }
+
   // 处理代理配置
   if (updates.proxy) {
     updates.proxy =
@@ -686,6 +717,10 @@ async function updateAccount(accountId, updates) {
     } catch (e) {
       updatedAccount.proxy = null
     }
+  }
+
+  if (!updatedAccount.subscriptionExpiresAt) {
+    updatedAccount.subscriptionExpiresAt = null
   }
 
   return updatedAccount
@@ -770,6 +805,8 @@ async function getAllAccounts() {
         }
       }
 
+      const subscriptionExpiresAt = accountData.subscriptionExpiresAt || null
+
       // 不解密敏感字段，只返回基本信息
       accounts.push({
         ...accountData,
@@ -784,6 +821,7 @@ async function getAllAccounts() {
           accountData.scopes && accountData.scopes.trim() ? accountData.scopes.split(' ') : [],
         // 添加 hasRefreshToken 标记
         hasRefreshToken: hasRefreshTokenFlag,
+        subscriptionExpiresAt,
         // 添加限流状态信息（统一格式）
         rateLimitStatus: rateLimitInfo
           ? {

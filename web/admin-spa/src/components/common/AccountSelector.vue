@@ -62,6 +62,28 @@
 
           <!-- 选项列表 -->
           <div class="custom-scrollbar flex-1 overflow-y-auto">
+            <!-- 特殊选项 -->
+            <div
+              v-if="specialOptionsList.length > 0"
+              class="border-b border-gray-200 dark:border-gray-600"
+            >
+              <div
+                v-for="option in specialOptionsList"
+                :key="`special-${option.value}`"
+                class="cursor-pointer px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
+                :class="{ 'bg-blue-50 dark:bg-blue-900/20': modelValue === option.value }"
+                @click="selectAccount(option.value)"
+              >
+                <span class="text-gray-700 dark:text-gray-300">{{ option.label }}</span>
+                <span
+                  v-if="option.description"
+                  class="ml-2 text-xs text-gray-400 dark:text-gray-500"
+                >
+                  {{ option.description }}
+                </span>
+              </div>
+            </div>
+
             <!-- 默认选项 -->
             <div
               class="cursor-pointer px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -264,6 +286,10 @@ const props = defineProps({
   defaultOptionText: {
     type: String,
     default: '使用共享账号池'
+  },
+  specialOptions: {
+    type: Array,
+    default: () => []
   }
 })
 
@@ -276,9 +302,17 @@ const dropdownRef = ref(null)
 const dropdownStyle = ref({})
 const triggerRef = ref(null)
 const lastDirection = ref('') // 记住上次的显示方向
+const specialOptionsList = computed(() => props.specialOptions || [])
 
 // 获取选中的标签
 const selectedLabel = computed(() => {
+  const matchedSpecial = specialOptionsList.value.find(
+    (option) => option.value === props.modelValue
+  )
+  if (matchedSpecial) {
+    return matchedSpecial.label
+  }
+
   // 如果没有选中值，显示默认选项文本
   if (!props.modelValue) return props.defaultOptionText
 

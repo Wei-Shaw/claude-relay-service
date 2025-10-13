@@ -1,0 +1,12 @@
+# These are supported funding model platforms
+
+github: # Your GitHub username for GitHub Sponsors
+patreon: # Replace with your Patreon username if you have one
+open_collective: # Replace with your Open Collective username if you have one
+ko_fi: # Replace with your Ko-fi username if you have one
+tidelift: # Replace with your Tidelift platform-name/package-name e.g., npm/babel
+community_bridge: # Replace with your Community Bridge project-name
+liberapay: # Replace with your Liberapay username
+issuehunt: # Replace with your IssueHunt username
+otechie: # Replace with your Otechie username
+custom: ['https://afdian.com/a/claude-relay-service'] # Your custom donation link (Afdian)

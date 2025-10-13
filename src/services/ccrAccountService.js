@@ -6,6 +6,19 @@ const logger = require('../utils/logger')
 const config = require('../../config/config')
 const LRUCache = require('../utils/lruCache')
 
+function normalizeSubscriptionExpiresAt(value) {
+  if (value === undefined || value === null || value === '') {
+    return ''
+  }
+
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  return date.toISOString()
+}
+
 class CcrAccountService {
   constructor() {
     // 加密相关常量
@@ -49,7 +62,8 @@ class CcrAccountService {
       accountType = 'shared', // 'dedicated' or 'shared'
       schedulable = true, // 是否可被调度
       dailyQuota = 0, // 每日额度限制（美元），0表示不限制
-      quotaResetTime = '00:00' // 额度重置时间（HH:mm格式）
+      quotaResetTime = '00:00', // 额度重置时间（HH:mm格式）
+      subscriptionExpiresAt = null
     } = options
 
     // 验证必填字段
@@ -91,7 +105,8 @@ class CcrAccountService {
       // 使用与统计一致的时区日期，避免边界问题
       lastResetDate: redis.getDateStringInTimezone(), // 最后重置日期（按配置时区）
       quotaResetTime, // 额度重置时间
-      quotaStoppedAt: '' // 因额度停用的时间
+      quotaStoppedAt: '', // 因额度停用的时间
+      subscriptionExpiresAt: normalizeSubscriptionExpiresAt(subscriptionExpiresAt)
     }
 
     const client = redis.getClientSafe()
@@ -127,7 +142,8 @@ class CcrAccountService {
       dailyUsage: 0,
       lastResetDate: accountData.lastResetDate,
       quotaResetTime,
-      quotaStoppedAt: null
+      quotaStoppedAt: null,
+      subscriptionExpiresAt: accountData.subscriptionExpiresAt || null
     }
   }
 
@@ -170,7 +186,9 @@ class CcrAccountService {
             dailyUsage: parseFloat(accountData.dailyUsage || '0'),
             lastResetDate: accountData.lastResetDate || '',
             quotaResetTime: accountData.quotaResetTime || '00:00',
-            quotaStoppedAt: accountData.quotaStoppedAt || null
+            quotaStoppedAt: accountData.quotaStoppedAt || null,
+            expiresAt: accountData.expiresAt || null,
+            subscriptionExpiresAt: accountData.subscriptionExpiresAt || null
           })
         }
       }
@@ -224,6 +242,11 @@ class CcrAccountService {
     logger.debug(
       `[DEBUG] Final CCR account data - name: ${accountData.name}, hasApiUrl: ${!!accountData.apiUrl}, hasApiKey: ${!!accountData.apiKey}, supportedModels: ${JSON.stringify(accountData.supportedModels)}`
     )
+
+    accountData.subscriptionExpiresAt =
+      accountData.subscriptionExpiresAt && accountData.subscriptionExpiresAt !== ''
+        ? accountData.subscriptionExpiresAt
+        : null
 
     return accountData
   }
@@ -286,6 +309,14 @@ class CcrAccountService {
       }
       if (updates.quotaResetTime !== undefined) {
         updatedData.quotaResetTime = updates.quotaResetTime
+      }
+
+      if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
+        updatedData.subscriptionExpiresAt = normalizeSubscriptionExpiresAt(
+          updates.subscriptionExpiresAt
+        )
+      } else if (Object.prototype.hasOwnProperty.call(updates, 'expiresAt')) {
+        updatedData.subscriptionExpiresAt = normalizeSubscriptionExpiresAt(updates.expiresAt)
       }
 
       await client.hset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, updatedData)
