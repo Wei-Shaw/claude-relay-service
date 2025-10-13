@@ -1817,7 +1817,7 @@
                   <li>新会话将随机命中一个 Key，并在会话有效期内保持粘性。</li>
                   <li>若某 Key 失效，会自动切换到剩余可用 Key，最大化成功率。</li>
                   <li>
-                    若上游返回 4xx 错误码，该 Key 会被自动移除；全部 Key 清空后账号将暂停调度。
+                    若上游返回 4xx 错误码，该 Key 会被自动标记为异常；全部 Key 异常后账号将暂停调度。
                   </li>
                 </ul>
               </div>
@@ -3011,10 +3011,18 @@
               >
                 <i class="fas fa-retweet text-sm text-white" />
               </div>
-              <div>
-                <h5 class="mb-2 font-semibold text-purple-900 dark:text-purple-200">
-                  更新 API Key
-                </h5>
+              <div class="flex-1">
+                <div class="mb-2 flex items-center justify-between">
+                  <h5 class="font-semibold text-purple-900 dark:text-purple-200">更新 API Key</h5>
+                  <button
+                    type="button"
+                    class="flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600"
+                    @click="showApiKeyManagement = true"
+                  >
+                    <i class="fas fa-list-ul" />
+                    <span>管理 API Key</span>
+                  </button>
+                </div>
                 <p class="mb-1 text-sm text-purple-800 dark:text-purple-200">
                   当前已保存 <strong>{{ existingApiKeyCount }}</strong> 条 API Key。您可以追加新的
                   Key，或通过下方模式快速覆盖、删除指定 Key。
@@ -3187,6 +3195,15 @@
       @close="showGroupManagement = false"
       @refresh="handleGroupRefresh"
     />
+
+    <!-- API Key 管理模态框 -->
+    <ApiKeyManagementModal
+      v-if="showApiKeyManagement"
+      :account-id="props.account?.id"
+      :account-name="props.account?.name"
+      @close="showApiKeyManagement = false"
+      @refresh="handleApiKeyRefresh"
+    />
   </Teleport>
 </template>
 
@@ -3200,6 +3217,7 @@ import ProxyConfig from './ProxyConfig.vue'
 import OAuthFlow from './OAuthFlow.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import GroupManagementModal from './GroupManagementModal.vue'
+import ApiKeyManagementModal from './ApiKeyManagementModal.vue'
 
 const props = defineProps({
   account: {
@@ -3238,6 +3256,9 @@ const clearingCache = ref(false)
 
 // 平台分组状态
 const platformGroup = ref('')
+
+// API Key 管理模态框
+const showApiKeyManagement = ref(false)
 
 // 根据现有平台确定分组
 const determinePlatformGroup = (platform) => {
@@ -4814,6 +4835,18 @@ const handleNewGroup = () => {
 // 处理分组管理模态框刷新
 const handleGroupRefresh = async () => {
   await loadGroups()
+}
+
+// 处理 API Key 管理模态框刷新
+const handleApiKeyRefresh = async () => {
+  // 刷新账户信息以更新 API Key 数量
+  if (props.account?.id) {
+    try {
+      await accountsStore.fetchAccounts()
+    } catch (error) {
+      console.error('Failed to refresh account data:', error)
+    }
+  }
 }
 
 // 监听平台变化，重置表单
