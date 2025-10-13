@@ -1151,7 +1151,7 @@ class DroidRelayService {
     if (authMethod === 'api_key') {
       if (selectedAccountApiKey?.id) {
         let markResult = null
-        const errorMessage = `上游返回 ${statusCode} 错误`
+        const errorMessage = `${statusCode}`
 
         try {
           // 标记API Key为异常状态而不是删除

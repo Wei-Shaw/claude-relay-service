@@ -49,11 +49,29 @@
             <div
               v-for="(apiKey, index) in paginatedApiKeys"
               :key="index"
-              class="rounded-lg border border-gray-200 bg-white p-4 transition-all hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
+              class="relative rounded-lg border border-gray-200 bg-white p-4 transition-all hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
             >
+              <!-- 左上角错误状态码角标 -->
+              <div
+                v-if="(apiKey.status === 'error' || apiKey.status === 'disabled') && apiKey.errorMessage"
+                class="absolute -left-2 -top-2 z-10"
+              >
+                <span
+                  class="inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold shadow-sm"
+                  :class="[
+                    apiKey.status === 'error'
+                      ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                      : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                  ]"
+                  :title="`错误状态码: ${apiKey.errorMessage}`"
+                >
+                  {{ apiKey.errorMessage }}
+                </span>
+              </div>
+
               <div class="flex flex-col gap-3">
                 <!-- API Key 信息 -->
-                <div class="flex items-start justify-between gap-2 mb-2">
+                <div class="flex items-start justify-between gap-2">
                   <span
                     class="font-mono text-xs font-medium text-gray-900 dark:text-gray-100 break-all flex-1"
                     :title="apiKey.key"
@@ -63,9 +81,25 @@
                   <div class="flex items-center gap-1">
                     <button
                       class="text-xs text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                      title="复制 API Key"
                       @click="copyApiKey(apiKey.key)"
                     >
                       <i class="fas fa-copy" />
+                    </button>
+                    <button
+                      v-if="apiKey.status === 'error' || apiKey.status === 'disabled'"
+                      class="text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      :class="[
+                        apiKey.status === 'error'
+                          ? 'text-orange-500 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300'
+                          : 'text-yellow-500 hover:text-yellow-700 dark:text-yellow-400 dark:hover:text-yellow-300'
+                      ]"
+                      @click="resetApiKeyStatus(apiKey, getOriginalIndex(index))"
+                      :disabled="resetting === getOriginalIndex(index)"
+                      title="重置状态"
+                    >
+                      <div v-if="resetting === getOriginalIndex(index)" class="loading-spinner-sm" />
+                      <i v-else class="fas fa-redo"></i>
                     </button>
                     <button
                       class="text-xs text-red-500 transition-colors hover:text-red-700 dark:text-red-400 dark:hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -116,44 +150,6 @@
                   </div>
                   <div v-if="apiKey.lastUsedAt">
                     <span>{{ formatTime(apiKey.lastUsedAt) }}</span>
-                  </div>
-                </div>
-                
-                <!-- 错误信息显示 -->
-                <div v-if="(apiKey.status === 'error' || apiKey.status === 'disabled') && apiKey.errorMessage" class="mt-2">
-                  <div
-                    class="text-xs p-2 rounded flex items-start justify-between gap-2"
-                    :class="[
-                      apiKey.status === 'error'
-                        ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20'
-                        : 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20'
-                    ]"
-                  >
-                    <div class="flex items-center flex-1 min-w-0">
-                      <i
-                        :class="[
-                          apiKey.status === 'error'
-                            ? 'fas fa-exclamation-triangle'
-                            : 'fas fa-exclamation-circle'
-                        ]"
-                        class="mr-1 flex-shrink-0"
-                      ></i>
-                      <span class="break-words">{{ apiKey.errorMessage }}</span>
-                    </div>
-                    <button
-                      class="text-xs px-2 py-1 rounded bg-white/80 dark:bg-gray-700/80 hover:bg-white dark:hover:bg-gray-600 transition-colors flex-shrink-0"
-                      :class="[
-                        apiKey.status === 'error'
-                          ? 'text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300'
-                          : 'text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300'
-                      ]"
-                      @click="resetApiKeyStatus(apiKey, getOriginalIndex(index))"
-                      :disabled="resetting === getOriginalIndex(index)"
-                      title="重置状态"
-                    >
-                      <div v-if="resetting === getOriginalIndex(index)" class="loading-spinner-sm" />
-                      <i v-else class="fas fa-redo"></i>
-                    </button>
                   </div>
                 </div>
               </div>
