@@ -39,12 +39,17 @@
 
       <form class="space-y-4 sm:space-y-6" @submit.prevent="handleLogin">
         <div>
-          <label class="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100 sm:mb-3"
+          <label
+            class="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100 sm:mb-3"
+            for="username"
             >用户名</label
           >
           <input
+            id="username"
             v-model="loginForm.username"
+            autocomplete="username"
             class="form-input w-full"
+            name="username"
             placeholder="请输入用户名"
             required
             type="text"
@@ -52,12 +57,17 @@
         </div>
 
         <div>
-          <label class="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100 sm:mb-3"
+          <label
+            class="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100 sm:mb-3"
+            for="password"
             >密码</label
           >
           <input
+            id="password"
             v-model="loginForm.password"
+            autocomplete="current-password"
             class="form-input w-full"
+            name="password"
             placeholder="请输入密码"
             required
             type="password"
