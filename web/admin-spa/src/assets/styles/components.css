@@ -261,6 +261,10 @@
   background: rgba(0, 0, 0, 0.6);
 }
 
+.dark .modal {
+  background: rgba(0, 0, 0, 0.75);
+}
+
 .modal-content {
   background: rgba(255, 255, 255, 0.98);
   border-radius: 24px;
@@ -269,6 +273,14 @@
     0 10px 25px -5px rgba(0, 0, 0, 0.15),
     0 0 0 1px rgba(255, 255, 255, 0.05);
   /* 移除模糊效果 */
+}
+
+.dark .modal-content {
+  background: rgba(17, 24, 39, 0.95);
+  border: 1px solid rgba(75, 85, 99, 0.3);
+  box-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 /* 弹窗滚动内容样式 */
