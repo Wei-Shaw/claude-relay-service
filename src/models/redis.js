@@ -1575,12 +1575,52 @@ class RedisClient {
   // 获取并发配置
   _getConcurrencyConfig() {
     const defaults = {
-      leaseSeconds: 900,
+      leaseSeconds: 300,
+      renewIntervalSeconds: 30,
       cleanupGraceSeconds: 30
     }
-    return {
+
+    const configValues = {
       ...defaults,
       ...(config.concurrency || {})
+    }
+
+    const normalizeNumber = (value, fallback, options = {}) => {
+      const parsed = Number(value)
+      if (!Number.isFinite(parsed)) {
+        return fallback
+      }
+
+      if (options.allowZero && parsed === 0) {
+        return 0
+      }
+
+      if (options.min !== undefined && parsed < options.min) {
+        return options.min
+      }
+
+      return parsed
+    }
+
+    return {
+      leaseSeconds: normalizeNumber(configValues.leaseSeconds, defaults.leaseSeconds, {
+        min: 30
+      }),
+      renewIntervalSeconds: normalizeNumber(
+        configValues.renewIntervalSeconds,
+        defaults.renewIntervalSeconds,
+        {
+          allowZero: true,
+          min: 0
+        }
+      ),
+      cleanupGraceSeconds: normalizeNumber(
+        configValues.cleanupGraceSeconds,
+        defaults.cleanupGraceSeconds,
+        {
+          min: 0
+        }
+      )
     }
   }
 
@@ -1650,9 +1690,9 @@ class RedisClient {
         local now = tonumber(ARGV[3])
         local ttl = tonumber(ARGV[4])
 
-        local exists = redis.call('ZSCORE', key, member)
-
         redis.call('ZREMRANGEBYSCORE', key, '-inf', now)
+
+        local exists = redis.call('ZSCORE', key, member)
 
         if exists then
           redis.call('ZADD', key, expireAt, member)
