@@ -296,15 +296,6 @@
               </p>
             </div>
           </div>
-          <p class="mt-3 text-xs text-purple-700 dark:text-purple-300 sm:text-sm">
-            🚀 如果你在后台添加了 <strong>Droid</strong> 类型账号，请将上述命令中的
-            <code class="rounded bg-purple-100 px-1 dark:bg-purple-900">{{ currentBaseUrl }}</code>
-            替换为
-            <code class="rounded bg-purple-100 px-1 dark:bg-purple-900">{{
-              droidClaudeBaseUrl
-            }}</code
-            >，其余配置保持不变。
-          </p>
         </div>
 
         <!-- VSCode 插件配置 -->
@@ -514,17 +505,6 @@
                   {{ line }}
                 </div>
               </div>
-              <p class="mt-2 text-xs text-yellow-700 dark:text-yellow-300 sm:text-sm">
-                🚀 如果你要使用 <strong>Droid</strong> 类型账号池，请把配置中的
-                <code class="rounded bg-yellow-100 px-1 dark:bg-yellow-900">{{
-                  openaiBaseUrl
-                }}</code>
-                替换为
-                <code class="rounded bg-yellow-100 px-1 dark:bg-yellow-900">{{
-                  droidOpenaiBaseUrl
-                }}</code
-                >。
-              </p>
               <p class="mt-3 text-sm text-yellow-700 dark:text-yellow-300">
                 在
                 <code class="rounded bg-yellow-100 px-1 dark:bg-yellow-900"
@@ -1009,15 +989,6 @@
               </div>
             </div>
           </div>
-          <p class="mt-3 text-xs text-orange-700 dark:text-orange-300 sm:text-sm">
-            🚀 如果你创建了 <strong>Droid</strong> 类型账号，请把上述命令中的
-            <code class="rounded bg-orange-100 px-1 dark:bg-orange-900">{{ currentBaseUrl }}</code>
-            替换为
-            <code class="rounded bg-orange-100 px-1 dark:bg-orange-900">{{
-              droidClaudeBaseUrl
-            }}</code
-            >，其余配置保持不变。
-          </p>
         </div>
 
         <!-- VSCode 插件配置 (macOS) -->
@@ -1185,17 +1156,6 @@
                   {{ line }}
                 </div>
               </div>
-              <p class="mt-2 text-xs text-yellow-700 dark:text-yellow-300 sm:text-sm">
-                🚀 如果你要使用 <strong>Droid</strong> 类型账号池，请把配置中的
-                <code class="rounded bg-yellow-100 px-1 dark:bg-yellow-900">{{
-                  openaiBaseUrl
-                }}</code>
-                替换为
-                <code class="rounded bg-yellow-100 px-1 dark:bg-yellow-900">{{
-                  droidOpenaiBaseUrl
-                }}</code
-                >。
-              </p>
               <p class="mt-3 text-sm text-yellow-700 dark:text-yellow-300">
                 在
                 <code class="rounded bg-yellow-100 px-1 dark:bg-yellow-900"
@@ -1674,15 +1634,6 @@
               </div>
             </div>
           </div>
-          <p class="mt-3 text-xs text-orange-700 dark:text-orange-300 sm:text-sm">
-            🚀 如果你创建了 <strong>Droid</strong> 类型账号，请把上述命令中的
-            <code class="rounded bg-orange-100 px-1 dark:bg-orange-900">{{ currentBaseUrl }}</code>
-            替换为
-            <code class="rounded bg-orange-100 px-1 dark:bg-orange-900">{{
-              droidClaudeBaseUrl
-            }}</code
-            >，其余配置保持不变。
-          </p>
         </div>
 
         <!-- Gemini CLI 环境变量设置 -->
@@ -1818,17 +1769,6 @@
                   {{ line }}
                 </div>
               </div>
-              <p class="mt-2 text-xs text-yellow-700 dark:text-yellow-300 sm:text-sm">
-                🚀 如果你要使用 <strong>Droid</strong> 类型账号池，请把配置中的
-                <code class="rounded bg-yellow-100 px-1 dark:bg-yellow-900">{{
-                  openaiBaseUrl
-                }}</code>
-                替换为
-                <code class="rounded bg-yellow-100 px-1 dark:bg-yellow-900">{{
-                  droidOpenaiBaseUrl
-                }}</code
-                >。
-              </p>
               <p class="mt-3 text-sm text-yellow-700 dark:text-yellow-300">
                 在
                 <code class="rounded bg-yellow-100 px-1 dark:bg-yellow-900"
@@ -2293,8 +2233,6 @@ const codexConfigContent = computed(() => {
       '[model_providers.crs]',
       'name = "crs"',
       `base_url = "${openaiBaseUrl.value}"`,
-      '# 若使用 Droid 类型账号，请改为以下地址',
-      `# base_url = "${droidOpenaiBaseUrl.value}"`,
       'wire_api = "responses"',
       'requires_openai_auth = true',
       'env_key = "CRS_OAI_KEY"'
