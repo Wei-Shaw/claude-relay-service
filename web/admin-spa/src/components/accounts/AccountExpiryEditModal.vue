@@ -304,14 +304,7 @@ const selectQuickOption = (value) => {
 // 更新自定义过期时间
 const updateCustomExpiryPreview = () => {
   if (localForm.customExpireDate) {
-    // 手动解析日期时间字符串，确保它被正确解释为本地时间
-    const [datePart, timePart] = localForm.customExpireDate.split('T')
-    const [year, month, day] = datePart.split('-').map(Number)
-    const [hours, minutes] = timePart.split(':').map(Number)
-
-    // 使用构造函数创建本地时间的 Date 对象，然后转换为 UTC ISO 字符串
-    const localDate = new Date(year, month - 1, day, hours, minutes, 0, 0)
-    localForm.expiresAt = localDate.toISOString()
+    localForm.expiresAt = new Date(localForm.customExpireDate).toISOString()
   }
 }
 
