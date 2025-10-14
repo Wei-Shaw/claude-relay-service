@@ -9058,6 +9058,109 @@ router.put('/droid-accounts/:id/toggle-schedulable', authenticateAdmin, async (r
   }
 })
 
+// 获取单个 Droid 账户详细信息
+router.get('/droid-accounts/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    // 获取账户基本信息
+    const account = await droidAccountService.getAccount(id)
+    if (!account) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'Droid account not found'
+      })
+    }
+
+    // 获取使用统计信息
+    let usageStats
+    try {
+      usageStats = await redis.getAccountUsageStats(account.id, 'droid')
+    } catch (error) {
+      logger.debug(`Failed to get usage stats for Droid account ${account.id}:`, error)
+      usageStats = {
+        daily: { tokens: 0, requests: 0, allTokens: 0 },
+        total: { tokens: 0, requests: 0, allTokens: 0 },
+        averages: { rpm: 0, tpm: 0 }
+      }
+    }
+
+    // 获取分组信息
+    let groupInfos = []
+    try {
+      groupInfos = await accountGroupService.getAccountGroups(account.id)
+    } catch (error) {
+      logger.debug(`Failed to get group infos for Droid account ${account.id}:`, error)
+      groupInfos = []
+    }
+
+    // 获取绑定的 API Key 数量
+    const allApiKeys = await redis.getAllApiKeys()
+    const groupIds = groupInfos.map((group) => group.id)
+    const boundApiKeysCount = allApiKeys.reduce((count, key) => {
+      const binding = key.droidAccountId
+      if (!binding) {
+        return count
+      }
+      if (binding === account.id) {
+        return count + 1
+      }
+      if (binding.startsWith('group:')) {
+        const groupId = binding.substring('group:'.length)
+        if (groupIds.includes(groupId)) {
+          return count + 1
+        }
+      }
+      return count
+    }, 0)
+
+    // 获取解密的 API Keys（用于管理界面）
+    let decryptedApiKeys = []
+    try {
+      decryptedApiKeys = await droidAccountService.getDecryptedApiKeyEntries(id)
+    } catch (error) {
+      logger.debug(`Failed to get decrypted API keys for Droid account ${account.id}:`, error)
+      decryptedApiKeys = []
+    }
+
+    // 返回完整的账户信息，包含实际的 API Keys
+    const accountDetails = {
+      ...account,
+      // 映射字段：使用 subscriptionExpiresAt 作为前端显示的 expiresAt
+      expiresAt: account.subscriptionExpiresAt || null,
+      schedulable: account.schedulable === 'true',
+      boundApiKeysCount,
+      groupInfos,
+      // 包含实际的 API Keys（用于管理界面）
+      apiKeys: decryptedApiKeys.map((entry) => ({
+        key: entry.key,
+        id: entry.id,
+        usageCount: entry.usageCount || 0,
+        lastUsedAt: entry.lastUsedAt || null,
+        status: entry.status || 'active', // 使用实际的状态，默认为 active
+        errorMessage: entry.errorMessage || '', // 包含错误信息
+        createdAt: entry.createdAt || null
+      })),
+      usage: {
+        daily: usageStats.daily,
+        total: usageStats.total,
+        averages: usageStats.averages
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: accountDetails
+    })
+  } catch (error) {
+    logger.error(`Failed to get Droid account ${req.params.id}:`, error)
+    return res.status(500).json({
+      error: 'Failed to get Droid account',
+      message: error.message
+    })
+  }
+})
+
 // 删除 Droid 账户
 router.delete('/droid-accounts/:id', authenticateAdmin, async (req, res) => {
   try {
