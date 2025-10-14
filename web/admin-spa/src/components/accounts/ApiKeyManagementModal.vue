@@ -20,12 +20,28 @@
               </p>
             </div>
           </div>
-          <button
-            class="p-1 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
-            @click="$emit('close')"
-          >
-            <i class="fas fa-times text-lg sm:text-xl" />
-          </button>
+          <div class="flex items-center gap-2">
+            <button
+              class="flex items-center gap-2 rounded-lg border border-purple-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-purple-600 shadow-sm transition-all duration-200 hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-purple-600/60 dark:bg-purple-900/20 dark:text-purple-200 dark:hover:border-purple-500 dark:hover:bg-purple-900/40 dark:hover:text-purple-100 dark:focus:ring-purple-500/40 sm:text-sm"
+              :disabled="loading || apiKeys.length === 0 || copyingAll"
+              @click="copyAllApiKeys"
+            >
+              <i
+                :class="[
+                  'text-sm sm:text-base',
+                  copyingAll ? 'fas fa-spinner fa-spin' : 'fas fa-clipboard-list'
+                ]"
+              />
+              <span>复制全部 Key</span>
+            </button>
+            <button
+              class="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-400 transition-colors hover:text-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-200 sm:h-10 sm:w-10"
+              title="关闭"
+              @click="$emit('close')"
+            >
+              <i class="fas fa-times text-base sm:text-lg" />
+            </button>
+          </div>
         </div>
 
         <!-- 加载状态 -->
@@ -239,6 +255,7 @@ const resetting = ref(null)
 const apiKeys = ref([])
 const currentPage = ref(1)
 const pageSize = ref(18)
+const copyingAll = ref(false)
 
 // 计算属性
 const totalItems = computed(() => apiKeys.value.length)
@@ -403,14 +420,71 @@ const maskApiKey = (key) => {
   return `${key.substring(0, 8)}...${key.substring(key.length - 4)}`
 }
 
+// 写入剪贴板（带回退逻辑）
+const writeToClipboard = async (text) => {
+  const canUseClipboardApi =
+    typeof navigator !== 'undefined' &&
+    navigator.clipboard &&
+    typeof navigator.clipboard.writeText === 'function' &&
+    (typeof window === 'undefined' || window.isSecureContext !== false)
+
+  if (canUseClipboardApi) {
+    await navigator.clipboard.writeText(text)
+    return
+  }
+
+  if (typeof document === 'undefined') {
+    throw new Error('clipboard unavailable')
+  }
+
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  textarea.style.pointerEvents = 'none'
+  document.body.appendChild(textarea)
+  textarea.select()
+
+  try {
+    const success = document.execCommand('copy')
+    document.body.removeChild(textarea)
+    if (!success) {
+      throw new Error('execCommand failed')
+    }
+  } catch (error) {
+    document.body.removeChild(textarea)
+    throw error
+  }
+}
+
 // 复制 API Key
 const copyApiKey = async (key) => {
   try {
-    await navigator.clipboard.writeText(key)
+    await writeToClipboard(key)
     showToast('API Key 已复制', 'success')
   } catch (error) {
     console.error('Failed to copy:', error)
-    showToast('复制失败', 'error')
+    showToast('复制失败，请手动复制', 'error')
+  }
+}
+
+// 复制全部 API Key
+const copyAllApiKeys = async () => {
+  if (!apiKeys.value.length || copyingAll.value) {
+    return
+  }
+
+  copyingAll.value = true
+  try {
+    const allKeysText = apiKeys.value.map((item) => item.key).join('\n')
+    await writeToClipboard(allKeysText)
+    showToast(`已复制 ${apiKeys.value.length} 条 API Key`, 'success')
+  } catch (error) {
+    console.error('Failed to copy all keys:', error)
+    showToast('复制全部 API Key 失败，请手动复制', 'error')
+  } finally {
+    copyingAll.value = false
   }
 }
 

@@ -4841,11 +4841,23 @@ const handleGroupRefresh = async () => {
 // 处理 API Key 管理模态框刷新
 const handleApiKeyRefresh = async () => {
   // 刷新账户信息以更新 API Key 数量
-  if (props.account?.id) {
+  if (!props.account?.id) {
+    return
+  }
+
+  const refreshers = [
+    typeof accountsStore.fetchDroidAccounts === 'function'
+      ? accountsStore.fetchDroidAccounts
+      : null,
+    typeof accountsStore.fetchAllAccounts === 'function' ? accountsStore.fetchAllAccounts : null
+  ].filter(Boolean)
+
+  for (const refresher of refreshers) {
     try {
-      await accountsStore.fetchAccounts()
+      await refresher()
+      return
     } catch (error) {
-      console.error('Failed to refresh account data:', error)
+      console.error('刷新账户列表失败:', error)
     }
   }
 }
