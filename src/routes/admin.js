@@ -52,6 +52,32 @@ function mapExpiryField(updates, accountType, accountId) {
   return mappedUpdates
 }
 
+/**
+ * 格式化账户数据，确保前端获取正确的过期时间字段
+ * 将 subscriptionExpiresAt（订阅过期时间）映射到 expiresAt 供前端使用
+ * 保留原始的 tokenExpiresAt（OAuth token过期时间）供内部使用
+ * @param {Object} account - 账户对象
+ * @returns {Object} 格式化后的账户对象
+ */
+function formatAccountExpiry(account) {
+  if (!account || typeof account !== 'object') {
+    return account
+  }
+
+  // 保存原始的 OAuth token 过期时间
+  const tokenExpiresAt = account.expiresAt || null
+
+  // 将订阅过期时间映射到 expiresAt（前端使用）
+  const subscriptionExpiresAt = account.subscriptionExpiresAt || null
+
+  return {
+    ...account,
+    expiresAt: subscriptionExpiresAt, // 前端显示订阅过期时间
+    tokenExpiresAt, // 保留 OAuth token 过期时间
+    subscriptionExpiresAt // 保留原始字段
+  }
+}
+
 // 👥 用户管理
 
 // 获取所有用户列表（用于API Key分配）
@@ -2143,8 +2169,9 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
             }
           }
 
+          const formattedAccount = formatAccountExpiry(account)
           return {
-            ...account,
+            ...formattedAccount,
             // 转换schedulable为布尔值
             schedulable: account.schedulable === 'true' || account.schedulable === true,
             groupInfos,
@@ -2160,8 +2187,9 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
           // 如果获取统计失败，返回空统计
           try {
             const groupInfos = await accountGroupService.getAccountGroups(account.id)
+            const formattedAccount = formatAccountExpiry(account)
             return {
-              ...account,
+              ...formattedAccount,
               groupInfos,
               usage: {
                 daily: { tokens: 0, requests: 0, allTokens: 0 },
@@ -2175,8 +2203,9 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
               `⚠️ Failed to get group info for account ${account.id}:`,
               groupError.message
             )
+            const formattedAccount = formatAccountExpiry(account)
             return {
-              ...account,
+              ...formattedAccount,
               groupInfos: [],
               usage: {
                 daily: { tokens: 0, requests: 0, allTokens: 0 },
@@ -2346,7 +2375,8 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
     }
 
     logger.success(`🏢 Admin created new Claude account: ${name} (${accountType || 'shared'})`)
-    return res.json({ success: true, data: newAccount })
+    const formattedAccount = formatAccountExpiry(newAccount)
+    return res.json({ success: true, data: formattedAccount })
   } catch (error) {
     logger.error('❌ Failed to create Claude account:', error)
     return res
@@ -2632,8 +2662,9 @@ router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
           const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
+          const formattedAccount = formatAccountExpiry(account)
           return {
-            ...account,
+            ...formattedAccount,
             // 转换schedulable为布尔值
             schedulable: account.schedulable === 'true' || account.schedulable === true,
             groupInfos,
@@ -2650,8 +2681,9 @@ router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
           )
           try {
             const groupInfos = await accountGroupService.getAccountGroups(account.id)
+            const formattedAccount = formatAccountExpiry(account)
             return {
-              ...account,
+              ...formattedAccount,
               // 转换schedulable为布尔值
               schedulable: account.schedulable === 'true' || account.schedulable === true,
               groupInfos,
@@ -2666,8 +2698,9 @@ router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
               `⚠️ Failed to get group info for Claude Console account ${account.id}:`,
               groupError.message
             )
+            const formattedAccount = formatAccountExpiry(account)
             return {
-              ...account,
+              ...formattedAccount,
               groupInfos: [],
               usage: {
                 daily: { tokens: 0, requests: 0, allTokens: 0 },
@@ -2751,7 +2784,8 @@ router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
     }
 
     logger.success(`🎮 Admin created Claude Console account: ${name}`)
-    return res.json({ success: true, data: newAccount })
+    const formattedAccount = formatAccountExpiry(newAccount)
+    return res.json({ success: true, data: formattedAccount })
   } catch (error) {
     logger.error('❌ Failed to create Claude Console account:', error)
     return res
@@ -3055,8 +3089,9 @@ router.get('/ccr-accounts', authenticateAdmin, async (req, res) => {
           const usageStats = await redis.getAccountUsageStats(account.id)
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
+          const formattedAccount = formatAccountExpiry(account)
           return {
-            ...account,
+            ...formattedAccount,
             // 转换schedulable为布尔值
             schedulable: account.schedulable === 'true' || account.schedulable === true,
             groupInfos,
@@ -3073,8 +3108,9 @@ router.get('/ccr-accounts', authenticateAdmin, async (req, res) => {
           )
           try {
             const groupInfos = await accountGroupService.getAccountGroups(account.id)
+            const formattedAccount = formatAccountExpiry(account)
             return {
-              ...account,
+              ...formattedAccount,
               // 转换schedulable为布尔值
               schedulable: account.schedulable === 'true' || account.schedulable === true,
               groupInfos,
@@ -3172,7 +3208,8 @@ router.post('/ccr-accounts', authenticateAdmin, async (req, res) => {
     }
 
     logger.success(`🔧 Admin created CCR account: ${name}`)
-    return res.json({ success: true, data: newAccount })
+    const formattedAccount = formatAccountExpiry(newAccount)
+    return res.json({ success: true, data: formattedAccount })
   } catch (error) {
     logger.error('❌ Failed to create CCR account:', error)
     return res.status(500).json({ error: 'Failed to create CCR account', message: error.message })
@@ -3462,8 +3499,9 @@ router.get('/bedrock-accounts', authenticateAdmin, async (req, res) => {
           const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
+          const formattedAccount = formatAccountExpiry(account)
           return {
-            ...account,
+            ...formattedAccount,
             groupInfos,
             usage: {
               daily: usageStats.daily,
@@ -3478,8 +3516,9 @@ router.get('/bedrock-accounts', authenticateAdmin, async (req, res) => {
           )
           try {
             const groupInfos = await accountGroupService.getAccountGroups(account.id)
+            const formattedAccount = formatAccountExpiry(account)
             return {
-              ...account,
+              ...formattedAccount,
               groupInfos,
               usage: {
                 daily: { tokens: 0, requests: 0, allTokens: 0 },
@@ -3568,6 +3607,7 @@ router.post('/bedrock-accounts', authenticateAdmin, async (req, res) => {
     }
 
     logger.success(`☁️ Admin created Bedrock account: ${name}`)
+    const formattedAccount = formatAccountExpiry(formattedAccount)
     return res.json({ success: true, data: result.data })
   } catch (error) {
     logger.error('❌ Failed to create Bedrock account:', error)
@@ -3934,8 +3974,9 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
           const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
+          const formattedAccount = formatAccountExpiry(account)
           return {
-            ...account,
+            ...formattedAccount,
             groupInfos,
             usage: {
               daily: usageStats.daily,
@@ -3951,8 +3992,9 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
           // 如果获取统计失败，返回空统计
           try {
             const groupInfos = await accountGroupService.getAccountGroups(account.id)
+            const formattedAccount = formatAccountExpiry(account)
             return {
-              ...account,
+              ...formattedAccount,
               groupInfos,
               usage: {
                 daily: { tokens: 0, requests: 0, allTokens: 0 },
@@ -4019,6 +4061,7 @@ router.post('/gemini-accounts', authenticateAdmin, async (req, res) => {
     }
 
     logger.success(`🏢 Admin created new Gemini account: ${accountData.name}`)
+    const formattedAccount = formatAccountExpiry(formattedAccount)
     return res.json({ success: true, data: newAccount })
   } catch (error) {
     logger.error('❌ Failed to create Gemini account:', error)
@@ -7231,8 +7274,9 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
         try {
           const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await fetchAccountGroups(account.id)
+          const formattedAccount = formatAccountExpiry(account)
           return {
-            ...account,
+            ...formattedAccount,
             groupInfos,
             usage: {
               daily: usageStats.daily,
@@ -7243,8 +7287,9 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
         } catch (error) {
           logger.debug(`Failed to get usage stats for OpenAI account ${account.id}:`, error)
           const groupInfos = await fetchAccountGroups(account.id)
+          const formattedAccount = formatAccountExpiry(account)
           return {
-            ...account,
+            ...formattedAccount,
             groupInfos,
             usage: {
               daily: { requests: 0, tokens: 0, allTokens: 0 },
@@ -7801,8 +7846,9 @@ router.get('/azure-openai-accounts', authenticateAdmin, async (req, res) => {
         try {
           const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
+          const formattedAccount = formatAccountExpiry(account)
           return {
-            ...account,
+            ...formattedAccount,
             groupInfos,
             usage: {
               daily: usageStats.daily,
@@ -7814,8 +7860,9 @@ router.get('/azure-openai-accounts', authenticateAdmin, async (req, res) => {
           logger.debug(`Failed to get usage stats for Azure OpenAI account ${account.id}:`, error)
           try {
             const groupInfos = await accountGroupService.getAccountGroups(account.id)
+            const formattedAccount = formatAccountExpiry(account)
             return {
-              ...account,
+              ...formattedAccount,
               groupInfos,
               usage: {
                 daily: { requests: 0, tokens: 0, allTokens: 0 },
@@ -8294,8 +8341,9 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
             logger.info(`OpenAI-Responses account ${account.id} has ${boundCount} bound API keys`)
           }
 
+          const formattedAccount = formatAccountExpiry(account)
           return {
-            ...account,
+            ...formattedAccount,
             boundApiKeysCount: boundCount,
             usage: {
               daily: usageStats.daily,
@@ -8305,8 +8353,9 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
           }
         } catch (error) {
           logger.error(`Failed to process OpenAI-Responses account ${account.id}:`, error)
+          const formattedAccount = formatAccountExpiry(account)
           return {
-            ...account,
+            ...formattedAccount,
             boundApiKeysCount: 0,
             usage: {
               daily: { requests: 0, tokens: 0, allTokens: 0 },
@@ -8329,7 +8378,8 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
 router.post('/openai-responses-accounts', authenticateAdmin, async (req, res) => {
   try {
     const account = await openaiResponsesAccountService.createAccount(req.body)
-    res.json({ success: true, account })
+    const formattedAccount = formatAccountExpiry(account)
+    res.json({ success: true, data: formattedAccount })
   } catch (error) {
     logger.error('Failed to create OpenAI-Responses account:', error)
     res.status(500).json({
@@ -8724,8 +8774,9 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
             return count
           }, 0)
 
+          const formattedAccount = formatAccountExpiry(account)
           return {
-            ...account,
+            ...formattedAccount,
             schedulable: account.schedulable === 'true',
             boundApiKeysCount,
             groupInfos,
@@ -8737,8 +8788,9 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
           }
         } catch (error) {
           logger.warn(`Failed to get stats for Droid account ${account.id}:`, error.message)
+          const formattedAccount = formatAccountExpiry(account)
           return {
-            ...account,
+            ...formattedAccount,
             boundApiKeysCount: 0,
             groupInfos: [],
             usage: {
@@ -8808,7 +8860,8 @@ router.post('/droid-accounts', authenticateAdmin, async (req, res) => {
     }
 
     logger.success(`Created Droid account: ${account.name} (${account.id})`)
-    return res.json({ success: true, data: account })
+    const formattedAccount = formatAccountExpiry(account)
+    return res.json({ success: true, data: formattedAccount })
   } catch (error) {
     logger.error('Failed to create Droid account:', error)
     return res.status(500).json({ error: 'Failed to create Droid account', message: error.message })
