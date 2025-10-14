@@ -14,6 +14,7 @@ const cacheMonitor = require('./utils/cacheMonitor')
 
 // Import routes
 const apiRoutes = require('./routes/api')
+const unifiedRoutes = require('./routes/unified')
 const adminRoutes = require('./routes/admin')
 const webRoutes = require('./routes/web')
 const apiStatsRoutes = require('./routes/apiStats')
@@ -256,6 +257,7 @@ class Application {
 
       // 🛣️ 路由
       this.app.use('/api', apiRoutes)
+      this.app.use('/api', unifiedRoutes) // 统一智能路由（支持 /v1/chat/completions 等）
       this.app.use('/claude', apiRoutes) // /claude 路由别名，与 /api 功能相同
       this.app.use('/admin', adminRoutes)
       this.app.use('/users', userRoutes)
