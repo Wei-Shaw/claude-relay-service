@@ -1254,6 +1254,19 @@ class ClaudeConsoleAccountService {
       throw error
     }
   }
+
+  /**
+   * ⏰ 检查账户订阅是否过期
+   * @param {Object} account - 账户对象
+   * @returns {boolean} - true: 已过期, false: 未过期
+   */
+  isSubscriptionExpired(account) {
+    if (!account.subscriptionExpiresAt) {
+      return false // 未设置视为永不过期
+    }
+    const expiryDate = new Date(account.subscriptionExpiresAt)
+    return expiryDate <= new Date()
+  }
 }
 
 module.exports = new ClaudeConsoleAccountService()

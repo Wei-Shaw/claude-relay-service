@@ -546,15 +546,11 @@ class UnifiedClaudeScheduler {
         }
 
         // 检查订阅是否过期
-        if (account.subscriptionExpiresAt) {
-          const expiryDate = new Date(account.subscriptionExpiresAt)
-          const now = new Date()
-          if (expiryDate <= now) {
-            logger.debug(
-              `⏰ Claude Console account ${account.name} (${account.id}) expired at ${account.subscriptionExpiresAt}`
-            )
-            continue
-          }
+        if (claudeConsoleAccountService.isSubscriptionExpired(account)) {
+          logger.debug(
+            `⏰ Claude Console account ${account.name} (${account.id}) expired at ${account.subscriptionExpiresAt}`
+          )
+          continue
         }
 
         // 主动触发一次额度检查，确保状态即时生效
@@ -655,15 +651,11 @@ class UnifiedClaudeScheduler {
           }
 
           // 检查订阅是否过期
-          if (account.subscriptionExpiresAt) {
-            const expiryDate = new Date(account.subscriptionExpiresAt)
-            const now = new Date()
-            if (expiryDate <= now) {
-              logger.debug(
-                `⏰ CCR account ${account.name} (${account.id}) expired at ${account.subscriptionExpiresAt}`
-              )
-              continue
-            }
+          if (ccrAccountService.isSubscriptionExpired(account)) {
+            logger.debug(
+              `⏰ CCR account ${account.name} (${account.id}) expired at ${account.subscriptionExpiresAt}`
+            )
+            continue
           }
 
           // 检查是否被限流
@@ -799,15 +791,11 @@ class UnifiedClaudeScheduler {
           return false
         }
         // 检查订阅是否过期
-        if (account.subscriptionExpiresAt) {
-          const expiryDate = new Date(account.subscriptionExpiresAt)
-          const now = new Date()
-          if (expiryDate <= now) {
-            logger.debug(
-              `⏰ Claude Console account ${account.name} (${accountId}) expired at ${account.subscriptionExpiresAt} (session check)`
-            )
-            return false
-          }
+        if (claudeConsoleAccountService.isSubscriptionExpired(account)) {
+          logger.debug(
+            `⏰ Claude Console account ${account.name} (${accountId}) expired at ${account.subscriptionExpiresAt} (session check)`
+          )
+          return false
         }
         // 检查是否超额
         try {
@@ -868,15 +856,11 @@ class UnifiedClaudeScheduler {
           return false
         }
         // 检查订阅是否过期
-        if (account.subscriptionExpiresAt) {
-          const expiryDate = new Date(account.subscriptionExpiresAt)
-          const now = new Date()
-          if (expiryDate <= now) {
-            logger.debug(
-              `⏰ CCR account ${account.name} (${accountId}) expired at ${account.subscriptionExpiresAt} (session check)`
-            )
-            return false
-          }
+        if (ccrAccountService.isSubscriptionExpired(account)) {
+          logger.debug(
+            `⏰ CCR account ${account.name} (${accountId}) expired at ${account.subscriptionExpiresAt} (session check)`
+          )
+          return false
         }
         // 检查是否超额
         try {
@@ -1400,15 +1384,11 @@ class UnifiedClaudeScheduler {
           }
 
           // 检查订阅是否过期
-          if (account.subscriptionExpiresAt) {
-            const expiryDate = new Date(account.subscriptionExpiresAt)
-            const now = new Date()
-            if (expiryDate <= now) {
-              logger.debug(
-                `⏰ CCR account ${account.name} (${account.id}) expired at ${account.subscriptionExpiresAt}`
-              )
-              continue
-            }
+          if (ccrAccountService.isSubscriptionExpired(account)) {
+            logger.debug(
+              `⏰ CCR account ${account.name} (${account.id}) expired at ${account.subscriptionExpiresAt}`
+            )
+            continue
           }
 
           // 检查是否被限流或超额

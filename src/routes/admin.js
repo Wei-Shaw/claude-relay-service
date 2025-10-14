@@ -2361,16 +2361,24 @@ router.put('/claude-accounts/:accountId', authenticateAdmin, async (req, res) =>
     const { accountId } = req.params
     const updates = req.body
 
+    // ✅ 【修改】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt（提前到参数验证之前）
+    const mappedUpdates = mapExpiryField(updates, 'Claude', accountId)
+
     // 验证priority的有效性
     if (
-      updates.priority !== undefined &&
-      (typeof updates.priority !== 'number' || updates.priority < 1 || updates.priority > 100)
+      mappedUpdates.priority !== undefined &&
+      (typeof mappedUpdates.priority !== 'number' ||
+        mappedUpdates.priority < 1 ||
+        mappedUpdates.priority > 100)
     ) {
       return res.status(400).json({ error: 'Priority must be a number between 1 and 100' })
     }
 
     // 验证accountType的有效性
-    if (updates.accountType && !['shared', 'dedicated', 'group'].includes(updates.accountType)) {
+    if (
+      mappedUpdates.accountType &&
+      !['shared', 'dedicated', 'group'].includes(mappedUpdates.accountType)
+    ) {
       return res
         .status(400)
         .json({ error: 'Invalid account type. Must be "shared", "dedicated" or "group"' })
@@ -2378,9 +2386,9 @@ router.put('/claude-accounts/:accountId', authenticateAdmin, async (req, res) =>
 
     // 如果更新为分组类型，验证groupId或groupIds
     if (
-      updates.accountType === 'group' &&
-      !updates.groupId &&
-      (!updates.groupIds || updates.groupIds.length === 0)
+      mappedUpdates.accountType === 'group' &&
+      !mappedUpdates.groupId &&
+      (!mappedUpdates.groupIds || mappedUpdates.groupIds.length === 0)
     ) {
       return res
         .status(400)
@@ -2394,32 +2402,29 @@ router.put('/claude-accounts/:accountId', authenticateAdmin, async (req, res) =>
     }
 
     // 处理分组的变更
-    if (updates.accountType !== undefined) {
+    if (mappedUpdates.accountType !== undefined) {
       // 如果之前是分组类型，需要从所有分组中移除
       if (currentAccount.accountType === 'group') {
         await accountGroupService.removeAccountFromAllGroups(accountId)
       }
 
       // 如果新类型是分组，添加到新分组
-      if (updates.accountType === 'group') {
+      if (mappedUpdates.accountType === 'group') {
         // 处理多分组/单分组的兼容性
-        if (Object.prototype.hasOwnProperty.call(updates, 'groupIds')) {
-          if (updates.groupIds && updates.groupIds.length > 0) {
+        if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'groupIds')) {
+          if (mappedUpdates.groupIds && mappedUpdates.groupIds.length > 0) {
             // 使用多分组设置
-            await accountGroupService.setAccountGroups(accountId, updates.groupIds, 'claude')
+            await accountGroupService.setAccountGroups(accountId, mappedUpdates.groupIds, 'claude')
           } else {
             // groupIds 为空数组，从所有分组中移除
             await accountGroupService.removeAccountFromAllGroups(accountId)
           }
-        } else if (updates.groupId) {
+        } else if (mappedUpdates.groupId) {
           // 兼容单分组模式
-          await accountGroupService.addAccountToGroup(accountId, updates.groupId, 'claude')
+          await accountGroupService.addAccountToGroup(accountId, mappedUpdates.groupId, 'claude')
         }
       }
     }
-
-    // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
-    const mappedUpdates = mapExpiryField(updates, 'Claude', accountId)
 
     await claudeAccountService.updateAccount(accountId, mappedUpdates)
 
