@@ -32,6 +32,18 @@ const ProxyHelper = require('../utils/proxyHelper')
 
 const router = express.Router()
 
+// 🛠️ 工具函数：处理可为空的时间字段
+function normalizeNullableDate(value) {
+  if (value === undefined || value === null) {
+    return null
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed === '' ? null : trimmed
+  }
+  return value
+}
+
 // 🛠️ 工具函数：映射前端字段名到后端字段名
 /**
  * 映射前端的 expiresAt 字段到后端的 subscriptionExpiresAt 字段
@@ -64,17 +76,22 @@ function formatAccountExpiry(account) {
     return account
   }
 
-  // 保存原始的 OAuth token 过期时间
-  const tokenExpiresAt = account.expiresAt || null
+  const rawSubscription = Object.prototype.hasOwnProperty.call(account, 'subscriptionExpiresAt')
+    ? account.subscriptionExpiresAt
+    : null
 
-  // 将订阅过期时间映射到 expiresAt（前端使用）
-  const subscriptionExpiresAt = account.subscriptionExpiresAt || null
+  const rawToken = Object.prototype.hasOwnProperty.call(account, 'tokenExpiresAt')
+    ? account.tokenExpiresAt
+    : account.expiresAt
+
+  const subscriptionExpiresAt = normalizeNullableDate(rawSubscription)
+  const tokenExpiresAt = normalizeNullableDate(rawToken)
 
   return {
     ...account,
-    expiresAt: subscriptionExpiresAt, // 前端显示订阅过期时间
-    tokenExpiresAt, // 保留 OAuth token 过期时间
-    subscriptionExpiresAt // 保留原始字段
+    subscriptionExpiresAt,
+    tokenExpiresAt,
+    expiresAt: subscriptionExpiresAt
   }
 }
 

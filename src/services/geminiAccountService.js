@@ -654,6 +654,12 @@ async function getAllAccounts() {
       // 转换 schedulable 字符串为布尔值（与 getAccount 保持一致）
       accountData.schedulable = accountData.schedulable !== 'false' // 默认为true，只有明确设置为'false'才为false
 
+      const tokenExpiresAt = accountData.expiresAt || null
+      const subscriptionExpiresAt =
+        accountData.subscriptionExpiresAt && accountData.subscriptionExpiresAt !== ''
+          ? accountData.subscriptionExpiresAt
+          : null
+
       // 不解密敏感字段，只返回基本信息
       accounts.push({
         ...accountData,
@@ -663,7 +669,9 @@ async function getAllAccounts() {
 
         // ✅ 前端显示订阅过期时间（业务字段）
         // 注意：前端看到的 expiresAt 实际上是 subscriptionExpiresAt
-        expiresAt: accountData.subscriptionExpiresAt || null,
+        tokenExpiresAt,
+        subscriptionExpiresAt,
+        expiresAt: subscriptionExpiresAt,
 
         // 添加 scopes 字段用于判断认证方式
         // 处理空字符串和默认值的情况

@@ -793,6 +793,12 @@ async function getAllAccounts() {
         }
       }
 
+      const tokenExpiresAt = accountData.expiresAt || null
+      const subscriptionExpiresAt =
+        accountData.subscriptionExpiresAt && accountData.subscriptionExpiresAt !== ''
+          ? accountData.subscriptionExpiresAt
+          : null
+
       // 不解密敏感字段，只返回基本信息
       accounts.push({
         ...accountData,
@@ -803,7 +809,9 @@ async function getAllAccounts() {
         refreshToken: maskedRefreshToken,
 
         // ✅ 前端显示订阅过期时间（业务字段）
-        expiresAt: accountData.subscriptionExpiresAt || null,
+        tokenExpiresAt,
+        subscriptionExpiresAt,
+        expiresAt: subscriptionExpiresAt,
 
         // 添加 scopes 字段用于判断认证方式
         // 处理空字符串的情况
