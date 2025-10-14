@@ -411,11 +411,10 @@ export ANTHROPIC_AUTH_TOKEN="后台创建的API密钥"
 **Gemini CLI 设置环境变量：**
 
 ```bash
-export CODE_ASSIST_ENDPOINT="http://127.0.0.1:3000/gemini" # 根据实际填写你服务器的ip地址或者域名
-export GOOGLE_CLOUD_ACCESS_TOKEN="后台创建的API密钥"  # 使用相同的API密钥即可
-export GOOGLE_GENAI_USE_GCA="true"
+GEMINI_MODEL="gemini-2.5-pro"
+GOOGLE_GEMINI_BASE_URL="http://127.0.0.1:3000/gemini" # 根据实际填写你服务器的ip地址或者域名
+GEMINI_API_KEY="后台创建的API密钥"  # 使用相同的API密钥即可
 ```
-
 **使用 Claude Code：**
 
 ```bash

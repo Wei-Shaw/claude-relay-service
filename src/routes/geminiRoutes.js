@@ -13,13 +13,10 @@ const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 
 // 生成会话哈希
 function generateSessionHash(req) {
-  const sessionData = [
-    req.headers['user-agent'],
-    req.ip,
-    req.headers['x-api-key']?.substring(0, 10)
-  ]
-    .filter(Boolean)
-    .join(':')
+  const apiKeyPrefix =
+    req.headers['x-api-key']?.substring(0, 10) || req.headers['x-goog-api-key']?.substring(0, 10)
+
+  const sessionData = [req.headers['user-agent'], req.ip, apiKeyPrefix].filter(Boolean).join(':')
 
   return crypto.createHash('sha256').update(sessionData).digest('hex')
 }

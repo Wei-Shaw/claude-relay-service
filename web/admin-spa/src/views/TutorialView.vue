@@ -403,13 +403,13 @@
                 class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
               >
                 <div class="whitespace-nowrap text-gray-300">
-                  $env:CODE_ASSIST_ENDPOINT = "{{ geminiBaseUrl }}"
+                  $env:GOOGLE_GEMINI_BASE_URL = "{{ geminiBaseUrl }}"
                 </div>
                 <div class="whitespace-nowrap text-gray-300">
-                  $env:GOOGLE_CLOUD_ACCESS_TOKEN = "你的API密钥"
+                  $env:GEMINI_API_KEY = "你的API密钥"
                 </div>
                 <div class="whitespace-nowrap text-gray-300">
-                  $env:GOOGLE_GENAI_USE_GCA = "true"
+                  $env:GEMINI_MODEL = "gemini-2.5-pro"
                 </div>
               </div>
               <p class="mt-2 text-xs text-yellow-700 dark:text-yellow-400">
@@ -431,16 +431,16 @@
               >
                 <div class="mb-2"># 设置用户级环境变量（永久生效）</div>
                 <div class="whitespace-nowrap text-gray-300">
-                  [System.Environment]::SetEnvironmentVariable("CODE_ASSIST_ENDPOINT", "{{
+                  [System.Environment]::SetEnvironmentVariable("GOOGLE_GEMINI_BASE_URL", "{{
                     geminiBaseUrl
                   }}", [System.EnvironmentVariableTarget]::User)
                 </div>
                 <div class="whitespace-nowrap text-gray-300">
-                  [System.Environment]::SetEnvironmentVariable("GOOGLE_CLOUD_ACCESS_TOKEN",
-                  "你的API密钥", [System.EnvironmentVariableTarget]::User)
+                  [System.Environment]::SetEnvironmentVariable("GEMINI_API_KEY", "你的API密钥",
+                  [System.EnvironmentVariableTarget]::User)
                 </div>
                 <div class="whitespace-nowrap text-gray-300">
-                  [System.Environment]::SetEnvironmentVariable("GOOGLE_GENAI_USE_GCA", "true",
+                  [System.Environment]::SetEnvironmentVariable("GEMINI_MODEL", "gemini-2.5-pro",
                   [System.EnvironmentVariableTarget]::User)
                 </div>
               </div>
@@ -459,11 +459,9 @@
               <div
                 class="space-y-1 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
               >
-                <div class="whitespace-nowrap text-gray-300">echo $env:CODE_ASSIST_ENDPOINT</div>
-                <div class="whitespace-nowrap text-gray-300">
-                  echo $env:GOOGLE_CLOUD_ACCESS_TOKEN
-                </div>
-                <div class="whitespace-nowrap text-gray-300">echo $env:GOOGLE_GENAI_USE_GCA</div>
+                <div class="whitespace-nowrap text-gray-300">echo $env:GOOGLE_GEMINI_BASE_URL</div>
+                <div class="whitespace-nowrap text-gray-300">echo $env:GEMINI_API_KEY</div>
+                <div class="whitespace-nowrap text-gray-300">echo $env:GEMINI_MODEL</div>
               </div>
             </div>
           </div>
@@ -1047,13 +1045,13 @@
                 class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
               >
                 <div class="whitespace-nowrap text-gray-300">
-                  export CODE_ASSIST_ENDPOINT="{{ geminiBaseUrl }}"
+                  export GOOGLE_GEMINI_BASE_URL="{{ geminiBaseUrl }}"
                 </div>
                 <div class="whitespace-nowrap text-gray-300">
-                  export GOOGLE_CLOUD_ACCESS_TOKEN="你的API密钥"
+                  export GEMINI_API_KEY="你的API密钥"
                 </div>
                 <div class="whitespace-nowrap text-gray-300">
-                  export GOOGLE_GENAI_USE_GCA="true"
+                  export GEMINI_MODEL="gemini-2.5-pro"
                 </div>
               </div>
               <p class="mt-2 text-xs text-yellow-700 dark:text-yellow-400">
@@ -1075,13 +1073,13 @@
               >
                 <div class="mb-2"># 对于 zsh (默认)</div>
                 <div class="whitespace-nowrap text-gray-300">
-                  echo 'export CODE_ASSIST_ENDPOINT="{{ geminiBaseUrl }}"' >> ~/.zshrc
+                  echo 'export GOOGLE_GEMINI_BASE_URL="{{ geminiBaseUrl }}"' >> ~/.zshrc
                 </div>
                 <div class="whitespace-nowrap text-gray-300">
-                  echo 'export GOOGLE_CLOUD_ACCESS_TOKEN="你的API密钥"' >> ~/.zshrc
+                  echo 'export GEMINI_API_KEY="你的API密钥"' >> ~/.zshrc
                 </div>
                 <div class="whitespace-nowrap text-gray-300">
-                  echo 'export GOOGLE_GENAI_USE_GCA="true"' >> ~/.zshrc
+                  echo 'export GEMINI_MODEL="gemini-2.5-pro"' >> ~/.zshrc
                 </div>
                 <div class="whitespace-nowrap text-gray-300">source ~/.zshrc</div>
               </div>
@@ -1090,13 +1088,13 @@
               >
                 <div class="mb-2"># 对于 bash</div>
                 <div class="whitespace-nowrap text-gray-300">
-                  echo 'export CODE_ASSIST_ENDPOINT="{{ geminiBaseUrl }}"' >> ~/.bash_profile
+                  echo 'export GOOGLE_GEMINI_BASE_URL="{{ geminiBaseUrl }}"' >> ~/.bash_profile
                 </div>
                 <div class="whitespace-nowrap text-gray-300">
-                  echo 'export GOOGLE_CLOUD_ACCESS_TOKEN="你的API密钥"' >> ~/.bash_profile
+                  echo 'export GEMINI_API_KEY="你的API密钥"' >> ~/.bash_profile
                 </div>
                 <div class="whitespace-nowrap text-gray-300">
-                  echo 'export GOOGLE_GENAI_USE_GCA="true"' >> ~/.bash_profile
+                  echo 'export GEMINI_MODEL="gemini-2.5-pro"' >> ~/.bash_profile
                 </div>
                 <div class="whitespace-nowrap text-gray-300">source ~/.bash_profile</div>
               </div>
@@ -1112,9 +1110,9 @@
               <div
                 class="space-y-1 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
               >
-                <div class="whitespace-nowrap text-gray-300">echo $CODE_ASSIST_ENDPOINT</div>
-                <div class="whitespace-nowrap text-gray-300">echo $GOOGLE_CLOUD_ACCESS_TOKEN</div>
-                <div class="whitespace-nowrap text-gray-300">echo $GOOGLE_GENAI_USE_GCA</div>
+                <div class="whitespace-nowrap text-gray-300">echo $GOOGLE_GEMINI_BASE_URL</div>
+                <div class="whitespace-nowrap text-gray-300">echo $GEMINI_API_KEY</div>
+                <div class="whitespace-nowrap text-gray-300">echo $GEMINI_MODEL</div>
               </div>
             </div>
           </div>
@@ -1660,13 +1658,13 @@
                 class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
               >
                 <div class="whitespace-nowrap text-gray-300">
-                  export CODE_ASSIST_ENDPOINT="{{ geminiBaseUrl }}"
+                  export GOOGLE_GEMINI_BASE_URL="{{ geminiBaseUrl }}"
                 </div>
                 <div class="whitespace-nowrap text-gray-300">
-                  export GOOGLE_CLOUD_ACCESS_TOKEN="你的API密钥"
+                  export GEMINI_API_KEY="你的API密钥"
                 </div>
                 <div class="whitespace-nowrap text-gray-300">
-                  export GOOGLE_GENAI_USE_GCA="true"
+                  export GEMINI_MODEL="gemini-2.5-pro"
                 </div>
               </div>
               <p class="mt-2 text-xs text-yellow-700 dark:text-yellow-400">
@@ -1688,13 +1686,13 @@
               >
                 <div class="mb-2"># 对于 bash (默认)</div>
                 <div class="whitespace-nowrap text-gray-300">
-                  echo 'export CODE_ASSIST_ENDPOINT="{{ geminiBaseUrl }}"' >> ~/.bashrc
+                  echo 'export GOOGLE_GEMINI_BASE_URL="{{ geminiBaseUrl }}"' >> ~/.bashrc
                 </div>
                 <div class="whitespace-nowrap text-gray-300">
-                  echo 'export GOOGLE_CLOUD_ACCESS_TOKEN="你的API密钥"' >> ~/.bashrc
+                  echo 'export GEMINI_API_KEY="你的API密钥"' >> ~/.bashrc
                 </div>
                 <div class="whitespace-nowrap text-gray-300">
-                  echo 'export GOOGLE_GENAI_USE_GCA="true"' >> ~/.bashrc
+                  echo 'export GEMINI_MODEL="gemini-2.5-pro"' >> ~/.bashrc
                 </div>
                 <div class="whitespace-nowrap text-gray-300">source ~/.bashrc</div>
               </div>
@@ -1703,13 +1701,13 @@
               >
                 <div class="mb-2"># 对于 zsh</div>
                 <div class="whitespace-nowrap text-gray-300">
-                  echo 'export CODE_ASSIST_ENDPOINT="{{ geminiBaseUrl }}"' >> ~/.zshrc
+                  echo 'export GOOGLE_GEMINI_BASE_URL="{{ geminiBaseUrl }}"' >> ~/.zshrc
                 </div>
                 <div class="whitespace-nowrap text-gray-300">
-                  echo 'export GOOGLE_CLOUD_ACCESS_TOKEN="你的API密钥"' >> ~/.zshrc
+                  echo 'export GEMINI_API_KEY="你的API密钥"' >> ~/.zshrc
                 </div>
                 <div class="whitespace-nowrap text-gray-300">
-                  echo 'export GOOGLE_GENAI_USE_GCA="true"' >> ~/.zshrc
+                  echo 'export GEMINI_MODEL="gemini-2.5-pro"' >> ~/.zshrc
                 </div>
                 <div class="whitespace-nowrap text-gray-300">source ~/.zshrc</div>
               </div>
@@ -1725,9 +1723,9 @@
               <div
                 class="space-y-1 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
               >
-                <div class="whitespace-nowrap text-gray-300">echo $CODE_ASSIST_ENDPOINT</div>
-                <div class="whitespace-nowrap text-gray-300">echo $GOOGLE_CLOUD_ACCESS_TOKEN</div>
-                <div class="whitespace-nowrap text-gray-300">echo $GOOGLE_GENAI_USE_GCA</div>
+                <div class="whitespace-nowrap text-gray-300">echo $GOOGLE_GEMINI_BASE_URL</div>
+                <div class="whitespace-nowrap text-gray-300">echo $GEMINI_API_KEY</div>
+                <div class="whitespace-nowrap text-gray-300">echo $GEMINI_MODEL</div>
               </div>
             </div>
           </div>

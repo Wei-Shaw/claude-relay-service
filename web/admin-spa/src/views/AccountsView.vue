@@ -3108,6 +3108,25 @@ const getDroidApiKeyCount = (account) => {
     return 0
   }
 
+  // 优先使用 apiKeys 数组来计算正常状态的 API Keys
+  if (Array.isArray(account.apiKeys)) {
+    // 只计算状态不是 'error' 的 API Keys
+    return account.apiKeys.filter((apiKey) => apiKey.status !== 'error').length
+  }
+
+  // 如果是字符串格式的 apiKeys，尝试解析
+  if (typeof account.apiKeys === 'string' && account.apiKeys.trim()) {
+    try {
+      const parsed = JSON.parse(account.apiKeys)
+      if (Array.isArray(parsed)) {
+        // 只计算状态不是 'error' 的 API Keys
+        return parsed.filter((apiKey) => apiKey.status !== 'error').length
+      }
+    } catch (error) {
+      // 忽略解析错误，继续使用其他字段
+    }
+  }
+
   const candidates = [
     account.apiKeyCount,
     account.api_key_count,
@@ -3119,21 +3138,6 @@ const getDroidApiKeyCount = (account) => {
     const value = Number(candidate)
     if (Number.isFinite(value) && value >= 0) {
       return value
-    }
-  }
-
-  if (Array.isArray(account.apiKeys)) {
-    return account.apiKeys.length
-  }
-
-  if (typeof account.apiKeys === 'string' && account.apiKeys.trim()) {
-    try {
-      const parsed = JSON.parse(account.apiKeys)
-      if (Array.isArray(parsed)) {
-        return parsed.length
-      }
-    } catch (error) {
-      // 忽略解析错误，维持默认值
     }
   }
 

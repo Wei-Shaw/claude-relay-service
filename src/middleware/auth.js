@@ -65,6 +65,44 @@ const TOKEN_COUNT_PATHS = new Set([
   '/droid/claude/v1/messages/count_tokens'
 ])
 
+function extractApiKey(req) {
+  const candidates = [
+    req.headers['x-api-key'],
+    req.headers['x-goog-api-key'],
+    req.headers['authorization'],
+    req.headers['api-key'],
+    req.query?.key
+  ]
+
+  for (const candidate of candidates) {
+    let value = candidate
+
+    if (Array.isArray(value)) {
+      value = value.find((item) => typeof item === 'string' && item.trim())
+    }
+
+    if (typeof value !== 'string') {
+      continue
+    }
+
+    let trimmed = value.trim()
+    if (!trimmed) {
+      continue
+    }
+
+    if (/^Bearer\s+/i.test(trimmed)) {
+      trimmed = trimmed.replace(/^Bearer\s+/i, '').trim()
+      if (!trimmed) {
+        continue
+      }
+    }
+
+    return trimmed
+  }
+
+  return ''
+}
+
 function normalizeRequestPath(value) {
   if (!value) {
     return '/'
@@ -95,18 +133,18 @@ const authenticateApiKey = async (req, res, next) => {
 
   try {
     // 安全提取API Key，支持多种格式（包括Gemini CLI支持）
-    const apiKey =
-      req.headers['x-api-key'] ||
-      req.headers['x-goog-api-key'] ||
-      req.headers['authorization']?.replace(/^Bearer\s+/i, '') ||
-      req.headers['api-key'] ||
-      req.query.key
+    const apiKey = extractApiKey(req)
+
+    if (apiKey) {
+      req.headers['x-api-key'] = apiKey
+    }
 
     if (!apiKey) {
       logger.security(`🔒 Missing API key attempt from ${req.ip || 'unknown'}`)
       return res.status(401).json({
         error: 'Missing API key',
-        message: 'Please provide an API key in the x-api-key header or Authorization header'
+        message:
+          'Please provide an API key in the x-api-key, x-goog-api-key, or Authorization header'
       })
     }
 
@@ -950,6 +988,7 @@ const corsMiddleware = (req, res, next) => {
       'Accept',
       'Authorization',
       'x-api-key',
+      'x-goog-api-key',
       'api-key',
       'x-admin-token',
       'anthropic-version',
