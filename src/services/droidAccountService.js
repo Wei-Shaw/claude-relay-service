@@ -1124,9 +1124,7 @@ class DroidAccountService {
         updatedHashes.add(hash)
 
         // 查找现有条目
-        const existingIndex = mergedApiKeys.findIndex(
-          (entry) => entry && entry.hash === hash
-        )
+        const existingIndex = mergedApiKeys.findIndex((entry) => entry && entry.hash === hash)
 
         if (existingIndex !== -1) {
           // 更新现有条目的状态信息
@@ -1134,9 +1132,18 @@ class DroidAccountService {
           mergedApiKeys[existingIndex] = {
             ...existingEntry,
             status: updateItem.status || existingEntry.status || 'active',
-            errorMessage: updateItem.errorMessage !== undefined ? updateItem.errorMessage : existingEntry.errorMessage || '',
-            lastUsedAt: updateItem.lastUsedAt !== undefined ? updateItem.lastUsedAt : existingEntry.lastUsedAt || '',
-            usageCount: updateItem.usageCount !== undefined ? String(updateItem.usageCount) : existingEntry.usageCount || '0'
+            errorMessage:
+              updateItem.errorMessage !== undefined
+                ? updateItem.errorMessage
+                : existingEntry.errorMessage || '',
+            lastUsedAt:
+              updateItem.lastUsedAt !== undefined
+                ? updateItem.lastUsedAt
+                : existingEntry.lastUsedAt || '',
+            usageCount:
+              updateItem.usageCount !== undefined
+                ? String(updateItem.usageCount)
+                : existingEntry.usageCount || '0'
           }
           apiKeysUpdated = true
         }

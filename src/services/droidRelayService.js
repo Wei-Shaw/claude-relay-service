@@ -1182,15 +1182,13 @@ class DroidRelayService {
         // 检查是否还有可用的API Key
         try {
           const availableEntries = await droidAccountService.getDecryptedApiKeyEntries(accountId)
-          const activeEntries = availableEntries.filter(entry => entry.status !== 'error')
-          
+          const activeEntries = availableEntries.filter((entry) => entry.status !== 'error')
+
           if (activeEntries.length === 0) {
             await this._stopDroidAccountScheduling(accountId, statusCode, '所有API Key均已异常')
             await this._clearAccountStickyMapping(normalizedEndpoint, sessionHash, clientApiKeyId)
           } else {
-            logger.info(
-              `ℹ️ Droid 账号 ${accountId} 仍有 ${activeEntries.length} 个可用 API Key`
-            )
+            logger.info(`ℹ️ Droid 账号 ${accountId} 仍有 ${activeEntries.length} 个可用 API Key`)
           }
         } catch (error) {
           logger.error(`❌ 检查可用API Key失败（Account: ${accountId}）：`, error)
