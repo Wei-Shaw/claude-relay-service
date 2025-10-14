@@ -341,7 +341,7 @@ const deleteApiKey = async (apiKey, index) => {
   try {
     // 准备更新数据：删除指定的 key
     const updateData = {
-      apiKeys: [apiKey.key],
+      removeApiKeys: [apiKey.key],
       apiKeyUpdateMode: 'delete'
     }
 
