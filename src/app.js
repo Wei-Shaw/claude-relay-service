@@ -5,6 +5,7 @@ const compression = require('compression')
 const path = require('path')
 const fs = require('fs')
 const bcrypt = require('bcryptjs')
+const promClient = require('prom-client')
 
 const config = require('../config/config')
 const logger = require('./utils/logger')
@@ -42,6 +43,52 @@ class Application {
   constructor() {
     this.app = express()
     this.server = null
+    // Prometheus/OpenMetrics registry and gauges
+    this.register = null
+    this.totalApiKeysGauge = null
+    this.totalClaudeAccountsGauge = null
+    this.totalUsageRecordsGauge = null
+    this.uptimeGauge = null
+
+    this.initPrometheusMetrics()
+  }
+
+  // 📊 初始化 Prometheus/OpenMetrics 指标
+  initPrometheusMetrics() {
+    try {
+      // 创建注册表
+      this.register = new promClient.Registry()
+
+      // 收集默认指标（进程、内存、事件循环等）
+      promClient.collectDefaultMetrics({ register: this.register })
+
+      // 自定义指标 - 系统对象数量
+      this.totalApiKeysGauge = new promClient.Gauge({
+        name: 'claude_relay_total_api_keys',
+        help: 'Total number of API keys in the system',
+        registers: [this.register]
+      })
+
+      this.totalClaudeAccountsGauge = new promClient.Gauge({
+        name: 'claude_relay_total_claude_accounts',
+        help: 'Total number of Claude accounts in the system',
+        registers: [this.register]
+      })
+
+      this.totalUsageRecordsGauge = new promClient.Gauge({
+        name: 'claude_relay_total_usage_records',
+        help: 'Total number of usage records in the system',
+        registers: [this.register]
+      })
+
+      this.uptimeGauge = new promClient.Gauge({
+        name: 'claude_relay_uptime_seconds',
+        help: 'Application uptime in seconds',
+        registers: [this.register]
+      })
+    } catch (error) {
+      logger.warn('⚠️ Prometheus metrics initialization failed:', error.message)
+    }
   }
 
   async initialize() {
@@ -352,6 +399,31 @@ class Application {
         } catch (error) {
           logger.error('❌ Metrics collection failed:', error)
           res.status(500).json({ error: 'Failed to collect metrics' })
+        }
+      })
+
+      // 📊 Prometheus指标端点 (OpenMetrics格式)
+      this.app.get('/prometheus', async (req, res) => {
+        try {
+          if (!this.register) {
+            // 尝试重新初始化注册表
+            this.initPrometheusMetrics()
+          }
+
+          const stats = await redis.getSystemStats()
+
+          // 更新Gauge指标
+          this.totalApiKeysGauge?.set(stats.totalApiKeys || 0)
+          this.totalClaudeAccountsGauge?.set(stats.totalClaudeAccounts || 0)
+          this.totalUsageRecordsGauge?.set(stats.totalUsageRecords || 0)
+          this.uptimeGauge?.set(process.uptime())
+
+          // 返回OpenMetrics格式
+          res.set('Content-Type', this.register?.contentType || promClient.register.contentType)
+          res.end(await this.register.metrics())
+        } catch (error) {
+          logger.error('❌ Prometheus metrics collection failed:', error)
+          res.status(500).send('# Error collecting metrics\n')
         }
       })
 
