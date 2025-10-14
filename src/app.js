@@ -55,6 +55,11 @@ class Application {
       logger.info('🔄 Initializing pricing service...')
       await pricingService.initialize()
 
+      // 📋 初始化模型服务
+      logger.info('🔄 Initializing model service...')
+      const modelService = require('./services/modelService')
+      await modelService.initialize()
+
       // 📊 初始化缓存监控
       await this.initializeCacheMonitoring()
 
@@ -628,6 +633,15 @@ class Application {
             logger.info('💰 Pricing service cleaned up')
           } catch (error) {
             logger.error('❌ Error cleaning up pricing service:', error)
+          }
+
+          // 清理 model service 的文件监听器
+          try {
+            const modelService = require('./services/modelService')
+            modelService.cleanup()
+            logger.info('📋 Model service cleaned up')
+          } catch (error) {
+            logger.error('❌ Error cleaning up model service:', error)
           }
 
           // 停止限流清理服务
