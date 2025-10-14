@@ -53,7 +53,9 @@
             >
               <!-- 左上角错误状态码角标 -->
               <div
-                v-if="(apiKey.status === 'error' || apiKey.status === 'disabled') && apiKey.errorMessage"
+                v-if="
+                  (apiKey.status === 'error' || apiKey.status === 'disabled') && apiKey.errorMessage
+                "
                 class="absolute -left-2 -top-2 z-10"
               >
                 <span
@@ -73,7 +75,7 @@
                 <!-- API Key 信息 -->
                 <div class="flex items-start justify-between gap-2">
                   <span
-                    class="font-mono text-xs font-medium text-gray-900 dark:text-gray-100 break-all flex-1"
+                    class="flex-1 break-all font-mono text-xs font-medium text-gray-900 dark:text-gray-100"
                     :title="apiKey.key"
                   >
                     {{ maskApiKey(apiKey.key) }}
@@ -88,7 +90,7 @@
                     </button>
                     <button
                       v-if="apiKey.status === 'error' || apiKey.status === 'disabled'"
-                      class="text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       :class="[
                         apiKey.status === 'error'
                           ? 'text-orange-500 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300'
@@ -98,11 +100,14 @@
                       :disabled="resetting === getOriginalIndex(index)"
                       title="重置状态"
                     >
-                      <div v-if="resetting === getOriginalIndex(index)" class="loading-spinner-sm" />
+                      <div
+                        v-if="resetting === getOriginalIndex(index)"
+                        class="loading-spinner-sm"
+                      />
                       <i v-else class="fas fa-redo"></i>
                     </button>
                     <button
-                      class="text-xs text-red-500 transition-colors hover:text-red-700 dark:text-red-400 dark:hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="text-xs text-red-500 transition-colors hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:text-red-600"
                       :disabled="deleting === getOriginalIndex(index)"
                       @click="deleteApiKey(apiKey, getOriginalIndex(index))"
                     >
@@ -113,15 +118,17 @@
                 </div>
 
                 <!-- 统计信息（一行显示） -->
-                <div class="flex flex-wrap items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
+                <div
+                  class="flex flex-wrap items-center gap-3 text-xs text-gray-600 dark:text-gray-400"
+                >
                   <div>
                     <span
                       :class="[
                         apiKey.status === 'active'
                           ? 'text-green-600 dark:text-green-400'
                           : apiKey.status === 'error'
-                          ? 'text-red-600 dark:text-red-400'
-                          : 'text-yellow-600 dark:text-yellow-400'
+                            ? 'text-red-600 dark:text-red-400'
+                            : 'text-yellow-600 dark:text-yellow-400'
                       ]"
                     >
                       <i
@@ -129,8 +136,8 @@
                           apiKey.status === 'active'
                             ? 'fas fa-check-circle'
                             : apiKey.status === 'error'
-                            ? 'fas fa-exclamation-triangle'
-                            : 'fas fa-exclamation-circle'
+                              ? 'fas fa-exclamation-triangle'
+                              : 'fas fa-exclamation-circle'
                         ]"
                         class="mr-1"
                       />
@@ -138,15 +145,18 @@
                         apiKey.status === 'active'
                           ? '正常'
                           : apiKey.status === 'error'
-                          ? '异常'
-                          : apiKey.status === 'disabled'
-                          ? '禁用'
-                          : apiKey.status || '未知'
+                            ? '异常'
+                            : apiKey.status === 'disabled'
+                              ? '禁用'
+                              : apiKey.status || '未知'
                       }}
                     </span>
                   </div>
                   <div>
-                    <span>使用: <strong>{{ apiKey.usageCount || 0 }}</strong>次</span>
+                    <span
+                      >使用: <strong>{{ apiKey.usageCount || 0 }}</strong
+                      >次</span
+                    >
                   </div>
                   <div v-if="apiKey.lastUsedAt">
                     <span>{{ formatTime(apiKey.lastUsedAt) }}</span>
@@ -159,18 +169,21 @@
           <!-- 分页控制（底部） -->
           <div v-if="totalPages > 1" class="mt-4 flex items-center justify-between">
             <div class="text-sm text-gray-600 dark:text-gray-400">
-              显示 {{ (currentPage - 1) * pageSize + 1 }}-{{ Math.min(currentPage * pageSize, totalItems) }} 项，共 {{ totalItems }} 项
+              显示 {{ (currentPage - 1) * pageSize + 1 }}-{{
+                Math.min(currentPage * pageSize, totalItems)
+              }}
+              项，共 {{ totalItems }} 项
             </div>
             <div class="flex items-center gap-2">
               <button
-                class="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                 :disabled="currentPage === 1"
                 @click="currentPage = 1"
               >
                 <i class="fas fa-angle-double-left" />
               </button>
               <button
-                class="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                 :disabled="currentPage === 1"
                 @click="currentPage--"
               >
@@ -180,14 +193,14 @@
                 {{ currentPage }} / {{ totalPages }}
               </span>
               <button
-                class="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                 :disabled="currentPage === totalPages"
                 @click="currentPage++"
               >
                 <i class="fas fa-angle-right" />
               </button>
               <button
-                class="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                 :disabled="currentPage === totalPages"
                 @click="currentPage = totalPages"
               >
@@ -347,7 +360,11 @@ const deleteApiKey = async (apiKey, index) => {
 
 // 重置 API Key 状态
 const resetApiKeyStatus = async (apiKey, index) => {
-  if (!confirm(`确定要重置 API Key "${maskApiKey(apiKey.key)}" 的状态吗？这将清除错误信息并恢复为正常状态。`)) {
+  if (
+    !confirm(
+      `确定要重置 API Key "${maskApiKey(apiKey.key)}" 的状态吗？这将清除错误信息并恢复为正常状态。`
+    )
+  ) {
     return
   }
 
