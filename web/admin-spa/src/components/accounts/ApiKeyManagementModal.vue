@@ -96,9 +96,9 @@
                           ? 'text-orange-500 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300'
                           : 'text-yellow-500 hover:text-yellow-700 dark:text-yellow-400 dark:hover:text-yellow-300'
                       ]"
-                      @click="resetApiKeyStatus(apiKey, getOriginalIndex(index))"
                       :disabled="resetting === getOriginalIndex(index)"
                       title="重置状态"
+                      @click="resetApiKeyStatus(apiKey, getOriginalIndex(index))"
                     >
                       <div
                         v-if="resetting === getOriginalIndex(index)"
@@ -132,6 +132,7 @@
                       ]"
                     >
                       <i
+                        class="mr-1"
                         :class="[
                           apiKey.status === 'active'
                             ? 'fas fa-check-circle'
@@ -139,7 +140,6 @@
                               ? 'fas fa-exclamation-triangle'
                               : 'fas fa-exclamation-circle'
                         ]"
-                        class="mr-1"
                       />
                       {{
                         apiKey.status === 'active'

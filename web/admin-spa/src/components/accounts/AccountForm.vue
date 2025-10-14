@@ -3016,8 +3016,8 @@
                 <div class="mb-2 flex items-center justify-between">
                   <h5 class="font-semibold text-purple-900 dark:text-purple-200">更新 API Key</h5>
                   <button
-                    type="button"
                     class="flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600"
+                    type="button"
                     @click="showApiKeyManagement = true"
                   >
                     <i class="fas fa-list-ul" />
