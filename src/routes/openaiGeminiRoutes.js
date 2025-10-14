@@ -9,11 +9,10 @@ const crypto = require('crypto')
 
 // 生成会话哈希
 function generateSessionHash(req) {
-  const sessionData = [
-    req.headers['user-agent'],
-    req.ip,
-    req.headers['authorization']?.substring(0, 20)
-  ]
+  const authSource =
+    req.headers['authorization'] || req.headers['x-api-key'] || req.headers['x-goog-api-key']
+
+  const sessionData = [req.headers['user-agent'], req.ip, authSource?.substring(0, 20)]
     .filter(Boolean)
     .join(':')
 
