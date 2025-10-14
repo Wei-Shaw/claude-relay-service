@@ -738,7 +738,7 @@ class DroidAccountService {
       expiresAt: normalizedExpiresAt || '', // OAuth Token 过期时间（技术字段，自动刷新）
 
       // ✅ 新增：账户订阅到期时间（业务字段，手动管理）
-      subscriptionExpiresAt: options.subscriptionExpiresAt || '',
+      subscriptionExpiresAt: options.subscriptionExpiresAt || null,
 
       proxy: proxy ? JSON.stringify(proxy) : '',
       isActive: isActive.toString(),
@@ -828,6 +828,7 @@ class DroidAccountService {
 
       // ✅ 前端显示订阅过期时间（业务字段）
       expiresAt: account.subscriptionExpiresAt || null,
+      platform: account.platform || 'droid',
 
       apiKeyCount: (() => {
         const parsedCount = this._parseApiKeyEntries(account.apiKeys).length
@@ -1276,8 +1277,8 @@ class DroidAccountService {
    * @param {Object} account - 账户对象
    * @returns {boolean} - true: 已过期, false: 未过期
    */
-  _isSubscriptionExpired(account) {
-    if (!account.subscriptionExpiresAt || account.subscriptionExpiresAt === '') {
+  isSubscriptionExpired(account) {
+    if (!account.subscriptionExpiresAt) {
       return false // 未设置视为永不过期
     }
     const expiryDate = new Date(account.subscriptionExpiresAt)
@@ -1330,7 +1331,7 @@ class DroidAccountService {
         const status = typeof account.status === 'string' ? account.status.toLowerCase() : ''
 
         // ✅ 检查账户订阅是否过期
-        if (this._isSubscriptionExpired(account)) {
+        if (this.isSubscriptionExpired(account)) {
           logger.debug(
             `⏰ Skipping expired Droid account: ${account.name}, expired at ${account.subscriptionExpiresAt}`
           )

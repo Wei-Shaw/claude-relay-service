@@ -32,6 +32,26 @@ const ProxyHelper = require('../utils/proxyHelper')
 
 const router = express.Router()
 
+// 🛠️ 工具函数：映射前端字段名到后端字段名
+/**
+ * 映射前端的 expiresAt 字段到后端的 subscriptionExpiresAt 字段
+ * @param {Object} updates - 更新对象
+ * @param {string} accountType - 账户类型 (如 'Claude', 'OpenAI' 等)
+ * @param {string} accountId - 账户 ID
+ * @returns {Object} 映射后的更新对象
+ */
+function mapExpiryField(updates, accountType, accountId) {
+  const mappedUpdates = { ...updates }
+  if ('expiresAt' in mappedUpdates) {
+    mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
+    delete mappedUpdates.expiresAt
+    logger.info(
+      `Mapping expiresAt to subscriptionExpiresAt for ${accountType} account ${accountId}`
+    )
+  }
+  return mappedUpdates
+}
+
 // 👥 用户管理
 
 // 获取所有用户列表（用于API Key分配）
@@ -2399,11 +2419,7 @@ router.put('/claude-accounts/:accountId', authenticateAdmin, async (req, res) =>
     }
 
     // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
-    const mappedUpdates = { ...updates }
-    if ('expiresAt' in mappedUpdates) {
-      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
-      delete mappedUpdates.expiresAt
-    }
+    const mappedUpdates = mapExpiryField(updates, 'Claude', accountId)
 
     await claudeAccountService.updateAccount(accountId, mappedUpdates)
 
@@ -2746,14 +2762,7 @@ router.put('/claude-console-accounts/:accountId', authenticateAdmin, async (req,
     const updates = req.body
 
     // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
-    const mappedUpdates = { ...updates }
-    if ('expiresAt' in mappedUpdates) {
-      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
-      delete mappedUpdates.expiresAt
-      logger.info(
-        `Mapping expiresAt to subscriptionExpiresAt for Claude Console account ${accountId}`
-      )
-    }
+    const mappedUpdates = mapExpiryField(updates, 'Claude Console', accountId)
 
     // 验证priority的有效性（1-100）
     if (
@@ -3172,12 +3181,7 @@ router.put('/ccr-accounts/:accountId', authenticateAdmin, async (req, res) => {
     const updates = req.body
 
     // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
-    const mappedUpdates = { ...updates }
-    if ('expiresAt' in mappedUpdates) {
-      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
-      delete mappedUpdates.expiresAt
-      logger.info(`Mapping expiresAt to subscriptionExpiresAt for CCR account ${accountId}`)
-    }
+    const mappedUpdates = mapExpiryField(updates, 'CCR', accountId)
 
     // 验证priority的有效性（1-100）
     if (
@@ -3575,12 +3579,7 @@ router.put('/bedrock-accounts/:accountId', authenticateAdmin, async (req, res) =
     const updates = req.body
 
     // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
-    const mappedUpdates = { ...updates }
-    if ('expiresAt' in mappedUpdates) {
-      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
-      delete mappedUpdates.expiresAt
-      logger.info(`Mapping expiresAt to subscriptionExpiresAt for Bedrock account ${accountId}`)
-    }
+    const mappedUpdates = mapExpiryField(updates, 'Bedrock', accountId)
 
     // 验证priority的有效性（1-100）
     if (
@@ -4047,12 +4046,7 @@ router.put('/gemini-accounts/:accountId', authenticateAdmin, async (req, res) =>
     }
 
     // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
-    const mappedUpdates = { ...updates }
-    if ('expiresAt' in mappedUpdates) {
-      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
-      delete mappedUpdates.expiresAt
-      logger.info(`Mapping expiresAt to subscriptionExpiresAt for Gemini account ${accountId}`)
-    }
+    const mappedUpdates = mapExpiryField(updates, 'Gemini', accountId)
 
     // 处理分组的变更
     if (mappedUpdates.accountType !== undefined) {
@@ -7430,12 +7424,7 @@ router.put('/openai-accounts/:id', authenticateAdmin, async (req, res) => {
     const updates = req.body
 
     // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
-    const mappedUpdates = { ...updates }
-    if ('expiresAt' in mappedUpdates) {
-      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
-      delete mappedUpdates.expiresAt
-      logger.info(`Mapping expiresAt to subscriptionExpiresAt for OpenAI account ${id}`)
-    }
+    const mappedUpdates = mapExpiryField(updates, 'OpenAI', id)
 
     const { needsImmediateRefresh, requireRefreshSuccess } = mappedUpdates
 
@@ -7988,12 +7977,7 @@ router.put('/azure-openai-accounts/:id', authenticateAdmin, async (req, res) => 
     const updates = req.body
 
     // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
-    const mappedUpdates = { ...updates }
-    if ('expiresAt' in mappedUpdates) {
-      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
-      delete mappedUpdates.expiresAt
-      logger.info(`Mapping expiresAt to subscriptionExpiresAt for Azure OpenAI account ${id}`)
-    }
+    const mappedUpdates = mapExpiryField(updates, 'Azure OpenAI', id)
 
     const account = await azureOpenaiAccountService.updateAccount(id, mappedUpdates)
 
@@ -8357,12 +8341,7 @@ router.put('/openai-responses-accounts/:id', authenticateAdmin, async (req, res)
     const updates = req.body
 
     // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
-    const mappedUpdates = { ...updates }
-    if ('expiresAt' in mappedUpdates) {
-      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
-      delete mappedUpdates.expiresAt
-      logger.info(`Mapping expiresAt to subscriptionExpiresAt for OpenAI-Responses account ${id}`)
-    }
+    const mappedUpdates = mapExpiryField(updates, 'OpenAI-Responses', id)
 
     // 验证priority的有效性（1-100）
     if (mappedUpdates.priority !== undefined) {
@@ -8838,12 +8817,7 @@ router.put('/droid-accounts/:id', authenticateAdmin, async (req, res) => {
     const updates = { ...req.body }
 
     // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
-    const mappedUpdates = { ...updates }
-    if ('expiresAt' in mappedUpdates) {
-      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
-      delete mappedUpdates.expiresAt
-      logger.info(`Mapping expiresAt to subscriptionExpiresAt for Droid account ${id}`)
-    }
+    const mappedUpdates = mapExpiryField(updates, 'Droid', id)
 
     const { accountType: rawAccountType, groupId, groupIds } = mappedUpdates
 

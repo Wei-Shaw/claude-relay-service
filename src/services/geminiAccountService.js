@@ -389,7 +389,7 @@ async function createAccount(accountData) {
     scopes: accountData.geminiOauth ? accountData.scopes || OAUTH_SCOPES.join(' ') : '',
 
     // ✅ 新增：账户订阅到期时间（业务字段，手动管理）
-    subscriptionExpiresAt: accountData.subscriptionExpiresAt || '',
+    subscriptionExpiresAt: accountData.subscriptionExpiresAt || null,
 
     // 代理设置
     proxy: accountData.proxy ? JSON.stringify(accountData.proxy) : '',
@@ -814,7 +814,7 @@ function isTokenExpired(account) {
  * @returns {boolean} - true: 已过期, false: 未过期
  */
 function isSubscriptionExpired(account) {
-  if (!account.subscriptionExpiresAt || account.subscriptionExpiresAt === '') {
+  if (!account.subscriptionExpiresAt) {
     return false // 未设置视为永不过期
   }
   const expiryDate = new Date(account.subscriptionExpiresAt)

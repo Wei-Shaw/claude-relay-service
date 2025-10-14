@@ -79,7 +79,7 @@ class CcrAccountService {
 
       // ✅ 新增：账户订阅到期时间（业务字段，手动管理）
       // 注意：CCR 使用 API Key 认证，没有 OAuth token，因此没有 expiresAt
-      subscriptionExpiresAt: options.subscriptionExpiresAt || '',
+      subscriptionExpiresAt: options.subscriptionExpiresAt || null,
 
       createdAt: new Date().toISOString(),
       lastUsedAt: '',

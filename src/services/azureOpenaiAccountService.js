@@ -132,7 +132,7 @@ async function createAccount(accountData) {
 
     // ✅ 新增：账户订阅到期时间（业务字段，手动管理）
     // 注意：Azure OpenAI 使用 API Key 认证，没有 OAuth token，因此没有 expiresAt
-    subscriptionExpiresAt: accountData.subscriptionExpiresAt || '',
+    subscriptionExpiresAt: accountData.subscriptionExpiresAt || null,
 
     // 状态字段
     isActive: accountData.isActive !== false ? 'true' : 'false',
@@ -317,7 +317,8 @@ async function getAllAccounts() {
         schedulable: accountData.schedulable !== 'false',
 
         // ✅ 前端显示订阅过期时间（业务字段）
-        expiresAt: accountData.subscriptionExpiresAt || null
+        expiresAt: accountData.subscriptionExpiresAt || null,
+        platform: 'azure-openai'
       })
     }
   }
@@ -351,7 +352,7 @@ async function getSharedAccounts() {
  * @returns {boolean} - true: 已过期, false: 未过期
  */
 function isSubscriptionExpired(account) {
-  if (!account.subscriptionExpiresAt || account.subscriptionExpiresAt === '') {
+  if (!account.subscriptionExpiresAt) {
     return false // 未设置视为永不过期
   }
   const expiryDate = new Date(account.subscriptionExpiresAt)

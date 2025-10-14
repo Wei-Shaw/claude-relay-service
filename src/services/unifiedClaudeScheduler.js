@@ -545,6 +545,18 @@ class UnifiedClaudeScheduler {
           continue
         }
 
+        // 检查订阅是否过期
+        if (account.subscriptionExpiresAt) {
+          const expiryDate = new Date(account.subscriptionExpiresAt)
+          const now = new Date()
+          if (expiryDate <= now) {
+            logger.debug(
+              `⏰ Claude Console account ${account.name} (${account.id}) expired at ${account.subscriptionExpiresAt}`
+            )
+            continue
+          }
+        }
+
         // 主动触发一次额度检查，确保状态即时生效
         try {
           await claudeConsoleAccountService.checkQuotaUsage(account.id)
@@ -640,6 +652,18 @@ class UnifiedClaudeScheduler {
           // 检查模型支持
           if (!this._isModelSupportedByAccount(account, 'ccr', requestedModel)) {
             continue
+          }
+
+          // 检查订阅是否过期
+          if (account.subscriptionExpiresAt) {
+            const expiryDate = new Date(account.subscriptionExpiresAt)
+            const now = new Date()
+            if (expiryDate <= now) {
+              logger.debug(
+                `⏰ CCR account ${account.name} (${account.id}) expired at ${account.subscriptionExpiresAt}`
+              )
+              continue
+            }
           }
 
           // 检查是否被限流
@@ -774,6 +798,17 @@ class UnifiedClaudeScheduler {
         ) {
           return false
         }
+        // 检查订阅是否过期
+        if (account.subscriptionExpiresAt) {
+          const expiryDate = new Date(account.subscriptionExpiresAt)
+          const now = new Date()
+          if (expiryDate <= now) {
+            logger.debug(
+              `⏰ Claude Console account ${account.name} (${accountId}) expired at ${account.subscriptionExpiresAt} (session check)`
+            )
+            return false
+          }
+        }
         // 检查是否超额
         try {
           await claudeConsoleAccountService.checkQuotaUsage(accountId)
@@ -831,6 +866,17 @@ class UnifiedClaudeScheduler {
         // 检查模型支持
         if (!this._isModelSupportedByAccount(account, 'ccr', requestedModel, 'in session check')) {
           return false
+        }
+        // 检查订阅是否过期
+        if (account.subscriptionExpiresAt) {
+          const expiryDate = new Date(account.subscriptionExpiresAt)
+          const now = new Date()
+          if (expiryDate <= now) {
+            logger.debug(
+              `⏰ CCR account ${account.name} (${accountId}) expired at ${account.subscriptionExpiresAt} (session check)`
+            )
+            return false
+          }
         }
         // 检查是否超额
         try {
@@ -1351,6 +1397,18 @@ class UnifiedClaudeScheduler {
           if (!this._isModelSupportedByAccount(account, 'ccr', requestedModel)) {
             logger.debug(`CCR account ${account.name} does not support model ${requestedModel}`)
             continue
+          }
+
+          // 检查订阅是否过期
+          if (account.subscriptionExpiresAt) {
+            const expiryDate = new Date(account.subscriptionExpiresAt)
+            const now = new Date()
+            if (expiryDate <= now) {
+              logger.debug(
+                `⏰ CCR account ${account.name} (${account.id}) expired at ${account.subscriptionExpiresAt}`
+              )
+              continue
+            }
           }
 
           // 检查是否被限流或超额

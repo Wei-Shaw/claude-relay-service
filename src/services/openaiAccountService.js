@@ -340,7 +340,7 @@ function isTokenExpired(account) {
  * @returns {boolean} - true: 已过期, false: 未过期
  */
 function isSubscriptionExpired(account) {
-  if (!account.subscriptionExpiresAt || account.subscriptionExpiresAt === '') {
+  if (!account.subscriptionExpiresAt) {
     return false // 未设置视为永不过期
   }
   const expiryDate = new Date(account.subscriptionExpiresAt)
@@ -571,7 +571,7 @@ async function createAccount(accountData) {
       : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // OAuth Token 过期时间（技术字段）
 
     // ✅ 新增：账户订阅到期时间（业务字段，手动管理）
-    subscriptionExpiresAt: accountData.subscriptionExpiresAt || '',
+    subscriptionExpiresAt: accountData.subscriptionExpiresAt || null,
 
     // 状态字段
     isActive: accountData.isActive !== false ? 'true' : 'false',

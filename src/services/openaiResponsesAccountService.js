@@ -78,7 +78,7 @@ class OpenAIResponsesAccountService {
 
       // ✅ 新增：账户订阅到期时间（业务字段，手动管理）
       // 注意：OpenAI-Responses 使用 API Key 认证，没有 OAuth token，因此没有 expiresAt
-      subscriptionExpiresAt: options.subscriptionExpiresAt || '',
+      subscriptionExpiresAt: options.subscriptionExpiresAt || null,
 
       createdAt: new Date().toISOString(),
       lastUsedAt: '',
@@ -225,6 +225,7 @@ class OpenAIResponsesAccountService {
 
           // ✅ 前端显示订阅过期时间（业务字段）
           account.expiresAt = account.subscriptionExpiresAt || null
+          account.platform = account.platform || 'openai-responses'
 
           accounts.push(account)
         }
@@ -274,6 +275,7 @@ class OpenAIResponsesAccountService {
 
             // ✅ 前端显示订阅过期时间（业务字段）
             accountData.expiresAt = accountData.subscriptionExpiresAt || null
+            accountData.platform = accountData.platform || 'openai-responses'
 
             accounts.push(accountData)
           }
@@ -519,6 +521,25 @@ class OpenAIResponsesAccountService {
     }
 
     return { success: true, message: 'Account status reset successfully' }
+  }
+
+  // ⏰ 检查账户订阅是否已过期
+  isSubscriptionExpired(account) {
+    if (!account.subscriptionExpiresAt) {
+      return false // 未设置过期时间，视为永不过期
+    }
+
+    const expiryDate = new Date(account.subscriptionExpiresAt)
+    const now = new Date()
+
+    if (expiryDate <= now) {
+      logger.debug(
+        `⏰ OpenAI-Responses Account ${account.name} (${account.id}) subscription expired at ${account.subscriptionExpiresAt}`
+      )
+      return true
+    }
+
+    return false
   }
 
   // 获取限流信息

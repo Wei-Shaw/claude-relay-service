@@ -86,7 +86,7 @@ class ClaudeConsoleAccountService {
 
       // ✅ 新增：账户订阅到期时间（业务字段，手动管理）
       // 注意：Claude Console 没有 OAuth token，因此没有 expiresAt（token过期）
-      subscriptionExpiresAt: options.subscriptionExpiresAt || '',
+      subscriptionExpiresAt: options.subscriptionExpiresAt || null,
 
       // 限流相关
       rateLimitedAt: '',

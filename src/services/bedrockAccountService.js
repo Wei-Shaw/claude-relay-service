@@ -59,7 +59,7 @@ class BedrockAccountService {
 
       // ✅ 新增：账户订阅到期时间（业务字段，手动管理）
       // 注意：Bedrock 使用 AWS 凭证，没有 OAuth token，因此没有 expiresAt
-      subscriptionExpiresAt: options.subscriptionExpiresAt || '',
+      subscriptionExpiresAt: options.subscriptionExpiresAt || null,
 
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -154,6 +154,7 @@ class BedrockAccountService {
             createdAt: account.createdAt,
             updatedAt: account.updatedAt,
             type: 'bedrock',
+            platform: 'bedrock',
             hasCredentials: !!account.awsCredentials
           })
         }
@@ -299,7 +300,7 @@ class BedrockAccountService {
 
       const availableAccounts = accountsResult.data.filter((account) => {
         // ✅ 检查账户订阅是否过期
-        if (this._isSubscriptionExpired(account)) {
+        if (this.isSubscriptionExpired(account)) {
           logger.debug(
             `⏰ Skipping expired Bedrock account: ${account.name}, expired at ${account.subscriptionExpiresAt || account.expiresAt}`
           )
@@ -380,8 +381,8 @@ class BedrockAccountService {
    * @param {Object} account - 账户对象
    * @returns {boolean} - true: 已过期, false: 未过期
    */
-  _isSubscriptionExpired(account) {
-    if (!account.subscriptionExpiresAt || account.subscriptionExpiresAt === '') {
+  isSubscriptionExpired(account) {
+    if (!account.subscriptionExpiresAt) {
       return false // 未设置视为永不过期
     }
     const expiryDate = new Date(account.subscriptionExpiresAt)
