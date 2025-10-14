@@ -6,19 +6,6 @@ const logger = require('../utils/logger')
 const config = require('../../config/config')
 const LRUCache = require('../utils/lruCache')
 
-function normalizeSubscriptionExpiresAt(value) {
-  if (value === undefined || value === null || value === '') {
-    return ''
-  }
-
-  const date = value instanceof Date ? value : new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return ''
-  }
-
-  return date.toISOString()
-}
-
 class ClaudeConsoleAccountService {
   constructor() {
     // 加密相关常量
@@ -65,8 +52,7 @@ class ClaudeConsoleAccountService {
       accountType = 'shared', // 'dedicated' or 'shared'
       schedulable = true, // 是否可被调度
       dailyQuota = 0, // 每日额度限制（美元），0表示不限制
-      quotaResetTime = '00:00', // 额度重置时间（HH:mm格式）
-      subscriptionExpiresAt = null
+      quotaResetTime = '00:00' // 额度重置时间（HH:mm格式）
     } = options
 
     // 验证必填字段
@@ -97,6 +83,11 @@ class ClaudeConsoleAccountService {
       lastUsedAt: '',
       status: 'active',
       errorMessage: '',
+
+      // ✅ 新增：账户订阅到期时间（业务字段，手动管理）
+      // 注意：Claude Console 没有 OAuth token，因此没有 expiresAt（token过期）
+      subscriptionExpiresAt: options.subscriptionExpiresAt || null,
+
       // 限流相关
       rateLimitedAt: '',
       rateLimitStatus: '',
@@ -108,8 +99,7 @@ class ClaudeConsoleAccountService {
       // 使用与统计一致的时区日期，避免边界问题
       lastResetDate: redis.getDateStringInTimezone(), // 最后重置日期（按配置时区）
       quotaResetTime, // 额度重置时间
-      quotaStoppedAt: '', // 因额度停用的时间
-      subscriptionExpiresAt: normalizeSubscriptionExpiresAt(subscriptionExpiresAt)
+      quotaStoppedAt: '' // 因额度停用的时间
     }
 
     const client = redis.getClientSafe()
@@ -145,8 +135,7 @@ class ClaudeConsoleAccountService {
       dailyUsage: 0,
       lastResetDate: accountData.lastResetDate,
       quotaResetTime,
-      quotaStoppedAt: null,
-      subscriptionExpiresAt: accountData.subscriptionExpiresAt || null
+      quotaStoppedAt: null
     }
   }
 
@@ -184,14 +173,16 @@ class ClaudeConsoleAccountService {
             errorMessage: accountData.errorMessage,
             rateLimitInfo,
             schedulable: accountData.schedulable !== 'false', // 默认为true，只有明确设置为false才不可调度
+
+            // ✅ 前端显示订阅过期时间（业务字段）
+            expiresAt: accountData.subscriptionExpiresAt || null,
+
             // 额度管理相关
             dailyQuota: parseFloat(accountData.dailyQuota || '0'),
             dailyUsage: parseFloat(accountData.dailyUsage || '0'),
             lastResetDate: accountData.lastResetDate || '',
             quotaResetTime: accountData.quotaResetTime || '00:00',
-            quotaStoppedAt: accountData.quotaStoppedAt || null,
-            expiresAt: accountData.expiresAt || null,
-            subscriptionExpiresAt: accountData.subscriptionExpiresAt || null
+            quotaStoppedAt: accountData.quotaStoppedAt || null
           })
         }
       }
@@ -241,11 +232,6 @@ class ClaudeConsoleAccountService {
     if (accountData.proxy) {
       accountData.proxy = JSON.parse(accountData.proxy)
     }
-
-    accountData.subscriptionExpiresAt =
-      accountData.subscriptionExpiresAt && accountData.subscriptionExpiresAt !== ''
-        ? accountData.subscriptionExpiresAt
-        : null
 
     logger.debug(
       `[DEBUG] Final account data - name: ${accountData.name}, hasApiUrl: ${!!accountData.apiUrl}, hasApiKey: ${!!accountData.apiKey}, supportedModels: ${JSON.stringify(accountData.supportedModels)}`
@@ -341,12 +327,10 @@ class ClaudeConsoleAccountService {
         updatedData.quotaStoppedAt = updates.quotaStoppedAt
       }
 
-      if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
-        updatedData.subscriptionExpiresAt = normalizeSubscriptionExpiresAt(
-          updates.subscriptionExpiresAt
-        )
-      } else if (Object.prototype.hasOwnProperty.call(updates, 'expiresAt')) {
-        updatedData.subscriptionExpiresAt = normalizeSubscriptionExpiresAt(updates.expiresAt)
+      // ✅ 直接保存 subscriptionExpiresAt（如果提供）
+      // Claude Console 没有 token 刷新逻辑，不会覆盖此字段
+      if (updates.subscriptionExpiresAt !== undefined) {
+        updatedData.subscriptionExpiresAt = updates.subscriptionExpiresAt
       }
 
       // 处理账户类型变更
@@ -1269,6 +1253,19 @@ class ClaudeConsoleAccountService {
       logger.error(`❌ Failed to reset Claude Console account status: ${accountId}`, error)
       throw error
     }
+  }
+
+  /**
+   * ⏰ 检查账户订阅是否过期
+   * @param {Object} account - 账户对象
+   * @returns {boolean} - true: 已过期, false: 未过期
+   */
+  isSubscriptionExpired(account) {
+    if (!account.subscriptionExpiresAt) {
+      return false // 未设置视为永不过期
+    }
+    const expiryDate = new Date(account.subscriptionExpiresAt)
+    return expiryDate <= new Date()
   }
 }
 

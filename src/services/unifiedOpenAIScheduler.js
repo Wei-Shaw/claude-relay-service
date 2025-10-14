@@ -211,6 +211,15 @@ class UnifiedOpenAIScheduler {
               error.statusCode = 403 // Forbidden - 调度被禁止
               throw error
             }
+
+            // ⏰ 检查 OpenAI-Responses 专属账户订阅是否过期
+            if (openaiResponsesAccountService.isSubscriptionExpired(boundAccount)) {
+              const errorMsg = `Dedicated account ${boundAccount.name} subscription has expired`
+              logger.warn(`⚠️ ${errorMsg}`)
+              const error = new Error(errorMsg)
+              error.statusCode = 403 // Forbidden - 订阅已过期
+              throw error
+            }
           }
 
           // 专属账户：可选的模型检查（只有明确配置了supportedModels且不为空才检查）
@@ -461,6 +470,14 @@ class UnifiedOpenAIScheduler {
           }
         }
 
+        // ⏰ 检查订阅是否过期
+        if (openaiResponsesAccountService.isSubscriptionExpired(account)) {
+          logger.debug(
+            `⏭️ Skipping OpenAI-Responses account ${account.name} - subscription expired`
+          )
+          continue
+        }
+
         // OpenAI-Responses 账户默认支持所有模型
         // 因为它们是第三方兼容 API，模型支持由第三方决定
 
@@ -534,6 +551,11 @@ class UnifiedOpenAIScheduler {
         // 检查是否可调度
         if (!this._isSchedulable(account.schedulable)) {
           logger.info(`🚫 OpenAI-Responses account ${accountId} is not schedulable`)
+          return false
+        }
+        // ⏰ 检查订阅是否过期
+        if (openaiResponsesAccountService.isSubscriptionExpired(account)) {
+          logger.info(`🚫 OpenAI-Responses account ${accountId} subscription expired`)
           return false
         }
         // 检查并清除过期的限流状态
