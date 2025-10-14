@@ -7,12 +7,38 @@ const logger = require('../utils/logger')
 const browserFallbackMiddleware = (req, res, next) => {
   const userAgent = req.headers['user-agent'] || ''
   const origin = req.headers['origin'] || ''
-  const authHeader = req.headers['authorization'] || req.headers['x-api-key'] || ''
+
+  const extractHeader = (value) => {
+    let candidate = value
+
+    if (Array.isArray(candidate)) {
+      candidate = candidate.find((item) => typeof item === 'string' && item.trim())
+    }
+
+    if (typeof candidate !== 'string') {
+      return ''
+    }
+
+    let trimmed = candidate.trim()
+    if (!trimmed) {
+      return ''
+    }
+
+    if (/^Bearer\s+/i.test(trimmed)) {
+      trimmed = trimmed.replace(/^Bearer\s+/i, '').trim()
+    }
+
+    return trimmed
+  }
+
+  const apiKeyHeader =
+    extractHeader(req.headers['x-api-key']) || extractHeader(req.headers['x-goog-api-key'])
+  const normalizedKey = extractHeader(req.headers['authorization']) || apiKeyHeader
 
   // 检查是否为Chrome插件或浏览器请求
   const isChromeExtension = origin.startsWith('chrome-extension://')
   const isBrowserRequest = userAgent.includes('Mozilla/') && userAgent.includes('Chrome/')
-  const hasApiKey = authHeader.startsWith('cr_') // 我们的API Key格式
+  const hasApiKey = normalizedKey.startsWith('cr_') // 我们的API Key格式
 
   if ((isChromeExtension || isBrowserRequest) && hasApiKey) {
     // 为Chrome插件请求添加特殊标记
@@ -23,8 +49,8 @@ const browserFallbackMiddleware = (req, res, next) => {
     req.headers['user-agent'] = 'claude-cli/1.0.110 (external, cli, browser-fallback)'
 
     // 确保设置正确的认证头
-    if (!req.headers['authorization'] && req.headers['x-api-key']) {
-      req.headers['authorization'] = `Bearer ${req.headers['x-api-key']}`
+    if (!req.headers['authorization'] && apiKeyHeader) {
+      req.headers['authorization'] = `Bearer ${apiKeyHeader}`
     }
 
     // 添加必要的Anthropic头
