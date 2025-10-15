@@ -196,9 +196,7 @@ class DroidScheduler {
     const selected = sorted[0]
 
     if (!selected) {
-      throw new Error(
-        `No schedulable account available after sorting (${normalizedEndpoint})`
-      )
+      throw new Error(`No schedulable account available after sorting (${normalizedEndpoint})`)
     }
 
     if (stickyKey && !isDedicatedBinding) {
