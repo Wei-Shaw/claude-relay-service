@@ -919,3 +919,4 @@ router.get('/key-info', authenticateApiKey, async (req, res) => {
 })
 
 module.exports = router
+module.exports.handleResponses = handleResponses
