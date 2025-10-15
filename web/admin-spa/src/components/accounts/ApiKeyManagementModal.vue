@@ -34,16 +34,173 @@
           <p class="text-gray-500 dark:text-gray-400">加载中...</p>
         </div>
 
-        <!-- API Key 列表 -->
+        <!-- 空状态：没有加载且没有 API Key -->
         <div
-          v-else-if="apiKeys.length === 0"
+          v-if="!loading && apiKeys.length === 0"
           class="rounded-lg bg-gray-50 py-8 text-center dark:bg-gray-800"
         >
           <i class="fas fa-key mb-4 text-4xl text-gray-300 dark:text-gray-600" />
           <p class="text-gray-500 dark:text-gray-400">暂无 API Key</p>
         </div>
 
-        <div v-else>
+        <!-- 有 API Key 时显示菜单和列表 -->
+        <div v-if="!loading && apiKeys.length > 0">
+          <!-- 菜单栏 -->
+          <div class="mb-4 space-y-3">
+            <!-- 工具栏：筛选、搜索和操作 -->
+            <div
+              class="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+            >
+              <!-- 第一行：筛选和搜索 -->
+              <div class="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <!-- 左侧：状态筛选 -->
+                <div class="flex items-center gap-2">
+                  <i class="fas fa-filter text-gray-400 dark:text-gray-500" />
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">筛选：</span>
+                  <div class="flex gap-1">
+                    <button
+                      :class="[
+                        'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                        statusFilter === 'all'
+                          ? 'bg-purple-500 text-white shadow-sm'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
+                      ]"
+                      @click="statusFilter = 'all'"
+                    >
+                      全部 ({{ apiKeys.length }})
+                    </button>
+                    <button
+                      :class="[
+                        'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                        statusFilter === 'active'
+                          ? 'bg-green-500 text-white shadow-sm'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
+                      ]"
+                      @click="statusFilter = 'active'"
+                    >
+                      <i class="fas fa-check-circle mr-1" />
+                      正常 ({{ activeKeysCount }})
+                    </button>
+                    <button
+                      :class="[
+                        'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                        statusFilter === 'error'
+                          ? 'bg-red-500 text-white shadow-sm'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
+                      ]"
+                      @click="statusFilter = 'error'"
+                    >
+                      <i class="fas fa-exclamation-triangle mr-1" />
+                      异常 ({{ errorKeysCount }})
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 右侧：搜索框 -->
+                <div class="flex flex-1 items-center gap-2 lg:max-w-md">
+                  <div class="relative flex-1">
+                    <input
+                      v-model="searchQuery"
+                      class="w-full rounded-md border border-gray-300 bg-gray-50 py-2 pl-10 pr-3 text-sm text-gray-700 transition-colors placeholder:text-gray-400 focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:placeholder:text-gray-500 dark:focus:border-purple-400 dark:focus:bg-gray-800"
+                      placeholder="搜索 API Key..."
+                      type="text"
+                    />
+                    <i
+                      class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+                    />
+                  </div>
+                  <div class="flex gap-1">
+                    <button
+                      :class="[
+                        'rounded-md px-2.5 py-2 text-xs font-medium transition-colors',
+                        searchMode === 'fuzzy'
+                          ? 'bg-purple-500 text-white shadow-sm'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
+                      ]"
+                      title="模糊搜索：包含查询字符串即可"
+                      @click="searchMode = 'fuzzy'"
+                    >
+                      <i class="fas fa-search mr-1" />
+                      模糊
+                    </button>
+                    <button
+                      :class="[
+                        'rounded-md px-2.5 py-2 text-xs font-medium transition-colors',
+                        searchMode === 'exact'
+                          ? 'bg-purple-500 text-white shadow-sm'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
+                      ]"
+                      title="精确搜索：完全匹配完整 Key"
+                      @click="searchMode = 'exact'"
+                    >
+                      <i class="fas fa-equals mr-1" />
+                      精确
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 分隔线 -->
+              <div class="my-3 border-t border-gray-200 dark:border-gray-700"></div>
+
+              <!-- 第二行：批量操作 -->
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <!-- 左侧：操作按钮 -->
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="text-xs font-medium text-gray-500 dark:text-gray-400"
+                    >批量操作：</span
+                  >
+                  <button
+                    class="group rounded-md bg-gradient-to-r from-red-500 to-red-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:from-red-600 hover:to-red-700 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
+                    :disabled="errorKeysCount === 0 || batchDeleting"
+                    title="删除所有异常状态的 API Key"
+                    @click="deleteAllErrorKeys"
+                  >
+                    <i class="fas fa-trash-alt mr-1" />
+                    删除异常
+                  </button>
+                  <button
+                    class="group rounded-md bg-gradient-to-r from-red-600 to-red-700 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:from-red-700 hover:to-red-800 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
+                    :disabled="apiKeys.length === 0 || batchDeleting"
+                    title="删除所有 API Key"
+                    @click="deleteAllKeys"
+                  >
+                    <i class="fas fa-trash mr-1" />
+                    删除全部
+                  </button>
+                  <div class="mx-1 h-5 w-px bg-gray-300 dark:bg-gray-600"></div>
+                  <button
+                    class="rounded-md bg-gradient-to-r from-blue-500 to-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:from-blue-600 hover:to-blue-700 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
+                    :disabled="errorKeysCount === 0"
+                    title="导出所有异常状态的 API Key"
+                    @click="exportKeys('error')"
+                  >
+                    <i class="fas fa-download mr-1" />
+                    导出异常
+                  </button>
+                  <button
+                    class="rounded-md bg-gradient-to-r from-blue-600 to-blue-700 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:from-blue-700 hover:to-blue-800 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
+                    :disabled="apiKeys.length === 0"
+                    title="导出所有 API Key"
+                    @click="exportKeys('all')"
+                  >
+                    <i class="fas fa-file-export mr-1" />
+                    导出全部
+                  </button>
+                </div>
+
+                <!-- 右侧：统计信息 -->
+                <div
+                  class="flex items-center gap-2 rounded-md bg-purple-50 px-3 py-1.5 dark:bg-purple-900/20"
+                >
+                  <i class="fas fa-info-circle text-purple-500 dark:text-purple-400" />
+                  <span class="text-xs font-medium text-purple-700 dark:text-purple-300">
+                    显示 <strong>{{ filteredApiKeys.length }}</strong> 个
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
           <!-- API Key 网格布局 -->
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div
@@ -96,22 +253,19 @@
                           ? 'text-orange-500 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300'
                           : 'text-yellow-500 hover:text-yellow-700 dark:text-yellow-400 dark:hover:text-yellow-300'
                       ]"
-                      :disabled="resetting === getOriginalIndex(index)"
+                      :disabled="resetting === apiKey.key"
                       title="重置状态"
-                      @click="resetApiKeyStatus(apiKey, getOriginalIndex(index))"
+                      @click="resetApiKeyStatus(apiKey)"
                     >
-                      <div
-                        v-if="resetting === getOriginalIndex(index)"
-                        class="loading-spinner-sm"
-                      />
+                      <div v-if="resetting === apiKey.key" class="loading-spinner-sm" />
                       <i v-else class="fas fa-redo"></i>
                     </button>
                     <button
                       class="text-xs text-red-500 transition-colors hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:text-red-600"
-                      :disabled="deleting === getOriginalIndex(index)"
-                      @click="deleteApiKey(apiKey, getOriginalIndex(index))"
+                      :disabled="deleting === apiKey.key"
+                      @click="deleteApiKey(apiKey)"
                     >
-                      <div v-if="deleting === getOriginalIndex(index)" class="loading-spinner-sm" />
+                      <div v-if="deleting === apiKey.key" class="loading-spinner-sm" />
                       <i v-else class="fas fa-trash" />
                     </button>
                   </div>
@@ -238,21 +392,66 @@ const deleting = ref(null)
 const resetting = ref(null)
 const apiKeys = ref([])
 const currentPage = ref(1)
-const pageSize = ref(18)
+const pageSize = ref(15)
+
+// 新增：筛选和搜索相关状态
+const statusFilter = ref('all') // 'all' | 'active' | 'error'
+const searchQuery = ref('')
+const searchMode = ref('fuzzy') // 'fuzzy' | 'exact'
+const batchDeleting = ref(false)
+
+// 掩码显示 API Key（提前声明供 computed 使用）
+const maskApiKey = (key) => {
+  if (!key || key.length < 12) {
+    return key
+  }
+  return `${key.substring(0, 8)}...${key.substring(key.length - 4)}`
+}
+
+// 计算属性：筛选后的 API Keys
+const filteredApiKeys = computed(() => {
+  let filtered = apiKeys.value
+
+  // 状态筛选
+  if (statusFilter.value !== 'all') {
+    filtered = filtered.filter((key) => key.status === statusFilter.value)
+  }
+
+  // 搜索筛选（使用完整的 key 进行搜索）
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.trim()
+    filtered = filtered.filter((key) => {
+      const fullKey = key.key // 使用完整的 key
+      if (searchMode.value === 'exact') {
+        // 精确搜索：完全匹配完整的 key
+        return fullKey === query
+      } else {
+        // 模糊搜索：完整 key 包含查询字符串（不区分大小写）
+        return fullKey.toLowerCase().includes(query.toLowerCase())
+      }
+    })
+  }
+
+  return filtered
+})
 
 // 计算属性
-const totalItems = computed(() => apiKeys.value.length)
+const totalItems = computed(() => filteredApiKeys.value.length)
 const totalPages = computed(() => Math.ceil(totalItems.value / pageSize.value))
 const paginatedApiKeys = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
   const end = start + pageSize.value
-  return apiKeys.value.slice(start, end)
+  return filteredApiKeys.value.slice(start, end)
 })
 
-// 获取原始索引的方法
-const getOriginalIndex = (paginatedIndex) => {
-  return (currentPage.value - 1) * pageSize.value + paginatedIndex
-}
+// 统计数量
+const activeKeysCount = computed(() => {
+  return apiKeys.value.filter((key) => key.status === 'active').length
+})
+
+const errorKeysCount = computed(() => {
+  return apiKeys.value.filter((key) => key.status === 'error').length
+})
 
 // 加载 API Keys
 const loadApiKeys = async () => {
@@ -332,12 +531,12 @@ const loadApiKeys = async () => {
 }
 
 // 删除 API Key
-const deleteApiKey = async (apiKey, index) => {
+const deleteApiKey = async (apiKey) => {
   if (!confirm(`确定要删除 API Key "${maskApiKey(apiKey.key)}" 吗？`)) {
     return
   }
 
-  deleting.value = index
+  deleting.value = apiKey.key
   try {
     // 准备更新数据：删除指定的 key
     const updateData = {
@@ -359,7 +558,7 @@ const deleteApiKey = async (apiKey, index) => {
 }
 
 // 重置 API Key 状态
-const resetApiKeyStatus = async (apiKey, index) => {
+const resetApiKeyStatus = async (apiKey) => {
   if (
     !confirm(
       `确定要重置 API Key "${maskApiKey(apiKey.key)}" 的状态吗？这将清除错误信息并恢复为正常状态。`
@@ -368,7 +567,7 @@ const resetApiKeyStatus = async (apiKey, index) => {
     return
   }
 
-  resetting.value = index
+  resetting.value = apiKey.key
   try {
     // 准备更新数据：重置指定 key 的状态
     const updateData = {
@@ -395,12 +594,113 @@ const resetApiKeyStatus = async (apiKey, index) => {
   }
 }
 
-// 掩码显示 API Key
-const maskApiKey = (key) => {
-  if (!key || key.length < 12) {
-    return key
+// 批量删除所有异常状态的 Key
+const deleteAllErrorKeys = async () => {
+  const errorKeys = apiKeys.value.filter((key) => key.status === 'error')
+  if (errorKeys.length === 0) {
+    showToast('没有异常状态的 API Key', 'warning')
+    return
   }
-  return `${key.substring(0, 8)}...${key.substring(key.length - 4)}`
+
+  if (!confirm(`确定要删除所有 ${errorKeys.length} 个异常状态的 API Key 吗？此操作不可恢复！`)) {
+    return
+  }
+
+  batchDeleting.value = true
+  try {
+    const keysToDelete = errorKeys.map((key) => key.key)
+    const updateData = {
+      removeApiKeys: keysToDelete,
+      apiKeyUpdateMode: 'delete'
+    }
+
+    await apiClient.put(`/admin/droid-accounts/${props.accountId}`, updateData)
+
+    showToast(`成功删除 ${errorKeys.length} 个异常 API Key`, 'success')
+    await loadApiKeys()
+    emit('refresh')
+  } catch (error) {
+    console.error('Failed to delete error API keys:', error)
+    showToast(error.response?.data?.error || '批量删除失败', 'error')
+  } finally {
+    batchDeleting.value = false
+  }
+}
+
+// 批量删除所有 Key
+const deleteAllKeys = async () => {
+  if (apiKeys.value.length === 0) {
+    showToast('没有可删除的 API Key', 'warning')
+    return
+  }
+
+  if (
+    !confirm(
+      `确定要删除所有 ${apiKeys.value.length} 个 API Key 吗？此操作不可恢复！\n\n请再次确认：这将删除该账户下的所有 API Key。`
+    )
+  ) {
+    return
+  }
+
+  // 二次确认
+  if (!confirm('最后确认：真的要删除所有 API Key 吗？')) {
+    return
+  }
+
+  batchDeleting.value = true
+  try {
+    const keysToDelete = apiKeys.value.map((key) => key.key)
+    const updateData = {
+      removeApiKeys: keysToDelete,
+      apiKeyUpdateMode: 'delete'
+    }
+
+    await apiClient.put(`/admin/droid-accounts/${props.accountId}`, updateData)
+
+    showToast(`成功删除所有 ${keysToDelete.length} 个 API Key`, 'success')
+    await loadApiKeys()
+    emit('refresh')
+  } catch (error) {
+    console.error('Failed to delete all API keys:', error)
+    showToast(error.response?.data?.error || '批量删除失败', 'error')
+  } finally {
+    batchDeleting.value = false
+  }
+}
+
+// 导出 Key
+const exportKeys = (type) => {
+  let keysToExport = []
+  let filename = ''
+
+  if (type === 'error') {
+    keysToExport = apiKeys.value.filter((key) => key.status === 'error')
+    filename = `error_api_keys_${props.accountName}_${new Date().toISOString().split('T')[0]}.txt`
+  } else {
+    keysToExport = apiKeys.value
+    filename = `all_api_keys_${props.accountName}_${new Date().toISOString().split('T')[0]}.txt`
+  }
+
+  if (keysToExport.length === 0) {
+    showToast('没有可导出的 API Key', 'warning')
+    return
+  }
+
+  // 生成 TXT 内容（每行一个完整的 key）
+  const content = keysToExport.map((key) => key.key).join('\n')
+
+  // 创建下载
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+
+  showToast(`成功导出 ${keysToExport.length} 个 API Key`, 'success')
 }
 
 // 复制 API Key
