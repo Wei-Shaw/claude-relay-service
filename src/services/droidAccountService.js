@@ -794,7 +794,11 @@ class DroidAccountService {
       description,
       refreshToken: this._encryptSensitiveData(normalizedRefreshToken),
       accessToken: this._encryptSensitiveData(normalizedAccessToken),
-      expiresAt: normalizedExpiresAt || '',
+      expiresAt: normalizedExpiresAt || '', // OAuth Token 过期时间（技术字段，自动刷新）
+
+      // ✅ 新增：账户订阅到期时间（业务字段，手动管理）
+      subscriptionExpiresAt: options.subscriptionExpiresAt || null,
+
       proxy: proxy ? JSON.stringify(proxy) : '',
       isActive: isActive.toString(),
       accountType,
@@ -880,6 +884,11 @@ class DroidAccountService {
       accessToken: account.accessToken
         ? maskToken(this._decryptSensitiveData(account.accessToken))
         : '',
+
+      // ✅ 前端显示订阅过期时间（业务字段）
+      expiresAt: account.subscriptionExpiresAt || null,
+      platform: account.platform || 'droid',
+
       apiKeyCount: (() => {
         const parsedCount = this._parseApiKeyEntries(account.apiKeys).length
         if (account.apiKeyCount === undefined || account.apiKeyCount === null) {
@@ -1018,6 +1027,12 @@ class DroidAccountService {
         logger.error('❌ 使用新的 Refresh Token 更新 Droid 账户失败:', error)
         throw new Error(`Refresh Token 验证失败：${error.message || '未知错误'}`)
       }
+    }
+
+    // ✅ 如果通过路由映射更新了 subscriptionExpiresAt，直接保存
+    // subscriptionExpiresAt 是业务字段，与 token 刷新独立
+    if (sanitizedUpdates.subscriptionExpiresAt !== undefined) {
+      // 直接保存，不做任何调整
     }
 
     if (sanitizedUpdates.proxy === undefined) {
@@ -1375,6 +1390,19 @@ class DroidAccountService {
   }
 
   /**
+   * 检查账户订阅是否过期
+   * @param {Object} account - 账户对象
+   * @returns {boolean} - true: 已过期, false: 未过期
+   */
+  isSubscriptionExpired(account) {
+    if (!account.subscriptionExpiresAt) {
+      return false // 未设置视为永不过期
+    }
+    const expiryDate = new Date(account.subscriptionExpiresAt)
+    return expiryDate <= new Date()
+  }
+
+  /**
    * 获取有效的 access token（自动刷新）
    */
   async getValidAccessToken(accountId) {
@@ -1418,6 +1446,14 @@ class DroidAccountService {
         const isActive = this._isTruthy(account.isActive)
         const isSchedulable = this._isTruthy(account.schedulable)
         const status = typeof account.status === 'string' ? account.status.toLowerCase() : ''
+
+        // ✅ 检查账户订阅是否过期
+        if (this.isSubscriptionExpired(account)) {
+          logger.debug(
+            `⏰ Skipping expired Droid account: ${account.name}, expired at ${account.subscriptionExpiresAt}`
+          )
+          return false
+        }
 
         if (!isActive || !isSchedulable || status !== 'active') {
           return false

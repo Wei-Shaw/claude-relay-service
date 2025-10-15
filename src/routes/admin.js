@@ -32,6 +32,7 @@ const ProxyHelper = require('../utils/proxyHelper')
 
 const router = express.Router()
 
+// 🛠️ 工具函数：处理可为空的时间字段
 function normalizeNullableDate(value) {
   if (value === undefined || value === null) {
     return null
@@ -43,13 +44,45 @@ function normalizeNullableDate(value) {
   return value
 }
 
-function formatSubscriptionExpiry(account) {
+// 🛠️ 工具函数：映射前端字段名到后端字段名
+/**
+ * 映射前端的 expiresAt 字段到后端的 subscriptionExpiresAt 字段
+ * @param {Object} updates - 更新对象
+ * @param {string} accountType - 账户类型 (如 'Claude', 'OpenAI' 等)
+ * @param {string} accountId - 账户 ID
+ * @returns {Object} 映射后的更新对象
+ */
+function mapExpiryField(updates, accountType, accountId) {
+  const mappedUpdates = { ...updates }
+  if ('expiresAt' in mappedUpdates) {
+    mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
+    delete mappedUpdates.expiresAt
+    logger.info(
+      `Mapping expiresAt to subscriptionExpiresAt for ${accountType} account ${accountId}`
+    )
+  }
+  return mappedUpdates
+}
+
+/**
+ * 格式化账户数据，确保前端获取正确的过期时间字段
+ * 将 subscriptionExpiresAt（订阅过期时间）映射到 expiresAt 供前端使用
+ * 保留原始的 tokenExpiresAt（OAuth token过期时间）供内部使用
+ * @param {Object} account - 账户对象
+ * @returns {Object} 格式化后的账户对象
+ */
+function formatAccountExpiry(account) {
   if (!account || typeof account !== 'object') {
     return account
   }
 
-  const rawSubscription = account.subscriptionExpiresAt
-  const rawToken = account.tokenExpiresAt !== undefined ? account.tokenExpiresAt : account.expiresAt
+  const rawSubscription = Object.prototype.hasOwnProperty.call(account, 'subscriptionExpiresAt')
+    ? account.subscriptionExpiresAt
+    : null
+
+  const rawToken = Object.prototype.hasOwnProperty.call(account, 'tokenExpiresAt')
+    ? account.tokenExpiresAt
+    : account.expiresAt
 
   const subscriptionExpiresAt = normalizeNullableDate(rawSubscription)
   const tokenExpiresAt = normalizeNullableDate(rawToken)
@@ -2112,7 +2145,6 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
         try {
           const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
-          const formattedAccount = formatSubscriptionExpiry(account)
 
           // 获取会话窗口使用统计（仅对有活跃窗口的账户）
           let sessionWindowUsage = null
@@ -2154,6 +2186,7 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
             }
           }
 
+          const formattedAccount = formatAccountExpiry(account)
           return {
             ...formattedAccount,
             // 转换schedulable为布尔值
@@ -2171,7 +2204,7 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
           // 如果获取统计失败，返回空统计
           try {
             const groupInfos = await accountGroupService.getAccountGroups(account.id)
-            const formattedAccount = formatSubscriptionExpiry(account)
+            const formattedAccount = formatAccountExpiry(account)
             return {
               ...formattedAccount,
               groupInfos,
@@ -2187,7 +2220,7 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
               `⚠️ Failed to get group info for account ${account.id}:`,
               groupError.message
             )
-            const formattedAccount = formatSubscriptionExpiry(account)
+            const formattedAccount = formatAccountExpiry(account)
             return {
               ...formattedAccount,
               groupInfos: [],
@@ -2203,8 +2236,7 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
       })
     )
 
-    const formattedAccounts = accountsWithStats.map(formatSubscriptionExpiry)
-    return res.json({ success: true, data: formattedAccounts })
+    return res.json({ success: true, data: accountsWithStats })
   } catch (error) {
     logger.error('❌ Failed to get Claude accounts:', error)
     return res.status(500).json({ error: 'Failed to get Claude accounts', message: error.message })
@@ -2301,8 +2333,7 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       useUnifiedUserAgent,
       useUnifiedClientId,
       unifiedClientId,
-      expiresAt,
-      subscriptionExpiresAt
+      expiresAt
     } = req.body
 
     if (!name) {
@@ -2346,7 +2377,7 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       useUnifiedUserAgent: useUnifiedUserAgent === true, // 默认为false
       useUnifiedClientId: useUnifiedClientId === true, // 默认为false
       unifiedClientId: unifiedClientId || '', // 统一的客户端标识
-      expiresAt: subscriptionExpiresAt ?? expiresAt ?? null // 账户订阅到期时间
+      expiresAt: expiresAt || null // 账户订阅到期时间
     })
 
     // 如果是分组类型，将账户添加到分组
@@ -2361,8 +2392,8 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
     }
 
     logger.success(`🏢 Admin created new Claude account: ${name} (${accountType || 'shared'})`)
-    const responseAccount = formatSubscriptionExpiry(newAccount)
-    return res.json({ success: true, data: responseAccount })
+    const formattedAccount = formatAccountExpiry(newAccount)
+    return res.json({ success: true, data: formattedAccount })
   } catch (error) {
     logger.error('❌ Failed to create Claude account:', error)
     return res
@@ -2377,16 +2408,24 @@ router.put('/claude-accounts/:accountId', authenticateAdmin, async (req, res) =>
     const { accountId } = req.params
     const updates = req.body
 
+    // ✅ 【修改】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt（提前到参数验证之前）
+    const mappedUpdates = mapExpiryField(updates, 'Claude', accountId)
+
     // 验证priority的有效性
     if (
-      updates.priority !== undefined &&
-      (typeof updates.priority !== 'number' || updates.priority < 1 || updates.priority > 100)
+      mappedUpdates.priority !== undefined &&
+      (typeof mappedUpdates.priority !== 'number' ||
+        mappedUpdates.priority < 1 ||
+        mappedUpdates.priority > 100)
     ) {
       return res.status(400).json({ error: 'Priority must be a number between 1 and 100' })
     }
 
     // 验证accountType的有效性
-    if (updates.accountType && !['shared', 'dedicated', 'group'].includes(updates.accountType)) {
+    if (
+      mappedUpdates.accountType &&
+      !['shared', 'dedicated', 'group'].includes(mappedUpdates.accountType)
+    ) {
       return res
         .status(400)
         .json({ error: 'Invalid account type. Must be "shared", "dedicated" or "group"' })
@@ -2394,9 +2433,9 @@ router.put('/claude-accounts/:accountId', authenticateAdmin, async (req, res) =>
 
     // 如果更新为分组类型，验证groupId或groupIds
     if (
-      updates.accountType === 'group' &&
-      !updates.groupId &&
-      (!updates.groupIds || updates.groupIds.length === 0)
+      mappedUpdates.accountType === 'group' &&
+      !mappedUpdates.groupId &&
+      (!mappedUpdates.groupIds || mappedUpdates.groupIds.length === 0)
     ) {
       return res
         .status(400)
@@ -2410,39 +2449,28 @@ router.put('/claude-accounts/:accountId', authenticateAdmin, async (req, res) =>
     }
 
     // 处理分组的变更
-    if (updates.accountType !== undefined) {
+    if (mappedUpdates.accountType !== undefined) {
       // 如果之前是分组类型，需要从所有分组中移除
       if (currentAccount.accountType === 'group') {
         await accountGroupService.removeAccountFromAllGroups(accountId)
       }
 
       // 如果新类型是分组，添加到新分组
-      if (updates.accountType === 'group') {
+      if (mappedUpdates.accountType === 'group') {
         // 处理多分组/单分组的兼容性
-        if (Object.prototype.hasOwnProperty.call(updates, 'groupIds')) {
-          if (updates.groupIds && updates.groupIds.length > 0) {
+        if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'groupIds')) {
+          if (mappedUpdates.groupIds && mappedUpdates.groupIds.length > 0) {
             // 使用多分组设置
-            await accountGroupService.setAccountGroups(accountId, updates.groupIds, 'claude')
+            await accountGroupService.setAccountGroups(accountId, mappedUpdates.groupIds, 'claude')
           } else {
             // groupIds 为空数组，从所有分组中移除
             await accountGroupService.removeAccountFromAllGroups(accountId)
           }
-        } else if (updates.groupId) {
+        } else if (mappedUpdates.groupId) {
           // 兼容单分组模式
-          await accountGroupService.addAccountToGroup(accountId, updates.groupId, 'claude')
+          await accountGroupService.addAccountToGroup(accountId, mappedUpdates.groupId, 'claude')
         }
       }
-    }
-
-    // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
-    const mappedUpdates = { ...updates }
-    if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
-      mappedUpdates.subscriptionExpiresAt = updates.subscriptionExpiresAt
-    } else if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'expiresAt')) {
-      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
-    }
-    if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'subscriptionExpiresAt')) {
-      delete mappedUpdates.expiresAt
     }
 
     await claudeAccountService.updateAccount(accountId, mappedUpdates)
@@ -2645,14 +2673,13 @@ router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
     }
 
     // 为每个账户添加使用统计信息
-
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
-        const formattedAccount = formatSubscriptionExpiry(account)
         try {
           const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
+          const formattedAccount = formatAccountExpiry(account)
           return {
             ...formattedAccount,
             // 转换schedulable为布尔值
@@ -2671,6 +2698,7 @@ router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
           )
           try {
             const groupInfos = await accountGroupService.getAccountGroups(account.id)
+            const formattedAccount = formatAccountExpiry(account)
             return {
               ...formattedAccount,
               // 转换schedulable为布尔值
@@ -2687,6 +2715,7 @@ router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
               `⚠️ Failed to get group info for Claude Console account ${account.id}:`,
               groupError.message
             )
+            const formattedAccount = formatAccountExpiry(account)
             return {
               ...formattedAccount,
               groupInfos: [],
@@ -2701,8 +2730,7 @@ router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
       })
     )
 
-    const formattedAccounts = accountsWithStats.map(formatSubscriptionExpiry)
-    return res.json({ success: true, data: formattedAccounts })
+    return res.json({ success: true, data: accountsWithStats })
   } catch (error) {
     logger.error('❌ Failed to get Claude Console accounts:', error)
     return res
@@ -2773,8 +2801,8 @@ router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
     }
 
     logger.success(`🎮 Admin created Claude Console account: ${name}`)
-    const responseAccount = formatSubscriptionExpiry(newAccount)
-    return res.json({ success: true, data: responseAccount })
+    const formattedAccount = formatAccountExpiry(newAccount)
+    return res.json({ success: true, data: formattedAccount })
   } catch (error) {
     logger.error('❌ Failed to create Claude Console account:', error)
     return res
@@ -2789,20 +2817,29 @@ router.put('/claude-console-accounts/:accountId', authenticateAdmin, async (req,
     const { accountId } = req.params
     const updates = req.body
 
+    // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
+    const mappedUpdates = mapExpiryField(updates, 'Claude Console', accountId)
+
     // 验证priority的有效性（1-100）
-    if (updates.priority !== undefined && (updates.priority < 1 || updates.priority > 100)) {
+    if (
+      mappedUpdates.priority !== undefined &&
+      (mappedUpdates.priority < 1 || mappedUpdates.priority > 100)
+    ) {
       return res.status(400).json({ error: 'Priority must be between 1 and 100' })
     }
 
     // 验证accountType的有效性
-    if (updates.accountType && !['shared', 'dedicated', 'group'].includes(updates.accountType)) {
+    if (
+      mappedUpdates.accountType &&
+      !['shared', 'dedicated', 'group'].includes(mappedUpdates.accountType)
+    ) {
       return res
         .status(400)
         .json({ error: 'Invalid account type. Must be "shared", "dedicated" or "group"' })
     }
 
     // 如果更新为分组类型，验证groupId
-    if (updates.accountType === 'group' && !updates.groupId) {
+    if (mappedUpdates.accountType === 'group' && !mappedUpdates.groupId) {
       return res.status(400).json({ error: 'Group ID is required for group type accounts' })
     }
 
@@ -2813,7 +2850,7 @@ router.put('/claude-console-accounts/:accountId', authenticateAdmin, async (req,
     }
 
     // 处理分组的变更
-    if (updates.accountType !== undefined) {
+    if (mappedUpdates.accountType !== undefined) {
       // 如果之前是分组类型，需要从所有分组中移除
       if (currentAccount.accountType === 'group') {
         const oldGroups = await accountGroupService.getAccountGroups(accountId)
@@ -2822,32 +2859,21 @@ router.put('/claude-console-accounts/:accountId', authenticateAdmin, async (req,
         }
       }
       // 如果新类型是分组，处理多分组支持
-      if (updates.accountType === 'group') {
-        if (Object.prototype.hasOwnProperty.call(updates, 'groupIds')) {
+      if (mappedUpdates.accountType === 'group') {
+        if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'groupIds')) {
           // 如果明确提供了 groupIds 参数（包括空数组）
-          if (updates.groupIds && updates.groupIds.length > 0) {
+          if (mappedUpdates.groupIds && mappedUpdates.groupIds.length > 0) {
             // 设置新的多分组
-            await accountGroupService.setAccountGroups(accountId, updates.groupIds, 'claude')
+            await accountGroupService.setAccountGroups(accountId, mappedUpdates.groupIds, 'claude')
           } else {
             // groupIds 为空数组，从所有分组中移除
             await accountGroupService.removeAccountFromAllGroups(accountId)
           }
-        } else if (updates.groupId) {
+        } else if (mappedUpdates.groupId) {
           // 向后兼容：仅当没有 groupIds 但有 groupId 时使用单分组逻辑
-          await accountGroupService.addAccountToGroup(accountId, updates.groupId, 'claude')
+          await accountGroupService.addAccountToGroup(accountId, mappedUpdates.groupId, 'claude')
         }
       }
-    }
-
-    // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
-    const mappedUpdates = { ...updates }
-    if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
-      mappedUpdates.subscriptionExpiresAt = updates.subscriptionExpiresAt
-    } else if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'expiresAt')) {
-      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
-    }
-    if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'subscriptionExpiresAt')) {
-      delete mappedUpdates.expiresAt
     }
 
     await claudeConsoleAccountService.updateAccount(accountId, mappedUpdates)
@@ -3076,11 +3102,11 @@ router.get('/ccr-accounts', authenticateAdmin, async (req, res) => {
     // 为每个账户添加使用统计信息
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
-        const formattedAccount = formatSubscriptionExpiry(account)
         try {
           const usageStats = await redis.getAccountUsageStats(account.id)
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
+          const formattedAccount = formatAccountExpiry(account)
           return {
             ...formattedAccount,
             // 转换schedulable为布尔值
@@ -3099,6 +3125,7 @@ router.get('/ccr-accounts', authenticateAdmin, async (req, res) => {
           )
           try {
             const groupInfos = await accountGroupService.getAccountGroups(account.id)
+            const formattedAccount = formatAccountExpiry(account)
             return {
               ...formattedAccount,
               // 转换schedulable为布尔值
@@ -3116,7 +3143,7 @@ router.get('/ccr-accounts', authenticateAdmin, async (req, res) => {
               groupError.message
             )
             return {
-              ...formattedAccount,
+              ...account,
               groupInfos: [],
               usage: {
                 daily: { tokens: 0, requests: 0, allTokens: 0 },
@@ -3129,8 +3156,7 @@ router.get('/ccr-accounts', authenticateAdmin, async (req, res) => {
       })
     )
 
-    const formattedAccounts = accountsWithStats.map(formatSubscriptionExpiry)
-    return res.json({ success: true, data: formattedAccounts })
+    return res.json({ success: true, data: accountsWithStats })
   } catch (error) {
     logger.error('❌ Failed to get CCR accounts:', error)
     return res.status(500).json({ error: 'Failed to get CCR accounts', message: error.message })
@@ -3199,8 +3225,8 @@ router.post('/ccr-accounts', authenticateAdmin, async (req, res) => {
     }
 
     logger.success(`🔧 Admin created CCR account: ${name}`)
-    const responseAccount = formatSubscriptionExpiry(newAccount)
-    return res.json({ success: true, data: responseAccount })
+    const formattedAccount = formatAccountExpiry(newAccount)
+    return res.json({ success: true, data: formattedAccount })
   } catch (error) {
     logger.error('❌ Failed to create CCR account:', error)
     return res.status(500).json({ error: 'Failed to create CCR account', message: error.message })
@@ -3213,20 +3239,29 @@ router.put('/ccr-accounts/:accountId', authenticateAdmin, async (req, res) => {
     const { accountId } = req.params
     const updates = req.body
 
+    // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
+    const mappedUpdates = mapExpiryField(updates, 'CCR', accountId)
+
     // 验证priority的有效性（1-100）
-    if (updates.priority !== undefined && (updates.priority < 1 || updates.priority > 100)) {
+    if (
+      mappedUpdates.priority !== undefined &&
+      (mappedUpdates.priority < 1 || mappedUpdates.priority > 100)
+    ) {
       return res.status(400).json({ error: 'Priority must be between 1 and 100' })
     }
 
     // 验证accountType的有效性
-    if (updates.accountType && !['shared', 'dedicated', 'group'].includes(updates.accountType)) {
+    if (
+      mappedUpdates.accountType &&
+      !['shared', 'dedicated', 'group'].includes(mappedUpdates.accountType)
+    ) {
       return res
         .status(400)
         .json({ error: 'Invalid account type. Must be "shared", "dedicated" or "group"' })
     }
 
     // 如果更新为分组类型，验证groupId
-    if (updates.accountType === 'group' && !updates.groupId) {
+    if (mappedUpdates.accountType === 'group' && !mappedUpdates.groupId) {
       return res.status(400).json({ error: 'Group ID is required for group type accounts' })
     }
 
@@ -3237,7 +3272,7 @@ router.put('/ccr-accounts/:accountId', authenticateAdmin, async (req, res) => {
     }
 
     // 处理分组的变更
-    if (updates.accountType !== undefined) {
+    if (mappedUpdates.accountType !== undefined) {
       // 如果之前是分组类型，需要从所有分组中移除
       if (currentAccount.accountType === 'group') {
         const oldGroups = await accountGroupService.getAccountGroups(accountId)
@@ -3246,32 +3281,21 @@ router.put('/ccr-accounts/:accountId', authenticateAdmin, async (req, res) => {
         }
       }
       // 如果新类型是分组，处理多分组支持
-      if (updates.accountType === 'group') {
-        if (Object.prototype.hasOwnProperty.call(updates, 'groupIds')) {
+      if (mappedUpdates.accountType === 'group') {
+        if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'groupIds')) {
           // 如果明确提供了 groupIds 参数（包括空数组）
-          if (updates.groupIds && updates.groupIds.length > 0) {
+          if (mappedUpdates.groupIds && mappedUpdates.groupIds.length > 0) {
             // 设置新的多分组
-            await accountGroupService.setAccountGroups(accountId, updates.groupIds, 'claude')
+            await accountGroupService.setAccountGroups(accountId, mappedUpdates.groupIds, 'claude')
           } else {
             // groupIds 为空数组，从所有分组中移除
             await accountGroupService.removeAccountFromAllGroups(accountId)
           }
-        } else if (updates.groupId) {
+        } else if (mappedUpdates.groupId) {
           // 向后兼容：仅当没有 groupIds 但有 groupId 时使用单分组逻辑
-          await accountGroupService.addAccountToGroup(accountId, updates.groupId, 'claude')
+          await accountGroupService.addAccountToGroup(accountId, mappedUpdates.groupId, 'claude')
         }
       }
-    }
-
-    // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
-    const mappedUpdates = { ...updates }
-    if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
-      mappedUpdates.subscriptionExpiresAt = updates.subscriptionExpiresAt
-    } else if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'expiresAt')) {
-      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
-    }
-    if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'subscriptionExpiresAt')) {
-      delete mappedUpdates.expiresAt
     }
 
     await ccrAccountService.updateAccount(accountId, mappedUpdates)
@@ -3488,11 +3512,11 @@ router.get('/bedrock-accounts', authenticateAdmin, async (req, res) => {
     // 为每个账户添加使用统计信息
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
-        const formattedAccount = formatSubscriptionExpiry(account)
         try {
           const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
+          const formattedAccount = formatAccountExpiry(account)
           return {
             ...formattedAccount,
             groupInfos,
@@ -3509,6 +3533,7 @@ router.get('/bedrock-accounts', authenticateAdmin, async (req, res) => {
           )
           try {
             const groupInfos = await accountGroupService.getAccountGroups(account.id)
+            const formattedAccount = formatAccountExpiry(account)
             return {
               ...formattedAccount,
               groupInfos,
@@ -3524,7 +3549,7 @@ router.get('/bedrock-accounts', authenticateAdmin, async (req, res) => {
               groupError.message
             )
             return {
-              ...formattedAccount,
+              ...account,
               groupInfos: [],
               usage: {
                 daily: { tokens: 0, requests: 0, allTokens: 0 },
@@ -3537,8 +3562,7 @@ router.get('/bedrock-accounts', authenticateAdmin, async (req, res) => {
       })
     )
 
-    const formattedAccounts = accountsWithStats.map(formatSubscriptionExpiry)
-    return res.json({ success: true, data: formattedAccounts })
+    return res.json({ success: true, data: accountsWithStats })
   } catch (error) {
     logger.error('❌ Failed to get Bedrock accounts:', error)
     return res.status(500).json({ error: 'Failed to get Bedrock accounts', message: error.message })
@@ -3600,8 +3624,8 @@ router.post('/bedrock-accounts', authenticateAdmin, async (req, res) => {
     }
 
     logger.success(`☁️ Admin created Bedrock account: ${name}`)
-    const responseAccount = formatSubscriptionExpiry(result.data)
-    return res.json({ success: true, data: responseAccount })
+    const formattedAccount = formatAccountExpiry(formattedAccount)
+    return res.json({ success: true, data: result.data })
   } catch (error) {
     logger.error('❌ Failed to create Bedrock account:', error)
     return res
@@ -3616,13 +3640,19 @@ router.put('/bedrock-accounts/:accountId', authenticateAdmin, async (req, res) =
     const { accountId } = req.params
     const updates = req.body
 
+    // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
+    const mappedUpdates = mapExpiryField(updates, 'Bedrock', accountId)
+
     // 验证priority的有效性（1-100）
-    if (updates.priority !== undefined && (updates.priority < 1 || updates.priority > 100)) {
+    if (
+      mappedUpdates.priority !== undefined &&
+      (mappedUpdates.priority < 1 || mappedUpdates.priority > 100)
+    ) {
       return res.status(400).json({ error: 'Priority must be between 1 and 100' })
     }
 
     // 验证accountType的有效性
-    if (updates.accountType && !['shared', 'dedicated'].includes(updates.accountType)) {
+    if (mappedUpdates.accountType && !['shared', 'dedicated'].includes(mappedUpdates.accountType)) {
       return res
         .status(400)
         .json({ error: 'Invalid account type. Must be "shared" or "dedicated"' })
@@ -3630,23 +3660,12 @@ router.put('/bedrock-accounts/:accountId', authenticateAdmin, async (req, res) =
 
     // 验证credentialType的有效性
     if (
-      updates.credentialType &&
-      !['default', 'access_key', 'bearer_token'].includes(updates.credentialType)
+      mappedUpdates.credentialType &&
+      !['default', 'access_key', 'bearer_token'].includes(mappedUpdates.credentialType)
     ) {
       return res.status(400).json({
         error: 'Invalid credential type. Must be "default", "access_key", or "bearer_token"'
       })
-    }
-
-    // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
-    const mappedUpdates = { ...updates }
-    if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
-      mappedUpdates.subscriptionExpiresAt = updates.subscriptionExpiresAt
-    } else if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'expiresAt')) {
-      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
-    }
-    if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'subscriptionExpiresAt')) {
-      delete mappedUpdates.expiresAt
     }
 
     const result = await bedrockAccountService.updateAccount(accountId, mappedUpdates)
@@ -3968,11 +3987,11 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
     // 为每个账户添加使用统计信息（与Claude账户相同的逻辑）
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
-        const formattedAccount = formatSubscriptionExpiry(account)
         try {
           const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
+          const formattedAccount = formatAccountExpiry(account)
           return {
             ...formattedAccount,
             groupInfos,
@@ -3990,6 +4009,7 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
           // 如果获取统计失败，返回空统计
           try {
             const groupInfos = await accountGroupService.getAccountGroups(account.id)
+            const formattedAccount = formatAccountExpiry(account)
             return {
               ...formattedAccount,
               groupInfos,
@@ -4005,7 +4025,7 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
               groupError.message
             )
             return {
-              ...formattedAccount,
+              ...account,
               groupInfos: [],
               usage: {
                 daily: { tokens: 0, requests: 0, allTokens: 0 },
@@ -4018,8 +4038,7 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
       })
     )
 
-    const formattedAccounts = accountsWithStats.map(formatSubscriptionExpiry)
-    return res.json({ success: true, data: formattedAccounts })
+    return res.json({ success: true, data: accountsWithStats })
   } catch (error) {
     logger.error('❌ Failed to get Gemini accounts:', error)
     return res.status(500).json({ error: 'Failed to get accounts', message: error.message })
@@ -4059,8 +4078,8 @@ router.post('/gemini-accounts', authenticateAdmin, async (req, res) => {
     }
 
     logger.success(`🏢 Admin created new Gemini account: ${accountData.name}`)
-    const responseAccount = formatSubscriptionExpiry(newAccount)
-    return res.json({ success: true, data: responseAccount })
+    const formattedAccount = formatAccountExpiry(formattedAccount)
+    return res.json({ success: true, data: newAccount })
   } catch (error) {
     logger.error('❌ Failed to create Gemini account:', error)
     return res.status(500).json({ error: 'Failed to create account', message: error.message })
@@ -4091,8 +4110,11 @@ router.put('/gemini-accounts/:accountId', authenticateAdmin, async (req, res) =>
       return res.status(404).json({ error: 'Account not found' })
     }
 
+    // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
+    const mappedUpdates = mapExpiryField(updates, 'Gemini', accountId)
+
     // 处理分组的变更
-    if (updates.accountType !== undefined) {
+    if (mappedUpdates.accountType !== undefined) {
       // 如果之前是分组类型，需要从所有分组中移除
       if (currentAccount.accountType === 'group') {
         const oldGroups = await accountGroupService.getAccountGroups(accountId)
@@ -4101,39 +4123,27 @@ router.put('/gemini-accounts/:accountId', authenticateAdmin, async (req, res) =>
         }
       }
       // 如果新类型是分组，处理多分组支持
-      if (updates.accountType === 'group') {
-        if (Object.prototype.hasOwnProperty.call(updates, 'groupIds')) {
+      if (mappedUpdates.accountType === 'group') {
+        if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'groupIds')) {
           // 如果明确提供了 groupIds 参数（包括空数组）
-          if (updates.groupIds && updates.groupIds.length > 0) {
+          if (mappedUpdates.groupIds && mappedUpdates.groupIds.length > 0) {
             // 设置新的多分组
-            await accountGroupService.setAccountGroups(accountId, updates.groupIds, 'gemini')
+            await accountGroupService.setAccountGroups(accountId, mappedUpdates.groupIds, 'gemini')
           } else {
             // groupIds 为空数组，从所有分组中移除
             await accountGroupService.removeAccountFromAllGroups(accountId)
           }
-        } else if (updates.groupId) {
+        } else if (mappedUpdates.groupId) {
           // 向后兼容：仅当没有 groupIds 但有 groupId 时使用单分组逻辑
-          await accountGroupService.addAccountToGroup(accountId, updates.groupId, 'gemini')
+          await accountGroupService.addAccountToGroup(accountId, mappedUpdates.groupId, 'gemini')
         }
       }
-    }
-
-    // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
-    const mappedUpdates = { ...updates }
-    if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
-      mappedUpdates.subscriptionExpiresAt = updates.subscriptionExpiresAt
-    } else if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'expiresAt')) {
-      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
-    }
-    if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'subscriptionExpiresAt')) {
-      delete mappedUpdates.expiresAt
     }
 
     const updatedAccount = await geminiAccountService.updateAccount(accountId, mappedUpdates)
 
     logger.success(`📝 Admin updated Gemini account: ${accountId}`)
-    const responseAccount = formatSubscriptionExpiry(updatedAccount)
-    return res.json({ success: true, data: responseAccount })
+    return res.json({ success: true, data: updatedAccount })
   } catch (error) {
     logger.error('❌ Failed to update Gemini account:', error)
     return res.status(500).json({ error: 'Failed to update account', message: error.message })
@@ -7281,7 +7291,7 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
         try {
           const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await fetchAccountGroups(account.id)
-          const formattedAccount = formatSubscriptionExpiry(account)
+          const formattedAccount = formatAccountExpiry(account)
           return {
             ...formattedAccount,
             groupInfos,
@@ -7294,7 +7304,7 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
         } catch (error) {
           logger.debug(`Failed to get usage stats for OpenAI account ${account.id}:`, error)
           const groupInfos = await fetchAccountGroups(account.id)
-          const formattedAccount = formatSubscriptionExpiry(account)
+          const formattedAccount = formatAccountExpiry(account)
           return {
             ...formattedAccount,
             groupInfos,
@@ -7310,11 +7320,9 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
 
     logger.info(`获取 OpenAI 账户列表: ${accountsWithStats.length} 个账户`)
 
-    const formattedAccounts = accountsWithStats.map(formatSubscriptionExpiry)
-
     return res.json({
       success: true,
-      data: formattedAccounts
+      data: accountsWithStats
     })
   } catch (error) {
     logger.error('获取 OpenAI 账户列表失败:', error)
@@ -7340,8 +7348,7 @@ router.post('/openai-accounts', authenticateAdmin, async (req, res) => {
       rateLimitDuration,
       priority,
       needsImmediateRefresh, // 是否需要立即刷新
-      requireRefreshSuccess, // 是否必须刷新成功才能创建
-      subscriptionExpiresAt
+      requireRefreshSuccess // 是否必须刷新成功才能创建
     } = req.body
 
     if (!name) {
@@ -7363,8 +7370,7 @@ router.post('/openai-accounts', authenticateAdmin, async (req, res) => {
       accountInfo: accountInfo || {},
       proxy: proxy || null,
       isActive: true,
-      schedulable: true,
-      subscriptionExpiresAt: subscriptionExpiresAt || null
+      schedulable: true
     }
 
     // 如果需要立即刷新且必须成功（OpenAI 手动模式）
@@ -7400,11 +7406,9 @@ router.post('/openai-accounts', authenticateAdmin, async (req, res) => {
 
         logger.success(`✅ 创建并验证 OpenAI 账户成功: ${name} (ID: ${tempAccount.id})`)
 
-        const responseAccount = formatSubscriptionExpiry(refreshedAccount)
-
         return res.json({
           success: true,
-          data: responseAccount,
+          data: refreshedAccount,
           message: '账户创建成功，并已获取完整 token 信息'
         })
       } catch (refreshError) {
@@ -7466,11 +7470,9 @@ router.post('/openai-accounts', authenticateAdmin, async (req, res) => {
 
     logger.success(`✅ 创建 OpenAI 账户成功: ${name} (ID: ${createdAccount.id})`)
 
-    const responseAccount = formatSubscriptionExpiry(createdAccount)
-
     return res.json({
       success: true,
-      data: responseAccount
+      data: createdAccount
     })
   } catch (error) {
     logger.error('创建 OpenAI 账户失败:', error)
@@ -7487,17 +7489,24 @@ router.put('/openai-accounts/:id', authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params
     const updates = req.body
-    const { needsImmediateRefresh, requireRefreshSuccess } = updates
+
+    // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
+    const mappedUpdates = mapExpiryField(updates, 'OpenAI', id)
+
+    const { needsImmediateRefresh, requireRefreshSuccess } = mappedUpdates
 
     // 验证accountType的有效性
-    if (updates.accountType && !['shared', 'dedicated', 'group'].includes(updates.accountType)) {
+    if (
+      mappedUpdates.accountType &&
+      !['shared', 'dedicated', 'group'].includes(mappedUpdates.accountType)
+    ) {
       return res
         .status(400)
         .json({ error: 'Invalid account type. Must be "shared", "dedicated" or "group"' })
     }
 
     // 如果更新为分组类型，验证groupId
-    if (updates.accountType === 'group' && !updates.groupId) {
+    if (mappedUpdates.accountType === 'group' && !mappedUpdates.groupId) {
       return res.status(400).json({ error: 'Group ID is required for group type accounts' })
     }
 
@@ -7508,18 +7517,18 @@ router.put('/openai-accounts/:id', authenticateAdmin, async (req, res) => {
     }
 
     // 如果更新了 Refresh Token，需要验证其有效性
-    if (updates.openaiOauth?.refreshToken && needsImmediateRefresh && requireRefreshSuccess) {
+    if (mappedUpdates.openaiOauth?.refreshToken && needsImmediateRefresh && requireRefreshSuccess) {
       // 先更新 token 信息
       const tempUpdateData = {}
-      if (updates.openaiOauth.refreshToken) {
-        tempUpdateData.refreshToken = updates.openaiOauth.refreshToken
+      if (mappedUpdates.openaiOauth.refreshToken) {
+        tempUpdateData.refreshToken = mappedUpdates.openaiOauth.refreshToken
       }
-      if (updates.openaiOauth.accessToken) {
-        tempUpdateData.accessToken = updates.openaiOauth.accessToken
+      if (mappedUpdates.openaiOauth.accessToken) {
+        tempUpdateData.accessToken = mappedUpdates.openaiOauth.accessToken
       }
       // 更新代理配置（如果有）
-      if (updates.proxy !== undefined) {
-        tempUpdateData.proxy = updates.proxy
+      if (mappedUpdates.proxy !== undefined) {
+        tempUpdateData.proxy = mappedUpdates.proxy
       }
 
       // 临时更新账户以测试新的 token
@@ -7595,7 +7604,7 @@ router.put('/openai-accounts/:id', authenticateAdmin, async (req, res) => {
     }
 
     // 处理分组的变更
-    if (updates.accountType !== undefined) {
+    if (mappedUpdates.accountType !== undefined) {
       // 如果之前是分组类型，需要从原分组中移除
       if (currentAccount.accountType === 'group') {
         const oldGroup = await accountGroupService.getAccountGroup(id)
@@ -7604,63 +7613,48 @@ router.put('/openai-accounts/:id', authenticateAdmin, async (req, res) => {
         }
       }
       // 如果新类型是分组，添加到新分组
-      if (updates.accountType === 'group' && updates.groupId) {
-        await accountGroupService.addAccountToGroup(id, updates.groupId, 'openai')
+      if (mappedUpdates.accountType === 'group' && mappedUpdates.groupId) {
+        await accountGroupService.addAccountToGroup(id, mappedUpdates.groupId, 'openai')
       }
     }
 
     // 准备更新数据
-    const updateData = { ...updates }
+    const updateData = { ...mappedUpdates }
 
     // 处理敏感数据加密
-    if (updates.openaiOauth) {
-      updateData.openaiOauth = updates.openaiOauth
+    if (mappedUpdates.openaiOauth) {
+      updateData.openaiOauth = mappedUpdates.openaiOauth
       // 编辑时不允许直接输入 ID Token，只能通过刷新获取
-      if (updates.openaiOauth.accessToken) {
-        updateData.accessToken = updates.openaiOauth.accessToken
+      if (mappedUpdates.openaiOauth.accessToken) {
+        updateData.accessToken = mappedUpdates.openaiOauth.accessToken
       }
-      if (updates.openaiOauth.refreshToken) {
-        updateData.refreshToken = updates.openaiOauth.refreshToken
+      if (mappedUpdates.openaiOauth.refreshToken) {
+        updateData.refreshToken = mappedUpdates.openaiOauth.refreshToken
       }
-      if (updates.openaiOauth.expires_in) {
+      if (mappedUpdates.openaiOauth.expires_in) {
         updateData.expiresAt = new Date(
-          Date.now() + updates.openaiOauth.expires_in * 1000
+          Date.now() + mappedUpdates.openaiOauth.expires_in * 1000
         ).toISOString()
       }
     }
 
     // 更新账户信息
-    if (updates.accountInfo) {
-      updateData.accountId = updates.accountInfo.accountId || currentAccount.accountId
-      updateData.chatgptUserId = updates.accountInfo.chatgptUserId || currentAccount.chatgptUserId
+    if (mappedUpdates.accountInfo) {
+      updateData.accountId = mappedUpdates.accountInfo.accountId || currentAccount.accountId
+      updateData.chatgptUserId =
+        mappedUpdates.accountInfo.chatgptUserId || currentAccount.chatgptUserId
       updateData.organizationId =
-        updates.accountInfo.organizationId || currentAccount.organizationId
+        mappedUpdates.accountInfo.organizationId || currentAccount.organizationId
       updateData.organizationRole =
-        updates.accountInfo.organizationRole || currentAccount.organizationRole
+        mappedUpdates.accountInfo.organizationRole || currentAccount.organizationRole
       updateData.organizationTitle =
-        updates.accountInfo.organizationTitle || currentAccount.organizationTitle
-      updateData.planType = updates.accountInfo.planType || currentAccount.planType
-      updateData.email = updates.accountInfo.email || currentAccount.email
+        mappedUpdates.accountInfo.organizationTitle || currentAccount.organizationTitle
+      updateData.planType = mappedUpdates.accountInfo.planType || currentAccount.planType
+      updateData.email = mappedUpdates.accountInfo.email || currentAccount.email
       updateData.emailVerified =
-        updates.accountInfo.emailVerified !== undefined
-          ? updates.accountInfo.emailVerified
+        mappedUpdates.accountInfo.emailVerified !== undefined
+          ? mappedUpdates.accountInfo.emailVerified
           : currentAccount.emailVerified
-    }
-
-    const hasOauthExpiry = Boolean(updates.openaiOauth?.expires_in)
-
-    // 处理订阅过期时间字段：优先使用 subscriptionExpiresAt，兼容旧版的 expiresAt
-    if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
-      updateData.subscriptionExpiresAt = updates.subscriptionExpiresAt
-    } else if (Object.prototype.hasOwnProperty.call(updates, 'expiresAt') && !hasOauthExpiry) {
-      updateData.subscriptionExpiresAt = updates.expiresAt
-    }
-
-    if (
-      !hasOauthExpiry &&
-      Object.prototype.hasOwnProperty.call(updateData, 'subscriptionExpiresAt')
-    ) {
-      delete updateData.expiresAt
     }
 
     const updatedAccount = await openaiAccountService.updateAccount(id, updateData)
@@ -7677,8 +7671,7 @@ router.put('/openai-accounts/:id', authenticateAdmin, async (req, res) => {
     }
 
     logger.success(`📝 Admin updated OpenAI account: ${id}`)
-    const responseAccount = formatSubscriptionExpiry(updatedAccount)
-    return res.json({ success: true, data: responseAccount })
+    return res.json({ success: true, data: updatedAccount })
   } catch (error) {
     logger.error('❌ Failed to update OpenAI account:', error)
     return res.status(500).json({ error: 'Failed to update account', message: error.message })
@@ -7759,11 +7752,9 @@ router.put('/openai-accounts/:id/toggle', authenticateAdmin, async (req, res) =>
       `✅ ${account.enabled ? '启用' : '禁用'} OpenAI 账户: ${account.name} (ID: ${id})`
     )
 
-    const responseAccount = formatSubscriptionExpiry(account)
-
     return res.json({
       success: true,
-      data: responseAccount
+      data: account
     })
   } catch (error) {
     logger.error('切换 OpenAI 账户状态失败:', error)
@@ -7869,10 +7860,10 @@ router.get('/azure-openai-accounts', authenticateAdmin, async (req, res) => {
     // 为每个账户添加使用统计信息和分组信息
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
-        const formattedAccount = formatSubscriptionExpiry(account)
         try {
           const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
+          const formattedAccount = formatAccountExpiry(account)
           return {
             ...formattedAccount,
             groupInfos,
@@ -7886,6 +7877,7 @@ router.get('/azure-openai-accounts', authenticateAdmin, async (req, res) => {
           logger.debug(`Failed to get usage stats for Azure OpenAI account ${account.id}:`, error)
           try {
             const groupInfos = await accountGroupService.getAccountGroups(account.id)
+            const formattedAccount = formatAccountExpiry(account)
             return {
               ...formattedAccount,
               groupInfos,
@@ -7898,7 +7890,7 @@ router.get('/azure-openai-accounts', authenticateAdmin, async (req, res) => {
           } catch (groupError) {
             logger.debug(`Failed to get group info for account ${account.id}:`, groupError)
             return {
-              ...formattedAccount,
+              ...account,
               groupInfos: [],
               usage: {
                 daily: { requests: 0, tokens: 0, allTokens: 0 },
@@ -7911,11 +7903,9 @@ router.get('/azure-openai-accounts', authenticateAdmin, async (req, res) => {
       })
     )
 
-    const formattedAccounts = accountsWithStats.map(formatSubscriptionExpiry)
-
     res.json({
       success: true,
-      data: formattedAccounts
+      data: accountsWithStats
     })
   } catch (error) {
     logger.error('Failed to fetch Azure OpenAI accounts:', error)
@@ -8034,11 +8024,9 @@ router.post('/azure-openai-accounts', authenticateAdmin, async (req, res) => {
       }
     }
 
-    const responseAccount = formatSubscriptionExpiry(account)
-
     res.json({
       success: true,
-      data: responseAccount,
+      data: account,
       message: 'Azure OpenAI account created successfully'
     })
   } catch (error) {
@@ -8057,23 +8045,14 @@ router.put('/azure-openai-accounts/:id', authenticateAdmin, async (req, res) => 
     const { id } = req.params
     const updates = req.body
 
-    // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
-    const mappedUpdates = { ...updates }
-    if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
-      mappedUpdates.subscriptionExpiresAt = updates.subscriptionExpiresAt
-    } else if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'expiresAt')) {
-      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
-    }
-    if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'subscriptionExpiresAt')) {
-      delete mappedUpdates.expiresAt
-    }
+    // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
+    const mappedUpdates = mapExpiryField(updates, 'Azure OpenAI', id)
 
     const account = await azureOpenaiAccountService.updateAccount(id, mappedUpdates)
-    const responseAccount = formatSubscriptionExpiry(account)
 
     res.json({
       success: true,
-      data: responseAccount,
+      data: account,
       message: 'Azure OpenAI account updated successfully'
     })
   } catch (error) {
@@ -8326,7 +8305,6 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
     // 处理额度信息、使用统计和绑定的 API Key 数量
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
-        const formattedAccount = formatSubscriptionExpiry(account)
         try {
           // 检查是否需要重置额度
           const today = redis.getDateStringInTimezone()
@@ -8380,6 +8358,7 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
             logger.info(`OpenAI-Responses account ${account.id} has ${boundCount} bound API keys`)
           }
 
+          const formattedAccount = formatAccountExpiry(account)
           return {
             ...formattedAccount,
             boundApiKeysCount: boundCount,
@@ -8391,6 +8370,7 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
           }
         } catch (error) {
           logger.error(`Failed to process OpenAI-Responses account ${account.id}:`, error)
+          const formattedAccount = formatAccountExpiry(account)
           return {
             ...formattedAccount,
             boundApiKeysCount: 0,
@@ -8404,9 +8384,7 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
       })
     )
 
-    const formattedAccounts = accountsWithStats.map(formatSubscriptionExpiry)
-
-    res.json({ success: true, data: formattedAccounts })
+    res.json({ success: true, data: accountsWithStats })
   } catch (error) {
     logger.error('Failed to get OpenAI-Responses accounts:', error)
     res.status(500).json({ success: false, message: error.message })
@@ -8417,8 +8395,8 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
 router.post('/openai-responses-accounts', authenticateAdmin, async (req, res) => {
   try {
     const account = await openaiResponsesAccountService.createAccount(req.body)
-    const responseAccount = formatSubscriptionExpiry(account)
-    res.json({ success: true, data: responseAccount })
+    const formattedAccount = formatAccountExpiry(account)
+    res.json({ success: true, data: formattedAccount })
   } catch (error) {
     logger.error('Failed to create OpenAI-Responses account:', error)
     res.status(500).json({
@@ -8434,27 +8412,19 @@ router.put('/openai-responses-accounts/:id', authenticateAdmin, async (req, res)
     const { id } = req.params
     const updates = req.body
 
+    // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
+    const mappedUpdates = mapExpiryField(updates, 'OpenAI-Responses', id)
+
     // 验证priority的有效性（1-100）
-    if (updates.priority !== undefined) {
-      const priority = parseInt(updates.priority)
+    if (mappedUpdates.priority !== undefined) {
+      const priority = parseInt(mappedUpdates.priority)
       if (isNaN(priority) || priority < 1 || priority > 100) {
         return res.status(400).json({
           success: false,
           message: 'Priority must be a number between 1 and 100'
         })
       }
-      updates.priority = priority.toString()
-    }
-
-    // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
-    const mappedUpdates = { ...updates }
-    if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
-      mappedUpdates.subscriptionExpiresAt = updates.subscriptionExpiresAt
-    } else if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'expiresAt')) {
-      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
-    }
-    if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'subscriptionExpiresAt')) {
-      delete mappedUpdates.expiresAt
+      mappedUpdates.priority = priority.toString()
     }
 
     const result = await openaiResponsesAccountService.updateAccount(id, mappedUpdates)
@@ -8463,13 +8433,7 @@ router.put('/openai-responses-accounts/:id', authenticateAdmin, async (req, res)
       return res.status(400).json(result)
     }
 
-    const updatedAccountData = await openaiResponsesAccountService.getAccount(id)
-    if (updatedAccountData) {
-      updatedAccountData.apiKey = '***'
-    }
-    const responseAccount = formatSubscriptionExpiry(updatedAccountData)
-
-    res.json({ success: true, data: responseAccount })
+    res.json({ success: true, ...result })
   } catch (error) {
     logger.error('Failed to update OpenAI-Responses account:', error)
     res.status(500).json({
@@ -8799,7 +8763,6 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
     // 添加使用统计
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
-        const formattedAccount = formatSubscriptionExpiry(account)
         try {
           const usageStats = await redis.getAccountUsageStats(account.id, 'droid')
           let groupInfos = []
@@ -8828,6 +8791,7 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
             return count
           }, 0)
 
+          const formattedAccount = formatAccountExpiry(account)
           return {
             ...formattedAccount,
             schedulable: account.schedulable === 'true',
@@ -8841,6 +8805,7 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
           }
         } catch (error) {
           logger.warn(`Failed to get stats for Droid account ${account.id}:`, error.message)
+          const formattedAccount = formatAccountExpiry(account)
           return {
             ...formattedAccount,
             boundApiKeysCount: 0,
@@ -8855,9 +8820,7 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
       })
     )
 
-    const formattedAccounts = accountsWithStats.map(formatSubscriptionExpiry)
-
-    return res.json({ success: true, data: formattedAccounts })
+    return res.json({ success: true, data: accountsWithStats })
   } catch (error) {
     logger.error('Failed to get Droid accounts:', error)
     return res.status(500).json({ error: 'Failed to get Droid accounts', message: error.message })
@@ -8914,8 +8877,8 @@ router.post('/droid-accounts', authenticateAdmin, async (req, res) => {
     }
 
     logger.success(`Created Droid account: ${account.name} (${account.id})`)
-    const responseAccount = formatSubscriptionExpiry(account)
-    return res.json({ success: true, data: responseAccount })
+    const formattedAccount = formatAccountExpiry(account)
+    return res.json({ success: true, data: formattedAccount })
   } catch (error) {
     logger.error('Failed to create Droid account:', error)
     return res.status(500).json({ error: 'Failed to create Droid account', message: error.message })
@@ -8927,7 +8890,11 @@ router.put('/droid-accounts/:id', authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params
     const updates = { ...req.body }
-    const { accountType: rawAccountType, groupId, groupIds } = updates
+
+    // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
+    const mappedUpdates = mapExpiryField(updates, 'Droid', id)
+
+    const { accountType: rawAccountType, groupId, groupIds } = mappedUpdates
 
     if (rawAccountType && !['shared', 'dedicated', 'group'].includes(rawAccountType)) {
       return res.status(400).json({ error: '账户类型必须是 shared、dedicated 或 group' })
@@ -8949,26 +8916,15 @@ router.put('/droid-accounts/:id', authenticateAdmin, async (req, res) => {
     const normalizedGroupIds = Array.isArray(groupIds)
       ? groupIds.filter((gid) => typeof gid === 'string' && gid.trim())
       : []
-    const hasGroupIdsField = Object.prototype.hasOwnProperty.call(updates, 'groupIds')
-    const hasGroupIdField = Object.prototype.hasOwnProperty.call(updates, 'groupId')
+    const hasGroupIdsField = Object.prototype.hasOwnProperty.call(mappedUpdates, 'groupIds')
+    const hasGroupIdField = Object.prototype.hasOwnProperty.call(mappedUpdates, 'groupId')
     const targetAccountType = rawAccountType || currentAccount.accountType || 'shared'
 
-    delete updates.groupId
-    delete updates.groupIds
+    delete mappedUpdates.groupId
+    delete mappedUpdates.groupIds
 
     if (rawAccountType) {
-      updates.accountType = targetAccountType
-    }
-
-    // 映射字段名：前端的expiresAt -> 后端的subscriptionExpiresAt
-    const mappedUpdates = { ...updates }
-    if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
-      mappedUpdates.subscriptionExpiresAt = updates.subscriptionExpiresAt
-    } else if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'expiresAt')) {
-      mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
-    }
-    if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'subscriptionExpiresAt')) {
-      delete mappedUpdates.expiresAt
+      mappedUpdates.accountType = targetAccountType
     }
 
     const account = await droidAccountService.updateAccount(id, mappedUpdates)
@@ -9003,8 +8959,7 @@ router.put('/droid-accounts/:id', authenticateAdmin, async (req, res) => {
       }
     }
 
-    const responseAccount = formatSubscriptionExpiry(account)
-    return res.json({ success: true, data: responseAccount })
+    return res.json({ success: true, data: account })
   } catch (error) {
     logger.error(`Failed to update Droid account ${req.params.id}:`, error)
     return res.status(500).json({ error: 'Failed to update Droid account', message: error.message })

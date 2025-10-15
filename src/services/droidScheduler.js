@@ -171,7 +171,7 @@ class DroidScheduler {
 
     if (filtered.length === 0) {
       throw new Error(
-        `No available Droid accounts for endpoint ${normalizedEndpoint}${apiKeyData?.droidAccountId ? ' (respecting binding)' : ''}`
+        `No available accounts for endpoint ${normalizedEndpoint}${apiKeyData?.droidAccountId ? ' (respecting binding)' : ''}`
       )
     }
 
@@ -196,9 +196,7 @@ class DroidScheduler {
     const selected = sorted[0]
 
     if (!selected) {
-      throw new Error(
-        `No schedulable Droid account available after sorting (${normalizedEndpoint})`
-      )
+      throw new Error(`No schedulable account available after sorting (${normalizedEndpoint})`)
     }
 
     if (stickyKey && !isDedicatedBinding) {

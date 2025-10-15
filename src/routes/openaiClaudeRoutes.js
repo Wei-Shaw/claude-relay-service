@@ -490,3 +490,4 @@ router.post('/v1/completions', authenticateApiKey, async (req, res) => {
 })
 
 module.exports = router
+module.exports.handleChatCompletion = handleChatCompletion

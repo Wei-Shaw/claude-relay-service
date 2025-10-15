@@ -65,19 +65,6 @@ const AZURE_OPENAI_ACCOUNT_KEY_PREFIX = 'azure_openai:account:'
 const SHARED_AZURE_OPENAI_ACCOUNTS_KEY = 'shared_azure_openai_accounts'
 const ACCOUNT_SESSION_MAPPING_PREFIX = 'azure_openai_session_account_mapping:'
 
-function normalizeSubscriptionExpiresAt(value) {
-  if (value === undefined || value === null || value === '') {
-    return ''
-  }
-
-  const date = value instanceof Date ? value : new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return ''
-  }
-
-  return date.toISOString()
-}
-
 // 加密函数
 function encrypt(text) {
   if (!text) {
@@ -142,11 +129,15 @@ async function createAccount(accountData) {
     supportedModels: JSON.stringify(
       accountData.supportedModels || ['gpt-4', 'gpt-4-turbo', 'gpt-35-turbo', 'gpt-35-turbo-16k']
     ),
+
+    // ✅ 新增：账户订阅到期时间（业务字段，手动管理）
+    // 注意：Azure OpenAI 使用 API Key 认证，没有 OAuth token，因此没有 expiresAt
+    subscriptionExpiresAt: accountData.subscriptionExpiresAt || null,
+
     // 状态字段
     isActive: accountData.isActive !== false ? 'true' : 'false',
     status: 'active',
     schedulable: accountData.schedulable !== false ? 'true' : 'false',
-    subscriptionExpiresAt: normalizeSubscriptionExpiresAt(accountData.subscriptionExpiresAt || ''),
     createdAt: now,
     updatedAt: now
   }
@@ -166,10 +157,7 @@ async function createAccount(accountData) {
   }
 
   logger.info(`Created Azure OpenAI account: ${accountId}`)
-  return {
-    ...account,
-    subscriptionExpiresAt: account.subscriptionExpiresAt || null
-  }
+  return account
 }
 
 // 获取账户
@@ -204,11 +192,6 @@ async function getAccount(accountId) {
     }
   }
 
-  accountData.subscriptionExpiresAt =
-    accountData.subscriptionExpiresAt && accountData.subscriptionExpiresAt !== ''
-      ? accountData.subscriptionExpiresAt
-      : null
-
   return accountData
 }
 
@@ -240,11 +223,10 @@ async function updateAccount(accountId, updates) {
         : JSON.stringify(updates.supportedModels)
   }
 
-  if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
-    updates.subscriptionExpiresAt = normalizeSubscriptionExpiresAt(updates.subscriptionExpiresAt)
-  } else if (Object.prototype.hasOwnProperty.call(updates, 'expiresAt')) {
-    updates.subscriptionExpiresAt = normalizeSubscriptionExpiresAt(updates.expiresAt)
-    delete updates.expiresAt
+  // ✅ 直接保存 subscriptionExpiresAt（如果提供）
+  // Azure OpenAI 使用 API Key，没有 token 刷新逻辑，不会覆盖此字段
+  if (updates.subscriptionExpiresAt !== undefined) {
+    // 直接保存，不做任何调整
   }
 
   // 更新账户类型时处理共享账户集合
@@ -271,10 +253,6 @@ async function updateAccount(accountId, updates) {
     } catch (e) {
       updatedAccount.proxy = null
     }
-  }
-
-  if (!updatedAccount.subscriptionExpiresAt) {
-    updatedAccount.subscriptionExpiresAt = null
   }
 
   return updatedAccount
@@ -337,7 +315,10 @@ async function getAllAccounts() {
         ...accountData,
         isActive: accountData.isActive === 'true',
         schedulable: accountData.schedulable !== 'false',
-        subscriptionExpiresAt: accountData.subscriptionExpiresAt || null
+
+        // ✅ 前端显示订阅过期时间（业务字段）
+        expiresAt: accountData.subscriptionExpiresAt || null,
+        platform: 'azure-openai'
       })
     }
   }
@@ -365,6 +346,19 @@ async function getSharedAccounts() {
   return accounts
 }
 
+/**
+ * 检查账户订阅是否过期
+ * @param {Object} account - 账户对象
+ * @returns {boolean} - true: 已过期, false: 未过期
+ */
+function isSubscriptionExpired(account) {
+  if (!account.subscriptionExpiresAt) {
+    return false // 未设置视为永不过期
+  }
+  const expiryDate = new Date(account.subscriptionExpiresAt)
+  return expiryDate <= new Date()
+}
+
 // 选择可用账户
 async function selectAvailableAccount(sessionId = null) {
   // 如果有会话ID，尝试获取之前分配的账户
@@ -386,9 +380,17 @@ async function selectAvailableAccount(sessionId = null) {
   const sharedAccounts = await getSharedAccounts()
 
   // 过滤出可用的账户
-  const availableAccounts = sharedAccounts.filter(
-    (acc) => acc.isActive === 'true' && acc.schedulable === 'true'
-  )
+  const availableAccounts = sharedAccounts.filter((acc) => {
+    // ✅ 检查账户订阅是否过期
+    if (isSubscriptionExpired(acc)) {
+      logger.debug(
+        `⏰ Skipping expired Azure OpenAI account: ${acc.name}, expired at ${acc.subscriptionExpiresAt}`
+      )
+      return false
+    }
+
+    return acc.isActive === 'true' && acc.schedulable === 'true'
+  })
 
   if (availableAccounts.length === 0) {
     throw new Error('No available Azure OpenAI accounts')

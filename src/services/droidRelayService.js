@@ -7,8 +7,10 @@ const apiKeyService = require('./apiKeyService')
 const redis = require('../models/redis')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const logger = require('../utils/logger')
+const runtimeAddon = require('../utils/runtimeAddon')
 
 const SYSTEM_PROMPT = 'You are Droid, an AI software engineering agent built by Factory.'
+const RUNTIME_EVENT_FMT_PAYLOAD = 'fmtPayload'
 
 /**
  * Droid API 转发服务
@@ -23,7 +25,7 @@ class DroidRelayService {
       openai: '/o/v1/responses'
     }
 
-    this.userAgent = 'factory-cli/0.19.4'
+    this.userAgent = 'factory-cli/0.19.12'
     this.systemPrompt = SYSTEM_PROMPT
     this.API_KEY_STICKY_PREFIX = 'droid_api_key'
   }
@@ -246,10 +248,33 @@ class DroidRelayService {
       // 处理请求体（注入 system prompt 等）
       const streamRequested = !disableStreaming && this._isStreamRequested(normalizedRequestBody)
 
-      const processedBody = this._processRequestBody(normalizedRequestBody, normalizedEndpoint, {
+      let processedBody = this._processRequestBody(normalizedRequestBody, normalizedEndpoint, {
         disableStreaming,
         streamRequested
       })
+
+      const extensionPayload = {
+        body: processedBody,
+        endpoint: normalizedEndpoint,
+        rawRequest: normalizedRequestBody,
+        originalRequest: requestBody
+      }
+
+      const extensionResult = runtimeAddon.emitSync(RUNTIME_EVENT_FMT_PAYLOAD, extensionPayload)
+      const resolvedPayload =
+        extensionResult && typeof extensionResult === 'object' ? extensionResult : extensionPayload
+
+      if (resolvedPayload && typeof resolvedPayload === 'object') {
+        if (resolvedPayload.abortResponse && typeof resolvedPayload.abortResponse === 'object') {
+          return resolvedPayload.abortResponse
+        }
+
+        if (resolvedPayload.body && typeof resolvedPayload.body === 'object') {
+          processedBody = resolvedPayload.body
+        } else if (resolvedPayload !== extensionPayload) {
+          processedBody = resolvedPayload
+        }
+      }
 
       // 发送请求
       const isStreaming = streamRequested

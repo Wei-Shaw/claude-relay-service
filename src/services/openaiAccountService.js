@@ -194,19 +194,6 @@ function buildCodexUsageSnapshot(accountData) {
   }
 }
 
-function normalizeSubscriptionExpiresAt(value) {
-  if (value === undefined || value === null || value === '') {
-    return ''
-  }
-
-  const date = value instanceof Date ? value : new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return ''
-  }
-
-  return date.toISOString()
-}
-
 // 刷新访问令牌
 async function refreshAccessToken(refreshToken, proxy = null) {
   try {
@@ -345,6 +332,19 @@ function isTokenExpired(account) {
     return false
   }
   return new Date(account.expiresAt) <= new Date()
+}
+
+/**
+ * 检查账户订阅是否过期
+ * @param {Object} account - 账户对象
+ * @returns {boolean} - true: 已过期, false: 未过期
+ */
+function isSubscriptionExpired(account) {
+  if (!account.subscriptionExpiresAt) {
+    return false // 未设置视为永不过期
+  }
+  const expiryDate = new Date(account.subscriptionExpiresAt)
+  return expiryDate <= new Date()
 }
 
 // 刷新账户的 access token（带分布式锁）
@@ -530,13 +530,6 @@ async function createAccount(accountData) {
   // 处理账户信息
   const accountInfo = accountData.accountInfo || {}
 
-  const tokenExpiresAt = oauthData.expires_in
-    ? new Date(Date.now() + oauthData.expires_in * 1000).toISOString()
-    : ''
-  const subscriptionExpiresAt = normalizeSubscriptionExpiresAt(
-    accountData.subscriptionExpiresAt || accountInfo.subscriptionExpiresAt || ''
-  )
-
   // 检查邮箱是否已经是加密格式（包含冒号分隔的32位十六进制字符）
   const isEmailEncrypted =
     accountInfo.email && accountInfo.email.length >= 33 && accountInfo.email.charAt(32) === ':'
@@ -573,8 +566,13 @@ async function createAccount(accountData) {
     email: isEmailEncrypted ? accountInfo.email : encrypt(accountInfo.email || ''),
     emailVerified: accountInfo.emailVerified === true ? 'true' : 'false',
     // 过期时间
-    expiresAt: tokenExpiresAt,
-    subscriptionExpiresAt,
+    expiresAt: oauthData.expires_in
+      ? new Date(Date.now() + oauthData.expires_in * 1000).toISOString()
+      : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // OAuth Token 过期时间（技术字段）
+
+    // ✅ 新增：账户订阅到期时间（业务字段，手动管理）
+    subscriptionExpiresAt: accountData.subscriptionExpiresAt || null,
+
     // 状态字段
     isActive: accountData.isActive !== false ? 'true' : 'false',
     status: 'active',
@@ -599,10 +597,7 @@ async function createAccount(accountData) {
   }
 
   logger.info(`Created OpenAI account: ${accountId}`)
-  return {
-    ...account,
-    subscriptionExpiresAt: account.subscriptionExpiresAt || null
-  }
+  return account
 }
 
 // 获取账户
@@ -645,11 +640,6 @@ async function getAccount(accountId) {
     }
   }
 
-  accountData.subscriptionExpiresAt =
-    accountData.subscriptionExpiresAt && accountData.subscriptionExpiresAt !== ''
-      ? accountData.subscriptionExpiresAt
-      : null
-
   return accountData
 }
 
@@ -683,14 +673,16 @@ async function updateAccount(accountId, updates) {
     updates.email = encrypt(updates.email)
   }
 
-  if (Object.prototype.hasOwnProperty.call(updates, 'subscriptionExpiresAt')) {
-    updates.subscriptionExpiresAt = normalizeSubscriptionExpiresAt(updates.subscriptionExpiresAt)
-  }
-
   // 处理代理配置
   if (updates.proxy) {
     updates.proxy =
       typeof updates.proxy === 'string' ? updates.proxy : JSON.stringify(updates.proxy)
+  }
+
+  // ✅ 如果通过路由映射更新了 subscriptionExpiresAt，直接保存
+  // subscriptionExpiresAt 是业务字段，与 token 刷新独立
+  if (updates.subscriptionExpiresAt !== undefined) {
+    // 直接保存，不做任何调整
   }
 
   // 更新账户类型时处理共享账户集合
@@ -717,10 +709,6 @@ async function updateAccount(accountId, updates) {
     } catch (e) {
       updatedAccount.proxy = null
     }
-  }
-
-  if (!updatedAccount.subscriptionExpiresAt) {
-    updatedAccount.subscriptionExpiresAt = null
   }
 
   return updatedAccount
@@ -805,7 +793,11 @@ async function getAllAccounts() {
         }
       }
 
-      const subscriptionExpiresAt = accountData.subscriptionExpiresAt || null
+      const tokenExpiresAt = accountData.expiresAt || null
+      const subscriptionExpiresAt =
+        accountData.subscriptionExpiresAt && accountData.subscriptionExpiresAt !== ''
+          ? accountData.subscriptionExpiresAt
+          : null
 
       // 不解密敏感字段，只返回基本信息
       accounts.push({
@@ -815,13 +807,18 @@ async function getAllAccounts() {
         openaiOauth: maskedOauth,
         accessToken: maskedAccessToken,
         refreshToken: maskedRefreshToken,
+
+        // ✅ 前端显示订阅过期时间（业务字段）
+        tokenExpiresAt,
+        subscriptionExpiresAt,
+        expiresAt: subscriptionExpiresAt,
+
         // 添加 scopes 字段用于判断认证方式
         // 处理空字符串的情况
         scopes:
           accountData.scopes && accountData.scopes.trim() ? accountData.scopes.split(' ') : [],
         // 添加 hasRefreshToken 标记
         hasRefreshToken: hasRefreshTokenFlag,
-        subscriptionExpiresAt,
         // 添加限流状态信息（统一格式）
         rateLimitStatus: rateLimitInfo
           ? {
@@ -940,8 +937,17 @@ async function selectAvailableAccount(apiKeyId, sessionHash = null) {
 
   for (const accountId of sharedAccountIds) {
     const account = await getAccount(accountId)
-    if (account && account.isActive === 'true' && !isRateLimited(account)) {
+    if (
+      account &&
+      account.isActive === 'true' &&
+      !isRateLimited(account) &&
+      !isSubscriptionExpired(account)
+    ) {
       availableAccounts.push(account)
+    } else if (account && isSubscriptionExpired(account)) {
+      logger.debug(
+        `⏰ Skipping expired OpenAI account: ${account.name}, expired at ${account.subscriptionExpiresAt}`
+      )
     }
   }
 

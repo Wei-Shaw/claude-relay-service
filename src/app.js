@@ -14,6 +14,7 @@ const cacheMonitor = require('./utils/cacheMonitor')
 
 // Import routes
 const apiRoutes = require('./routes/api')
+const unifiedRoutes = require('./routes/unified')
 const adminRoutes = require('./routes/admin')
 const webRoutes = require('./routes/web')
 const apiStatsRoutes = require('./routes/apiStats')
@@ -54,6 +55,11 @@ class Application {
       // 💰 初始化价格服务
       logger.info('🔄 Initializing pricing service...')
       await pricingService.initialize()
+
+      // 📋 初始化模型服务
+      logger.info('🔄 Initializing model service...')
+      const modelService = require('./services/modelService')
+      await modelService.initialize()
 
       // 📊 初始化缓存监控
       await this.initializeCacheMonitoring()
@@ -251,6 +257,7 @@ class Application {
 
       // 🛣️ 路由
       this.app.use('/api', apiRoutes)
+      this.app.use('/api', unifiedRoutes) // 统一智能路由（支持 /v1/chat/completions 等）
       this.app.use('/claude', apiRoutes) // /claude 路由别名，与 /api 功能相同
       this.app.use('/admin', adminRoutes)
       this.app.use('/users', userRoutes)
@@ -262,7 +269,8 @@ class Application {
       this.app.use('/gemini', geminiRoutes) // 保留原有路径以保持向后兼容
       this.app.use('/openai/gemini', openaiGeminiRoutes)
       this.app.use('/openai/claude', openaiClaudeRoutes)
-      this.app.use('/openai', openaiRoutes)
+      this.app.use('/openai', unifiedRoutes) // 复用统一智能路由，支持 /openai/v1/chat/completions
+      this.app.use('/openai', openaiRoutes) // Codex API 路由（/openai/responses, /openai/v1/responses）
       // Droid 路由：支持多种 Factory.ai 端点
       this.app.use('/droid', droidRoutes) // Droid (Factory.ai) API 转发
       this.app.use('/azure', azureOpenaiRoutes)
@@ -628,6 +636,15 @@ class Application {
             logger.info('💰 Pricing service cleaned up')
           } catch (error) {
             logger.error('❌ Error cleaning up pricing service:', error)
+          }
+
+          // 清理 model service 的文件监听器
+          try {
+            const modelService = require('./services/modelService')
+            modelService.cleanup()
+            logger.info('📋 Model service cleaned up')
+          } catch (error) {
+            logger.error('❌ Error cleaning up model service:', error)
           }
 
           // 停止限流清理服务

@@ -3728,47 +3728,54 @@ const closeAccountExpiryEdit = () => {
   editingExpiryAccount.value = null
 }
 
-// 根据账户平台解析更新端点
-const resolveAccountUpdateEndpoint = (account) => {
-  switch (account.platform) {
-    case 'claude':
-      return `/admin/claude-accounts/${account.id}`
-    case 'claude-console':
-      return `/admin/claude-console-accounts/${account.id}`
-    case 'bedrock':
-      return `/admin/bedrock-accounts/${account.id}`
-    case 'openai':
-      return `/admin/openai-accounts/${account.id}`
-    case 'azure_openai':
-      return `/admin/azure-openai-accounts/${account.id}`
-    case 'openai-responses':
-      return `/admin/openai-responses-accounts/${account.id}`
-    case 'ccr':
-      return `/admin/ccr-accounts/${account.id}`
-    case 'gemini':
-      return `/admin/gemini-accounts/${account.id}`
-    case 'droid':
-      return `/admin/droid-accounts/${account.id}`
-    default:
-      throw new Error(`Unsupported platform: ${account.platform}`)
-  }
-}
-
 // 保存账户过期时间
 const handleSaveAccountExpiry = async ({ accountId, expiresAt }) => {
   try {
-    // 找到对应的账户以获取平台信息
+    // 根据账号平台选择正确的 API 端点
     const account = accounts.value.find((acc) => acc.id === accountId)
+
     if (!account) {
-      showToast('账户不存在', 'error')
-      if (expiryEditModalRef.value) {
-        expiryEditModalRef.value.resetSaving()
-      }
+      showToast('未找到账户', 'error')
       return
     }
 
-    // 根据平台动态选择端点
-    const endpoint = resolveAccountUpdateEndpoint(account)
+    // 定义每个平台的端点和参数名
+    // 注意：部分平台使用 :accountId，部分使用 :id
+    let endpoint = ''
+    switch (account.platform) {
+      case 'claude':
+      case 'claude-oauth':
+        endpoint = `/admin/claude-accounts/${accountId}`
+        break
+      case 'gemini':
+        endpoint = `/admin/gemini-accounts/${accountId}`
+        break
+      case 'claude-console':
+        endpoint = `/admin/claude-console-accounts/${accountId}`
+        break
+      case 'bedrock':
+        endpoint = `/admin/bedrock-accounts/${accountId}`
+        break
+      case 'ccr':
+        endpoint = `/admin/ccr-accounts/${accountId}`
+        break
+      case 'openai':
+        endpoint = `/admin/openai-accounts/${accountId}` // 使用 :id
+        break
+      case 'droid':
+        endpoint = `/admin/droid-accounts/${accountId}` // 使用 :id
+        break
+      case 'azure_openai':
+        endpoint = `/admin/azure-openai-accounts/${accountId}` // 使用 :id
+        break
+      case 'openai-responses':
+        endpoint = `/admin/openai-responses-accounts/${accountId}` // 使用 :id
+        break
+      default:
+        showToast(`不支持的平台类型: ${account.platform}`, 'error')
+        return
+    }
+
     const data = await apiClient.put(endpoint, {
       expiresAt: expiresAt || null
     })
@@ -3786,7 +3793,8 @@ const handleSaveAccountExpiry = async ({ accountId, expiresAt }) => {
       }
     }
   } catch (error) {
-    showToast(error.message || '更新失败', 'error')
+    console.error('更新账户过期时间失败:', error)
+    showToast('更新失败', 'error')
     // 重置保存状态
     if (expiryEditModalRef.value) {
       expiryEditModalRef.value.resetSaving()
@@ -3802,6 +3810,7 @@ onMounted(() => {
 
 <style scoped>
 .table-container {
+  overflow-x: auto;
   border-radius: 12px;
   border: 1px solid rgba(0, 0, 0, 0.05);
 }
@@ -3833,6 +3842,12 @@ onMounted(() => {
 }
 .accounts-container {
   min-height: calc(100vh - 300px);
+}
+
+.table-container {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .table-row {
