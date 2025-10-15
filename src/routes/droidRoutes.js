@@ -60,49 +60,6 @@ router.post('/claude/v1/messages', authenticateApiKey, async (req, res) => {
   }
 })
 
-router.post('/claude/v1/messages/count_tokens', authenticateApiKey, async (req, res) => {
-  try {
-    const requestBody = { ...req.body }
-    if ('stream' in requestBody) {
-      delete requestBody.stream
-    }
-    const sessionHash = sessionHelper.generateSessionHash(requestBody)
-
-    if (!hasDroidPermission(req.apiKey)) {
-      logger.security(
-        `🚫 API Key ${req.apiKey?.id || 'unknown'} 缺少 Droid 权限，拒绝访问 ${req.originalUrl}`
-      )
-      return res.status(403).json({
-        error: 'permission_denied',
-        message: '此 API Key 未启用 Droid 权限'
-      })
-    }
-
-    const result = await droidRelayService.relayRequest(
-      requestBody,
-      req.apiKey,
-      req,
-      res,
-      req.headers,
-      {
-        endpointType: 'anthropic',
-        sessionHash,
-        customPath: '/a/v1/messages/count_tokens',
-        skipUsageRecord: true,
-        disableStreaming: true
-      }
-    )
-
-    res.status(result.statusCode).set(result.headers).send(result.body)
-  } catch (error) {
-    logger.error('Droid Claude count_tokens relay error:', error)
-    res.status(500).json({
-      error: 'internal_server_error',
-      message: error.message
-    })
-  }
-})
-
 // OpenAI 端点 - /v1/responses
 router.post(['/openai/v1/responses', '/openai/responses'], authenticateApiKey, async (req, res) => {
   try {

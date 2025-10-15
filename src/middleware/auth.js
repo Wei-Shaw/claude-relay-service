@@ -61,8 +61,7 @@ const resolveConcurrencyConfig = () => {
 const TOKEN_COUNT_PATHS = new Set([
   '/v1/messages/count_tokens',
   '/api/v1/messages/count_tokens',
-  '/claude/v1/messages/count_tokens',
-  '/droid/claude/v1/messages/count_tokens'
+  '/claude/v1/messages/count_tokens'
 ])
 
 function extractApiKey(req) {
