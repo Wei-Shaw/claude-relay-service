@@ -3810,7 +3810,6 @@ onMounted(() => {
 
 <style scoped>
 .table-container {
-  overflow-x: auto;
   border-radius: 12px;
   border: 1px solid rgba(0, 0, 0, 0.05);
 }
@@ -3842,12 +3841,6 @@ onMounted(() => {
 }
 .accounts-container {
   min-height: calc(100vh - 300px);
-}
-
-.table-container {
-  overflow-x: auto;
-  border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .table-row {
