@@ -726,7 +726,8 @@ let accountUsageTrendChartInstance = null
 const accountGroupOptions = [
   { value: 'claude', label: 'Claude' },
   { value: 'openai', label: 'OpenAI' },
-  { value: 'gemini', label: 'Gemini' }
+  { value: 'gemini', label: 'Gemini' },
+  { value: 'droid', label: 'Droid' }
 ]
 
 const accountTrendUpdating = ref(false)
