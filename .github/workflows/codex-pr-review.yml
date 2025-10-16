@@ -27,7 +27,7 @@ jobs:
 
       - name: Run Codex
         id: run_codex
-        uses: hewenyu/codex-action@crs
+        uses: Wei-Shaw/codex-action@crs
         with:
           crs-api-key: ${{ secrets.CRS_API_KEY }}
           crs-base-url: ${{ secrets.CRS_API_BASE_URL }}
