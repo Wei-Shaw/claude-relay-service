@@ -1277,6 +1277,15 @@
                       + Sonnet 4
                     </button>
                     <button
+                      class="rounded-lg bg-indigo-100 px-3 py-1 text-xs text-indigo-700 transition-colors hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50"
+                      type="button"
+                      @click="
+                        addPresetMapping('claude-sonnet-4-5-20250929', 'claude-sonnet-4-5-20250929')
+                      "
+                    >
+                      + Sonnet 4.5
+                    </button>
+                    <button
                       class="rounded-lg bg-purple-100 px-3 py-1 text-xs text-purple-700 transition-colors hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50"
                       type="button"
                       @click="
@@ -1295,7 +1304,44 @@
                       + Haiku 3.5
                     </button>
                     <button
+                      class="rounded-lg bg-emerald-100 px-3 py-1 text-xs text-emerald-700 transition-colors hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50"
+                      type="button"
+                      @click="
+                        addPresetMapping('claude-haiku-4-5-20251001', 'claude-haiku-4-5-20251001')
+                      "
+                    >
+                      + Haiku 4.5
+                    </button>
+                    <button
+                      class="rounded-lg bg-cyan-100 px-3 py-1 text-xs text-cyan-700 transition-colors hover:bg-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-400 dark:hover:bg-cyan-900/50"
+                      type="button"
+                      @click="addPresetMapping('deepseek-chat', 'deepseek-chat')"
+                    >
+                      + DeepSeek
+                    </button>
+                    <button
                       class="rounded-lg bg-orange-100 px-3 py-1 text-xs text-orange-700 transition-colors hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:hover:bg-orange-900/50"
+                      type="button"
+                      @click="addPresetMapping('Qwen', 'Qwen')"
+                    >
+                      + Qwen
+                    </button>
+                    <button
+                      class="rounded-lg bg-pink-100 px-3 py-1 text-xs text-pink-700 transition-colors hover:bg-pink-200 dark:bg-pink-900/30 dark:text-pink-400 dark:hover:bg-pink-900/50"
+                      type="button"
+                      @click="addPresetMapping('Kimi', 'Kimi')"
+                    >
+                      + Kimi
+                    </button>
+                    <button
+                      class="rounded-lg bg-teal-100 px-3 py-1 text-xs text-teal-700 transition-colors hover:bg-teal-200 dark:bg-teal-900/30 dark:text-teal-400 dark:hover:bg-teal-900/50"
+                      type="button"
+                      @click="addPresetMapping('GLM', 'GLM')"
+                    >
+                      + GLM
+                    </button>
+                    <button
+                      class="rounded-lg bg-amber-100 px-3 py-1 text-xs text-amber-700 transition-colors hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50"
                       type="button"
                       @click="
                         addPresetMapping('claude-opus-4-1-20250805', 'claude-sonnet-4-20250514')
@@ -2629,6 +2675,15 @@
                     + Sonnet 4
                   </button>
                   <button
+                    class="rounded-lg bg-indigo-100 px-3 py-1 text-xs text-indigo-700 transition-colors hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50"
+                    type="button"
+                    @click="
+                      addPresetMapping('claude-sonnet-4-5-20250929', 'claude-sonnet-4-5-20250929')
+                    "
+                  >
+                    + Sonnet 4.5
+                  </button>
+                  <button
                     class="rounded-lg bg-purple-100 px-3 py-1 text-xs text-purple-700 transition-colors hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50"
                     type="button"
                     @click="
@@ -2647,7 +2702,44 @@
                     + Haiku 3.5
                   </button>
                   <button
+                    class="rounded-lg bg-emerald-100 px-3 py-1 text-xs text-emerald-700 transition-colors hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50"
+                    type="button"
+                    @click="
+                      addPresetMapping('claude-haiku-4-5-20251001', 'claude-haiku-4-5-20251001')
+                    "
+                  >
+                    + Haiku 4.5
+                  </button>
+                  <button
+                    class="rounded-lg bg-cyan-100 px-3 py-1 text-xs text-cyan-700 transition-colors hover:bg-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-400 dark:hover:bg-cyan-900/50"
+                    type="button"
+                    @click="addPresetMapping('deepseek-chat', 'deepseek-chat')"
+                  >
+                    + DeepSeek
+                  </button>
+                  <button
                     class="rounded-lg bg-orange-100 px-3 py-1 text-xs text-orange-700 transition-colors hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:hover:bg-orange-900/50"
+                    type="button"
+                    @click="addPresetMapping('Qwen', 'Qwen')"
+                  >
+                    + Qwen
+                  </button>
+                  <button
+                    class="rounded-lg bg-pink-100 px-3 py-1 text-xs text-pink-700 transition-colors hover:bg-pink-200 dark:bg-pink-900/30 dark:text-pink-400 dark:hover:bg-pink-900/50"
+                    type="button"
+                    @click="addPresetMapping('Kimi', 'Kimi')"
+                  >
+                    + Kimi
+                  </button>
+                  <button
+                    class="rounded-lg bg-teal-100 px-3 py-1 text-xs text-teal-700 transition-colors hover:bg-teal-200 dark:bg-teal-900/30 dark:text-teal-400 dark:hover:bg-teal-900/50"
+                    type="button"
+                    @click="addPresetMapping('GLM', 'GLM')"
+                  >
+                    + GLM
+                  </button>
+                  <button
+                    class="rounded-lg bg-amber-100 px-3 py-1 text-xs text-amber-700 transition-colors hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50"
                     type="button"
                     @click="
                       addPresetMapping('claude-opus-4-1-20250805', 'claude-sonnet-4-20250514')
@@ -3494,9 +3586,13 @@ const commonModels = [
   { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4', color: 'blue' },
   { value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5', color: 'indigo' },
   { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku', color: 'green' },
+  { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', color: 'emerald' },
   { value: 'claude-opus-4-20250514', label: 'Claude Opus 4', color: 'purple' },
   { value: 'claude-opus-4-1-20250805', label: 'Claude Opus 4.1', color: 'purple' },
-  { value: 'deepseek-chat', label: 'DeepSeek Chat', color: 'cyan' }
+  { value: 'deepseek-chat', label: 'DeepSeek Chat', color: 'cyan' },
+  { value: 'Qwen', label: 'Qwen', color: 'orange' },
+  { value: 'Kimi', label: 'Kimi', color: 'pink' },
+  { value: 'GLM', label: 'GLM', color: 'teal' }
 ]
 
 // 模型映射表数据

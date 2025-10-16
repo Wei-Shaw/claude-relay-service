@@ -990,8 +990,20 @@ class ClaudeConsoleAccountService {
       return true
     }
 
-    // 检查请求的模型是否在映射表的键中
-    return Object.prototype.hasOwnProperty.call(modelMapping, requestedModel)
+    // 检查请求的模型是否在映射表的键中（精确匹配）
+    if (Object.prototype.hasOwnProperty.call(modelMapping, requestedModel)) {
+      return true
+    }
+
+    // 尝试大小写不敏感匹配
+    const requestedModelLower = requestedModel.toLowerCase()
+    for (const key of Object.keys(modelMapping)) {
+      if (key.toLowerCase() === requestedModelLower) {
+        return true
+      }
+    }
+
+    return false
   }
 
   // 🔄 获取映射后的模型名称
@@ -1001,8 +1013,21 @@ class ClaudeConsoleAccountService {
       return requestedModel
     }
 
-    // 返回映射后的模型，如果不存在则返回原模型
-    return modelMapping[requestedModel] || requestedModel
+    // 精确匹配
+    if (modelMapping[requestedModel]) {
+      return modelMapping[requestedModel]
+    }
+
+    // 大小写不敏感匹配
+    const requestedModelLower = requestedModel.toLowerCase()
+    for (const [key, value] of Object.entries(modelMapping)) {
+      if (key.toLowerCase() === requestedModelLower) {
+        return value
+      }
+    }
+
+    // 如果不存在则返回原模型
+    return requestedModel
   }
 
   // 💰 检查账户使用额度（基于实时统计数据）
