@@ -774,11 +774,15 @@ class ClaudeConsoleRelayService {
   async _updateLastUsedTime(accountId) {
     try {
       const client = require('../models/redis').getClientSafe()
-      await client.hset(
-        `claude_console_account:${accountId}`,
-        'lastUsedAt',
-        new Date().toISOString()
-      )
+      const accountKey = `claude_console_account:${accountId}`
+      const exists = await client.exists(accountKey)
+
+      if (!exists) {
+        logger.debug(`🔎 跳过更新已删除的Claude Console账号最近使用时间: ${accountId}`)
+        return
+      }
+
+      await client.hset(accountKey, 'lastUsedAt', new Date().toISOString())
     } catch (error) {
       logger.warn(
         `⚠️ Failed to update last used time for Claude Console account ${accountId}:`,

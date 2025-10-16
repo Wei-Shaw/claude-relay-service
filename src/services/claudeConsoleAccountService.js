@@ -149,6 +149,12 @@ class ClaudeConsoleAccountService {
       for (const key of keys) {
         const accountData = await client.hgetall(key)
         if (accountData && Object.keys(accountData).length > 0) {
+          if (!accountData.id) {
+            logger.warn(`⚠️ 检测到缺少ID的Claude Console账户数据，执行清理: ${key}`)
+            await client.del(key)
+            continue
+          }
+
           // 获取限流状态信息
           const rateLimitInfo = this._getRateLimitInfo(accountData)
 
