@@ -462,6 +462,7 @@ const props = defineProps({
       claude: [],
       gemini: [],
       openai: [],
+      openaiResponses: [],
       bedrock: [],
       droid: [],
       claudeGroups: [],
@@ -581,6 +582,7 @@ const refreshAccounts = async () => {
       claudeConsoleData,
       geminiData,
       openaiData,
+      openaiResponsesData,
       bedrockData,
       droidData,
       groupsData
@@ -589,6 +591,7 @@ const refreshAccounts = async () => {
       apiClient.get('/admin/claude-console-accounts'),
       apiClient.get('/admin/gemini-accounts'),
       apiClient.get('/admin/openai-accounts'),
+      apiClient.get('/admin/openai-responses-accounts'),
       apiClient.get('/admin/bedrock-accounts'),
       apiClient.get('/admin/droid-accounts'),
       apiClient.get('/admin/account-groups')
@@ -626,12 +629,29 @@ const refreshAccounts = async () => {
       }))
     }
 
+    const openaiAccounts = []
+
     if (openaiData.success) {
-      localAccounts.value.openai = (openaiData.data || []).map((account) => ({
-        ...account,
-        isDedicated: account.accountType === 'dedicated'
-      }))
+      ;(openaiData.data || []).forEach((account) => {
+        openaiAccounts.push({
+          ...account,
+          platform: 'openai',
+          isDedicated: account.accountType === 'dedicated'
+        })
+      })
     }
+
+    if (openaiResponsesData.success) {
+      ;(openaiResponsesData.data || []).forEach((account) => {
+        openaiAccounts.push({
+          ...account,
+          platform: 'openai-responses',
+          isDedicated: account.accountType === 'dedicated'
+        })
+      })
+    }
+
+    localAccounts.value.openai = openaiAccounts
 
     if (bedrockData.success) {
       localAccounts.value.bedrock = (bedrockData.data || []).map((account) => ({
@@ -799,10 +819,28 @@ onMounted(async () => {
 
   // 初始化账号数据
   if (props.accounts) {
+    const openaiAccounts = []
+    if (props.accounts.openai) {
+      props.accounts.openai.forEach((account) => {
+        openaiAccounts.push({
+          ...account,
+          platform: 'openai'
+        })
+      })
+    }
+    if (props.accounts.openaiResponses) {
+      props.accounts.openaiResponses.forEach((account) => {
+        openaiAccounts.push({
+          ...account,
+          platform: 'openai-responses'
+        })
+      })
+    }
+
     localAccounts.value = {
       claude: props.accounts.claude || [],
       gemini: props.accounts.gemini || [],
-      openai: props.accounts.openai || [],
+      openai: openaiAccounts,
       bedrock: props.accounts.bedrock || [],
       droid: props.accounts.droid || [],
       claudeGroups: props.accounts.claudeGroups || [],
