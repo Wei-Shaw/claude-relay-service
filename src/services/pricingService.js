@@ -25,6 +25,7 @@ class PricingService {
     this.fileWatcher = null // 文件监听器
     this.reloadDebounceTimer = null // 防抖定时器
     this.hashCheckTimer = null // 哈希轮询定时器
+    this.updateTimer = null // 定时更新任务句柄
     this.hashSyncInProgress = false // 哈希同步状态
 
     // 硬编码的 1 小时缓存价格（美元/百万 token）
@@ -91,7 +92,10 @@ class PricingService {
       await this.syncWithRemoteHash()
 
       // 设置定时更新
-      setInterval(() => {
+      if (this.updateTimer) {
+        clearInterval(this.updateTimer)
+      }
+      this.updateTimer = setInterval(() => {
         this.checkAndUpdatePricing()
       }, this.updateInterval)
 
@@ -776,6 +780,11 @@ class PricingService {
 
   // 清理资源
   cleanup() {
+    if (this.updateTimer) {
+      clearInterval(this.updateTimer)
+      this.updateTimer = null
+      logger.debug('💰 Pricing update timer cleared')
+    }
     if (this.fileWatcher) {
       this.fileWatcher.close()
       this.fileWatcher = null
@@ -784,6 +793,11 @@ class PricingService {
     if (this.reloadDebounceTimer) {
       clearTimeout(this.reloadDebounceTimer)
       this.reloadDebounceTimer = null
+    }
+    if (this.hashCheckTimer) {
+      clearInterval(this.hashCheckTimer)
+      this.hashCheckTimer = null
+      logger.debug('💰 Hash check timer cleared')
     }
   }
 }
