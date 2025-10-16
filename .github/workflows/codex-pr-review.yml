@@ -25,6 +25,23 @@ jobs:
             ${{ github.event.pull_request.base.ref }} \
             +refs/pull/${{ github.event.pull_request.number }}/head
 
+      - name: 校验CRS密钥
+        if: ${{ secrets.CRS_API_KEY == '' || secrets.CRS_API_BASE_URL == '' }}
+        env:
+          CRS_API_KEY: ${{ secrets.CRS_API_KEY }}
+          CRS_API_BASE_URL: ${{ secrets.CRS_API_BASE_URL }}
+        run: |
+          missing=0
+          if [ -z "$CRS_API_KEY" ]; then
+            echo "::error::CRS_API_KEY 缺失，终止流程"
+            missing=1
+          fi
+          if [ -z "$CRS_API_BASE_URL" ]; then
+            echo "::error::CRS_API_BASE_URL 缺失，终止流程"
+            missing=1
+          fi
+          exit $missing
+
       - name: Run Codex
         id: run_codex
         uses: Wei-Shaw/codex-action@crs
