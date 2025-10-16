@@ -1,25 +1,31 @@
 const fs = require('fs')
 const path = require('path')
 const https = require('https')
+const crypto = require('crypto')
+const pricingSource = require('../../config/pricingSource')
 const logger = require('../utils/logger')
 
 class PricingService {
   constructor() {
     this.dataDir = path.join(process.cwd(), 'data')
     this.pricingFile = path.join(this.dataDir, 'model_pricing.json')
-    this.pricingUrl =
-      'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json'
+    this.pricingUrl = pricingSource.pricingUrl
+    this.hashUrl = pricingSource.hashUrl
     this.fallbackFile = path.join(
       process.cwd(),
       'resources',
       'model-pricing',
       'model_prices_and_context_window.json'
     )
+    this.localHashFile = path.join(this.dataDir, 'model_pricing.sha256')
     this.pricingData = null
     this.lastUpdated = null
     this.updateInterval = 24 * 60 * 60 * 1000 // 24小时
+    this.hashCheckInterval = 10 * 60 * 1000 // 10分钟哈希校验
     this.fileWatcher = null // 文件监听器
     this.reloadDebounceTimer = null // 防抖定时器
+    this.hashCheckTimer = null // 哈希轮询定时器
+    this.hashSyncInProgress = false // 哈希同步状态
 
     // 硬编码的 1 小时缓存价格（美元/百万 token）
     // ephemeral_5m 的价格使用 model_pricing.json 中的 cache_creation_input_token_cost
@@ -81,10 +87,16 @@ class PricingService {
       // 检查是否需要下载或更新价格数据
       await this.checkAndUpdatePricing()
 
+      // 初次启动时执行一次哈希校验，确保与远端保持一致
+      await this.syncWithRemoteHash()
+
       // 设置定时更新
       setInterval(() => {
         this.checkAndUpdatePricing()
       }, this.updateInterval)
+
+      // 设置哈希轮询
+      this.setupHashCheck()
 
       // 设置文件监听器
       this.setupFileWatcher()
@@ -145,12 +157,58 @@ class PricingService {
     }
   }
 
-  // 实际的下载逻辑
-  _downloadFromRemote() {
+  // 哈希轮询设置
+  setupHashCheck() {
+    if (this.hashCheckTimer) {
+      clearInterval(this.hashCheckTimer)
+    }
+
+    this.hashCheckTimer = setInterval(() => {
+      this.syncWithRemoteHash()
+    }, this.hashCheckInterval)
+
+    logger.info('🕒 已启用价格文件哈希轮询（每10分钟校验一次）')
+  }
+
+  // 与远端哈希对比
+  async syncWithRemoteHash() {
+    if (this.hashSyncInProgress) {
+      return
+    }
+
+    this.hashSyncInProgress = true
+    try {
+      const remoteHash = await this.fetchRemoteHash()
+
+      if (!remoteHash) {
+        return
+      }
+
+      const localHash = this.computeLocalHash()
+
+      if (!localHash) {
+        logger.info('📄 本地价格文件缺失，尝试下载最新版本')
+        await this.downloadPricingData()
+        return
+      }
+
+      if (remoteHash !== localHash) {
+        logger.info('🔁 检测到远端价格文件更新，开始下载最新数据')
+        await this.downloadPricingData()
+      }
+    } catch (error) {
+      logger.warn(`⚠️  哈希校验失败：${error.message}`)
+    } finally {
+      this.hashSyncInProgress = false
+    }
+  }
+
+  // 获取远端哈希值
+  fetchRemoteHash() {
     return new Promise((resolve, reject) => {
-      const request = https.get(this.pricingUrl, (response) => {
+      const request = https.get(this.hashUrl, (response) => {
         if (response.statusCode !== 200) {
-          reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`))
+          reject(new Error(`哈希文件获取失败：HTTP ${response.statusCode}`))
           return
         }
 
@@ -160,11 +218,77 @@ class PricingService {
         })
 
         response.on('end', () => {
-          try {
-            const jsonData = JSON.parse(data)
+          const hash = data.trim().split(/\s+/)[0]
 
-            // 保存到文件
-            fs.writeFileSync(this.pricingFile, JSON.stringify(jsonData, null, 2))
+          if (!hash) {
+            reject(new Error('哈希文件内容为空'))
+            return
+          }
+
+          resolve(hash)
+        })
+      })
+
+      request.on('error', (error) => {
+        reject(new Error(`网络错误：${error.message}`))
+      })
+
+      request.setTimeout(30000, () => {
+        request.destroy()
+        reject(new Error('获取哈希超时（30秒）'))
+      })
+    })
+  }
+
+  // 计算本地文件哈希
+  computeLocalHash() {
+    if (!fs.existsSync(this.pricingFile)) {
+      return null
+    }
+
+    if (fs.existsSync(this.localHashFile)) {
+      const cached = fs.readFileSync(this.localHashFile, 'utf8').trim()
+      if (cached) {
+        return cached
+      }
+    }
+
+    const fileBuffer = fs.readFileSync(this.pricingFile)
+    return this.persistLocalHash(fileBuffer)
+  }
+
+  // 写入本地哈希文件
+  persistLocalHash(content) {
+    const buffer = Buffer.isBuffer(content) ? content : Buffer.from(content, 'utf8')
+    const hash = crypto.createHash('sha256').update(buffer).digest('hex')
+    fs.writeFileSync(this.localHashFile, `${hash}\n`)
+    return hash
+  }
+
+  // 实际的下载逻辑
+  _downloadFromRemote() {
+    return new Promise((resolve, reject) => {
+      const request = https.get(this.pricingUrl, (response) => {
+        if (response.statusCode !== 200) {
+          reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`))
+          return
+        }
+
+        const chunks = []
+        response.on('data', (chunk) => {
+          const bufferChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+          chunks.push(bufferChunk)
+        })
+
+        response.on('end', () => {
+          try {
+            const buffer = Buffer.concat(chunks)
+            const rawContent = buffer.toString('utf8')
+            const jsonData = JSON.parse(rawContent)
+
+            // 保存到文件并更新哈希
+            fs.writeFileSync(this.pricingFile, rawContent)
+            this.persistLocalHash(buffer)
 
             // 更新内存中的数据
             this.pricingData = jsonData
@@ -226,8 +350,11 @@ class PricingService {
         const fallbackData = fs.readFileSync(this.fallbackFile, 'utf8')
         const jsonData = JSON.parse(fallbackData)
 
+        const formattedJson = JSON.stringify(jsonData, null, 2)
+
         // 保存到data目录
-        fs.writeFileSync(this.pricingFile, JSON.stringify(jsonData, null, 2))
+        fs.writeFileSync(this.pricingFile, formattedJson)
+        this.persistLocalHash(formattedJson)
 
         // 更新内存中的数据
         this.pricingData = jsonData

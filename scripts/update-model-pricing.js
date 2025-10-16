@@ -2,12 +2,14 @@
 
 /**
  * 手动更新模型价格数据脚本
- * 从 LiteLLM 仓库下载最新的模型价格和上下文窗口信息
+ * 从价格镜像分支下载最新的模型价格和上下文窗口信息
  */
 
 const fs = require('fs')
 const path = require('path')
 const https = require('https')
+const crypto = require('crypto')
+const pricingSource = require('../config/pricingSource')
 
 // 颜色输出
 const colors = {
@@ -32,8 +34,8 @@ const log = {
 const config = {
   dataDir: path.join(process.cwd(), 'data'),
   pricingFile: path.join(process.cwd(), 'data', 'model_pricing.json'),
-  pricingUrl:
-    'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json',
+  hashFile: path.join(process.cwd(), 'data', 'model_pricing.sha256'),
+  pricingUrl: pricingSource.pricingUrl,
   fallbackFile: path.join(
     process.cwd(),
     'resources',
@@ -85,8 +87,8 @@ function restoreBackup() {
 // 下载价格数据
 function downloadPricingData() {
   return new Promise((resolve, reject) => {
-    log.info('Downloading model pricing data from LiteLLM...')
-    log.info(`URL: ${config.pricingUrl}`)
+    log.info('正在从价格镜像分支拉取最新的模型价格数据...')
+    log.info(`拉取地址: ${config.pricingUrl}`)
 
     const request = https.get(config.pricingUrl, (response) => {
       if (response.statusCode !== 200) {
@@ -115,7 +117,11 @@ function downloadPricingData() {
           }
 
           // 保存到文件
-          fs.writeFileSync(config.pricingFile, JSON.stringify(jsonData, null, 2))
+          const formattedJson = JSON.stringify(jsonData, null, 2)
+          fs.writeFileSync(config.pricingFile, formattedJson)
+
+          const hash = crypto.createHash('sha256').update(formattedJson).digest('hex')
+          fs.writeFileSync(config.hashFile, `${hash}\n`)
 
           const modelCount = Object.keys(jsonData).length
           const fileSize = Math.round(fs.statSync(config.pricingFile).size / 1024)

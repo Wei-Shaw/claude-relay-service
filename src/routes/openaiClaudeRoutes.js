@@ -17,11 +17,26 @@ const claudeCodeHeadersService = require('../services/claudeCodeHeadersService')
 const sessionHelper = require('../utils/sessionHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 
+const dataDir = path.join(__dirname, '../../data')
+const localPricingPath = path.join(dataDir, 'model_pricing.json')
+const fallbackPricingPath = path.join(
+  __dirname,
+  '../../resources/model-pricing/model_prices_and_context_window.json'
+)
+
 // 加载模型定价数据
 let modelPricingData = {}
 try {
-  const pricingPath = path.join(__dirname, '../../data/model_pricing.json')
-  const pricingContent = fs.readFileSync(pricingPath, 'utf8')
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true })
+  }
+
+  if (!fs.existsSync(localPricingPath) && fs.existsSync(fallbackPricingPath)) {
+    fs.copyFileSync(fallbackPricingPath, localPricingPath)
+    logger.warn('⚠️  未找到 data/model_pricing.json，已使用备用价格文件初始化')
+  }
+
+  const pricingContent = fs.readFileSync(localPricingPath, 'utf8')
   modelPricingData = JSON.parse(pricingContent)
   logger.info('✅ Model pricing data loaded successfully')
 } catch (error) {

@@ -1,11 +1,11 @@
 # Model Pricing Data
 
-This directory contains a local copy of the LiteLLM model pricing data as a fallback mechanism.
+This directory contains a local copy of the mirrored model pricing data as a fallback mechanism.
 
 ## Source
-The original file is maintained by the LiteLLM project:
-- Repository: https://github.com/BerriAI/litellm
-- File: https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json
+The original file is maintained by the LiteLLM project and mirrored into the `price-mirror` branch of this repository via GitHub Actions:
+- Mirror branch (configurable via `PRICE_MIRROR_REPO`): https://raw.githubusercontent.com/<your-repo>/price-mirror/model_prices_and_context_window.json
+- Upstream source: https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json
 
 ## Purpose
 This local copy serves as a fallback when the remote file cannot be downloaded due to:
@@ -22,7 +22,7 @@ The pricingService will:
 3. Log a warning when using the fallback file
 
 ## Manual Update
-To manually update this file with the latest pricing data:
+To manually update this file with the latest pricing data (if automation is unavailable):
 ```bash
 curl -s https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json -o model_prices_and_context_window.json
 ```
