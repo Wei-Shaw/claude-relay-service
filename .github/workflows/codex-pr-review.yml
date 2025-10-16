@@ -1,7 +1,7 @@
 name: Codex PR Review
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, reopened, synchronize]
 
 jobs:
@@ -14,16 +14,28 @@ jobs:
     environment: CODEX
     name: Codex PR Review
     steps:
-      - name: Checkout
+      - name: Checkout base revision
         uses: actions/checkout@v5
         with:
-          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Pre-fetch base and head refs for the PR
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
+          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
           git fetch --no-tags origin \
             ${{ github.event.pull_request.base.ref }} \
-            +refs/pull/${{ github.event.pull_request.number }}/head
+            +refs/pull/${{ github.event.pull_request.number }}/head:refs/pr/${{ github.event.pull_request.number }}/head \
+            +refs/pull/${{ github.event.pull_request.number }}/merge:refs/pr/${{ github.event.pull_request.number }}/merge
+
+      - name: 准备PR工作区
+        run: |
+          rm -rf ../pr-worktree
+          git worktree prune
+          git worktree add ../pr-worktree refs/pr/${{ github.event.pull_request.number }}/merge
 
       - name: 校验CRS密钥
         env:
@@ -49,6 +61,7 @@ jobs:
           crs-base-url: ${{ secrets.CRS_API_BASE_URL }}
           crs-model: "gpt-5-codex"
           crs-reasoning-effort: "high"
+          working-directory: ../pr-worktree
           prompt: |
             This is PR #${{ github.event.pull_request.number }} for ${{ github.repository }}.
             Base SHA: ${{ github.event.pull_request.base.sha }}
