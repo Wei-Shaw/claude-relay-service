@@ -5,8 +5,6 @@
 
 const express = require('express')
 const router = express.Router()
-const fs = require('fs')
-const path = require('path')
 const logger = require('../utils/logger')
 const { authenticateApiKey } = require('../middleware/auth')
 const claudeRelayService = require('../services/claudeRelayService')
@@ -16,32 +14,7 @@ const unifiedClaudeScheduler = require('../services/unifiedClaudeScheduler')
 const claudeCodeHeadersService = require('../services/claudeCodeHeadersService')
 const sessionHelper = require('../utils/sessionHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
-
-const dataDir = path.join(__dirname, '../../data')
-const localPricingPath = path.join(dataDir, 'model_pricing.json')
-const fallbackPricingPath = path.join(
-  __dirname,
-  '../../resources/model-pricing/model_prices_and_context_window.json'
-)
-
-// 加载模型定价数据
-let modelPricingData = {}
-try {
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true })
-  }
-
-  if (!fs.existsSync(localPricingPath) && fs.existsSync(fallbackPricingPath)) {
-    fs.copyFileSync(fallbackPricingPath, localPricingPath)
-    logger.warn('⚠️  未找到 data/model_pricing.json，已使用备用价格文件初始化')
-  }
-
-  const pricingContent = fs.readFileSync(localPricingPath, 'utf8')
-  modelPricingData = JSON.parse(pricingContent)
-  logger.info('✅ Model pricing data loaded successfully')
-} catch (error) {
-  logger.error('❌ Failed to load model pricing data:', error)
-}
+const pricingService = require('../services/pricingService')
 
 // 🔧 辅助函数：检查 API Key 权限
 function checkPermissions(apiKeyData, requiredPermission = 'claude') {
@@ -155,7 +128,7 @@ router.get('/v1/models/:model', authenticateApiKey, async (req, res) => {
     }
 
     // 从 model_pricing.json 获取模型信息
-    const modelData = modelPricingData[modelId]
+    const modelData = pricingService.getModelPricing(modelId)
 
     // 构建标准 OpenAI 格式的模型响应
     let modelInfo
