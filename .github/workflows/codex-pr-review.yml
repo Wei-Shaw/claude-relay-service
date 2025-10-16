@@ -26,7 +26,6 @@ jobs:
             +refs/pull/${{ github.event.pull_request.number }}/head
 
       - name: 校验CRS密钥
-        if: ${{ secrets.CRS_API_KEY == '' || secrets.CRS_API_BASE_URL == '' }}
         env:
           CRS_API_KEY: ${{ secrets.CRS_API_KEY }}
           CRS_API_BASE_URL: ${{ secrets.CRS_API_BASE_URL }}
