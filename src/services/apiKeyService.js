@@ -4,6 +4,53 @@ const config = require('../../config/config')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 
+const ACCOUNT_TYPE_CONFIG = {
+  claude: { prefix: 'claude_account:', category: 'claude' },
+  'claude-console': { prefix: 'claude_console_account:', category: 'claude' },
+  openai: { prefix: 'openai_account:', category: 'openai' },
+  'openai-responses': { prefix: 'openai_responses_account:', category: 'openai' },
+  'azure-openai': { prefix: 'azure_openai:account:', category: 'openai' },
+  gemini: { prefix: 'gemini_account:', category: 'gemini' },
+  droid: { prefix: 'droid:account:', category: 'droid' }
+}
+
+const DEFAULT_LAST_USAGE_TYPES = [
+  'claude',
+  'claude-console',
+  'openai',
+  'openai-responses',
+  'azure-openai',
+  'gemini',
+  'droid'
+]
+
+function normalizeAccountTypeKey(type) {
+  if (!type) {
+    return null
+  }
+  const lower = String(type).toLowerCase()
+  if (lower === 'claude_console') {
+    return 'claude-console'
+  }
+  if (lower === 'openai_responses' || lower === 'openai-response' || lower === 'openai-responses') {
+    return 'openai-responses'
+  }
+  if (lower === 'azure_openai' || lower === 'azureopenai' || lower === 'azure-openai') {
+    return 'azure-openai'
+  }
+  return lower
+}
+
+function sanitizeAccountIdForType(accountId, accountType) {
+  if (!accountId || typeof accountId !== 'string') {
+    return accountId
+  }
+  if (accountType === 'openai-responses') {
+    return accountId.replace(/^responses:/, '')
+  }
+  return accountId
+}
+
 class ApiKeyService {
   constructor() {
     this.prefix = config.security.apiKeyPrefix
@@ -418,6 +465,7 @@ class ApiKeyService {
     try {
       let apiKeys = await redis.getAllApiKeys()
       const client = redis.getClientSafe()
+      const accountInfoCache = new Map()
 
       // 默认过滤掉已删除的API Keys
       if (!includeDeleted) {
@@ -524,6 +572,48 @@ class ApiKeyService {
         if (Object.prototype.hasOwnProperty.call(key, 'ccrAccountId')) {
           delete key.ccrAccountId
         }
+
+        let lastUsageRecord = null
+        try {
+          const usageRecords = await redis.getUsageRecords(key.id, 1)
+          if (Array.isArray(usageRecords) && usageRecords.length > 0) {
+            lastUsageRecord = usageRecords[0]
+          }
+        } catch (error) {
+          logger.debug(`加载 API Key ${key.id} 的使用记录失败:`, error)
+        }
+
+        if (lastUsageRecord && (lastUsageRecord.accountId || lastUsageRecord.accountType)) {
+          const resolvedAccount = await this._resolveLastUsageAccount(
+            key,
+            lastUsageRecord,
+            accountInfoCache,
+            client
+          )
+
+          if (resolvedAccount) {
+            key.lastUsage = {
+              accountId: resolvedAccount.accountId,
+              rawAccountId: lastUsageRecord.accountId || resolvedAccount.accountId,
+              accountType: resolvedAccount.accountType,
+              accountCategory: resolvedAccount.accountCategory,
+              accountName: resolvedAccount.accountName,
+              recordedAt: lastUsageRecord.timestamp || key.lastUsedAt || null
+            }
+          } else {
+            key.lastUsage = {
+              accountId: null,
+              rawAccountId: lastUsageRecord.accountId || null,
+              accountType: 'deleted',
+              accountCategory: 'deleted',
+              accountName: '已删除',
+              recordedAt: lastUsageRecord.timestamp || key.lastUsedAt || null
+            }
+          }
+        } else {
+          key.lastUsage = null
+        }
+
         delete key.apiKey // 不返回哈希后的key
       }
 
@@ -1159,6 +1249,125 @@ class ApiKeyService {
     } catch (error) {
       logger.error('❌ Failed to record usage:', error)
     }
+  }
+
+  async _fetchAccountInfo(accountId, accountType, cache, client) {
+    if (!client || !accountId || !accountType) {
+      return null
+    }
+
+    const cacheKey = `${accountType}:${accountId}`
+    if (cache.has(cacheKey)) {
+      return cache.get(cacheKey)
+    }
+
+    const accountConfig = ACCOUNT_TYPE_CONFIG[accountType]
+    if (!accountConfig) {
+      cache.set(cacheKey, null)
+      return null
+    }
+
+    const redisKey = `${accountConfig.prefix}${accountId}`
+    let accountData = null
+    try {
+      accountData = await client.hgetall(redisKey)
+    } catch (error) {
+      logger.debug(`加载账号信息失败 ${redisKey}:`, error)
+    }
+
+    if (accountData && Object.keys(accountData).length > 0) {
+      const displayName =
+        accountData.name ||
+        accountData.displayName ||
+        accountData.email ||
+        accountData.username ||
+        accountData.description ||
+        accountId
+
+      const info = { id: accountId, name: displayName }
+      cache.set(cacheKey, info)
+      return info
+    }
+
+    cache.set(cacheKey, null)
+    return null
+  }
+
+  async _resolveLastUsageAccount(apiKey, usageRecord, cache, client) {
+    if (!client || !usageRecord) {
+      return null
+    }
+
+    const candidateIds = new Set()
+    const addId = (value) => {
+      if (!value) {
+        return
+      }
+      candidateIds.add(value)
+      if (typeof value === 'string' && value.startsWith('responses:')) {
+        candidateIds.add(value.replace(/^responses:/, ''))
+      }
+    }
+
+    addId(usageRecord.accountId)
+    addId(apiKey?.openaiAccountId)
+    addId(apiKey?.azureOpenaiAccountId)
+    addId(apiKey?.claudeAccountId)
+    addId(apiKey?.claudeConsoleAccountId)
+    addId(apiKey?.geminiAccountId)
+    addId(apiKey?.droidAccountId)
+
+    const candidateTypes = []
+    const addType = (type) => {
+      const normalized = normalizeAccountTypeKey(type)
+      if (normalized && !candidateTypes.includes(normalized)) {
+        candidateTypes.push(normalized)
+      }
+    }
+
+    addType(usageRecord.accountType)
+    if (apiKey?.claudeAccountId) {
+      addType('claude')
+    }
+    if (apiKey?.claudeConsoleAccountId) {
+      addType('claude-console')
+    }
+    if (apiKey?.geminiAccountId) {
+      addType('gemini')
+    }
+    if (apiKey?.openaiAccountId) {
+      addType(apiKey.openaiAccountId.startsWith('responses:') ? 'openai-responses' : 'openai')
+    }
+    if (apiKey?.azureOpenaiAccountId) {
+      addType('azure-openai')
+    }
+    if (apiKey?.droidAccountId) {
+      addType('droid')
+    }
+
+    DEFAULT_LAST_USAGE_TYPES.forEach(addType)
+
+    for (const type of candidateTypes) {
+      const accountConfig = ACCOUNT_TYPE_CONFIG[type]
+      if (!accountConfig) {
+        continue
+      }
+
+      for (const candidateId of candidateIds) {
+        const normalizedId = sanitizeAccountIdForType(candidateId, type)
+        const accountInfo = await this._fetchAccountInfo(normalizedId, type, cache, client)
+        if (accountInfo) {
+          return {
+            accountId: accountInfo.id,
+            accountName: accountInfo.name,
+            accountType: type,
+            accountCategory: accountConfig.category
+          }
+        }
+      }
+    }
+
+    return null
   }
 
   // 🔔 发布计费事件（内部方法）

@@ -686,15 +686,33 @@
                         class="whitespace-nowrap px-3 py-3 text-gray-700 dark:text-gray-300"
                         style="font-size: 13px"
                       >
-                        <span
-                          v-if="key.lastUsedAt"
-                          class="cursor-help"
-                          style="font-size: 13px"
-                          :title="new Date(key.lastUsedAt).toLocaleString('zh-CN')"
-                        >
-                          {{ formatLastUsed(key.lastUsedAt) }}
-                        </span>
-                        <span v-else class="text-gray-400" style="font-size: 13px">从未使用</span>
+                        <div class="flex flex-col leading-tight">
+                          <span
+                            v-if="key.lastUsedAt"
+                            class="cursor-help"
+                            style="font-size: 13px"
+                            :title="new Date(key.lastUsedAt).toLocaleString('zh-CN')"
+                          >
+                            {{ formatLastUsed(key.lastUsedAt) }}
+                          </span>
+                          <span v-else class="text-gray-400" style="font-size: 13px">从未使用</span>
+                          <span
+                            v-if="hasLastUsageAccount(key)"
+                            class="mt-1 text-xs text-gray-500 dark:text-gray-400"
+                            :title="getLastUsageFullName(key)"
+                          >
+                            {{ getLastUsageDisplayName(key) }}
+                            <span
+                              v-if="!isLastUsageDeleted(key)"
+                              class="ml-1 text-gray-400 dark:text-gray-500"
+                            >
+                              ({{ getLastUsageTypeLabel(key) }})
+                            </span>
+                          </span>
+                          <span v-else class="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                            暂无使用账号
+                          </span>
+                        </div>
                       </td>
                       <!-- 创建时间 -->
                       <td
@@ -1258,11 +1276,31 @@
                       <p class="text-xs text-gray-500 dark:text-gray-400">费用</p>
                     </div>
                   </div>
-                  <div class="mt-2 flex items-center justify-between">
-                    <span class="text-xs text-gray-600 dark:text-gray-400">最后使用</span>
-                    <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{
-                      formatLastUsed(key.lastUsedAt)
-                    }}</span>
+                  <div class="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                    <div class="flex items-center justify-between">
+                      <span>最后使用</span>
+                      <span class="font-medium text-gray-700 dark:text-gray-300">
+                        {{ key.lastUsedAt ? formatLastUsed(key.lastUsedAt) : '从未使用' }}
+                      </span>
+                    </div>
+                    <div class="mt-1 flex items-center justify-between">
+                      <span>账号</span>
+                      <span
+                        v-if="hasLastUsageAccount(key)"
+                        class="truncate text-gray-500 dark:text-gray-400"
+                        style="max-width: 180px"
+                        :title="getLastUsageFullName(key)"
+                      >
+                        {{ getLastUsageDisplayName(key) }}
+                        <span
+                          v-if="!isLastUsageDeleted(key)"
+                          class="ml-1 text-gray-400 dark:text-gray-500"
+                        >
+                          ({{ getLastUsageTypeLabel(key) }})
+                        </span>
+                      </span>
+                      <span v-else class="text-gray-400 dark:text-gray-500">暂无使用账号</span>
+                    </div>
                   </div>
                 </div>
 
@@ -1765,10 +1803,33 @@
                         class="whitespace-nowrap px-3 py-3 text-gray-700 dark:text-gray-300"
                         style="font-size: 13px"
                       >
-                        <span v-if="key.lastUsedAt" style="font-size: 13px">
-                          {{ formatLastUsed(key.lastUsedAt) }}
-                        </span>
-                        <span v-else class="text-gray-400" style="font-size: 13px">从未使用</span>
+                        <div class="flex flex-col leading-tight">
+                          <span
+                            v-if="key.lastUsedAt"
+                            class="cursor-help"
+                            style="font-size: 13px"
+                            :title="new Date(key.lastUsedAt).toLocaleString('zh-CN')"
+                          >
+                            {{ formatLastUsed(key.lastUsedAt) }}
+                          </span>
+                          <span v-else class="text-gray-400" style="font-size: 13px">从未使用</span>
+                          <span
+                            v-if="hasLastUsageAccount(key)"
+                            class="mt-1 text-xs text-gray-500 dark:text-gray-400"
+                            :title="getLastUsageFullName(key)"
+                          >
+                            {{ getLastUsageDisplayName(key) }}
+                            <span
+                              v-if="!isLastUsageDeleted(key)"
+                              class="ml-1 text-gray-400 dark:text-gray-500"
+                            >
+                              ({{ getLastUsageTypeLabel(key) }})
+                            </span>
+                          </span>
+                          <span v-else class="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                            暂无使用账号
+                          </span>
+                        </div>
                       </td>
                       <td class="operations-column operations-cell px-3 py-3">
                         <div class="flex items-center gap-2">
@@ -3676,6 +3737,100 @@ const formatLastUsed = (dateString) => {
   return date.toLocaleDateString('zh-CN')
 }
 
+const ACCOUNT_TYPE_LABELS = {
+  claude: 'Claude',
+  openai: 'OpenAI',
+  gemini: 'Gemini',
+  droid: 'Droid',
+  deleted: '已删除',
+  other: '其他'
+}
+
+const MAX_LAST_USAGE_NAME_LENGTH = 16
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const normalizeFrontendAccountCategory = (type) => {
+  if (!type) return 'other'
+  const lower = String(type).toLowerCase()
+  if (lower === 'claude-console' || lower === 'claude_console' || lower === 'claude') {
+    return 'claude'
+  }
+  if (
+    lower === 'openai' ||
+    lower === 'openai-responses' ||
+    lower === 'openai_responses' ||
+    lower === 'azure-openai' ||
+    lower === 'azure_openai'
+  ) {
+    return 'openai'
+  }
+  if (lower === 'gemini') {
+    return 'gemini'
+  }
+  if (lower === 'droid') {
+    return 'droid'
+  }
+  return 'other'
+}
+
+const getLastUsageInfo = (apiKey) => apiKey?.lastUsage || null
+
+const hasLastUsageAccount = (apiKey) => {
+  const info = getLastUsageInfo(apiKey)
+  return !!(info && (info.accountName || info.accountId || info.rawAccountId))
+}
+
+const isLikelyDeletedUsage = (info) => {
+  if (!info) return false
+  if (info.accountCategory === 'deleted') return true
+
+  const rawId = typeof info.rawAccountId === 'string' ? info.rawAccountId.trim() : ''
+  const accountName = typeof info.accountName === 'string' ? info.accountName.trim() : ''
+  const accountType =
+    typeof info.accountType === 'string' ? info.accountType.trim().toLowerCase() : ''
+
+  if (!rawId) return false
+
+  const looksLikeUuid = UUID_PATTERN.test(rawId)
+  const nameMissingOrSame = !accountName || accountName === rawId
+  const typeUnknown =
+    !accountType || accountType === 'unknown' || ACCOUNT_TYPE_LABELS[accountType] === undefined
+
+  return looksLikeUuid && nameMissingOrSame && typeUnknown
+}
+
+const getLastUsageBaseName = (info) => {
+  if (!info) return '未知账号'
+  if (isLikelyDeletedUsage(info)) {
+    return '已删除'
+  }
+  return info.accountName || info.accountId || info.rawAccountId || '未知账号'
+}
+
+const getLastUsageFullName = (apiKey) => getLastUsageBaseName(getLastUsageInfo(apiKey))
+
+const getLastUsageDisplayName = (apiKey) => {
+  const full = getLastUsageFullName(apiKey)
+  return full.length > MAX_LAST_USAGE_NAME_LENGTH
+    ? `${full.slice(0, MAX_LAST_USAGE_NAME_LENGTH)}...`
+    : full
+}
+
+const getLastUsageTypeLabel = (apiKey) => {
+  const info = getLastUsageInfo(apiKey)
+  if (isLikelyDeletedUsage(info)) {
+    return ACCOUNT_TYPE_LABELS.deleted
+  }
+  const category = info?.accountCategory || normalizeFrontendAccountCategory(info?.accountType)
+  return ACCOUNT_TYPE_LABELS[category] || ACCOUNT_TYPE_LABELS.other
+}
+
+const isLastUsageDeleted = (apiKey) => {
+  const info = getLastUsageInfo(apiKey)
+  return isLikelyDeletedUsage(info)
+}
+
 // 清除搜索
 const clearSearch = () => {
   searchKeyword.value = ''
@@ -3785,7 +3940,9 @@ const exportToExcel = () => {
         Token数: formatTokenCount(periodTokens),
         输入Token: formatTokenCount(periodInputTokens),
         输出Token: formatTokenCount(periodOutputTokens),
-        最后使用时间: key.lastUsedAt ? formatDate(key.lastUsedAt) : '从未使用'
+        最后使用时间: key.lastUsedAt ? formatDate(key.lastUsedAt) : '从未使用',
+        最后使用账号: getLastUsageFullName(key),
+        最后使用类型: getLastUsageTypeLabel(key)
       }
 
       // 添加分模型统计
