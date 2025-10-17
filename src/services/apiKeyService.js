@@ -7,7 +7,7 @@ const logger = require('../utils/logger')
 const ACCOUNT_TYPE_CONFIG = {
   claude: { prefix: 'claude_account:', category: 'claude' },
   'claude-console': { prefix: 'claude_console_account:', category: 'claude' },
-  openai: { prefix: 'openai_account:', category: 'openai' },
+  openai: { prefix: 'openai:account:', category: 'openai' },
   'openai-responses': { prefix: 'openai_responses_account:', category: 'openai' },
   'azure-openai': { prefix: 'azure_openai:account:', category: 'openai' },
   gemini: { prefix: 'gemini_account:', category: 'gemini' },
