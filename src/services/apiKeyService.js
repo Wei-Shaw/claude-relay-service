@@ -5,24 +5,34 @@ const redis = require('../models/redis')
 const logger = require('../utils/logger')
 
 const ACCOUNT_TYPE_CONFIG = {
-  claude: { prefix: 'claude_account:', category: 'claude' },
-  'claude-console': { prefix: 'claude_console_account:', category: 'claude' },
-  openai: { prefix: 'openai:account:', category: 'openai' },
-  'openai-responses': { prefix: 'openai_responses_account:', category: 'openai' },
-  'azure-openai': { prefix: 'azure_openai:account:', category: 'openai' },
-  gemini: { prefix: 'gemini_account:', category: 'gemini' },
-  droid: { prefix: 'droid:account:', category: 'droid' }
+  claude: { prefix: 'claude_account:' },
+  'claude-console': { prefix: 'claude_console_account:' },
+  openai: { prefix: 'openai:account:' },
+  'openai-responses': { prefix: 'openai_responses_account:' },
+  'azure-openai': { prefix: 'azure_openai:account:' },
+  gemini: { prefix: 'gemini_account:' },
+  droid: { prefix: 'droid:account:' }
 }
 
-const DEFAULT_LAST_USAGE_TYPES = [
-  'claude',
-  'claude-console',
+const ACCOUNT_TYPE_PRIORITY = [
   'openai',
   'openai-responses',
   'azure-openai',
+  'claude',
+  'claude-console',
   'gemini',
   'droid'
 ]
+
+const ACCOUNT_CATEGORY_MAP = {
+  claude: 'claude',
+  'claude-console': 'claude',
+  openai: 'openai',
+  'openai-responses': 'openai',
+  'azure-openai': 'openai',
+  gemini: 'gemini',
+  droid: 'droid'
+}
 
 function normalizeAccountTypeKey(type) {
   if (!type) {
@@ -1293,61 +1303,60 @@ class ApiKeyService {
     return null
   }
 
-  async _resolveLastUsageAccount(apiKey, usageRecord, cache, client) {
-    if (!client || !usageRecord) {
+  async _resolveAccountByUsageRecord(usageRecord, cache, client) {
+    if (!usageRecord || !client) {
+      return null
+    }
+
+    const rawAccountId = usageRecord.accountId || null
+    const rawAccountType = normalizeAccountTypeKey(usageRecord.accountType)
+    const modelName = usageRecord.model || usageRecord.actualModel || usageRecord.service || null
+
+    if (!rawAccountId && !rawAccountType) {
       return null
     }
 
     const candidateIds = new Set()
-    const addId = (value) => {
-      if (!value) {
-        return
-      }
-      candidateIds.add(value)
-      if (typeof value === 'string' && value.startsWith('responses:')) {
-        candidateIds.add(value.replace(/^responses:/, ''))
+    if (rawAccountId) {
+      candidateIds.add(rawAccountId)
+      if (typeof rawAccountId === 'string' && rawAccountId.startsWith('responses:')) {
+        candidateIds.add(rawAccountId.replace(/^responses:/, ''))
       }
     }
 
-    addId(usageRecord.accountId)
-    addId(apiKey?.openaiAccountId)
-    addId(apiKey?.azureOpenaiAccountId)
-    addId(apiKey?.claudeAccountId)
-    addId(apiKey?.claudeConsoleAccountId)
-    addId(apiKey?.geminiAccountId)
-    addId(apiKey?.droidAccountId)
+    if (candidateIds.size === 0) {
+      return null
+    }
 
-    const candidateTypes = []
-    const addType = (type) => {
+    const typeCandidates = []
+    const pushType = (type) => {
       const normalized = normalizeAccountTypeKey(type)
-      if (normalized && !candidateTypes.includes(normalized)) {
-        candidateTypes.push(normalized)
+      if (normalized && ACCOUNT_TYPE_CONFIG[normalized] && !typeCandidates.includes(normalized)) {
+        typeCandidates.push(normalized)
       }
     }
 
-    addType(usageRecord.accountType)
-    if (apiKey?.claudeAccountId) {
-      addType('claude')
-    }
-    if (apiKey?.claudeConsoleAccountId) {
-      addType('claude-console')
-    }
-    if (apiKey?.geminiAccountId) {
-      addType('gemini')
-    }
-    if (apiKey?.openaiAccountId) {
-      addType(apiKey.openaiAccountId.startsWith('responses:') ? 'openai-responses' : 'openai')
-    }
-    if (apiKey?.azureOpenaiAccountId) {
-      addType('azure-openai')
-    }
-    if (apiKey?.droidAccountId) {
-      addType('droid')
+    pushType(rawAccountType)
+
+    if (modelName) {
+      const lowerModel = modelName.toLowerCase()
+      if (lowerModel.includes('gpt') || lowerModel.includes('openai')) {
+        pushType('openai')
+        pushType('openai-responses')
+        pushType('azure-openai')
+      } else if (lowerModel.includes('gemini')) {
+        pushType('gemini')
+      } else if (lowerModel.includes('claude') || lowerModel.includes('anthropic')) {
+        pushType('claude')
+        pushType('claude-console')
+      } else if (lowerModel.includes('droid')) {
+        pushType('droid')
+      }
     }
 
-    DEFAULT_LAST_USAGE_TYPES.forEach(addType)
+    ACCOUNT_TYPE_PRIORITY.forEach(pushType)
 
-    for (const type of candidateTypes) {
+    for (const type of typeCandidates) {
       const accountConfig = ACCOUNT_TYPE_CONFIG[type]
       if (!accountConfig) {
         continue
@@ -1358,16 +1367,21 @@ class ApiKeyService {
         const accountInfo = await this._fetchAccountInfo(normalizedId, type, cache, client)
         if (accountInfo) {
           return {
-            accountId: accountInfo.id,
+            accountId: normalizedId,
             accountName: accountInfo.name,
             accountType: type,
-            accountCategory: accountConfig.category
+            accountCategory: ACCOUNT_CATEGORY_MAP[type] || 'other',
+            rawAccountId: rawAccountId || normalizedId
           }
         }
       }
     }
 
     return null
+  }
+
+  async _resolveLastUsageAccount(apiKey, usageRecord, cache, client) {
+    return await this._resolveAccountByUsageRecord(usageRecord, cache, client)
   }
 
   // 🔔 发布计费事件（内部方法）
