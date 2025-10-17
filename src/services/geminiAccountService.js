@@ -1084,8 +1084,12 @@ async function loadCodeAssist(client, projectId = null, proxyConfig = null) {
     tokenInfoConfig.httpsAgent = proxyAgent
   }
 
-  await axios(tokenInfoConfig)
-  logger.info('📋 tokeninfo 接口验证成功')
+  try {
+    await axios(tokenInfoConfig)
+    logger.info('📋 tokeninfo 接口验证成功')
+  } catch (error) {
+    logger.info('tokeninfo 接口获取失败', error)
+  }
 
   const userInfoConfig = {
     url: 'https://www.googleapis.com/oauth2/v2/userinfo',
@@ -1101,8 +1105,12 @@ async function loadCodeAssist(client, projectId = null, proxyConfig = null) {
     userInfoConfig.httpsAgent = proxyAgent
   }
 
-  await axios(userInfoConfig)
-  logger.info('📋 userinfo 接口获取成功')
+  try {
+    await axios(userInfoConfig)
+    logger.info('📋 userinfo 接口获取成功')
+  } catch (error) {
+    logger.info('userinfo 接口获取失败', error)
+  }
 
   // 创建ClientMetadata
   const clientMetadata = {
