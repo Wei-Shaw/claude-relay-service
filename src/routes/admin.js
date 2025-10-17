@@ -3624,8 +3624,8 @@ router.post('/bedrock-accounts', authenticateAdmin, async (req, res) => {
     }
 
     logger.success(`☁️ Admin created Bedrock account: ${name}`)
-    const formattedAccount = formatAccountExpiry(formattedAccount)
-    return res.json({ success: true, data: result.data })
+    const formattedAccount = formatAccountExpiry(result.data)
+    return res.json({ success: true, data: formattedAccount })
   } catch (error) {
     logger.error('❌ Failed to create Bedrock account:', error)
     return res
@@ -4078,8 +4078,8 @@ router.post('/gemini-accounts', authenticateAdmin, async (req, res) => {
     }
 
     logger.success(`🏢 Admin created new Gemini account: ${accountData.name}`)
-    const formattedAccount = formatAccountExpiry(formattedAccount)
-    return res.json({ success: true, data: newAccount })
+    const formattedAccount = formatAccountExpiry(newAccount)
+    return res.json({ success: true, data: formattedAccount })
   } catch (error) {
     logger.error('❌ Failed to create Gemini account:', error)
     return res.status(500).json({ error: 'Failed to create account', message: error.message })

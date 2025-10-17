@@ -1048,6 +1048,7 @@ async function getOauthClient(accessToken, refreshToken, proxyConfig = null) {
 
   // 验证凭据本地有效性
   const { token } = await client.getAccessToken()
+
   if (!token) {
     return false
   }
@@ -1066,6 +1067,42 @@ async function loadCodeAssist(client, projectId = null, proxyConfig = null) {
   const CODE_ASSIST_API_VERSION = 'v1internal'
 
   const { token } = await client.getAccessToken()
+  const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+
+  const tokenInfoConfig = {
+    url: 'https://oauth2.googleapis.com/tokeninfo',
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    data: new URLSearchParams({ access_token: token }).toString(),
+    timeout: 15000
+  }
+
+  if (proxyAgent) {
+    tokenInfoConfig.httpsAgent = proxyAgent
+  }
+
+  await axios(tokenInfoConfig)
+  logger.info('📋 tokeninfo 接口验证成功')
+
+  const userInfoConfig = {
+    url: 'https://www.googleapis.com/oauth2/v2/userinfo',
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: '*/*'
+    },
+    timeout: 15000
+  }
+
+  if (proxyAgent) {
+    userInfoConfig.httpsAgent = proxyAgent
+  }
+
+  await axios(userInfoConfig)
+  logger.info('📋 userinfo 接口获取成功')
 
   // 创建ClientMetadata
   const clientMetadata = {
@@ -1100,7 +1137,6 @@ async function loadCodeAssist(client, projectId = null, proxyConfig = null) {
   }
 
   // 添加代理配置
-  const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
   if (proxyAgent) {
     axiosConfig.httpsAgent = proxyAgent
     logger.info(

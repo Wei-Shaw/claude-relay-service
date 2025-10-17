@@ -44,6 +44,90 @@ function ensureGeminiPermissionMiddleware(req, res, next) {
   return undefined
 }
 
+// 判断对象是否为可读流
+function isReadableStream(value) {
+  return value && typeof value.on === 'function' && typeof value.pipe === 'function'
+}
+
+// 读取可读流内容为字符串
+async function readStreamToString(stream) {
+  return new Promise((resolve, reject) => {
+    let result = ''
+
+    try {
+      if (typeof stream.setEncoding === 'function') {
+        stream.setEncoding('utf8')
+      }
+    } catch (error) {
+      logger.warn('设置流编码失败:', error)
+    }
+
+    stream.on('data', (chunk) => {
+      result += chunk
+    })
+
+    stream.on('end', () => {
+      resolve(result)
+    })
+
+    stream.on('error', (error) => {
+      reject(error)
+    })
+  })
+}
+
+// 规范化上游 Axios 错误信息
+async function normalizeAxiosStreamError(error) {
+  const status = error.response?.status
+  const statusText = error.response?.statusText
+  const responseData = error.response?.data
+  let rawBody = null
+  let parsedBody = null
+
+  if (responseData) {
+    try {
+      if (isReadableStream(responseData)) {
+        rawBody = await readStreamToString(responseData)
+      } else if (Buffer.isBuffer(responseData)) {
+        rawBody = responseData.toString('utf8')
+      } else if (typeof responseData === 'string') {
+        rawBody = responseData
+      } else {
+        rawBody = JSON.stringify(responseData)
+      }
+    } catch (streamError) {
+      logger.warn('读取 Gemini 上游错误流失败:', streamError)
+    }
+  }
+
+  if (rawBody) {
+    if (typeof rawBody === 'string') {
+      try {
+        parsedBody = JSON.parse(rawBody)
+      } catch (parseError) {
+        parsedBody = rawBody
+      }
+    } else {
+      parsedBody = rawBody
+    }
+  }
+
+  let finalMessage = error.message || 'Internal server error'
+  if (parsedBody && typeof parsedBody === 'object') {
+    finalMessage = parsedBody.error?.message || parsedBody.message || finalMessage
+  } else if (typeof parsedBody === 'string' && parsedBody.trim()) {
+    finalMessage = parsedBody.trim()
+  }
+
+  return {
+    status,
+    statusText,
+    message: finalMessage,
+    parsedBody,
+    rawBody
+  }
+}
+
 // 标准 Gemini API 路由处理器
 // 这些路由将挂载在 /gemini 路径下，处理标准 Gemini API 格式的请求
 // 标准格式: /gemini/v1beta/models/{model}:generateContent
@@ -552,21 +636,38 @@ async function handleStandardStreamGenerateContent(req, res) {
       }
     })
   } catch (error) {
+    const normalizedError = await normalizeAxiosStreamError(error)
+
     logger.error(`Error in standard streamGenerateContent endpoint`, {
       message: error.message,
       status: error.response?.status,
       statusText: error.response?.statusText,
-      responseData: error.response?.data,
+      responseData: normalizedError.parsedBody || normalizedError.rawBody,
       stack: error.stack
     })
 
     if (!res.headersSent) {
-      res.status(500).json({
+      const statusCode = normalizedError.status || 500
+      const responseBody = {
         error: {
-          message: error.message || 'Internal server error',
+          message: normalizedError.message,
           type: 'api_error'
         }
-      })
+      }
+
+      if (normalizedError.status) {
+        responseBody.error.upstreamStatus = normalizedError.status
+      }
+      if (normalizedError.statusText) {
+        responseBody.error.upstreamStatusText = normalizedError.statusText
+      }
+      if (normalizedError.parsedBody && typeof normalizedError.parsedBody === 'object') {
+        responseBody.error.upstreamResponse = normalizedError.parsedBody
+      } else if (normalizedError.rawBody) {
+        responseBody.error.upstreamRaw = normalizedError.rawBody
+      }
+
+      return res.status(statusCode).json(responseBody)
     }
   } finally {
     // 清理资源
