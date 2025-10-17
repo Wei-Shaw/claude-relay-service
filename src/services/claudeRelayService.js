@@ -227,6 +227,9 @@ class ClaudeRelayService {
         options
       )
 
+      response.accountId = accountId
+      response.accountType = accountType
+
       // 移除监听器（请求成功完成）
       if (clientRequest) {
         clientRequest.removeListener('close', handleClientDisconnect)
