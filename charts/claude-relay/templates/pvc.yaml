@@ -1,0 +1,47 @@
+{{- if eq .Values.storage.logs.mode "pvc" }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "claude-relay.fullname" . }}-logs
+  labels:
+    {{- include "claude-relay.labels" . | nindent 4 }}
+    component: logs
+spec:
+  accessModes:
+    - {{ .Values.storage.logs.persistence.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.logs.persistence.size }}
+  {{- if .Values.storage.logs.persistence.storageClass }}
+  {{- if (eq "-" .Values.storage.logs.persistence.storageClass) }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: {{ .Values.storage.logs.persistence.storageClass }}
+  {{- end }}
+  {{- end }}
+{{- end }}
+
+{{- if .Values.storage.data.external.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "claude-relay.fullname" . }}-external-data
+  labels:
+    {{- include "claude-relay.labels" . | nindent 4 }}
+    component: external-data
+spec:
+  accessModes:
+    - {{ .Values.storage.data.external.accessMode | default "ReadWriteOnce" }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.data.external.size | default "1Gi" }}
+  {{- if .Values.storage.data.external.storageClass }}
+  {{- if (eq "-" .Values.storage.data.external.storageClass) }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: {{ .Values.storage.data.external.storageClass }}
+  {{- end }}
+  {{- end }}
+{{- end }}

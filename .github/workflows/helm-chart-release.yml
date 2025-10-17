@@ -1,0 +1,153 @@
+name: Helm Chart Release
+
+on:
+  push:
+    paths:
+      - 'charts/claude-relay/**'
+      - '.github/workflows/helm-chart-release.yml'
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  CHART_NAME: claude-relay
+  CHART_PATH: charts/claude-relay
+
+jobs:
+  helm-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Install Helm
+      uses: azure/setup-helm@v4
+      with:
+        version: '3.14.0'
+
+    - name: Calculate next version
+      id: version
+      run: |
+        # Get current version from Chart.yaml
+        CURRENT_VERSION=$(grep '^version:' ${{ env.CHART_PATH }}/Chart.yaml | awk '{print $2}')
+        echo "Current Chart version: $CURRENT_VERSION"
+        
+        # Parse and increment patch version
+        IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
+        patch=$((patch + 1))
+        NEW_VERSION="$major.$minor.$patch"
+        
+        echo "New Chart version: $NEW_VERSION"
+        echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "new_tag=chart-v$NEW_VERSION" >> $GITHUB_OUTPUT
+
+    - name: Update Chart version and commit
+      run: |
+        NEW_VERSION="${{ steps.version.outputs.new_version }}"
+        
+        # Update Chart.yaml version
+        sed -i "s/^version:.*/version: $NEW_VERSION/" ${{ env.CHART_PATH }}/Chart.yaml
+        
+        # Commit changes
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add ${{ env.CHART_PATH }}/Chart.yaml
+        git commit -m "chore(chart): bump version to $NEW_VERSION [skip ci]"
+        
+        # Create and push tag
+        NEW_TAG="${{ steps.version.outputs.new_tag }}"
+        git tag -a "$NEW_TAG" -m "Helm Chart release $NEW_VERSION"
+        git push origin HEAD:main "$NEW_TAG"
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # Get the last chart tag
+        LAST_CHART_TAG=$(git tag -l "chart-v*" | sort -V | tail -n 2 | head -n 1)
+        
+        if [ -z "$LAST_CHART_TAG" ]; then
+          CHANGELOG="Initial Helm Chart release"
+        else
+          # Generate changelog for chart-related changes
+          CHANGELOG=$(git log --oneline "${LAST_CHART_TAG}..HEAD~1" --pretty=format:"- %s" | head -10)
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="- Chart configuration updates and improvements"
+          fi
+        fi
+        
+        echo "content<<EOF" >> $GITHUB_OUTPUT
+        echo "$CHANGELOG" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Package and Push Helm Chart
+      run: |
+        NEW_VERSION="${{ steps.version.outputs.new_version }}"
+        
+        # Package and push Helm Chart
+        helm package "${{ env.CHART_PATH }}" --version "$NEW_VERSION"
+        helm push "${{ env.CHART_NAME }}-${NEW_VERSION}.tgz" "oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts"
+        
+        # Cleanup
+        rm -f "${{ env.CHART_NAME }}-${NEW_VERSION}.tgz"
+
+    - name: Create GitHub Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.version.outputs.new_tag }}
+        release_name: "Helm Chart v${{ steps.version.outputs.new_version }}"
+        body: |
+          ## ⚓ Helm Chart v${{ steps.version.outputs.new_version }}
+          
+          ### 📦 安装方式
+          
+          ```bash
+          # 安装
+          helm install claude-relay oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/${{ env.CHART_NAME }} --version ${{ steps.version.outputs.new_version }}
+          
+          # 升级
+          helm upgrade claude-relay oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/${{ env.CHART_NAME }} --version ${{ steps.version.outputs.new_version }}
+          ```
+          
+          ### 📝 更新内容
+          
+          ${{ steps.changelog.outputs.content }}
+        draft: false
+        prerelease: false
+
+    - name: Send Telegram Notification
+      if: vars.TELEGRAM_BOT_TOKEN != '' && vars.TELEGRAM_CHAT_ID != ''
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      continue-on-error: true
+      run: |
+        NEW_VERSION="${{ steps.version.outputs.new_version }}"
+        NEW_TAG="${{ steps.version.outputs.new_tag }}"
+        REPO="${{ github.repository }}"
+        
+        MESSAGE="⚓ *Claude Relay Helm Chart v${NEW_VERSION} 发布！*"$'\n'$'\n'
+        MESSAGE+="📦 安装命令:"$'\n'
+        MESSAGE+="\`helm install claude-relay oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/${{ env.CHART_NAME }} --version ${NEW_VERSION}\`"$'\n'$'\n'
+        MESSAGE+="🔗 [GitHub Release](https://github.com/${REPO}/releases/tag/${NEW_TAG})"
+        
+        curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+          -H "Content-Type: application/json" \
+          -d "{\"chat_id\":\"${TELEGRAM_CHAT_ID}\",\"text\":\"${MESSAGE}\",\"parse_mode\":\"Markdown\"}"
