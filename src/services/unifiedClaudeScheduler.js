@@ -527,68 +527,86 @@ class UnifiedClaudeScheduler {
     logger.info(`📋 Found ${consoleAccounts.length} total Claude Console accounts`)
 
     for (const account of consoleAccounts) {
+      // 主动检查封禁状态并尝试恢复（在过滤之前执行，确保可以恢复被封禁的账户）
+      const wasBlocked = await claudeConsoleAccountService.isAccountBlocked(account.id)
+
+      // 如果账户之前被封禁但现在已恢复，重新获取最新状态
+      let currentAccount = account
+      if (wasBlocked === false && account.status === 'account_blocked') {
+        // 可能刚刚被恢复，重新获取账户状态
+        const freshAccount = await claudeConsoleAccountService.getAccount(account.id)
+        if (freshAccount) {
+          currentAccount = freshAccount
+          logger.info(`🔄 Account ${account.name} was recovered from blocked status`)
+        }
+      }
+
       logger.info(
-        `🔍 Checking Claude Console account: ${account.name} - isActive: ${account.isActive}, status: ${account.status}, accountType: ${account.accountType}, schedulable: ${account.schedulable}`
+        `🔍 Checking Claude Console account: ${currentAccount.name} - isActive: ${currentAccount.isActive}, status: ${currentAccount.status}, accountType: ${currentAccount.accountType}, schedulable: ${currentAccount.schedulable}`
       )
 
-      // 注意：getAllAccounts返回的isActive是布尔值
+      // 注意：getAllAccounts返回的isActive是布尔值，getAccount返回的也是布尔值
       if (
-        account.isActive === true &&
-        account.status === 'active' &&
-        account.accountType === 'shared' &&
-        this._isSchedulable(account.schedulable)
+        currentAccount.isActive === true &&
+        currentAccount.status === 'active' &&
+        currentAccount.accountType === 'shared' &&
+        this._isSchedulable(currentAccount.schedulable)
       ) {
         // 检查是否可调度
 
         // 检查模型支持
-        if (!this._isModelSupportedByAccount(account, 'claude-console', requestedModel)) {
+        if (!this._isModelSupportedByAccount(currentAccount, 'claude-console', requestedModel)) {
           continue
         }
 
         // 检查订阅是否过期
-        if (claudeConsoleAccountService.isSubscriptionExpired(account)) {
+        if (claudeConsoleAccountService.isSubscriptionExpired(currentAccount)) {
           logger.debug(
-            `⏰ Claude Console account ${account.name} (${account.id}) expired at ${account.subscriptionExpiresAt}`
+            `⏰ Claude Console account ${currentAccount.name} (${currentAccount.id}) expired at ${currentAccount.subscriptionExpiresAt}`
           )
           continue
         }
 
         // 主动触发一次额度检查，确保状态即时生效
         try {
-          await claudeConsoleAccountService.checkQuotaUsage(account.id)
+          await claudeConsoleAccountService.checkQuotaUsage(currentAccount.id)
         } catch (e) {
           logger.warn(
-            `Failed to check quota for Claude Console account ${account.name}: ${e.message}`
+            `Failed to check quota for Claude Console account ${currentAccount.name}: ${e.message}`
           )
           // 继续处理该账号
         }
 
         // 检查是否被限流
-        const isRateLimited = await claudeConsoleAccountService.isAccountRateLimited(account.id)
-        const isQuotaExceeded = await claudeConsoleAccountService.isAccountQuotaExceeded(account.id)
+        const isRateLimited = await claudeConsoleAccountService.isAccountRateLimited(
+          currentAccount.id
+        )
+        const isQuotaExceeded = await claudeConsoleAccountService.isAccountQuotaExceeded(
+          currentAccount.id
+        )
 
         if (!isRateLimited && !isQuotaExceeded) {
           availableAccounts.push({
-            ...account,
-            accountId: account.id,
+            ...currentAccount,
+            accountId: currentAccount.id,
             accountType: 'claude-console',
-            priority: parseInt(account.priority) || 50,
-            lastUsedAt: account.lastUsedAt || '0'
+            priority: parseInt(currentAccount.priority) || 50,
+            lastUsedAt: currentAccount.lastUsedAt || '0'
           })
           logger.info(
-            `✅ Added Claude Console account to available pool: ${account.name} (priority: ${account.priority})`
+            `✅ Added Claude Console account to available pool: ${currentAccount.name} (priority: ${currentAccount.priority})`
           )
         } else {
           if (isRateLimited) {
-            logger.warn(`⚠️ Claude Console account ${account.name} is rate limited`)
+            logger.warn(`⚠️ Claude Console account ${currentAccount.name} is rate limited`)
           }
           if (isQuotaExceeded) {
-            logger.warn(`💰 Claude Console account ${account.name} quota exceeded`)
+            logger.warn(`💰 Claude Console account ${currentAccount.name} quota exceeded`)
           }
         }
       } else {
         logger.info(
-          `❌ Claude Console account ${account.name} not eligible - isActive: ${account.isActive}, status: ${account.status}, accountType: ${account.accountType}, schedulable: ${account.schedulable}`
+          `❌ Claude Console account ${currentAccount.name} not eligible - isActive: ${currentAccount.isActive}, status: ${currentAccount.status}, accountType: ${currentAccount.accountType}, schedulable: ${currentAccount.schedulable}`
         )
       }
     }

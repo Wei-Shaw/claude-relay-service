@@ -36,6 +36,20 @@ class ClaudeConsoleAccountService {
     )
   }
 
+  _getBlockedHandlingMinutes() {
+    const raw = process.env.CLAUDE_CONSOLE_BLOCKED_HANDLING_MINUTES
+    if (raw === undefined || raw === null || raw === '') {
+      return 0
+    }
+
+    const parsed = Number.parseInt(raw, 10)
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return 0
+    }
+
+    return parsed
+  }
+
   // 🏢 创建Claude Console账户
   async createAccount(options = {}) {
     const {
@@ -687,6 +701,183 @@ class ClaudeConsoleAccountService {
     } catch (error) {
       logger.error(`❌ Failed to mark Claude Console account as unauthorized: ${accountId}`, error)
       throw error
+    }
+  }
+
+  // 🚫 标记账号为临时封禁状态（400错误 - 账户临时禁用）
+  async markConsoleAccountBlocked(accountId, errorDetails = '') {
+    try {
+      const client = redis.getClientSafe()
+      const account = await this.getAccount(accountId)
+
+      if (!account) {
+        throw new Error('Account not found')
+      }
+
+      const blockedMinutes = this._getBlockedHandlingMinutes()
+
+      if (blockedMinutes <= 0) {
+        logger.info(
+          `ℹ️ CLAUDE_CONSOLE_BLOCKED_HANDLING_MINUTES 未设置或为0，跳过账户封禁：${account.name} (${accountId})`
+        )
+
+        if (account.blockedStatus === 'blocked') {
+          try {
+            await this.removeAccountBlocked(accountId)
+          } catch (cleanupError) {
+            logger.warn(`⚠️ 尝试移除账户封禁状态失败：${accountId}`, cleanupError)
+          }
+        }
+
+        return { success: false, skipped: true }
+      }
+
+      const updates = {
+        blockedAt: new Date().toISOString(),
+        blockedStatus: 'blocked',
+        isActive: 'false', // 禁用账户（与429保持一致）
+        schedulable: 'false', // 停止调度（与429保持一致）
+        status: 'account_blocked', // 设置状态（与429保持一致）
+        errorMessage: '账户临时被禁用（400错误）',
+        // 使用独立的封禁自动停止标记
+        blockedAutoStopped: 'true'
+      }
+
+      await client.hset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, updates)
+
+      // 发送Webhook通知，包含完整错误详情
+      try {
+        const webhookNotifier = require('../utils/webhookNotifier')
+        await webhookNotifier.sendAccountAnomalyNotification({
+          accountId,
+          accountName: account.name || 'Claude Console Account',
+          platform: 'claude-console',
+          status: 'error',
+          errorCode: 'CLAUDE_CONSOLE_BLOCKED',
+          reason: `账户临时被禁用（400错误）。账户将在 ${blockedMinutes} 分钟后自动恢复。`,
+          errorDetails: errorDetails || '无错误详情',
+          timestamp: new Date().toISOString()
+        })
+      } catch (webhookError) {
+        logger.error('Failed to send blocked webhook notification:', webhookError)
+      }
+
+      logger.warn(`🚫 Claude Console account temporarily blocked: ${account.name} (${accountId})`)
+      return { success: true }
+    } catch (error) {
+      logger.error(`❌ Failed to mark Claude Console account as blocked: ${accountId}`, error)
+      throw error
+    }
+  }
+
+  // ✅ 移除账号的临时封禁状态
+  async removeAccountBlocked(accountId) {
+    try {
+      const client = redis.getClientSafe()
+      const accountKey = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+
+      // 获取账户当前状态和额度信息
+      const [currentStatus, quotaStoppedAt] = await client.hmget(
+        accountKey,
+        'status',
+        'quotaStoppedAt'
+      )
+
+      // 删除封禁相关字段
+      await client.hdel(accountKey, 'blockedAt', 'blockedStatus')
+
+      // 根据不同情况决定是否恢复账户
+      if (currentStatus === 'account_blocked') {
+        if (quotaStoppedAt) {
+          // 还有额度限制，改为quota_exceeded状态
+          await client.hset(accountKey, {
+            status: 'quota_exceeded'
+            // isActive保持false
+          })
+          logger.info(
+            `⚠️ Blocked status removed but quota exceeded remains for account: ${accountId}`
+          )
+        } else {
+          // 没有额度限制，完全恢复
+          const accountData = await client.hgetall(accountKey)
+          const updateData = {
+            isActive: 'true',
+            status: 'active',
+            errorMessage: ''
+          }
+
+          const hadAutoStop = accountData.blockedAutoStopped === 'true'
+
+          // 只恢复因封禁而自动停止的账户
+          if (hadAutoStop && accountData.schedulable === 'false') {
+            updateData.schedulable = 'true' // 恢复调度
+            logger.info(
+              `✅ Auto-resuming scheduling for Claude Console account ${accountId} after blocked status cleared`
+            )
+          }
+
+          if (hadAutoStop) {
+            await client.hdel(accountKey, 'blockedAutoStopped')
+          }
+
+          await client.hset(accountKey, updateData)
+          logger.success(`✅ Blocked status removed and account re-enabled: ${accountId}`)
+        }
+      } else {
+        if (await client.hdel(accountKey, 'blockedAutoStopped')) {
+          logger.info(
+            `ℹ️ Removed stale auto-stop flag for Claude Console account ${accountId} during blocked status recovery`
+          )
+        }
+        logger.success(`✅ Blocked status removed for Claude Console account: ${accountId}`)
+      }
+
+      return { success: true }
+    } catch (error) {
+      logger.error(
+        `❌ Failed to remove blocked status for Claude Console account: ${accountId}`,
+        error
+      )
+      throw error
+    }
+  }
+
+  // 🔍 检查账号是否处于临时封禁状态
+  async isAccountBlocked(accountId) {
+    try {
+      const account = await this.getAccount(accountId)
+      if (!account) {
+        return false
+      }
+
+      if (account.blockedStatus === 'blocked' && account.blockedAt) {
+        const blockedDuration = this._getBlockedHandlingMinutes()
+
+        if (blockedDuration <= 0) {
+          await this.removeAccountBlocked(accountId)
+          return false
+        }
+
+        const blockedAt = new Date(account.blockedAt)
+        const now = new Date()
+        const minutesSinceBlocked = (now - blockedAt) / (1000 * 60)
+
+        // 禁用时长过后自动恢复
+        if (minutesSinceBlocked >= blockedDuration) {
+          await this.removeAccountBlocked(accountId)
+          return false
+        }
+
+        return true
+      }
+
+      return false
+    } catch (error) {
+      logger.error(
+        `❌ Failed to check blocked status for Claude Console account: ${accountId}`,
+        error
+      )
+      return false
     }
   }
 
