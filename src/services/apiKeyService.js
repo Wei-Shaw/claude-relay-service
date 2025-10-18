@@ -5,7 +5,7 @@ const redis = require('../models/redis')
 const logger = require('../utils/logger')
 
 const ACCOUNT_TYPE_CONFIG = {
-  claude: { prefix: 'claude_account:' },
+  claude: { prefix: 'claude:account:' },
   'claude-console': { prefix: 'claude_console_account:' },
   openai: { prefix: 'openai:account:' },
   'openai-responses': { prefix: 'openai_responses_account:' },
