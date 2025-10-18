@@ -11,7 +11,6 @@ const baseUrl = process.env.PRICE_MIRROR_BASE_URL
 module.exports = {
   pricingFileName,
   hashFileName,
-  pricingUrl:
-    process.env.PRICE_MIRROR_JSON_URL || `${baseUrl}/${pricingFileName}`,
+  pricingUrl: process.env.PRICE_MIRROR_JSON_URL || `${baseUrl}/${pricingFileName}`,
   hashUrl: process.env.PRICE_MIRROR_HASH_URL || `${baseUrl}/${hashFileName}`
 }

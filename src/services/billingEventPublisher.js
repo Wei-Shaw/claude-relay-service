@@ -2,6 +2,23 @@ const redis = require('../models/redis')
 const logger = require('../utils/logger')
 
 /**
+ * 生成 asctime 格式的时间戳
+ * @returns {string} 格式: YYYY-MM-DD HH:mm:ss,mmm
+ */
+function getAsctime() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  const hours = String(now.getHours()).padStart(2, '0')
+  const minutes = String(now.getMinutes()).padStart(2, '0')
+  const seconds = String(now.getSeconds()).padStart(2, '0')
+  const milliseconds = String(now.getMilliseconds()).padStart(3, '0')
+
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds},${milliseconds}`
+}
+
+/**
  * 计费事件发布器 - 使用 Redis Stream 解耦计费系统
  *
  * 设计原则:
@@ -35,14 +52,14 @@ class BillingEventPublisher {
         // 事件元数据
         eventId: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         eventType: 'usage.recorded',
-        timestamp: new Date().toISOString(),
+        timestamp: getAsctime(),
         version: '1.0',
 
         // 核心计费数据
-        apiKey: {
+        apiKeyInfo: {
           id: eventData.keyId,
           name: eventData.keyName || null,
-          userId: eventData.userId || null
+          apiKey: eventData.apiKey || null
         },
 
         // 使用量详情
@@ -80,7 +97,7 @@ class BillingEventPublisher {
         // 请求上下文
         context: {
           isLongContext: eventData.isLongContext || false,
-          requestTimestamp: eventData.requestTimestamp || new Date().toISOString()
+          requestTimestamp: eventData.requestTimestamp || getAsctime()
         }
       }
 
@@ -126,11 +143,12 @@ class BillingEventPublisher {
         const event = {
           eventId: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           eventType: 'usage.recorded',
-          timestamp: new Date().toISOString(),
+          timestamp: getAsctime(),
           version: '1.0',
-          apiKey: {
+          apiKeyInfo: {
             id: eventData.keyId,
-            name: eventData.keyName || null
+            name: eventData.keyName || null,
+            apiKey: eventData.apiKey || null
           },
           usage: {
             model: eventData.model,

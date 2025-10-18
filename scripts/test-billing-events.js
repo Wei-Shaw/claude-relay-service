@@ -46,10 +46,10 @@ async function publishTestEvent() {
     eventType: 'usage.recorded',
     timestamp: new Date().toISOString(),
     version: '1.0',
-    apiKey: {
+    apiKeyInfo: {
       id: 'test-key-123',
       name: 'Test API Key',
-      userId: 'test-user-456'
+      apiKey: 'cr_test_********************************'
     },
     usage: {
       model: 'claude-sonnet-4-20250514',
@@ -142,7 +142,9 @@ async function consumeTestEvents() {
           const event = JSON.parse(data.data)
 
           console.log(`📊 Event: ${event.eventId}`)
-          console.log(`   API Key: ${event.apiKey.name} (${event.apiKey.id})`)
+          console.log(
+            `   API Key: ${event.apiKeyInfo?.name || 'N/A'} (${event.apiKeyInfo?.id || 'N/A'})`
+          )
           console.log(`   Model: ${event.usage.model}`)
           console.log(`   Tokens: ${event.usage.totalTokens}`)
           console.log(`   Cost: $${event.cost.total.toFixed(6)}`)
