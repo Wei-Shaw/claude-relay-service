@@ -309,7 +309,8 @@ class DroidRelayService {
           responseType: 'json',
           ...(proxyAgent && {
             httpAgent: proxyAgent,
-            httpsAgent: proxyAgent
+            httpsAgent: proxyAgent,
+            proxy: false
           })
         }
 

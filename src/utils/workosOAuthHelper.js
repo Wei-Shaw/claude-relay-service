@@ -40,13 +40,20 @@ async function startDeviceAuthorization(proxyConfig = null) {
       hasProxy: !!agent
     })
 
-    const response = await axios.post(WORKOS_DEVICE_AUTHORIZE_URL, form.toString(), {
+    const axiosConfig = {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       },
-      httpsAgent: agent,
       timeout: 15000
-    })
+    }
+
+    if (agent) {
+      axiosConfig.httpAgent = agent
+      axiosConfig.httpsAgent = agent
+      axiosConfig.proxy = false
+    }
+
+    const response = await axios.post(WORKOS_DEVICE_AUTHORIZE_URL, form.toString(), axiosConfig)
 
     const data = response.data || {}
 
@@ -108,13 +115,20 @@ async function pollDeviceAuthorization(deviceCode, proxyConfig = null) {
   const agent = ProxyHelper.createProxyAgent(proxyConfig)
 
   try {
-    const response = await axios.post(WORKOS_TOKEN_URL, form.toString(), {
+    const axiosConfig = {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       },
-      httpsAgent: agent,
       timeout: 15000
-    })
+    }
+
+    if (agent) {
+      axiosConfig.httpAgent = agent
+      axiosConfig.httpsAgent = agent
+      axiosConfig.proxy = false
+    }
+
+    const response = await axios.post(WORKOS_TOKEN_URL, form.toString(), axiosConfig)
 
     const data = response.data || {}
 

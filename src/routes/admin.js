@@ -7183,6 +7183,7 @@ router.post('/openai-accounts/exchange-code', authenticateAdmin, async (req, res
     // 配置代理（如果有）
     const proxyAgent = ProxyHelper.createProxyAgent(sessionData.proxy)
     if (proxyAgent) {
+      axiosConfig.httpAgent = proxyAgent
       axiosConfig.httpsAgent = proxyAgent
       axiosConfig.proxy = false
     }

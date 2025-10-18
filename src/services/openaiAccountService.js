@@ -223,6 +223,7 @@ async function refreshAccessToken(refreshToken, proxy = null) {
     // 配置代理（如果有）
     const proxyAgent = ProxyHelper.createProxyAgent(proxy)
     if (proxyAgent) {
+      requestOptions.httpAgent = proxyAgent
       requestOptions.httpsAgent = proxyAgent
       requestOptions.proxy = false
       logger.info(

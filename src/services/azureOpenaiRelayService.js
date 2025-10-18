@@ -82,7 +82,9 @@ async function handleAzureOpenAIRequest({
 
     // 如果有代理，添加代理配置
     if (proxyAgent) {
+      axiosConfig.httpAgent = proxyAgent
       axiosConfig.httpsAgent = proxyAgent
+      axiosConfig.proxy = false
       // 为代理添加额外的keep-alive设置
       if (proxyAgent.options) {
         proxyAgent.options.keepAlive = true

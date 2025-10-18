@@ -279,7 +279,9 @@ async function sendGeminiRequest({
   // 添加代理配置
   const proxyAgent = createProxyAgent(proxy)
   if (proxyAgent) {
+    axiosConfig.httpAgent = proxyAgent
     axiosConfig.httpsAgent = proxyAgent
+    axiosConfig.proxy = false
     logger.info(`🌐 Using proxy for Gemini API request: ${ProxyHelper.getProxyDescription(proxy)}`)
   } else {
     logger.debug('🌐 No proxy configured for Gemini API request')
@@ -387,7 +389,9 @@ async function getAvailableModels(accessToken, proxy, projectId, location = 'us-
 
   const proxyAgent = createProxyAgent(proxy)
   if (proxyAgent) {
+    axiosConfig.httpAgent = proxyAgent
     axiosConfig.httpsAgent = proxyAgent
+    axiosConfig.proxy = false
     logger.info(
       `🌐 Using proxy for Gemini models request: ${ProxyHelper.getProxyDescription(proxy)}`
     )
@@ -488,7 +492,9 @@ async function countTokens({
   // 添加代理配置
   const proxyAgent = createProxyAgent(proxy)
   if (proxyAgent) {
+    axiosConfig.httpAgent = proxyAgent
     axiosConfig.httpsAgent = proxyAgent
+    axiosConfig.proxy = false
     logger.info(
       `🌐 Using proxy for Gemini countTokens request: ${ProxyHelper.getProxyDescription(proxy)}`
     )

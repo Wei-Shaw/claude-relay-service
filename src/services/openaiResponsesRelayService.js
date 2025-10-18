@@ -107,6 +107,7 @@ class OpenAIResponsesRelayService {
       if (fullAccount.proxy) {
         const proxyAgent = ProxyHelper.createProxyAgent(fullAccount.proxy)
         if (proxyAgent) {
+          requestOptions.httpAgent = proxyAgent
           requestOptions.httpsAgent = proxyAgent
           requestOptions.proxy = false
           logger.info(

@@ -173,7 +173,7 @@ async function exchangeCodeForTokens(authorizationCode, codeVerifier, state, pro
       proxyType: proxyConfig?.type || 'none'
     })
 
-    const response = await axios.post(OAUTH_CONFIG.TOKEN_URL, params, {
+    const axiosConfig = {
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'claude-cli/1.0.56 (external, cli)',
@@ -182,9 +182,16 @@ async function exchangeCodeForTokens(authorizationCode, codeVerifier, state, pro
         Referer: 'https://claude.ai/',
         Origin: 'https://claude.ai'
       },
-      httpsAgent: agent,
       timeout: 30000
-    })
+    }
+
+    if (agent) {
+      axiosConfig.httpAgent = agent
+      axiosConfig.httpsAgent = agent
+      axiosConfig.proxy = false
+    }
+
+    const response = await axios.post(OAUTH_CONFIG.TOKEN_URL, params, axiosConfig)
 
     // 记录完整的响应数据到专门的认证详细日志
     logger.authDetail('OAuth token exchange response', response.data)
@@ -378,7 +385,7 @@ async function exchangeSetupTokenCode(authorizationCode, codeVerifier, state, pr
       proxyType: proxyConfig?.type || 'none'
     })
 
-    const response = await axios.post(OAUTH_CONFIG.TOKEN_URL, params, {
+    const axiosConfig = {
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'claude-cli/1.0.56 (external, cli)',
@@ -387,9 +394,16 @@ async function exchangeSetupTokenCode(authorizationCode, codeVerifier, state, pr
         Referer: 'https://claude.ai/',
         Origin: 'https://claude.ai'
       },
-      httpsAgent: agent,
       timeout: 30000
-    })
+    }
+
+    if (agent) {
+      axiosConfig.httpAgent = agent
+      axiosConfig.httpsAgent = agent
+      axiosConfig.proxy = false
+    }
+
+    const response = await axios.post(OAUTH_CONFIG.TOKEN_URL, params, axiosConfig)
 
     // 记录完整的响应数据到专门的认证详细日志
     logger.authDetail('Setup Token exchange response', response.data)

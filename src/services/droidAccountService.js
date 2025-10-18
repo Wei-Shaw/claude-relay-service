@@ -438,6 +438,7 @@ class DroidAccountService {
       if (proxyAgent) {
         requestOptions.httpAgent = proxyAgent
         requestOptions.httpsAgent = proxyAgent
+        requestOptions.proxy = false
         logger.info(
           `🌐 使用代理验证 Droid Refresh Token: ${ProxyHelper.getProxyDescription(proxyConfig)}`
         )
@@ -506,6 +507,7 @@ class DroidAccountService {
       if (proxyAgent) {
         requestOptions.httpAgent = proxyAgent
         requestOptions.httpsAgent = proxyAgent
+        requestOptions.proxy = false
       }
     }
 

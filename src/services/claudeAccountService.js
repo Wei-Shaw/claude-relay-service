@@ -248,6 +248,24 @@ class ClaudeAccountService {
       // 创建代理agent
       const agent = this._createProxyAgent(accountData.proxy)
 
+      const axiosConfig = {
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/plain, */*',
+          'User-Agent': 'claude-cli/1.0.56 (external, cli)',
+          'Accept-Language': 'en-US,en;q=0.9',
+          Referer: 'https://claude.ai/',
+          Origin: 'https://claude.ai'
+        },
+        timeout: 30000
+      }
+
+      if (agent) {
+        axiosConfig.httpAgent = agent
+        axiosConfig.httpsAgent = agent
+        axiosConfig.proxy = false
+      }
+
       const response = await axios.post(
         this.claudeApiUrl,
         {
@@ -255,18 +273,7 @@ class ClaudeAccountService {
           refresh_token: refreshToken,
           client_id: this.claudeOauthClientId
         },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json, text/plain, */*',
-            'User-Agent': 'claude-cli/1.0.56 (external, cli)',
-            'Accept-Language': 'en-US,en;q=0.9',
-            Referer: 'https://claude.ai/',
-            Origin: 'https://claude.ai'
-          },
-          httpsAgent: agent,
-          timeout: 30000
-        }
+        axiosConfig
       )
 
       if (response.status === 200) {
@@ -1824,7 +1831,7 @@ class ClaudeAccountService {
       logger.debug(`📊 Fetching OAuth usage for account: ${accountData.name} (${accountId})`)
 
       // 请求 OAuth usage 接口
-      const response = await axios.get('https://api.anthropic.com/api/oauth/usage', {
+      const axiosConfig = {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
@@ -1833,9 +1840,16 @@ class ClaudeAccountService {
           'User-Agent': 'claude-cli/1.0.56 (external, cli)',
           'Accept-Language': 'en-US,en;q=0.9'
         },
-        httpsAgent: agent,
         timeout: 15000
-      })
+      }
+
+      if (agent) {
+        axiosConfig.httpAgent = agent
+        axiosConfig.httpsAgent = agent
+        axiosConfig.proxy = false
+      }
+
+      const response = await axios.get('https://api.anthropic.com/api/oauth/usage', axiosConfig)
 
       if (response.status === 200 && response.data) {
         logger.debug('✅ Successfully fetched OAuth usage data:', {
@@ -2003,7 +2017,7 @@ class ClaudeAccountService {
       logger.info(`📊 Fetching profile info for account: ${accountData.name} (${accountId})`)
 
       // 请求 profile 接口
-      const response = await axios.get('https://api.anthropic.com/api/oauth/profile', {
+      const axiosConfig = {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
@@ -2011,9 +2025,16 @@ class ClaudeAccountService {
           'User-Agent': 'claude-cli/1.0.56 (external, cli)',
           'Accept-Language': 'en-US,en;q=0.9'
         },
-        httpsAgent: agent,
         timeout: 15000
-      })
+      }
+
+      if (agent) {
+        axiosConfig.httpAgent = agent
+        axiosConfig.httpsAgent = agent
+        axiosConfig.proxy = false
+      }
+
+      const response = await axios.get('https://api.anthropic.com/api/oauth/profile', axiosConfig)
 
       if (response.status === 200 && response.data) {
         const profileData = response.data
