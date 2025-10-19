@@ -45,7 +45,11 @@
     "data:export:encrypted": "node scripts/data-transfer-enhanced.js export --decrypt=false",
     "data:import:enhanced": "node scripts/data-transfer-enhanced.js import",
     "data:debug": "node scripts/debug-redis-keys.js",
-    "test:pricing-fallback": "node scripts/test-pricing-fallback.js"
+    "test:pricing-fallback": "node scripts/test-pricing-fallback.js",
+    "fix:cost": "node scripts/fix-cost-total.js",
+    "fix:cost:check": "node scripts/fix-cost-total.js --verbose",
+    "fix:cost:dry-run": "node scripts/fix-cost-total.js --dry-run",
+    "fix:cost:auto": "node scripts/fix-cost-total.js --auto-fix"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.861.0",
