@@ -12,6 +12,9 @@ const claudeCodeHeadersService = require('./claudeCodeHeadersService')
 const redis = require('../models/redis')
 const ClaudeCodeValidator = require('../validators/clients/claudeCodeValidator')
 const { formatDateWithTimezone } = require('../utils/dateHelper')
+const runtimeAddon = require('../utils/runtimeAddon')
+
+const RUNTIME_EVENT_FMT_CLAUDE_REQ = 'fmtClaudeReq'
 
 class ClaudeRelayService {
   constructor() {
@@ -896,6 +899,36 @@ class ClaudeRelayService {
     return filteredHeaders
   }
 
+  _applyLocalRequestFormatters(body, headers, context = {}) {
+    const normalizedHeaders = headers && typeof headers === 'object' ? { ...headers } : {}
+
+    try {
+      const payload = {
+        body,
+        headers: normalizedHeaders,
+        ...context
+      }
+
+      const result = runtimeAddon.emitSync(RUNTIME_EVENT_FMT_CLAUDE_REQ, payload)
+      if (!result || typeof result !== 'object') {
+        return { body, headers: normalizedHeaders }
+      }
+
+      const nextBody = result.body && typeof result.body === 'object' ? result.body : body
+      const nextHeaders =
+        result.headers && typeof result.headers === 'object' ? result.headers : normalizedHeaders
+      const abortResponse =
+        result.abortResponse && typeof result.abortResponse === 'object'
+          ? result.abortResponse
+          : null
+
+      return { body: nextBody, headers: nextHeaders, abortResponse }
+    } catch (error) {
+      logger.warn('⚠️ 应用本地 fmtClaudeReq 插件失败:', error)
+      return { body, headers: normalizedHeaders }
+    }
+  }
+
   // 🔗 发送请求到Claude API
   async _makeClaudeRequest(
     body,
@@ -921,7 +954,8 @@ class ClaudeRelayService {
     const isRealClaudeCode = this.isRealClaudeCodeRequest(body)
 
     // 如果不是真实的 Claude Code 请求，需要使用从账户获取的 Claude Code headers
-    const finalHeaders = { ...filteredHeaders }
+    let finalHeaders = { ...filteredHeaders }
+    let requestPayload = body
 
     if (!isRealClaudeCode) {
       // 获取该账号存储的 Claude Code headers
@@ -935,6 +969,21 @@ class ClaudeRelayService {
         }
       })
     }
+
+    const extensionResult = this._applyLocalRequestFormatters(requestPayload, finalHeaders, {
+      account,
+      accountId,
+      clientHeaders,
+      requestOptions,
+      isStream: false
+    })
+
+    if (extensionResult.abortResponse) {
+      return extensionResult.abortResponse
+    }
+
+    requestPayload = extensionResult.body
+    finalHeaders = extensionResult.headers
 
     return new Promise((resolve, reject) => {
       // 支持自定义路径（如 count_tokens）
@@ -1064,7 +1113,7 @@ class ClaudeRelayService {
       })
 
       // 写入请求体
-      req.write(JSON.stringify(body))
+      req.write(JSON.stringify(requestPayload))
       req.end()
     })
   }
@@ -1225,7 +1274,8 @@ class ClaudeRelayService {
     const isRealClaudeCode = this.isRealClaudeCodeRequest(body)
 
     // 如果不是真实的 Claude Code 请求，需要使用从账户获取的 Claude Code headers
-    const finalHeaders = { ...filteredHeaders }
+    let finalHeaders = { ...filteredHeaders }
+    let requestPayload = body
 
     if (!isRealClaudeCode) {
       // 获取该账号存储的 Claude Code headers
@@ -1239,6 +1289,23 @@ class ClaudeRelayService {
         }
       })
     }
+
+    const extensionResult = this._applyLocalRequestFormatters(requestPayload, finalHeaders, {
+      account,
+      accountId,
+      accountType,
+      sessionHash,
+      clientHeaders,
+      requestOptions,
+      isStream: true
+    })
+
+    if (extensionResult.abortResponse) {
+      return extensionResult.abortResponse
+    }
+
+    requestPayload = extensionResult.body
+    finalHeaders = extensionResult.headers
 
     return new Promise((resolve, reject) => {
       const url = new URL(this.claudeApiUrl)
@@ -1871,7 +1938,7 @@ class ClaudeRelayService {
       })
 
       // 写入请求体
-      req.write(JSON.stringify(body))
+      req.write(JSON.stringify(requestPayload))
       req.end()
     })
   }
