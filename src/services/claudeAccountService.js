@@ -74,12 +74,14 @@ class ClaudeAccountService {
       useUnifiedUserAgent = false, // 是否使用统一Claude Code版本的User-Agent
       useUnifiedClientId = false, // 是否使用统一的客户端标识
       unifiedClientId = '', // 统一的客户端标识
-      expiresAt = null // 账户订阅到期时间
+      expiresAt = null, // 账户订阅到期时间
+      extInfo = null // 额外扩展信息
     } = options
 
     const accountId = uuidv4()
 
     let accountData
+    const normalizedExtInfo = this._normalizeExtInfo(extInfo, claudeAiOauth)
 
     if (claudeAiOauth) {
       // 使用Claude标准格式的OAuth数据
@@ -116,7 +118,9 @@ class ClaudeAccountService {
             ? JSON.stringify(claudeAiOauth.subscriptionInfo)
             : '',
         // 账户订阅到期时间
-        subscriptionExpiresAt: expiresAt || ''
+        subscriptionExpiresAt: expiresAt || '',
+        // 扩展信息
+        extInfo: normalizedExtInfo ? JSON.stringify(normalizedExtInfo) : ''
       }
     } else {
       // 兼容旧格式
@@ -146,7 +150,9 @@ class ClaudeAccountService {
         // 手动设置的订阅信息
         subscriptionInfo: subscriptionInfo ? JSON.stringify(subscriptionInfo) : '',
         // 账户订阅到期时间
-        subscriptionExpiresAt: expiresAt || ''
+        subscriptionExpiresAt: expiresAt || '',
+        // 扩展信息
+        extInfo: normalizedExtInfo ? JSON.stringify(normalizedExtInfo) : ''
       }
     }
 
@@ -193,7 +199,8 @@ class ClaudeAccountService {
       autoStopOnWarning,
       useUnifiedUserAgent,
       useUnifiedClientId,
-      unifiedClientId
+      unifiedClientId,
+      extInfo: normalizedExtInfo
     }
   }
 
@@ -485,6 +492,7 @@ class ClaudeAccountService {
           const scopes = account.scopes && account.scopes.trim() ? account.scopes.split(' ') : []
           const isOAuth = scopes.includes('user:profile') && scopes.includes('user:inference')
           const authType = isOAuth ? 'oauth' : 'setup-token'
+          const parsedExtInfo = this._safeParseJson(account.extInfo)
 
           return {
             id: account.id,
@@ -548,7 +556,9 @@ class ClaudeAccountService {
             useUnifiedClientId: account.useUnifiedClientId === 'true', // 默认为false
             unifiedClientId: account.unifiedClientId || '', // 统一的客户端标识
             // 添加停止原因
-            stoppedReason: account.stoppedReason || null
+            stoppedReason: account.stoppedReason || null,
+            // 扩展信息
+            extInfo: parsedExtInfo
           }
         })
       )
@@ -639,10 +649,12 @@ class ClaudeAccountService {
         'useUnifiedUserAgent',
         'useUnifiedClientId',
         'unifiedClientId',
-        'subscriptionExpiresAt'
+        'subscriptionExpiresAt',
+        'extInfo'
       ]
       const updatedData = { ...accountData }
       let shouldClearAutoStopFields = false
+      let extInfoProvided = false
 
       // 检查是否新增了 refresh token
       const oldRefreshToken = this._decryptSensitiveData(accountData.refreshToken)
@@ -661,6 +673,10 @@ class ClaudeAccountService {
           } else if (field === 'subscriptionExpiresAt') {
             // 处理订阅到期时间，允许 null 值（永不过期）
             updatedData[field] = value ? value.toString() : ''
+          } else if (field === 'extInfo') {
+            const normalized = this._normalizeExtInfo(value, updates.claudeAiOauth)
+            updatedData.extInfo = normalized ? JSON.stringify(normalized) : ''
+            extInfoProvided = true
           } else if (field === 'claudeAiOauth') {
             // 更新 Claude AI OAuth 数据
             if (value) {
@@ -672,6 +688,13 @@ class ClaudeAccountService {
               updatedData.status = 'active'
               updatedData.errorMessage = ''
               updatedData.lastRefreshAt = new Date().toISOString()
+
+              if (!extInfoProvided) {
+                const normalized = this._normalizeExtInfo(value.extInfo, value)
+                if (normalized) {
+                  updatedData.extInfo = JSON.stringify(normalized)
+                }
+              }
             }
           } else {
             updatedData[field] = value !== null && value !== undefined ? value.toString() : ''
@@ -3037,6 +3060,93 @@ class ClaudeAccountService {
     } catch (error) {
       logger.error('❌ Failed to check and recover 5-hour stopped accounts:', error)
       throw error
+    }
+  }
+
+  /**
+   * 规范化扩展信息，提取组织与账户UUID
+   * @param {object|string|null} extInfoSource - 原始扩展信息
+   * @param {object|null} oauthPayload - OAuth 数据载荷
+   * @returns {object|null} 规范化后的扩展信息
+   */
+  _normalizeExtInfo(extInfoSource, oauthPayload) {
+    let extInfo = null
+
+    if (extInfoSource) {
+      if (typeof extInfoSource === 'string') {
+        extInfo = this._safeParseJson(extInfoSource)
+      } else if (typeof extInfoSource === 'object') {
+        extInfo = { ...extInfoSource }
+      }
+    }
+
+    if (!extInfo && oauthPayload && typeof oauthPayload === 'object') {
+      if (oauthPayload.extInfo) {
+        if (typeof oauthPayload.extInfo === 'string') {
+          extInfo = this._safeParseJson(oauthPayload.extInfo)
+        } else if (typeof oauthPayload.extInfo === 'object') {
+          extInfo = { ...oauthPayload.extInfo }
+        }
+      }
+
+      if (!extInfo) {
+        const organization = oauthPayload.organization || null
+        const account = oauthPayload.account || null
+
+        const normalized = {}
+        const orgUuid =
+          organization?.uuid ||
+          organization?.id ||
+          organization?.organization_uuid ||
+          organization?.organization_id
+        const accountUuid =
+          account?.uuid || account?.id || account?.account_uuid || account?.account_id
+
+        if (orgUuid) {
+          normalized.org_uuid = orgUuid
+        }
+
+        if (accountUuid) {
+          normalized.account_uuid = accountUuid
+        }
+
+        extInfo = Object.keys(normalized).length > 0 ? normalized : null
+      }
+    }
+
+    if (!extInfo || typeof extInfo !== 'object') {
+      return null
+    }
+
+    const result = {}
+
+    if (extInfo.org_uuid && typeof extInfo.org_uuid === 'string') {
+      result.org_uuid = extInfo.org_uuid
+    }
+
+    if (extInfo.account_uuid && typeof extInfo.account_uuid === 'string') {
+      result.account_uuid = extInfo.account_uuid
+    }
+
+    return Object.keys(result).length > 0 ? result : null
+  }
+
+  /**
+   * 安全解析 JSON 字符串
+   * @param {string} value - 需要解析的字符串
+   * @returns {object|null} 解析结果
+   */
+  _safeParseJson(value) {
+    if (!value || typeof value !== 'string') {
+      return null
+    }
+
+    try {
+      const parsed = JSON.parse(value)
+      return parsed && typeof parsed === 'object' ? parsed : null
+    } catch (error) {
+      logger.warn('⚠️ 解析扩展信息失败，已忽略：', error.message)
+      return null
     }
   }
 

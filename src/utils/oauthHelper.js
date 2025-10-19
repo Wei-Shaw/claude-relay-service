@@ -219,13 +219,21 @@ async function exchangeCodeForTokens(authorizationCode, codeVerifier, state, pro
 
     const { data } = response
 
+    // 解析组织与账户信息
+    const organizationInfo = data.organization || null
+    const accountInfo = data.account || null
+    const extInfo = extractExtInfo(data)
+
     // 返回Claude格式的token数据，包含可能的套餐信息
     const result = {
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
       expiresAt: (Math.floor(Date.now() / 1000) + data.expires_in) * 1000,
       scopes: data.scope ? data.scope.split(' ') : ['user:inference', 'user:profile'],
-      isMax: true
+      isMax: true,
+      organization: organizationInfo,
+      account: accountInfo,
+      extInfo
     }
 
     // 如果响应中包含套餐信息，添加到返回结果中
@@ -430,13 +438,21 @@ async function exchangeSetupTokenCode(authorizationCode, codeVerifier, state, pr
 
     const { data } = response
 
+    // 解析组织与账户信息
+    const organizationInfo = data.organization || null
+    const accountInfo = data.account || null
+    const extInfo = extractExtInfo(data)
+
     // 返回Claude格式的token数据，包含可能的套餐信息
     const result = {
       accessToken: data.access_token,
       refreshToken: '',
       expiresAt: (Math.floor(Date.now() / 1000) + data.expires_in) * 1000,
       scopes: data.scope ? data.scope.split(' ') : ['user:inference', 'user:profile'],
-      isMax: true
+      isMax: true,
+      organization: organizationInfo,
+      account: accountInfo,
+      extInfo
     }
 
     // 如果响应中包含套餐信息，添加到返回结果中
@@ -513,9 +529,45 @@ function formatClaudeCredentials(tokenData) {
       refreshToken: tokenData.refreshToken,
       expiresAt: tokenData.expiresAt,
       scopes: tokenData.scopes,
-      isMax: tokenData.isMax
+      isMax: tokenData.isMax,
+      organization: tokenData.organization || null,
+      account: tokenData.account || null,
+      extInfo: tokenData.extInfo || null
     }
   }
+}
+
+/**
+ * 从令牌响应中提取扩展信息
+ * @param {object} data - 令牌响应
+ * @returns {object|null} 包含组织与账户UUID的扩展信息
+ */
+function extractExtInfo(data) {
+  if (!data || typeof data !== 'object') {
+    return null
+  }
+
+  const organization = data.organization || null
+  const account = data.account || null
+
+  const ext = {}
+
+  const orgUuid =
+    organization?.uuid ||
+    organization?.id ||
+    organization?.organization_uuid ||
+    organization?.organization_id
+  const accountUuid = account?.uuid || account?.id || account?.account_uuid || account?.account_id
+
+  if (orgUuid) {
+    ext.org_uuid = orgUuid
+  }
+
+  if (accountUuid) {
+    ext.account_uuid = accountUuid
+  }
+
+  return Object.keys(ext).length > 0 ? ext : null
 }
 
 module.exports = {
@@ -526,6 +578,7 @@ module.exports = {
   exchangeSetupTokenCode,
   parseCallbackUrl,
   formatClaudeCredentials,
+  extractExtInfo,
   generateState,
   generateCodeVerifier,
   generateCodeChallenge,

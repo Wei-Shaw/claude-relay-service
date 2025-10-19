@@ -4007,7 +4007,35 @@ const handleOAuthSuccess = async (tokenInfo) => {
 
     if (currentPlatform === 'claude') {
       // Claude使用claudeAiOauth字段
-      data.claudeAiOauth = tokenInfo.claudeAiOauth || tokenInfo
+      const claudeOauthPayload = tokenInfo.claudeAiOauth || tokenInfo
+      data.claudeAiOauth = claudeOauthPayload
+      if (claudeOauthPayload) {
+        const extInfoPayload = {}
+        const extSource = claudeOauthPayload.extInfo
+        if (extSource && typeof extSource === 'object') {
+          if (extSource.org_uuid) {
+            extInfoPayload.org_uuid = extSource.org_uuid
+          }
+          if (extSource.account_uuid) {
+            extInfoPayload.account_uuid = extSource.account_uuid
+          }
+        }
+
+        if (!extSource) {
+          const orgUuid = claudeOauthPayload.organization?.uuid
+          const accountUuid = claudeOauthPayload.account?.uuid
+          if (orgUuid) {
+            extInfoPayload.org_uuid = orgUuid
+          }
+          if (accountUuid) {
+            extInfoPayload.account_uuid = accountUuid
+          }
+        }
+
+        if (Object.keys(extInfoPayload).length > 0) {
+          data.extInfo = extInfoPayload
+        }
+      }
       data.priority = form.value.priority || 50
       data.autoStopOnWarning = form.value.autoStopOnWarning || false
       data.useUnifiedUserAgent = form.value.useUnifiedUserAgent || false
