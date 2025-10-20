@@ -1,5 +1,149 @@
 # 变更日志 - 团队 Memory 功能
 
+## [1.1.0] - 2025-10-20
+
+### 新增功能 ✨
+
+#### URL 加载和自动刷新支持
+
+为团队 Memory 功能增加从远程 URL 加载和定期自动刷新机制，特别适合 K8S/云环境部署。
+
+**核心特性**：
+- ✅ 支持从远程 URL 拉取团队 Memory 内容
+- ✅ 可配置自动刷新间隔（支持浮点数分钟）
+- ✅ 智能加载优先级（直接配置 > URL > 本地文件）
+- ✅ 错误处理：网络失败时保留旧缓存
+- ✅ 10秒请求超时保护
+- ✅ 完整的状态监控和调试接口
+
+**新增环境变量**：
+
+```bash
+# 团队 Memory URL（可选，优先级第二）
+CLAUDE_TEAM_MEMORY_URL=https://example.com/team-memory.md
+
+# 刷新间隔（分钟），0 表示禁用，支持小数
+CLAUDE_TEAM_MEMORY_REFRESH_INTERVAL=60
+```
+
+**加载优先级**（从高到低）：
+1. `CLAUDE_TEAM_MEMORY_CONTENT` - 直接配置（最高优先级，不刷新）
+2. `CLAUDE_TEAM_MEMORY_URL` - URL 拉取（支持自动刷新）
+3. 本地文件 - 文件系统（支持热更新）
+
+### 文件变更 📁
+
+#### 修改的文件
+- `src/services/claudeMemoryService.js` - 实现 URL 加载和自动刷新
+- `config/config.js` - 新增 url 和 refreshInterval 配置
+- `config/config.example.js` - 新增 url 和 refreshInterval 配置
+- `.env.example` - 更新环境变量说明
+
+#### 新增的文件
+- `docs/TEAM_MEMORY_URL_USAGE.md` - URL 加载和自动刷新使用指南
+- `scripts/test-team-memory-url.js` - URL 功能测试脚本
+
+### 测试结果 ✅
+
+```bash
+✅ Test 1: Initial URL loading - 通过
+✅ Test 2: Manual refresh - 通过
+✅ Test 3: Auto-refresh mechanism - 通过
+✅ Test 4: Priority testing (content > url > file) - 通过
+✅ Test 5: Error handling (invalid URL) - 通过
+```
+
+### 使用示例 📝
+
+#### K8S 环境（ConfigMap + Service）
+
+```bash
+CLAUDE_TEAM_MEMORY_ENABLED=true
+CLAUDE_TEAM_MEMORY_URL=http://team-memory-service/team-memory.md
+CLAUDE_TEAM_MEMORY_REFRESH_INTERVAL=60  # 每小时刷新
+```
+
+#### 从 CDN/对象存储加载
+
+```bash
+CLAUDE_TEAM_MEMORY_ENABLED=true
+CLAUDE_TEAM_MEMORY_URL=https://your-cdn.com/team-memory.md
+CLAUDE_TEAM_MEMORY_REFRESH_INTERVAL=1440  # 每天刷新
+```
+
+#### 本地文件 + 热更新
+
+```bash
+CLAUDE_TEAM_MEMORY_ENABLED=true
+# 不设置 URL，使用本地文件
+CLAUDE_TEAM_MEMORY_REFRESH_INTERVAL=1  # 每分钟检查更新
+```
+
+### API 变更 🔧
+
+**新增方法**：
+
+```javascript
+// 从 URL 加载
+await claudeMemoryService.loadTeamMemoryFromUrl()
+
+// 手动刷新
+await claudeMemoryService.refreshMemory()
+
+// 启动/停止自动刷新
+claudeMemoryService.startAutoRefresh()
+claudeMemoryService.stopAutoRefresh()
+
+// 获取状态
+const status = claudeMemoryService.getStatus()
+// {
+//   enabled: true,
+//   source: 'url',  // 'content' | 'url' | 'file'
+//   lastLoadedTime: Date,
+//   cacheSize: number,
+//   autoRefreshEnabled: boolean,
+//   config: {...}
+// }
+```
+
+### 向后兼容 🔄
+
+✅ 完全向后兼容
+✅ 不设置 URL 时行为与之前完全一致
+✅ 默认刷新间隔为 0（禁用）
+✅ 现有配置无需修改
+
+### 性能影响 ⚡
+
+- **启动延迟**：首次加载 URL < 10s（异步，不阻塞启动）
+- **内存影响**：仅缓存一份内容（忽略不计）
+- **网络流量**：按刷新间隔定期请求（推荐 60+ 分钟）
+- **CPU 影响**：定时器和 HTTP 请求开销极小
+
+### 注意事项 ⚠️
+
+1. **刷新间隔**：推荐 60-1440 分钟，不建议过短
+2. **网络稳定性**：失败时保留旧缓存，不影响服务
+3. **HTTPS**：生产环境建议使用 HTTPS URL
+4. **内容大小**：建议控制在 2000-5000 tokens
+5. **K8S 环境**：使用内部 Service 无需公网访问
+
+### 后续规划 🚀
+
+#### 阶段 2：API Key 级别配置（计划中）
+- [ ] 在 API Key 中添加 `teamMemoryUrl` 字段
+- [ ] 支持不同项目/团队使用不同的 Memory URL
+- [ ] Web 界面支持配置和预览
+- [ ] 支持多个 URL 加载和合并
+
+#### 阶段 3：高级功能（计划中）
+- [ ] 支持 HTTP 认证（Basic Auth / Bearer Token）
+- [ ] 支持 URL 模板变量（如 ${apiKeyId}）
+- [ ] 支持从数据库动态加载
+- [ ] 支持条件注入和内容过滤
+
+---
+
 ## [1.0.0] - 2025-01-20
 
 ### 新增功能 ✨

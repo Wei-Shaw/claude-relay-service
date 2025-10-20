@@ -57,7 +57,9 @@ const config = {
     // 🧠 团队 Memory 配置
     teamMemory: {
       enabled: process.env.CLAUDE_TEAM_MEMORY_ENABLED === 'true',
-      content: process.env.CLAUDE_TEAM_MEMORY_CONTENT || '',
+      content: process.env.CLAUDE_TEAM_MEMORY_CONTENT || '', // 直接配置内容（最高优先级）
+      url: process.env.CLAUDE_TEAM_MEMORY_URL || '', // 远程 URL（第二优先级）
+      refreshInterval: parseFloat(process.env.CLAUDE_TEAM_MEMORY_REFRESH_INTERVAL) || 0, // 刷新间隔（分钟），0 表示禁用
       useCacheControl: process.env.CLAUDE_TEAM_MEMORY_USE_CACHE !== 'false', // 默认启用
       onlyForRealClaudeCode: process.env.CLAUDE_TEAM_MEMORY_ONLY_REAL_CC !== 'false' // 默认启用
     }
