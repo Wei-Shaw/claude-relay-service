@@ -49,7 +49,19 @@ class ClaudeMemoryService {
       return
     }
 
+    const model = typeof body.model === 'string' ? body.model : null
     const teamMemoryConfig = this.getConfig()
+
+    // 检查模型是否匹配配置的前缀
+    if (model === null) {
+      return
+    }
+
+    const modelPrefixes = teamMemoryConfig.modelPrefixes || ['claude-sonnet']
+    const matchesPrefix = modelPrefixes.some((prefix) => model.startsWith(prefix))
+    if (!matchesPrefix) {
+      return
+    }
 
     // 如果没有传入 isRealClaudeCode，自动判断
     const isRealCC =
@@ -86,11 +98,20 @@ class ClaudeMemoryService {
       body.system = []
     }
 
+    // @Deprecate 因为外部中转站普遍叠加 system prompts，所以改为插入到第二个位置，避免触发CacheControl的最大数量限制
     // 插入到第二个位置（Claude Code prompt 之后）
     // system[0] = Claude Code prompt
     // system[1] = Team Memory (新插入)
     // system[2+] = 用户的 system prompts
-    body.system.splice(1, 0, teamMemoryBlock)
+    // body.system.splice(1, 0, teamMemoryBlock)
+
+    // 使用插入第二个位置的方法，避免重复注入
+    if (body.system.length > 1) {
+      body.system[1].text = `${memoryContent.trim()}\n\n${body.system[1].text}`
+      body.system[1].cache_control = teamMemoryBlock.cache_control
+    } else {
+      body.system.push(teamMemoryBlock)
+    }
 
     logger.info('🧠 Injected team memory into system prompts', {
       source: this.lastLoadedSource,
@@ -206,7 +227,7 @@ class ClaudeMemoryService {
       const request = protocol.get(
         url,
         {
-          timeout: 10000 // 10秒超时
+          timeout: 30000 // 30秒超时
         },
         (res) => {
           // 检查状态码

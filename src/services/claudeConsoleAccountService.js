@@ -79,6 +79,13 @@ class ClaudeConsoleAccountService {
     // 处理 supportedModels，确保向后兼容
     const processedModels = this._processModelMapping(supportedModels)
 
+    if ('expiresAt' in options) {
+      logger.warn(
+        '⚠️ Deprecated field "expiresAt" used in createAccount options. Please use "subscriptionExpiresAt" instead.'
+      )
+      options.subscriptionExpiresAt = options.expiresAt
+    }
+
     const accountData = {
       id: accountId,
       platform: 'claude-console',
@@ -345,6 +352,13 @@ class ClaudeConsoleAccountService {
       }
       if (updates.quotaStoppedAt !== undefined) {
         updatedData.quotaStoppedAt = updates.quotaStoppedAt
+      }
+
+      if (updates.expiresAt) {
+        logger.warn(
+          '⚠️ Deprecated field "expiresAt" used in updateAccount. Please use "subscriptionExpiresAt" instead.'
+        )
+        updates.subscriptionExpiresAt = updates.expiresAt
       }
 
       // ✅ 直接保存 subscriptionExpiresAt（如果提供）
