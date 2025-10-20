@@ -202,7 +202,8 @@ class ClaudeConsoleAccountService {
             schedulable: accountData.schedulable !== 'false', // 默认为true，只有明确设置为false才不可调度
 
             // ✅ 前端显示订阅过期时间（业务字段）
-            expiresAt: accountData.subscriptionExpiresAt || null,
+            // 不改变字段名，因为admin.js中会自动处理，这里操作了反而画蛇添足
+            subscriptionExpiresAt: accountData.subscriptionExpiresAt || null,
 
             // 额度管理相关
             dailyQuota: parseFloat(accountData.dailyQuota || '0'),
