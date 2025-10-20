@@ -6,6 +6,7 @@ const {
 const { fromEnv } = require('@aws-sdk/credential-providers')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
+const claudeMemoryService = require('./claudeMemoryService')
 
 class BedrockRelayService {
   constructor() {
@@ -70,6 +71,9 @@ class BedrockRelayService {
   // 处理非流式请求
   async handleNonStreamRequest(requestBody, bedrockAccount = null) {
     try {
+      // 🧠 注入团队 Memory（在转换格式之前）
+      claudeMemoryService.injectTeamMemory(requestBody)
+
       const modelId = this._selectModel(requestBody, bedrockAccount)
       const region = this._selectRegion(modelId, bedrockAccount)
       const client = this._getBedrockClient(region, bedrockAccount)
@@ -112,6 +116,9 @@ class BedrockRelayService {
   // 处理流式请求
   async handleStreamRequest(requestBody, bedrockAccount = null, res) {
     try {
+      // 🧠 注入团队 Memory（在转换格式之前）
+      claudeMemoryService.injectTeamMemory(requestBody)
+
       const modelId = this._selectModel(requestBody, bedrockAccount)
       const region = this._selectRegion(modelId, bedrockAccount)
       const client = this._getBedrockClient(region, bedrockAccount)

@@ -53,6 +53,13 @@ const config = {
         // 验证配置值：限制在0-1440分钟(24小时)内
         return Math.max(0, Math.min(minutes, 1440))
       })()
+    },
+    // 🧠 团队 Memory 配置
+    teamMemory: {
+      enabled: process.env.CLAUDE_TEAM_MEMORY_ENABLED === 'true',
+      content: process.env.CLAUDE_TEAM_MEMORY_CONTENT || '',
+      useCacheControl: process.env.CLAUDE_TEAM_MEMORY_USE_CACHE !== 'false', // 默认启用
+      onlyForRealClaudeCode: process.env.CLAUDE_TEAM_MEMORY_ONLY_REAL_CC !== 'false' // 默认启用
     }
   },
 

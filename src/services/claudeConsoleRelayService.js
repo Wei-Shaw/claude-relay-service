@@ -1,5 +1,6 @@
 const axios = require('axios')
 const claudeConsoleAccountService = require('./claudeConsoleAccountService')
+const claudeMemoryService = require('./claudeMemoryService')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
 const {
@@ -57,6 +58,9 @@ class ClaudeConsoleRelayService {
           mappedModel = newModel
         }
       }
+
+      // 🧠 注入团队 Memory（在修改请求体之前）
+      claudeMemoryService.injectTeamMemory(requestBody)
 
       // 创建修改后的请求体
       const modifiedRequestBody = {
@@ -340,6 +344,9 @@ class ClaudeConsoleRelayService {
           mappedModel = newModel
         }
       }
+
+      // 🧠 注入团队 Memory（在修改请求体之前）
+      claudeMemoryService.injectTeamMemory(requestBody)
 
       // 创建修改后的请求体
       const modifiedRequestBody = {
