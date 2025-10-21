@@ -1,5 +1,7 @@
 const axios = require('axios')
+const { v4: uuidv4 } = require('uuid')
 const claudeConsoleAccountService = require('./claudeConsoleAccountService')
+const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
 const {
@@ -25,6 +27,8 @@ class ClaudeConsoleRelayService {
   ) {
     let abortController = null
     let account = null
+    const requestId = uuidv4() // 用于并发追踪
+    let concurrencyAcquired = false
 
     try {
       // 获取账户信息
@@ -34,8 +38,37 @@ class ClaudeConsoleRelayService {
       }
 
       logger.info(
-        `📤 Processing Claude Console API request for key: ${apiKeyData.name || apiKeyData.id}, account: ${account.name} (${accountId})`
+        `📤 Processing Claude Console API request for key: ${apiKeyData.name || apiKeyData.id}, account: ${account.name} (${accountId}), request: ${requestId}`
       )
+
+      // 🔒 并发控制：原子性抢占槽位
+      if (account.maxConcurrentTasks > 0) {
+        // 先抢占，再检查 - 避免竞态条件
+        const newConcurrency = Number(
+          await redis.incrConsoleAccountConcurrency(accountId, requestId, 600)
+        )
+        concurrencyAcquired = true
+
+        // 检查是否超过限制
+        if (newConcurrency > account.maxConcurrentTasks) {
+          // 超限，立即回滚
+          await redis.decrConsoleAccountConcurrency(accountId, requestId)
+          concurrencyAcquired = false
+
+          logger.warn(
+            `⚠️ Console account ${account.name} (${accountId}) concurrency limit exceeded: ${newConcurrency}/${account.maxConcurrentTasks} (request: ${requestId}, rolled back)`
+          )
+
+          const error = new Error('Console account concurrency limit reached')
+          error.code = 'CONSOLE_ACCOUNT_CONCURRENCY_FULL'
+          error.accountId = accountId
+          throw error
+        }
+
+        logger.debug(
+          `🔓 Acquired concurrency slot for account ${account.name} (${accountId}), current: ${newConcurrency}/${account.maxConcurrentTasks}, request: ${requestId}`
+        )
+      }
       logger.debug(`🌐 Account API URL: ${account.apiUrl}`)
       logger.debug(`🔍 Account supportedModels: ${JSON.stringify(account.supportedModels)}`)
       logger.debug(`🔑 Account has apiKey: ${!!account.apiKey}`)
@@ -297,6 +330,21 @@ class ClaudeConsoleRelayService {
       // 不再因为模型不支持而block账号
 
       throw error
+    } finally {
+      // 🔓 并发控制：释放并发槽位
+      if (concurrencyAcquired) {
+        try {
+          await redis.decrConsoleAccountConcurrency(accountId, requestId)
+          logger.debug(
+            `🔓 Released concurrency slot for account ${account?.name || accountId}, request: ${requestId}`
+          )
+        } catch (releaseError) {
+          logger.error(
+            `❌ Failed to release concurrency slot for account ${accountId}, request: ${requestId}:`,
+            releaseError.message
+          )
+        }
+      }
     }
   }
 
@@ -312,6 +360,10 @@ class ClaudeConsoleRelayService {
     options = {}
   ) {
     let account = null
+    const requestId = uuidv4() // 用于并发追踪
+    let concurrencyAcquired = false
+    let leaseRefreshInterval = null // 租约刷新定时器
+
     try {
       // 获取账户信息
       account = await claudeConsoleAccountService.getAccount(accountId)
@@ -320,8 +372,56 @@ class ClaudeConsoleRelayService {
       }
 
       logger.info(
-        `📡 Processing streaming Claude Console API request for key: ${apiKeyData.name || apiKeyData.id}, account: ${account.name} (${accountId})`
+        `📡 Processing streaming Claude Console API request for key: ${apiKeyData.name || apiKeyData.id}, account: ${account.name} (${accountId}), request: ${requestId}`
       )
+
+      // 🔒 并发控制：原子性抢占槽位
+      if (account.maxConcurrentTasks > 0) {
+        // 先抢占，再检查 - 避免竞态条件
+        const newConcurrency = Number(
+          await redis.incrConsoleAccountConcurrency(accountId, requestId, 600)
+        )
+        concurrencyAcquired = true
+
+        // 检查是否超过限制
+        if (newConcurrency > account.maxConcurrentTasks) {
+          // 超限，立即回滚
+          await redis.decrConsoleAccountConcurrency(accountId, requestId)
+          concurrencyAcquired = false
+
+          logger.warn(
+            `⚠️ Console account ${account.name} (${accountId}) concurrency limit exceeded: ${newConcurrency}/${account.maxConcurrentTasks} (stream request: ${requestId}, rolled back)`
+          )
+
+          const error = new Error('Console account concurrency limit reached')
+          error.code = 'CONSOLE_ACCOUNT_CONCURRENCY_FULL'
+          error.accountId = accountId
+          throw error
+        }
+
+        logger.debug(
+          `🔓 Acquired concurrency slot for stream account ${account.name} (${accountId}), current: ${newConcurrency}/${account.maxConcurrentTasks}, request: ${requestId}`
+        )
+
+        // 🔄 启动租约刷新定时器（每5分钟刷新一次，防止长连接租约过期）
+        leaseRefreshInterval = setInterval(
+          async () => {
+            try {
+              await redis.refreshConsoleAccountConcurrencyLease(accountId, requestId, 600)
+              logger.debug(
+                `🔄 Refreshed concurrency lease for stream account ${account.name} (${accountId}), request: ${requestId}`
+              )
+            } catch (refreshError) {
+              logger.error(
+                `❌ Failed to refresh concurrency lease for account ${accountId}, request: ${requestId}:`,
+                refreshError.message
+              )
+            }
+          },
+          5 * 60 * 1000
+        ) // 5分钟刷新一次
+      }
+
       logger.debug(`🌐 Account API URL: ${account.apiUrl}`)
 
       // 处理模型映射
@@ -373,6 +473,29 @@ class ClaudeConsoleRelayService {
         error
       )
       throw error
+    } finally {
+      // 🛑 清理租约刷新定时器
+      if (leaseRefreshInterval) {
+        clearInterval(leaseRefreshInterval)
+        logger.debug(
+          `🛑 Cleared lease refresh interval for stream account ${account?.name || accountId}, request: ${requestId}`
+        )
+      }
+
+      // 🔓 并发控制:释放并发槽位
+      if (concurrencyAcquired) {
+        try {
+          await redis.decrConsoleAccountConcurrency(accountId, requestId)
+          logger.debug(
+            `🔓 Released concurrency slot for stream account ${account?.name || accountId}, request: ${requestId}`
+          )
+        } catch (releaseError) {
+          logger.error(
+            `❌ Failed to release concurrency slot for stream account ${accountId}, request: ${requestId}:`,
+            releaseError.message
+          )
+        }
+      }
     }
   }
 

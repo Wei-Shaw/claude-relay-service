@@ -1775,6 +1775,38 @@ class RedisClient {
     }
   }
 
+  // 🏢 Claude Console 账户并发控制（复用现有并发机制）
+  // 增加 Console 账户并发计数
+  async incrConsoleAccountConcurrency(accountId, requestId, leaseSeconds = null) {
+    if (!requestId) {
+      throw new Error('Request ID is required for console account concurrency tracking')
+    }
+    // 使用特殊的 key 前缀区分 Console 账户并发
+    const compositeKey = `console_account:${accountId}`
+    return await this.incrConcurrency(compositeKey, requestId, leaseSeconds)
+  }
+
+  // 刷新 Console 账户并发租约
+  async refreshConsoleAccountConcurrencyLease(accountId, requestId, leaseSeconds = null) {
+    if (!requestId) {
+      return 0
+    }
+    const compositeKey = `console_account:${accountId}`
+    return await this.refreshConcurrencyLease(compositeKey, requestId, leaseSeconds)
+  }
+
+  // 减少 Console 账户并发计数
+  async decrConsoleAccountConcurrency(accountId, requestId) {
+    const compositeKey = `console_account:${accountId}`
+    return await this.decrConcurrency(compositeKey, requestId)
+  }
+
+  // 获取 Console 账户当前并发数
+  async getConsoleAccountConcurrency(accountId) {
+    const compositeKey = `console_account:${accountId}`
+    return await this.getConcurrency(compositeKey)
+  }
+
   // 🔧 Basic Redis operations wrapper methods for convenience
   async get(key) {
     const client = this.getClientSafe()

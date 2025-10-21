@@ -955,42 +955,89 @@
                   </div>
                   <div v-else class="text-xs text-gray-400">暂无统计</div>
                 </div>
-                <!-- Claude Console: 显示每日额度使用进度 -->
-                <div v-else-if="account.platform === 'claude-console'" class="space-y-2">
-                  <div v-if="Number(account.dailyQuota) > 0">
+                <!-- Claude Console: 显示每日额度和并发状态 -->
+                <div v-else-if="account.platform === 'claude-console'" class="space-y-3">
+                  <div>
+                    <template v-if="Number(account.dailyQuota) > 0">
+                      <div class="flex items-center justify-between text-xs">
+                        <span class="text-gray-600 dark:text-gray-300">额度进度</span>
+                        <span class="font-medium text-gray-700 dark:text-gray-200">
+                          {{ getQuotaUsagePercent(account).toFixed(1) }}%
+                        </span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <div class="h-2 w-24 rounded-full bg-gray-200 dark:bg-gray-700">
+                          <div
+                            :class="[
+                              'h-2 rounded-full transition-all duration-300',
+                              getQuotaBarClass(getQuotaUsagePercent(account))
+                            ]"
+                            :style="{ width: Math.min(100, getQuotaUsagePercent(account)) + '%' }"
+                          />
+                        </div>
+                        <span
+                          class="min-w-[32px] text-xs font-medium text-gray-700 dark:text-gray-200"
+                        >
+                          ${{ formatCost(account.usage?.daily?.cost || 0) }} / ${{
+                            Number(account.dailyQuota).toFixed(2)
+                          }}
+                        </span>
+                      </div>
+                      <div class="text-xs text-gray-600 dark:text-gray-400">
+                        剩余 ${{ formatRemainingQuota(account) }}
+                        <span class="ml-2 text-gray-400"
+                          >重置 {{ account.quotaResetTime || '00:00' }}</span
+                        >
+                      </div>
+                    </template>
+                    <template v-else>
+                      <div class="text-sm text-gray-400">
+                        <i class="fas fa-minus" />
+                      </div>
+                    </template>
+                  </div>
+
+                  <div class="space-y-1">
                     <div class="flex items-center justify-between text-xs">
-                      <span class="text-gray-600 dark:text-gray-300">额度进度</span>
-                      <span class="font-medium text-gray-700 dark:text-gray-200">
-                        {{ getQuotaUsagePercent(account).toFixed(1) }}%
+                      <span class="text-gray-600 dark:text-gray-300">并发状态</span>
+                      <span
+                        v-if="Number(account.maxConcurrentTasks || 0) > 0"
+                        class="font-medium text-gray-700 dark:text-gray-200"
+                      >
+                        {{ getConsoleConcurrencyPercent(account).toFixed(0) }}%
                       </span>
                     </div>
-                    <div class="flex items-center gap-2">
+                    <div
+                      v-if="Number(account.maxConcurrentTasks || 0) > 0"
+                      class="flex items-center gap-2"
+                    >
                       <div class="h-2 w-24 rounded-full bg-gray-200 dark:bg-gray-700">
                         <div
                           :class="[
                             'h-2 rounded-full transition-all duration-300',
-                            getQuotaBarClass(getQuotaUsagePercent(account))
+                            getConcurrencyBarClass(getConsoleConcurrencyPercent(account))
                           ]"
-                          :style="{ width: Math.min(100, getQuotaUsagePercent(account)) + '%' }"
+                          :style="{
+                            width: Math.min(100, getConsoleConcurrencyPercent(account)) + '%'
+                          }"
                         />
                       </div>
                       <span
-                        class="min-w-[32px] text-xs font-medium text-gray-700 dark:text-gray-200"
+                        :class="[
+                          'min-w-[48px] text-xs font-medium',
+                          getConcurrencyLabelClass(account)
+                        ]"
                       >
-                        ${{ formatCost(account.usage?.daily?.cost || 0) }} / ${{
-                          Number(account.dailyQuota).toFixed(2)
-                        }}
+                        {{ Number(account.activeTaskCount || 0) }} /
+                        {{ Number(account.maxConcurrentTasks || 0) }}
                       </span>
                     </div>
-                    <div class="text-xs text-gray-600 dark:text-gray-400">
-                      剩余 ${{ formatRemainingQuota(account) }}
-                      <span class="ml-2 text-gray-400"
-                        >重置 {{ account.quotaResetTime || '00:00' }}</span
-                      >
+                    <div
+                      v-else
+                      class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500 dark:bg-gray-700 dark:text-gray-300"
+                    >
+                      <i class="fas fa-infinity mr-1" />并发无限制
                     </div>
-                  </div>
-                  <div v-else class="text-sm text-gray-400">
-                    <i class="fas fa-minus" />
                   </div>
                 </div>
                 <div v-else-if="account.platform === 'openai'" class="space-y-2">
@@ -3620,6 +3667,35 @@ const getQuotaBarClass = (percent) => {
   if (percent >= 90) return 'bg-red-500'
   if (percent >= 70) return 'bg-yellow-500'
   return 'bg-green-500'
+}
+
+// 并发使用百分比（Claude Console）
+const getConsoleConcurrencyPercent = (account) => {
+  const max = Number(account?.maxConcurrentTasks || 0)
+  if (!max || max <= 0) return 0
+  const active = Number(account?.activeTaskCount || 0)
+  return Math.min(100, (active / max) * 100)
+}
+
+// 并发进度条颜色（Claude Console）
+const getConcurrencyBarClass = (percent) => {
+  if (percent >= 100) return 'bg-red-500'
+  if (percent >= 80) return 'bg-yellow-500'
+  return 'bg-green-500'
+}
+
+// 并发标签颜色（Claude Console）
+const getConcurrencyLabelClass = (account) => {
+  const max = Number(account?.maxConcurrentTasks || 0)
+  if (!max || max <= 0) return 'text-gray-500 dark:text-gray-400'
+  const active = Number(account?.activeTaskCount || 0)
+  if (active >= max) {
+    return 'text-red-600 dark:text-red-400'
+  }
+  if (active >= max * 0.8) {
+    return 'text-yellow-600 dark:text-yellow-400'
+  }
+  return 'text-gray-700 dark:text-gray-200'
 }
 
 // 剩余额度（Claude Console）
