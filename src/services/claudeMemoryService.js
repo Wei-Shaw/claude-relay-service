@@ -40,6 +40,8 @@ class ClaudeMemoryService {
 
   /**
    * 注入团队 Memory 到请求 body 中
+   * 采用合并策略：将 Team Memory 合并到 system[1].text 开头
+   * 这样不会增加新的 cache_control 块，避免超过4个缓存块的限制
    * @param {Object} body - 请求体
    * @param isRealClaudeCode
    */
@@ -80,43 +82,60 @@ class ClaudeMemoryService {
       return
     }
 
-    // 构建团队 Memory 块
-    const teamMemoryBlock = {
-      type: 'text',
-      text: memoryContent.trim()
-    }
-
-    // 如果启用缓存控制，添加 cache_control
-    if (teamMemoryConfig.useCacheControl) {
-      teamMemoryBlock.cache_control = {
-        type: 'ephemeral'
-      }
-    }
-
     // 确保 system 是数组
     if (!Array.isArray(body.system)) {
       body.system = []
     }
 
-    // @Deprecate 因为外部中转站普遍叠加 system prompts，所以改为插入到第二个位置，避免触发CacheControl的最大数量限制
-    // 插入到第二个位置（Claude Code prompt 之后）
-    // system[0] = Claude Code prompt
-    // system[1] = Team Memory (新插入)
-    // system[2+] = 用户的 system prompts
-    // body.system.splice(1, 0, teamMemoryBlock)
+    // 🔍 检查是否已注入（通过文本标签防止重复注入）
+    const memoryMarker = '<!-- TEAM_MEMORY_INJECTED -->'
 
-    // 使用插入第二个位置的方法，避免重复注入
+    // 📝 合并到 system[1].text（不增加新的 cache_control 块）
     if (body.system.length > 1) {
-      body.system[1].text = `${memoryContent.trim()}\n\n${body.system[1].text}`
-      body.system[1].cache_control = teamMemoryBlock.cache_control
+      // 已有 system[1]，检查是否已注入
+      if (body.system[1].text && body.system[1].text.includes(memoryMarker)) {
+        logger.debug('🔄 Team memory already injected, skipping')
+        return
+      }
+
+      // 合并到 system[1] 的开头（Team Memory 在前，用户 prompt 在后）
+      const originalText = body.system[1].text || ''
+      body.system[1].text = `${memoryMarker}\n${memoryContent.trim()}\n\n${originalText}`
+
+      // 如果配置启用缓存控制，且 system[1] 还没有 cache_control，添加它
+      if (teamMemoryConfig.useCacheControl && !body.system[1].cache_control) {
+        body.system[1].cache_control = {
+          type: 'ephemeral'
+        }
+      }
+
+      logger.info('🧠 Merged team memory into system[1]', {
+        source: this.lastLoadedSource,
+        size: memoryContent.length,
+        position: 'prepend'
+      })
     } else {
+      // 只有 system[0] 或为空，追加一个新的 system block
+      const teamMemoryBlock = {
+        type: 'text',
+        text: `${memoryMarker}\n${memoryContent.trim()}`
+      }
+
+      if (teamMemoryConfig.useCacheControl) {
+        teamMemoryBlock.cache_control = {
+          type: 'ephemeral'
+        }
+      }
+
       body.system.push(teamMemoryBlock)
+
+      logger.info('🧠 Appended team memory as system[1]', {
+        source: this.lastLoadedSource,
+        size: memoryContent.length
+      })
     }
 
-    logger.info('🧠 Injected team memory into system prompts', {
-      source: this.lastLoadedSource,
-      size: memoryContent.length
-    })
+    logger.debug('🔧 Request body after team memory injection:', body)
   }
 
   /**
