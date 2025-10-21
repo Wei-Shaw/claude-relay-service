@@ -87,20 +87,55 @@ class ClaudeMemoryService {
       body.system = []
     }
 
-    // 🔍 检查是否已注入（通过文本标签防止重复注入）
-    const memoryMarker = '<!-- TEAM_MEMORY_INJECTED -->'
+    // 🔍 生成带时间戳的标记（使用加载时间或当前时间）
+    const timestamp = this.lastLoadedTime ? this.lastLoadedTime.getTime() : Date.now()
+    const memoryStartMarker = `<!-- TEAM_MEMORY_START:${timestamp} -->`
+    const memoryEndMarker = `<!-- TEAM_MEMORY_END:${timestamp} -->`
+    const wrappedMemory = `${memoryStartMarker}\n${memoryContent.trim()}\n${memoryEndMarker}`
+
+    // 正则匹配已存在的 Team Memory 块（任意时间戳）
+    const memoryBlockRegex = /<!-- TEAM_MEMORY_START:\d+ -->[\s\S]*?<!-- TEAM_MEMORY_END:\d+ -->/
 
     // 📝 合并到 system[1].text（不增加新的 cache_control 块）
     if (body.system.length > 1) {
-      // 已有 system[1]，检查是否已注入
-      if (body.system[1].text && body.system[1].text.includes(memoryMarker)) {
-        logger.debug('🔄 Team memory already injected, skipping')
-        return
-      }
-
-      // 合并到 system[1] 的开头（Team Memory 在前，用户 prompt 在后）
       const originalText = body.system[1].text || ''
-      body.system[1].text = `${memoryMarker}\n${memoryContent.trim()}\n\n${originalText}`
+
+      // 检查是否已存在 Team Memory 块
+      const existingMatch = originalText.match(memoryBlockRegex)
+
+      if (existingMatch) {
+        // 已存在，检查时间戳是否相同
+        const existingTimestampMatch = existingMatch[0].match(/TEAM_MEMORY_START:(\d+)/)
+        const existingTimestamp = existingTimestampMatch
+          ? parseInt(existingTimestampMatch[1], 10)
+          : 0
+
+        if (existingTimestamp === timestamp) {
+          logger.debug('🔄 Team memory already injected with same timestamp, skipping', {
+            timestamp
+          })
+          return
+        }
+
+        // 时间戳不同，替换整个块
+        body.system[1].text = originalText.replace(memoryBlockRegex, wrappedMemory)
+
+        logger.info('🔄 Updated team memory in system[1]', {
+          source: this.lastLoadedSource,
+          size: memoryContent.length,
+          oldTimestamp: existingTimestamp,
+          newTimestamp: timestamp
+        })
+      } else {
+        // 不存在，插入到开头
+        body.system[1].text = `${wrappedMemory}\n\n${originalText}`
+
+        logger.info('🧠 Merged team memory into system[1]', {
+          source: this.lastLoadedSource,
+          size: memoryContent.length,
+          timestamp
+        })
+      }
 
       // 如果配置启用缓存控制，且 system[1] 还没有 cache_control，添加它
       if (teamMemoryConfig.useCacheControl && !body.system[1].cache_control) {
@@ -108,17 +143,11 @@ class ClaudeMemoryService {
           type: 'ephemeral'
         }
       }
-
-      logger.info('🧠 Merged team memory into system[1]', {
-        source: this.lastLoadedSource,
-        size: memoryContent.length,
-        position: 'prepend'
-      })
     } else {
       // 只有 system[0] 或为空，追加一个新的 system block
       const teamMemoryBlock = {
         type: 'text',
-        text: `${memoryMarker}\n${memoryContent.trim()}`
+        text: wrappedMemory
       }
 
       if (teamMemoryConfig.useCacheControl) {
@@ -131,7 +160,8 @@ class ClaudeMemoryService {
 
       logger.info('🧠 Appended team memory as system[1]', {
         source: this.lastLoadedSource,
-        size: memoryContent.length
+        size: memoryContent.length,
+        timestamp
       })
     }
 
