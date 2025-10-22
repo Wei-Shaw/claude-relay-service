@@ -117,7 +117,7 @@ class PricingService {
       const needsUpdate = this.needsUpdate()
 
       if (needsUpdate) {
-        logger.info('🔄 Updating model pricing data...')
+        logger.info(`🔄 Updating model pricing data..., url: ${this.pricingUrl}`)
         await this.downloadPricingData()
       } else {
         // 如果不需要更新，加载现有数据
@@ -446,6 +446,35 @@ class PricingService {
     return null
   }
 
+  // 根据 token 数量从分级定价中获取价格
+  getPricingFromTier(tieredPricing, tokenCount) {
+    if (!tieredPricing || !Array.isArray(tieredPricing)) {
+      return null
+    }
+
+    // 找到适用的价格区间
+    for (const tier of tieredPricing) {
+      const [min, max] = tier.range || [0, Infinity]
+      if (tokenCount >= min && tokenCount < max) {
+        return {
+          input_cost_per_token: tier.input_cost_per_token,
+          output_cost_per_token: tier.output_cost_per_token
+        }
+      }
+    }
+
+    // 如果没有找到匹配的区间，使用最后一个区间（通常是最高档）
+    const lastTier = tieredPricing[tieredPricing.length - 1]
+    if (lastTier) {
+      return {
+        input_cost_per_token: lastTier.input_cost_per_token,
+        output_cost_per_token: lastTier.output_cost_per_token
+      }
+    }
+
+    return null
+  }
+
   // 确保价格对象包含缓存价格
   ensureCachePricing(pricing) {
     if (!pricing) {
@@ -547,23 +576,53 @@ class PricingService {
 
     let inputCost = 0
     let outputCost = 0
+    let inputPricePerToken = 0
+    let outputPricePerToken = 0
 
-    if (useLongContextPricing) {
+    // 检查是否使用分级定价
+    if (pricing?.tiered_pricing && Array.isArray(pricing.tiered_pricing)) {
+      const inputTokens = usage.input_tokens || 0
+      const outputTokens = usage.output_tokens || 0
+
+      // 从分级定价中获取适用的价格
+      const inputTierPricing = this.getPricingFromTier(pricing.tiered_pricing, inputTokens)
+      const outputTierPricing = this.getPricingFromTier(pricing.tiered_pricing, outputTokens)
+
+      if (inputTierPricing) {
+        inputPricePerToken = inputTierPricing.input_cost_per_token
+        inputCost = inputTokens * inputPricePerToken
+        logger.debug(
+          `💰 Using tiered input pricing for ${modelName}: ${inputTokens} tokens at $${inputPricePerToken}/token`
+        )
+      }
+
+      if (outputTierPricing) {
+        outputPricePerToken = outputTierPricing.output_cost_per_token
+        outputCost = outputTokens * outputPricePerToken
+        logger.debug(
+          `💰 Using tiered output pricing for ${modelName}: ${outputTokens} tokens at $${outputPricePerToken}/token`
+        )
+      }
+    } else if (useLongContextPricing) {
       // 使用 1M 上下文特殊价格（仅输入和输出价格改变）
       const longContextPrices =
         this.longContextPricing[modelName] ||
         this.longContextPricing[Object.keys(this.longContextPricing)[0]]
 
-      inputCost = (usage.input_tokens || 0) * longContextPrices.input
-      outputCost = (usage.output_tokens || 0) * longContextPrices.output
+      inputPricePerToken = longContextPrices.input
+      outputPricePerToken = longContextPrices.output
+      inputCost = (usage.input_tokens || 0) * inputPricePerToken
+      outputCost = (usage.output_tokens || 0) * outputPricePerToken
 
       logger.info(
-        `💰 Using 1M context pricing for ${modelName}: input=$${longContextPrices.input}/token, output=$${longContextPrices.output}/token`
+        `💰 Using 1M context pricing for ${modelName}: input=$${inputPricePerToken}/token, output=$${outputPricePerToken}/token`
       )
     } else {
       // 使用正常价格
-      inputCost = (usage.input_tokens || 0) * (pricing?.input_cost_per_token || 0)
-      outputCost = (usage.output_tokens || 0) * (pricing?.output_cost_per_token || 0)
+      inputPricePerToken = pricing?.input_cost_per_token || 0
+      outputPricePerToken = pricing?.output_cost_per_token || 0
+      inputCost = (usage.input_tokens || 0) * inputPricePerToken
+      outputCost = (usage.output_tokens || 0) * outputPricePerToken
     }
 
     // 缓存价格保持不变（即使对于 1M 模型）
@@ -609,18 +668,8 @@ class PricingService {
       hasPricing: true,
       isLongContextRequest,
       pricing: {
-        input: useLongContextPricing
-          ? (
-              this.longContextPricing[modelName] ||
-              this.longContextPricing[Object.keys(this.longContextPricing)[0]]
-            )?.input || 0
-          : pricing?.input_cost_per_token || 0,
-        output: useLongContextPricing
-          ? (
-              this.longContextPricing[modelName] ||
-              this.longContextPricing[Object.keys(this.longContextPricing)[0]]
-            )?.output || 0
-          : pricing?.output_cost_per_token || 0,
+        input: inputPricePerToken,
+        output: outputPricePerToken,
         cacheCreate: pricing?.cache_creation_input_token_cost || 0,
         cacheRead: pricing?.cache_read_input_token_cost || 0,
         ephemeral1h: this.getEphemeral1hPricing(modelName)

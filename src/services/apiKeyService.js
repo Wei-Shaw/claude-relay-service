@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid')
 const config = require('../../config/config')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
+const billingEventPublisher = require('./billingEventPublisher')
 
 const ACCOUNT_TYPE_CONFIG = {
   claude: { prefix: 'claude:account:' },
@@ -1230,7 +1231,7 @@ class ApiKeyService {
       this._publishBillingEvent({
         keyId,
         keyName: keyData?.name,
-        userId: keyData?.userId,
+        apiKey: keyData?.apiKey,
         model,
         inputTokens,
         outputTokens,
@@ -1387,7 +1388,6 @@ class ApiKeyService {
   // 🔔 发布计费事件（内部方法）
   async _publishBillingEvent(eventData) {
     try {
-      const billingEventPublisher = require('./billingEventPublisher')
       await billingEventPublisher.publishBillingEvent(eventData)
     } catch (error) {
       // 静默失败，不影响主流程

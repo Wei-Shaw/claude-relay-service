@@ -28,17 +28,20 @@
 有几种方法获取频道的 Chat ID：
 
 #### 方法 1：使用 Web Telegram
+
 1. 打开 https://web.telegram.org
 2. 进入你的频道
 3. 查看 URL，格式为：`https://web.telegram.org/k/#-1234567890`
 4. Chat ID 就是 `#` 后面的数字（包括负号）：`-1234567890`
 
 #### 方法 2：使用 Bot API
+
 1. 先在频道发送一条消息
 2. 访问：`https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
 3. 找到你的频道消息，查看 `chat.id` 字段
 
 #### 方法 3：使用频道用户名
+
 如果频道是公开的，可以直接使用 `@频道用户名` 作为 Chat ID
 
 ### 4. 添加 GitHub Secrets
@@ -90,6 +93,7 @@ docker pull weishaw/claude-relay-service:latest
 ### Q: 通知发送失败怎么办？
 
 检查：
+
 1. Bot Token 是否正确
 2. Bot 是否已添加为频道管理员
 3. Chat ID 是否正确（注意负号）

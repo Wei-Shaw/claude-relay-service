@@ -17,10 +17,10 @@
 
 ### 必需的 Secrets
 
-| Secret 名称 | 说明 | 如何获取 |
-|------------|------|---------|
-| `DOCKERHUB_USERNAME` | Docker Hub 用户名 | 你的 Docker Hub 登录用户名 |
-| `DOCKERHUB_TOKEN` | Docker Hub Access Token | 见下方说明 |
+| Secret 名称          | 说明                    | 如何获取                   |
+| -------------------- | ----------------------- | -------------------------- |
+| `DOCKERHUB_USERNAME` | Docker Hub 用户名       | 你的 Docker Hub 登录用户名 |
+| `DOCKERHUB_TOKEN`    | Docker Hub Access Token | 见下方说明                 |
 
 ### 获取 Docker Hub Access Token
 
