@@ -56,6 +56,28 @@ const config = {
     }
   },
 
+  // 🤖 OpenAI 故障转移配置
+  openai: {
+    failover: {
+      // 连续失败次数阈值，超过则临时禁用
+      threshold: (() => {
+        const n = parseInt(process.env.OPENAI_ERROR_THRESHOLD)
+        return Number.isFinite(n) && n > 0 ? n : 10
+      })(),
+      // 错误计数时间窗口（分钟）
+      windowMinutes: (() => {
+        const n = parseInt(process.env.OPENAI_ERROR_WINDOW_MINUTES)
+        return Number.isFinite(n) && n > 0 ? n : 5
+      })(),
+      // 临时禁用持续时长（分钟）
+      tempDisableMinutes: (() => {
+        const n = parseInt(process.env.OPENAI_TEMP_DISABLE_MINUTES)
+        return Number.isFinite(n) && n > 0 ? n : 5
+      })()
+    }
+  },
+
+
   // ☁️ Bedrock API配置
   bedrock: {
     enabled: process.env.CLAUDE_CODE_USE_BEDROCK === '1',

@@ -1258,6 +1258,337 @@ async function updateCodexUsageSnapshot(accountId, usageSnapshot) {
   await client.hset(`${OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`, updates)
 }
 
+// =============================
+// 🔁 OpenAI 故障转移错误计数与临时禁用支持
+// =============================
+
+// 计数器键前缀（用于记录连续失败次数）
+const OPENAI_REQUEST_ERROR_KEY_PREFIX = 'openai_account:request_errors:'
+
+// 获取故障转移配置（阈值/窗口/禁用时长），全部从环境变量配置中读取，避免Magic Number
+function getFailoverConfig() {
+  const fallbackThreshold = 10 // 仅作为最后兜底，正常情况下应从环境变量读取
+  const fallbackWindow = 5
+  const fallbackDisable = 5
+
+  const threshold = parseInt(config?.openai?.failover?.threshold)
+  const windowMinutes = parseInt(config?.openai?.failover?.windowMinutes)
+  const tempDisableMinutes = parseInt(config?.openai?.failover?.tempDisableMinutes)
+
+  return {
+    threshold: Number.isFinite(threshold) && threshold > 0 ? threshold : fallbackThreshold,
+    windowMinutes:
+      Number.isFinite(windowMinutes) && windowMinutes > 0 ? windowMinutes : fallbackWindow,
+    tempDisableMinutes:
+      Number.isFinite(tempDisableMinutes) && tempDisableMinutes > 0
+        ? tempDisableMinutes
+        : fallbackDisable
+  }
+}
+
+/**
+ * 记录一次失败请求（非白名单状态码），并设置基于窗口的TTL
+ * @param {string} accountId - 账户ID
+ * @param {number} statusCode - 上游返回的HTTP状态码
+ */
+async function recordRequestError(accountId, statusCode) {
+  try {
+    const client = redisClient.getClientSafe()
+    const key = `${OPENAI_REQUEST_ERROR_KEY_PREFIX}${accountId}`
+    const { windowMinutes } = getFailoverConfig()
+    const ttlSeconds = Math.max(1, windowMinutes * 60)
+
+    // 使用 pipeline 确保 incr + expire 原子性（减少一次网络往返）
+    const pipeline = client.pipeline()
+    pipeline.incr(key)
+    pipeline.expire(key, ttlSeconds)
+    const results = await pipeline.exec()
+    const count = Array.isArray(results) && results[0] ? results[0][1] : 0
+
+    logger.warn(
+      `📉 OpenAI request failure recorded: accountId=${accountId}, status=${statusCode}, window=${windowMinutes}min, consecutive=${count}`
+    )
+    return count
+  } catch (error) {
+    logger.error(`❌ Failed to record OpenAI request error (accountId=${accountId}):`, error)
+    return 0
+  }
+}
+
+/**
+ * 获取当前窗口内的失败请求计数
+ * @param {string} accountId - 账户ID
+ */
+async function getRequestErrorCount(accountId) {
+  try {
+    const client = redisClient.getClientSafe()
+    const key = `${OPENAI_REQUEST_ERROR_KEY_PREFIX}${accountId}`
+    const val = await client.get(key)
+    const count = parseInt(val || '0', 10)
+    return Number.isFinite(count) ? count : 0
+  } catch (error) {
+    logger.error(`❌ Failed to get OpenAI error count (accountId=${accountId}):`, error)
+    return 0
+  }
+}
+
+/**
+ * 清除失败计数器
+ * @param {string} accountId - 账户ID
+ */
+async function clearRequestErrors(accountId) {
+  try {
+    const client = redisClient.getClientSafe()
+    const key = `${OPENAI_REQUEST_ERROR_KEY_PREFIX}${accountId}`
+    await client.del(key)
+    logger.info(`🧹 Cleared OpenAI error counter: accountId=${accountId}`)
+  } catch (error) {
+    logger.error(`❌ Failed to clear OpenAI error counter (accountId=${accountId}):`, error)
+  }
+}
+
+/**
+ * 标记账户为临时错误状态（temp_error），使用Redis TTL自动恢复
+ * @param {string} accountId - 账户ID
+ * @param {string|null} sessionHash - 会话哈希（可选，用于删除粘性会话映射）
+ */
+async function markAccountTempError(accountId, sessionHash = null) {
+  try {
+    const account = await getAccount(accountId)
+    if (!account) {
+      throw new Error('Account not found')
+    }
+
+    const client = redisClient.getClientSafe()
+    const tempErrorKey = `openai_account:temp_error:${accountId}`
+    const { tempDisableMinutes } = getFailoverConfig()
+
+    // 使用Redis原子操作防止并发调用
+    const lockKey = `openai_account:temp_error:lock:${accountId}`
+    // 延长并发锁TTL：30s 避免重复标记同一账户为 temp_error。
+    const locked = await client.set(lockKey, '1', 'NX', 'EX', 30) // 30秒锁
+
+    if (!locked) {
+      logger.debug(`🔒 Account ${accountId} is already being marked as temp_error, skipping`)
+      return { success: false, reason: 'already_processing' }
+    }
+
+    try {
+      // 检查是否已经是temp_error状态
+      const currentStatus = await client.hget(`${OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`, 'status')
+      if (currentStatus === 'temp_error') {
+        logger.debug(`⏭️ Account ${accountId} is already in temp_error state`)
+        return { success: false, reason: 'already_temp_error' }
+      }
+
+      const now = new Date().toISOString()
+      // 更新账户状态为临时错误并禁止调度
+      await updateAccount(accountId, {
+        status: 'temp_error',
+        schedulable: 'false',
+        errorMessage: 'Account temporarily disabled due to multiple failures within time window',
+        tempErrorAt: now
+      })
+
+      // 使用Redis TTL设置自动恢复标记
+      await client.setex(
+        tempErrorKey,
+        tempDisableMinutes * 60,
+        JSON.stringify({
+          accountId,
+          accountName: account.name,
+          disabledAt: now,
+          willRecoverAt: new Date(Date.now() + tempDisableMinutes * 60 * 1000).toISOString()
+        })
+      )
+
+      logger.warn(
+        `⚠️ OpenAI account temporarily disabled (temp_error): ${account.name || accountId}, will recover in ${tempDisableMinutes} minutes`
+      )
+
+      // 发送Webhook通知
+      try {
+        const webhookNotifier = require('../utils/webhookNotifier')
+        await webhookNotifier.sendAccountAnomalyNotification({
+          accountId,
+          accountName: account.name || accountId,
+          platform: 'openai',
+          status: 'temp_error',
+          errorCode: 'OPENAI_TEMP_ERROR',
+          reason: 'Account temporarily disabled due to multiple failures within time window',
+          timestamp: now
+        })
+        logger.info(
+          `📢 Sent OpenAI account temp_error webhook notification: ${account.name || accountId}`
+        )
+      } catch (webhookError) {
+        logger.error('Failed to send temp_error webhook notification (openai):', webhookError)
+      }
+
+      // 删除粘性会话（如果提供）
+      try {
+        if (sessionHash) {
+          await client.del(`${ACCOUNT_SESSION_MAPPING_PREFIX}${sessionHash}`)
+          // 同步删除统一调度映射，防止残留
+          await client.del(`unified_openai_session_mapping:${sessionHash}`)
+          logger.info(`🗑️ Deleted OpenAI sticky session mapping(s): ${sessionHash}`)
+        }
+      } catch (sessErr) {
+        logger.error('Failed to delete sticky session mapping (openai):', sessErr)
+      }
+
+      return { success: true }
+    } finally {
+      // 释放锁
+      await client.del(lockKey)
+    }
+  } catch (error) {
+    logger.error(`❌ Failed to mark OpenAI account temp_error (${accountId}):`, error)
+    throw error
+  }
+}
+
+/**
+ * 检查并恢复临时错误状态的账户
+ * 由定期清理任务调用
+ */
+async function checkAndRecoverTempErrorAccounts() {
+  try {
+    const client = redisClient.getClientSafe()
+    const pattern = 'openai_account:temp_error:*'
+
+    let recoveredCount = 0
+    let checked = 0
+    // 详细统计
+    let firstPassChecked = 0
+    let firstPassRecovered = 0
+    let fallbackChecked = 0
+    let fallbackRecovered = 0
+
+    // 使用SCAN避免阻塞
+    let cursor = '0'
+    do {
+      const scanResult = await client.scan(cursor, 'MATCH', pattern, 'COUNT', 200)
+      cursor = scanResult[0]
+      const keys = scanResult[1] || []
+      checked += keys.length
+
+      for (const key of keys) {
+        const accountId = key.split(':').pop()
+        firstPassChecked++
+
+        // 检查Redis TTL是否已过期（如果key存在但TTL为-1表示永不过期，这是异常情况）
+        const ttl = await client.ttl(key)
+        if (ttl === -1) {
+          logger.warn(`⚠️ Found temp_error key without TTL: ${key}, removing it`)
+          await client.del(key)
+        }
+
+        // 如果key不存在了（已过期），恢复账户
+        const exists = await client.exists(key)
+        if (!exists) {
+          const account = await getAccount(accountId)
+          if (account && account.status === 'temp_error') {
+            await updateAccount(accountId, {
+              status: 'active',
+              schedulable: 'true',
+              errorMessage: null,
+              tempErrorAt: null
+            })
+
+            // 清理失败计数器
+            await clearRequestErrors(accountId)
+
+            // 发送恢复通知
+            try {
+              const webhookNotifier = require('../utils/webhookNotifier')
+              await webhookNotifier.sendAccountAnomalyNotification({
+                accountId,
+                accountName: account.name || accountId,
+                platform: 'openai',
+                status: 'recovered',
+                errorCode: 'OPENAI_TEMP_ERROR_RECOVERED',
+                reason: 'Account auto-recovered after temp disable period',
+                timestamp: new Date().toISOString()
+              })
+              logger.info(`✅ OpenAI account auto-recovered: ${account.name || accountId}`)
+              recoveredCount++
+              firstPassRecovered++
+            } catch (webhookError) {
+              logger.error('Failed to send recovery webhook notification (openai):', webhookError)
+            }
+          }
+        }
+      }
+    } while (cursor !== '0')
+
+    // 第二遍兜底：扫描所有处于 temp_error 状态的账户；
+    // 若对应 temp_error key 已过期（不存在），立即恢复。
+    cursor = '0'
+    do {
+      const scanResult2 = await client.scan(
+        cursor,
+        'MATCH',
+        `${OPENAI_ACCOUNT_KEY_PREFIX}*`,
+        'COUNT',
+        200
+      )
+      cursor = scanResult2[0]
+      const keys2 = scanResult2[1] || []
+      for (const key of keys2) {
+        const accountId = key.replace(OPENAI_ACCOUNT_KEY_PREFIX, '')
+        const status = await client.hget(key, 'status')
+        if (status === 'temp_error') {
+          fallbackChecked++
+          const tempKey = `openai_account:temp_error:${accountId}`
+          const exists = await client.exists(tempKey)
+          if (!exists) {
+            const account = await getAccount(accountId)
+            if (account) {
+              await updateAccount(accountId, {
+                status: 'active',
+                schedulable: 'true',
+                errorMessage: null,
+                tempErrorAt: null
+              })
+
+              await clearRequestErrors(accountId)
+
+              try {
+                const webhookNotifier = require('../utils/webhookNotifier')
+                await webhookNotifier.sendAccountAnomalyNotification({
+                  accountId,
+                  accountName: account.name || accountId,
+                  platform: 'openai',
+                  status: 'recovered',
+                  errorCode: 'OPENAI_TEMP_ERROR_RECOVERED',
+                  reason: 'Account auto-recovered after temp disable period',
+                  timestamp: new Date().toISOString()
+                })
+              } catch (webhookError) {
+                logger.error('Failed to send recovery webhook notification (openai):', webhookError)
+              }
+
+              recoveredCount++
+              fallbackRecovered++
+            }
+          }
+        }
+      }
+    } while (cursor !== '0')
+
+    return {
+      checked,
+      recovered: recoveredCount,
+      firstPass: { checked: firstPassChecked, recovered: firstPassRecovered },
+      fallback: { checked: fallbackChecked, recovered: fallbackRecovered }
+    }
+  } catch (error) {
+    logger.error('❌ Failed to check and recover temp error accounts:', error)
+    return { checked: 0, recovered: 0 }
+  }
+}
+
 module.exports = {
   createAccount,
   getAccount,
@@ -1276,6 +1607,14 @@ module.exports = {
   updateAccountUsage,
   recordUsage, // 别名，指向updateAccountUsage
   updateCodexUsageSnapshot,
+  // 故障转移相关导出
+  recordRequestError,
+  getRequestErrorCount,
+  clearRequestErrors,
+  markAccountTempError,
+  getFailoverConfig,
+  checkAndRecoverTempErrorAccounts,
+  // 加密工具导出
   encrypt,
   decrypt,
   generateEncryptionKey,

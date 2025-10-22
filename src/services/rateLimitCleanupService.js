@@ -129,7 +129,7 @@ class RateLimitCleanupService {
   }
 
   /**
-   * 清理 OpenAI 账号的过期限流
+   * 清理 OpenAI 账号的过期限流和临时错误状态
    */
   async cleanupOpenAIAccounts(result) {
     try {
@@ -137,7 +137,9 @@ class RateLimitCleanupService {
       const accounts = await openaiAccountService.getAllAccounts()
 
       for (const account of accounts) {
-        const { rateLimitStatus } = account
+        const { rateLimitStatus, status } = account
+
+        // 检查限流状态
         const isRateLimited =
           rateLimitStatus === 'limited' ||
           (rateLimitStatus &&
@@ -173,6 +175,16 @@ class RateLimitCleanupService {
               error: error.message
             })
           }
+        }
+
+        // 检查临时错误状态（由故障转移机制标记的）
+        if (status === 'temp_error') {
+          result.checked++
+          // 临时错误的恢复由专门的OpenAI清理服务处理
+          // 这里只记录数量，不执行恢复操作
+          logger.debug(
+            `📌 Found temp_error OpenAI account: ${account.name} (${account.id}), will be handled by OpenAI cleanup service`
+          )
         }
       }
     } catch (error) {
