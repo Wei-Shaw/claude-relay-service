@@ -29,6 +29,7 @@ function sanitizeErrorMessage(message) {
   cleaned = cleaned.replace(/ikun\S*/gi, '')
   cleaned = cleaned.replace(/privnode\S*/gi, '')
   cleaned = cleaned.replace(/yescode\S*/gi, '')
+  cleaned = cleaned.replace(/yes.vg\S*/gi, '')
   cleaned = cleaned.replace(/share\S*/gi, '')
   cleaned = cleaned.replace(/yhlxj\S*/gi, '')
   cleaned = cleaned.replace(/gac\S*/gi, '')

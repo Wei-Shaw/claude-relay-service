@@ -56,6 +56,11 @@ async function handleMessagesRequest(req, res) {
       })
     }
 
+    // 🔄 并发满额重试标志：最多重试一次（使用req对象存储状态）
+    if (req._concurrencyRetryAttempted === undefined) {
+      req._concurrencyRetryAttempted = false
+    }
+
     // 严格的输入验证
     if (!req.body || typeof req.body !== 'object') {
       return res.status(400).json({
@@ -676,9 +681,75 @@ async function handleMessagesRequest(req, res) {
     logger.api(`✅ Request completed in ${duration}ms for key: ${req.apiKey.name}`)
     return undefined
   } catch (error) {
-    logger.error('❌ Claude relay error:', error.message, {
-      code: error.code,
-      stack: error.stack
+    let handledError = error
+
+    // 🔄 并发满额降级处理：捕获CONSOLE_ACCOUNT_CONCURRENCY_FULL错误
+    if (
+      handledError.code === 'CONSOLE_ACCOUNT_CONCURRENCY_FULL' &&
+      !req._concurrencyRetryAttempted
+    ) {
+      req._concurrencyRetryAttempted = true
+      logger.warn(
+        `⚠️ Console account ${handledError.accountId} concurrency full, attempting fallback to other accounts...`
+      )
+
+      // 只有在响应头未发送时才能重试
+      if (!res.headersSent) {
+        try {
+          // 清理粘性会话映射（如果存在）
+          const sessionHash = sessionHelper.generateSessionHash(req.body)
+          await unifiedClaudeScheduler.clearSessionMapping(sessionHash)
+
+          logger.info('🔄 Session mapping cleared, retrying handleMessagesRequest...')
+
+          // 递归重试整个请求处理（会选择新账户）
+          return await handleMessagesRequest(req, res)
+        } catch (retryError) {
+          // 重试失败
+          if (retryError.code === 'CONSOLE_ACCOUNT_CONCURRENCY_FULL') {
+            logger.error('❌ All Console accounts reached concurrency limit after retry')
+            return res.status(503).json({
+              error: 'service_unavailable',
+              message:
+                'All available Claude Console accounts have reached their concurrency limit. Please try again later.'
+            })
+          }
+          // 其他错误继续向下处理
+          handledError = retryError
+        }
+      } else {
+        // 响应头已发送，无法重试
+        logger.error('❌ Cannot retry concurrency full error - response headers already sent')
+        if (!res.destroyed && !res.finished) {
+          res.end()
+        }
+        return undefined
+      }
+    }
+
+    // 🚫 第二次并发满额错误：已经重试过，直接返回503
+    if (
+      handledError.code === 'CONSOLE_ACCOUNT_CONCURRENCY_FULL' &&
+      req._concurrencyRetryAttempted
+    ) {
+      logger.error('❌ All Console accounts reached concurrency limit (retry already attempted)')
+      if (!res.headersSent) {
+        return res.status(503).json({
+          error: 'service_unavailable',
+          message:
+            'All available Claude Console accounts have reached their concurrency limit. Please try again later.'
+        })
+      } else {
+        if (!res.destroyed && !res.finished) {
+          res.end()
+        }
+        return undefined
+      }
+    }
+
+    logger.error('❌ Claude relay error:', handledError.message, {
+      code: handledError.code,
+      stack: handledError.stack
     })
 
     // 确保在任何情况下都能返回有效的JSON响应
@@ -687,23 +758,29 @@ async function handleMessagesRequest(req, res) {
       let statusCode = 500
       let errorType = 'Relay service error'
 
-      if (error.message.includes('Connection reset') || error.message.includes('socket hang up')) {
+      if (
+        handledError.message.includes('Connection reset') ||
+        handledError.message.includes('socket hang up')
+      ) {
         statusCode = 502
         errorType = 'Upstream connection error'
-      } else if (error.message.includes('Connection refused')) {
+      } else if (handledError.message.includes('Connection refused')) {
         statusCode = 502
         errorType = 'Upstream service unavailable'
-      } else if (error.message.includes('timeout')) {
+      } else if (handledError.message.includes('timeout')) {
         statusCode = 504
         errorType = 'Upstream timeout'
-      } else if (error.message.includes('resolve') || error.message.includes('ENOTFOUND')) {
+      } else if (
+        handledError.message.includes('resolve') ||
+        handledError.message.includes('ENOTFOUND')
+      ) {
         statusCode = 502
         errorType = 'Upstream hostname resolution failed'
       }
 
       return res.status(statusCode).json({
         error: errorType,
-        message: error.message || 'An unexpected error occurred',
+        message: handledError.message || 'An unexpected error occurred',
         timestamp: new Date().toISOString()
       })
     } else {
@@ -860,84 +937,85 @@ router.get('/v1/organizations/:org_id/usage', authenticateApiKey, async (req, re
 
 // 🔢 Token计数端点 - count_tokens beta API
 router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) => {
-  try {
-    // 检查权限
-    if (
-      req.apiKey.permissions &&
-      req.apiKey.permissions !== 'all' &&
-      req.apiKey.permissions !== 'claude'
-    ) {
-      return res.status(403).json({
-        error: {
-          type: 'permission_error',
-          message: 'This API key does not have permission to access Claude'
-        }
-      })
-    }
+  // 检查权限
+  if (
+    req.apiKey.permissions &&
+    req.apiKey.permissions !== 'all' &&
+    req.apiKey.permissions !== 'claude'
+  ) {
+    return res.status(403).json({
+      error: {
+        type: 'permission_error',
+        message: 'This API key does not have permission to access Claude'
+      }
+    })
+  }
 
-    logger.info(`🔢 Processing token count request for key: ${req.apiKey.name}`)
+  logger.info(`🔢 Processing token count request for key: ${req.apiKey.name}`)
 
-    // 生成会话哈希用于sticky会话
-    const sessionHash = sessionHelper.generateSessionHash(req.body)
+  const sessionHash = sessionHelper.generateSessionHash(req.body)
+  const requestedModel = req.body.model
+  const maxAttempts = 2
+  let attempt = 0
 
-    // 选择可用的Claude账户
-    const requestedModel = req.body.model
+  const processRequest = async () => {
     const { accountId, accountType } = await unifiedClaudeScheduler.selectAccountForApiKey(
       req.apiKey,
       sessionHash,
       requestedModel
     )
 
-    let response
-    if (accountType === 'claude-official') {
-      // 使用官方Claude账号转发count_tokens请求
-      response = await claudeRelayService.relayRequest(
-        req.body,
-        req.apiKey,
-        req,
-        res,
-        req.headers,
-        {
-          skipUsageRecord: true, // 跳过usage记录，这只是计数请求
-          customPath: '/v1/messages/count_tokens' // 指定count_tokens路径
-        }
-      )
-    } else if (accountType === 'claude-console') {
-      // 使用Console Claude账号转发count_tokens请求
-      response = await claudeConsoleRelayService.relayRequest(
-        req.body,
-        req.apiKey,
-        req,
-        res,
-        req.headers,
-        accountId,
-        {
-          skipUsageRecord: true, // 跳过usage记录，这只是计数请求
-          customPath: '/v1/messages/count_tokens' // 指定count_tokens路径
-        }
-      )
-    } else if (accountType === 'ccr') {
-      // CCR不支持count_tokens
-      return res.status(501).json({
-        error: {
-          type: 'not_supported',
-          message: 'Token counting is not supported for CCR accounts'
-        }
-      })
-    } else {
-      // Bedrock不支持count_tokens
-      return res.status(501).json({
-        error: {
-          type: 'not_supported',
-          message: 'Token counting is not supported for Bedrock accounts'
+    if (accountType === 'ccr') {
+      throw Object.assign(new Error('Token counting is not supported for CCR accounts'), {
+        httpStatus: 501,
+        errorPayload: {
+          error: {
+            type: 'not_supported',
+            message: 'Token counting is not supported for CCR accounts'
+          }
         }
       })
     }
 
-    // 直接返回响应，不记录token使用量
+    if (accountType === 'bedrock') {
+      throw Object.assign(new Error('Token counting is not supported for Bedrock accounts'), {
+        httpStatus: 501,
+        errorPayload: {
+          error: {
+            type: 'not_supported',
+            message: 'Token counting is not supported for Bedrock accounts'
+          }
+        }
+      })
+    }
+
+    const relayOptions = {
+      skipUsageRecord: true,
+      customPath: '/v1/messages/count_tokens'
+    }
+
+    const response =
+      accountType === 'claude-official'
+        ? await claudeRelayService.relayRequest(
+            req.body,
+            req.apiKey,
+            req,
+            res,
+            req.headers,
+            relayOptions
+          )
+        : await claudeConsoleRelayService.relayRequest(
+            req.body,
+            req.apiKey,
+            req,
+            res,
+            req.headers,
+            accountId,
+            relayOptions
+          )
+
     res.status(response.statusCode)
 
-    // 设置响应头
     const skipHeaders = ['content-encoding', 'transfer-encoding', 'content-length']
     Object.keys(response.headers).forEach((key) => {
       if (!skipHeaders.includes(key.toLowerCase())) {
@@ -945,10 +1023,8 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
       }
     })
 
-    // 尝试解析并返回JSON响应
     try {
       const jsonData = JSON.parse(response.body)
-      // 对于非 2xx 响应，清理供应商特定信息
       if (response.statusCode < 200 || response.statusCode >= 300) {
         const sanitizedData = sanitizeUpstreamError(jsonData)
         res.json(sanitizedData)
@@ -960,14 +1036,70 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
     }
 
     logger.info(`✅ Token count request completed for key: ${req.apiKey.name}`)
-  } catch (error) {
-    logger.error('❌ Token count error:', error)
-    res.status(500).json({
-      error: {
-        type: 'server_error',
-        message: 'Failed to count tokens'
+  }
+
+  while (attempt < maxAttempts) {
+    try {
+      await processRequest()
+      return
+    } catch (error) {
+      if (error.code === 'CONSOLE_ACCOUNT_CONCURRENCY_FULL') {
+        logger.warn(
+          `⚠️ Console account concurrency full during count_tokens (attempt ${attempt + 1}/${maxAttempts})`
+        )
+        if (attempt < maxAttempts - 1) {
+          try {
+            await unifiedClaudeScheduler.clearSessionMapping(sessionHash)
+          } catch (clearError) {
+            logger.error('❌ Failed to clear session mapping for count_tokens retry:', clearError)
+            if (!res.headersSent) {
+              return res.status(500).json({
+                error: {
+                  type: 'server_error',
+                  message: 'Failed to count tokens'
+                }
+              })
+            }
+            if (!res.destroyed && !res.finished) {
+              res.end()
+            }
+            return
+          }
+          attempt += 1
+          continue
+        }
+        if (!res.headersSent) {
+          return res.status(503).json({
+            error: 'service_unavailable',
+            message:
+              'All available Claude Console accounts have reached their concurrency limit. Please try again later.'
+          })
+        }
+        if (!res.destroyed && !res.finished) {
+          res.end()
+        }
+        return
       }
-    })
+
+      if (error.httpStatus) {
+        return res.status(error.httpStatus).json(error.errorPayload)
+      }
+
+      logger.error('❌ Token count error:', error)
+      if (!res.headersSent) {
+        return res.status(500).json({
+          error: {
+            type: 'server_error',
+            message: 'Failed to count tokens'
+          }
+        })
+      }
+
+      if (!res.destroyed && !res.finished) {
+        res.end()
+      }
+      return
+    }
   }
 })
 
