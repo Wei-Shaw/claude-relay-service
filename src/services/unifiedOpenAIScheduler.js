@@ -321,11 +321,18 @@ class UnifiedOpenAIScheduler {
         }
       }
 
-      // 按最后使用时间排序（最久未使用的优先，与 Claude 保持一致）
+      // 按优先级→最后使用时间排序：
+      // 1) priority 数字越小优先级越高
+      // 2) 同优先级按 lastUsedAt 升序（最久未使用优先）
       const sortedAccounts = availableAccounts.sort((a, b) => {
+        const pa = Number.isFinite(a.priority) ? a.priority : 50
+        const pb = Number.isFinite(b.priority) ? b.priority : 50
+        if (pa !== pb) {
+          return pa - pb
+        }
         const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
         const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
-        return aLastUsed - bLastUsed // 最久未使用的优先
+        return aLastUsed - bLastUsed
       })
 
       // 选择第一个账户
@@ -494,20 +501,20 @@ class UnifiedOpenAIScheduler {
     return availableAccounts
   }
 
-  // 🔢 按优先级和最后使用时间排序账户（已废弃，改为与 Claude 保持一致，只按最后使用时间排序）
-  // _sortAccountsByPriority(accounts) {
-  //   return accounts.sort((a, b) => {
-  //     // 首先按优先级排序（数字越小优先级越高）
-  //     if (a.priority !== b.priority) {
-  //       return a.priority - b.priority
-  //     }
-
-  //     // 优先级相同时，按最后使用时间排序（最久未使用的优先）
-  //     const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
-  //     const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
-  //     return aLastUsed - bLastUsed
-  //   })
-  // }
+  // 🔢 按优先级和最后使用时间排序账户（当前策略）
+  // 说明：优先使用优先级（小者优先），同优先级再按 LRU（lastUsedAt 升序）。
+  _sortAccountsByPriority(accounts) {
+    return accounts.sort((a, b) => {
+      const pa = Number.isFinite(a.priority) ? a.priority : 50
+      const pb = Number.isFinite(b.priority) ? b.priority : 50
+      if (pa !== pb) {
+        return pa - pb
+      }
+      const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
+      const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
+      return aLastUsed - bLastUsed
+    })
+  }
 
   // 🔍 检查账户是否可用
   async _isAccountAvailable(accountId, accountType) {
@@ -894,11 +901,17 @@ class UnifiedOpenAIScheduler {
         throw error
       }
 
-      // 按最后使用时间排序（最久未使用的优先，与 Claude 保持一致）
+      // 按优先级→最后使用时间排序（与 Claude 行为对齐）：
+      // 1) priority 小者优先；2) 同优先级按 lastUsedAt 升序（最久未用优先）
       const sortedAccounts = availableAccounts.sort((a, b) => {
+        const pa = Number.isFinite(a.priority) ? a.priority : 50
+        const pb = Number.isFinite(b.priority) ? b.priority : 50
+        if (pa !== pb) {
+          return pa - pb
+        }
         const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
         const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
-        return aLastUsed - bLastUsed // 最久未使用的优先
+        return aLastUsed - bLastUsed
       })
 
       // 选择第一个账户

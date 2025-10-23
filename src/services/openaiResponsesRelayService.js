@@ -153,6 +153,21 @@ class OpenAIResponsesRelayService {
 
       // 处理其他错误状态码
       if (response.status >= 400) {
+        // 故障转移：对除 429/401/402 外的错误计数
+        if (response.status !== 429 && response.status !== 401 && response.status !== 402) {
+          try {
+            const count = await openaiResponsesAccountService.recordRequestError(
+              account.id,
+              response.status
+            )
+            const { threshold } = openaiResponsesAccountService._getFailoverConfig()
+            if (count >= threshold) {
+              await openaiResponsesAccountService.markAccountTempError(account.id, sessionHash)
+            }
+          } catch (fe) {
+            logger.error('⚠️ OpenAI-Responses failover counting failed:', fe)
+          }
+        }
         // 处理流式错误响应
         let errorData = response.data
         if (response.data && typeof response.data.pipe === 'function') {
@@ -258,6 +273,12 @@ class OpenAIResponsesRelayService {
         return res.status(response.status).json(errorData)
       }
 
+      // 成功：清空错误计数并更新最后使用时间
+      try {
+        await openaiResponsesAccountService.clearRequestErrors(account.id)
+      } catch (e) {
+        logger.error('⚠️ Failed to clear error counter after success (OpenAI-Responses):', e)
+      }
       // 更新最后使用时间
       await openaiResponsesAccountService.updateAccount(account.id, {
         lastUsedAt: new Date().toISOString()
@@ -304,6 +325,20 @@ class OpenAIResponsesRelayService {
       // 如果已经发送了响应头，直接结束
       if (res.headersSent) {
         return res.end()
+      }
+
+      // 故障转移：错误计数（axios 层）
+      try {
+        const status = error.response?.status || 500
+        if (status !== 429 && status !== 401 && status !== 402) {
+          const count = await openaiResponsesAccountService.recordRequestError(account.id, status)
+          const { threshold } = openaiResponsesAccountService._getFailoverConfig()
+          if (count >= threshold) {
+            await openaiResponsesAccountService.markAccountTempError(account.id, sessionHash)
+          }
+        }
+      } catch (fe) {
+        logger.error('⚠️ OpenAI-Responses failover counting in catch failed:', fe)
       }
 
       // 检查是否是axios错误并包含响应
@@ -588,6 +623,16 @@ class OpenAIResponsesRelayService {
         )
       }
 
+      // 流式成功完成：清除错误计数
+      try {
+        await openaiResponsesAccountService.clearRequestErrors(account.id)
+        logger.debug(
+          `✅ OpenAI-Responses stream completed successfully, cleared error counter for ${account.id}`
+        )
+      } catch (e) {
+        logger.error('⚠️ Failed to clear error counter after stream completion (responses):', e)
+      }
+
       // 清理监听器
       req.removeListener('close', handleClientDisconnect)
       res.removeListener('close', handleClientDisconnect)
@@ -603,16 +648,59 @@ class OpenAIResponsesRelayService {
       })
     })
 
-    response.data.on('error', (error) => {
+    response.data.on('error', async (error) => {
       streamEnded = true
       logger.error('Stream error:', error)
+
+      // 故障转移：记录流式错误，并准确推断状态码
+      try {
+        let status = error?.response?.status || error?.statusCode
+        if (!status) {
+          if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+            status = 504 // Gateway Timeout
+          } else if (error.code === 'ECONNREFUSED') {
+            status = 503 // Service Unavailable
+          } else if (error.code === 'ENOTFOUND') {
+            status = 502 // Bad Gateway (DNS)
+          } else {
+            status = 502 // Bad Gateway 默认
+          }
+        }
+        if (status !== 429 && status !== 401 && status !== 402) {
+          // 计算会话哈希
+          const sessionId = req.headers['session_id'] || req.body?.session_id
+          const sessionHash = sessionId
+            ? crypto.createHash('sha256').update(sessionId).digest('hex')
+            : null
+          const count = await openaiResponsesAccountService.recordRequestError(account.id, status)
+          const { threshold } = openaiResponsesAccountService._getFailoverConfig()
+          if (count >= threshold) {
+            await openaiResponsesAccountService.markAccountTempError(account.id, sessionHash)
+          }
+        }
+      } catch (fe) {
+        logger.error('⚠️ Failed to record stream error (responses):', fe)
+      }
 
       // 清理监听器
       req.removeListener('close', handleClientDisconnect)
       res.removeListener('close', handleClientDisconnect)
 
       if (!res.headersSent) {
-        res.status(502).json({ error: { message: 'Upstream stream error' } })
+        // 使用上面推断的更准确的状态码返回给客户端
+        let status = error?.response?.status || error?.statusCode
+        if (!status) {
+          if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+            status = 504
+          } else if (error.code === 'ECONNREFUSED') {
+            status = 503
+          } else if (error.code === 'ENOTFOUND') {
+            status = 502
+          } else {
+            status = 502
+          }
+        }
+        res.status(status).json({ error: { message: 'Upstream stream error' } })
       } else if (!res.destroyed) {
         res.end()
       }

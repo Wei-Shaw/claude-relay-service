@@ -136,6 +136,10 @@ Claude Relay Service 是一个多平台 AI API 中转服务，支持 **Claude (�
 ### 高级功能
 
 - ✅ **529错误处理**: 自动识别Claude过载状态并暂时排除账户
+- ✅ **400错误处理**: Console账号特定400错误自动临时禁用（organization/account被禁用、会话过多等）
+- ✅ **RuntimeAddon支持**: Claude转发支持运行时附加组件功能
+- ✅ **账户UUID追踪**: Claude账号自动保存和追踪UUID信息
+- ✅ **最后使用账号**: API Key可查看最后调度使用的账号详情
 - ✅ **HTTP调试**: DEBUG_HTTP_TRAFFIC模式详细记录HTTP请求/响应
 - ✅ **数据迁移**: 完整的数据导入导出工具（含加密/脱敏）
 - ✅ **自动清理**: 并发计数、速率限制、临时错误状态自动清理
@@ -183,6 +187,7 @@ npm run service:stop          # 停止服务
 - `WEBHOOK_ENABLED`: 启用Webhook通知（默认true）
 - `WEBHOOK_URLS`: Webhook通知URL列表（逗号分隔）
 - `CLAUDE_OVERLOAD_HANDLING_MINUTES`: Claude 529错误处理持续时间（分钟，0表示禁用）
+- `CLAUDE_CONSOLE_BLOCKED_HANDLING_MINUTES`: Console账号400错误处理时间（分钟，默认10）
 - `STICKY_SESSION_TTL_HOURS`: 粘性会话TTL（小时，默认1）
 - `STICKY_SESSION_RENEWAL_THRESHOLD_MINUTES`: 粘性会话续期阈值（分钟，默认0）
 - `METRICS_WINDOW`: 实时指标统计窗口（分钟，1-60，默认5）
@@ -222,9 +227,9 @@ npm run setup  # 自动生成密钥并创建管理员账户
 ### 核心管理功能
 
 - **实时仪表板**: 系统统计、账户状态、使用量监控、实时指标（METRICS_WINDOW配置窗口）
-- **API Key管理**: 创建、配额设置、使用统计查看、权限配置、客户端限制、模型黑名单
+- **API Key管理**: 创建、配额设置、使用统计查看、权限配置、客户端限制、模型黑名单、最后使用账号显示
 - **多平台账户管理**:
-  - Claude账户（官方/Console）: OAuth账户添加、代理配置、状态监控
+  - Claude账户（官方/Console）: OAuth账户添加、代理配置、状态监控、UUID追踪
   - Gemini账户: Google OAuth授权、代理配置
   - OpenAI Responses (Codex)账户: API Key配置
   - AWS Bedrock账户: AWS凭据配置
@@ -307,6 +312,25 @@ npm run setup  # 自动生成密钥并创建管理员账户
 2. **授权码无效**: 确保复制了完整的Authorization Code，没有遗漏字符
 3. **Token刷新失败**: 检查refreshToken有效性和代理配置
 
+### Console账号400错误处理
+
+系统自动识别Console账号的特定400错误并临时禁用账号，通过`CLAUDE_CONSOLE_BLOCKED_HANDLING_MINUTES`配置禁用时长（默认10分钟）。
+
+**自动处理的错误模式**：
+- `organization has been disabled` - 组织已被禁用
+- `account has been disabled` - 账户已被禁用
+- `account is disabled` - 账户被禁用
+- `no account supporting` - 无可用账户
+- `account not found` - 账户未找到
+- `invalid account` - 无效账户
+- `Too many active sessions` - 活跃会话过多
+
+**处理流程**：
+1. 系统检测到匹配的400错误时自动标记账户为临时禁用状态
+2. 在配置的时长内该账户不会被调度使用
+3. 超时后自动恢复账户可用状态
+4. 错误信息记录在日志中便于排查
+
 ### Gemini Token刷新问题
 
 1. **刷新失败**: 确保 refresh_token 有效且未过期
@@ -333,10 +357,16 @@ npm run setup  # 自动生成密钥并创建管理员账户
    - 检查账户状态（status: 'active'）
    - 确认账户类型与请求路由匹配
    - 查看粘性会话绑定情况
-10. **并发计数泄漏**: 系统每分钟自动清理过期并发计数（concurrency cleanup task），重启时也会自动清理
-11. **速率限制未清理**: rateLimitCleanupService每5分钟自动清理过期限流状态
-12. **成本统计不准确**: 运行 `npm run init:costs` 初始化成本数据，检查pricingService是否正确加载模型价格
-13. **缓存命中率低**: 查看缓存监控统计，调整LRU缓存大小配置
+   - 检查是否有账户被临时禁用（529/400错误处理）
+10. **Console账号频繁400错误**:
+   - 检查CLAUDE_CONSOLE_BLOCKED_HANDLING_MINUTES配置（默认10分钟）
+   - 查看日志中的具体错误模式（organization/account被禁用、会话过多等）
+   - 确认账号是否确实被Claude官方禁用或限制
+   - 考虑增加临时禁用时长避免频繁重试
+11. **并发计数泄漏**: 系统每分钟自动清理过期并发计数（concurrency cleanup task），重启时也会自动清理
+12. **速率限制未清理**: rateLimitCleanupService每5分钟自动清理过期限流状态
+13. **成本统计不准确**: 运行 `npm run init:costs` 初始化成本数据，检查pricingService是否正确加载模型价格
+14. **缓存命中率低**: 查看缓存监控统计，调整LRU缓存大小配置
 
 ### 调试工具
 
@@ -450,7 +480,9 @@ npm run setup  # 自动生成密钥并创建管理员账户
 - **成本追踪**: 实时token使用统计（input/output/cache_create/cache_read）和成本计算（基于pricingService）
 - **并发控制**: Redis Sorted Set实现的并发计数，支持自动过期清理
 - **客户端识别**: 基于User-Agent的客户端限制，支持预定义客户端（ClaudeCode、Gemini-CLI等）
-- **错误处理**: 529错误自动标记账户过载状态，配置时长内自动排除该账户
+- **错误处理**: 529错误自动标记账户过载状态，配置时长内自动排除该账户；Console账号400错误智能识别并临时禁用（CLAUDE_CONSOLE_BLOCKED_HANDLING_MINUTES）
+- **Runtime功能**: 支持Claude转发的RuntimeAddon附加组件
+- **账户追踪**: Claude账号自动保存UUID信息，API Key记录最后使用账号详情
 
 ### 核心数据流和性能优化
 
@@ -473,12 +505,12 @@ npm run setup  # 自动生成密钥并创建管理员账户
 ### Redis 数据结构
 
 - **API Keys**:
-  - `api_key:{id}` - API Key详细信息（含权限、客户端限制、模型黑名单等）
+  - `api_key:{id}` - API Key详细信息（含权限、客户端限制、模型黑名单、最后使用账号等）
   - `api_key_hash:{hash}` - 哈希到ID的快速映射
   - `api_key_usage:{keyId}` - 使用统计数据
   - `api_key_cost:{keyId}` - 成本统计数据
 - **账户数据**（多类型）:
-  - `claude_account:{id}` - Claude官方账户（加密的OAuth数据）
+  - `claude_account:{id}` - Claude官方账户（加密的OAuth数据、UUID追踪）
   - `claude_console_account:{id}` - Claude Console账户
   - `gemini_account:{id}` - Gemini账户
   - `openai_responses_account:{id}` - OpenAI Responses账户

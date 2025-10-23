@@ -565,6 +565,15 @@ class Application {
       `🚨 Rate limit cleanup service started (checking every ${cleanupIntervalMinutes} minutes)`
     )
 
+    // 🔄 启动OpenAI账户清理服务
+    // 每分钟检查一次临时错误状态的账户，使用Redis TTL自动恢复机制
+    const openaiCleanupService = require('./services/openaiCleanupService')
+    const openaiCleanupIntervalSeconds = 60 // 默认60秒，比限流清理更频繁
+    openaiCleanupService.start(openaiCleanupIntervalSeconds)
+    logger.info(
+      `🔄 OpenAI cleanup service started (checking every ${openaiCleanupIntervalSeconds} seconds)`
+    )
+
     // 🔢 启动并发计数自动清理任务（Phase 1 修复：解决并发泄漏问题）
     // 每分钟主动清理所有过期的并发项，不依赖请求触发
     setInterval(async () => {

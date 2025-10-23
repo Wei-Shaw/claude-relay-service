@@ -347,6 +347,8 @@ const handleResponses = async (req, res) => {
         ...axiosConfig,
         responseType: 'stream'
       })
+      // 流式响应：连接建立成功，但暂不清除错误计数
+      // 将在 stream.on('end') 时才清除计数
     } else {
       // 非流式请求
       upstream = await axios.post(
@@ -354,6 +356,31 @@ const handleResponses = async (req, res) => {
         req.body,
         axiosConfig
       )
+
+      // ===== 故障转移：非流式成功清零 / 失败计数与阈值触发 =====
+      try {
+        const { status } = upstream
+        const isSuccessStatus = (status >= 200 && status < 300) || status === 304 || status === 307
+
+        if (isSuccessStatus) {
+          await openaiAccountService.clearRequestErrors(accountId)
+          logger.debug(
+            `✅ OpenAI non-stream request succeeded, cleared error counter for ${accountId}`
+          )
+        } else if (status !== 429 && status !== 401 && status !== 402) {
+          // 非成功、且非已特殊处理的状态码：计入失败并检查阈值
+          await openaiAccountService.recordRequestError(accountId, status)
+          const errorCount = await openaiAccountService.getRequestErrorCount(accountId)
+          const { threshold } = openaiAccountService.getFailoverConfig()
+
+          if (errorCount >= threshold) {
+            await openaiAccountService.markAccountTempError(accountId, sessionHash)
+          }
+          logger.warn(`📉 OpenAI non-stream error recorded for ${accountId}, status: ${status}`)
+        }
+      } catch (failoverErr) {
+        logger.error('⚠️ OpenAI failover error counting failed:', failoverErr)
+      }
     }
 
     const codexUsageSnapshot = extractCodexUsageHeaders(upstream.headers)
@@ -776,11 +803,51 @@ const handleResponses = async (req, res) => {
         }
       }
 
+      // ===== 故障转移：流式响应成功完成，清除错误计数 =====
+      try {
+        await openaiAccountService.clearRequestErrors(accountId)
+        logger.debug(
+          `✅ OpenAI stream completed successfully, cleared error counter for ${accountId}`
+        )
+      } catch (failoverErr) {
+        logger.error('⚠️ Failed to clear error counter after stream completion:', failoverErr)
+      }
+
       res.end()
     })
 
-    upstream.data.on('error', (err) => {
+    upstream.data.on('error', async (err) => {
       logger.error('Upstream stream error:', err)
+
+      // ===== 故障转移：流式传输错误，记录失败 =====
+      try {
+        // 尝试从错误对象中提取实际的状态码（使用解构以满足ESLint）
+        const { response, statusCode: errStatusCode, code: errCode } = err || {}
+        let statusCode = 500 // 默认500
+        if (response?.status) {
+          statusCode = response.status
+        } else if (typeof errStatusCode === 'number') {
+          statusCode = errStatusCode
+        } else if (errCode === 'ECONNABORTED' || errCode === 'ETIMEDOUT') {
+          statusCode = 504 // 网关超时
+        } else if (errCode === 'ECONNREFUSED') {
+          statusCode = 503 // 服务不可用
+        } else if (errCode === 'ENOTFOUND') {
+          statusCode = 502 // 网关错误（DNS解析失败）
+        }
+
+        await openaiAccountService.recordRequestError(accountId, statusCode)
+        const errorCount = await openaiAccountService.getRequestErrorCount(accountId)
+        const { threshold } = openaiAccountService.getFailoverConfig()
+
+        if (errorCount >= threshold) {
+          await openaiAccountService.markAccountTempError(accountId, sessionHash)
+        }
+        logger.warn(`📉 OpenAI stream error recorded for ${accountId}, status: ${statusCode}`)
+      } catch (failoverErr) {
+        logger.error('⚠️ Failed to record stream error:', failoverErr)
+      }
+
       if (!res.headersSent) {
         res.status(502).json({ error: { message: 'Upstream stream error' } })
       } else {
@@ -802,7 +869,37 @@ const handleResponses = async (req, res) => {
   } catch (error) {
     logger.error('Proxy to ChatGPT codex/responses failed:', error)
     // 优先使用主动设置的 statusCode，然后是上游响应的状态码，最后默认 500
-    const status = error.statusCode || error.response?.status || 500
+    let status = error.statusCode || error.response?.status || 500
+    // 当没有上游HTTP状态码时，根据错误码细化：
+    if (!error.response?.status && error.code) {
+      if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+        status = 504 // Gateway Timeout
+      } else if (error.code === 'ECONNREFUSED') {
+        status = 503 // Service Unavailable
+      } else if (error.code === 'ENOTFOUND') {
+        status = 502 // Bad Gateway (DNS failure)
+      }
+    }
+
+    // ===== 故障转移：所有错误请求的错误计数（捕获4xx/5xx等） =====
+    if (accountId && status) {
+      try {
+        const isSuccessStatus = (status >= 200 && status < 300) || status === 304 || status === 307
+
+        if (!isSuccessStatus) {
+          // 非成功状态码：记录失败并判断是否达到阈值
+          await openaiAccountService.recordRequestError(accountId, status)
+          const errorCount = await openaiAccountService.getRequestErrorCount(accountId)
+          const { threshold } = openaiAccountService.getFailoverConfig()
+
+          if (errorCount >= threshold) {
+            await openaiAccountService.markAccountTempError(accountId, sessionHash)
+          }
+        }
+      } catch (failoverErr) {
+        logger.error('⚠️ OpenAI failover error counting in catch block failed:', failoverErr)
+      }
+    }
 
     if ((status === 401 || status === 402) && accountId) {
       const statusLabel = status === 401 ? '401错误' : '402错误'
