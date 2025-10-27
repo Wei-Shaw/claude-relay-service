@@ -5385,7 +5385,9 @@ watch(
         // 额度管理字段
         dailyQuota: newAccount.dailyQuota || 0,
         dailyUsage: newAccount.dailyUsage || 0,
-        quotaResetTime: newAccount.quotaResetTime || '00:00'
+        quotaResetTime: newAccount.quotaResetTime || '00:00',
+        // 并发控制字段
+        maxConcurrentTasks: newAccount.maxConcurrentTasks || 0
       }
 
       // 如果是Claude Console账户，加载实时使用情况
