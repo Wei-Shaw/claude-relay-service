@@ -597,15 +597,24 @@
                             variant="compact"
                           />
 
-                          <!-- 总费用限制进度条（无每日限制时展示） -->
+                          <!-- 总费用限制进度条 -->
                           <LimitProgressBar
-                            v-else-if="key.totalCostLimit > 0"
-                            :current="key.usage?.total?.cost || 0"
+                            v-if="key.totalCostLimit > 0"
+                            :current="key.totalCost || 0"
                             label="总费用限制"
                             :limit="key.totalCostLimit"
                             type="total"
                             variant="compact"
                           />
+
+                          <!-- 总费用无限制提示（当有每日限制但无总费用限制时） -->
+                          <div
+                            v-else-if="key.dailyCostLimit > 0"
+                            class="flex items-center justify-center gap-1.5 py-2 text-gray-500 dark:text-gray-400"
+                          >
+                            <i class="fas fa-infinity text-base" />
+                            <span class="text-xs font-medium">总费用无限制</span>
+                          </div>
 
                           <!-- 时间窗口费用限制（无每日和总费用限制时展示） -->
                           <div
@@ -1316,15 +1325,24 @@
                     variant="compact"
                   />
 
-                  <!-- 总费用限制（无每日限制时展示） -->
+                  <!-- 总费用限制 -->
                   <LimitProgressBar
-                    v-else-if="key.totalCostLimit > 0"
-                    :current="key.usage?.total?.cost || 0"
+                    v-if="key.totalCostLimit > 0"
+                    :current="key.totalCost || 0"
                     label="总费用限制"
                     :limit="key.totalCostLimit"
                     type="total"
                     variant="compact"
                   />
+
+                  <!-- 总费用无限制提示（当有每日限制但无总费用限制时） -->
+                  <div
+                    v-else-if="key.dailyCostLimit > 0"
+                    class="flex items-center justify-center gap-1.5 py-2 text-gray-500 dark:text-gray-400"
+                  >
+                    <i class="fas fa-infinity text-base" />
+                    <span class="text-xs font-medium">总费用无限制</span>
+                  </div>
 
                   <!-- 时间窗口费用限制（无每日和总费用限制时展示） -->
                   <div
