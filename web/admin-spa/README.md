@@ -23,6 +23,7 @@ npm run dev
 ```
 
 **重要提示：**
+
 - 开发服务器启动后，会自动在浏览器中打开
 - 必须访问完整路径：http://localhost:3001/web/admin/
 - 不要访问 http://localhost:3001/ （会显示404）
@@ -125,23 +126,30 @@ npm run dev
 ## 常见问题
 
 ### Q: 访问 localhost:3001 显示 404？
+
 A: 这是正常的。应用配置在 `/web/admin/` 路径下，必须访问完整路径：http://localhost:3001/web/admin/
 
 ### Q: 登录时 API 请求失败（500错误）？
-A: 
+
+A:
+
 1. **确保主服务运行**：Claude Relay Service 必须运行在 http://localhost:3000
 2. **检查代理配置**：Vite 会自动代理 `/admin` 和 `/api` 请求到 3000 端口
 3. **重启开发服务器**：如果修改了配置，需要重启 `npm run dev`
 4. **测试代理**：运行 `node test-proxy.js` 检查代理是否正常工作
 
 ### Q: 如何处理开发和生产环境的 API 配置？
-A: 
+
+A:
+
 - **开发环境**：使用 Vite 代理，自动转发请求到 localhost:3000
 - **生产环境**：直接使用相对路径 `/admin`，无需配置
 - 两种环境都使用相同的 API 路径，通过环境变量自动切换
 
 ### Q: 如何部署到生产环境？
-A: 
+
+A:
+
 1. 运行 `npm run build` 构建项目
 2. 将 `dist` 目录内容复制到服务器的 `/web/admin/` 路径
 3. 确保服务器配置了 SPA 路由回退规则

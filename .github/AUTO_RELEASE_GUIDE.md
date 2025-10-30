@@ -90,7 +90,7 @@ git push origin v1.1.0
 
 ## 📊 查看发布历史
 
-1. **GitHub Releases 页面**: 
+1. **GitHub Releases 页面**:
    - 访问 `https://github.com/<owner>/<repo>/releases`
    - 查看所有发布版本和更新内容
 

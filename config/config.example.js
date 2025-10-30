@@ -194,6 +194,13 @@ const config = {
   development: {
     debug: process.env.DEBUG === 'true',
     hotReload: process.env.HOT_RELOAD === 'true'
+  },
+
+  // 💰 计费事件配置
+  billing: {
+    enabled: process.env.BILLING_EVENTS_ENABLED === 'true', // 默认禁用，需显式启用
+    streamKey: process.env.BILLING_STREAM_KEY || 'billing:events',
+    maxLength: parseInt(process.env.BILLING_STREAM_MAX_LENGTH) || 100000
   }
 }
 

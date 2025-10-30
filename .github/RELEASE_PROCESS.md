@@ -37,12 +37,14 @@
 ### 4. 触发条件
 
 **会触发版本更新的文件变更**:
+
 - 源代码文件（.js, .ts, .jsx, .tsx等）
 - 配置文件（package.json, Dockerfile等）
 - 其他功能性文件
 
 **不会触发版本更新的文件变更**:
-- Markdown文件（*.md）
+
+- Markdown文件（\*.md）
 - 文档目录（docs/）
 - GitHub配置（.github/）
 - VERSION文件本身
@@ -83,6 +85,7 @@ git push origin main
 ### 需要手动触发发布
 
 如果需要手动控制版本：
+
 1. 直接修改VERSION文件
 2. 提交并推送
 3. 系统会检测到VERSION变更并触发发布

@@ -12,7 +12,8 @@ if (!repository) {
 }
 const branch = process.env.PRICE_MIRROR_BRANCH || 'price-mirror'
 const pricingFileName = process.env.PRICE_MIRROR_FILENAME || 'model_prices_and_context_window.json'
-const hashFileName = process.env.PRICE_MIRROR_HASH_FILENAME || 'model_prices_and_context_window.sha256'
+const hashFileName =
+  process.env.PRICE_MIRROR_HASH_FILENAME || 'model_prices_and_context_window.sha256'
 
 const baseUrl = process.env.PRICE_MIRROR_BASE_URL
   ? process.env.PRICE_MIRROR_BASE_URL.replace(/\/$/, '')
@@ -21,7 +22,6 @@ const baseUrl = process.env.PRICE_MIRROR_BASE_URL
 module.exports = {
   pricingFileName,
   hashFileName,
-  pricingUrl:
-    process.env.PRICE_MIRROR_JSON_URL || `${baseUrl}/${pricingFileName}`,
+  pricingUrl: process.env.PRICE_MIRROR_JSON_URL || `${baseUrl}/${pricingFileName}`,
   hashUrl: process.env.PRICE_MIRROR_HASH_URL || `${baseUrl}/${hashFileName}`
 }

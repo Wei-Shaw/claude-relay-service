@@ -7,7 +7,7 @@
 [![Redis](https://img.shields.io/badge/Redis-6+-red.svg)](https://redis.io/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 
-**🔐 Self-hosted Claude API relay service with multi-account management** 
+**🔐 Self-hosted Claude API relay service with multi-account management**
 
 [中文文档](README.md) • [Preview](https://demo.pincc.ai/admin-next/login) • [Telegram Channel](https://t.me/claude_relay_service)
 
@@ -45,14 +45,14 @@ If you have any of these concerns, this project might be suitable for you.
 ✅ **Privacy Sensitive**: Don't want third-party mirrors to see your conversation content  
 ✅ **Technical Tinkering**: Have basic technical skills, willing to build and maintain yourself  
 ✅ **Stability Needs**: Need long-term stable Claude access, don't want to be restricted by mirror sites  
-✅ **Regional Restrictions**: Cannot directly access Claude official service  
+✅ **Regional Restrictions**: Cannot directly access Claude official service
 
 ### Unsuitable Scenarios
 
 ❌ **Complete Beginner**: Don't understand technology at all, don't even know how to buy a server  
 ❌ **Occasional Use**: Use it only a few times a month, not worth the hassle  
 ❌ **Registration Issues**: Cannot register Claude account yourself  
-❌ **Payment Issues**: No payment method to subscribe to Claude Code  
+❌ **Payment Issues**: No payment method to subscribe to Claude Code
 
 **If you're just an ordinary user with low privacy requirements, just want to casually play around and quickly experience Claude, then choosing a mirror site you're familiar with would be more suitable.**
 
@@ -80,11 +80,13 @@ If you have any of these concerns, this project might be suitable for you.
 > 📸 **[Click to view interface preview](docs/preview.md)** - See detailed screenshots of the Web management interface
 
 ### Basic Features
+
 - ✅ **Multi-account Management**: Add multiple Claude accounts for automatic rotation
 - ✅ **Custom API Keys**: Assign independent keys to each person
 - ✅ **Usage Statistics**: Detailed records of how many tokens each person used
 
 ### Advanced Features
+
 - 🔄 **Smart Switching**: Automatically switch to next account when one has issues
 - 🚀 **Performance Optimization**: Connection pooling, caching to reduce latency
 - 📊 **Monitoring Dashboard**: Web interface to view all data
@@ -96,6 +98,7 @@ If you have any of these concerns, this project might be suitable for you.
 ## 📋 Deployment Requirements
 
 ### Hardware Requirements (Minimum Configuration)
+
 - **CPU**: 1 core is sufficient
 - **Memory**: 512MB (1GB recommended)
 - **Storage**: 30GB available space
@@ -103,11 +106,13 @@ If you have any of these concerns, this project might be suitable for you.
 - **Recommendation**: 2 cores 4GB is basically enough, choose network with good return routes to your country (to improve speed, recommend not using proxy or setting server IP for direct connection)
 
 ### Software Requirements
+
 - **Node.js** 18 or higher
 - **Redis** 6 or higher
 - **Operating System**: Linux recommended
 
 ### Cost Estimation
+
 - **Server**: Light cloud server, $5-10 per month
 - **Claude Subscription**: Depends on how you share costs
 - **Others**: Domain name (optional)
@@ -119,6 +124,7 @@ If you have any of these concerns, this project might be suitable for you.
 ### Step 1: Environment Setup
 
 **Ubuntu/Debian users:**
+
 ```bash
 # Install Node.js
 curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
@@ -131,6 +137,7 @@ sudo systemctl start redis-server
 ```
 
 **CentOS/RHEL users:**
+
 ```bash
 # Install Node.js
 curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
@@ -159,6 +166,7 @@ cp .env.example .env
 ### Step 3: Configuration File Setup
 
 **Edit `.env` file:**
+
 ```bash
 # Generate these two keys randomly, but remember them
 JWT_SECRET=your-super-secret-key
@@ -171,16 +179,17 @@ REDIS_PASSWORD=
 ```
 
 **Edit `config/config.js` file:**
+
 ```javascript
 module.exports = {
   server: {
-    port: 3000,          // Service port, can be changed
-    host: '0.0.0.0'     // Don't change
+    port: 3000, // Service port, can be changed
+    host: '0.0.0.0' // Don't change
   },
   redis: {
-    host: '127.0.0.1',  // Redis address
-    port: 6379          // Redis port
-  },
+    host: '127.0.0.1', // Redis address
+    port: 6379 // Redis port
+  }
   // Keep other configurations as default
 }
 ```
@@ -237,12 +246,14 @@ Assign a key to each user:
 Now you can replace the official API with your own service:
 
 **Set environment variables:**
+
 ```bash
 export ANTHROPIC_BASE_URL="http://127.0.0.1:3000/api/" # Fill in your server's IP address or domain according to actual situation
 export ANTHROPIC_AUTH_TOKEN="API key created in the backend"
 ```
 
 **Use claude:**
+
 ```bash
 claude
 ```
@@ -299,6 +310,7 @@ npm run service:status
 ```
 
 **Important Notes:**
+
 - Before upgrading, it's recommended to backup important configuration files (.env, config/config.js)
 - Check the changelog to understand if there are any breaking changes
 - Database structure changes will be migrated automatically if needed
@@ -306,6 +318,7 @@ npm run service:status
 ### Common Issue Resolution
 
 **Can't connect to Redis?**
+
 ```bash
 # Check if Redis is running
 redis-cli ping
@@ -314,11 +327,13 @@ redis-cli ping
 ```
 
 **OAuth authorization failed?**
+
 - Check if proxy settings are correct
 - Ensure normal access to claude.ai
 - Clear browser cache and retry
 
 **API request failed?**
+
 - Check if API Key is correct
 - View log files for error information
 - Confirm Claude account status is normal
@@ -412,10 +427,10 @@ module.exports = {
 
 **Caddy Features**
 
-* 🔒 Automatic HTTPS with zero-configuration certificate management
-* 🛡️ Secure default configuration with modern TLS suites
-* ⚡ HTTP/2 and streaming support
-* 🔧 Concise configuration files, easy to maintain
+- 🔒 Automatic HTTPS with zero-configuration certificate management
+- 🛡️ Secure default configuration with modern TLS suites
+- ⚡ HTTP/2 and streaming support
+- 🔧 Concise configuration files, easy to maintain
 
 ---
 
@@ -427,18 +442,19 @@ Nginx Proxy Manager manages reverse proxies and HTTPS certificates through a gra
 
 Configure the Details as follows:
 
-| Item                  | Setting                  |
-| --------------------- | ------------------------ |
-| Domain Names          | relay.example.com        |
-| Scheme                | http                     |
+| Item                  | Setting                      |
+| --------------------- | ---------------------------- |
+| Domain Names          | relay.example.com            |
+| Scheme                | http                         |
 | Forward Hostname / IP | 192.168.0.1 (docker host IP) |
-| Forward Port          | 3000                     |
-| Block Common Exploits | ☑️                       |
-| Websockets Support    | ❌ **Disable**            |
-| Cache Assets          | ❌ **Disable**            |
-| Access List           | Publicly Accessible      |
+| Forward Port          | 3000                         |
+| Block Common Exploits | ☑️                           |
+| Websockets Support    | ❌ **Disable**               |
+| Cache Assets          | ❌ **Disable**               |
+| Access List           | Publicly Accessible          |
 
 > Note:
+>
 > - Ensure Claude Relay Service **listens on `0.0.0.0`, container IP, or host IP** to allow NPM internal network connections.
 > - **Websockets Support and Cache Assets must be disabled**, otherwise SSE / streaming responses will fail.
 
@@ -448,11 +464,11 @@ No content needed, keep it empty.
 
 **3. SSL Settings**
 
-* **SSL Certificate**: Request a new SSL Certificate (Let's Encrypt) or existing certificate
-* ☑️ **Force SSL**
-* ☑️ **HTTP/2 Support**
-* ☑️ **HSTS Enabled**
-* ☑️ **HSTS Subdomains**
+- **SSL Certificate**: Request a new SSL Certificate (Let's Encrypt) or existing certificate
+- ☑️ **Force SSL**
+- ☑️ **HTTP/2 Support**
+- ☑️ **HSTS Enabled**
+- ☑️ **HSTS Subdomains**
 
 **4. Advanced Configuration**
 
@@ -499,16 +515,16 @@ proxy_request_buffering off;
 
 **5. Launch and Verify**
 
-* After saving, wait for NPM to automatically request Let's Encrypt certificate (if applicable).
-* Check Proxy Host status in Dashboard to ensure it shows "Online".
-* Visit `https://relay.example.com`, if the green lock icon appears, HTTPS is working properly.
+- After saving, wait for NPM to automatically request Let's Encrypt certificate (if applicable).
+- Check Proxy Host status in Dashboard to ensure it shows "Online".
+- Visit `https://relay.example.com`, if the green lock icon appears, HTTPS is working properly.
 
 **NPM Features**
 
-* 🔒 Automatic certificate application and renewal
-* 🔧 Graphical interface for easy multi-service management
-* ⚡ Native HTTP/2 / HTTPS support
-* 🚀 Ideal for Docker container deployments
+- 🔒 Automatic certificate application and renewal
+- 🔧 Graphical interface for easy multi-service management
+- ⚡ Native HTTP/2 / HTTPS support
+- 🚀 Ideal for Docker container deployments
 
 ---
 
@@ -519,10 +535,12 @@ Both solutions are suitable for production deployment. If you use a Docker envir
 ## 💡 Usage Recommendations
 
 ### Account Management
+
 - **Regular Checks**: Check account status weekly, handle exceptions promptly
 - **Reasonable Allocation**: Can assign different API keys to different people, analyze usage based on different API keys
 
 ### Security Recommendations
+
 - **Use HTTPS**: Strongly recommend using Caddy reverse proxy (automatic HTTPS) to ensure secure data transmission
 - **Regular Backups**: Back up important configurations and data
 - **Monitor Logs**: Regularly check exception logs
@@ -534,12 +552,14 @@ Both solutions are suitable for production deployment. If you use a Docker envir
 ## 🆘 What to Do When You Encounter Problems?
 
 ### Self-troubleshooting
+
 1. **Check Logs**: Log files in `logs/` directory
 2. **Check Configuration**: Confirm configuration files are set correctly
 3. **Test Connectivity**: Use curl to test if API is normal
 4. **Restart Service**: Sometimes restarting fixes it
 
 ### Seeking Help
+
 - **GitHub Issues**: Submit detailed error information
 - **Read Documentation**: Carefully read error messages and documentation
 - **Community Discussion**: See if others have encountered similar problems
@@ -547,6 +567,7 @@ Both solutions are suitable for production deployment. If you use a Docker envir
 ---
 
 ## 📄 License
+
 This project uses the [MIT License](LICENSE).
 
 ---
