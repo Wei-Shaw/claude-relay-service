@@ -133,10 +133,34 @@ class CostInitService {
       totalCost += cost
     }
 
-    // 写入总费用
+    // 写入总费用 - 修复：只在总费用不存在时初始化，避免覆盖现有累计值
     if (totalCost > 0) {
       const totalKey = `usage:cost:total:${apiKeyId}`
-      promises.push(client.set(totalKey, totalCost.toString()))
+      // 先检查总费用是否已存在
+      const existingTotal = await client.get(totalKey)
+
+      if (!existingTotal || parseFloat(existingTotal) === 0) {
+        // 仅在总费用不存在或为0时才初始化
+        promises.push(client.set(totalKey, totalCost.toString()))
+        logger.info(`💰 Initialized total cost for API Key ${apiKeyId}: $${totalCost.toFixed(6)}`)
+      } else {
+        // 如果总费用已存在，保持不变，避免覆盖累计值
+        // 注意：这个逻辑防止因每日费用键过期（30天）导致的错误覆盖
+        // 如果需要强制重新计算，请先手动删除 usage:cost:total:{keyId} 键
+        const existing = parseFloat(existingTotal)
+        const calculated = totalCost
+
+        if (calculated > existing * 1.1) {
+          // 如果计算值比现有值大 10% 以上，记录警告（可能是数据不一致）
+          logger.warn(
+            `💰 Total cost mismatch for API Key ${apiKeyId}: existing=$${existing.toFixed(6)}, calculated=$${calculated.toFixed(6)} (from last 30 days). Keeping existing value to prevent data loss.`
+          )
+        } else {
+          logger.debug(
+            `💰 Skipping total cost initialization for API Key ${apiKeyId} - existing: $${existing.toFixed(6)}, calculated: $${calculated.toFixed(6)}`
+          )
+        }
+      }
     }
 
     await Promise.all(promises)
