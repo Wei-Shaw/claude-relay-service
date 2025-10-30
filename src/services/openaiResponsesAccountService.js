@@ -14,6 +14,10 @@ class OpenAIResponsesAccountService {
     // Redis 键前缀
     this.ACCOUNT_KEY_PREFIX = 'openai_responses_account:'
     this.SHARED_ACCOUNTS_KEY = 'shared_openai_responses_accounts'
+    // 失败计数与临时禁用支持
+    this.REQUEST_ERROR_KEY_PREFIX = 'openai_responses_account:request_errors:'
+    this.TEMP_ERROR_KEY_PREFIX = 'openai_responses_account:temp_error:'
+    this.TEMP_ERROR_LOCK_PREFIX = 'openai_responses_account:temp_error:lock:'
 
     // 🚀 性能优化：缓存派生的加密密钥，避免每次重复计算
     this._encryptionKeyCache = null
@@ -21,7 +25,7 @@ class OpenAIResponsesAccountService {
     // 🔄 解密结果缓存，提高解密性能
     this._decryptCache = new LRUCache(500)
 
-    // 🧹 定期清理缓存（每10分钟）
+    // 🧹 定期清理缓存（每10分钟）。unref() 防止定时器阻止进程自然退出
     setInterval(
       () => {
         this._decryptCache.cleanup()
@@ -31,7 +35,7 @@ class OpenAIResponsesAccountService {
         )
       },
       10 * 60 * 1000
-    )
+    ).unref()
   }
 
   // 创建账户
@@ -132,6 +136,279 @@ class OpenAIResponsesAccountService {
     return accountData
   }
 
+  // ===== 故障转移：配置与计数 =====
+  _getFailoverConfig() {
+    // 复用 OpenAI 的 failover 配置（三项：threshold/windowMinutes/tempDisableMinutes）
+    const fallback = { threshold: 10, windowMinutes: 5, tempDisableMinutes: 5 }
+    const cfg = require('../../config/config')?.openai?.failover || {}
+    const t = parseInt(cfg.threshold)
+    const w = parseInt(cfg.windowMinutes)
+    const d = parseInt(cfg.tempDisableMinutes)
+    return {
+      threshold: Number.isFinite(t) && t > 0 ? t : fallback.threshold,
+      windowMinutes: Number.isFinite(w) && w > 0 ? w : fallback.windowMinutes,
+      tempDisableMinutes: Number.isFinite(d) && d > 0 ? d : fallback.tempDisableMinutes
+    }
+  }
+
+  async recordRequestError(accountId, statusCode) {
+    try {
+      const client = redis.getClientSafe()
+      const key = `${this.REQUEST_ERROR_KEY_PREFIX}${accountId}`
+      const { windowMinutes } = this._getFailoverConfig()
+      const ttl = Math.max(1, windowMinutes * 60)
+      // 使用 pipeline 保证 incr + expire 的原子性，并减少一次往返
+      const pipeline = client.pipeline()
+      pipeline.incr(key)
+      pipeline.expire(key, ttl)
+      const results = await pipeline.exec()
+      const count = Array.isArray(results) && results[0] ? results[0][1] : 0
+      logger.warn(
+        `📉 OpenAI-Responses failure recorded: accountId=${accountId}, status=${statusCode}, window=${windowMinutes}min, count=${count}`
+      )
+      return count
+    } catch (error) {
+      logger.error(`❌ Failed to record OpenAI-Responses error (accountId=${accountId}):`, error)
+      return 0
+    }
+  }
+
+  async getRequestErrorCount(accountId) {
+    try {
+      const client = redis.getClientSafe()
+      const key = `${this.REQUEST_ERROR_KEY_PREFIX}${accountId}`
+      const val = await client.get(key)
+      const count = parseInt(val || '0', 10)
+      return Number.isFinite(count) ? count : 0
+    } catch (error) {
+      logger.error(`❌ Failed to get OpenAI-Responses error count (accountId=${accountId}):`, error)
+      return 0
+    }
+  }
+
+  async clearRequestErrors(accountId) {
+    try {
+      const client = redis.getClientSafe()
+      const key = `${this.REQUEST_ERROR_KEY_PREFIX}${accountId}`
+      await client.del(key)
+      logger.info(`🧹 Cleared OpenAI-Responses error counter: accountId=${accountId}`)
+    } catch (error) {
+      logger.error(
+        `❌ Failed to clear OpenAI-Responses error counter (accountId=${accountId}):`,
+        error
+      )
+    }
+  }
+
+  // ===== 故障转移：临时禁用与自动恢复 =====
+  async markAccountTempError(accountId, sessionHash = null) {
+    const account = await this.getAccount(accountId)
+    if (!account) {
+      throw new Error('Account not found')
+    }
+
+    const client = redis.getClientSafe()
+    const tempErrorKey = `${this.TEMP_ERROR_KEY_PREFIX}${accountId}`
+    const lockKey = `${this.TEMP_ERROR_LOCK_PREFIX}${accountId}`
+    const { tempDisableMinutes } = this._getFailoverConfig()
+
+    // 分布式锁，30s 兜底
+    const locked = await client.set(lockKey, '1', 'NX', 'EX', 30)
+    if (!locked) {
+      logger.debug(`🔒 OpenAI-Responses account ${accountId} already being marked temp_error`)
+      return { success: false, reason: 'already_processing' }
+    }
+
+    try {
+      // 若已是 temp_error 则跳过
+      if (account.status === 'temp_error') {
+        return { success: false, reason: 'already_temp_error' }
+      }
+
+      const now = new Date().toISOString()
+      await this.updateAccount(accountId, {
+        status: 'temp_error',
+        schedulable: 'false',
+        errorMessage: 'Account temporarily disabled due to multiple failures within time window',
+        tempErrorAt: now
+      })
+
+      await client.setex(
+        tempErrorKey,
+        tempDisableMinutes * 60,
+        JSON.stringify({
+          accountId,
+          accountName: account.name,
+          disabledAt: now,
+          willRecoverAt: new Date(Date.now() + tempDisableMinutes * 60000).toISOString()
+        })
+      )
+
+      // 删除统一调度的会话映射（若提供）
+      try {
+        if (sessionHash) {
+          await client.del(`unified_openai_session_mapping:${sessionHash}`)
+        }
+      } catch (e) {
+        // 忽略
+      }
+
+      // 通知
+      try {
+        const webhookNotifier = require('../utils/webhookNotifier')
+        await webhookNotifier.sendAccountAnomalyNotification({
+          accountId,
+          accountName: account.name || accountId,
+          platform: 'openai',
+          status: 'temp_error',
+          errorCode: 'OPENAI_RESPONSES_TEMP_ERROR',
+          reason: 'Multiple failures within window; temporarily disabled',
+          timestamp: now
+        })
+      } catch (e) {
+        logger.error('Failed to send temp_error webhook (openai-responses):', e)
+      }
+
+      logger.warn(
+        `⚠️ OpenAI-Responses account temporarily disabled: ${account.name || accountId}, will recover in ${tempDisableMinutes} minutes`
+      )
+      return { success: true }
+    } finally {
+      await client.del(lockKey)
+    }
+  }
+
+  async checkAndRecoverTempErrorAccounts() {
+    try {
+      const client = redis.getClientSafe()
+      const pattern = `${this.TEMP_ERROR_KEY_PREFIX}*`
+      let cursor = '0'
+      let recovered = 0
+      let checked = 0
+      // 详细统计：第一遍（temp_error:*）与第二遍兜底（账户哈希）
+      let firstPassChecked = 0
+      let firstPassRecovered = 0
+      let fallbackChecked = 0
+      let fallbackRecovered = 0
+
+      do {
+        const [next, keys] = await client.scan(cursor, 'MATCH', pattern, 'COUNT', 200)
+        cursor = next
+        for (const key of keys) {
+          checked++
+          firstPassChecked++
+          const accountId = key.split(':').pop()
+          const exists = await client.exists(key)
+          if (!exists) {
+            const account = await this.getAccount(accountId)
+            if (account && account.status === 'temp_error') {
+              await this.updateAccount(accountId, {
+                status: 'active',
+                schedulable: 'true',
+                errorMessage: '',
+                tempErrorAt: ''
+              })
+              await this.clearRequestErrors(accountId)
+              // 通知
+              try {
+                const webhookNotifier = require('../utils/webhookNotifier')
+                await webhookNotifier.sendAccountAnomalyNotification({
+                  accountId,
+                  accountName: account.name || accountId,
+                  platform: 'openai',
+                  status: 'recovered',
+                  errorCode: 'OPENAI_RESPONSES_TEMP_ERROR_RECOVERED',
+                  reason: 'Auto-recovered after temporary disable period',
+                  timestamp: new Date().toISOString()
+                })
+              } catch (e) {
+                logger.error('Failed to send recovery webhook (openai-responses):', e)
+              }
+              recovered++
+              firstPassRecovered++
+            }
+          }
+        }
+      } while (cursor !== '0')
+
+      // 第二遍兜底：扫描所有处于 temp_error 状态的账户，
+      // 如果对应的 temp_error key 已不存在（TTL 已过期），立即恢复。
+      // 解决“key 已过期而 SCAN 匹配不到”的漏恢复问题。
+      cursor = '0'
+      do {
+        const [next2, keys2] = await client.scan(
+          cursor,
+          'MATCH',
+          `${this.ACCOUNT_KEY_PREFIX}*`,
+          'COUNT',
+          200
+        )
+        cursor = next2
+        for (const key of keys2) {
+          const suffix = key.substring(this.ACCOUNT_KEY_PREFIX.length)
+          if (
+            suffix.startsWith('request_errors:') ||
+            suffix.startsWith('temp_error:') ||
+            suffix.startsWith('temp_error:lock:')
+          ) {
+            continue
+          }
+
+          let status
+          try {
+            status = await client.hget(key, 'status')
+          } catch (_) {
+            // 非哈希键，跳过
+            continue
+          }
+
+          if (status === 'temp_error') {
+            fallbackChecked++
+            const accountId = key.replace(this.ACCOUNT_KEY_PREFIX, '')
+            const tempKey = `${this.TEMP_ERROR_KEY_PREFIX}${accountId}`
+            const exists = await client.exists(tempKey)
+            if (!exists) {
+              const account = await this.getAccount(accountId)
+              await this.updateAccount(accountId, {
+                status: 'active',
+                schedulable: 'true',
+                errorMessage: '',
+                tempErrorAt: ''
+              })
+              await this.clearRequestErrors(accountId)
+              try {
+                const webhookNotifier = require('../utils/webhookNotifier')
+                await webhookNotifier.sendAccountAnomalyNotification({
+                  accountId,
+                  accountName: account?.name || accountId,
+                  platform: 'openai',
+                  status: 'recovered',
+                  errorCode: 'OPENAI_RESPONSES_TEMP_ERROR_RECOVERED',
+                  reason: 'Auto-recovered after temporary disable period',
+                  timestamp: new Date().toISOString()
+                })
+              } catch (e) {
+                logger.error('Failed to send recovery webhook (openai-responses):', e)
+              }
+              recovered++
+              fallbackRecovered++
+            }
+          }
+        }
+      } while (cursor !== '0')
+
+      return {
+        checked,
+        recovered,
+        firstPass: { checked: firstPassChecked, recovered: firstPassRecovered },
+        fallback: { checked: fallbackChecked, recovered: fallbackRecovered }
+      }
+    } catch (error) {
+      logger.error('❌ Failed to check/recover OpenAI-Responses temp error accounts:', error)
+      return { checked: 0, recovered: 0 }
+    }
+  }
+
   // 更新账户
   async updateAccount(accountId, updates) {
     const account = await this.getAccount(accountId)
@@ -183,6 +460,13 @@ class OpenAIResponsesAccountService {
     // 删除账户数据
     await client.del(key)
 
+    // 清理关联的临时/计数键，防止脏数据残留
+    await client.del(
+      `${this.REQUEST_ERROR_KEY_PREFIX}${accountId}`,
+      `${this.TEMP_ERROR_KEY_PREFIX}${accountId}`,
+      `${this.TEMP_ERROR_LOCK_PREFIX}${accountId}`
+    )
+
     logger.info(`🗑️ Deleted OpenAI-Responses account: ${accountId}`)
 
     return { success: true }
@@ -232,56 +516,87 @@ class OpenAIResponsesAccountService {
       }
     }
 
-    // 直接从 Redis 获取所有账户（包括非共享账户）
-    const keys = await client.keys(`${this.ACCOUNT_KEY_PREFIX}*`)
-    for (const key of keys) {
-      const accountId = key.replace(this.ACCOUNT_KEY_PREFIX, '')
-      if (!accountIds.includes(accountId)) {
-        const accountData = await client.hgetall(key)
-        if (accountData && accountData.id) {
-          // 过滤非活跃账户
-          if (includeInactive || accountData.isActive === 'true') {
-            // 隐藏敏感信息
-            accountData.apiKey = '***'
-            // 解析 JSON 字段
-            if (accountData.proxy) {
-              try {
-                accountData.proxy = JSON.parse(accountData.proxy)
-              } catch (e) {
-                accountData.proxy = null
+    // 使用 SCAN 遍历所有账户键（包括非共享账户），避免 KEYS 阻塞
+    // 同一前缀下还包含 request_errors/temp_error 等字符串键，对这些键进行过滤
+    let scanCursor = '0'
+    do {
+      const [nextCursor, keys] = await client.scan(
+        scanCursor,
+        'MATCH',
+        `${this.ACCOUNT_KEY_PREFIX}*`,
+        'COUNT',
+        200
+      )
+      scanCursor = nextCursor
+
+      for (const key of keys) {
+        const suffix = key.substring(this.ACCOUNT_KEY_PREFIX.length)
+        if (
+          suffix.startsWith('request_errors:') ||
+          suffix.startsWith('temp_error:') ||
+          suffix.startsWith('temp_error:lock:')
+        ) {
+          continue // 跳过非哈希的临时状态键
+        }
+
+        const accountId = suffix
+        if (!accountIds.includes(accountId)) {
+          let accountData
+          try {
+            accountData = await client.hgetall(key)
+          } catch (err) {
+            // 若遇到 WRONGTYPE（例如历史残留的非哈希键），安全跳过并继续
+            logger.debug(
+              `Skip non-hash key when listing OpenAI-Responses accounts: ${key} -> ${err?.message}`
+            )
+            continue
+          }
+
+          if (accountData && accountData.id) {
+            // 过滤非活跃账户
+            if (includeInactive || accountData.isActive === 'true') {
+              // 隐藏敏感信息
+              accountData.apiKey = '***'
+              // 解析 JSON 字段
+              if (accountData.proxy) {
+                try {
+                  accountData.proxy = JSON.parse(accountData.proxy)
+                } catch (e) {
+                  accountData.proxy = null
+                }
               }
+
+              // 获取限流状态信息（与普通OpenAI账号保持一致的格式）
+              const rateLimitInfo = this._getRateLimitInfo(accountData)
+
+              // 格式化 rateLimitStatus 为对象（与普通 OpenAI 账号一致）
+              accountData.rateLimitStatus = rateLimitInfo.isRateLimited
+                ? {
+                    isRateLimited: true,
+                    rateLimitedAt: accountData.rateLimitedAt || null,
+                    minutesRemaining: rateLimitInfo.remainingMinutes || 0
+                  }
+                : {
+                    isRateLimited: false,
+                    rateLimitedAt: null,
+                    minutesRemaining: 0
+                  }
+
+              // 转换 schedulable 字段为布尔值（前端需要布尔值来判断）
+              accountData.schedulable = accountData.schedulable !== 'false'
+              // 转换 isActive 字段为布尔值
+              accountData.isActive = accountData.isActive === 'true'
+
+              // ✅ 前端显示订阅过期时间（业务字段）
+              accountData.expiresAt = accountData.subscriptionExpiresAt || null
+              accountData.platform = accountData.platform || 'openai-responses'
+
+              accounts.push(accountData)
             }
-
-            // 获取限流状态信息（与普通OpenAI账号保持一致的格式）
-            const rateLimitInfo = this._getRateLimitInfo(accountData)
-
-            // 格式化 rateLimitStatus 为对象（与普通 OpenAI 账号一致）
-            accountData.rateLimitStatus = rateLimitInfo.isRateLimited
-              ? {
-                  isRateLimited: true,
-                  rateLimitedAt: accountData.rateLimitedAt || null,
-                  minutesRemaining: rateLimitInfo.remainingMinutes || 0
-                }
-              : {
-                  isRateLimited: false,
-                  rateLimitedAt: null,
-                  minutesRemaining: 0
-                }
-
-            // 转换 schedulable 字段为布尔值（前端需要布尔值来判断）
-            accountData.schedulable = accountData.schedulable !== 'false'
-            // 转换 isActive 字段为布尔值
-            accountData.isActive = accountData.isActive === 'true'
-
-            // ✅ 前端显示订阅过期时间（业务字段）
-            accountData.expiresAt = accountData.subscriptionExpiresAt || null
-            accountData.platform = accountData.platform || 'openai-responses'
-
-            accounts.push(accountData)
           }
         }
       }
-    }
+    } while (scanCursor !== '0')
 
     return accounts
   }
@@ -507,7 +822,7 @@ class OpenAIResponsesAccountService {
       await webhookNotifier.sendAccountAnomalyNotification({
         accountId,
         accountName: account.name || accountId,
-        platform: 'openai-responses',
+        platform: 'openai',
         status: 'recovered',
         errorCode: 'STATUS_RESET',
         reason: 'Account status manually reset',
@@ -530,6 +845,12 @@ class OpenAIResponsesAccountService {
     }
 
     const expiryDate = new Date(account.subscriptionExpiresAt)
+    if (Number.isNaN(expiryDate.getTime())) {
+      logger.warn(
+        `Invalid subscriptionExpiresAt: ${account.subscriptionExpiresAt} for account ${account.id}`
+      )
+      return false
+    }
     const now = new Date()
 
     if (expiryDate <= now) {
