@@ -363,6 +363,19 @@ check_installation() {
     return 1
 }
 
+# 将安装路径持久化到本地（用于后续 update/status 自动识别自定义安装目录）
+persist_install_path() {
+    local conf_dir="$HOME/.config/crs"
+    local conf_file="$conf_dir/install.conf"
+
+    mkdir -p "$conf_dir" 2>/dev/null || true
+    if ! { echo "INSTALL_DIR=\"$INSTALL_DIR\"" > "$conf_file" && echo "APP_DIR=\"$APP_DIR\"" >> "$conf_file"; }; then
+        print_warning "无法写入 $conf_file，后续 update 可能找不到安装目录"
+        return 1
+    fi
+    return 0
+}
+
 # 安装服务
 install_service() {
     print_info "开始安装 Claude Relay Service..."
@@ -739,6 +752,9 @@ update_service() {
     
     # 更新软链接到最新版本
     create_symlink
+
+    # 持久化安装路径，便于后续 update/status 自动识别
+    persist_install_path || true
     
     # 如果之前在运行，则重新启动服务
     if [ "$was_running" = true ]; then
@@ -1631,30 +1647,87 @@ create_symlink() {
 
 # 加载已安装的配置
 load_config() {
-    # 尝试找到安装目录
-    if [ -z "$INSTALL_DIR" ]; then
-        if [ -d "$DEFAULT_INSTALL_DIR" ]; then
-            INSTALL_DIR="$DEFAULT_INSTALL_DIR"
+    # 1) 优先使用外部显式提供的 APP_DIR
+    if [ -n "$APP_DIR" ] && [ -f "$APP_DIR/package.json" ]; then
+        :
+    else
+        # 2) 若提供了 INSTALL_DIR，则据此推导 APP_DIR
+        if [ -n "$INSTALL_DIR" ]; then
+            if [ -d "$INSTALL_DIR/app" ] && [ -f "$INSTALL_DIR/app/package.json" ]; then
+                APP_DIR="$INSTALL_DIR/app"
+            elif [ -f "$INSTALL_DIR/package.json" ]; then
+                APP_DIR="$INSTALL_DIR"
+            fi
+        fi
+
+        # 3) 尝试从持久化配置读取安装位置
+        if [ -z "$APP_DIR" ]; then
+            local conf_file="$HOME/.config/crs/install.conf"
+            if [ -f "$conf_file" ]; then
+                local conf_install_dir
+                local conf_app_dir
+                conf_install_dir=$(awk -F= '/^INSTALL_DIR=/{sub(/^"/,"",$2); sub(/"$/, "", $2); print $2}' "$conf_file" 2>/dev/null)
+                conf_app_dir=$(awk -F= '/^APP_DIR=/{sub(/^"/,"",$2); sub(/"$/, "", $2); print $2}' "$conf_file" 2>/dev/null)
+
+                if [ -n "$conf_app_dir" ] && [ -f "$conf_app_dir/package.json" ]; then
+                    APP_DIR="$conf_app_dir"
+                    [ -z "$INSTALL_DIR" ] && INSTALL_DIR="$(cd "$conf_app_dir/.." 2>/dev/null && pwd)"
+                elif [ -n "$conf_install_dir" ]; then
+                    if [ -d "$conf_install_dir/app" ] && [ -f "$conf_install_dir/app/package.json" ]; then
+                        INSTALL_DIR="$conf_install_dir"
+                        APP_DIR="$conf_install_dir/app"
+                    elif [ -f "$conf_install_dir/package.json" ]; then
+                        INSTALL_DIR="$conf_install_dir"
+                        APP_DIR="$conf_install_dir"
+                    fi
+                fi
+            fi
+        fi
+
+        # 4) 基于脚本自身路径推导（处理从 app/scripts/manage.sh 或软链调用的情形）
+        if [ -z "$APP_DIR" ]; then
+            local script_path=""
+            if [ -n "$APP_DIR" ] && [ -f "$APP_DIR/scripts/manage.sh" ]; then
+                script_path="$APP_DIR/scripts/manage.sh"
+            elif command_exists realpath; then
+                script_path="$(realpath "$0" 2>/dev/null)"
+            elif command_exists readlink && readlink -f "$0" >/dev/null 2>&1; then
+                script_path="$(readlink -f "$0")"
+            else
+                script_path="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+            fi
+            local script_dir="$(cd "$(dirname "$script_path")" && pwd)"
+            local parent_dir="$(cd "$script_dir/.." && pwd)"
+            if [ -f "$parent_dir/package.json" ]; then
+                APP_DIR="$parent_dir"
+                INSTALL_DIR="$(cd "$parent_dir/.." 2>/dev/null && pwd)"
+            elif [ -f "$parent_dir/app/package.json" ]; then
+                APP_DIR="$parent_dir/app"
+                INSTALL_DIR="$parent_dir"
+            fi
+        fi
+
+        # 5) 退回到默认目录逻辑
+        if [ -z "$INSTALL_DIR" ]; then
+            if [ -d "$DEFAULT_INSTALL_DIR" ]; then
+                INSTALL_DIR="$DEFAULT_INSTALL_DIR"
+            fi
+        fi
+        if [ -n "$INSTALL_DIR" ] && [ -z "$APP_DIR" ]; then
+            if [ -d "$INSTALL_DIR/app" ] && [ -f "$INSTALL_DIR/app/package.json" ]; then
+                APP_DIR="$INSTALL_DIR/app"
+            elif [ -f "$INSTALL_DIR/package.json" ]; then
+                APP_DIR="$INSTALL_DIR"
+            else
+                APP_DIR="$INSTALL_DIR/app"
+            fi
         fi
     fi
-    
-    if [ -n "$INSTALL_DIR" ]; then
-        # 检查是否使用了标准的安装结构（项目在 app 子目录）
-        if [ -d "$INSTALL_DIR/app" ] && [ -f "$INSTALL_DIR/app/package.json" ]; then
-            APP_DIR="$INSTALL_DIR/app"
-        # 检查是否直接克隆了项目（项目在根目录）
-        elif [ -f "$INSTALL_DIR/package.json" ]; then
-            APP_DIR="$INSTALL_DIR"
-        else
-            APP_DIR="$INSTALL_DIR/app"
-        fi
-        
-        # 加载.env配置
-        if [ -f "$APP_DIR/.env" ]; then
-            export $(cat "$APP_DIR/.env" | grep -v '^#' | xargs)
-            # 特别加载端口配置
-            APP_PORT=$(grep "^PORT=" "$APP_DIR/.env" 2>/dev/null | cut -d'=' -f2)
-        fi
+
+    # 6) 加载 .env 配置（如存在）
+    if [ -n "$APP_DIR" ] && [ -f "$APP_DIR/.env" ]; then
+        export $(cat "$APP_DIR/.env" | grep -v '^#' | xargs)
+        APP_PORT=$(grep "^PORT=" "$APP_DIR/.env" 2>/dev/null | cut -d'=' -f2)
     fi
 }
 
