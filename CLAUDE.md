@@ -132,6 +132,7 @@ Claude Relay Service 是一个多平台 AI API 中转服务，支持 **Claude (�
 
 - ✅ **Webhook系统**: 事件通知和Webhook配置管理
 - ✅ **多URL支持**: 支持多个Webhook URL（逗号分隔）
+- ✅ **使用额度告警**: 自动监控 Claude 账号使用额度，当达到 80%、90% 阈值时通过 Telegram、邮件 SMTP 发送告警
 
 ### 高级功能
 
@@ -182,6 +183,9 @@ npm run service:stop          # 停止服务
 - `LDAP_TLS_REJECT_UNAUTHORIZED`: LDAP证书验证（默认true）
 - `WEBHOOK_ENABLED`: 启用Webhook通知（默认true）
 - `WEBHOOK_URLS`: Webhook通知URL列表（逗号分隔）
+- `USAGE_ALERT_ENABLED`: 启用使用额度告警（默认true）
+- `USAGE_ALERT_CHECK_INTERVAL`: 使用额度检查间隔（毫秒，默认3600000即1小时）
+- `USAGE_ALERT_SUPPRESSION_TIME`: 告警抑制时间，避免重复告警（毫秒，默认86400000即24小时）
 - `CLAUDE_OVERLOAD_HANDLING_MINUTES`: Claude 529错误处理持续时间（分钟，0表示禁用）
 - `STICKY_SESSION_TTL_HOURS`: 粘性会话TTL（小时，默认1）
 - `STICKY_SESSION_RENEWAL_THRESHOLD_MINUTES`: 粘性会话续期阈值（分钟，默认0）
@@ -298,6 +302,98 @@ npm run setup  # 自动生成密钥并创建管理员账户
 - `GET /web` - 传统Web管理界面
 - `GET /admin-next/` - 新版SPA管理界面（主界面）
 - `GET /admin/dashboard` - 系统概览数据
+
+## 使用额度告警配置
+
+### 功能说明
+
+使用额度告警服务会定期监控所有 Claude 账号的使用情况，当账号的月度使用额度达到预设阈值（80%、90%）时，自动通过 Telegram Bot 或邮件 SMTP 发送告警通知。
+
+### 配置步骤
+
+1. **启用告警服务**（.env 配置）:
+   ```bash
+   USAGE_ALERT_ENABLED=true                    # 启用使用额度告警
+   USAGE_ALERT_CHECK_INTERVAL=3600000          # 检查间隔（1小时）
+   USAGE_ALERT_SUPPRESSION_TIME=86400000       # 告警抑制时间（24小时）
+   ```
+
+2. **配置账号月度限额**:
+   - 在 Web 管理界面中，编辑 Claude 账号
+   - 在"订阅信息"字段中设置 JSON 格式的月度限额：
+     ```json
+     {
+       "monthlyLimit": 100
+     }
+     ```
+   - `monthlyLimit` 单位为美元（USD）
+
+3. **配置 Telegram 通知**（在 Web 界面的 Webhook 配置中）:
+   - 进入 `/admin-next/settings` → Webhook 配置
+   - 添加 Telegram 平台：
+     - **Bot Token**: 从 [@BotFather](https://t.me/BotFather) 获取
+     - **Chat ID**: 从 [@userinfobot](https://t.me/userinfobot) 获取您的用户ID，或群组 Chat ID
+     - **API Base URL**（可选）: 自定义 Telegram API 地址（默认 https://api.telegram.org）
+     - **代理设置**（可选）: 如需通过代理访问 Telegram API
+   - 启用"配额警告"通知类型
+
+4. **配置邮件 SMTP 通知**（在 Web 界面的 Webhook 配置中）:
+   - 进入 `/admin-next/settings` → Webhook 配置
+   - 添加 SMTP 平台：
+     - **SMTP Host**: 邮件服务器地址（如 smtp.gmail.com）
+     - **SMTP Port**: 端口号（587 或 465）
+     - **SMTP User**: 发送邮箱账号
+     - **SMTP Password**: 邮箱密码或应用专用密码
+     - **From**: 发件人地址
+     - **To**: 收件人地址（必填）
+     - **Secure**: 是否使用 SSL/TLS（465端口选true，587端口选false）
+   - 启用"配额警告"通知类型
+
+### 告警阈值
+
+系统内置两个告警阈值：
+- **80%**: 当使用额度达到月度限额的 80% 时发送警告
+- **90%**: 当使用额度达到月度限额的 90% 时发送警告
+
+### 测试和调试
+
+使用测试脚本验证告警功能：
+
+```bash
+# 列出所有活跃账号
+node scripts/test-usage-alerts.js --list-accounts
+
+# 模拟账号使用量达到 85%（触发 80% 告警）
+node scripts/test-usage-alerts.js --account-id <account-id> --usage-percent 85
+
+# 手动触发一次告警检查
+node scripts/test-usage-alerts.js --trigger
+
+# 清除账号告警历史（允许重新发送告警）
+node scripts/test-usage-alerts.js --clear-history <account-id>
+```
+
+### 告警抑制机制
+
+- 每个账号在每个阈值下，24小时内（可通过 `USAGE_ALERT_SUPPRESSION_TIME` 配置）只会发送一次告警
+- 避免短时间内重复发送相同告警，造成干扰
+
+### 故障排查
+
+1. **告警未触发**:
+   - 检查 `USAGE_ALERT_ENABLED=true` 是否配置
+   - 确认账号设置了 `subscriptionInfo.monthlyLimit`
+   - 查看日志 `logs/claude-relay-*.log` 确认服务已启动
+
+2. **Telegram 通知失败**:
+   - 验证 Bot Token 和 Chat ID 正确
+   - 检查网络连接或代理配置
+   - 在 Webhook 配置中测试 Telegram 平台
+
+3. **邮件通知失败**:
+   - 验证 SMTP 服务器地址、端口和认证信息
+   - 检查邮箱是否启用了"允许不够安全的应用"或使用应用专用密码
+   - 查看日志 `logs/webhook-*.log` 获取详细错误
 
 ## 故障排除
 

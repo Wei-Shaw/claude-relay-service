@@ -175,6 +175,13 @@ const config = {
     retries: parseInt(process.env.WEBHOOK_RETRIES) || 3 // 重试3次
   },
 
+  // 📊 使用额度告警配置
+  usageAlert: {
+    enabled: process.env.USAGE_ALERT_ENABLED !== 'false', // 默认启用
+    checkInterval: parseInt(process.env.USAGE_ALERT_CHECK_INTERVAL) || 3600000, // 检查间隔，默认1小时
+    suppressionTime: parseInt(process.env.USAGE_ALERT_SUPPRESSION_TIME) || 86400000 // 告警抑制时间，默认24小时
+  },
+
   // 🛠️ 开发配置
   development: {
     debug: process.env.DEBUG === 'true',

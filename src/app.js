@@ -620,6 +620,16 @@ class Application {
     }, 60000) // 每分钟执行一次
 
     logger.info('🔢 Concurrency cleanup task started (running every 1 minute)')
+
+    // 📊 启动使用额度告警服务
+    try {
+      const usageAlertService = require('./services/usageAlertService')
+      usageAlertService.start().catch((error) => {
+        logger.error('❌ Failed to start usage alert service:', error)
+      })
+    } catch (error) {
+      logger.error('❌ Failed to load usage alert service:', error)
+    }
   }
 
   setupGracefulShutdown() {
@@ -654,6 +664,15 @@ class Application {
             logger.info('🚨 Rate limit cleanup service stopped')
           } catch (error) {
             logger.error('❌ Error stopping rate limit cleanup service:', error)
+          }
+
+          // 停止使用额度告警服务
+          try {
+            const usageAlertService = require('./services/usageAlertService')
+            usageAlertService.stop()
+            logger.info('📊 Usage alert service stopped')
+          } catch (error) {
+            logger.error('❌ Error stopping usage alert service:', error)
           }
 
           // 🔢 清理所有并发计数（Phase 1 修复：防止重启泄漏）
