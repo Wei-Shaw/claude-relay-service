@@ -1,7 +1,7 @@
 <template>
-  <div class="min-h-screen p-4 md:p-6" :class="isDarkMode ? 'gradient-bg-dark' : 'gradient-bg'">
+  <div class="min-h-screen p-4 md:p-6 animate-fade-in" :class="isDarkMode ? 'gradient-bg-dark' : 'gradient-bg'">
     <!-- 顶部导航 -->
-    <div class="glass-strong mb-6 rounded-3xl p-4 shadow-xl md:mb-8 md:p-6">
+    <div class="glass-strong mb-6 rounded-3xl p-4 shadow-xl md:mb-8 md:p-6 animate-fade-in-down">
       <div class="flex flex-col items-center justify-between gap-4 md:flex-row">
         <LogoTitle
           :loading="oemLoading"
@@ -44,10 +44,10 @@
     </div>
 
     <!-- Tab 切换 -->
-    <div class="mb-6 md:mb-8">
+    <div class="mb-6 md:mb-8 animate-fade-in-up" style="animation-delay: 0.1s">
       <div class="flex justify-center">
         <div
-          class="inline-flex w-full max-w-md rounded-full border border-white/20 bg-white/10 p-1 shadow-lg backdrop-blur-xl md:w-auto"
+          class="inline-flex w-full max-w-md rounded-full border border-white/20 bg-white/10 p-1 shadow-lg backdrop-blur-xl transition-all duration-300 hover:shadow-glow-primary md:w-auto"
         >
           <button
             :class="['tab-pill-button', currentTab === 'stats' ? 'active' : '']"
@@ -68,7 +68,7 @@
     </div>
 
     <!-- 统计内容 -->
-    <div v-if="currentTab === 'stats'" class="tab-content">
+    <div v-if="currentTab === 'stats'" class="tab-content animate-fade-in-up" style="animation-delay: 0.2s">
       <!-- API Key 输入区域 -->
       <ApiKeyInput />
 
@@ -165,6 +165,8 @@ import LimitConfig from '@/components/apistats/LimitConfig.vue'
 import AggregatedStatsCard from '@/components/apistats/AggregatedStatsCard.vue'
 import ModelUsageStats from '@/components/apistats/ModelUsageStats.vue'
 import TutorialView from './TutorialView.vue'
+import GlassCard from '@/components/ui/GlassCard.vue'
+import ModernButton from '@/components/ui/ModernButton.vue'
 
 const route = useRoute()
 const apiStatsStore = useApiStatsStore()
