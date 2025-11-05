@@ -1,50 +1,140 @@
 /* 从原始 style.css 复制的全局样式 */
 :root {
-  /* 亮色模式 */
+  /* 亮色模式 - 现代简约配色 */
   --primary-color: #667eea;
-  --secondary-color: #764ba2;
-  --accent-color: #f093fb;
+  --primary-light: #8da3f7;
+  --primary-dark: #4651b0;
+  --secondary-color: #a855f7;
+  --secondary-light: #c084fc;
+  --secondary-dark: #7e22ce;
+  --accent-color: #d946ef;
+  --accent-light: #e879f9;
+  --accent-dark: #a21caf;
   --success-color: #10b981;
+  --success-light: #34d399;
+  --success-dark: #059669;
   --warning-color: #f59e0b;
+  --warning-light: #fbbf24;
+  --warning-dark: #d97706;
   --error-color: #ef4444;
+  --error-light: #f87171;
+  --error-dark: #dc2626;
+  --info-color: #3b82f6;
+  --info-light: #60a5fa;
+  --info-dark: #2563eb;
+
+  /* 背景和表面 */
   --surface-color: rgba(255, 255, 255, 0.95);
+  --surface-elevated: rgba(255, 255, 255, 0.98);
   --glass-color: rgba(255, 255, 255, 0.1);
   --glass-strong-color: rgba(255, 255, 255, 0.95);
-  --text-primary: #1f2937;
+
+  /* 文本颜色 */
+  --text-primary: #111827;
   --text-secondary: #6b7280;
-  --border-color: rgba(255, 255, 255, 0.2);
+  --text-tertiary: #9ca3af;
+  --text-inverse: #ffffff;
+
+  /* 边框和分隔线 */
+  --border-color: rgba(229, 231, 235, 0.8);
+  --border-light: rgba(243, 244, 246, 0.8);
+  --divider-color: rgba(229, 231, 235, 0.5);
+
+  /* 背景渐变 */
   --bg-gradient-start: #667eea;
-  --bg-gradient-mid: #764ba2;
-  --bg-gradient-end: #f093fb;
-  --input-bg: rgba(255, 255, 255, 0.9);
+  --bg-gradient-mid: #a855f7;
+  --bg-gradient-end: #d946ef;
+
+  /* 输入框 */
+  --input-bg: rgba(255, 255, 255, 0.95);
   --input-border: rgba(209, 213, 219, 0.8);
-  --modal-bg: rgba(0, 0, 0, 0.4);
+  --input-focus: rgba(102, 126, 234, 0.2);
+
+  /* 模态框和遮罩 */
+  --modal-bg: rgba(0, 0, 0, 0.5);
+  --overlay-bg: rgba(0, 0, 0, 0.3);
+
+  /* 表格 */
   --table-bg: rgba(255, 255, 255, 0.95);
+  --table-header-bg: rgba(249, 250, 251, 0.95);
   --table-hover: rgba(102, 126, 234, 0.05);
+  --table-border: rgba(229, 231, 235, 0.8);
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
 .dark {
-  /* 暗黑模式 */
+  /* 暗黑模式 - 精致深色配色 */
   --primary-color: #818cf8;
-  --secondary-color: #a78bfa;
-  --accent-color: #c084fc;
-  --success-color: #10b981;
-  --warning-color: #f59e0b;
-  --error-color: #ef4444;
-  --surface-color: rgba(31, 41, 55, 0.95);
-  --glass-color: rgba(0, 0, 0, 0.2);
-  --glass-strong-color: rgba(31, 41, 55, 0.95);
-  --text-primary: #f3f4f6;
-  --text-secondary: #9ca3af;
-  --border-color: rgba(75, 85, 99, 0.3);
-  --bg-gradient-start: #1f2937;
-  --bg-gradient-mid: #374151;
-  --bg-gradient-end: #4b5563;
-  --input-bg: rgba(31, 41, 55, 0.9);
-  --input-border: rgba(75, 85, 99, 0.5);
-  --modal-bg: rgba(0, 0, 0, 0.6);
-  --table-bg: rgba(31, 41, 55, 0.95);
+  --primary-light: #a5b4fc;
+  --primary-dark: #6366f1;
+  --secondary-color: #c084fc;
+  --secondary-light: #d8b4fe;
+  --secondary-dark: #a855f7;
+  --accent-color: #e879f9;
+  --accent-light: #f0abfc;
+  --accent-dark: #d946ef;
+  --success-color: #34d399;
+  --success-light: #6ee7b7;
+  --success-dark: #10b981;
+  --warning-color: #fbbf24;
+  --warning-light: #fcd34d;
+  --warning-dark: #f59e0b;
+  --error-color: #f87171;
+  --error-light: #fca5a5;
+  --error-dark: #ef4444;
+  --info-color: #60a5fa;
+  --info-light: #93c5fd;
+  --info-dark: #3b82f6;
+
+  /* 背景和表面 */
+  --surface-color: rgba(17, 24, 39, 0.95);
+  --surface-elevated: rgba(31, 41, 55, 0.98);
+  --glass-color: rgba(0, 0, 0, 0.3);
+  --glass-strong-color: rgba(17, 24, 39, 0.95);
+
+  /* 文本颜色 */
+  --text-primary: #f9fafb;
+  --text-secondary: #d1d5db;
+  --text-tertiary: #9ca3af;
+  --text-inverse: #111827;
+
+  /* 边框和分隔线 */
+  --border-color: rgba(55, 65, 81, 0.8);
+  --border-light: rgba(75, 85, 99, 0.5);
+  --divider-color: rgba(55, 65, 81, 0.5);
+
+  /* 背景渐变 */
+  --bg-gradient-start: #1e293b;
+  --bg-gradient-mid: #334155;
+  --bg-gradient-end: #475569;
+
+  /* 输入框 */
+  --input-bg: rgba(17, 24, 39, 0.95);
+  --input-border: rgba(75, 85, 99, 0.6);
+  --input-focus: rgba(129, 140, 248, 0.3);
+
+  /* 模态框和遮罩 */
+  --modal-bg: rgba(0, 0, 0, 0.7);
+  --overlay-bg: rgba(0, 0, 0, 0.5);
+
+  /* 表格 */
+  --table-bg: rgba(17, 24, 39, 0.95);
+  --table-header-bg: rgba(31, 41, 55, 0.95);
   --table-hover: rgba(129, 140, 248, 0.1);
+  --table-border: rgba(55, 65, 81, 0.8);
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.5), 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
 }
 
 /* 优化后的transition - 避免布局跳动 */
