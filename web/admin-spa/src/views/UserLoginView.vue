@@ -7,11 +7,11 @@
       <ThemeToggle mode="dropdown" />
     </div>
 
-    <div class="w-full max-w-md space-y-8">
-      <div>
+    <div class="w-full max-w-md space-y-8 animate-fade-in-up">
+      <div class="animate-fade-in-down">
         <div class="mx-auto flex h-12 w-auto items-center justify-center">
           <svg
-            class="h-8 w-8 text-blue-600 dark:text-blue-400"
+            class="h-8 w-8 text-primary-600 dark:text-primary-400 transition-transform duration-300 hover:scale-110"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -25,7 +25,7 @@
           </svg>
           <span class="ml-2 text-xl font-bold text-gray-900 dark:text-white">Claude Relay</span>
         </div>
-        <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
+        <h2 class="mt-6 text-center text-3xl font-extrabold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
           User Sign In
         </h2>
         <p class="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
@@ -33,7 +33,7 @@
         </p>
       </div>
 
-      <div class="rounded-lg bg-white px-6 py-8 shadow dark:bg-gray-800 dark:shadow-xl">
+      <GlassCard hover class="px-6 py-8 animate-scale-in" style="animation-delay: 0.2s">
         <form class="space-y-6" @submit.prevent="handleLogin">
           <div>
             <label
@@ -100,47 +100,31 @@
           </div>
 
           <div>
-            <button
-              class="group relative flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-blue-400 dark:focus:ring-offset-gray-800"
+            <ModernButton
+              variant="primary"
+              size="md"
+              class="w-full"
               :disabled="loading || !form.username || !form.password"
+              :loading="loading"
               type="submit"
             >
-              <span v-if="loading" class="absolute inset-y-0 left-0 flex items-center pl-3">
-                <svg
-                  class="h-5 w-5 animate-spin text-white"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <circle
-                    class="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    stroke-width="4"
-                  ></circle>
-                  <path
-                    class="opacity-75"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    fill="currentColor"
-                  ></path>
-                </svg>
-              </span>
+              <template #icon-left>
+                <i class="fas fa-sign-in-alt" />
+              </template>
               {{ loading ? 'Signing In...' : 'Sign In' }}
-            </button>
+            </ModernButton>
           </div>
 
           <div class="text-center">
             <router-link
-              class="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+              class="text-sm text-primary-600 hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300 transition-colors duration-200"
               to="/admin-login"
             >
               Admin Login
             </router-link>
           </div>
         </form>
-      </div>
+      </GlassCard>
     </div>
   </div>
 </template>
@@ -152,6 +136,8 @@ import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import { showToast } from '@/utils/toast'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
+import GlassCard from '@/components/ui/GlassCard.vue'
+import ModernButton from '@/components/ui/ModernButton.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
