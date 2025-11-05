@@ -6,12 +6,12 @@
     </div>
 
     <div
-      class="glass-strong w-full max-w-md rounded-xl p-6 shadow-2xl sm:rounded-2xl sm:p-8 md:rounded-3xl md:p-10"
+      class="glass-strong w-full max-w-md animate-scale-in rounded-xl p-6 shadow-2xl sm:rounded-2xl sm:p-8 md:rounded-3xl md:p-10"
     >
-      <div class="mb-6 text-center sm:mb-8">
+      <div class="mb-6 animate-fade-in-down text-center sm:mb-8">
         <!-- 使用自定义布局来保持登录页面的居中大logo样式 -->
         <div
-          class="mx-auto mb-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-gray-300/30 bg-gradient-to-br from-blue-500/20 to-purple-500/20 backdrop-blur-sm sm:mb-6 sm:h-20 sm:w-20 sm:rounded-2xl"
+          class="mx-auto mb-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-gray-300/30 bg-gradient-to-br from-primary-500/20 to-secondary-500/20 shadow-glow-primary backdrop-blur-sm transition-transform duration-300 hover:scale-110 sm:mb-6 sm:h-20 sm:w-20 sm:rounded-2xl"
         >
           <template v-if="!oemLoading">
             <img
@@ -37,7 +37,7 @@
         <p class="text-base text-gray-600 dark:text-gray-400 sm:text-lg">管理后台</p>
       </div>
 
-      <form class="space-y-4 sm:space-y-6" @submit.prevent="handleLogin">
+      <form class="space-y-4 animate-fade-in-up sm:space-y-6" style="animation-delay: 0.2s" @submit.prevent="handleLogin">
         <div>
           <label
             class="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100 sm:mb-3"
@@ -48,7 +48,7 @@
             id="username"
             v-model="loginForm.username"
             autocomplete="username"
-            class="form-input w-full"
+            class="form-input w-full transition-all duration-300 focus:scale-105"
             name="username"
             placeholder="请输入用户名"
             required
@@ -66,7 +66,7 @@
             id="password"
             v-model="loginForm.password"
             autocomplete="current-password"
-            class="form-input w-full"
+            class="form-input w-full transition-all duration-300 focus:scale-105"
             name="password"
             placeholder="请输入密码"
             required
@@ -74,15 +74,19 @@
           />
         </div>
 
-        <button
-          class="btn btn-primary w-full px-4 py-3 text-base font-semibold sm:px-6 sm:py-4 sm:text-lg"
+        <ModernButton
+          variant="primary"
+          size="lg"
+          class="w-full"
           :disabled="authStore.loginLoading"
+          :loading="authStore.loginLoading"
           type="submit"
         >
-          <i v-if="!authStore.loginLoading" class="fas fa-sign-in-alt mr-2" />
-          <div v-if="authStore.loginLoading" class="loading-spinner mr-2" />
+          <template #icon-left>
+            <i class="fas fa-sign-in-alt" />
+          </template>
           {{ authStore.loginLoading ? '登录中...' : '登录' }}
-        </button>
+        </ModernButton>
       </form>
 
       <div
@@ -100,6 +104,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
+import ModernButton from '@/components/ui/ModernButton.vue'
 
 const authStore = useAuthStore()
 const themeStore = useThemeStore()
