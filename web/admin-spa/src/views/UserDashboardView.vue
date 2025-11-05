@@ -1,13 +1,13 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+  <div class="min-h-screen bg-gray-50 dark:bg-gray-900 animate-fade-in">
     <!-- 导航栏 -->
-    <nav class="bg-white shadow dark:bg-gray-800">
+    <nav class="bg-white shadow dark:bg-gray-800 animate-fade-in-down">
       <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div class="flex h-16 justify-between">
           <div class="flex items-center">
             <div class="flex flex-shrink-0 items-center">
               <svg
-                class="h-8 w-8 text-blue-600 dark:text-blue-400"
+                class="h-8 w-8 text-primary-600 dark:text-primary-400 transition-transform duration-300 hover:scale-110"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -92,9 +92,9 @@
     <!-- 主内容 -->
     <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
       <!-- Overview Tab -->
-      <div v-if="activeTab === 'overview'" class="space-y-6">
+      <div v-if="activeTab === 'overview'" class="space-y-6 animate-fade-in-up" style="animation-delay: 0.1s">
         <div>
-          <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">Dashboard Overview</h1>
+          <h1 class="text-2xl font-semibold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">Dashboard Overview</h1>
           <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Welcome to your Claude Relay dashboard
           </p>
@@ -345,6 +345,8 @@ import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import UserApiKeysManager from '@/components/user/UserApiKeysManager.vue'
 import UserUsageStats from '@/components/user/UserUsageStats.vue'
 import TutorialView from '@/views/TutorialView.vue'
+import GlassCard from '@/components/ui/GlassCard.vue'
+import ModernButton from '@/components/ui/ModernButton.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
