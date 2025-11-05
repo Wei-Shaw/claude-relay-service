@@ -1085,6 +1085,18 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
         return res.status(error.httpStatus).json(error.errorPayload)
       }
 
+      // 客户端断开连接不是错误，使用 INFO 级别
+      if (error.message === 'Client disconnected') {
+        logger.info('🔌 Client disconnected during token count request')
+        if (!res.headersSent) {
+          return res.status(499).end() // 499 Client Closed Request
+        }
+        if (!res.destroyed && !res.finished) {
+          res.end()
+        }
+        return
+      }
+
       logger.error('❌ Token count error:', error)
       if (!res.headersSent) {
         return res.status(500).json({
