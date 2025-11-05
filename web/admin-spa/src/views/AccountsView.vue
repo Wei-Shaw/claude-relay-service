@@ -1,9 +1,9 @@
 <template>
-  <div class="accounts-container">
-    <div class="card p-4 sm:p-6">
+  <div class="accounts-container animate-fade-in-up">
+    <GlassCard hover class="p-4 sm:p-6">
       <div class="mb-4 flex flex-col gap-4 sm:mb-6">
         <div>
-          <h3 class="mb-1 text-lg font-bold text-gray-900 dark:text-gray-100 sm:mb-2 sm:text-xl">
+          <h3 class="mb-1 bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-lg font-bold text-transparent sm:mb-2 sm:text-xl">
             账户管理
           </h3>
           <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-base">
@@ -1707,7 +1707,7 @@
           <i class="fas fa-chevron-right" />
         </button>
       </div>
-    </div>
+    </GlassCard>
 
     <!-- 添加账户模态框 -->
     <AccountForm
@@ -1781,6 +1781,8 @@ import AccountUsageDetailModal from '@/components/accounts/AccountUsageDetailMod
 import AccountExpiryEditModal from '@/components/accounts/AccountExpiryEditModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
+import GlassCard from '@/components/ui/GlassCard.vue'
+import ModernButton from '@/components/ui/ModernButton.vue'
 
 // 使用确认弹窗
 const { showConfirmModal, confirmOptions, showConfirm, handleConfirm, handleCancel } = useConfirm()
