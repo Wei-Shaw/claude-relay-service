@@ -1,9 +1,9 @@
 <template>
-  <div class="settings-container">
-    <div class="card p-4 sm:p-6">
+  <div class="settings-container animate-fade-in-up">
+    <GlassCard hover class="p-4 sm:p-6">
       <!-- 页面标题 -->
       <div class="mb-4 sm:mb-6">
-        <h3 class="mb-1 text-lg font-bold text-gray-900 dark:text-gray-100 sm:mb-2 sm:text-xl">
+        <h3 class="mb-1 bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-lg font-bold text-transparent sm:mb-2 sm:text-xl">
           系统设置
         </h3>
         <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-base">网站定制和通知配置</p>
@@ -1206,7 +1206,7 @@
           </div>
         </div>
       </div>
-    </div>
+    </GlassCard>
   </div>
 </template>
 
@@ -1216,6 +1216,8 @@ import { storeToRefs } from 'pinia'
 import { showToast } from '@/utils/toast'
 import { useSettingsStore } from '@/stores/settings'
 import { apiClient } from '@/config/api'
+import GlassCard from '@/components/ui/GlassCard.vue'
+import ModernButton from '@/components/ui/ModernButton.vue'
 
 // 定义组件名称，用于keep-alive排除
 defineOptions({
