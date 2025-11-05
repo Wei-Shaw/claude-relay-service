@@ -1,9 +1,9 @@
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6 animate-fade-in-up">
     <!-- Header -->
     <div class="sm:flex sm:items-center">
       <div class="sm:flex-auto">
-        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">User Management</h1>
+        <h1 class="text-2xl font-semibold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">User Management</h1>
         <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">
           Manage users, their API keys, and view usage statistics
         </p>
@@ -482,6 +482,8 @@ import { debounce } from 'lodash-es'
 import UserUsageStatsModal from '@/components/admin/UserUsageStatsModal.vue'
 import ChangeRoleModal from '@/components/admin/ChangeRoleModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
+import GlassCard from '@/components/ui/GlassCard.vue'
+import ModernButton from '@/components/ui/ModernButton.vue'
 
 const loading = ref(true)
 const users = ref([])
