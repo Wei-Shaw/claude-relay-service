@@ -1,29 +1,20 @@
 <template>
-  <div>
+  <div class="animate-fade-in-up">
     <!-- 主要统计 -->
     <div
       class="mb-4 grid grid-cols-1 gap-3 sm:mb-6 sm:grid-cols-2 sm:gap-4 md:mb-8 md:gap-6 lg:grid-cols-4"
     >
-      <div class="stat-card">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
-              总API Keys
-            </p>
-            <p class="text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">
-              {{ dashboardData.totalApiKeys }}
-            </p>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              活跃: {{ dashboardData.activeApiKeys || 0 }}
-            </p>
-          </div>
-          <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-blue-500 to-blue-600">
-            <i class="fas fa-key" />
-          </div>
-        </div>
-      </div>
+      <AnimatedStatCard
+        class="animate-fade-in-up"
+        style="animation-delay: 0.1s"
+        title="总API Keys"
+        :value="dashboardData.totalApiKeys"
+        :subtitle="`活跃: ${dashboardData.activeApiKeys || 0}`"
+        icon="fas fa-key"
+        variant="primary"
+      />
 
-      <div class="stat-card">
+      <GlassCard hover class="group animate-fade-in-up transition-all duration-300 hover:shadow-glow-secondary" style="animation-delay: 0.2s">
         <div class="flex items-center justify-between">
           <div class="flex-1">
             <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
@@ -151,56 +142,40 @@
               </span>
             </p>
           </div>
-          <div class="stat-icon ml-2 flex-shrink-0 bg-gradient-to-br from-green-500 to-green-600">
+          <div
+            class="ml-2 flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-green-500 to-green-600 text-3xl text-white shadow-lg transition-transform duration-300 group-hover:scale-110 sm:h-20 sm:w-20"
+          >
             <i class="fas fa-user-circle" />
           </div>
         </div>
-      </div>
+      </GlassCard>
 
-      <div class="stat-card">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
-              今日请求
-            </p>
-            <p class="text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">
-              {{ dashboardData.todayRequests }}
-            </p>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              总请求: {{ formatNumber(dashboardData.totalRequests || 0) }}
-            </p>
-          </div>
-          <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-purple-500 to-purple-600">
-            <i class="fas fa-chart-line" />
-          </div>
-        </div>
-      </div>
+      <AnimatedStatCard
+        class="animate-fade-in-up"
+        style="animation-delay: 0.3s"
+        title="今日请求"
+        :value="dashboardData.todayRequests"
+        :subtitle="`总请求: ${formatNumber(dashboardData.totalRequests || 0)}`"
+        icon="fas fa-chart-line"
+        variant="info"
+      />
 
-      <div class="stat-card">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
-              系统状态
-            </p>
-            <p class="text-2xl font-bold text-green-600 sm:text-3xl">
-              {{ dashboardData.systemStatus }}
-            </p>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              运行时间: {{ formattedUptime }}
-            </p>
-          </div>
-          <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-yellow-500 to-orange-500">
-            <i class="fas fa-heartbeat" />
-          </div>
-        </div>
-      </div>
+      <AnimatedStatCard
+        class="animate-fade-in-up"
+        style="animation-delay: 0.4s"
+        title="系统状态"
+        :value="dashboardData.systemStatus"
+        :subtitle="`运行时间: ${formattedUptime}`"
+        icon="fas fa-heartbeat"
+        variant="success"
+      />
     </div>
 
     <!-- Token统计和性能指标 -->
     <div
       class="mb-4 grid grid-cols-1 gap-3 sm:mb-6 sm:grid-cols-2 sm:gap-4 md:mb-8 md:gap-6 lg:grid-cols-4"
     >
-      <div class="stat-card">
+      <GlassCard hover class="group animate-fade-in-up transition-all duration-300 hover:shadow-glow-primary" style="animation-delay: 0.5s">
         <div class="flex items-center justify-between">
           <div class="mr-8 flex-1">
             <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
@@ -250,13 +225,15 @@
               </div>
             </div>
           </div>
-          <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-indigo-500 to-indigo-600">
+          <div
+            class="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-3xl text-white shadow-lg transition-transform duration-300 group-hover:scale-110 sm:h-20 sm:w-20"
+          >
             <i class="fas fa-coins" />
           </div>
         </div>
-      </div>
+      </GlassCard>
 
-      <div class="stat-card">
+      <GlassCard hover class="group animate-fade-in-up transition-all duration-300 hover:shadow-glow-secondary" style="animation-delay: 0.6s">
         <div class="flex items-center justify-between">
           <div class="mr-8 flex-1">
             <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
@@ -306,61 +283,37 @@
               </div>
             </div>
           </div>
-          <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-emerald-500 to-emerald-600">
+          <div
+            class="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-3xl text-white shadow-lg transition-transform duration-300 group-hover:scale-110 sm:h-20 sm:w-20"
+          >
             <i class="fas fa-database" />
           </div>
         </div>
-      </div>
+      </GlassCard>
 
-      <div class="stat-card">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
-              实时RPM
-              <span class="text-xs text-gray-400">({{ dashboardData.metricsWindow }}分钟)</span>
-            </p>
-            <p class="text-2xl font-bold text-orange-600 sm:text-3xl">
-              {{ dashboardData.realtimeRPM || 0 }}
-            </p>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              每分钟请求数
-              <span v-if="dashboardData.isHistoricalMetrics" class="text-yellow-600">
-                <i class="fas fa-exclamation-circle" /> 历史数据
-              </span>
-            </p>
-          </div>
-          <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-orange-500 to-orange-600">
-            <i class="fas fa-tachometer-alt" />
-          </div>
-        </div>
-      </div>
+      <AnimatedStatCard
+        class="animate-fade-in-up"
+        style="animation-delay: 0.7s"
+        :title="`实时RPM (${dashboardData.metricsWindow}分钟)`"
+        :value="dashboardData.realtimeRPM || 0"
+        subtitle="每分钟请求数"
+        icon="fas fa-tachometer-alt"
+        variant="warning"
+      />
 
-      <div class="stat-card">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
-              实时TPM
-              <span class="text-xs text-gray-400">({{ dashboardData.metricsWindow }}分钟)</span>
-            </p>
-            <p class="text-2xl font-bold text-rose-600 sm:text-3xl">
-              {{ formatNumber(dashboardData.realtimeTPM || 0) }}
-            </p>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              每分钟Token数
-              <span v-if="dashboardData.isHistoricalMetrics" class="text-yellow-600">
-                <i class="fas fa-exclamation-circle" /> 历史数据
-              </span>
-            </p>
-          </div>
-          <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-rose-500 to-rose-600">
-            <i class="fas fa-rocket" />
-          </div>
-        </div>
-      </div>
+      <AnimatedStatCard
+        class="animate-fade-in-up"
+        style="animation-delay: 0.8s"
+        :title="`实时TPM (${dashboardData.metricsWindow}分钟)`"
+        :value="formatNumber(dashboardData.realtimeTPM || 0)"
+        subtitle="每分钟Token数"
+        icon="fas fa-rocket"
+        variant="danger"
+      />
     </div>
 
     <!-- 模型消费统计 -->
-    <div class="mb-8">
+    <div class="mb-8 animate-fade-in-up" style="animation-delay: 0.9s">
       <div class="mb-4 flex flex-col gap-4 sm:mb-6">
         <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">
           模型使用分布与Token使用趋势
@@ -460,32 +413,36 @@
             </div>
 
             <!-- 刷新按钮 -->
-            <button
-              class="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-blue-600 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-700 sm:gap-2"
+            <ModernButton
+              variant="outline"
+              size="sm"
               :disabled="isRefreshing"
+              :loading="isRefreshing"
               title="立即刷新数据"
               @click="refreshAllData()"
             >
-              <i :class="['fas fa-sync-alt text-xs', { 'animate-spin': isRefreshing }]" />
+              <template #icon-left>
+                <i class="fas fa-sync-alt" />
+              </template>
               <span class="hidden sm:inline">{{ isRefreshing ? '刷新中' : '刷新' }}</span>
-            </button>
+            </ModernButton>
           </div>
         </div>
       </div>
 
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <!-- 饼图 -->
-        <div class="card p-4 sm:p-6">
+        <GlassCard hover class="p-4 sm:p-6">
           <h4 class="mb-4 text-base font-semibold text-gray-800 dark:text-gray-200 sm:text-lg">
             Token使用分布
           </h4>
           <div class="relative" style="height: 250px">
             <canvas ref="modelUsageChart" />
           </div>
-        </div>
+        </GlassCard>
 
         <!-- 详细数据表格 -->
-        <div class="card p-4 sm:p-6">
+        <GlassCard hover class="p-4 sm:p-6">
           <h4 class="mb-4 text-base font-semibold text-gray-800 dark:text-gray-200 sm:text-lg">
             详细统计数据
           </h4>
@@ -562,22 +519,22 @@
               </tbody>
             </table>
           </div>
-        </div>
+        </GlassCard>
       </div>
     </div>
 
     <!-- Token使用趋势图 -->
-    <div class="mb-4 sm:mb-6 md:mb-8">
-      <div class="card p-4 sm:p-6">
+    <div class="mb-4 sm:mb-6 md:mb-8 animate-fade-in-up" style="animation-delay: 1s">
+      <GlassCard hover class="p-4 sm:p-6">
         <div class="sm:h-[300px]" style="height: 250px">
           <canvas ref="usageTrendChart" />
         </div>
-      </div>
+      </GlassCard>
     </div>
 
     <!-- API Keys 使用趋势图 -->
-    <div class="mb-4 sm:mb-6 md:mb-8">
-      <div class="card p-4 sm:p-6">
+    <div class="mb-4 sm:mb-6 md:mb-8 animate-fade-in-up" style="animation-delay: 1.1s">
+      <GlassCard hover class="p-4 sm:p-6">
         <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 sm:text-lg">
             API Keys 使用趋势
@@ -619,12 +576,12 @@
         <div class="sm:h-[350px]" style="height: 300px">
           <canvas ref="apiKeysUsageTrendChart" />
         </div>
-      </div>
+      </GlassCard>
     </div>
 
     <!-- 账号使用趋势图 -->
-    <div class="mb-4 sm:mb-6 md:mb-8">
-      <div class="card p-4 sm:p-6">
+    <div class="mb-4 sm:mb-6 md:mb-8 animate-fade-in-up" style="animation-delay: 1.2s">
+      <GlassCard hover class="p-4 sm:p-6">
         <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
             <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 sm:text-lg">
@@ -671,7 +628,7 @@
         <div v-else class="sm:h-[350px]" style="height: 300px">
           <canvas ref="accountUsageTrendChart" />
         </div>
-      </div>
+      </GlassCard>
     </div>
   </div>
 </template>
@@ -682,6 +639,9 @@ import { storeToRefs } from 'pinia'
 import { useDashboardStore } from '@/stores/dashboard'
 import { useThemeStore } from '@/stores/theme'
 import Chart from 'chart.js/auto'
+import AnimatedStatCard from '@/components/ui/AnimatedStatCard.vue'
+import GlassCard from '@/components/ui/GlassCard.vue'
+import ModernButton from '@/components/ui/ModernButton.vue'
 
 const dashboardStore = useDashboardStore()
 const themeStore = useThemeStore()
