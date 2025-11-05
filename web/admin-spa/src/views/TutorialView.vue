@@ -1,11 +1,11 @@
 <template>
-  <div class="card p-3 sm:p-6">
+  <GlassCard hover class="p-3 sm:p-6 animate-fade-in-up">
     <div class="mb-4 sm:mb-8">
       <h3
-        class="mb-3 flex items-center text-xl font-bold text-gray-900 dark:text-gray-100 sm:mb-4 sm:text-2xl"
+        class="mb-3 flex items-center text-xl font-bold sm:mb-4 sm:text-2xl"
       >
-        <i class="fas fa-graduation-cap mr-2 text-blue-600 sm:mr-3" />
-        Claude Code 使用教程
+        <i class="fas fa-graduation-cap mr-2 text-primary-600 sm:mr-3" />
+        <span class="bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">Claude Code 使用教程</span>
       </h3>
       <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-lg">
         跟着这个教程，你可以轻松在自己的电脑上安装并使用 Claude Code。
@@ -2066,11 +2066,12 @@
         </p>
       </div>
     </div>
-  </div>
+  </GlassCard>
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
+import GlassCard from '@/components/ui/GlassCard.vue'
 
 // 当前系统选择
 const activeTutorialSystem = ref('windows')
