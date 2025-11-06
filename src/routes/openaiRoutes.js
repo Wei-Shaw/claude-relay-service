@@ -260,6 +260,8 @@ const handleResponses = async (req, res) => {
     // 判断是否为 Codex CLI 的请求
     const isCodexCLI = req.body?.instructions?.startsWith(
       'You are a coding agent running in the Codex CLI'
+    ) || req.body?.instructions?.startsWith(
+      'You are Codex'
     )
 
     // 如果不是 Codex CLI 请求，则进行适配
