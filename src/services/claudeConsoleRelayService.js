@@ -317,7 +317,12 @@ class ClaudeConsoleRelayService {
       }
     } catch (error) {
       // 处理特定错误
-      if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {
+      if (
+        error.name === 'AbortError' ||
+        error.name === 'CanceledError' ||
+        error.code === 'ECONNABORTED' ||
+        error.code === 'ERR_CANCELED'
+      ) {
         logger.info('Request aborted due to client disconnect')
         throw new Error('Client disconnected')
       }
