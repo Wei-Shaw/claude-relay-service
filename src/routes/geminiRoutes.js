@@ -351,7 +351,7 @@ router.get('/key-info', authenticateApiKey, async (req, res) => {
 
 // 通用的简单端点处理函数（用于直接转发的端点）
 // 适用于：listExperiments 等不需要特殊业务逻辑的端点
-async function handleSimpleEndpoint(apiMethod) {
+function handleSimpleEndpoint(apiMethod) {
   return async (req, res) => {
     try {
       if (!ensureGeminiPermission(req, res)) {
