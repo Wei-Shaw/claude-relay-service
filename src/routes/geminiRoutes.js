@@ -9,6 +9,7 @@ const sessionHelper = require('../utils/sessionHelper')
 const unifiedGeminiScheduler = require('../services/unifiedGeminiScheduler')
 const apiKeyService = require('../services/apiKeyService')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
+const { parseSSELine } = require('../utils/sseParser')
 // const { OAuth2Client } = require('google-auth-library'); // OAuth2Client is not used in this file
 
 // 生成会话哈希
@@ -916,26 +917,6 @@ async function handleStreamGenerateContent(req, res) {
     res.setHeader('Cache-Control', 'no-cache')
     res.setHeader('Connection', 'keep-alive')
     res.setHeader('X-Accel-Buffering', 'no')
-
-    // SSE 解析函数
-    const parseSSELine = (line) => {
-      if (!line.startsWith('data: ')) {
-        return { type: 'other', line, data: null }
-      }
-
-      const jsonStr = line.substring(6).trim()
-
-      if (!jsonStr || jsonStr === '[DONE]') {
-        return { type: 'control', line, data: null, jsonStr }
-      }
-
-      try {
-        const data = JSON.parse(jsonStr)
-        return { type: 'data', line, data, jsonStr }
-      } catch (e) {
-        return { type: 'invalid', line, data: null, jsonStr, error: e }
-      }
-    }
 
     // 处理流式响应并捕获usage数据
     let streamBuffer = '' // 统一的流处理缓冲区
