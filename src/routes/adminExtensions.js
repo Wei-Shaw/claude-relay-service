@@ -62,7 +62,7 @@ router.post('/api-keys', authenticateAdminOrPermanentKey, async (req, res) => {
 
       for (const key of sameNameKeys) {
         try {
-          await apiKeyService.deleteApiKey(key.id, createdBy, 'admin')
+          await apiKeyService.deleteApiKey(key.id)
           logger.info(`🗑️ Deleted existing API key: ${key.name} (${key.id})`)
         } catch (deleteError) {
           logger.error(`❌ Failed to delete existing API key ${key.id}:`, deleteError)
