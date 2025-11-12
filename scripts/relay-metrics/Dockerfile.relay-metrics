@@ -1,0 +1,22 @@
+# Multi-stage build for the relay metrics publisher
+FROM node:20-alpine AS base
+WORKDIR /app
+
+# Install production dependencies only
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund
+
+# Copy metrics publisher sources
+COPY scripts/relay-metrics ./scripts/relay-metrics
+
+# Final runtime image
+FROM node:20-alpine
+WORKDIR /app
+ENV NODE_ENV=production
+
+# Copy node modules and sources from build stage
+COPY --from=base /app/node_modules ./node_modules
+COPY --from=base /app/scripts/relay-metrics ./scripts/relay-metrics
+COPY package.json ./
+
+CMD ["node", "scripts/relay-metrics/publishMetrics.js"]

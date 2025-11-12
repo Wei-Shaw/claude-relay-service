@@ -1,0 +1,30 @@
+services:
+  relay-metrics:
+    build:
+      context: ../..
+      dockerfile: scripts/relay-metrics/Dockerfile.relay-metrics
+    command: ["node", "scripts/relay-metrics/publishMetrics.js"]
+    env_file:
+      - ./.env
+    environment:
+      - OTEL_EXPORT_URL=${OTEL_EXPORT_URL:-http://alloy:4318/v1/metrics}
+    restart: unless-stopped
+    depends_on:
+      - alloy
+
+  alloy:
+    image: grafana/alloy:${ALLOY_VERSION:-latest}
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:${ALLOY_PORT:-12345}
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    env_file:
+      - ./.env
+    ports:
+      - "${ALLOY_UI_BIND_ADDRESS:-127.0.0.1}:${ALLOY_PORT:-12345}:${ALLOY_PORT:-12345}"
+      - "${ALLOY_PROM_BIND_ADDRESS:-127.0.0.1}:${ALLOY_PROMETHEUS_PORT:-9600}:${ALLOY_PROMETHEUS_PORT:-9600}"
+    volumes:
+      - ${ALLOY_CONFIG_PATH:-./config/alloy/config.alloy}:/etc/alloy/config.alloy:ro
+      - ${ALLOY_DATA_PATH:-./data/alloy}:/var/lib/alloy/data
+    restart: unless-stopped

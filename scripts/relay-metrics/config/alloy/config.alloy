@@ -1,0 +1,42 @@
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+otelcol.receiver.otlp "relay" {
+  grpc {
+    endpoint = env("ALLOY_OTLP_GRPC_ENDPOINT")
+  }
+  http {
+    endpoint = env("ALLOY_OTLP_HTTP_ENDPOINT")
+  }
+
+  output {
+    metrics = [otelcol.processor.batch.default.input]
+  }
+}
+
+otelcol.processor.batch "default" {
+  timeout = "10s"
+
+  output {
+    metrics = [
+      otelcol.exporter.otlphttp.greptimedb.input,
+    ]
+  }
+}
+
+otelcol.auth.basic "greptimedb_credentials" {
+  username = env("ALLOY_GREPTIME_USERNAME")
+  password = env("ALLOY_GREPTIME_PASSWORD")
+}
+
+otelcol.exporter.otlphttp "greptimedb" {
+  client {
+    endpoint = env("ALLOY_GREPTIME_ENDPOINT")
+    headers = {
+      "X-Greptime-DB-Name" = env("ALLOY_GREPTIME_DB_NAME"),
+    }
+    auth = otelcol.auth.basic.greptimedb_credentials.handler
+  }
+}
