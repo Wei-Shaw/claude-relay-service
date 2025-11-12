@@ -249,3 +249,6 @@ web/apiStats/
 
 # Admin SPA build files
 web/admin-spa/dist/
+
+# Relay metrics docker volumes
+scripts/relay-metrics/data/

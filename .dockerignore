@@ -15,6 +15,7 @@ logs/
 # Data files
 data/
 temp/
+scripts/relay-metrics/data/
 
 # Git
 .git/
