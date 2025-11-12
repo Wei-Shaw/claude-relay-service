@@ -301,30 +301,9 @@ async function handleStandardGenerateContent(req, res) {
     }
 
     // 返回标准 Gemini API 格式的响应
-    // 内部 API 返回的是 { response: {...} } 格式，需要提取并过滤
-    if (response.response) {
-      // 过滤掉 thought 部分（这是内部 API 特有的）
-      const standardResponse = { ...response.response }
-      if (standardResponse.candidates) {
-        standardResponse.candidates = standardResponse.candidates.map((candidate) => {
-          if (candidate.content && candidate.content.parts) {
-            // 过滤掉 thought: true 的 parts
-            const filteredParts = candidate.content.parts.filter((part) => !part.thought)
-            return {
-              ...candidate,
-              content: {
-                ...candidate.content,
-                parts: filteredParts
-              }
-            }
-          }
-          return candidate
-        })
-      }
-      res.json(standardResponse)
-    } else {
-      res.json(response)
-    }
+    // 内部 API 返回的是 { response: {...} } 格式，需要提取
+    // 注意：不过滤 thought 字段，因为 gemini-cli 会自行处理
+    res.json(response.response || response)
   } catch (error) {
     logger.error(`Error in standard generateContent endpoint`, {
       message: error.message,
@@ -536,47 +515,9 @@ async function handleStandardStreamGenerateContent(req, res) {
                   }
 
                   // 转换格式：移除 response 包装，直接返回标准 Gemini API 格式
+                  // 注意：不过滤 thought 字段，因为 gemini-cli 会自行处理
                   if (data.response) {
-                    // 过滤掉 thought 部分（这是内部 API 特有的）
-                    if (data.response.candidates) {
-                      const filteredCandidates = data.response.candidates
-                        .map((candidate) => {
-                          if (candidate.content && candidate.content.parts) {
-                            // 过滤掉 thought: true 的 parts
-                            const filteredParts = candidate.content.parts.filter(
-                              (part) => !part.thought
-                            )
-                            if (filteredParts.length > 0) {
-                              return {
-                                ...candidate,
-                                content: {
-                                  ...candidate.content,
-                                  parts: filteredParts
-                                }
-                              }
-                            }
-                            return null
-                          }
-                          return candidate
-                        })
-                        .filter(Boolean)
-
-                      // 只有当有有效内容时才发送
-                      if (filteredCandidates.length > 0 || data.response.usageMetadata) {
-                        const standardResponse = {
-                          candidates: filteredCandidates,
-                          ...(data.response.usageMetadata && {
-                            usageMetadata: data.response.usageMetadata
-                          }),
-                          ...(data.response.modelVersion && {
-                            modelVersion: data.response.modelVersion
-                          }),
-                          ...(data.response.createTime && { createTime: data.response.createTime }),
-                          ...(data.response.responseId && { responseId: data.response.responseId })
-                        }
-                        res.write(`data: ${JSON.stringify(standardResponse)}\n\n`)
-                      }
-                    }
+                    res.write(`data: ${JSON.stringify(data.response)}\n\n`)
                   } else {
                     // 如果没有 response 包装，直接发送
                     res.write(`data: ${JSON.stringify(data)}\n\n`)
