@@ -1088,9 +1088,7 @@ async function forwardToCodeAssist(client, apiMethod, requestBody, proxyConfig =
     axiosConfig.httpAgent = proxyAgent
     axiosConfig.httpsAgent = proxyAgent
     axiosConfig.proxy = false
-    logger.info(
-      `🌐 Using proxy for ${apiMethod}: ${ProxyHelper.getProxyDescription(proxyConfig)}`
-    )
+    logger.info(`🌐 Using proxy for ${apiMethod}: ${ProxyHelper.getProxyDescription(proxyConfig)}`)
   } else {
     logger.debug(`🌐 No proxy configured for ${apiMethod}`)
   }
@@ -1109,52 +1107,55 @@ async function loadCodeAssist(client, projectId = null, proxyConfig = null) {
 
   const { token } = await client.getAccessToken()
   const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+  // 🔍 只有个人账户（无 projectId）才需要调用 tokeninfo/userinfo
+  // 这些调用有助于 Google 获取临时 projectId
+  if (!projectId) {
+    const tokenInfoConfig = {
+      url: 'https://oauth2.googleapis.com/tokeninfo',
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      data: new URLSearchParams({ access_token: token }).toString(),
+      timeout: 15000
+    }
 
-  const tokenInfoConfig = {
-    url: 'https://oauth2.googleapis.com/tokeninfo',
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    data: new URLSearchParams({ access_token: token }).toString(),
-    timeout: 15000
-  }
+    if (proxyAgent) {
+      tokenInfoConfig.httpAgent = proxyAgent
+      tokenInfoConfig.httpsAgent = proxyAgent
+      tokenInfoConfig.proxy = false
+    }
 
-  if (proxyAgent) {
-    tokenInfoConfig.httpAgent = proxyAgent
-    tokenInfoConfig.httpsAgent = proxyAgent
-    tokenInfoConfig.proxy = false
-  }
+    try {
+      await axios(tokenInfoConfig)
+      logger.info('📋 tokeninfo 接口验证成功')
+    } catch (error) {
+      logger.warn('⚠️ tokeninfo 接口调用失败:', error.message)
+    }
 
-  try {
-    await axios(tokenInfoConfig)
-    logger.info('📋 tokeninfo 接口验证成功')
-  } catch (error) {
-    logger.info('tokeninfo 接口获取失败', error)
-  }
+    const userInfoConfig = {
+      url: 'https://www.googleapis.com/oauth2/v2/userinfo',
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: '*/*'
+      },
+      timeout: 15000
+    }
 
-  const userInfoConfig = {
-    url: 'https://www.googleapis.com/oauth2/v2/userinfo',
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: '*/*'
-    },
-    timeout: 15000
-  }
+    if (proxyAgent) {
+      userInfoConfig.httpAgent = proxyAgent
+      userInfoConfig.httpsAgent = proxyAgent
+      userInfoConfig.proxy = false
+    }
 
-  if (proxyAgent) {
-    userInfoConfig.httpAgent = proxyAgent
-    userInfoConfig.httpsAgent = proxyAgent
-    userInfoConfig.proxy = false
-  }
-
-  try {
-    await axios(userInfoConfig)
-    logger.info('📋 userinfo 接口获取成功')
-  } catch (error) {
-    logger.info('userinfo 接口获取失败', error)
+    try {
+      await axios(userInfoConfig)
+      logger.info('📋 userinfo 接口获取成功')
+    } catch (error) {
+      logger.warn('⚠️ userinfo 接口调用失败:', error.message)
+    }
   }
 
   // 创建ClientMetadata

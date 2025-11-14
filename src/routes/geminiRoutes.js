@@ -381,13 +381,18 @@ function handleSimpleEndpoint(apiMethod) {
       let proxyConfig = null
       if (account.proxy) {
         try {
-          proxyConfig = typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
+          proxyConfig =
+            typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
         } catch (e) {
           logger.warn('Failed to parse proxy configuration:', e)
         }
       }
 
-      const client = await geminiAccountService.getOauthClient(accessToken, refreshToken, proxyConfig)
+      const client = await geminiAccountService.getOauthClient(
+        accessToken,
+        refreshToken,
+        proxyConfig
+      )
 
       // 直接转发请求体，不做特殊处理
       const response = await geminiAccountService.forwardToCodeAssist(
@@ -1080,7 +1085,11 @@ router.post('/v1internal\\:onboardUser', authenticateApiKey, handleOnboardUser)
 router.post('/v1internal\\:countTokens', authenticateApiKey, handleCountTokens)
 router.post('/v1internal\\:generateContent', authenticateApiKey, handleGenerateContent)
 router.post('/v1internal\\:streamGenerateContent', authenticateApiKey, handleStreamGenerateContent)
-router.post('/v1internal\\:listExperiments', authenticateApiKey, handleSimpleEndpoint('listExperiments'))
+router.post(
+  '/v1internal\\:listExperiments',
+  authenticateApiKey,
+  handleSimpleEndpoint('listExperiments')
+)
 
 // v1beta 版本的端点 - 支持动态模型名称
 router.post('/v1beta/models/:modelName\\:loadCodeAssist', authenticateApiKey, handleLoadCodeAssist)
