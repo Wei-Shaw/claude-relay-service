@@ -67,8 +67,12 @@ jobs:
             break
           fi
         done <<< "$CHANGED_FILES"
-        
-        if [ "$SIGNIFICANT_CHANGES" = true ]; then
+
+        # 检查是否是手动触发
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "Manual workflow trigger detected, forcing version bump"
+          echo "needs_bump=true" >> $GITHUB_OUTPUT
+        elif [ "$SIGNIFICANT_CHANGES" = true ]; then
           echo "Significant changes detected, version bump needed"
           echo "needs_bump=true" >> $GITHUB_OUTPUT
         else

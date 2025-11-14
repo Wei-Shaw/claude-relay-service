@@ -9,6 +9,7 @@ const sessionHelper = require('../utils/sessionHelper')
 const unifiedGeminiScheduler = require('../services/unifiedGeminiScheduler')
 const apiKeyService = require('../services/apiKeyService')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
+const { parseSSELine } = require('../utils/sseParser')
 // const { OAuth2Client } = require('google-auth-library'); // OAuth2Client is not used in this file
 
 // 生成会话哈希
@@ -348,6 +349,70 @@ router.get('/key-info', authenticateApiKey, async (req, res) => {
     })
   }
 })
+
+// 通用的简单端点处理函数（用于直接转发的端点）
+// 适用于：listExperiments 等不需要特殊业务逻辑的端点
+function handleSimpleEndpoint(apiMethod) {
+  return async (req, res) => {
+    try {
+      if (!ensureGeminiPermission(req, res)) {
+        return undefined
+      }
+
+      const sessionHash = sessionHelper.generateSessionHash(req.body)
+
+      // 从路径参数或请求体中获取模型名
+      const requestedModel = req.body.model || req.params.modelName || 'gemini-2.5-flash'
+      const { accountId } = await unifiedGeminiScheduler.selectAccountForApiKey(
+        req.apiKey,
+        sessionHash,
+        requestedModel
+      )
+      const account = await geminiAccountService.getAccount(accountId)
+      const { accessToken, refreshToken } = account
+
+      const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
+      logger.info(`${apiMethod} request (${version})`, {
+        apiKeyId: req.apiKey?.id || 'unknown',
+        requestBody: req.body
+      })
+
+      // 解析账户的代理配置
+      let proxyConfig = null
+      if (account.proxy) {
+        try {
+          proxyConfig =
+            typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
+        } catch (e) {
+          logger.warn('Failed to parse proxy configuration:', e)
+        }
+      }
+
+      const client = await geminiAccountService.getOauthClient(
+        accessToken,
+        refreshToken,
+        proxyConfig
+      )
+
+      // 直接转发请求体，不做特殊处理
+      const response = await geminiAccountService.forwardToCodeAssist(
+        client,
+        apiMethod,
+        req.body,
+        proxyConfig
+      )
+
+      res.json(response)
+    } catch (error) {
+      const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
+      logger.error(`Error in ${apiMethod} endpoint (${version})`, { error: error.message })
+      res.status(500).json({
+        error: 'Internal server error',
+        message: error.message
+      })
+    }
+  }
+}
 
 // 共用的 loadCodeAssist 处理函数
 async function handleLoadCodeAssist(req, res) {
@@ -858,26 +923,6 @@ async function handleStreamGenerateContent(req, res) {
     res.setHeader('Connection', 'keep-alive')
     res.setHeader('X-Accel-Buffering', 'no')
 
-    // SSE 解析函数
-    const parseSSELine = (line) => {
-      if (!line.startsWith('data: ')) {
-        return { type: 'other', line, data: null }
-      }
-
-      const jsonStr = line.substring(6).trim()
-
-      if (!jsonStr || jsonStr === '[DONE]') {
-        return { type: 'control', line, data: null, jsonStr }
-      }
-
-      try {
-        const data = JSON.parse(jsonStr)
-        return { type: 'data', line, data, jsonStr }
-      } catch (e) {
-        return { type: 'invalid', line, data: null, jsonStr, error: e }
-      }
-    }
-
     // 处理流式响应并捕获usage数据
     let streamBuffer = '' // 统一的流处理缓冲区
     let totalUsage = {
@@ -1040,6 +1085,11 @@ router.post('/v1internal\\:onboardUser', authenticateApiKey, handleOnboardUser)
 router.post('/v1internal\\:countTokens', authenticateApiKey, handleCountTokens)
 router.post('/v1internal\\:generateContent', authenticateApiKey, handleGenerateContent)
 router.post('/v1internal\\:streamGenerateContent', authenticateApiKey, handleStreamGenerateContent)
+router.post(
+  '/v1internal\\:listExperiments',
+  authenticateApiKey,
+  handleSimpleEndpoint('listExperiments')
+)
 
 // v1beta 版本的端点 - 支持动态模型名称
 router.post('/v1beta/models/:modelName\\:loadCodeAssist', authenticateApiKey, handleLoadCodeAssist)
@@ -1054,6 +1104,11 @@ router.post(
   '/v1beta/models/:modelName\\:streamGenerateContent',
   authenticateApiKey,
   handleStreamGenerateContent
+)
+router.post(
+  '/v1beta/models/:modelName\\:listExperiments',
+  authenticateApiKey,
+  handleSimpleEndpoint('listExperiments')
 )
 
 // 导出处理函数供标准路由使用
