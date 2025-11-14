@@ -1110,10 +1110,54 @@ async function loadCodeAssist(client, projectId = null, proxyConfig = null) {
   const { token } = await client.getAccessToken()
   const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
 
+  const tokenInfoConfig = {
+    url: 'https://oauth2.googleapis.com/tokeninfo',
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    data: new URLSearchParams({ access_token: token }).toString(),
+    timeout: 15000
+  }
+
+  if (proxyAgent) {
+    tokenInfoConfig.httpAgent = proxyAgent
+    tokenInfoConfig.httpsAgent = proxyAgent
+    tokenInfoConfig.proxy = false
+  }
+
+  try {
+    await axios(tokenInfoConfig)
+    logger.info('📋 tokeninfo 接口验证成功')
+  } catch (error) {
+    logger.info('tokeninfo 接口获取失败', error)
+  }
+
+  const userInfoConfig = {
+    url: 'https://www.googleapis.com/oauth2/v2/userinfo',
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: '*/*'
+    },
+    timeout: 15000
+  }
+
+  if (proxyAgent) {
+    userInfoConfig.httpAgent = proxyAgent
+    userInfoConfig.httpsAgent = proxyAgent
+    userInfoConfig.proxy = false
+  }
+
+  try {
+    await axios(userInfoConfig)
+    logger.info('📋 userinfo 接口获取成功')
+  } catch (error) {
+    logger.info('userinfo 接口获取失败', error)
+  }
+
   // 创建ClientMetadata
-  // Note: 移除了 tokeninfo 和 userinfo 验证调用
-  // 这些调用在原生 gemini-cli 的 CodeAssistServer.loadCodeAssist 中不存在
-  // 且会导致使用特殊 token 时出现 401 错误
   const clientMetadata = {
     ideType: 'IDE_UNSPECIFIED',
     platform: 'PLATFORM_UNSPECIFIED',
