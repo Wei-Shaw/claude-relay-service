@@ -108,6 +108,15 @@ async function handleMessagesRequest(req, res) {
       delete req.body.context_management
     }
 
+    // 遍历tools数组，删除input_examples字段
+    if (req.body.tools && Array.isArray(req.body.tools)) {
+      req.body.tools.forEach((tool) => {
+        if (tool && typeof tool === 'object' && tool.input_examples) {
+          delete tool.input_examples
+        }
+      })
+    }
+
     logger.api(
       `🚀 Processing ${isStream ? 'stream' : 'non-stream'} request for key: ${req.apiKey.name}`
     )
