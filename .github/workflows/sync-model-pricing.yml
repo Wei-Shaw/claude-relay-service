@@ -2,7 +2,7 @@ name: 同步模型价格数据
 
 on:
   schedule:
-    - cron: '*/10 * * * *'
+    - cron: '0 */5 * * *'  # 每5小时运行一次
   workflow_dispatch: {}
 
 jobs:

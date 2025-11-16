@@ -69,9 +69,10 @@ jobs:
           echo "❌ 部署失败！请检查日志"
           exit 1
 
-      # 可选：发送 Telegram 通知
+      # 可选：发送 Telegram 通知（需要配置 TELEGRAM_BOT_TOKEN 和 TELEGRAM_CHAT_ID secrets）
       - name: 发送 Telegram 通知
-        if: always() && secrets.TELEGRAM_BOT_TOKEN != '' && secrets.TELEGRAM_CHAT_ID != ''
+        if: always()
+        continue-on-error: true
         uses: appleboy/telegram-action@master
         with:
           to: ${{ secrets.TELEGRAM_CHAT_ID }}
