@@ -31,6 +31,7 @@ const config = require('../../config/config')
 const ProxyHelper = require('../utils/proxyHelper')
 
 const router = express.Router()
+const scheduledRequestExecutor = require('../services/scheduledRequestExecutor')
 
 // 🛠️ 工具函数：处理可为空的时间字段
 function normalizeNullableDate(value) {
@@ -9178,6 +9179,43 @@ router.post('/droid-accounts/:id/refresh-token', authenticateAdmin, async (req, 
   } catch (error) {
     logger.error(`Failed to refresh Droid account token ${req.params.id}:`, error)
     return res.status(500).json({ error: 'Failed to refresh token', message: error.message })
+  }
+})
+
+// ⏰ 定时任务 - 测试执行
+router.post('/accounts/:accountType/:id/test-scheduled-request', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountType, id } = req.params
+
+    logger.info(`[API] Testing scheduled request for ${accountType}:${id}`)
+
+    const result = await scheduledRequestExecutor.executeForAccount(id, accountType)
+
+    if (result.success) {
+      return res.json({
+        success: true,
+        message: 'Scheduled request executed successfully',
+        data: {
+          status: result.status,
+          responseTime: result.responseTime,
+          tokensUsed: result.tokensUsed,
+          accountName: result.accountName
+        }
+      })
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Scheduled request failed',
+        error: result.error
+      })
+    }
+  } catch (error) {
+    logger.error(`Failed to test scheduled request for ${req.params.accountType}:${req.params.id}:`, error)
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to execute scheduled request',
+      message: error.message
+    })
   }
 })
 

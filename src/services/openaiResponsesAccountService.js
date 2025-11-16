@@ -162,6 +162,14 @@ class OpenAIResponsesAccountService {
       // 直接保存，不做任何调整
     }
 
+    // 处理定时任务配置
+    if (updates.scheduledRequest !== undefined) {
+      updates.scheduledRequest =
+        typeof updates.scheduledRequest === 'string'
+          ? updates.scheduledRequest
+          : JSON.stringify(updates.scheduledRequest)
+    }
+
     // 更新 Redis
     const client = redis.getClientSafe()
     const key = `${this.ACCOUNT_KEY_PREFIX}${accountId}`

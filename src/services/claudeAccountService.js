@@ -650,7 +650,8 @@ class ClaudeAccountService {
         'useUnifiedClientId',
         'unifiedClientId',
         'subscriptionExpiresAt',
-        'extInfo'
+        'extInfo',
+        'scheduledRequest'
       ]
       const updatedData = { ...accountData }
       let shouldClearAutoStopFields = false
@@ -696,6 +697,9 @@ class ClaudeAccountService {
                 }
               }
             }
+          } else if (field === 'scheduledRequest') {
+            // 处理定时任务配置
+            updatedData[field] = typeof value === 'string' ? value : JSON.stringify(value)
           } else {
             updatedData[field] = value !== null && value !== undefined ? value.toString() : ''
           }

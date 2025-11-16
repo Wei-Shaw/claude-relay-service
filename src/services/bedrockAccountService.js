@@ -241,6 +241,14 @@ class BedrockAccountService {
         account.subscriptionExpiresAt = updates.subscriptionExpiresAt
       }
 
+      // 处理定时任务配置
+      if (updates.scheduledRequest !== undefined) {
+        account.scheduledRequest =
+          typeof updates.scheduledRequest === 'string'
+            ? updates.scheduledRequest
+            : JSON.stringify(updates.scheduledRequest)
+      }
+
       account.updatedAt = new Date().toISOString()
 
       await client.set(`bedrock_account:${accountId}`, JSON.stringify(account))
