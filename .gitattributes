@@ -1,0 +1,6 @@
+# Git Attributes Configuration
+# 配置特定文件的 merge 策略
+
+# Auto-release CI workflow - 在合并 upstream 时始终保留我们的版本
+# 因为 fork 不需要自动发布流程
+.github/workflows/auto-release-pipeline.yml merge=ours
