@@ -1,0 +1,86 @@
+name: Auto Deploy to Server
+
+on:
+  push:
+    branches:
+      - main  # 推送到 main 分支时触发
+      # - dev  # 如果需要部署 dev 分支，取消注释
+  workflow_dispatch:  # 支持手动触发
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # 跳过包含 [skip deploy] 的提交
+    if: "!contains(github.event.head_commit.message, '[skip deploy]')"
+
+    steps:
+      - name: 开始部署
+        run: |
+          echo "🚀 开始部署到生产服务器..."
+          echo "分支: ${{ github.ref_name }}"
+          echo "提交: ${{ github.sha }}"
+          echo "提交信息: ${{ github.event.head_commit.message }}"
+
+      - name: 部署到服务器
+        uses: appleboy/ssh-action@v1.0.0
+        env:
+          BRANCH: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          envs: BRANCH,COMMIT_SHA,COMMIT_MSG
+          script_stop: true  # 脚本出错时停止
+          command_timeout: 30m  # 超时时间
+          script: |
+            echo "========================================="
+            echo "🚀 Claude Relay Service 自动部署开始"
+            echo "========================================="
+            echo "📌 分支: $BRANCH"
+            echo "📌 提交: $COMMIT_SHA"
+            echo "📌 信息: $COMMIT_MSG"
+            echo "📌 时间: $(date '+%Y-%m-%d %H:%M:%S')"
+            echo ""
+
+            # 切换到项目目录
+            cd ${{ secrets.DEPLOY_PATH || '/home/user/claude-relay-service' }}
+
+            # 执行部署脚本
+            bash scripts/deploy.sh
+
+            echo ""
+            echo "========================================="
+            echo "✅ 部署完成！"
+            echo "========================================="
+
+      - name: 部署成功通知
+        if: success()
+        run: |
+          echo "✅ 部署成功！"
+          echo "服务器: ${{ secrets.SSH_HOST }}"
+          echo "分支: ${{ github.ref_name }}"
+
+      - name: 部署失败通知
+        if: failure()
+        run: |
+          echo "❌ 部署失败！请检查日志"
+          exit 1
+
+      # 可选：发送 Telegram 通知
+      - name: 发送 Telegram 通知
+        if: always() && secrets.TELEGRAM_BOT_TOKEN != '' && secrets.TELEGRAM_CHAT_ID != ''
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          format: markdown
+          message: |
+            ${{ job.status == 'success' && '✅' || '❌' }} *Claude Relay 部署${{ job.status == 'success' && '成功' || '失败' }}*
+
+            📦 分支: `${{ github.ref_name }}`
+            💬 提交: ${{ github.event.head_commit.message }}
+            👤 作者: ${{ github.actor }}
+            🔗 [查看详情](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
