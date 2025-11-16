@@ -1037,6 +1037,14 @@ class DroidAccountService {
       // 直接保存，不做任何调整
     }
 
+    // 处理定时任务配置
+    if (sanitizedUpdates.scheduledRequest !== undefined) {
+      sanitizedUpdates.scheduledRequest =
+        typeof sanitizedUpdates.scheduledRequest === 'string'
+          ? sanitizedUpdates.scheduledRequest
+          : JSON.stringify(sanitizedUpdates.scheduledRequest)
+    }
+
     if (sanitizedUpdates.proxy === undefined) {
       sanitizedUpdates.proxy = account.proxy || ''
     }

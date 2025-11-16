@@ -374,6 +374,14 @@ class ClaudeConsoleAccountService {
         updatedData.subscriptionExpiresAt = updates.subscriptionExpiresAt
       }
 
+      // 处理定时任务配置
+      if (updates.scheduledRequest !== undefined) {
+        updatedData.scheduledRequest =
+          typeof updates.scheduledRequest === 'string'
+            ? updates.scheduledRequest
+            : JSON.stringify(updates.scheduledRequest)
+      }
+
       // 处理账户类型变更
       if (updates.accountType && updates.accountType !== existingAccount.accountType) {
         updatedData.accountType = updates.accountType

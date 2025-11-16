@@ -85,6 +85,11 @@ class Application {
       const claudeAccountService = require('./services/claudeAccountService')
       await claudeAccountService.initializeSessionWindows()
 
+      // ⏰ 初始化定时任务调度器
+      logger.info('⏰ Initializing scheduled request cron scheduler...')
+      const cronScheduler = require('./services/cronScheduler')
+      await cronScheduler.initialize()
+
       // 超早期拦截 /admin-next/ 请求 - 在所有中间件之前
       this.app.use((req, res, next) => {
         if (req.path === '/admin-next/' && req.method === 'GET') {

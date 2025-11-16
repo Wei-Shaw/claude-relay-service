@@ -541,6 +541,14 @@ async function updateAccount(accountId, updates) {
     // 直接保存，不做任何调整
   }
 
+  // 处理定时任务配置
+  if (updates.scheduledRequest !== undefined) {
+    updates.scheduledRequest =
+      typeof updates.scheduledRequest === 'string'
+        ? updates.scheduledRequest
+        : JSON.stringify(updates.scheduledRequest)
+  }
+
   // 如果通过 geminiOauth 更新，也要检查是否新增了 refresh token
   if (updates.geminiOauth && !oldRefreshToken) {
     const oauthData =

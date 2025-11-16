@@ -1,6 +1,9 @@
 <template>
   <Teleport to="body">
-    <div v-if="show" class="modal fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+    <div
+      v-if="show"
+      class="modal fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+    >
       <div
         class="modal-content custom-scrollbar mx-auto max-h-[90vh] w-full max-w-2xl overflow-y-auto p-4 sm:p-6 md:p-8"
       >
@@ -11,8 +14,10 @@
             >
               <i class="fas fa-user-circle text-sm text-white sm:text-base" />
             </div>
-            <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">
-              {{ isEdit ? '编辑账户' : '添加账户' }}
+            <h3
+              class="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl"
+            >
+              {{ isEdit ? "编辑账户" : "添加账户" }}
             </h3>
           </div>
           <button
@@ -25,7 +30,10 @@
 
         <!-- 步骤指示器 -->
         <div
-          v-if="!isEdit && (form.addType === 'oauth' || form.addType === 'setup-token')"
+          v-if="
+            !isEdit &&
+            (form.addType === 'oauth' || form.addType === 'setup-token')
+          "
           class="mb-4 flex items-center justify-center sm:mb-8"
         >
           <div class="flex items-center space-x-2 sm:space-x-4">
@@ -33,7 +41,9 @@
               <div
                 :class="[
                   'flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold sm:h-8 sm:w-8 sm:text-sm',
-                  oauthStep >= 1 ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-500'
+                  oauthStep >= 1
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-200 text-gray-500',
                 ]"
               >
                 1
@@ -48,7 +58,9 @@
               <div
                 :class="[
                   'flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold sm:h-8 sm:w-8 sm:text-sm',
-                  oauthStep >= 2 ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-500'
+                  oauthStep >= 2
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-200 text-gray-500',
                 ]"
               >
                 2
@@ -65,7 +77,8 @@
         <div v-if="oauthStep === 1 && !isEdit">
           <div class="space-y-6">
             <div v-if="!isEdit">
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              <label
+                class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >选择平台</label
               >
               <!-- 平台分组选择器 -->
@@ -78,7 +91,7 @@
                     :class="[
                       platformGroup === 'claude'
                         ? 'border-indigo-500 bg-gradient-to-br from-indigo-50 to-purple-50 shadow-md dark:from-indigo-900/20 dark:to-purple-900/20'
-                        : 'border-gray-200 bg-white hover:border-indigo-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-600'
+                        : 'border-gray-200 bg-white hover:border-indigo-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-600',
                     ]"
                     @click="selectPlatformGroup('claude')"
                   >
@@ -96,10 +109,14 @@
                           <i class="fas fa-check text-xs text-white"></i>
                         </div>
                       </div>
-                      <h4 class="mt-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      <h4
+                        class="mt-2 text-sm font-semibold text-gray-900 dark:text-gray-100"
+                      >
                         Claude
                       </h4>
-                      <p class="text-xs text-gray-600 dark:text-gray-400">Anthropic</p>
+                      <p class="text-xs text-gray-600 dark:text-gray-400">
+                        Anthropic
+                      </p>
                     </div>
                   </div>
 
@@ -109,7 +126,7 @@
                     :class="[
                       platformGroup === 'openai'
                         ? 'border-emerald-500 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-md dark:from-emerald-900/20 dark:to-teal-900/20'
-                        : 'border-gray-200 bg-white hover:border-emerald-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-emerald-600'
+                        : 'border-gray-200 bg-white hover:border-emerald-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-emerald-600',
                     ]"
                     @click="selectPlatformGroup('openai')"
                   >
@@ -136,10 +153,14 @@
                           <i class="fas fa-check text-xs text-white"></i>
                         </div>
                       </div>
-                      <h4 class="mt-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      <h4
+                        class="mt-2 text-sm font-semibold text-gray-900 dark:text-gray-100"
+                      >
                         OpenAI
                       </h4>
-                      <p class="text-xs text-gray-600 dark:text-gray-400">GPT 系列</p>
+                      <p class="text-xs text-gray-600 dark:text-gray-400">
+                        GPT 系列
+                      </p>
                     </div>
                   </div>
 
@@ -149,7 +170,7 @@
                     :class="[
                       platformGroup === 'gemini'
                         ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-md dark:from-blue-900/20 dark:to-indigo-900/20'
-                        : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-600'
+                        : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-600',
                     ]"
                     @click="selectPlatformGroup('gemini')"
                   >
@@ -167,10 +188,14 @@
                           <i class="fas fa-check text-xs text-white"></i>
                         </div>
                       </div>
-                      <h4 class="mt-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      <h4
+                        class="mt-2 text-sm font-semibold text-gray-900 dark:text-gray-100"
+                      >
                         Gemini
                       </h4>
-                      <p class="text-xs text-gray-600 dark:text-gray-400">Google AI</p>
+                      <p class="text-xs text-gray-600 dark:text-gray-400">
+                        Google AI
+                      </p>
                     </div>
                   </div>
 
@@ -180,7 +205,7 @@
                     :class="[
                       platformGroup === 'droid'
                         ? 'border-rose-500 bg-gradient-to-br from-rose-50 to-orange-50 shadow-md dark:from-rose-900/20 dark:to-orange-900/20'
-                        : 'border-gray-200 bg-white hover:border-rose-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-rose-600'
+                        : 'border-gray-200 bg-white hover:border-rose-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-rose-600',
                     ]"
                     @click="selectPlatformGroup('droid')"
                   >
@@ -198,10 +223,14 @@
                           <i class="fas fa-check text-xs text-white"></i>
                         </div>
                       </div>
-                      <h4 class="mt-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      <h4
+                        class="mt-2 text-sm font-semibold text-gray-900 dark:text-gray-100"
+                      >
                         Droid
                       </h4>
-                      <p class="text-xs text-gray-600 dark:text-gray-400">Claude Droid</p>
+                      <p class="text-xs text-gray-600 dark:text-gray-400">
+                        Claude Droid
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -211,7 +240,9 @@
                   v-if="platformGroup"
                   class="animate-fadeIn rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50"
                 >
-                  <p class="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">
+                  <p
+                    class="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300"
+                  >
                     选择具体平台类型：
                   </p>
                   <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -222,7 +253,7 @@
                         :class="[
                           form.platform === 'claude'
                             ? 'border-indigo-500 bg-indigo-50 dark:border-indigo-400 dark:bg-indigo-900/30'
-                            : 'border-gray-300 bg-white hover:border-indigo-400 hover:bg-indigo-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-indigo-500 dark:hover:bg-indigo-900/20'
+                            : 'border-gray-300 bg-white hover:border-indigo-400 hover:bg-indigo-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-indigo-500 dark:hover:bg-indigo-900/20',
                         ]"
                       >
                         <input
@@ -232,12 +263,18 @@
                           value="claude"
                         />
                         <div class="flex items-center gap-2">
-                          <i class="fas fa-brain text-sm text-indigo-600 dark:text-indigo-400"></i>
+                          <i
+                            class="fas fa-brain text-sm text-indigo-600 dark:text-indigo-400"
+                          ></i>
                           <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
+                            <span
+                              class="block text-xs font-medium text-gray-900 dark:text-gray-100"
                               >Claude Code</span
                             >
-                            <span class="text-xs text-gray-500 dark:text-gray-400">官方</span>
+                            <span
+                              class="text-xs text-gray-500 dark:text-gray-400"
+                              >官方</span
+                            >
                           </div>
                         </div>
                         <div
@@ -253,7 +290,7 @@
                         :class="[
                           form.platform === 'claude-console'
                             ? 'border-purple-500 bg-purple-50 dark:border-purple-400 dark:bg-purple-900/30'
-                            : 'border-gray-300 bg-white hover:border-purple-400 hover:bg-purple-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-purple-500 dark:hover:bg-purple-900/20'
+                            : 'border-gray-300 bg-white hover:border-purple-400 hover:bg-purple-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-purple-500 dark:hover:bg-purple-900/20',
                         ]"
                       >
                         <input
@@ -267,10 +304,14 @@
                             class="fas fa-terminal text-sm text-purple-600 dark:text-purple-400"
                           ></i>
                           <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
+                            <span
+                              class="block text-xs font-medium text-gray-900 dark:text-gray-100"
                               >Claude Console</span
                             >
-                            <span class="text-xs text-gray-500 dark:text-gray-400">标准API</span>
+                            <span
+                              class="text-xs text-gray-500 dark:text-gray-400"
+                              >标准API</span
+                            >
                           </div>
                         </div>
                         <div
@@ -286,7 +327,7 @@
                         :class="[
                           form.platform === 'bedrock'
                             ? 'border-orange-500 bg-orange-50 dark:border-orange-400 dark:bg-orange-900/30'
-                            : 'border-gray-300 bg-white hover:border-orange-400 hover:bg-orange-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-orange-500 dark:hover:bg-orange-900/20'
+                            : 'border-gray-300 bg-white hover:border-orange-400 hover:bg-orange-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-orange-500 dark:hover:bg-orange-900/20',
                         ]"
                       >
                         <input
@@ -296,12 +337,18 @@
                           value="bedrock"
                         />
                         <div class="flex items-center gap-2">
-                          <i class="fab fa-aws text-sm text-orange-600 dark:text-orange-400"></i>
+                          <i
+                            class="fab fa-aws text-sm text-orange-600 dark:text-orange-400"
+                          ></i>
                           <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
+                            <span
+                              class="block text-xs font-medium text-gray-900 dark:text-gray-100"
                               >Bedrock</span
                             >
-                            <span class="text-xs text-gray-500 dark:text-gray-400">AWS</span>
+                            <span
+                              class="text-xs text-gray-500 dark:text-gray-400"
+                              >AWS</span
+                            >
                           </div>
                         </div>
                         <div
@@ -317,19 +364,26 @@
                         :class="[
                           form.platform === 'ccr'
                             ? 'border-cyan-500 bg-cyan-50 dark:border-cyan-400 dark:bg-cyan-900/30'
-                            : 'border-gray-300 bg-white hover:border-cyan-400 hover:bg-cyan-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-cyan-500 dark:hover:bg-cyan-900/20'
+                            : 'border-gray-300 bg-white hover:border-cyan-400 hover:bg-cyan-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-cyan-500 dark:hover:bg-cyan-900/20',
                         ]"
                       >
-                        <input v-model="form.platform" class="sr-only" type="radio" value="ccr" />
+                        <input
+                          v-model="form.platform"
+                          class="sr-only"
+                          type="radio"
+                          value="ccr"
+                        />
                         <div class="flex items-center gap-2">
                           <i
                             class="fas fa-code-branch text-sm text-cyan-600 dark:text-cyan-400"
                           ></i>
                           <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
+                            <span
+                              class="block text-xs font-medium text-gray-900 dark:text-gray-100"
                               >CCR</span
                             >
-                            <span class="text-xs text-gray-500 dark:text-gray-400"
+                            <span
+                              class="text-xs text-gray-500 dark:text-gray-400"
                               >Claude Code Router</span
                             >
                           </div>
@@ -350,7 +404,7 @@
                         :class="[
                           form.platform === 'openai'
                             ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-400 dark:bg-emerald-900/30'
-                            : 'border-gray-300 bg-white hover:border-emerald-400 hover:bg-emerald-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-emerald-500 dark:hover:bg-emerald-900/20'
+                            : 'border-gray-300 bg-white hover:border-emerald-400 hover:bg-emerald-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-emerald-500 dark:hover:bg-emerald-900/20',
                         ]"
                       >
                         <input
@@ -364,10 +418,14 @@
                             class="fas fa-robot text-sm text-emerald-600 dark:text-emerald-400"
                           ></i>
                           <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
+                            <span
+                              class="block text-xs font-medium text-gray-900 dark:text-gray-100"
                               >Codex Cli</span
                             >
-                            <span class="text-xs text-gray-500 dark:text-gray-400">官方</span>
+                            <span
+                              class="text-xs text-gray-500 dark:text-gray-400"
+                              >官方</span
+                            >
                           </div>
                         </div>
                         <div
@@ -383,7 +441,7 @@
                         :class="[
                           form.platform === 'openai-responses'
                             ? 'border-teal-500 bg-teal-50 dark:border-teal-400 dark:bg-teal-900/30'
-                            : 'border-gray-300 bg-white hover:border-teal-400 hover:bg-teal-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-teal-500 dark:hover:bg-teal-900/20'
+                            : 'border-gray-300 bg-white hover:border-teal-400 hover:bg-teal-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-teal-500 dark:hover:bg-teal-900/20',
                         ]"
                       >
                         <input
@@ -393,12 +451,16 @@
                           value="openai-responses"
                         />
                         <div class="flex items-center gap-2">
-                          <i class="fas fa-server text-sm text-teal-600 dark:text-teal-400"></i>
+                          <i
+                            class="fas fa-server text-sm text-teal-600 dark:text-teal-400"
+                          ></i>
                           <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
+                            <span
+                              class="block text-xs font-medium text-gray-900 dark:text-gray-100"
                               >Responses</span
                             >
-                            <span class="text-xs text-gray-500 dark:text-gray-400"
+                            <span
+                              class="text-xs text-gray-500 dark:text-gray-400"
                               >Openai-Responses</span
                             >
                           </div>
@@ -416,7 +478,7 @@
                         :class="[
                           form.platform === 'azure_openai'
                             ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30'
-                            : 'border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-blue-500 dark:hover:bg-blue-900/20'
+                            : 'border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-blue-500 dark:hover:bg-blue-900/20',
                         ]"
                       >
                         <input
@@ -426,12 +488,16 @@
                           value="azure_openai"
                         />
                         <div class="flex items-center gap-2">
-                          <i class="fab fa-microsoft text-sm text-blue-600 dark:text-blue-400"></i>
+                          <i
+                            class="fab fa-microsoft text-sm text-blue-600 dark:text-blue-400"
+                          ></i>
                           <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
+                            <span
+                              class="block text-xs font-medium text-gray-900 dark:text-gray-100"
                               >Azure</span
                             >
-                            <span class="text-xs text-gray-500 dark:text-gray-400"
+                            <span
+                              class="text-xs text-gray-500 dark:text-gray-400"
                               >Azure Openai</span
                             >
                           </div>
@@ -452,7 +518,7 @@
                         :class="[
                           form.platform === 'gemini'
                             ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30'
-                            : 'border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-blue-500 dark:hover:bg-blue-900/20'
+                            : 'border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-blue-500 dark:hover:bg-blue-900/20',
                         ]"
                       >
                         <input
@@ -462,12 +528,18 @@
                           value="gemini"
                         />
                         <div class="flex items-center gap-2">
-                          <i class="fab fa-google text-sm text-blue-600 dark:text-blue-400"></i>
+                          <i
+                            class="fab fa-google text-sm text-blue-600 dark:text-blue-400"
+                          ></i>
                           <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
+                            <span
+                              class="block text-xs font-medium text-gray-900 dark:text-gray-100"
                               >Gemini Cli</span
                             >
-                            <span class="text-xs text-gray-500 dark:text-gray-400">官方</span>
+                            <span
+                              class="text-xs text-gray-500 dark:text-gray-400"
+                              >官方</span
+                            >
                           </div>
                         </div>
                         <div
@@ -486,17 +558,28 @@
                         :class="[
                           form.platform === 'droid'
                             ? 'border-rose-500 bg-rose-50 dark:border-rose-400 dark:bg-rose-900/30'
-                            : 'border-gray-300 bg-white hover:border-rose-400 hover:bg-rose-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-rose-500 dark:hover:bg-rose-900/20'
+                            : 'border-gray-300 bg-white hover:border-rose-400 hover:bg-rose-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-rose-500 dark:hover:bg-rose-900/20',
                         ]"
                       >
-                        <input v-model="form.platform" class="sr-only" type="radio" value="droid" />
+                        <input
+                          v-model="form.platform"
+                          class="sr-only"
+                          type="radio"
+                          value="droid"
+                        />
                         <div class="flex items-center gap-2">
-                          <i class="fas fa-robot text-sm text-rose-600 dark:text-rose-400"></i>
+                          <i
+                            class="fas fa-robot text-sm text-rose-600 dark:text-rose-400"
+                          ></i>
                           <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
+                            <span
+                              class="block text-xs font-medium text-gray-900 dark:text-gray-100"
                               >Droid 专属</span
                             >
-                            <span class="text-xs text-gray-500 dark:text-gray-400">官方</span>
+                            <span
+                              class="text-xs text-gray-500 dark:text-gray-400"
+                              >官方</span
+                            >
                           </div>
                         </div>
                         <div
@@ -522,7 +605,8 @@
                 form.platform !== 'openai-responses'
               "
             >
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              <label
+                class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >添加方式</label
               >
               <div class="flex flex-wrap gap-4">
@@ -534,19 +618,28 @@
                     value="oauth"
                   />
                   <span class="text-sm text-gray-700 dark:text-gray-300">
-                    OAuth 授权<span v-if="form.platform === 'claude' || form.platform === 'openai'">
+                    OAuth 授权<span
+                      v-if="
+                        form.platform === 'claude' || form.platform === 'openai'
+                      "
+                    >
                       (用量可视化)</span
                     >
                   </span>
                 </label>
-                <label v-if="form.platform === 'claude'" class="flex cursor-pointer items-center">
+                <label
+                  v-if="form.platform === 'claude'"
+                  class="flex cursor-pointer items-center"
+                >
                   <input
                     v-model="form.addType"
                     class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
                     type="radio"
                     value="setup-token"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">Setup Token (效期长)</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300"
+                    >Setup Token (效期长)</span
+                  >
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -559,7 +652,10 @@
                     >手动输入 Access Token</span
                   >
                 </label>
-                <label v-if="form.platform === 'droid'" class="flex cursor-pointer items-center">
+                <label
+                  v-if="form.platform === 'droid'"
+                  class="flex cursor-pointer items-center"
+                >
                   <input
                     v-model="form.addType"
                     class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
@@ -574,7 +670,8 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              <label
+                class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >账户名称</label
               >
               <input
@@ -591,7 +688,8 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              <label
+                class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >描述 (可选)</label
               >
               <textarea
@@ -603,7 +701,8 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              <label
+                class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >账户类型</label
               >
               <div class="flex gap-4">
@@ -614,7 +713,9 @@
                     type="radio"
                     value="shared"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">共享账户</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300"
+                    >共享账户</span
+                  >
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -623,7 +724,9 @@
                     type="radio"
                     value="dedicated"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">专属账户</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300"
+                    >专属账户</span
+                  >
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -632,7 +735,9 @@
                     type="radio"
                     value="group"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">分组调度</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300"
+                    >分组调度</span
+                  >
                 </label>
               </div>
               <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
@@ -643,7 +748,8 @@
 
             <!-- 到期时间 - 仅在创建账户时显示，编辑时使用独立的过期时间编辑弹窗 -->
             <div v-if="!isEdit">
-              <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              <label
+                class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >到期时间 (可选)</label
               >
               <div
@@ -670,7 +776,10 @@
                     @change="updateAccountCustomExpireAt"
                   />
                 </div>
-                <p v-if="form.expiresAt" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                <p
+                  v-if="form.expiresAt"
+                  class="mt-2 text-xs text-gray-500 dark:text-gray-400"
+                >
                   <i class="fas fa-calendar-alt mr-1" />
                   将于 {{ formatExpireDate(form.expiresAt) }} 过期
                 </p>
@@ -686,7 +795,8 @@
 
             <!-- 分组选择器 -->
             <div v-if="form.accountType === 'group'">
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              <label
+                class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >选择分组 *</label
               >
               <div class="flex gap-2">
@@ -734,14 +844,18 @@
                   type="button"
                   @click="refreshGroups"
                 >
-                  <i class="fas fa-sync-alt" :class="{ 'animate-spin': loadingGroups }" />
+                  <i
+                    class="fas fa-sync-alt"
+                    :class="{ 'animate-spin': loadingGroups }"
+                  />
                 </button>
               </div>
             </div>
 
             <!-- Gemini 项目 ID 字段 -->
             <div v-if="form.platform === 'gemini'">
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              <label
+                class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >项目 ID (可选)</label
               >
               <input
@@ -750,16 +864,22 @@
                 placeholder="例如：verdant-wares-464411-k9"
                 type="text"
               />
-              <div class="mt-2 rounded-lg border border-yellow-200 bg-yellow-50 p-3">
+              <div
+                class="mt-2 rounded-lg border border-yellow-200 bg-yellow-50 p-3"
+              >
                 <div class="flex items-start gap-2">
                   <i class="fas fa-info-circle mt-0.5 text-yellow-600" />
                   <div class="text-xs text-yellow-700">
-                    <p class="mb-1 font-medium">Google Cloud/Workspace 账号需要提供项目 ID</p>
-                    <p>
-                      某些 Google 账号（特别是绑定了 Google Cloud 的账号）会被识别为 Workspace
-                      账号，需要提供额外的项目 ID。
+                    <p class="mb-1 font-medium">
+                      Google Cloud/Workspace 账号需要提供项目 ID
                     </p>
-                    <div class="mt-2 rounded border border-yellow-300 bg-white p-2">
+                    <p>
+                      某些 Google 账号（特别是绑定了 Google Cloud
+                      的账号）会被识别为 Workspace 账号，需要提供额外的项目 ID。
+                    </p>
+                    <div
+                      class="mt-2 rounded border border-yellow-300 bg-white p-2"
+                    >
                       <p class="mb-1 font-medium">如何获取项目 ID：</p>
                       <ol class="ml-2 list-inside list-decimal space-y-1">
                         <li>
@@ -772,17 +892,19 @@
                           >
                         </li>
                         <li>
-                          复制<span class="font-semibold text-red-600">项目 ID（Project ID）</span
+                          复制<span class="font-semibold text-red-600"
+                            >项目 ID（Project ID）</span
                           >，通常是字符串格式
                         </li>
                         <li class="text-red-600">
-                          ⚠️ 注意：要复制项目 ID（Project ID），不要复制项目编号（Project Number）！
+                          ⚠️ 注意：要复制项目 ID（Project
+                          ID），不要复制项目编号（Project Number）！
                         </li>
                       </ol>
                     </div>
                     <p class="mt-2">
-                      <strong>提示：</strong>如果您的账号是普通个人账号（未绑定 Google
-                      Cloud），请留空此字段。
+                      <strong>提示：</strong>如果您的账号是普通个人账号（未绑定
+                      Google Cloud），请留空此字段。
                     </p>
                   </div>
                 </div>
@@ -790,9 +912,13 @@
             </div>
 
             <!-- Bedrock 特定字段 -->
-            <div v-if="form.platform === 'bedrock' && !isEdit" class="space-y-4">
+            <div
+              v-if="form.platform === 'bedrock' && !isEdit"
+              class="space-y-4"
+            >
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >AWS 访问密钥 ID *</label
                 >
                 <input
@@ -809,7 +935,8 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >AWS 秘密访问密钥 *</label
                 >
                 <input
@@ -820,13 +947,17 @@
                   required
                   type="password"
                 />
-                <p v-if="errors.secretAccessKey" class="mt-1 text-xs text-red-500">
+                <p
+                  v-if="errors.secretAccessKey"
+                  class="mt-1 text-xs text-red-500"
+                >
                   {{ errors.secretAccessKey }}
                 </p>
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >AWS 区域 *</label
                 >
                 <input
@@ -840,7 +971,9 @@
                 <p v-if="errors.region" class="mt-1 text-xs text-red-500">
                   {{ errors.region }}
                 </p>
-                <div class="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                <div
+                  class="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3"
+                >
                   <div class="flex items-start gap-2">
                     <i class="fas fa-info-circle mt-0.5 text-blue-600" />
                     <div class="text-xs text-blue-700">
@@ -853,14 +986,17 @@
                         <span>• ap-northeast-1 (东京)</span>
                         <span>• eu-central-1 (法兰克福)</span>
                       </div>
-                      <p class="mt-2 text-blue-600">💡 请输入完整的区域代码，如 us-east-1</p>
+                      <p class="mt-2 text-blue-600">
+                        💡 请输入完整的区域代码，如 us-east-1
+                      </p>
                     </div>
                   </div>
                 </div>
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >会话令牌 (可选)</label
                 >
                 <input
@@ -875,7 +1011,8 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >默认主模型 (可选)</label
                 >
                 <input
@@ -887,7 +1024,9 @@
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   留空将使用系统默认模型。支持 inference profile ID 或 ARN
                 </p>
-                <div class="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <div
+                  class="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3"
+                >
                   <div class="flex items-start gap-2">
                     <i class="fas fa-info-circle mt-0.5 text-amber-600" />
                     <div class="text-xs text-amber-700">
@@ -895,7 +1034,9 @@
                       <ul class="list-inside list-disc space-y-1 text-xs">
                         <li>支持 Inference Profile ID（推荐）</li>
                         <li>支持 Application Inference Profile ARN</li>
-                        <li>常用模型：us.anthropic.claude-sonnet-4-20250514-v1:0</li>
+                        <li>
+                          常用模型：us.anthropic.claude-sonnet-4-20250514-v1:0
+                        </li>
                         <li>留空将使用系统配置的默认模型</li>
                       </ul>
                     </div>
@@ -904,7 +1045,8 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >小快速模型 (可选)</label
                 >
                 <input
@@ -920,9 +1062,13 @@
             </div>
 
             <!-- Azure OpenAI 特定字段 -->
-            <div v-if="form.platform === 'azure_openai' && !isEdit" class="space-y-4">
+            <div
+              v-if="form.platform === 'azure_openai' && !isEdit"
+              class="space-y-4"
+            >
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >Azure Endpoint *</label
                 >
                 <input
@@ -933,16 +1079,21 @@
                   required
                   type="url"
                 />
-                <p v-if="errors.azureEndpoint" class="mt-1 text-xs text-red-500">
+                <p
+                  v-if="errors.azureEndpoint"
+                  class="mt-1 text-xs text-red-500"
+                >
                   {{ errors.azureEndpoint }}
                 </p>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Azure OpenAI 资源的终结点 URL，格式：https://your-resource.openai.azure.com
+                  Azure OpenAI 资源的终结点
+                  URL，格式：https://your-resource.openai.azure.com
                 </p>
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >API 版本</label
                 >
                 <input
@@ -957,7 +1108,8 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >部署名称 *</label
                 >
                 <input
@@ -968,7 +1120,10 @@
                   required
                   type="text"
                 />
-                <p v-if="errors.deploymentName" class="mt-1 text-xs text-red-500">
+                <p
+                  v-if="errors.deploymentName"
+                  class="mt-1 text-xs text-red-500"
+                >
                   {{ errors.deploymentName }}
                 </p>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -977,7 +1132,8 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >API Key *</label
                 >
                 <input
@@ -997,7 +1153,8 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >支持的模型</label
                 >
                 <div class="flex flex-wrap gap-2">
@@ -1011,7 +1168,7 @@
                       'gpt-5-mini',
                       'gpt-35-turbo',
                       'gpt-35-turbo-16k',
-                      'codex-mini'
+                      'codex-mini',
                     ]"
                     :key="model"
                     class="flex cursor-pointer items-center"
@@ -1022,7 +1179,9 @@
                       type="checkbox"
                       :value="model"
                     />
-                    <span class="text-sm text-gray-700 dark:text-gray-300">{{ model }}</span>
+                    <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                      model
+                    }}</span>
                   </label>
                 </div>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -1033,7 +1192,8 @@
 
             <div v-if="form.platform === 'bedrock' && !isEdit">
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >限流机制</label
                 >
                 <div class="mb-3">
@@ -1043,7 +1203,9 @@
                       class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700"
                       type="checkbox"
                     />
-                    <span class="text-sm text-gray-700 dark:text-gray-300">启用限流机制</span>
+                    <span class="text-sm text-gray-700 dark:text-gray-300"
+                      >启用限流机制</span
+                    >
                   </label>
                   <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     启用后，当账号返回429错误时将暂停调度一段时间
@@ -1051,7 +1213,8 @@
                 </div>
 
                 <div v-if="form.enableRateLimit">
-                  <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  <label
+                    class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                     >限流时间 (分钟)</label
                   >
                   <input
@@ -1070,11 +1233,16 @@
 
             <!-- Claude Console 和 CCR 特定字段 -->
             <div
-              v-if="(form.platform === 'claude-console' || form.platform === 'ccr') && !isEdit"
+              v-if="
+                (form.platform === 'claude-console' ||
+                  form.platform === 'ccr') &&
+                !isEdit
+              "
               class="space-y-4"
             >
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >API URL *</label
                 >
                 <input
@@ -1091,7 +1259,8 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >API Key *</label
                 >
                 <input
@@ -1110,7 +1279,9 @@
               <!-- 额度管理字段 -->
               <div class="grid grid-cols-2 gap-4">
                 <div>
-                  <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  <label
+                    class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  >
                     每日额度限制 ($)
                   </label>
                   <input
@@ -1127,7 +1298,9 @@
                 </div>
 
                 <div>
-                  <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  <label
+                    class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  >
                     额度重置时间
                   </label>
                   <input
@@ -1144,7 +1317,9 @@
 
               <!-- 并发控制字段 -->
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >
                   最大并发任务数
                 </label>
                 <input
@@ -1160,7 +1335,8 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >模型限制 (可选)</label
                 >
 
@@ -1196,7 +1372,9 @@
 
                 <!-- 白名单模式 -->
                 <div v-if="modelRestrictionMode === 'whitelist'">
-                  <div class="mb-3 rounded-lg bg-blue-50 p-3 dark:bg-blue-900/30">
+                  <div
+                    class="mb-3 rounded-lg bg-blue-50 p-3 dark:bg-blue-900/30"
+                  >
                     <p class="text-xs text-blue-700 dark:text-blue-400">
                       <i class="fas fa-info-circle mr-1" />
                       选择允许使用此账户的模型。留空表示支持所有模型。
@@ -1221,21 +1399,26 @@
                         type="checkbox"
                         :value="model.value"
                       />
-                      <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
-                        model.label
-                      }}</span>
+                      <span
+                        class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                        >{{ model.label }}</span
+                      >
                     </label>
                   </div>
 
                   <p class="text-xs text-gray-500 dark:text-gray-400">
                     已选择 {{ allowedModels.length }} 个模型
-                    <span v-if="allowedModels.length === 0">（支持所有模型）</span>
+                    <span v-if="allowedModels.length === 0"
+                      >（支持所有模型）</span
+                    >
                   </p>
                 </div>
 
                 <!-- 映射模式 -->
                 <div v-else>
-                  <div class="mb-3 rounded-lg bg-purple-50 p-3 dark:bg-purple-900/30">
+                  <div
+                    class="mb-3 rounded-lg bg-purple-50 p-3 dark:bg-purple-900/30"
+                  >
                     <p class="text-xs text-purple-700 dark:text-purple-400">
                       <i class="fas fa-info-circle mr-1" />
                       配置模型映射关系。左侧是客户端请求的模型，右侧是实际发送给API的模型。
@@ -1255,7 +1438,9 @@
                         placeholder="原始模型名称"
                         type="text"
                       />
-                      <i class="fas fa-arrow-right text-gray-400 dark:text-gray-500" />
+                      <i
+                        class="fas fa-arrow-right text-gray-400 dark:text-gray-500"
+                      />
                       <input
                         v-model="mapping.to"
                         class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -1288,7 +1473,10 @@
                       class="rounded-lg bg-blue-100 px-3 py-1 text-xs text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
                       type="button"
                       @click="
-                        addPresetMapping('claude-sonnet-4-20250514', 'claude-sonnet-4-20250514')
+                        addPresetMapping(
+                          'claude-sonnet-4-20250514',
+                          'claude-sonnet-4-20250514',
+                        )
                       "
                     >
                       + Sonnet 4
@@ -1297,7 +1485,10 @@
                       class="rounded-lg bg-indigo-100 px-3 py-1 text-xs text-indigo-700 transition-colors hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50"
                       type="button"
                       @click="
-                        addPresetMapping('claude-sonnet-4-5-20250929', 'claude-sonnet-4-5-20250929')
+                        addPresetMapping(
+                          'claude-sonnet-4-5-20250929',
+                          'claude-sonnet-4-5-20250929',
+                        )
                       "
                     >
                       + Sonnet 4.5
@@ -1306,7 +1497,10 @@
                       class="rounded-lg bg-purple-100 px-3 py-1 text-xs text-purple-700 transition-colors hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50"
                       type="button"
                       @click="
-                        addPresetMapping('claude-opus-4-1-20250805', 'claude-opus-4-1-20250805')
+                        addPresetMapping(
+                          'claude-opus-4-1-20250805',
+                          'claude-opus-4-1-20250805',
+                        )
                       "
                     >
                       + Opus 4.1
@@ -1315,7 +1509,10 @@
                       class="rounded-lg bg-green-100 px-3 py-1 text-xs text-green-700 transition-colors hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
                       type="button"
                       @click="
-                        addPresetMapping('claude-3-5-haiku-20241022', 'claude-3-5-haiku-20241022')
+                        addPresetMapping(
+                          'claude-3-5-haiku-20241022',
+                          'claude-3-5-haiku-20241022',
+                        )
                       "
                     >
                       + Haiku 3.5
@@ -1324,7 +1521,10 @@
                       class="rounded-lg bg-emerald-100 px-3 py-1 text-xs text-emerald-700 transition-colors hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50"
                       type="button"
                       @click="
-                        addPresetMapping('claude-haiku-4-5-20251001', 'claude-haiku-4-5-20251001')
+                        addPresetMapping(
+                          'claude-haiku-4-5-20251001',
+                          'claude-haiku-4-5-20251001',
+                        )
                       "
                     >
                       + Haiku 4.5
@@ -1332,7 +1532,9 @@
                     <button
                       class="rounded-lg bg-cyan-100 px-3 py-1 text-xs text-cyan-700 transition-colors hover:bg-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-400 dark:hover:bg-cyan-900/50"
                       type="button"
-                      @click="addPresetMapping('deepseek-chat', 'deepseek-chat')"
+                      @click="
+                        addPresetMapping('deepseek-chat', 'deepseek-chat')
+                      "
                     >
                       + DeepSeek
                     </button>
@@ -1361,7 +1563,10 @@
                       class="rounded-lg bg-amber-100 px-3 py-1 text-xs text-amber-700 transition-colors hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50"
                       type="button"
                       @click="
-                        addPresetMapping('claude-opus-4-1-20250805', 'claude-sonnet-4-20250514')
+                        addPresetMapping(
+                          'claude-opus-4-1-20250805',
+                          'claude-sonnet-4-20250514',
+                        )
                       "
                     >
                       + Opus → Sonnet
@@ -1371,7 +1576,8 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >自定义 User-Agent (可选)</label
                 >
                 <input
@@ -1381,12 +1587,14 @@
                   type="text"
                 />
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  留空时将自动使用客户端的 User-Agent，仅在需要固定特定 UA 时填写
+                  留空时将自动使用客户端的 User-Agent，仅在需要固定特定 UA
+                  时填写
                 </p>
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >限流机制</label
                 >
                 <div class="mb-3">
@@ -1396,7 +1604,9 @@
                       class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700"
                       type="checkbox"
                     />
-                    <span class="text-sm text-gray-700 dark:text-gray-300">启用限流机制</span>
+                    <span class="text-sm text-gray-700 dark:text-gray-300"
+                      >启用限流机制</span
+                    >
                   </label>
                   <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     启用后，当账号返回429错误时将暂停调度一段时间
@@ -1404,7 +1614,8 @@
                 </div>
 
                 <div v-if="form.enableRateLimit">
-                  <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  <label
+                    class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                     >限流时间 (分钟)</label
                   >
                   <input
@@ -1422,9 +1633,13 @@
             </div>
 
             <!-- OpenAI-Responses 特定字段 -->
-            <div v-if="form.platform === 'openai-responses' && !isEdit" class="space-y-4">
+            <div
+              v-if="form.platform === 'openai-responses' && !isEdit"
+              class="space-y-4"
+            >
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >API 基础地址 *</label
                 >
                 <input
@@ -1440,7 +1655,8 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >API 密钥 *</label
                 >
                 <div class="relative">
@@ -1456,7 +1672,9 @@
                     type="button"
                     @click="showApiKey = !showApiKey"
                   >
-                    <i :class="showApiKey ? 'fas fa-eye-slash' : 'fas fa-eye'" />
+                    <i
+                      :class="showApiKey ? 'fas fa-eye-slash' : 'fas fa-eye'"
+                    />
                   </button>
                 </div>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -1465,7 +1683,8 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >自定义 User-Agent (可选)</label
                 >
                 <input
@@ -1475,17 +1694,23 @@
                   type="text"
                 />
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  可选项。如果设置，所有请求将使用此 User-Agent；否则透传客户端的 User-Agent
+                  可选项。如果设置，所有请求将使用此
+                  User-Agent；否则透传客户端的 User-Agent
                 </p>
               </div>
 
               <!-- 限流时长字段 - 隐藏不显示，使用默认值60 -->
-              <input v-model.number="form.rateLimitDuration" type="hidden" value="60" />
+              <input
+                v-model.number="form.rateLimitDuration"
+                type="hidden"
+                value="60"
+              />
             </div>
 
             <!-- Claude 订阅类型选择 -->
             <div v-if="form.platform === 'claude'">
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              <label
+                class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >订阅类型</label
               >
               <div class="flex gap-4">
@@ -1496,7 +1721,9 @@
                     type="radio"
                     value="claude_max"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">Claude Max</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300"
+                    >Claude Max</span
+                  >
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input
@@ -1505,7 +1732,9 @@
                     type="radio"
                     value="claude_pro"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">Claude Pro</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300"
+                    >Claude Pro</span
+                  >
                 </label>
               </div>
               <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
@@ -1523,7 +1752,9 @@
                   type="checkbox"
                 />
                 <div class="ml-3">
-                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <span
+                    class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
                     5小时使用量接近限制时自动停止调度
                   </span>
                   <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -1542,11 +1773,14 @@
                   type="checkbox"
                 />
                 <div class="ml-3">
-                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <span
+                    class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
                     使用统一 Claude Code 版本
                   </span>
                   <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    开启后将使用从真实 Claude Code 客户端捕获的统一 User-Agent，提高兼容性
+                    开启后将使用从真实 Claude Code 客户端捕获的统一
+                    User-Agent，提高兼容性
                   </p>
                   <div v-if="unifiedUserAgent" class="mt-1">
                     <div class="flex items-center justify-between">
@@ -1559,9 +1793,12 @@
                         type="button"
                         @click="clearUnifiedCache"
                       >
-                        <i v-if="!clearingCache" class="fas fa-trash-alt mr-1"></i>
+                        <i
+                          v-if="!clearingCache"
+                          class="fas fa-trash-alt mr-1"
+                        ></i>
                         <div v-else class="loading-spinner mr-1"></div>
-                        {{ clearingCache ? '清除中...' : '清除缓存' }}
+                        {{ clearingCache ? "清除中..." : "清除缓存" }}
                       </button>
                     </div>
                   </div>
@@ -1570,8 +1807,9 @@
                       ⏳ 等待从 Claude Code 客户端捕获 User-Agent
                     </p>
                     <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                      💡 提示：如果长时间未能捕获，请确认有 Claude Code 客户端正在使用此账户，
-                      或联系开发者检查 User-Agent 格式是否发生变化
+                      💡 提示：如果长时间未能捕获，请确认有 Claude Code
+                      客户端正在使用此账户， 或联系开发者检查 User-Agent
+                      格式是否发生变化
                     </p>
                   </div>
                 </div>
@@ -1588,7 +1826,9 @@
                   @change="handleUnifiedClientIdChange"
                 />
                 <div class="ml-3 flex-1">
-                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <span
+                    class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
                     使用统一的客户端标识
                   </span>
                   <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -1599,7 +1839,8 @@
                       class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50"
                     >
                       <div class="mb-2 flex items-center justify-between">
-                        <span class="text-xs font-medium text-gray-600 dark:text-gray-400"
+                        <span
+                          class="text-xs font-medium text-gray-600 dark:text-gray-400"
                           >客户端标识 ID</span
                         >
                         <button
@@ -1638,7 +1879,8 @@
 
             <!-- 所有平台的优先级设置 -->
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              <label
+                class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >调度优先级 (1-100)</label
               >
               <input
@@ -1673,7 +1915,9 @@
                   <i class="fas fa-info text-sm text-white" />
                 </div>
                 <div>
-                  <h5 class="mb-2 font-semibold text-blue-900 dark:text-blue-300">
+                  <h5
+                    class="mb-2 font-semibold text-blue-900 dark:text-blue-300"
+                  >
                     手动输入 Token
                   </h5>
                   <p
@@ -1701,12 +1945,15 @@
                     v-else-if="form.platform === 'droid'"
                     class="mb-2 text-sm text-blue-800 dark:text-blue-300"
                   >
-                    请输入有效的 Droid Access Token，并同时提供 Refresh Token 以支持自动刷新。
+                    请输入有效的 Droid Access Token，并同时提供 Refresh Token
+                    以支持自动刷新。
                   </p>
                   <div
                     class="mb-2 mt-2 rounded-lg border border-blue-300 bg-white/80 p-3 dark:border-blue-600 dark:bg-gray-800/80"
                   >
-                    <p class="mb-1 text-sm font-medium text-blue-900 dark:text-blue-300">
+                    <p
+                      class="mb-1 text-sm font-medium text-blue-900 dark:text-blue-300"
+                    >
                       <i class="fas fa-folder-open mr-1" />
                       获取 Access Token 的方法：
                     </p>
@@ -1715,7 +1962,8 @@
                       class="text-xs text-blue-800 dark:text-blue-300"
                     >
                       请从已登录 Claude Code 的机器上获取
-                      <code class="rounded bg-blue-100 px-1 py-0.5 font-mono dark:bg-blue-900/50"
+                      <code
+                        class="rounded bg-blue-100 px-1 py-0.5 font-mono dark:bg-blue-900/50"
                         >~/.claude/.credentials.json</code
                       >
                       文件中的凭证， 请勿使用 Claude 官网 API Keys 页面的密钥。
@@ -1725,7 +1973,8 @@
                       class="text-xs text-blue-800 dark:text-blue-300"
                     >
                       请从已登录 Gemini CLI 的机器上获取
-                      <code class="rounded bg-blue-100 px-1 py-0.5 font-mono dark:bg-blue-900/50"
+                      <code
+                        class="rounded bg-blue-100 px-1 py-0.5 font-mono dark:bg-blue-900/50"
                         >~/.config/gemini/credentials.json</code
                       >
                       文件中的凭证。
@@ -1734,15 +1983,15 @@
                       v-else-if="form.platform === 'openai'"
                       class="text-xs text-blue-800 dark:text-blue-300"
                     >
-                      请从已登录 OpenAI 账户的机器上获取认证凭证， 或通过 OAuth 授权流程获取 Access
-                      Token。
+                      请从已登录 OpenAI 账户的机器上获取认证凭证， 或通过 OAuth
+                      授权流程获取 Access Token。
                     </p>
                     <p
                       v-else-if="form.platform === 'droid'"
                       class="text-xs text-blue-800 dark:text-blue-300"
                     >
-                      请从已完成授权的 Droid CLI 或 Factory.ai 导出的凭证中获取 Access Token 与
-                      Refresh Token。
+                      请从已完成授权的 Droid CLI 或 Factory.ai 导出的凭证中获取
+                      Access Token 与 Refresh Token。
                     </p>
                   </div>
                   <p
@@ -1752,13 +2001,15 @@
                     💡 如果未填写 Refresh Token，Token 过期后需要手动更新。
                   </p>
                   <p v-else class="text-xs text-red-600 dark:text-red-400">
-                    ⚠️ Droid 账户必须填写 Refresh Token，缺失将导致无法自动刷新 Access Token。
+                    ⚠️ Droid 账户必须填写 Refresh Token，缺失将导致无法自动刷新
+                    Access Token。
                   </p>
                 </div>
               </div>
 
               <div v-if="form.platform === 'openai'">
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >Access Token (可选)</label
                 >
                 <textarea
@@ -1769,12 +2020,14 @@
                 />
                 <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                   <i class="fas fa-info-circle mr-1" />
-                  Access Token 可选填。如果不提供，系统会通过 Refresh Token 自动获取。
+                  Access Token 可选填。如果不提供，系统会通过 Refresh Token
+                  自动获取。
                 </p>
               </div>
 
               <div v-else>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >Access Token *</label
                 >
                 <textarea
@@ -1790,8 +2043,11 @@
                 </p>
               </div>
 
-              <div v-if="form.platform === 'openai' || form.platform === 'droid'">
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              <div
+                v-if="form.platform === 'openai' || form.platform === 'droid'"
+              >
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >Refresh Token *</label
                 >
                 <textarea
@@ -1811,13 +2067,15 @@
                     系统将使用 Refresh Token 自动获取 Access Token 和用户信息
                   </template>
                   <template v-else>
-                    系统将使用 Refresh Token 自动刷新 Factory.ai 访问令牌，确保账户保持可用。
+                    系统将使用 Refresh Token 自动刷新 Factory.ai
+                    访问令牌，确保账户保持可用。
                   </template>
                 </p>
               </div>
 
               <div v-else>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >Refresh Token (可选)</label
                 >
                 <textarea
@@ -1841,7 +2099,9 @@
                   <i class="fas fa-key text-sm text-white" />
                 </div>
                 <div>
-                  <h5 class="mb-2 font-semibold text-purple-900 dark:text-purple-200">
+                  <h5
+                    class="mb-2 font-semibold text-purple-900 dark:text-purple-200"
+                  >
                     使用 API Key 调度 Droid
                   </h5>
                   <p class="text-sm text-purple-800 dark:text-purple-200">
@@ -1852,7 +2112,8 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >API Key 列表 *</label
                 >
                 <textarea
@@ -1875,10 +2136,14 @@
               <div
                 class="rounded-lg border border-purple-200 bg-white/70 p-3 text-xs text-purple-800 dark:border-purple-700 dark:bg-purple-800/20 dark:text-purple-100"
               >
-                <p class="font-medium"><i class="fas fa-random mr-1" />分配策略说明</p>
+                <p class="font-medium">
+                  <i class="fas fa-random mr-1" />分配策略说明
+                </p>
                 <ul class="mt-1 list-disc space-y-1 pl-4">
                   <li>新会话将随机命中一个 Key，并在会话有效期内保持粘性。</li>
-                  <li>若某 Key 失效，会自动切换到剩余可用 Key，最大化成功率。</li>
+                  <li>
+                    若某 Key 失效，会自动切换到剩余可用 Key，最大化成功率。
+                  </li>
                   <li>
                     若上游返回 4xx 错误码，该 Key 会被自动标记为异常；全部 Key
                     异常后账号将暂停调度。
@@ -1900,7 +2165,8 @@
               </button>
               <button
                 v-if="
-                  (form.addType === 'oauth' || form.addType === 'setup-token') &&
+                  (form.addType === 'oauth' ||
+                    form.addType === 'setup-token') &&
                   form.platform !== 'claude-console' &&
                   form.platform !== 'ccr' &&
                   form.platform !== 'bedrock' &&
@@ -1922,7 +2188,7 @@
                 @click="createAccount"
               >
                 <div v-if="loading" class="loading-spinner mr-2" />
-                {{ loading ? '创建中...' : '创建' }}
+                {{ loading ? "创建中..." : "创建" }}
               </button>
             </div>
           </div>
@@ -1938,7 +2204,10 @@
         />
 
         <!-- 步骤2: Setup Token授权 -->
-        <div v-if="oauthStep === 2 && form.addType === 'setup-token'" class="space-y-6">
+        <div
+          v-if="oauthStep === 2 && form.addType === 'setup-token'"
+          class="space-y-6"
+        >
           <!-- Claude Setup Token流程 -->
           <div v-if="form.platform === 'claude'">
             <div
@@ -1951,7 +2220,9 @@
                   <i class="fas fa-key text-white" />
                 </div>
                 <div class="flex-1">
-                  <h4 class="mb-3 font-semibold text-blue-900 dark:text-blue-200">
+                  <h4
+                    class="mb-3 font-semibold text-blue-900 dark:text-blue-200"
+                  >
                     Claude Setup Token 授权
                   </h4>
                   <p class="mb-4 text-sm text-blue-800 dark:text-blue-300">
@@ -1970,7 +2241,9 @@
                           1
                         </div>
                         <div class="flex-1">
-                          <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
+                          <p
+                            class="mb-2 font-medium text-blue-900 dark:text-blue-200"
+                          >
                             点击下方按钮生成授权链接
                           </p>
                           <button
@@ -1979,9 +2252,16 @@
                             :disabled="setupTokenLoading"
                             @click="generateSetupTokenAuthUrl"
                           >
-                            <i v-if="!setupTokenLoading" class="fas fa-link mr-2" />
+                            <i
+                              v-if="!setupTokenLoading"
+                              class="fas fa-link mr-2"
+                            />
                             <div v-else class="loading-spinner mr-2" />
-                            {{ setupTokenLoading ? '生成中...' : '生成 Setup Token 授权链接' }}
+                            {{
+                              setupTokenLoading
+                                ? "生成中..."
+                                : "生成 Setup Token 授权链接"
+                            }}
                           </button>
                           <div v-else class="space-y-3">
                             <div class="flex items-center gap-2">
@@ -1998,7 +2278,9 @@
                               >
                                 <i
                                   :class="
-                                    setupTokenCopied ? 'fas fa-check text-green-500' : 'fas fa-copy'
+                                    setupTokenCopied
+                                      ? 'fas fa-check text-green-500'
+                                      : 'fas fa-copy'
                                   "
                                 />
                               </button>
@@ -2025,16 +2307,23 @@
                           2
                         </div>
                         <div class="flex-1">
-                          <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
+                          <p
+                            class="mb-2 font-medium text-blue-900 dark:text-blue-200"
+                          >
                             在浏览器中打开链接并完成授权
                           </p>
-                          <p class="mb-2 text-sm text-blue-700 dark:text-blue-300">
-                            请在新标签页中打开授权链接，登录您的 Claude 账户并授权 Claude Code。
+                          <p
+                            class="mb-2 text-sm text-blue-700 dark:text-blue-300"
+                          >
+                            请在新标签页中打开授权链接，登录您的 Claude
+                            账户并授权 Claude Code。
                           </p>
                           <div
                             class="rounded border border-yellow-300 bg-yellow-50 p-3 dark:border-yellow-700 dark:bg-yellow-900/30"
                           >
-                            <p class="text-xs text-yellow-800 dark:text-yellow-300">
+                            <p
+                              class="text-xs text-yellow-800 dark:text-yellow-300"
+                            >
                               <i class="fas fa-exclamation-triangle mr-1" />
                               <strong>注意：</strong
                               >如果您设置了代理，请确保浏览器也使用相同的代理访问授权页面。
@@ -2055,18 +2344,25 @@
                           3
                         </div>
                         <div class="flex-1">
-                          <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
+                          <p
+                            class="mb-2 font-medium text-blue-900 dark:text-blue-200"
+                          >
                             输入 Authorization Code
                           </p>
-                          <p class="mb-3 text-sm text-blue-700 dark:text-blue-300">
-                            授权完成后，从返回页面复制 Authorization Code，并粘贴到下方输入框：
+                          <p
+                            class="mb-3 text-sm text-blue-700 dark:text-blue-300"
+                          >
+                            授权完成后，从返回页面复制 Authorization
+                            Code，并粘贴到下方输入框：
                           </p>
                           <div class="space-y-3">
                             <div>
                               <label
                                 class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                               >
-                                <i class="fas fa-key mr-2 text-blue-500" />Authorization Code
+                                <i
+                                  class="fas fa-key mr-2 text-blue-500"
+                                />Authorization Code
                               </label>
                               <textarea
                                 v-model="setupTokenAuthCode"
@@ -2075,9 +2371,12 @@
                                 rows="3"
                               />
                             </div>
-                            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            <p
+                              class="mt-2 text-xs text-gray-500 dark:text-gray-400"
+                            >
                               <i class="fas fa-info-circle mr-1" />
-                              请粘贴从Claude Code授权页面复制的Authorization Code
+                              请粘贴从Claude Code授权页面复制的Authorization
+                              Code
                             </p>
                           </div>
                         </div>
@@ -2104,7 +2403,7 @@
               @click="exchangeSetupTokenCode"
             >
               <div v-if="setupTokenExchanging" class="loading-spinner mr-2" />
-              {{ setupTokenExchanging ? '验证中...' : '完成授权' }}
+              {{ setupTokenExchanging ? "验证中..." : "完成授权" }}
             </button>
           </div>
         </div>
@@ -2113,7 +2412,8 @@
         <div v-if="isEdit" class="space-y-6">
           <!-- 基本信息 -->
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+            <label
+              class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
               >账户名称</label
             >
             <input
@@ -2126,7 +2426,8 @@
           </div>
 
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+            <label
+              class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
               >描述 (可选)</label
             >
             <textarea
@@ -2138,7 +2439,8 @@
           </div>
 
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+            <label
+              class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
               >账户类型</label
             >
             <div class="flex gap-4">
@@ -2149,7 +2451,9 @@
                   type="radio"
                   value="shared"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">共享账户</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300"
+                  >共享账户</span
+                >
               </label>
               <label class="flex cursor-pointer items-center">
                 <input
@@ -2158,7 +2462,9 @@
                   type="radio"
                   value="dedicated"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">专属账户</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300"
+                  >专属账户</span
+                >
               </label>
               <label class="flex cursor-pointer items-center">
                 <input
@@ -2167,7 +2473,9 @@
                   type="radio"
                   value="group"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">分组调度</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300"
+                  >分组调度</span
+                >
               </label>
             </div>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
@@ -2178,7 +2486,8 @@
 
           <!-- 到期时间 - 仅在创建账户时显示，编辑时使用独立的过期时间编辑弹窗 -->
           <div v-if="!isEdit">
-            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+            <label
+              class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
               >到期时间 (可选)</label
             >
             <div
@@ -2205,7 +2514,10 @@
                   @change="updateAccountCustomExpireAt"
                 />
               </div>
-              <p v-if="form.expiresAt" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              <p
+                v-if="form.expiresAt"
+                class="mt-2 text-xs text-gray-500 dark:text-gray-400"
+              >
                 <i class="fas fa-calendar-alt mr-1" />
                 将于 {{ formatExpireDate(form.expiresAt) }} 过期
               </p>
@@ -2221,7 +2533,8 @@
 
           <!-- 分组选择器 -->
           <div v-if="form.accountType === 'group'">
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+            <label
+              class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
               >选择分组 *</label
             >
             <div class="flex gap-2">
@@ -2269,14 +2582,18 @@
                 type="button"
                 @click="refreshGroups"
               >
-                <i class="fas fa-sync-alt" :class="{ 'animate-spin': loadingGroups }" />
+                <i
+                  class="fas fa-sync-alt"
+                  :class="{ 'animate-spin': loadingGroups }"
+                />
               </button>
             </div>
           </div>
 
           <!-- Gemini 项目 ID 字段 -->
           <div v-if="form.platform === 'gemini'">
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+            <label
+              class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
               >项目 ID (可选)</label
             >
             <input
@@ -2292,7 +2609,8 @@
 
           <!-- Claude 订阅类型选择（编辑模式） -->
           <div v-if="form.platform === 'claude'">
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+            <label
+              class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
               >订阅类型</label
             >
             <div class="flex gap-4">
@@ -2303,7 +2621,9 @@
                   type="radio"
                   value="claude_max"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">Claude Max</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300"
+                  >Claude Max</span
+                >
               </label>
               <label class="flex cursor-pointer items-center">
                 <input
@@ -2312,7 +2632,9 @@
                   type="radio"
                   value="claude_pro"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">Claude Pro</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300"
+                  >Claude Pro</span
+                >
               </label>
             </div>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
@@ -2330,7 +2652,9 @@
                 type="checkbox"
               />
               <div class="ml-3">
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <span
+                  class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
                   5小时使用量接近限制时自动停止调度
                 </span>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -2349,11 +2673,14 @@
                 type="checkbox"
               />
               <div class="ml-3">
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <span
+                  class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
                   使用统一 Claude Code 版本
                 </span>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  开启后将使用从真实 Claude Code 客户端捕获的统一 User-Agent，提高兼容性
+                  开启后将使用从真实 Claude Code 客户端捕获的统一
+                  User-Agent，提高兼容性
                 </p>
                 <div v-if="unifiedUserAgent" class="mt-1">
                   <div class="flex items-center justify-between">
@@ -2366,9 +2693,12 @@
                       type="button"
                       @click="clearUnifiedCache"
                     >
-                      <i v-if="!clearingCache" class="fas fa-trash-alt mr-1"></i>
+                      <i
+                        v-if="!clearingCache"
+                        class="fas fa-trash-alt mr-1"
+                      ></i>
                       <div v-else class="loading-spinner mr-1"></div>
-                      {{ clearingCache ? '清除中...' : '清除缓存' }}
+                      {{ clearingCache ? "清除中..." : "清除缓存" }}
                     </button>
                   </div>
                 </div>
@@ -2377,8 +2707,9 @@
                     ⏳ 等待从 Claude Code 客户端捕获 User-Agent
                   </p>
                   <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                    💡 提示：如果长时间未能捕获，请确认有 Claude Code 客户端正在使用此账户，
-                    或联系开发者检查 User-Agent 格式是否发生变化
+                    💡 提示：如果长时间未能捕获，请确认有 Claude Code
+                    客户端正在使用此账户， 或联系开发者检查 User-Agent
+                    格式是否发生变化
                   </p>
                 </div>
               </div>
@@ -2395,7 +2726,9 @@
                 @change="handleUnifiedClientIdChange"
               />
               <div class="ml-3 flex-1">
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <span
+                  class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
                   使用统一的客户端标识
                 </span>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -2406,7 +2739,8 @@
                     class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50"
                   >
                     <div class="mb-2 flex items-center justify-between">
-                      <span class="text-xs font-medium text-gray-600 dark:text-gray-400"
+                      <span
+                        class="text-xs font-medium text-gray-600 dark:text-gray-400"
                         >客户端标识 ID</span
                       >
                       <button
@@ -2445,7 +2779,8 @@
 
           <!-- 所有平台的优先级设置（编辑模式） -->
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+            <label
+              class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
               >调度优先级 (1-100)</label
             >
             <input
@@ -2461,13 +2796,121 @@
             </p>
           </div>
 
+          <!-- 定时任务配置 -->
+          <div
+            class="rounded-lg border border-gray-200 p-4 dark:border-gray-600"
+          >
+            <div class="mb-3 flex items-center justify-between">
+              <label class="flex items-center gap-2">
+                <input
+                  v-model="form.scheduledRequest.enabled"
+                  class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  type="checkbox"
+                />
+                <span
+                  class="text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >
+                  启用定时任务
+                </span>
+              </label>
+              <button
+                v-if="form.scheduledRequest.enabled && isEdit"
+                class="rounded-md bg-blue-100 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
+                type="button"
+                :disabled="testingScheduledRequest"
+                @click="testScheduledRequest"
+              >
+                <i v-if="!testingScheduledRequest" class="fas fa-play mr-1" />
+                <i v-else class="fas fa-spinner fa-spin mr-1" />
+                {{ testingScheduledRequest ? "测试中..." : "立即测试" }}
+              </button>
+            </div>
+
+            <div v-if="form.scheduledRequest.enabled" class="space-y-3">
+              <div>
+                <label
+                  class="mb-2 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                >
+                  执行时间
+                </label>
+                <select
+                  v-model.number="form.scheduledRequest.scheduleHour"
+                  class="form-select w-full rounded-lg border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                >
+                  <option v-for="hour in 24" :key="hour - 1" :value="hour - 1">
+                    {{ String(hour - 1).padStart(2, "0") }}:05
+                  </option>
+                </select>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  <i class="fas fa-clock mr-1 text-blue-500" />
+                  选择每天执行定时任务的时间
+                </p>
+              </div>
+
+              <div
+                v-if="form.scheduledRequest.lastExecutedAt"
+                class="rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50"
+              >
+                <div
+                  class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400"
+                >
+                  上次执行状态
+                </div>
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <span
+                      v-if="form.scheduledRequest.lastStatus === 'success'"
+                      class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                    >
+                      <i class="fas fa-check mr-1" />
+                      成功
+                    </span>
+                    <span
+                      v-else-if="form.scheduledRequest.lastStatus === 'error'"
+                      class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                    >
+                      <i class="fas fa-times mr-1" />
+                      失败
+                    </span>
+                  </div>
+                  <span class="text-xs text-gray-500 dark:text-gray-400">
+                    {{
+                      formatRelativeTime(form.scheduledRequest.lastExecutedAt)
+                    }}
+                  </span>
+                </div>
+                <div
+                  v-if="
+                    form.scheduledRequest.lastStatus === 'error' &&
+                    form.scheduledRequest.lastError
+                  "
+                  class="mt-2"
+                >
+                  <div class="text-xs text-red-600 dark:text-red-400">
+                    <i class="fas fa-exclamation-circle mr-1" />
+                    {{ form.scheduledRequest.lastError }}
+                  </div>
+                </div>
+              </div>
+
+              <div class="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/30">
+                <p class="text-xs text-blue-700 dark:text-blue-400">
+                  <i class="fas fa-info-circle mr-1" />
+                  定时任务将在每天指定时间执行一次API请求，用于保持账户活跃或测试账户可用性
+                </p>
+              </div>
+            </div>
+          </div>
+
           <!-- Claude Console 和 CCR 特定字段（编辑模式）-->
           <div
             v-if="form.platform === 'claude-console' || form.platform === 'ccr'"
             class="space-y-4"
           >
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">API URL</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700"
+                >API URL</label
+              >
               <input
                 v-model="form.apiUrl"
                 class="form-input w-full"
@@ -2478,7 +2921,9 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">API Key</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700"
+                >API Key</label
+              >
               <input
                 v-model="form.apiKey"
                 class="form-input w-full"
@@ -2491,7 +2936,9 @@
             <!-- 额度管理字段 -->
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >
                   每日额度限制 ($)
                 </label>
                 <input
@@ -2508,7 +2955,9 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >
                   额度重置时间
                 </label>
                 <input
@@ -2517,7 +2966,9 @@
                   placeholder="00:00"
                   type="time"
                 />
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">每日自动重置额度的时间</p>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  每日自动重置额度的时间
+                </p>
               </div>
             </div>
 
@@ -2527,14 +2978,20 @@
               class="rounded-lg bg-gray-50 p-4 dark:bg-gray-800"
             >
               <div class="mb-2 flex items-center justify-between">
-                <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                <span
+                  class="text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >
                   今日使用情况
                 </span>
                 <span class="text-sm text-gray-500 dark:text-gray-400">
-                  ${{ calculateCurrentUsage().toFixed(4) }} / ${{ form.dailyQuota.toFixed(2) }}
+                  ${{ calculateCurrentUsage().toFixed(4) }} / ${{
+                    form.dailyQuota.toFixed(2)
+                  }}
                 </span>
               </div>
-              <div class="relative h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
+              <div
+                class="relative h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700"
+              >
                 <div
                   class="absolute left-0 top-0 h-full rounded-full transition-all"
                   :class="
@@ -2549,7 +3006,12 @@
               </div>
               <div class="mt-2 flex items-center justify-between text-xs">
                 <span class="text-gray-500 dark:text-gray-400">
-                  剩余: ${{ Math.max(0, form.dailyQuota - calculateCurrentUsage()).toFixed(2) }}
+                  剩余: ${{
+                    Math.max(
+                      0,
+                      form.dailyQuota - calculateCurrentUsage(),
+                    ).toFixed(2)
+                  }}
                 </span>
                 <span class="text-gray-500 dark:text-gray-400">
                   {{ usagePercentage.toFixed(1) }}% 已使用
@@ -2559,7 +3021,9 @@
 
             <!-- 并发控制字段（编辑模式）-->
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+              <label
+                class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >
                 最大并发任务数
               </label>
               <input
@@ -2575,7 +3039,8 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              <label
+                class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >模型限制 (可选)</label
               >
 
@@ -2636,21 +3101,26 @@
                       type="checkbox"
                       :value="model.value"
                     />
-                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
-                      model.label
-                    }}</span>
+                    <span
+                      class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                      >{{ model.label }}</span
+                    >
                   </label>
                 </div>
 
                 <p class="text-xs text-gray-500 dark:text-gray-400">
                   已选择 {{ allowedModels.length }} 个模型
-                  <span v-if="allowedModels.length === 0">（支持所有模型）</span>
+                  <span v-if="allowedModels.length === 0"
+                    >（支持所有模型）</span
+                  >
                 </p>
               </div>
 
               <!-- 映射模式 -->
               <div v-else>
-                <div class="mb-3 rounded-lg bg-purple-50 p-3 dark:bg-purple-900/30">
+                <div
+                  class="mb-3 rounded-lg bg-purple-50 p-3 dark:bg-purple-900/30"
+                >
                   <p class="text-xs text-purple-700 dark:text-purple-400">
                     <i class="fas fa-info-circle mr-1" />
                     配置模型映射关系。左侧是客户端请求的模型，右侧是实际发送给API的模型。
@@ -2670,7 +3140,9 @@
                       placeholder="原始模型名称"
                       type="text"
                     />
-                    <i class="fas fa-arrow-right text-gray-400 dark:text-gray-500" />
+                    <i
+                      class="fas fa-arrow-right text-gray-400 dark:text-gray-500"
+                    />
                     <input
                       v-model="mapping.to"
                       class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
@@ -2703,7 +3175,10 @@
                     class="rounded-lg bg-blue-100 px-3 py-1 text-xs text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
                     type="button"
                     @click="
-                      addPresetMapping('claude-sonnet-4-20250514', 'claude-sonnet-4-20250514')
+                      addPresetMapping(
+                        'claude-sonnet-4-20250514',
+                        'claude-sonnet-4-20250514',
+                      )
                     "
                   >
                     + Sonnet 4
@@ -2712,7 +3187,10 @@
                     class="rounded-lg bg-indigo-100 px-3 py-1 text-xs text-indigo-700 transition-colors hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50"
                     type="button"
                     @click="
-                      addPresetMapping('claude-sonnet-4-5-20250929', 'claude-sonnet-4-5-20250929')
+                      addPresetMapping(
+                        'claude-sonnet-4-5-20250929',
+                        'claude-sonnet-4-5-20250929',
+                      )
                     "
                   >
                     + Sonnet 4.5
@@ -2721,7 +3199,10 @@
                     class="rounded-lg bg-purple-100 px-3 py-1 text-xs text-purple-700 transition-colors hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50"
                     type="button"
                     @click="
-                      addPresetMapping('claude-opus-4-1-20250805', 'claude-opus-4-1-20250805')
+                      addPresetMapping(
+                        'claude-opus-4-1-20250805',
+                        'claude-opus-4-1-20250805',
+                      )
                     "
                   >
                     + Opus 4.1
@@ -2730,7 +3211,10 @@
                     class="rounded-lg bg-green-100 px-3 py-1 text-xs text-green-700 transition-colors hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
                     type="button"
                     @click="
-                      addPresetMapping('claude-3-5-haiku-20241022', 'claude-3-5-haiku-20241022')
+                      addPresetMapping(
+                        'claude-3-5-haiku-20241022',
+                        'claude-3-5-haiku-20241022',
+                      )
                     "
                   >
                     + Haiku 3.5
@@ -2739,7 +3223,10 @@
                     class="rounded-lg bg-emerald-100 px-3 py-1 text-xs text-emerald-700 transition-colors hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50"
                     type="button"
                     @click="
-                      addPresetMapping('claude-haiku-4-5-20251001', 'claude-haiku-4-5-20251001')
+                      addPresetMapping(
+                        'claude-haiku-4-5-20251001',
+                        'claude-haiku-4-5-20251001',
+                      )
                     "
                   >
                     + Haiku 4.5
@@ -2776,7 +3263,10 @@
                     class="rounded-lg bg-amber-100 px-3 py-1 text-xs text-amber-700 transition-colors hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50"
                     type="button"
                     @click="
-                      addPresetMapping('claude-opus-4-1-20250805', 'claude-sonnet-4-20250514')
+                      addPresetMapping(
+                        'claude-opus-4-1-20250805',
+                        'claude-sonnet-4-20250514',
+                      )
                     "
                   >
                     + Opus → Sonnet
@@ -2801,7 +3291,9 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">限流机制</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700"
+                >限流机制</label
+              >
               <div class="mb-3">
                 <label class="inline-flex cursor-pointer items-center">
                   <input
@@ -2826,7 +3318,9 @@
                   min="1"
                   type="number"
                 />
-                <p class="mt-1 text-xs text-gray-500">账号被限流后暂停调度的时间（分钟）</p>
+                <p class="mt-1 text-xs text-gray-500">
+                  账号被限流后暂停调度的时间（分钟）
+                </p>
               </div>
             </div>
           </div>
@@ -2834,7 +3328,9 @@
           <!-- OpenAI-Responses 特定字段（编辑模式）-->
           <div v-if="form.platform === 'openai-responses'" class="space-y-4">
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">API 基础地址</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700"
+                >API 基础地址</label
+              >
               <input
                 v-model="form.baseApi"
                 class="form-input w-full"
@@ -2844,7 +3340,9 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">API 密钥</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700"
+                >API 密钥</label
+              >
               <div class="relative">
                 <input
                   v-model="form.apiKey"
@@ -2884,7 +3382,9 @@
             <!-- 额度管理字段 -->
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >
                   每日额度限制 ($)
                 </label>
                 <input
@@ -2897,7 +3397,9 @@
                 />
               </div>
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >
                   额度重置时间
                 </label>
                 <input
@@ -2910,7 +3412,9 @@
 
             <!-- 并发控制字段 -->
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+              <label
+                class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >
                 最大并发任务数
               </label>
               <input
@@ -2929,36 +3433,48 @@
           <!-- Bedrock 特定字段（编辑模式）-->
           <div v-if="form.platform === 'bedrock'" class="space-y-4">
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">AWS 访问密钥 ID</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700"
+                >AWS 访问密钥 ID</label
+              >
               <input
                 v-model="form.accessKeyId"
                 class="form-input w-full"
                 placeholder="留空表示不更新"
                 type="text"
               />
-              <p class="mt-1 text-xs text-gray-500">留空表示不更新 AWS Access Key ID</p>
+              <p class="mt-1 text-xs text-gray-500">
+                留空表示不更新 AWS Access Key ID
+              </p>
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">AWS 秘密访问密钥</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700"
+                >AWS 秘密访问密钥</label
+              >
               <input
                 v-model="form.secretAccessKey"
                 class="form-input w-full"
                 placeholder="留空表示不更新"
                 type="password"
               />
-              <p class="mt-1 text-xs text-gray-500">留空表示不更新 AWS Secret Access Key</p>
+              <p class="mt-1 text-xs text-gray-500">
+                留空表示不更新 AWS Secret Access Key
+              </p>
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">AWS 区域</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700"
+                >AWS 区域</label
+              >
               <input
                 v-model="form.region"
                 class="form-input w-full"
                 placeholder="例如：us-east-1"
                 type="text"
               />
-              <div class="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <div
+                class="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3"
+              >
                 <div class="flex items-start gap-2">
                   <i class="fas fa-info-circle mt-0.5 text-blue-600" />
                   <div class="text-xs text-blue-700">
@@ -2977,7 +3493,9 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">会话令牌 (可选)</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700"
+                >会话令牌 (可选)</label
+              >
               <input
                 v-model="form.sessionToken"
                 class="form-input w-full"
@@ -3002,7 +3520,8 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              <label
+                class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >小快速模型 (可选)</label
               >
               <input
@@ -3011,11 +3530,15 @@
                 placeholder="例如：us.anthropic.claude-3-5-haiku-20241022-v1:0"
                 type="text"
               />
-              <p class="mt-1 text-xs text-gray-500">用于快速响应的轻量级模型，留空将使用系统默认</p>
+              <p class="mt-1 text-xs text-gray-500">
+                用于快速响应的轻量级模型，留空将使用系统默认
+              </p>
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">限流机制</label>
+              <label class="mb-3 block text-sm font-semibold text-gray-700"
+                >限流机制</label
+              >
               <div class="mb-3">
                 <label class="inline-flex cursor-pointer items-center">
                   <input
@@ -3040,7 +3563,9 @@
                   min="1"
                   type="number"
                 />
-                <p class="mt-1 text-xs text-gray-500">账号被限流后暂停调度的时间（分钟）</p>
+                <p class="mt-1 text-xs text-gray-500">
+                  账号被限流后暂停调度的时间（分钟）
+                </p>
               </div>
             </div>
           </div>
@@ -3048,7 +3573,8 @@
           <!-- Azure OpenAI 特定字段（编辑模式）-->
           <div v-if="form.platform === 'azure_openai'" class="space-y-4">
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              <label
+                class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >Azure Endpoint</label
               >
               <input
@@ -3064,7 +3590,8 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              <label
+                class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >API 版本</label
               >
               <input
@@ -3079,7 +3606,8 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              <label
+                class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >部署名称</label
               >
               <input
@@ -3095,7 +3623,8 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              <label
+                class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >API Key</label
               >
               <input
@@ -3108,11 +3637,14 @@
               <p v-if="errors.apiKey" class="mt-1 text-xs text-red-500">
                 {{ errors.apiKey }}
               </p>
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">留空表示不更新 API Key</p>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                留空表示不更新 API Key
+              </p>
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              <label
+                class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >支持的模型</label
               >
               <div class="flex flex-wrap gap-2">
@@ -3126,7 +3658,7 @@
                     'gpt-5-mini',
                     'gpt-35-turbo',
                     'gpt-35-turbo-16k',
-                    'codex-mini'
+                    'codex-mini',
                   ]"
                   :key="model"
                   class="flex cursor-pointer items-center"
@@ -3137,10 +3669,14 @@
                     type="checkbox"
                     :value="model"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ model }}</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    model
+                  }}</span>
                 </label>
               </div>
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">选择此部署支持的模型类型</p>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                选择此部署支持的模型类型
+              </p>
             </div>
           </div>
 
@@ -3157,7 +3693,11 @@
               </div>
               <div class="flex-1">
                 <div class="mb-2 flex items-center justify-between">
-                  <h5 class="font-semibold text-purple-900 dark:text-purple-200">更新 API Key</h5>
+                  <h5
+                    class="font-semibold text-purple-900 dark:text-purple-200"
+                  >
+                    更新 API Key
+                  </h5>
                   <button
                     class="flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600"
                     type="button"
@@ -3168,18 +3708,21 @@
                   </button>
                 </div>
                 <p class="mb-1 text-sm text-purple-800 dark:text-purple-200">
-                  当前已保存 <strong>{{ existingApiKeyCount }}</strong> 条 API Key。您可以追加新的
-                  Key，或通过下方模式快速覆盖、删除指定 Key。
+                  当前已保存 <strong>{{ existingApiKeyCount }}</strong> 条 API
+                  Key。您可以追加新的 Key，或通过下方模式快速覆盖、删除指定
+                  Key。
                 </p>
                 <p class="text-xs text-purple-700 dark:text-purple-300">
-                  留空表示保留现有 Key 不变；根据所选模式决定是追加、覆盖还是删除输入的 Key。
+                  留空表示保留现有 Key
+                  不变；根据所选模式决定是追加、覆盖还是删除输入的 Key。
                 </p>
               </div>
             </div>
 
             <div class="space-y-4">
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >新的 API Key 列表</label
                 >
                 <textarea
@@ -3196,7 +3739,8 @@
 
               <div class="space-y-2">
                 <div class="flex items-center justify-between">
-                  <span class="text-sm font-semibold text-purple-800 dark:text-purple-100"
+                  <span
+                    class="text-sm font-semibold text-purple-800 dark:text-purple-100"
                     >API Key 更新模式</span
                   >
                   <span class="text-xs text-purple-600 dark:text-purple-300">
@@ -3233,12 +3777,20 @@
               <div
                 class="rounded-lg border border-purple-200 bg-white/70 p-3 text-xs text-purple-800 dark:border-purple-700 dark:bg-purple-800/20 dark:text-purple-100"
               >
-                <p class="font-medium"><i class="fas fa-lightbulb mr-1" />小提示</p>
+                <p class="font-medium">
+                  <i class="fas fa-lightbulb mr-1" />小提示
+                </p>
                 <ul class="mt-1 list-disc space-y-1 pl-4">
-                  <li>系统会为新的 Key 自动建立粘性映射，保持同一会话命中同一个 Key。</li>
+                  <li>
+                    系统会为新的 Key 自动建立粘性映射，保持同一会话命中同一个
+                    Key。
+                  </li>
                   <li>追加模式会保留现有 Key 并在末尾追加新的 Key。</li>
                   <li>覆盖模式会先清空旧 Key 再写入上方的新列表。</li>
-                  <li>删除模式会根据输入精准移除指定 Key，适合快速处理失效或被封禁的 Key。</li>
+                  <li>
+                    删除模式会根据输入精准移除指定
+                    Key，适合快速处理失效或被封禁的 Key。
+                  </li>
                 </ul>
               </div>
             </div>
@@ -3262,17 +3814,25 @@
                 <i class="fas fa-key text-sm text-white" />
               </div>
               <div>
-                <h5 class="mb-2 font-semibold text-amber-900 dark:text-amber-300">更新 Token</h5>
+                <h5
+                  class="mb-2 font-semibold text-amber-900 dark:text-amber-300"
+                >
+                  更新 Token
+                </h5>
                 <p class="mb-2 text-sm text-amber-800 dark:text-amber-300">
-                  可以更新 Access Token 和 Refresh Token。为了安全起见，不会显示当前的 Token 值。
+                  可以更新 Access Token 和 Refresh
+                  Token。为了安全起见，不会显示当前的 Token 值。
                 </p>
-                <p class="text-xs text-amber-600 dark:text-amber-400">💡 留空表示不更新该字段。</p>
+                <p class="text-xs text-amber-600 dark:text-amber-400">
+                  💡 留空表示不更新该字段。
+                </p>
               </div>
             </div>
 
             <div class="space-y-4">
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >新的 Access Token</label
                 >
                 <textarea
@@ -3284,7 +3844,8 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                <label
+                  class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >新的 Refresh Token</label
                 >
                 <textarea
@@ -3315,7 +3876,7 @@
               @click="updateAccount"
             >
               <div v-if="loading" class="loading-spinner mr-2" />
-              {{ loading ? '更新中...' : '更新' }}
+              {{ loading ? "更新中..." : "更新" }}
             </button>
           </div>
         </div>
@@ -3352,471 +3913,516 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
-import { showToast } from '@/utils/toast'
-import { apiClient } from '@/config/api'
-import { useAccountsStore } from '@/stores/accounts'
-import { useConfirm } from '@/composables/useConfirm'
-import ProxyConfig from './ProxyConfig.vue'
-import OAuthFlow from './OAuthFlow.vue'
-import ConfirmModal from '@/components/common/ConfirmModal.vue'
-import GroupManagementModal from './GroupManagementModal.vue'
-import ApiKeyManagementModal from './ApiKeyManagementModal.vue'
+import { ref, computed, watch, onMounted } from "vue";
+import { showToast } from "@/utils/toast";
+import { apiClient } from "@/config/api";
+import { useAccountsStore } from "@/stores/accounts";
+import { useConfirm } from "@/composables/useConfirm";
+import ProxyConfig from "./ProxyConfig.vue";
+import OAuthFlow from "./OAuthFlow.vue";
+import ConfirmModal from "@/components/common/ConfirmModal.vue";
+import GroupManagementModal from "./GroupManagementModal.vue";
+import ApiKeyManagementModal from "./ApiKeyManagementModal.vue";
 
 const props = defineProps({
   account: {
     type: Object,
-    default: null
-  }
-})
+    default: null,
+  },
+});
 
-const emit = defineEmits(['close', 'success', 'platform-changed'])
+const emit = defineEmits(["close", "success", "platform-changed"]);
 
-const accountsStore = useAccountsStore()
-const { showConfirmModal, confirmOptions, showConfirm, handleConfirm, handleCancel } = useConfirm()
+const accountsStore = useAccountsStore();
+const {
+  showConfirmModal,
+  confirmOptions,
+  showConfirm,
+  handleConfirm,
+  handleCancel,
+} = useConfirm();
 
 // 是否为编辑模式
-const isEdit = computed(() => !!props.account)
-const show = ref(true)
+const isEdit = computed(() => !!props.account);
+const show = ref(true);
 
 // OAuth步骤
-const oauthStep = ref(1)
-const loading = ref(false)
-const showApiKey = ref(false)
+const oauthStep = ref(1);
+const loading = ref(false);
+const showApiKey = ref(false);
 
 // Setup Token 相关状态
-const setupTokenLoading = ref(false)
-const setupTokenExchanging = ref(false)
-const setupTokenAuthUrl = ref('')
-const setupTokenAuthCode = ref('')
-const setupTokenCopied = ref(false)
-const setupTokenSessionId = ref('')
+const setupTokenLoading = ref(false);
+const setupTokenExchanging = ref(false);
+
+// 定时任务测试状态
+const testingScheduledRequest = ref(false);
+const setupTokenAuthUrl = ref("");
+const setupTokenAuthCode = ref("");
+const setupTokenCopied = ref(false);
+const setupTokenSessionId = ref("");
 
 // Claude Code 统一 User-Agent 信息
-const unifiedUserAgent = ref('')
-const clearingCache = ref(false)
+const unifiedUserAgent = ref("");
+const clearingCache = ref(false);
 // 客户端标识编辑状态（已废弃，不再需要编辑功能）
 // const editingClientId = ref(false)
 
 // 平台分组状态
-const platformGroup = ref('')
+const platformGroup = ref("");
 
 // API Key 管理模态框
-const showApiKeyManagement = ref(false)
+const showApiKeyManagement = ref(false);
 
 // 根据现有平台确定分组
 const determinePlatformGroup = (platform) => {
-  if (['claude', 'claude-console', 'ccr', 'bedrock'].includes(platform)) {
-    return 'claude'
-  } else if (['openai', 'openai-responses', 'azure_openai'].includes(platform)) {
-    return 'openai'
-  } else if (platform === 'gemini') {
-    return 'gemini'
-  } else if (platform === 'droid') {
-    return 'droid'
+  if (["claude", "claude-console", "ccr", "bedrock"].includes(platform)) {
+    return "claude";
+  } else if (
+    ["openai", "openai-responses", "azure_openai"].includes(platform)
+  ) {
+    return "openai";
+  } else if (platform === "gemini") {
+    return "gemini";
+  } else if (platform === "droid") {
+    return "droid";
   }
-  return ''
-}
+  return "";
+};
 
 const createDefaultProxyState = () => ({
   enabled: false,
-  type: 'socks5',
-  host: '',
-  port: '',
-  username: '',
-  password: ''
-})
+  type: "socks5",
+  host: "",
+  port: "",
+  username: "",
+  password: "",
+});
 
 const parseProxyResponse = (rawProxy) => {
   if (!rawProxy) {
-    return null
+    return null;
   }
 
-  let proxyObject = rawProxy
-  if (typeof rawProxy === 'string') {
+  let proxyObject = rawProxy;
+  if (typeof rawProxy === "string") {
     try {
-      proxyObject = JSON.parse(rawProxy)
+      proxyObject = JSON.parse(rawProxy);
     } catch (error) {
-      return null
+      return null;
     }
   }
 
   if (
     proxyObject &&
-    typeof proxyObject === 'object' &&
+    typeof proxyObject === "object" &&
     proxyObject.proxy &&
-    typeof proxyObject.proxy === 'object'
+    typeof proxyObject.proxy === "object"
   ) {
-    proxyObject = proxyObject.proxy
+    proxyObject = proxyObject.proxy;
   }
 
-  if (!proxyObject || typeof proxyObject !== 'object') {
-    return null
+  if (!proxyObject || typeof proxyObject !== "object") {
+    return null;
   }
 
   const host =
-    typeof proxyObject.host === 'string'
+    typeof proxyObject.host === "string"
       ? proxyObject.host.trim()
       : proxyObject.host !== undefined && proxyObject.host !== null
         ? String(proxyObject.host).trim()
-        : ''
+        : "";
 
   const port =
     proxyObject.port !== undefined && proxyObject.port !== null
       ? String(proxyObject.port).trim()
-      : ''
+      : "";
 
   const type =
-    typeof proxyObject.type === 'string' && proxyObject.type.trim()
+    typeof proxyObject.type === "string" && proxyObject.type.trim()
       ? proxyObject.type.trim()
-      : 'socks5'
+      : "socks5";
 
   const username =
-    typeof proxyObject.username === 'string'
+    typeof proxyObject.username === "string"
       ? proxyObject.username
       : proxyObject.username !== undefined && proxyObject.username !== null
         ? String(proxyObject.username)
-        : ''
+        : "";
 
   const password =
-    typeof proxyObject.password === 'string'
+    typeof proxyObject.password === "string"
       ? proxyObject.password
       : proxyObject.password !== undefined && proxyObject.password !== null
         ? String(proxyObject.password)
-        : ''
+        : "";
 
   return {
     type,
     host,
     port,
     username,
-    password
-  }
-}
+    password,
+  };
+};
 
 const normalizeProxyFormState = (rawProxy) => {
-  const parsed = parseProxyResponse(rawProxy)
+  const parsed = parseProxyResponse(rawProxy);
 
   if (parsed && parsed.host && parsed.port) {
     return {
       enabled: true,
-      type: parsed.type || 'socks5',
+      type: parsed.type || "socks5",
       host: parsed.host,
       port: parsed.port,
-      username: parsed.username || '',
-      password: parsed.password || ''
-    }
+      username: parsed.username || "",
+      password: parsed.password || "",
+    };
   }
 
-  return createDefaultProxyState()
-}
+  return createDefaultProxyState();
+};
 
 const buildProxyPayload = (proxyState) => {
   if (!proxyState || !proxyState.enabled) {
-    return null
+    return null;
   }
 
-  const host = (proxyState.host || '').trim()
-  const portNumber = Number.parseInt(proxyState.port, 10)
+  const host = (proxyState.host || "").trim();
+  const portNumber = Number.parseInt(proxyState.port, 10);
 
   if (!host || Number.isNaN(portNumber) || portNumber <= 0) {
-    return null
+    return null;
   }
 
-  const username = proxyState.username ? proxyState.username.trim() : ''
-  const password = proxyState.password ? proxyState.password.trim() : ''
+  const username = proxyState.username ? proxyState.username.trim() : "";
+  const password = proxyState.password ? proxyState.password.trim() : "";
 
   return {
-    type: proxyState.type || 'socks5',
+    type: proxyState.type || "socks5",
     host,
     port: portNumber,
     username: username || null,
-    password: password || null
-  }
-}
+    password: password || null,
+  };
+};
 
 // 初始化代理配置
 const initProxyConfig = () => {
-  return normalizeProxyFormState(props.account?.proxy)
-}
+  return normalizeProxyFormState(props.account?.proxy);
+};
 
 // 表单数据
 const form = ref({
-  platform: props.account?.platform || 'claude',
+  platform: props.account?.platform || "claude",
   addType: (() => {
-    const platform = props.account?.platform || 'claude'
-    if (platform === 'gemini' || platform === 'openai') return 'oauth'
-    if (platform === 'claude') return 'oauth'
-    return 'manual'
+    const platform = props.account?.platform || "claude";
+    if (platform === "gemini" || platform === "openai") return "oauth";
+    if (platform === "claude") return "oauth";
+    return "manual";
   })(),
-  name: props.account?.name || '',
-  description: props.account?.description || '',
-  accountType: props.account?.accountType || 'shared',
-  authenticationMethod: props.account?.authenticationMethod || '',
-  subscriptionType: 'claude_max', // 默认为 Claude Max，兼容旧数据
+  name: props.account?.name || "",
+  description: props.account?.description || "",
+  accountType: props.account?.accountType || "shared",
+  authenticationMethod: props.account?.authenticationMethod || "",
+  subscriptionType: "claude_max", // 默认为 Claude Max，兼容旧数据
   autoStopOnWarning: props.account?.autoStopOnWarning || false, // 5小时限制自动停止调度
   useUnifiedUserAgent: props.account?.useUnifiedUserAgent || false, // 使用统一Claude Code版本
   useUnifiedClientId: props.account?.useUnifiedClientId || false, // 使用统一的客户端标识
-  unifiedClientId: props.account?.unifiedClientId || '', // 统一的客户端标识
-  groupId: '',
+  unifiedClientId: props.account?.unifiedClientId || "", // 统一的客户端标识
+  groupId: "",
   groupIds: [],
-  projectId: props.account?.projectId || '',
-  accessToken: '',
-  refreshToken: '',
-  apiKeysInput: '',
-  apiKeyUpdateMode: 'append',
+  projectId: props.account?.projectId || "",
+  accessToken: "",
+  refreshToken: "",
+  apiKeysInput: "",
+  apiKeyUpdateMode: "append",
   proxy: initProxyConfig(),
   // Claude Console 特定字段
-  apiUrl: props.account?.apiUrl || '',
-  apiKey: props.account?.apiKey || '',
+  apiUrl: props.account?.apiUrl || "",
+  apiKey: props.account?.apiKey || "",
   priority: props.account?.priority || 50,
-  endpointType: props.account?.endpointType || 'anthropic',
+  endpointType: props.account?.endpointType || "anthropic",
   // OpenAI-Responses 特定字段
-  baseApi: props.account?.baseApi || '',
+  baseApi: props.account?.baseApi || "",
   rateLimitDuration: props.account?.rateLimitDuration || 60,
   supportedModels: (() => {
-    const models = props.account?.supportedModels
-    if (!models) return []
+    const models = props.account?.supportedModels;
+    if (!models) return [];
     // 处理对象格式（Claude Console 的新格式）
-    if (typeof models === 'object' && !Array.isArray(models)) {
-      return Object.keys(models)
+    if (typeof models === "object" && !Array.isArray(models)) {
+      return Object.keys(models);
     }
     // 处理数组格式（向后兼容）
     if (Array.isArray(models)) {
-      return models
+      return models;
     }
-    return []
+    return [];
   })(),
-  userAgent: props.account?.userAgent || '',
+  userAgent: props.account?.userAgent || "",
   enableRateLimit: props.account ? props.account.rateLimitDuration > 0 : true,
   // 额度管理字段
   dailyQuota: props.account?.dailyQuota || 0,
   dailyUsage: props.account?.dailyUsage || 0,
-  quotaResetTime: props.account?.quotaResetTime || '00:00',
+  quotaResetTime: props.account?.quotaResetTime || "00:00",
   // 并发控制字段
   maxConcurrentTasks: props.account?.maxConcurrentTasks || 0,
   // Bedrock 特定字段
-  accessKeyId: props.account?.accessKeyId || '',
-  secretAccessKey: props.account?.secretAccessKey || '',
-  region: props.account?.region || '',
-  sessionToken: props.account?.sessionToken || '',
-  defaultModel: props.account?.defaultModel || '',
-  smallFastModel: props.account?.smallFastModel || '',
+  accessKeyId: props.account?.accessKeyId || "",
+  secretAccessKey: props.account?.secretAccessKey || "",
+  region: props.account?.region || "",
+  sessionToken: props.account?.sessionToken || "",
+  defaultModel: props.account?.defaultModel || "",
+  smallFastModel: props.account?.smallFastModel || "",
   // Azure OpenAI 特定字段
-  azureEndpoint: props.account?.azureEndpoint || '',
-  apiVersion: props.account?.apiVersion || '',
-  deploymentName: props.account?.deploymentName || '',
+  azureEndpoint: props.account?.azureEndpoint || "",
+  apiVersion: props.account?.apiVersion || "",
+  deploymentName: props.account?.deploymentName || "",
   // 到期时间字段
   expireDuration: (() => {
     // 编辑时根据expiresAt初始化expireDuration
     if (props.account?.expiresAt) {
-      return 'custom' // 如果有过期时间，默认显示为自定义
+      return "custom"; // 如果有过期时间，默认显示为自定义
     }
-    return ''
+    return "";
   })(),
   customExpireDate: (() => {
     // 编辑时根据expiresAt初始化customExpireDate
     if (props.account?.expiresAt) {
       // 转换ISO时间为datetime-local格式 (YYYY-MM-DDTHH:mm)
-      return new Date(props.account.expiresAt).toISOString().slice(0, 16)
+      return new Date(props.account.expiresAt).toISOString().slice(0, 16);
     }
-    return ''
+    return "";
   })(),
-  expiresAt: props.account?.expiresAt || null
-})
+  expiresAt: props.account?.expiresAt || null,
+  // 定时任务配置
+  scheduledRequest: {
+    enabled: props.account?.scheduledRequest?.enabled || false,
+    scheduleHour: props.account?.scheduledRequest?.scheduleHour || 7,
+    lastExecutedAt: props.account?.scheduledRequest?.lastExecutedAt || null,
+    lastStatus: props.account?.scheduledRequest?.lastStatus || null,
+    lastError: props.account?.scheduledRequest?.lastError || null,
+  },
+});
 
 // 模型限制配置
-const modelRestrictionMode = ref('whitelist') // 'whitelist' 或 'mapping'
+const modelRestrictionMode = ref("whitelist"); // 'whitelist' 或 'mapping'
 const allowedModels = ref([
   // 默认勾选所有 Sonnet 和 Haiku 模型
-  'claude-sonnet-4-20250514',
-  'claude-sonnet-4-5-20250929',
-  'claude-3-5-haiku-20241022'
-]) // 白名单模式下选中的模型列表
+  "claude-sonnet-4-20250514",
+  "claude-sonnet-4-5-20250929",
+  "claude-3-5-haiku-20241022",
+]); // 白名单模式下选中的模型列表
 
 // 常用模型列表
 const commonModels = [
-  { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4', color: 'blue' },
-  { value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5', color: 'indigo' },
-  { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku', color: 'green' },
-  { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', color: 'emerald' },
-  { value: 'claude-opus-4-20250514', label: 'Claude Opus 4', color: 'purple' },
-  { value: 'claude-opus-4-1-20250805', label: 'Claude Opus 4.1', color: 'purple' },
-  { value: 'deepseek-chat', label: 'DeepSeek Chat', color: 'cyan' },
-  { value: 'Qwen', label: 'Qwen', color: 'orange' },
-  { value: 'Kimi', label: 'Kimi', color: 'pink' },
-  { value: 'GLM', label: 'GLM', color: 'teal' }
-]
+  {
+    value: "claude-sonnet-4-20250514",
+    label: "Claude Sonnet 4",
+    color: "blue",
+  },
+  {
+    value: "claude-sonnet-4-5-20250929",
+    label: "Claude Sonnet 4.5",
+    color: "indigo",
+  },
+  {
+    value: "claude-3-5-haiku-20241022",
+    label: "Claude 3.5 Haiku",
+    color: "green",
+  },
+  {
+    value: "claude-haiku-4-5-20251001",
+    label: "Claude Haiku 4.5",
+    color: "emerald",
+  },
+  { value: "claude-opus-4-20250514", label: "Claude Opus 4", color: "purple" },
+  {
+    value: "claude-opus-4-1-20250805",
+    label: "Claude Opus 4.1",
+    color: "purple",
+  },
+  { value: "deepseek-chat", label: "DeepSeek Chat", color: "cyan" },
+  { value: "Qwen", label: "Qwen", color: "orange" },
+  { value: "Kimi", label: "Kimi", color: "pink" },
+  { value: "GLM", label: "GLM", color: "teal" },
+];
 
 // 模型映射表数据
-const modelMappings = ref([])
+const modelMappings = ref([]);
 
 // 初始化模型映射表
 const initModelMappings = () => {
   if (props.account?.supportedModels) {
     // 如果是对象格式（新的映射表）
     if (
-      typeof props.account.supportedModels === 'object' &&
+      typeof props.account.supportedModels === "object" &&
       !Array.isArray(props.account.supportedModels)
     ) {
-      const entries = Object.entries(props.account.supportedModels)
+      const entries = Object.entries(props.account.supportedModels);
 
       // 判断是白名单模式还是映射模式
       // 如果所有映射都是"映射到自己"，则视为白名单模式
-      const isWhitelist = entries.every(([from, to]) => from === to)
+      const isWhitelist = entries.every(([from, to]) => from === to);
       if (isWhitelist) {
-        modelRestrictionMode.value = 'whitelist'
+        modelRestrictionMode.value = "whitelist";
         // 白名单模式：设置 allowedModels（显示勾选的模型）
-        allowedModels.value = entries.map(([from]) => from)
+        allowedModels.value = entries.map(([from]) => from);
         // 同时保留 modelMappings（以便用户切换到映射模式时有初始数据）
-        modelMappings.value = entries.map(([from, to]) => ({ from, to }))
+        modelMappings.value = entries.map(([from, to]) => ({ from, to }));
       } else {
-        modelRestrictionMode.value = 'mapping'
+        modelRestrictionMode.value = "mapping";
         // 映射模式：设置 modelMappings（显示映射表）
-        modelMappings.value = entries.map(([from, to]) => ({ from, to }))
+        modelMappings.value = entries.map(([from, to]) => ({ from, to }));
         // 不填充 allowedModels，因为映射模式不使用白名单复选框
       }
     } else if (Array.isArray(props.account.supportedModels)) {
       // 如果是数组格式（旧格式），转换为白名单模式
-      modelRestrictionMode.value = 'whitelist'
-      allowedModels.value = props.account.supportedModels
+      modelRestrictionMode.value = "whitelist";
+      allowedModels.value = props.account.supportedModels;
       // 同时设置 modelMappings 为自映射
       modelMappings.value = props.account.supportedModels.map((model) => ({
         from: model,
-        to: model
-      }))
+        to: model,
+      }));
     }
   }
-}
+};
 
 // 解析多行 API Key 输入
 const parseApiKeysInput = (input) => {
-  if (!input || typeof input !== 'string') {
-    return []
+  if (!input || typeof input !== "string") {
+    return [];
   }
 
   const segments = input
     .split(/\r?\n/)
     .map((item) => item.trim())
-    .filter((item) => item.length > 0)
+    .filter((item) => item.length > 0);
 
   if (segments.length === 0) {
-    return []
+    return [];
   }
 
-  const uniqueKeys = Array.from(new Set(segments))
-  return uniqueKeys
-}
+  const uniqueKeys = Array.from(new Set(segments));
+  return uniqueKeys;
+};
 
 const apiKeyModeOptions = [
   {
-    value: 'append',
-    label: '追加模式',
-    description: '保留现有 Key，并在末尾追加新 Key 列表。'
+    value: "append",
+    label: "追加模式",
+    description: "保留现有 Key，并在末尾追加新 Key 列表。",
   },
   {
-    value: 'replace',
-    label: '覆盖模式',
-    description: '先清空旧 Key，再写入上方的新 Key 列表。'
+    value: "replace",
+    label: "覆盖模式",
+    description: "先清空旧 Key，再写入上方的新 Key 列表。",
   },
   {
-    value: 'delete',
-    label: '删除模式',
-    description: '输入要移除的 Key，可精准删除失效或被封禁的 Key。'
-  }
-]
+    value: "delete",
+    label: "删除模式",
+    description: "输入要移除的 Key，可精准删除失效或被封禁的 Key。",
+  },
+];
 
 const apiKeyModeSliderStyle = computed(() => {
   const index = Math.max(
-    apiKeyModeOptions.findIndex((option) => option.value === form.value.apiKeyUpdateMode),
-    0
-  )
-  const widthPercent = 100 / apiKeyModeOptions.length
+    apiKeyModeOptions.findIndex(
+      (option) => option.value === form.value.apiKeyUpdateMode,
+    ),
+    0,
+  );
+  const widthPercent = 100 / apiKeyModeOptions.length;
 
   return {
     width: `${widthPercent}%`,
-    left: `${index * widthPercent}%`
-  }
-})
+    left: `${index * widthPercent}%`,
+  };
+});
 
 const currentApiKeyModeLabel = computed(() => {
-  const option = apiKeyModeOptions.find((item) => item.value === form.value.apiKeyUpdateMode)
-  return option ? option.label : apiKeyModeOptions[0].label
-})
+  const option = apiKeyModeOptions.find(
+    (item) => item.value === form.value.apiKeyUpdateMode,
+  );
+  return option ? option.label : apiKeyModeOptions[0].label;
+});
 
 const currentApiKeyModeDescription = computed(() => {
-  const option = apiKeyModeOptions.find((item) => item.value === form.value.apiKeyUpdateMode)
-  return option ? option.description : apiKeyModeOptions[0].description
-})
+  const option = apiKeyModeOptions.find(
+    (item) => item.value === form.value.apiKeyUpdateMode,
+  );
+  return option ? option.description : apiKeyModeOptions[0].description;
+});
 
 // 表单验证错误
 const errors = ref({
-  name: '',
-  refreshToken: '',
-  accessToken: '',
-  apiKeys: '',
-  apiUrl: '',
-  apiKey: '',
-  baseApi: '',
-  accessKeyId: '',
-  secretAccessKey: '',
-  region: '',
-  azureEndpoint: '',
-  deploymentName: ''
-})
+  name: "",
+  refreshToken: "",
+  accessToken: "",
+  apiKeys: "",
+  apiUrl: "",
+  apiKey: "",
+  baseApi: "",
+  accessKeyId: "",
+  secretAccessKey: "",
+  region: "",
+  azureEndpoint: "",
+  deploymentName: "",
+});
 
 // 计算是否可以进入下一步
 const canProceed = computed(() => {
-  return form.value.name?.trim() && form.value.platform
-})
+  return form.value.name?.trim() && form.value.platform;
+});
 
 // 计算是否可以交换Setup Token code
 const canExchangeSetupToken = computed(() => {
-  return setupTokenAuthUrl.value && setupTokenAuthCode.value.trim()
-})
+  return setupTokenAuthUrl.value && setupTokenAuthCode.value.trim();
+});
 
 // 获取当前使用量（实时）
 const calculateCurrentUsage = () => {
   // 如果不是编辑模式或没有账户ID，返回0
   if (!isEdit.value || !props.account?.id) {
-    return 0
+    return 0;
   }
 
   // 如果已经加载了今日使用数据，直接使用
-  if (typeof form.value.dailyUsage === 'number') {
-    return form.value.dailyUsage
+  if (typeof form.value.dailyUsage === "number") {
+    return form.value.dailyUsage;
   }
 
-  return 0
-}
+  return 0;
+};
 
 // 计算额度使用百分比
 const usagePercentage = computed(() => {
   if (!form.value.dailyQuota || form.value.dailyQuota <= 0) {
-    return 0
+    return 0;
   }
-  const currentUsage = calculateCurrentUsage()
-  return (currentUsage / form.value.dailyQuota) * 100
-})
+  const currentUsage = calculateCurrentUsage();
+  return (currentUsage / form.value.dailyQuota) * 100;
+});
 
 // 当前账户的 API Key 数量（仅用于展示）
 const existingApiKeyCount = computed(() => {
-  if (!props.account || props.account.platform !== 'droid') {
-    return 0
+  if (!props.account || props.account.platform !== "droid") {
+    return 0;
   }
 
-  let fallbackList = 0
+  let fallbackList = 0;
 
   if (Array.isArray(props.account.apiKeys)) {
-    fallbackList = props.account.apiKeys.length
-  } else if (typeof props.account.apiKeys === 'string') {
+    fallbackList = props.account.apiKeys.length;
+  } else if (typeof props.account.apiKeys === "string") {
     try {
-      const parsed = JSON.parse(props.account.apiKeys)
+      const parsed = JSON.parse(props.account.apiKeys);
       if (Array.isArray(parsed)) {
-        fallbackList = parsed.length
+        fallbackList = parsed.length;
       }
     } catch (error) {
-      fallbackList = 0
+      fallbackList = 0;
     }
   }
 
@@ -3824,44 +4430,46 @@ const existingApiKeyCount = computed(() => {
     props.account.apiKeyCount ??
     props.account.apiKeysCount ??
     props.account.api_key_count ??
-    fallbackList
+    fallbackList;
 
-  return Number(count) || 0
-})
+  return Number(count) || 0;
+});
 
 // 编辑时判断是否为 API Key 模式的 Droid 账户
 const isEditingDroidApiKey = computed(() => {
-  if (!isEdit.value || form.value.platform !== 'droid') {
-    return false
+  if (!isEdit.value || form.value.platform !== "droid") {
+    return false;
   }
   const method =
     form.value.authenticationMethod ||
     props.account?.authenticationMethod ||
     props.account?.authMethod ||
     props.account?.authentication_mode ||
-    ''
+    "";
 
-  if (typeof method !== 'string') {
-    return false
+  if (typeof method !== "string") {
+    return false;
   }
 
-  return method.trim().toLowerCase() === 'api_key'
-})
+  return method.trim().toLowerCase() === "api_key";
+});
 
 // 加载账户今日使用情况
 const loadAccountUsage = async () => {
-  if (!isEdit.value || !props.account?.id) return
+  if (!isEdit.value || !props.account?.id) return;
 
   try {
-    const response = await apiClient.get(`/admin/claude-console-accounts/${props.account.id}/usage`)
+    const response = await apiClient.get(
+      `/admin/claude-console-accounts/${props.account.id}/usage`,
+    );
     if (response) {
       // 更新表单中的使用量数据
-      form.value.dailyUsage = response.dailyUsage || 0
+      form.value.dailyUsage = response.dailyUsage || 0;
     }
   } catch (error) {
     // 静默处理使用量加载失败
   }
-}
+};
 
 // // 计算是否可以创建
 // const canCreate = computed(() => {
@@ -3873,1175 +4481,1245 @@ const loadAccountUsage = async () => {
 
 // 选择平台分组
 const selectPlatformGroup = (group) => {
-  platformGroup.value = group
+  platformGroup.value = group;
   // 根据分组自动选择默认平台
-  if (group === 'claude') {
-    form.value.platform = 'claude'
-  } else if (group === 'openai') {
-    form.value.platform = 'openai'
-  } else if (group === 'gemini') {
-    form.value.platform = 'gemini'
-  } else if (group === 'droid') {
-    form.value.platform = 'droid'
+  if (group === "claude") {
+    form.value.platform = "claude";
+  } else if (group === "openai") {
+    form.value.platform = "openai";
+  } else if (group === "gemini") {
+    form.value.platform = "gemini";
+  } else if (group === "droid") {
+    form.value.platform = "droid";
   }
-}
+};
 
 // 下一步
 const nextStep = async () => {
   // 清除之前的错误
-  errors.value.name = ''
+  errors.value.name = "";
 
   if (!canProceed.value) {
-    if (!form.value.name || form.value.name.trim() === '') {
-      errors.value.name = '请填写账户名称'
+    if (!form.value.name || form.value.name.trim() === "") {
+      errors.value.name = "请填写账户名称";
     }
-    return
+    return;
   }
 
   // 分组类型验证 - OAuth流程修复
   if (
-    form.value.accountType === 'group' &&
+    form.value.accountType === "group" &&
     (!form.value.groupIds || form.value.groupIds.length === 0)
   ) {
-    showToast('请选择一个分组', 'error')
-    return
+    showToast("请选择一个分组", "error");
+    return;
   }
 
   // 数据同步：确保 groupId 和 groupIds 保持一致 - OAuth流程
-  if (form.value.accountType === 'group') {
+  if (form.value.accountType === "group") {
     if (form.value.groupIds && form.value.groupIds.length > 0) {
-      form.value.groupId = form.value.groupIds[0]
+      form.value.groupId = form.value.groupIds[0];
     } else {
-      form.value.groupId = ''
+      form.value.groupId = "";
     }
   }
 
   // 对于Gemini账户，检查项目 ID
-  if (form.value.platform === 'gemini' && oauthStep.value === 1 && form.value.addType === 'oauth') {
-    if (!form.value.projectId || form.value.projectId.trim() === '') {
+  if (
+    form.value.platform === "gemini" &&
+    oauthStep.value === 1 &&
+    form.value.addType === "oauth"
+  ) {
+    if (!form.value.projectId || form.value.projectId.trim() === "") {
       // 使用自定义确认弹窗
       const confirmed = await showConfirm(
-        '项目 ID 未填写',
-        '您尚未填写项目 ID。\n\n如果您的Google账号绑定了Google Cloud或被识别为Workspace账号，需要提供项目 ID。\n如果您使用的是普通个人账号，可以继续不填写。',
-        '继续',
-        '返回填写'
-      )
+        "项目 ID 未填写",
+        "您尚未填写项目 ID。\n\n如果您的Google账号绑定了Google Cloud或被识别为Workspace账号，需要提供项目 ID。\n如果您使用的是普通个人账号，可以继续不填写。",
+        "继续",
+        "返回填写",
+      );
       if (!confirmed) {
-        return
+        return;
       }
     }
   }
 
-  oauthStep.value = 2
-}
+  oauthStep.value = 2;
+};
 
 // Setup Token 相关方法
 // 生成Setup Token授权URL
 const generateSetupTokenAuthUrl = async () => {
-  setupTokenLoading.value = true
+  setupTokenLoading.value = true;
   try {
-    const proxyPayload = buildProxyPayload(form.value.proxy)
-    const proxyConfig = proxyPayload ? { proxy: proxyPayload } : {}
+    const proxyPayload = buildProxyPayload(form.value.proxy);
+    const proxyConfig = proxyPayload ? { proxy: proxyPayload } : {};
 
-    const result = await accountsStore.generateClaudeSetupTokenUrl(proxyConfig)
-    setupTokenAuthUrl.value = result.authUrl
-    setupTokenSessionId.value = result.sessionId
+    const result = await accountsStore.generateClaudeSetupTokenUrl(proxyConfig);
+    setupTokenAuthUrl.value = result.authUrl;
+    setupTokenSessionId.value = result.sessionId;
   } catch (error) {
-    showToast(error.message || '生成Setup Token授权链接失败', 'error')
+    showToast(error.message || "生成Setup Token授权链接失败", "error");
   } finally {
-    setupTokenLoading.value = false
+    setupTokenLoading.value = false;
   }
-}
+};
 
 // 重新生成Setup Token授权URL
 const regenerateSetupTokenAuthUrl = () => {
-  setupTokenAuthUrl.value = ''
-  setupTokenAuthCode.value = ''
-  generateSetupTokenAuthUrl()
-}
+  setupTokenAuthUrl.value = "";
+  setupTokenAuthCode.value = "";
+  generateSetupTokenAuthUrl();
+};
 
 // 复制Setup Token授权URL
 const copySetupTokenAuthUrl = async () => {
   try {
-    await navigator.clipboard.writeText(setupTokenAuthUrl.value)
-    setupTokenCopied.value = true
-    showToast('链接已复制', 'success')
+    await navigator.clipboard.writeText(setupTokenAuthUrl.value);
+    setupTokenCopied.value = true;
+    showToast("链接已复制", "success");
     setTimeout(() => {
-      setupTokenCopied.value = false
-    }, 2000)
+      setupTokenCopied.value = false;
+    }, 2000);
   } catch (error) {
     // 降级方案 - 使用 textarea 替代 input，禁用 ESLint 警告
-    const textarea = document.createElement('textarea')
-    textarea.value = setupTokenAuthUrl.value
-    textarea.style.position = 'fixed'
-    textarea.style.opacity = '0'
-    document.body.appendChild(textarea)
-    textarea.select()
+    const textarea = document.createElement("textarea");
+    textarea.value = setupTokenAuthUrl.value;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
 
     try {
       // eslint-disable-next-line
-      const successful = document.execCommand('copy')
+      const successful = document.execCommand("copy");
       if (successful) {
-        setupTokenCopied.value = true
-        showToast('链接已复制', 'success')
+        setupTokenCopied.value = true;
+        showToast("链接已复制", "success");
       } else {
-        showToast('复制失败，请手动复制', 'error')
+        showToast("复制失败，请手动复制", "error");
       }
     } catch (err) {
-      showToast('复制失败，请手动复制', 'error')
+      showToast("复制失败，请手动复制", "error");
     }
 
-    document.body.removeChild(textarea)
+    document.body.removeChild(textarea);
     setTimeout(() => {
-      setupTokenCopied.value = false
-    }, 2000)
+      setupTokenCopied.value = false;
+    }, 2000);
   }
-}
+};
 
 // 交换Setup Token授权码
 const exchangeSetupTokenCode = async () => {
-  if (!canExchangeSetupToken.value) return
+  if (!canExchangeSetupToken.value) return;
 
-  setupTokenExchanging.value = true
+  setupTokenExchanging.value = true;
   try {
     const data = {
       sessionId: setupTokenSessionId.value,
-      callbackUrl: setupTokenAuthCode.value.trim()
-    }
+      callbackUrl: setupTokenAuthCode.value.trim(),
+    };
 
     // 添加代理配置（如果启用）
-    const proxyPayload = buildProxyPayload(form.value.proxy)
+    const proxyPayload = buildProxyPayload(form.value.proxy);
     if (proxyPayload) {
-      data.proxy = proxyPayload
+      data.proxy = proxyPayload;
     }
 
-    const tokenInfo = await accountsStore.exchangeClaudeSetupTokenCode(data)
+    const tokenInfo = await accountsStore.exchangeClaudeSetupTokenCode(data);
 
     // Setup Token模式也需要确保生成客户端ID
     if (form.value.useUnifiedClientId && !form.value.unifiedClientId) {
-      form.value.unifiedClientId = generateClientId()
+      form.value.unifiedClientId = generateClientId();
     }
 
     // 调用相同的成功处理函数
-    await handleOAuthSuccess(tokenInfo)
+    await handleOAuthSuccess(tokenInfo);
   } catch (error) {
-    showToast(error.message || 'Setup Token授权失败，请检查授权码是否正确', 'error')
+    showToast(
+      error.message || "Setup Token授权失败，请检查授权码是否正确",
+      "error",
+    );
   } finally {
-    setupTokenExchanging.value = false
+    setupTokenExchanging.value = false;
   }
-}
+};
 
 // 处理OAuth成功
 const handleOAuthSuccess = async (tokenInfo) => {
-  loading.value = true
+  loading.value = true;
   try {
     // OAuth模式也需要确保生成客户端ID
     if (
-      form.value.platform === 'claude' &&
+      form.value.platform === "claude" &&
       form.value.useUnifiedClientId &&
       !form.value.unifiedClientId
     ) {
-      form.value.unifiedClientId = generateClientId()
+      form.value.unifiedClientId = generateClientId();
     }
 
-    const proxyPayload = buildProxyPayload(form.value.proxy)
+    const proxyPayload = buildProxyPayload(form.value.proxy);
 
     const data = {
       name: form.value.name,
       description: form.value.description,
       accountType: form.value.accountType,
-      groupId: form.value.accountType === 'group' ? form.value.groupId : undefined,
-      groupIds: form.value.accountType === 'group' ? form.value.groupIds : undefined,
+      groupId:
+        form.value.accountType === "group" ? form.value.groupId : undefined,
+      groupIds:
+        form.value.accountType === "group" ? form.value.groupIds : undefined,
       expiresAt: form.value.expiresAt || undefined,
-      proxy: proxyPayload
-    }
+      proxy: proxyPayload,
+    };
 
-    const currentPlatform = form.value.platform
+    const currentPlatform = form.value.platform;
 
-    if (currentPlatform === 'claude') {
+    if (currentPlatform === "claude") {
       // Claude使用claudeAiOauth字段
-      const claudeOauthPayload = tokenInfo.claudeAiOauth || tokenInfo
-      data.claudeAiOauth = claudeOauthPayload
+      const claudeOauthPayload = tokenInfo.claudeAiOauth || tokenInfo;
+      data.claudeAiOauth = claudeOauthPayload;
       if (claudeOauthPayload) {
-        const extInfoPayload = {}
-        const extSource = claudeOauthPayload.extInfo
-        if (extSource && typeof extSource === 'object') {
+        const extInfoPayload = {};
+        const extSource = claudeOauthPayload.extInfo;
+        if (extSource && typeof extSource === "object") {
           if (extSource.org_uuid) {
-            extInfoPayload.org_uuid = extSource.org_uuid
+            extInfoPayload.org_uuid = extSource.org_uuid;
           }
           if (extSource.account_uuid) {
-            extInfoPayload.account_uuid = extSource.account_uuid
+            extInfoPayload.account_uuid = extSource.account_uuid;
           }
         }
 
         if (!extSource) {
-          const orgUuid = claudeOauthPayload.organization?.uuid
-          const accountUuid = claudeOauthPayload.account?.uuid
+          const orgUuid = claudeOauthPayload.organization?.uuid;
+          const accountUuid = claudeOauthPayload.account?.uuid;
           if (orgUuid) {
-            extInfoPayload.org_uuid = orgUuid
+            extInfoPayload.org_uuid = orgUuid;
           }
           if (accountUuid) {
-            extInfoPayload.account_uuid = accountUuid
+            extInfoPayload.account_uuid = accountUuid;
           }
         }
 
         if (Object.keys(extInfoPayload).length > 0) {
-          data.extInfo = extInfoPayload
+          data.extInfo = extInfoPayload;
         }
       }
-      data.priority = form.value.priority || 50
-      data.autoStopOnWarning = form.value.autoStopOnWarning || false
-      data.useUnifiedUserAgent = form.value.useUnifiedUserAgent || false
-      data.useUnifiedClientId = form.value.useUnifiedClientId || false
-      data.unifiedClientId = form.value.unifiedClientId || ''
+      data.priority = form.value.priority || 50;
+      data.autoStopOnWarning = form.value.autoStopOnWarning || false;
+      data.useUnifiedUserAgent = form.value.useUnifiedUserAgent || false;
+      data.useUnifiedClientId = form.value.useUnifiedClientId || false;
+      data.unifiedClientId = form.value.unifiedClientId || "";
       // 添加订阅类型信息
       data.subscriptionInfo = {
-        accountType: form.value.subscriptionType || 'claude_max',
-        hasClaudeMax: form.value.subscriptionType === 'claude_max',
-        hasClaudePro: form.value.subscriptionType === 'claude_pro',
-        manuallySet: true // 标记为手动设置
-      }
-    } else if (currentPlatform === 'gemini') {
+        accountType: form.value.subscriptionType || "claude_max",
+        hasClaudeMax: form.value.subscriptionType === "claude_max",
+        hasClaudePro: form.value.subscriptionType === "claude_pro",
+        manuallySet: true, // 标记为手动设置
+      };
+    } else if (currentPlatform === "gemini") {
       // Gemini使用geminiOauth字段
-      data.geminiOauth = tokenInfo.tokens || tokenInfo
+      data.geminiOauth = tokenInfo.tokens || tokenInfo;
       if (form.value.projectId) {
-        data.projectId = form.value.projectId
+        data.projectId = form.value.projectId;
       }
       // 添加 Gemini 优先级
-      data.priority = form.value.priority || 50
-    } else if (currentPlatform === 'openai') {
-      data.openaiOauth = tokenInfo.tokens || tokenInfo
-      data.accountInfo = tokenInfo.accountInfo
-      data.priority = form.value.priority || 50
-    } else if (currentPlatform === 'droid') {
-      const rawTokens = tokenInfo.tokens || tokenInfo || {}
+      data.priority = form.value.priority || 50;
+    } else if (currentPlatform === "openai") {
+      data.openaiOauth = tokenInfo.tokens || tokenInfo;
+      data.accountInfo = tokenInfo.accountInfo;
+      data.priority = form.value.priority || 50;
+    } else if (currentPlatform === "droid") {
+      const rawTokens = tokenInfo.tokens || tokenInfo || {};
 
       const normalizedTokens = {
-        accessToken: rawTokens.accessToken || rawTokens.access_token || '',
-        refreshToken: rawTokens.refreshToken || rawTokens.refresh_token || '',
-        expiresAt: rawTokens.expiresAt || rawTokens.expires_at || '',
+        accessToken: rawTokens.accessToken || rawTokens.access_token || "",
+        refreshToken: rawTokens.refreshToken || rawTokens.refresh_token || "",
+        expiresAt: rawTokens.expiresAt || rawTokens.expires_at || "",
         expiresIn: rawTokens.expiresIn || rawTokens.expires_in || null,
-        tokenType: rawTokens.tokenType || rawTokens.token_type || 'Bearer',
-        organizationId: rawTokens.organizationId || rawTokens.organization_id || '',
+        tokenType: rawTokens.tokenType || rawTokens.token_type || "Bearer",
+        organizationId:
+          rawTokens.organizationId || rawTokens.organization_id || "",
         authenticationMethod:
-          rawTokens.authenticationMethod || rawTokens.authentication_method || ''
-      }
+          rawTokens.authenticationMethod ||
+          rawTokens.authentication_method ||
+          "",
+      };
 
       if (!normalizedTokens.refreshToken) {
-        loading.value = false
-        showToast('授权成功但未返回 Refresh Token，请确认已授予离线访问权限后重试。', 'error')
-        return
+        loading.value = false;
+        showToast(
+          "授权成功但未返回 Refresh Token，请确认已授予离线访问权限后重试。",
+          "error",
+        );
+        return;
       }
 
-      data.refreshToken = normalizedTokens.refreshToken
-      data.accessToken = normalizedTokens.accessToken
-      data.expiresAt = normalizedTokens.expiresAt
-      if (normalizedTokens.expiresIn !== null && normalizedTokens.expiresIn !== undefined) {
-        data.expiresIn = normalizedTokens.expiresIn
+      data.refreshToken = normalizedTokens.refreshToken;
+      data.accessToken = normalizedTokens.accessToken;
+      data.expiresAt = normalizedTokens.expiresAt;
+      if (
+        normalizedTokens.expiresIn !== null &&
+        normalizedTokens.expiresIn !== undefined
+      ) {
+        data.expiresIn = normalizedTokens.expiresIn;
       }
-      data.priority = form.value.priority || 50
-      data.endpointType = form.value.endpointType || 'anthropic'
-      data.platform = 'droid'
-      data.tokenType = normalizedTokens.tokenType
-      data.authenticationMethod = normalizedTokens.authenticationMethod
+      data.priority = form.value.priority || 50;
+      data.endpointType = form.value.endpointType || "anthropic";
+      data.platform = "droid";
+      data.tokenType = normalizedTokens.tokenType;
+      data.authenticationMethod = normalizedTokens.authenticationMethod;
 
       if (normalizedTokens.organizationId) {
-        data.organizationId = normalizedTokens.organizationId
+        data.organizationId = normalizedTokens.organizationId;
       }
 
       if (rawTokens.user) {
-        const user = rawTokens.user
-        const nameParts = []
-        if (typeof user.first_name === 'string' && user.first_name.trim()) {
-          nameParts.push(user.first_name.trim())
+        const user = rawTokens.user;
+        const nameParts = [];
+        if (typeof user.first_name === "string" && user.first_name.trim()) {
+          nameParts.push(user.first_name.trim());
         }
-        if (typeof user.last_name === 'string' && user.last_name.trim()) {
-          nameParts.push(user.last_name.trim())
+        if (typeof user.last_name === "string" && user.last_name.trim()) {
+          nameParts.push(user.last_name.trim());
         }
         const derivedName =
-          nameParts.join(' ').trim() ||
-          (typeof user.name === 'string' ? user.name.trim() : '') ||
-          (typeof user.display_name === 'string' ? user.display_name.trim() : '')
+          nameParts.join(" ").trim() ||
+          (typeof user.name === "string" ? user.name.trim() : "") ||
+          (typeof user.display_name === "string"
+            ? user.display_name.trim()
+            : "");
 
-        if (typeof user.email === 'string' && user.email.trim()) {
-          data.ownerEmail = user.email.trim()
+        if (typeof user.email === "string" && user.email.trim()) {
+          data.ownerEmail = user.email.trim();
         }
         if (derivedName) {
-          data.ownerName = derivedName
-          data.ownerDisplayName = derivedName
+          data.ownerName = derivedName;
+          data.ownerDisplayName = derivedName;
         } else if (data.ownerEmail) {
-          data.ownerName = data.ownerName || data.ownerEmail
-          data.ownerDisplayName = data.ownerDisplayName || data.ownerEmail
+          data.ownerName = data.ownerName || data.ownerEmail;
+          data.ownerDisplayName = data.ownerDisplayName || data.ownerEmail;
         }
-        if (typeof user.id === 'string' && user.id.trim()) {
-          data.userId = user.id.trim()
+        if (typeof user.id === "string" && user.id.trim()) {
+          data.userId = user.id.trim();
         }
       }
     }
 
-    let result
-    if (currentPlatform === 'claude') {
-      result = await accountsStore.createClaudeAccount(data)
-    } else if (currentPlatform === 'gemini') {
-      result = await accountsStore.createGeminiAccount(data)
-    } else if (currentPlatform === 'openai') {
-      result = await accountsStore.createOpenAIAccount(data)
-    } else if (currentPlatform === 'droid') {
-      result = await accountsStore.createDroidAccount(data)
+    let result;
+    if (currentPlatform === "claude") {
+      result = await accountsStore.createClaudeAccount(data);
+    } else if (currentPlatform === "gemini") {
+      result = await accountsStore.createGeminiAccount(data);
+    } else if (currentPlatform === "openai") {
+      result = await accountsStore.createOpenAIAccount(data);
+    } else if (currentPlatform === "droid") {
+      result = await accountsStore.createDroidAccount(data);
     } else {
-      result = await accountsStore.createGeminiAccount(data)
+      result = await accountsStore.createGeminiAccount(data);
     }
 
-    emit('success', result)
+    emit("success", result);
   } catch (error) {
     // 显示详细的错误信息
-    const errorMessage = error.response?.data?.error || error.message || '账户创建失败'
-    const suggestion = error.response?.data?.suggestion || ''
-    const errorDetails = error.response?.data?.errorDetails || null
+    const errorMessage =
+      error.response?.data?.error || error.message || "账户创建失败";
+    const suggestion = error.response?.data?.suggestion || "";
+    const errorDetails = error.response?.data?.errorDetails || null;
 
     // 构建完整的错误提示
-    let fullMessage = errorMessage
+    let fullMessage = errorMessage;
     if (suggestion) {
-      fullMessage += `\n${suggestion}`
+      fullMessage += `\n${suggestion}`;
     }
 
     // 如果有详细的 OAuth 错误信息，也显示出来
     if (errorDetails && errorDetails.error_description) {
-      fullMessage += `\n详细信息: ${errorDetails.error_description}`
-    } else if (errorDetails && errorDetails.error && errorDetails.error.message) {
+      fullMessage += `\n详细信息: ${errorDetails.error_description}`;
+    } else if (
+      errorDetails &&
+      errorDetails.error &&
+      errorDetails.error.message
+    ) {
       // 处理 OpenAI 格式的错误
-      fullMessage += `\n详细信息: ${errorDetails.error.message}`
+      fullMessage += `\n详细信息: ${errorDetails.error.message}`;
     }
 
-    showToast(fullMessage, 'error', '', 8000)
+    showToast(fullMessage, "error", "", 8000);
 
     // 错误已通过 toast 显示给用户
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 // 创建账户（手动模式）
 const createAccount = async () => {
   // 清除之前的错误
-  errors.value.name = ''
-  errors.value.accessToken = ''
-  errors.value.refreshToken = ''
-  errors.value.apiUrl = ''
-  errors.value.apiKey = ''
-  errors.value.apiKeys = ''
+  errors.value.name = "";
+  errors.value.accessToken = "";
+  errors.value.refreshToken = "";
+  errors.value.apiUrl = "";
+  errors.value.apiKey = "";
+  errors.value.apiKeys = "";
 
-  let hasError = false
+  let hasError = false;
 
-  if (!form.value.name || form.value.name.trim() === '') {
-    errors.value.name = '请填写账户名称'
-    hasError = true
+  if (!form.value.name || form.value.name.trim() === "") {
+    errors.value.name = "请填写账户名称";
+    hasError = true;
   }
 
   // Claude Console 验证
-  if (form.value.platform === 'claude-console') {
-    if (!form.value.apiUrl || form.value.apiUrl.trim() === '') {
-      errors.value.apiUrl = '请填写 API URL'
-      hasError = true
+  if (form.value.platform === "claude-console") {
+    if (!form.value.apiUrl || form.value.apiUrl.trim() === "") {
+      errors.value.apiUrl = "请填写 API URL";
+      hasError = true;
     }
-    if (!form.value.apiKey || form.value.apiKey.trim() === '') {
-      errors.value.apiKey = '请填写 API Key'
-      hasError = true
+    if (!form.value.apiKey || form.value.apiKey.trim() === "") {
+      errors.value.apiKey = "请填写 API Key";
+      hasError = true;
     }
   }
 
   // CCR (Claude Code Router) 验证 - 使用与 Claude Console 相同的字段
-  if (form.value.platform === 'ccr') {
-    if (!form.value.apiUrl || form.value.apiUrl.trim() === '') {
-      errors.value.apiUrl = '请填写 API URL'
-      hasError = true
+  if (form.value.platform === "ccr") {
+    if (!form.value.apiUrl || form.value.apiUrl.trim() === "") {
+      errors.value.apiUrl = "请填写 API URL";
+      hasError = true;
     }
-    if (!form.value.apiKey || form.value.apiKey.trim() === '') {
-      errors.value.apiKey = '请填写 API Key'
-      hasError = true
+    if (!form.value.apiKey || form.value.apiKey.trim() === "") {
+      errors.value.apiKey = "请填写 API Key";
+      hasError = true;
     }
   }
 
   // OpenAI-Responses 验证
-  if (form.value.platform === 'openai-responses') {
-    if (!form.value.baseApi || form.value.baseApi.trim() === '') {
-      errors.value.baseApi = '请填写 API 基础地址'
-      hasError = true
+  if (form.value.platform === "openai-responses") {
+    if (!form.value.baseApi || form.value.baseApi.trim() === "") {
+      errors.value.baseApi = "请填写 API 基础地址";
+      hasError = true;
     }
-    if (!form.value.apiKey || form.value.apiKey.trim() === '') {
-      errors.value.apiKey = '请填写 API 密钥'
-      hasError = true
+    if (!form.value.apiKey || form.value.apiKey.trim() === "") {
+      errors.value.apiKey = "请填写 API 密钥";
+      hasError = true;
     }
-  } else if (form.value.platform === 'bedrock') {
+  } else if (form.value.platform === "bedrock") {
     // Bedrock 验证
-    if (!form.value.accessKeyId || form.value.accessKeyId.trim() === '') {
-      errors.value.accessKeyId = '请填写 AWS 访问密钥 ID'
-      hasError = true
+    if (!form.value.accessKeyId || form.value.accessKeyId.trim() === "") {
+      errors.value.accessKeyId = "请填写 AWS 访问密钥 ID";
+      hasError = true;
     }
-    if (!form.value.secretAccessKey || form.value.secretAccessKey.trim() === '') {
-      errors.value.secretAccessKey = '请填写 AWS 秘密访问密钥'
-      hasError = true
+    if (
+      !form.value.secretAccessKey ||
+      form.value.secretAccessKey.trim() === ""
+    ) {
+      errors.value.secretAccessKey = "请填写 AWS 秘密访问密钥";
+      hasError = true;
     }
-    if (!form.value.region || form.value.region.trim() === '') {
-      errors.value.region = '请选择 AWS 区域'
-      hasError = true
+    if (!form.value.region || form.value.region.trim() === "") {
+      errors.value.region = "请选择 AWS 区域";
+      hasError = true;
     }
-  } else if (form.value.platform === 'azure_openai') {
+  } else if (form.value.platform === "azure_openai") {
     // Azure OpenAI 验证
-    if (!form.value.azureEndpoint || form.value.azureEndpoint.trim() === '') {
-      errors.value.azureEndpoint = '请填写 Azure Endpoint'
-      hasError = true
+    if (!form.value.azureEndpoint || form.value.azureEndpoint.trim() === "") {
+      errors.value.azureEndpoint = "请填写 Azure Endpoint";
+      hasError = true;
     }
-    if (!form.value.deploymentName || form.value.deploymentName.trim() === '') {
-      errors.value.deploymentName = '请填写部署名称'
-      hasError = true
+    if (!form.value.deploymentName || form.value.deploymentName.trim() === "") {
+      errors.value.deploymentName = "请填写部署名称";
+      hasError = true;
     }
-    if (!form.value.apiKey || form.value.apiKey.trim() === '') {
-      errors.value.apiKey = '请填写 API Key'
-      hasError = true
+    if (!form.value.apiKey || form.value.apiKey.trim() === "") {
+      errors.value.apiKey = "请填写 API Key";
+      hasError = true;
     }
-  } else if (form.value.addType === 'manual') {
+  } else if (form.value.addType === "manual") {
     // 手动模式验证 - 只有部分平台需要验证 Token
-    if (form.value.platform === 'openai') {
+    if (form.value.platform === "openai") {
       // OpenAI 平台必须有 Refresh Token
-      if (!form.value.refreshToken || form.value.refreshToken.trim() === '') {
-        errors.value.refreshToken = '请填写 Refresh Token'
-        hasError = true
+      if (!form.value.refreshToken || form.value.refreshToken.trim() === "") {
+        errors.value.refreshToken = "请填写 Refresh Token";
+        hasError = true;
       }
       // Access Token 可选，如果没有会通过 Refresh Token 获取
-    } else if (form.value.platform === 'gemini') {
+    } else if (form.value.platform === "gemini") {
       // Gemini 平台需要 Access Token
-      if (!form.value.accessToken || form.value.accessToken.trim() === '') {
-        errors.value.accessToken = '请填写 Access Token'
-        hasError = true
+      if (!form.value.accessToken || form.value.accessToken.trim() === "") {
+        errors.value.accessToken = "请填写 Access Token";
+        hasError = true;
       }
-    } else if (form.value.platform === 'droid') {
-      if (!form.value.accessToken || form.value.accessToken.trim() === '') {
-        errors.value.accessToken = '请填写 Access Token'
-        hasError = true
+    } else if (form.value.platform === "droid") {
+      if (!form.value.accessToken || form.value.accessToken.trim() === "") {
+        errors.value.accessToken = "请填写 Access Token";
+        hasError = true;
       }
-      if (!form.value.refreshToken || form.value.refreshToken.trim() === '') {
-        errors.value.refreshToken = '请填写 Refresh Token'
-        hasError = true
+      if (!form.value.refreshToken || form.value.refreshToken.trim() === "") {
+        errors.value.refreshToken = "请填写 Refresh Token";
+        hasError = true;
       }
-    } else if (form.value.platform === 'claude') {
+    } else if (form.value.platform === "claude") {
       // Claude 平台需要 Access Token
-      if (!form.value.accessToken || form.value.accessToken.trim() === '') {
-        errors.value.accessToken = '请填写 Access Token'
-        hasError = true
+      if (!form.value.accessToken || form.value.accessToken.trim() === "") {
+        errors.value.accessToken = "请填写 Access Token";
+        hasError = true;
       }
     }
     // Claude Console、CCR、OpenAI-Responses 等其他平台不需要 Token 验证
-  } else if (form.value.addType === 'apikey') {
-    const apiKeys = parseApiKeysInput(form.value.apiKeysInput)
+  } else if (form.value.addType === "apikey") {
+    const apiKeys = parseApiKeysInput(form.value.apiKeysInput);
     if (apiKeys.length === 0) {
-      errors.value.apiKeys = '请至少填写一个 API Key'
-      hasError = true
+      errors.value.apiKeys = "请至少填写一个 API Key";
+      hasError = true;
     }
   }
 
   // 分组类型验证 - 创建账户流程修复
   if (
-    form.value.accountType === 'group' &&
+    form.value.accountType === "group" &&
     (!form.value.groupIds || form.value.groupIds.length === 0)
   ) {
-    showToast('请选择一个分组', 'error')
-    hasError = true
+    showToast("请选择一个分组", "error");
+    hasError = true;
   }
 
   // 数据同步：确保 groupId 和 groupIds 保持一致 - 创建流程
-  if (form.value.accountType === 'group') {
+  if (form.value.accountType === "group") {
     if (form.value.groupIds && form.value.groupIds.length > 0) {
-      form.value.groupId = form.value.groupIds[0]
+      form.value.groupId = form.value.groupIds[0];
     } else {
-      form.value.groupId = ''
+      form.value.groupId = "";
     }
   }
 
   if (hasError) {
-    return
+    return;
   }
 
-  loading.value = true
+  loading.value = true;
   try {
-    const proxyPayload = buildProxyPayload(form.value.proxy)
+    const proxyPayload = buildProxyPayload(form.value.proxy);
 
     const data = {
       name: form.value.name,
       description: form.value.description,
       accountType: form.value.accountType,
-      groupId: form.value.accountType === 'group' ? form.value.groupId : undefined,
-      groupIds: form.value.accountType === 'group' ? form.value.groupIds : undefined,
+      groupId:
+        form.value.accountType === "group" ? form.value.groupId : undefined,
+      groupIds:
+        form.value.accountType === "group" ? form.value.groupIds : undefined,
       expiresAt: form.value.expiresAt || undefined,
-      proxy: proxyPayload
-    }
+      proxy: proxyPayload,
+    };
 
-    if (form.value.platform === 'claude') {
+    if (form.value.platform === "claude") {
       // Claude手动模式需要构建claudeAiOauth对象
       const expiresInMs = form.value.refreshToken
         ? 10 * 60 * 1000 // 10分钟
-        : 365 * 24 * 60 * 60 * 1000 // 1年
+        : 365 * 24 * 60 * 60 * 1000; // 1年
 
       // 手动模式也需要确保生成客户端ID
       if (form.value.useUnifiedClientId && !form.value.unifiedClientId) {
-        form.value.unifiedClientId = generateClientId()
+        form.value.unifiedClientId = generateClientId();
       }
 
       data.claudeAiOauth = {
         accessToken: form.value.accessToken,
-        refreshToken: form.value.refreshToken || '',
+        refreshToken: form.value.refreshToken || "",
         expiresAt: Date.now() + expiresInMs,
-        scopes: [] // 手动添加没有 scopes
-      }
-      data.priority = form.value.priority || 50
-      data.autoStopOnWarning = form.value.autoStopOnWarning || false
-      data.useUnifiedUserAgent = form.value.useUnifiedUserAgent || false
-      data.useUnifiedClientId = form.value.useUnifiedClientId || false
-      data.unifiedClientId = form.value.unifiedClientId || ''
+        scopes: [], // 手动添加没有 scopes
+      };
+      data.priority = form.value.priority || 50;
+      data.autoStopOnWarning = form.value.autoStopOnWarning || false;
+      data.useUnifiedUserAgent = form.value.useUnifiedUserAgent || false;
+      data.useUnifiedClientId = form.value.useUnifiedClientId || false;
+      data.unifiedClientId = form.value.unifiedClientId || "";
       // 添加订阅类型信息
       data.subscriptionInfo = {
-        accountType: form.value.subscriptionType || 'claude_max',
-        hasClaudeMax: form.value.subscriptionType === 'claude_max',
-        hasClaudePro: form.value.subscriptionType === 'claude_pro',
-        manuallySet: true // 标记为手动设置
-      }
-    } else if (form.value.platform === 'gemini') {
+        accountType: form.value.subscriptionType || "claude_max",
+        hasClaudeMax: form.value.subscriptionType === "claude_max",
+        hasClaudePro: form.value.subscriptionType === "claude_pro",
+        manuallySet: true, // 标记为手动设置
+      };
+    } else if (form.value.platform === "gemini") {
       // Gemini手动模式需要构建geminiOauth对象
       const expiresInMs = form.value.refreshToken
         ? 10 * 60 * 1000 // 10分钟
-        : 365 * 24 * 60 * 60 * 1000 // 1年
+        : 365 * 24 * 60 * 60 * 1000; // 1年
 
       data.geminiOauth = {
         access_token: form.value.accessToken,
-        refresh_token: form.value.refreshToken || '',
-        scope: 'https://www.googleapis.com/auth/cloud-platform',
-        token_type: 'Bearer',
-        expiry_date: Date.now() + expiresInMs
-      }
+        refresh_token: form.value.refreshToken || "",
+        scope: "https://www.googleapis.com/auth/cloud-platform",
+        token_type: "Bearer",
+        expiry_date: Date.now() + expiresInMs,
+      };
 
       if (form.value.projectId) {
-        data.projectId = form.value.projectId
+        data.projectId = form.value.projectId;
       }
 
       // 添加 Gemini 优先级
-      data.priority = form.value.priority || 50
-    } else if (form.value.platform === 'openai') {
+      data.priority = form.value.priority || 50;
+    } else if (form.value.platform === "openai") {
       // OpenAI手动模式需要构建openaiOauth对象
       const expiresInMs = form.value.refreshToken
         ? 10 * 60 * 1000 // 10分钟
-        : 365 * 24 * 60 * 60 * 1000 // 1年
+        : 365 * 24 * 60 * 60 * 1000; // 1年
 
       data.openaiOauth = {
-        idToken: '', // 不再需要用户输入，系统会自动获取
-        accessToken: form.value.accessToken || '', // Access Token 可选
+        idToken: "", // 不再需要用户输入，系统会自动获取
+        accessToken: form.value.accessToken || "", // Access Token 可选
         refreshToken: form.value.refreshToken, // Refresh Token 必填
-        expires_in: Math.floor(expiresInMs / 1000) // 转换为秒
-      }
+        expires_in: Math.floor(expiresInMs / 1000), // 转换为秒
+      };
 
       // 账户信息将在首次刷新时自动获取
       data.accountInfo = {
-        accountId: '',
-        chatgptUserId: '',
-        organizationId: '',
-        organizationRole: '',
-        organizationTitle: '',
-        planType: '',
-        email: '',
-        emailVerified: false
-      }
+        accountId: "",
+        chatgptUserId: "",
+        organizationId: "",
+        organizationRole: "",
+        organizationTitle: "",
+        planType: "",
+        email: "",
+        emailVerified: false,
+      };
 
       // OpenAI 手动模式必须刷新以获取完整信息（包括 ID Token）
-      data.needsImmediateRefresh = true
-      data.requireRefreshSuccess = true // 必须刷新成功才能创建账户
-      data.priority = form.value.priority || 50
-    } else if (form.value.platform === 'droid') {
-      data.priority = form.value.priority || 50
-      data.endpointType = form.value.endpointType || 'anthropic'
-      data.platform = 'droid'
+      data.needsImmediateRefresh = true;
+      data.requireRefreshSuccess = true; // 必须刷新成功才能创建账户
+      data.priority = form.value.priority || 50;
+    } else if (form.value.platform === "droid") {
+      data.priority = form.value.priority || 50;
+      data.endpointType = form.value.endpointType || "anthropic";
+      data.platform = "droid";
 
-      if (form.value.addType === 'apikey') {
-        const apiKeys = parseApiKeysInput(form.value.apiKeysInput)
-        data.apiKeys = apiKeys
-        data.authenticationMethod = 'api_key'
-        data.isActive = true
-        data.schedulable = true
+      if (form.value.addType === "apikey") {
+        const apiKeys = parseApiKeysInput(form.value.apiKeysInput);
+        data.apiKeys = apiKeys;
+        data.authenticationMethod = "api_key";
+        data.isActive = true;
+        data.schedulable = true;
       } else {
-        const accessToken = form.value.accessToken?.trim() || ''
-        const refreshToken = form.value.refreshToken?.trim() || ''
-        const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString()
+        const accessToken = form.value.accessToken?.trim() || "";
+        const refreshToken = form.value.refreshToken?.trim() || "";
+        const expiresAt = new Date(
+          Date.now() + 8 * 60 * 60 * 1000,
+        ).toISOString();
 
-        data.accessToken = accessToken
-        data.refreshToken = refreshToken
-        data.expiresAt = expiresAt
-        data.expiresIn = 8 * 60 * 60
-        data.tokenType = 'Bearer'
-        data.authenticationMethod = 'manual'
+        data.accessToken = accessToken;
+        data.refreshToken = refreshToken;
+        data.expiresAt = expiresAt;
+        data.expiresIn = 8 * 60 * 60;
+        data.tokenType = "Bearer";
+        data.authenticationMethod = "manual";
       }
-    } else if (form.value.platform === 'claude-console' || form.value.platform === 'ccr') {
+    } else if (
+      form.value.platform === "claude-console" ||
+      form.value.platform === "ccr"
+    ) {
       // Claude Console 和 CCR 账户特定数据（CCR 使用 Claude Console 的后端逻辑）
-      data.apiUrl = form.value.apiUrl
-      data.apiKey = form.value.apiKey
-      data.priority = form.value.priority || 50
-      data.supportedModels = convertMappingsToObject() || {}
-      data.userAgent = form.value.userAgent || null
+      data.apiUrl = form.value.apiUrl;
+      data.apiKey = form.value.apiKey;
+      data.priority = form.value.priority || 50;
+      data.supportedModels = convertMappingsToObject() || {};
+      data.userAgent = form.value.userAgent || null;
       // 如果不启用限流，传递 0 表示不限流
-      data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
+      data.rateLimitDuration = form.value.enableRateLimit
+        ? form.value.rateLimitDuration || 60
+        : 0;
       // 额度管理字段
-      data.dailyQuota = form.value.dailyQuota || 0
-      data.quotaResetTime = form.value.quotaResetTime || '00:00'
+      data.dailyQuota = form.value.dailyQuota || 0;
+      data.quotaResetTime = form.value.quotaResetTime || "00:00";
       // 并发控制字段
-      data.maxConcurrentTasks = form.value.maxConcurrentTasks || 0
-    } else if (form.value.platform === 'openai-responses') {
+      data.maxConcurrentTasks = form.value.maxConcurrentTasks || 0;
+    } else if (form.value.platform === "openai-responses") {
       // OpenAI-Responses 账户特定数据
-      data.baseApi = form.value.baseApi
-      data.apiKey = form.value.apiKey
-      data.userAgent = form.value.userAgent || ''
-      data.priority = form.value.priority || 50
-      data.rateLimitDuration = 60 // 默认值60，不从用户输入获取
-      data.dailyQuota = form.value.dailyQuota || 0
-      data.quotaResetTime = form.value.quotaResetTime || '00:00'
-    } else if (form.value.platform === 'bedrock') {
+      data.baseApi = form.value.baseApi;
+      data.apiKey = form.value.apiKey;
+      data.userAgent = form.value.userAgent || "";
+      data.priority = form.value.priority || 50;
+      data.rateLimitDuration = 60; // 默认值60，不从用户输入获取
+      data.dailyQuota = form.value.dailyQuota || 0;
+      data.quotaResetTime = form.value.quotaResetTime || "00:00";
+    } else if (form.value.platform === "bedrock") {
       // Bedrock 账户特定数据 - 构造 awsCredentials 对象
       data.awsCredentials = {
         accessKeyId: form.value.accessKeyId,
         secretAccessKey: form.value.secretAccessKey,
-        sessionToken: form.value.sessionToken || null
-      }
-      data.region = form.value.region
-      data.defaultModel = form.value.defaultModel || null
-      data.smallFastModel = form.value.smallFastModel || null
-      data.priority = form.value.priority || 50
+        sessionToken: form.value.sessionToken || null,
+      };
+      data.region = form.value.region;
+      data.defaultModel = form.value.defaultModel || null;
+      data.smallFastModel = form.value.smallFastModel || null;
+      data.priority = form.value.priority || 50;
       // 如果不启用限流，传递 0 表示不限流
-      data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
-    } else if (form.value.platform === 'azure_openai') {
+      data.rateLimitDuration = form.value.enableRateLimit
+        ? form.value.rateLimitDuration || 60
+        : 0;
+    } else if (form.value.platform === "azure_openai") {
       // Azure OpenAI 账户特定数据
-      data.azureEndpoint = form.value.azureEndpoint
-      data.apiKey = form.value.apiKey
-      data.apiVersion = form.value.apiVersion || '2024-02-01'
-      data.deploymentName = form.value.deploymentName
+      data.azureEndpoint = form.value.azureEndpoint;
+      data.apiKey = form.value.apiKey;
+      data.apiVersion = form.value.apiVersion || "2024-02-01";
+      data.deploymentName = form.value.deploymentName;
       data.supportedModels = Array.isArray(form.value.supportedModels)
         ? form.value.supportedModels
-        : []
-      data.priority = form.value.priority || 50
-      data.isActive = form.value.isActive !== false
-      data.schedulable = form.value.schedulable !== false
+        : [];
+      data.priority = form.value.priority || 50;
+      data.isActive = form.value.isActive !== false;
+      data.schedulable = form.value.schedulable !== false;
     }
 
-    let result
-    if (form.value.platform === 'claude') {
-      result = await accountsStore.createClaudeAccount(data)
-    } else if (form.value.platform === 'claude-console' || form.value.platform === 'ccr') {
+    let result;
+    if (form.value.platform === "claude") {
+      result = await accountsStore.createClaudeAccount(data);
+    } else if (
+      form.value.platform === "claude-console" ||
+      form.value.platform === "ccr"
+    ) {
       // CCR 使用 Claude Console 的后端 API
-      result = await accountsStore.createClaudeConsoleAccount(data)
-    } else if (form.value.platform === 'droid') {
-      result = await accountsStore.createDroidAccount(data)
-    } else if (form.value.platform === 'openai-responses') {
-      result = await accountsStore.createOpenAIResponsesAccount(data)
-    } else if (form.value.platform === 'bedrock') {
-      result = await accountsStore.createBedrockAccount(data)
-    } else if (form.value.platform === 'openai') {
-      result = await accountsStore.createOpenAIAccount(data)
-    } else if (form.value.platform === 'azure_openai') {
-      result = await accountsStore.createAzureOpenAIAccount(data)
-    } else if (form.value.platform === 'gemini') {
-      result = await accountsStore.createGeminiAccount(data)
+      result = await accountsStore.createClaudeConsoleAccount(data);
+    } else if (form.value.platform === "droid") {
+      result = await accountsStore.createDroidAccount(data);
+    } else if (form.value.platform === "openai-responses") {
+      result = await accountsStore.createOpenAIResponsesAccount(data);
+    } else if (form.value.platform === "bedrock") {
+      result = await accountsStore.createBedrockAccount(data);
+    } else if (form.value.platform === "openai") {
+      result = await accountsStore.createOpenAIAccount(data);
+    } else if (form.value.platform === "azure_openai") {
+      result = await accountsStore.createAzureOpenAIAccount(data);
+    } else if (form.value.platform === "gemini") {
+      result = await accountsStore.createGeminiAccount(data);
     } else {
-      throw new Error(`不支持的平台: ${form.value.platform}`)
+      throw new Error(`不支持的平台: ${form.value.platform}`);
     }
 
-    emit('success', result)
+    emit("success", result);
   } catch (error) {
     // 显示详细的错误信息
-    const errorMessage = error.response?.data?.error || error.message || '账户创建失败'
-    const suggestion = error.response?.data?.suggestion || ''
-    const errorDetails = error.response?.data?.errorDetails || null
+    const errorMessage =
+      error.response?.data?.error || error.message || "账户创建失败";
+    const suggestion = error.response?.data?.suggestion || "";
+    const errorDetails = error.response?.data?.errorDetails || null;
 
     // 构建完整的错误提示
-    let fullMessage = errorMessage
+    let fullMessage = errorMessage;
     if (suggestion) {
-      fullMessage += `\n${suggestion}`
+      fullMessage += `\n${suggestion}`;
     }
 
     // 如果有详细的 OAuth 错误信息，也显示出来
     if (errorDetails && errorDetails.error_description) {
-      fullMessage += `\n详细信息: ${errorDetails.error_description}`
-    } else if (errorDetails && errorDetails.error && errorDetails.error.message) {
+      fullMessage += `\n详细信息: ${errorDetails.error_description}`;
+    } else if (
+      errorDetails &&
+      errorDetails.error &&
+      errorDetails.error.message
+    ) {
       // 处理 OpenAI 格式的错误
-      fullMessage += `\n详细信息: ${errorDetails.error.message}`
+      fullMessage += `\n详细信息: ${errorDetails.error.message}`;
     }
 
-    showToast(fullMessage, 'error', '', 8000)
+    showToast(fullMessage, "error", "", 8000);
 
     // 错误已通过 toast 显示给用户
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 // 更新账户
 const updateAccount = async () => {
   // 清除之前的错误
-  errors.value.name = ''
-  errors.value.apiKeys = ''
+  errors.value.name = "";
+  errors.value.apiKeys = "";
 
   // 验证账户名称
-  if (!form.value.name || form.value.name.trim() === '') {
-    errors.value.name = '请填写账户名称'
-    return
+  if (!form.value.name || form.value.name.trim() === "") {
+    errors.value.name = "请填写账户名称";
+    return;
   }
 
   // 分组类型验证 - 更新账户流程修复
   if (
-    form.value.accountType === 'group' &&
+    form.value.accountType === "group" &&
     (!form.value.groupIds || form.value.groupIds.length === 0)
   ) {
-    showToast('请选择一个分组', 'error')
-    return
+    showToast("请选择一个分组", "error");
+    return;
   }
 
   // 数据同步：确保 groupId 和 groupIds 保持一致 - 更新流程
-  if (form.value.accountType === 'group') {
+  if (form.value.accountType === "group") {
     if (form.value.groupIds && form.value.groupIds.length > 0) {
-      form.value.groupId = form.value.groupIds[0]
+      form.value.groupId = form.value.groupIds[0];
     } else {
-      form.value.groupId = ''
+      form.value.groupId = "";
     }
   }
 
   // 对于Gemini账户，检查项目 ID
-  if (form.value.platform === 'gemini') {
-    if (!form.value.projectId || form.value.projectId.trim() === '') {
+  if (form.value.platform === "gemini") {
+    if (!form.value.projectId || form.value.projectId.trim() === "") {
       // 使用自定义确认弹窗
       const confirmed = await showConfirm(
-        '项目 ID 未填写',
-        '您尚未填写项目 ID。\n\n如果您的Google账号绑定了Google Cloud或被识别为Workspace账号，需要提供项目 ID。\n如果您使用的是普通个人账号，可以继续不填写。',
-        '继续保存',
-        '返回填写'
-      )
+        "项目 ID 未填写",
+        "您尚未填写项目 ID。\n\n如果您的Google账号绑定了Google Cloud或被识别为Workspace账号，需要提供项目 ID。\n如果您使用的是普通个人账号，可以继续不填写。",
+        "继续保存",
+        "返回填写",
+      );
       if (!confirmed) {
-        return
+        return;
       }
     }
   }
 
-  loading.value = true
+  loading.value = true;
   try {
-    const proxyPayload = buildProxyPayload(form.value.proxy)
+    const proxyPayload = buildProxyPayload(form.value.proxy);
 
     const data = {
       name: form.value.name,
       description: form.value.description,
       accountType: form.value.accountType,
-      groupId: form.value.accountType === 'group' ? form.value.groupId : undefined,
-      groupIds: form.value.accountType === 'group' ? form.value.groupIds : undefined,
+      groupId:
+        form.value.accountType === "group" ? form.value.groupId : undefined,
+      groupIds:
+        form.value.accountType === "group" ? form.value.groupIds : undefined,
       expiresAt: form.value.expiresAt || undefined,
-      proxy: proxyPayload
-    }
+      proxy: proxyPayload,
+    };
 
     // 只有非空时才更新token
     if (form.value.accessToken || form.value.refreshToken) {
-      const trimmedAccessToken = form.value.accessToken?.trim() || ''
-      const trimmedRefreshToken = form.value.refreshToken?.trim() || ''
+      const trimmedAccessToken = form.value.accessToken?.trim() || "";
+      const trimmedRefreshToken = form.value.refreshToken?.trim() || "";
 
-      if (props.account.platform === 'claude') {
+      if (props.account.platform === "claude") {
         // Claude需要构建claudeAiOauth对象
         const expiresInMs = form.value.refreshToken
           ? 10 * 60 * 1000 // 10分钟
-          : 365 * 24 * 60 * 60 * 1000 // 1年
+          : 365 * 24 * 60 * 60 * 1000; // 1年
 
         data.claudeAiOauth = {
-          accessToken: trimmedAccessToken || '',
-          refreshToken: trimmedRefreshToken || '',
+          accessToken: trimmedAccessToken || "",
+          refreshToken: trimmedRefreshToken || "",
           expiresAt: Date.now() + expiresInMs,
-          scopes: props.account.scopes || [] // 保持原有的 scopes，如果没有则为空数组
-        }
-      } else if (props.account.platform === 'gemini') {
+          scopes: props.account.scopes || [], // 保持原有的 scopes，如果没有则为空数组
+        };
+      } else if (props.account.platform === "gemini") {
         // Gemini需要构建geminiOauth对象
         const expiresInMs = form.value.refreshToken
           ? 10 * 60 * 1000 // 10分钟
-          : 365 * 24 * 60 * 60 * 1000 // 1年
+          : 365 * 24 * 60 * 60 * 1000; // 1年
 
         data.geminiOauth = {
-          access_token: trimmedAccessToken || '',
-          refresh_token: trimmedRefreshToken || '',
-          scope: 'https://www.googleapis.com/auth/cloud-platform',
-          token_type: 'Bearer',
-          expiry_date: Date.now() + expiresInMs
-        }
-      } else if (props.account.platform === 'openai') {
+          access_token: trimmedAccessToken || "",
+          refresh_token: trimmedRefreshToken || "",
+          scope: "https://www.googleapis.com/auth/cloud-platform",
+          token_type: "Bearer",
+          expiry_date: Date.now() + expiresInMs,
+        };
+      } else if (props.account.platform === "openai") {
         // OpenAI需要构建openaiOauth对象
         const expiresInMs = form.value.refreshToken
           ? 10 * 60 * 1000 // 10分钟
-          : 365 * 24 * 60 * 60 * 1000 // 1年
+          : 365 * 24 * 60 * 60 * 1000; // 1年
 
         data.openaiOauth = {
-          idToken: '', // 不需要用户输入
-          accessToken: trimmedAccessToken || '',
-          refreshToken: trimmedRefreshToken || '',
-          expires_in: Math.floor(expiresInMs / 1000) // 转换为秒
-        }
+          idToken: "", // 不需要用户输入
+          accessToken: trimmedAccessToken || "",
+          refreshToken: trimmedRefreshToken || "",
+          expires_in: Math.floor(expiresInMs / 1000), // 转换为秒
+        };
 
         // 编辑 OpenAI 账户时，如果更新了 Refresh Token，也需要验证
-        if (trimmedRefreshToken && trimmedRefreshToken !== props.account.refreshToken) {
-          data.needsImmediateRefresh = true
-          data.requireRefreshSuccess = true
+        if (
+          trimmedRefreshToken &&
+          trimmedRefreshToken !== props.account.refreshToken
+        ) {
+          data.needsImmediateRefresh = true;
+          data.requireRefreshSuccess = true;
         }
-      } else if (props.account.platform === 'droid') {
+      } else if (props.account.platform === "droid") {
         if (trimmedAccessToken) {
-          data.accessToken = trimmedAccessToken
+          data.accessToken = trimmedAccessToken;
         }
         if (trimmedRefreshToken) {
-          data.refreshToken = trimmedRefreshToken
+          data.refreshToken = trimmedRefreshToken;
         }
       }
     }
 
-    if (props.account.platform === 'droid') {
-      const trimmedApiKeysInput = form.value.apiKeysInput?.trim() || ''
-      const apiKeyUpdateMode = form.value.apiKeyUpdateMode || 'append'
+    if (props.account.platform === "droid") {
+      const trimmedApiKeysInput = form.value.apiKeysInput?.trim() || "";
+      const apiKeyUpdateMode = form.value.apiKeyUpdateMode || "append";
 
-      if (apiKeyUpdateMode === 'delete') {
+      if (apiKeyUpdateMode === "delete") {
         if (!trimmedApiKeysInput) {
-          errors.value.apiKeys = '请填写需要删除的 API Key'
-          loading.value = false
-          return
+          errors.value.apiKeys = "请填写需要删除的 API Key";
+          loading.value = false;
+          return;
         }
 
-        const removeApiKeys = parseApiKeysInput(trimmedApiKeysInput)
+        const removeApiKeys = parseApiKeysInput(trimmedApiKeysInput);
         if (removeApiKeys.length === 0) {
-          errors.value.apiKeys = '请填写需要删除的 API Key'
-          loading.value = false
-          return
+          errors.value.apiKeys = "请填写需要删除的 API Key";
+          loading.value = false;
+          return;
         }
 
-        data.removeApiKeys = removeApiKeys
-        data.apiKeyUpdateMode = 'delete'
+        data.removeApiKeys = removeApiKeys;
+        data.apiKeyUpdateMode = "delete";
       } else {
         if (trimmedApiKeysInput) {
-          const apiKeys = parseApiKeysInput(trimmedApiKeysInput)
+          const apiKeys = parseApiKeysInput(trimmedApiKeysInput);
           if (apiKeys.length === 0) {
-            errors.value.apiKeys = '请至少填写一个 API Key'
-            loading.value = false
-            return
+            errors.value.apiKeys = "请至少填写一个 API Key";
+            loading.value = false;
+            return;
           }
-          data.apiKeys = apiKeys
-        } else if (apiKeyUpdateMode === 'replace') {
-          data.apiKeys = []
+          data.apiKeys = apiKeys;
+        } else if (apiKeyUpdateMode === "replace") {
+          data.apiKeys = [];
         }
 
-        if (apiKeyUpdateMode !== 'append' || trimmedApiKeysInput) {
-          data.apiKeyUpdateMode = apiKeyUpdateMode
+        if (apiKeyUpdateMode !== "append" || trimmedApiKeysInput) {
+          data.apiKeyUpdateMode = apiKeyUpdateMode;
         }
       }
 
       if (isEditingDroidApiKey.value) {
-        data.authenticationMethod = 'api_key'
+        data.authenticationMethod = "api_key";
       }
     }
 
-    if (props.account.platform === 'gemini') {
-      data.projectId = form.value.projectId || ''
+    if (props.account.platform === "gemini") {
+      data.projectId = form.value.projectId || "";
     }
 
-    if (props.account.platform === 'droid') {
-      data.priority = form.value.priority || 50
-      data.endpointType = form.value.endpointType || 'anthropic'
+    if (props.account.platform === "droid") {
+      data.priority = form.value.priority || 50;
+      data.endpointType = form.value.endpointType || "anthropic";
     }
 
     // Claude 官方账号优先级和订阅类型更新
-    if (props.account.platform === 'claude') {
+    if (props.account.platform === "claude") {
       // 更新模式也需要确保生成客户端ID
       if (form.value.useUnifiedClientId && !form.value.unifiedClientId) {
-        form.value.unifiedClientId = generateClientId()
+        form.value.unifiedClientId = generateClientId();
       }
 
-      data.priority = form.value.priority || 50
-      data.autoStopOnWarning = form.value.autoStopOnWarning || false
-      data.useUnifiedUserAgent = form.value.useUnifiedUserAgent || false
-      data.useUnifiedClientId = form.value.useUnifiedClientId || false
-      data.unifiedClientId = form.value.unifiedClientId || ''
+      data.priority = form.value.priority || 50;
+      data.autoStopOnWarning = form.value.autoStopOnWarning || false;
+      data.useUnifiedUserAgent = form.value.useUnifiedUserAgent || false;
+      data.useUnifiedClientId = form.value.useUnifiedClientId || false;
+      data.unifiedClientId = form.value.unifiedClientId || "";
       // 更新订阅类型信息
       data.subscriptionInfo = {
-        accountType: form.value.subscriptionType || 'claude_max',
-        hasClaudeMax: form.value.subscriptionType === 'claude_max',
-        hasClaudePro: form.value.subscriptionType === 'claude_pro',
-        manuallySet: true // 标记为手动设置
-      }
+        accountType: form.value.subscriptionType || "claude_max",
+        hasClaudeMax: form.value.subscriptionType === "claude_max",
+        hasClaudePro: form.value.subscriptionType === "claude_pro",
+        manuallySet: true, // 标记为手动设置
+      };
     }
 
     // OpenAI 账号优先级更新
-    if (props.account.platform === 'openai') {
-      data.priority = form.value.priority || 50
+    if (props.account.platform === "openai") {
+      data.priority = form.value.priority || 50;
     }
 
     // Gemini 账号优先级更新
-    if (props.account.platform === 'gemini') {
-      data.priority = form.value.priority || 50
+    if (props.account.platform === "gemini") {
+      data.priority = form.value.priority || 50;
     }
 
     // Claude Console 特定更新
-    if (props.account.platform === 'claude-console') {
-      data.apiUrl = form.value.apiUrl
+    if (props.account.platform === "claude-console") {
+      data.apiUrl = form.value.apiUrl;
       if (form.value.apiKey) {
-        data.apiKey = form.value.apiKey
+        data.apiKey = form.value.apiKey;
       }
-      data.priority = form.value.priority || 50
-      data.supportedModels = convertMappingsToObject() || {}
-      data.userAgent = form.value.userAgent || null
+      data.priority = form.value.priority || 50;
+      data.supportedModels = convertMappingsToObject() || {};
+      data.userAgent = form.value.userAgent || null;
       // 如果不启用限流，传递 0 表示不限流
-      data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
+      data.rateLimitDuration = form.value.enableRateLimit
+        ? form.value.rateLimitDuration || 60
+        : 0;
       // 额度管理字段
-      data.dailyQuota = form.value.dailyQuota || 0
-      data.quotaResetTime = form.value.quotaResetTime || '00:00'
+      data.dailyQuota = form.value.dailyQuota || 0;
+      data.quotaResetTime = form.value.quotaResetTime || "00:00";
       // 并发控制字段
-      data.maxConcurrentTasks = form.value.maxConcurrentTasks || 0
+      data.maxConcurrentTasks = form.value.maxConcurrentTasks || 0;
     }
 
     // OpenAI-Responses 特定更新
-    if (props.account.platform === 'openai-responses') {
-      data.baseApi = form.value.baseApi
+    if (props.account.platform === "openai-responses") {
+      data.baseApi = form.value.baseApi;
       if (form.value.apiKey) {
-        data.apiKey = form.value.apiKey
+        data.apiKey = form.value.apiKey;
       }
-      data.userAgent = form.value.userAgent || ''
-      data.priority = form.value.priority || 50
+      data.userAgent = form.value.userAgent || "";
+      data.priority = form.value.priority || 50;
       // 编辑时不上传 rateLimitDuration，保持原值
-      data.dailyQuota = form.value.dailyQuota || 0
-      data.quotaResetTime = form.value.quotaResetTime || '00:00'
+      data.dailyQuota = form.value.dailyQuota || 0;
+      data.quotaResetTime = form.value.quotaResetTime || "00:00";
     }
 
     // Bedrock 特定更新
-    if (props.account.platform === 'bedrock') {
+    if (props.account.platform === "bedrock") {
       // 只有当有凭证变更时才构造 awsCredentials 对象
-      if (form.value.accessKeyId || form.value.secretAccessKey || form.value.sessionToken) {
-        data.awsCredentials = {}
+      if (
+        form.value.accessKeyId ||
+        form.value.secretAccessKey ||
+        form.value.sessionToken
+      ) {
+        data.awsCredentials = {};
         if (form.value.accessKeyId) {
-          data.awsCredentials.accessKeyId = form.value.accessKeyId
+          data.awsCredentials.accessKeyId = form.value.accessKeyId;
         }
         if (form.value.secretAccessKey) {
-          data.awsCredentials.secretAccessKey = form.value.secretAccessKey
+          data.awsCredentials.secretAccessKey = form.value.secretAccessKey;
         }
         if (form.value.sessionToken !== undefined) {
-          data.awsCredentials.sessionToken = form.value.sessionToken || null
+          data.awsCredentials.sessionToken = form.value.sessionToken || null;
         }
       }
       if (form.value.region) {
-        data.region = form.value.region
+        data.region = form.value.region;
       }
       // 模型配置（支持设置为空来使用系统默认）
-      data.defaultModel = form.value.defaultModel || null
-      data.smallFastModel = form.value.smallFastModel || null
-      data.priority = form.value.priority || 50
+      data.defaultModel = form.value.defaultModel || null;
+      data.smallFastModel = form.value.smallFastModel || null;
+      data.priority = form.value.priority || 50;
       // 如果不启用限流，传递 0 表示不限流
-      data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
+      data.rateLimitDuration = form.value.enableRateLimit
+        ? form.value.rateLimitDuration || 60
+        : 0;
     }
 
     // Azure OpenAI 特定更新
-    if (props.account.platform === 'azure_openai') {
-      data.azureEndpoint = form.value.azureEndpoint
-      data.apiVersion = form.value.apiVersion || '2024-02-01'
-      data.deploymentName = form.value.deploymentName
+    if (props.account.platform === "azure_openai") {
+      data.azureEndpoint = form.value.azureEndpoint;
+      data.apiVersion = form.value.apiVersion || "2024-02-01";
+      data.deploymentName = form.value.deploymentName;
       data.supportedModels = Array.isArray(form.value.supportedModels)
         ? form.value.supportedModels
-        : []
-      data.priority = form.value.priority || 50
+        : [];
+      data.priority = form.value.priority || 50;
       // 只有当有新的 API Key 时才更新
       if (form.value.apiKey && form.value.apiKey.trim()) {
-        data.apiKey = form.value.apiKey
+        data.apiKey = form.value.apiKey;
       }
     }
 
-    if (props.account.platform === 'claude') {
-      await accountsStore.updateClaudeAccount(props.account.id, data)
-    } else if (props.account.platform === 'claude-console') {
-      await accountsStore.updateClaudeConsoleAccount(props.account.id, data)
-    } else if (props.account.platform === 'openai-responses') {
-      await accountsStore.updateOpenAIResponsesAccount(props.account.id, data)
-    } else if (props.account.platform === 'bedrock') {
-      await accountsStore.updateBedrockAccount(props.account.id, data)
-    } else if (props.account.platform === 'openai') {
-      await accountsStore.updateOpenAIAccount(props.account.id, data)
-    } else if (props.account.platform === 'azure_openai') {
-      await accountsStore.updateAzureOpenAIAccount(props.account.id, data)
-    } else if (props.account.platform === 'gemini') {
-      await accountsStore.updateGeminiAccount(props.account.id, data)
-    } else if (props.account.platform === 'droid') {
-      await accountsStore.updateDroidAccount(props.account.id, data)
+    if (props.account.platform === "claude") {
+      await accountsStore.updateClaudeAccount(props.account.id, data);
+    } else if (props.account.platform === "claude-console") {
+      await accountsStore.updateClaudeConsoleAccount(props.account.id, data);
+    } else if (props.account.platform === "openai-responses") {
+      await accountsStore.updateOpenAIResponsesAccount(props.account.id, data);
+    } else if (props.account.platform === "bedrock") {
+      await accountsStore.updateBedrockAccount(props.account.id, data);
+    } else if (props.account.platform === "openai") {
+      await accountsStore.updateOpenAIAccount(props.account.id, data);
+    } else if (props.account.platform === "azure_openai") {
+      await accountsStore.updateAzureOpenAIAccount(props.account.id, data);
+    } else if (props.account.platform === "gemini") {
+      await accountsStore.updateGeminiAccount(props.account.id, data);
+    } else if (props.account.platform === "droid") {
+      await accountsStore.updateDroidAccount(props.account.id, data);
     } else {
-      throw new Error(`不支持的平台: ${props.account.platform}`)
+      throw new Error(`不支持的平台: ${props.account.platform}`);
     }
 
-    emit('success')
+    emit("success");
   } catch (error) {
     // 显示详细的错误信息
-    const errorMessage = error.response?.data?.error || error.message || '账户更新失败'
-    const suggestion = error.response?.data?.suggestion || ''
-    const errorDetails = error.response?.data?.errorDetails || null
+    const errorMessage =
+      error.response?.data?.error || error.message || "账户更新失败";
+    const suggestion = error.response?.data?.suggestion || "";
+    const errorDetails = error.response?.data?.errorDetails || null;
 
     // 构建完整的错误提示
-    let fullMessage = errorMessage
+    let fullMessage = errorMessage;
     if (suggestion) {
-      fullMessage += `\n${suggestion}`
+      fullMessage += `\n${suggestion}`;
     }
 
     // 如果有详细的 OAuth 错误信息，也显示出来
     if (errorDetails && errorDetails.error_description) {
-      fullMessage += `\n详细信息: ${errorDetails.error_description}`
-    } else if (errorDetails && errorDetails.error && errorDetails.error.message) {
+      fullMessage += `\n详细信息: ${errorDetails.error_description}`;
+    } else if (
+      errorDetails &&
+      errorDetails.error &&
+      errorDetails.error.message
+    ) {
       // 处理 OpenAI 格式的错误
-      fullMessage += `\n详细信息: ${errorDetails.error.message}`
+      fullMessage += `\n详细信息: ${errorDetails.error.message}`;
     }
 
-    showToast(fullMessage, 'error', '', 8000)
+    showToast(fullMessage, "error", "", 8000);
 
     // 错误已通过 toast 显示给用户
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 // 监听表单名称变化，清除错误
 watch(
   () => form.value.name,
   () => {
     if (errors.value.name && form.value.name?.trim()) {
-      errors.value.name = ''
+      errors.value.name = "";
     }
-  }
-)
+  },
+);
 
 // 监听Access Token变化，清除错误
 watch(
   () => form.value.accessToken,
   () => {
     if (errors.value.accessToken && form.value.accessToken?.trim()) {
-      errors.value.accessToken = ''
+      errors.value.accessToken = "";
     }
-  }
-)
+  },
+);
 
 // 监听Refresh Token变化，清除错误
 watch(
   () => form.value.refreshToken,
   () => {
     if (errors.value.refreshToken && form.value.refreshToken?.trim()) {
-      errors.value.refreshToken = ''
+      errors.value.refreshToken = "";
     }
-  }
-)
+  },
+);
 
 // 监听API URL变化，清除错误
 watch(
   () => form.value.apiUrl,
   () => {
     if (errors.value.apiUrl && form.value.apiUrl?.trim()) {
-      errors.value.apiUrl = ''
+      errors.value.apiUrl = "";
     }
-  }
-)
+  },
+);
 
 // 监听API Key变化，清除错误
 watch(
   () => form.value.apiKey,
   () => {
     if (errors.value.apiKey && form.value.apiKey?.trim()) {
-      errors.value.apiKey = ''
+      errors.value.apiKey = "";
     }
-  }
-)
+  },
+);
 
 // 监听Azure Endpoint变化，清除错误
 watch(
   () => form.value.azureEndpoint,
   () => {
     if (errors.value.azureEndpoint && form.value.azureEndpoint?.trim()) {
-      errors.value.azureEndpoint = ''
+      errors.value.azureEndpoint = "";
     }
-  }
-)
+  },
+);
 
 // 监听Deployment Name变化，清除错误
 watch(
   () => form.value.deploymentName,
   () => {
     if (errors.value.deploymentName && form.value.deploymentName?.trim()) {
-      errors.value.deploymentName = ''
+      errors.value.deploymentName = "";
     }
-  }
-)
+  },
+);
 
 // 分组相关数据
-const groups = ref([])
-const loadingGroups = ref(false)
-const showGroupManagement = ref(false)
+const groups = ref([]);
+const loadingGroups = ref(false);
+const showGroupManagement = ref(false);
 
 // 根据平台筛选分组
 const filteredGroups = computed(() => {
-  let platformFilter = form.value.platform
+  let platformFilter = form.value.platform;
   // Claude Console 和 CCR 使用 Claude 分组
-  if (form.value.platform === 'claude-console' || form.value.platform === 'ccr') {
-    platformFilter = 'claude'
+  if (
+    form.value.platform === "claude-console" ||
+    form.value.platform === "ccr"
+  ) {
+    platformFilter = "claude";
   }
   // OpenAI-Responses 使用 OpenAI 分组
-  else if (form.value.platform === 'openai-responses') {
-    platformFilter = 'openai'
+  else if (form.value.platform === "openai-responses") {
+    platformFilter = "openai";
   }
-  return groups.value.filter((g) => g.platform === platformFilter)
-})
+  return groups.value.filter((g) => g.platform === platformFilter);
+});
 
 // 加载分组列表
 const loadGroups = async () => {
-  loadingGroups.value = true
+  loadingGroups.value = true;
   try {
-    const response = await apiClient.get('/admin/account-groups')
-    groups.value = response.data || []
+    const response = await apiClient.get("/admin/account-groups");
+    groups.value = response.data || [];
   } catch (error) {
-    showToast('加载分组列表失败', 'error')
-    groups.value = []
+    showToast("加载分组列表失败", "error");
+    groups.value = [];
   } finally {
-    loadingGroups.value = false
+    loadingGroups.value = false;
   }
-}
+};
 
 // 刷新分组列表
 const refreshGroups = async () => {
-  await loadGroups()
-  showToast('分组列表已刷新', 'success')
-}
+  await loadGroups();
+  showToast("分组列表已刷新", "success");
+};
 
 // 处理新建分组
 const handleNewGroup = () => {
-  showGroupManagement.value = true
-}
+  showGroupManagement.value = true;
+};
 
 // 处理分组管理模态框刷新
 const handleGroupRefresh = async () => {
-  await loadGroups()
-}
+  await loadGroups();
+};
 
 // 处理 API Key 管理模态框刷新
 const handleApiKeyRefresh = async () => {
   // 刷新账户信息以更新 API Key 数量
   if (!props.account?.id) {
-    return
+    return;
   }
 
   const refreshers = [
-    typeof accountsStore.fetchDroidAccounts === 'function'
+    typeof accountsStore.fetchDroidAccounts === "function"
       ? accountsStore.fetchDroidAccounts
       : null,
-    typeof accountsStore.fetchAllAccounts === 'function' ? accountsStore.fetchAllAccounts : null
-  ].filter(Boolean)
+    typeof accountsStore.fetchAllAccounts === "function"
+      ? accountsStore.fetchAllAccounts
+      : null,
+  ].filter(Boolean);
 
   for (const refresher of refreshers) {
     try {
-      await refresher()
-      return
+      await refresher();
+      return;
     } catch (error) {
-      console.error('刷新账户列表失败:', error)
+      console.error("刷新账户列表失败:", error);
     }
   }
-}
+};
 
 // 监听平台变化，重置表单
 watch(
@@ -5049,160 +5727,161 @@ watch(
   (newPlatform) => {
     // 处理添加方式的自动切换
     if (
-      newPlatform === 'claude-console' ||
-      newPlatform === 'ccr' ||
-      newPlatform === 'bedrock' ||
-      newPlatform === 'openai-responses'
+      newPlatform === "claude-console" ||
+      newPlatform === "ccr" ||
+      newPlatform === "bedrock" ||
+      newPlatform === "openai-responses"
     ) {
-      form.value.addType = 'manual' // Claude Console、CCR、Bedrock 和 OpenAI-Responses 只支持手动模式
-    } else if (newPlatform === 'claude') {
+      form.value.addType = "manual"; // Claude Console、CCR、Bedrock 和 OpenAI-Responses 只支持手动模式
+    } else if (newPlatform === "claude") {
       // 切换到 Claude 时，使用 oauth 作为默认方式
-      form.value.addType = 'oauth'
-    } else if (newPlatform === 'gemini') {
+      form.value.addType = "oauth";
+    } else if (newPlatform === "gemini") {
       // 切换到 Gemini 时，使用 OAuth 作为默认方式
-      form.value.addType = 'oauth'
-    } else if (newPlatform === 'openai') {
+      form.value.addType = "oauth";
+    } else if (newPlatform === "openai") {
       // 切换到 OpenAI 时，使用 OAuth 作为默认方式
-      form.value.addType = 'oauth'
+      form.value.addType = "oauth";
     }
 
     // 平台变化时，清空分组选择
-    if (form.value.accountType === 'group') {
-      form.value.groupId = ''
-      form.value.groupIds = []
+    if (form.value.accountType === "group") {
+      form.value.groupId = "";
+      form.value.groupIds = [];
     }
-  }
-)
+  },
+);
 
 // 监听分组选择变化，保持 groupId 和 groupIds 同步
 watch(
   () => form.value.groupIds,
   (newGroupIds) => {
-    if (form.value.accountType === 'group') {
+    if (form.value.accountType === "group") {
       if (newGroupIds && newGroupIds.length > 0) {
         // 如果有选中的分组，使用第一个作为主分组
-        form.value.groupId = newGroupIds[0]
+        form.value.groupId = newGroupIds[0];
       } else {
         // 如果没有选中分组，清空主分组
-        form.value.groupId = ''
+        form.value.groupId = "";
       }
     }
   },
-  { deep: true }
-)
+  { deep: true },
+);
 
 // 监听添加方式切换，确保字段状态同步
 watch(
   () => form.value.addType,
   (newType, oldType) => {
     if (newType === oldType) {
-      return
+      return;
     }
 
-    if (newType === 'apikey') {
+    if (newType === "apikey") {
       // 切换到 API Key 模式时清理 Token 字段
-      form.value.accessToken = ''
-      form.value.refreshToken = ''
-      errors.value.accessToken = ''
-      errors.value.refreshToken = ''
-      form.value.authenticationMethod = 'api_key'
-      form.value.apiKeyUpdateMode = 'append'
-    } else if (oldType === 'apikey') {
+      form.value.accessToken = "";
+      form.value.refreshToken = "";
+      errors.value.accessToken = "";
+      errors.value.refreshToken = "";
+      form.value.authenticationMethod = "api_key";
+      form.value.apiKeyUpdateMode = "append";
+    } else if (oldType === "apikey") {
       // 切换离开 API Key 模式时重置 API Key 输入
-      form.value.apiKeysInput = ''
-      form.value.apiKeyUpdateMode = 'append'
-      errors.value.apiKeys = ''
+      form.value.apiKeysInput = "";
+      form.value.apiKeyUpdateMode = "append";
+      errors.value.apiKeys = "";
       if (!isEdit.value) {
-        form.value.authenticationMethod = ''
+        form.value.authenticationMethod = "";
       }
     }
-  }
-)
+  },
+);
 
 // 监听 API Key 更新模式切换，自动清理提示
 watch(
   () => form.value.apiKeyUpdateMode,
   (newMode, oldMode) => {
     if (newMode === oldMode) {
-      return
+      return;
     }
 
     if (errors.value.apiKeys) {
-      errors.value.apiKeys = ''
+      errors.value.apiKeys = "";
     }
-  }
-)
+  },
+);
 
 // 监听 API Key 输入，自动清理错误提示
 watch(
   () => form.value.apiKeysInput,
   (newValue) => {
     if (!errors.value.apiKeys) {
-      return
+      return;
     }
 
-    const parsed = parseApiKeysInput(newValue)
-    const mode = form.value.apiKeyUpdateMode
+    const parsed = parseApiKeysInput(newValue);
+    const mode = form.value.apiKeyUpdateMode;
 
-    if (mode === 'append' && parsed.length > 0) {
-      errors.value.apiKeys = ''
-      return
+    if (mode === "append" && parsed.length > 0) {
+      errors.value.apiKeys = "";
+      return;
     }
 
-    if (mode === 'replace') {
-      if (parsed.length > 0 || !newValue || newValue.trim() === '') {
-        errors.value.apiKeys = ''
+    if (mode === "replace") {
+      if (parsed.length > 0 || !newValue || newValue.trim() === "") {
+        errors.value.apiKeys = "";
       }
-      return
+      return;
     }
 
-    if (mode === 'delete' && parsed.length > 0) {
-      errors.value.apiKeys = ''
+    if (mode === "delete" && parsed.length > 0) {
+      errors.value.apiKeys = "";
     }
-  }
-)
+  },
+);
 
 // 监听Setup Token授权码输入，自动提取URL中的code参数
 watch(setupTokenAuthCode, (newValue) => {
-  if (!newValue || typeof newValue !== 'string') return
+  if (!newValue || typeof newValue !== "string") return;
 
-  const trimmedValue = newValue.trim()
+  const trimmedValue = newValue.trim();
 
   // 如果内容为空，不处理
-  if (!trimmedValue) return
+  if (!trimmedValue) return;
 
   // 检查是否是 URL 格式（包含 http:// 或 https://）
-  const isUrl = trimmedValue.startsWith('http://') || trimmedValue.startsWith('https://')
+  const isUrl =
+    trimmedValue.startsWith("http://") || trimmedValue.startsWith("https://");
 
   // 如果是 URL 格式
   if (isUrl) {
     // 检查是否是正确的 localhost:45462 开头的 URL
-    if (trimmedValue.startsWith('http://localhost:45462')) {
+    if (trimmedValue.startsWith("http://localhost:45462")) {
       try {
-        const url = new URL(trimmedValue)
-        const code = url.searchParams.get('code')
+        const url = new URL(trimmedValue);
+        const code = url.searchParams.get("code");
 
         if (code) {
           // 成功提取授权码
-          setupTokenAuthCode.value = code
-          showToast('成功提取授权码！', 'success')
+          setupTokenAuthCode.value = code;
+          showToast("成功提取授权码！", "success");
           // Successfully extracted authorization code from URL
         } else {
           // URL 中没有 code 参数
-          showToast('URL 中未找到授权码参数，请检查链接是否正确', 'error')
+          showToast("URL 中未找到授权码参数，请检查链接是否正确", "error");
         }
       } catch (error) {
         // URL 解析失败
         // Failed to parse URL
-        showToast('链接格式错误，请检查是否为完整的 URL', 'error')
+        showToast("链接格式错误，请检查是否为完整的 URL", "error");
       }
     } else {
       // 错误的 URL（不是 localhost:45462 开头）
-      showToast('请粘贴以 http://localhost:45462 开头的链接', 'error')
+      showToast("请粘贴以 http://localhost:45462 开头的链接", "error");
     }
   }
   // 如果不是 URL，保持原值（兼容直接输入授权码）
-})
+});
 
 // 监听平台变化
 watch(
@@ -5210,121 +5889,190 @@ watch(
   (newPlatform) => {
     // 当选择 CCR 平台时，通知父组件
     if (!isEdit.value) {
-      emit('platform-changed', newPlatform)
+      emit("platform-changed", newPlatform);
     }
-  }
-)
+  },
+);
 
 // 监听账户类型变化
 watch(
   () => form.value.accountType,
   (newType) => {
-    if (newType === 'group') {
+    if (newType === "group") {
       // 如果选择分组类型，加载分组列表
       if (groups.value.length === 0) {
-        loadGroups()
+        loadGroups();
       }
     }
-  }
-)
+  },
+);
 
 // 监听分组选择
 watch(
   () => form.value.groupId,
   (newGroupId) => {
-    if (newGroupId === '__new__') {
+    if (newGroupId === "__new__") {
       // 触发创建新分组
-      form.value.groupId = ''
-      showGroupManagement.value = true
+      form.value.groupId = "";
+      showGroupManagement.value = true;
     }
-  }
-)
+  },
+);
 
 // 添加模型映射
 const addModelMapping = () => {
-  modelMappings.value.push({ from: '', to: '' })
-}
+  modelMappings.value.push({ from: "", to: "" });
+};
 
 // 移除模型映射
 const removeModelMapping = (index) => {
-  modelMappings.value.splice(index, 1)
-}
+  modelMappings.value.splice(index, 1);
+};
 
 // 添加预设映射
 const addPresetMapping = (from, to) => {
   // 检查是否已存在相同的映射
-  const exists = modelMappings.value.some((mapping) => mapping.from === from)
+  const exists = modelMappings.value.some((mapping) => mapping.from === from);
   if (exists) {
-    showToast(`模型 ${from} 的映射已存在`, 'info')
-    return
+    showToast(`模型 ${from} 的映射已存在`, "info");
+    return;
   }
 
-  modelMappings.value.push({ from, to })
-  showToast(`已添加映射: ${from} → ${to}`, 'success')
-}
+  modelMappings.value.push({ from, to });
+  showToast(`已添加映射: ${from} → ${to}`, "success");
+};
 
 // 将模型映射表转换为对象格式（根据当前模式）
 const convertMappingsToObject = () => {
-  const mapping = {}
+  const mapping = {};
 
-  if (modelRestrictionMode.value === 'whitelist') {
+  if (modelRestrictionMode.value === "whitelist") {
     // 白名单模式：将选中的模型映射到自己
     allowedModels.value.forEach((model) => {
-      mapping[model] = model
-    })
+      mapping[model] = model;
+    });
   } else {
     // 映射模式：使用手动配置的映射表
     modelMappings.value.forEach((item) => {
       if (item.from && item.to) {
-        mapping[item.from] = item.to
+        mapping[item.from] = item.to;
       }
-    })
+    });
   }
 
-  return Object.keys(mapping).length > 0 ? mapping : null
-}
+  return Object.keys(mapping).length > 0 ? mapping : null;
+};
+
+// 格式化相对时间
+const formatRelativeTime = (dateString) => {
+  if (!dateString) return "-";
+
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "刚刚";
+  if (diffMins < 60) return `${diffMins}分钟前`;
+  if (diffHours < 24) return `${diffHours}小时前`;
+  if (diffDays < 7) return `${diffDays}天前`;
+
+  // 超过7天显示具体日期
+  return date.toLocaleDateString("zh-CN");
+};
+
+// 测试定时任务
+const testScheduledRequest = async () => {
+  if (!props.account?.id) {
+    showToast("无法测试：账户ID不存在", "error");
+    return;
+  }
+
+  testingScheduledRequest.value = true;
+
+  try {
+    // 确定账户类型
+    const accountType = props.account.platform || "claude";
+
+    // 调用测试API
+    const response = await apiClient.post(
+      `/admin/accounts/${accountType}/${props.account.id}/test-scheduled-request`,
+    );
+
+    if (response.data.success) {
+      showToast("定时任务测试成功！", "success");
+
+      // 更新表单中的执行状态
+      form.value.scheduledRequest.lastExecutedAt = new Date().toISOString();
+      form.value.scheduledRequest.lastStatus = "success";
+      form.value.scheduledRequest.lastError = null;
+    } else {
+      throw new Error(response.data.error || "测试失败");
+    }
+  } catch (error) {
+    console.error("测试定时任务失败:", error);
+
+    const errorMessage =
+      error.response?.data?.error ||
+      error.message ||
+      "测试失败，请检查账户配置";
+    showToast(`测试失败: ${errorMessage}`, "error");
+
+    // 更新表单中的执行状态
+    form.value.scheduledRequest.lastExecutedAt = new Date().toISOString();
+    form.value.scheduledRequest.lastStatus = "error";
+    form.value.scheduledRequest.lastError = errorMessage;
+  } finally {
+    testingScheduledRequest.value = false;
+  }
+};
 
 // 监听账户变化，更新表单
 watch(
   () => props.account,
   (newAccount) => {
     if (newAccount) {
-      initModelMappings()
+      initModelMappings();
       // 重新初始化代理配置
-      const proxyConfig = normalizeProxyFormState(newAccount.proxy)
+      const proxyConfig = normalizeProxyFormState(newAccount.proxy);
       const normalizedAuthMethod =
-        typeof newAccount.authenticationMethod === 'string'
+        typeof newAccount.authenticationMethod === "string"
           ? newAccount.authenticationMethod.trim().toLowerCase()
-          : ''
+          : "";
       const derivedAddType =
-        normalizedAuthMethod === 'api_key'
-          ? 'apikey'
-          : normalizedAuthMethod === 'manual'
-            ? 'manual'
-            : 'oauth'
+        normalizedAuthMethod === "api_key"
+          ? "apikey"
+          : normalizedAuthMethod === "manual"
+            ? "manual"
+            : "oauth";
 
       // 获取分组ID - 可能来自 groupId 字段或 groupInfo 对象
-      let groupId = ''
-      if (newAccount.accountType === 'group') {
-        groupId = newAccount.groupId || (newAccount.groupInfo && newAccount.groupInfo.id) || ''
+      let groupId = "";
+      if (newAccount.accountType === "group") {
+        groupId =
+          newAccount.groupId ||
+          (newAccount.groupInfo && newAccount.groupInfo.id) ||
+          "";
       }
 
       // 初始化订阅类型（从 subscriptionInfo 中提取，兼容旧数据默认为 claude_max）
-      let subscriptionType = 'claude_max'
+      let subscriptionType = "claude_max";
       if (newAccount.subscriptionInfo) {
         const info =
-          typeof newAccount.subscriptionInfo === 'string'
+          typeof newAccount.subscriptionInfo === "string"
             ? JSON.parse(newAccount.subscriptionInfo)
-            : newAccount.subscriptionInfo
+            : newAccount.subscriptionInfo;
 
         if (info.accountType) {
-          subscriptionType = info.accountType
+          subscriptionType = info.accountType;
         } else if (info.hasClaudeMax) {
-          subscriptionType = 'claude_max'
+          subscriptionType = "claude_max";
         } else if (info.hasClaudePro) {
-          subscriptionType = 'claude_pro'
+          subscriptionType = "claude_pro";
         } else {
-          subscriptionType = 'claude_free'
+          subscriptionType = "claude_free";
         }
       }
 
@@ -5332,262 +6080,266 @@ watch(
         platform: newAccount.platform,
         addType: derivedAddType,
         name: newAccount.name,
-        description: newAccount.description || '',
-        accountType: newAccount.accountType || 'shared',
+        description: newAccount.description || "",
+        accountType: newAccount.accountType || "shared",
         subscriptionType: subscriptionType,
         autoStopOnWarning: newAccount.autoStopOnWarning || false,
         useUnifiedUserAgent: newAccount.useUnifiedUserAgent || false,
         useUnifiedClientId: newAccount.useUnifiedClientId || false,
-        unifiedClientId: newAccount.unifiedClientId || '',
+        unifiedClientId: newAccount.unifiedClientId || "",
         groupId: groupId,
         groupIds: [],
-        projectId: newAccount.projectId || '',
-        accessToken: '',
-        refreshToken: '',
-        authenticationMethod: newAccount.authenticationMethod || '',
-        apiKeysInput: '',
-        apiKeyUpdateMode: 'append',
+        projectId: newAccount.projectId || "",
+        accessToken: "",
+        refreshToken: "",
+        authenticationMethod: newAccount.authenticationMethod || "",
+        apiKeysInput: "",
+        apiKeyUpdateMode: "append",
         proxy: proxyConfig,
         // Claude Console 特定字段
-        apiUrl: newAccount.apiUrl || '',
-        apiKey: '', // 编辑模式不显示现有的 API Key
+        apiUrl: newAccount.apiUrl || "",
+        apiKey: "", // 编辑模式不显示现有的 API Key
         priority: newAccount.priority || 50,
         supportedModels: (() => {
-          const models = newAccount.supportedModels
-          if (!models) return []
+          const models = newAccount.supportedModels;
+          if (!models) return [];
           // 处理对象格式（Claude Console 的新格式）
-          if (typeof models === 'object' && !Array.isArray(models)) {
-            return Object.keys(models)
+          if (typeof models === "object" && !Array.isArray(models)) {
+            return Object.keys(models);
           }
           // 处理数组格式（向后兼容）
           if (Array.isArray(models)) {
-            return models
+            return models;
           }
-          return []
+          return [];
         })(),
-        userAgent: newAccount.userAgent || '',
+        userAgent: newAccount.userAgent || "",
         enableRateLimit:
-          newAccount.rateLimitDuration && newAccount.rateLimitDuration > 0 ? true : false,
+          newAccount.rateLimitDuration && newAccount.rateLimitDuration > 0
+            ? true
+            : false,
         rateLimitDuration: newAccount.rateLimitDuration || 60,
         // Bedrock 特定字段
-        accessKeyId: '', // 编辑模式不显示现有的访问密钥
-        secretAccessKey: '', // 编辑模式不显示现有的秘密密钥
-        region: newAccount.region || '',
-        sessionToken: '', // 编辑模式不显示现有的会话令牌
-        defaultModel: newAccount.defaultModel || '',
-        smallFastModel: newAccount.smallFastModel || '',
+        accessKeyId: "", // 编辑模式不显示现有的访问密钥
+        secretAccessKey: "", // 编辑模式不显示现有的秘密密钥
+        region: newAccount.region || "",
+        sessionToken: "", // 编辑模式不显示现有的会话令牌
+        defaultModel: newAccount.defaultModel || "",
+        smallFastModel: newAccount.smallFastModel || "",
         // Azure OpenAI 特定字段
-        azureEndpoint: newAccount.azureEndpoint || '',
-        apiVersion: newAccount.apiVersion || '',
-        deploymentName: newAccount.deploymentName || '',
+        azureEndpoint: newAccount.azureEndpoint || "",
+        apiVersion: newAccount.apiVersion || "",
+        deploymentName: newAccount.deploymentName || "",
         // OpenAI-Responses 特定字段
-        baseApi: newAccount.baseApi || '',
+        baseApi: newAccount.baseApi || "",
         // 额度管理字段
         dailyQuota: newAccount.dailyQuota || 0,
         dailyUsage: newAccount.dailyUsage || 0,
-        quotaResetTime: newAccount.quotaResetTime || '00:00',
+        quotaResetTime: newAccount.quotaResetTime || "00:00",
         // 并发控制字段
-        maxConcurrentTasks: newAccount.maxConcurrentTasks || 0
-      }
+        maxConcurrentTasks: newAccount.maxConcurrentTasks || 0,
+      };
 
       // 如果是Claude Console账户，加载实时使用情况
-      if (newAccount.platform === 'claude-console') {
-        loadAccountUsage()
+      if (newAccount.platform === "claude-console") {
+        loadAccountUsage();
       }
 
       // 如果是分组类型，加载分组ID
-      if (newAccount.accountType === 'group') {
+      if (newAccount.accountType === "group") {
         // 先加载分组列表
         loadGroups().then(async () => {
-          const foundGroupIds = []
+          const foundGroupIds = [];
 
           // 如果账户有 groupInfo，直接使用它的 groupId
           if (newAccount.groupInfo && newAccount.groupInfo.id) {
-            form.value.groupId = newAccount.groupInfo.id
-            foundGroupIds.push(newAccount.groupInfo.id)
+            form.value.groupId = newAccount.groupInfo.id;
+            foundGroupIds.push(newAccount.groupInfo.id);
           } else if (newAccount.groupId) {
             // 如果账户有 groupId 字段，直接使用（OpenAI-Responses 等账户）
-            form.value.groupId = newAccount.groupId
-            foundGroupIds.push(newAccount.groupId)
+            form.value.groupId = newAccount.groupId;
+            foundGroupIds.push(newAccount.groupId);
           } else if (
             newAccount.groupIds &&
             Array.isArray(newAccount.groupIds) &&
             newAccount.groupIds.length > 0
           ) {
             // 如果账户有 groupIds 数组，使用它
-            form.value.groupId = newAccount.groupIds[0]
-            foundGroupIds.push(...newAccount.groupIds)
+            form.value.groupId = newAccount.groupIds[0];
+            foundGroupIds.push(...newAccount.groupIds);
           } else {
             // 否则查找账户所属的分组
             const checkPromises = groups.value.map(async (group) => {
               try {
-                const response = await apiClient.get(`/admin/account-groups/${group.id}/members`)
-                const members = response.data || []
+                const response = await apiClient.get(
+                  `/admin/account-groups/${group.id}/members`,
+                );
+                const members = response.data || [];
                 if (members.some((m) => m.id === newAccount.id)) {
-                  foundGroupIds.push(group.id)
+                  foundGroupIds.push(group.id);
                   if (!form.value.groupId) {
-                    form.value.groupId = group.id // 设置第一个找到的分组作为主分组
+                    form.value.groupId = group.id; // 设置第一个找到的分组作为主分组
                   }
                 }
               } catch (error) {
                 // 忽略错误
               }
-            })
+            });
 
-            await Promise.all(checkPromises)
+            await Promise.all(checkPromises);
           }
 
           // 设置多选分组
-          form.value.groupIds = foundGroupIds
-        })
+          form.value.groupIds = foundGroupIds;
+        });
       }
     }
   },
-  { immediate: true }
-)
+  { immediate: true },
+);
 
 // 获取统一 User-Agent 信息
 const fetchUnifiedUserAgent = async () => {
   try {
-    const response = await apiClient.get('/admin/claude-code-version')
+    const response = await apiClient.get("/admin/claude-code-version");
     if (response.success && response.userAgent) {
-      unifiedUserAgent.value = response.userAgent
+      unifiedUserAgent.value = response.userAgent;
     } else {
-      unifiedUserAgent.value = ''
+      unifiedUserAgent.value = "";
     }
   } catch (error) {
     // Failed to fetch unified User-Agent
-    unifiedUserAgent.value = ''
+    unifiedUserAgent.value = "";
   }
-}
+};
 
 // 清除统一 User-Agent 缓存
 const clearUnifiedCache = async () => {
-  clearingCache.value = true
+  clearingCache.value = true;
   try {
-    const response = await apiClient.post('/admin/claude-code-version/clear')
+    const response = await apiClient.post("/admin/claude-code-version/clear");
     if (response.success) {
-      unifiedUserAgent.value = ''
-      showToast('统一User-Agent缓存已清除', 'success')
+      unifiedUserAgent.value = "";
+      showToast("统一User-Agent缓存已清除", "success");
     } else {
-      showToast('清除缓存失败', 'error')
+      showToast("清除缓存失败", "error");
     }
   } catch (error) {
     // Failed to clear unified User-Agent cache
-    showToast('清除缓存失败：' + (error.message || '未知错误'), 'error')
+    showToast("清除缓存失败：" + (error.message || "未知错误"), "error");
   } finally {
-    clearingCache.value = false
+    clearingCache.value = false;
   }
-}
+};
 
 // 生成客户端标识
 const generateClientId = () => {
   // 生成64位十六进制字符串（32字节）
-  const bytes = new Uint8Array(32)
-  crypto.getRandomValues(bytes)
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
-}
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+};
 
 // 重新生成客户端标识
 const regenerateClientId = () => {
-  form.value.unifiedClientId = generateClientId()
-  showToast('已生成新的客户端标识', 'success')
-}
+  form.value.unifiedClientId = generateClientId();
+  showToast("已生成新的客户端标识", "success");
+};
 
 // 处理统一客户端标识复选框变化
 const handleUnifiedClientIdChange = () => {
   if (form.value.useUnifiedClientId) {
     // 如果启用了统一客户端标识，自动启用统一User-Agent
-    form.value.useUnifiedUserAgent = true
+    form.value.useUnifiedUserAgent = true;
     // 如果没有客户端标识，自动生成一个
     if (!form.value.unifiedClientId) {
-      form.value.unifiedClientId = generateClientId()
+      form.value.unifiedClientId = generateClientId();
     }
   }
-}
+};
 
 // 到期时间相关方法
 // 计算最小日期时间
 const minDateTime = computed(() => {
-  const now = new Date()
-  now.setMinutes(now.getMinutes() + 1)
-  return now.toISOString().slice(0, 16)
-})
+  const now = new Date();
+  now.setMinutes(now.getMinutes() + 1);
+  return now.toISOString().slice(0, 16);
+});
 
 // 更新账户过期时间
 const updateAccountExpireAt = () => {
   if (!form.value.expireDuration) {
-    form.value.expiresAt = null
-    return
+    form.value.expiresAt = null;
+    return;
   }
 
-  if (form.value.expireDuration === 'custom') {
-    return
+  if (form.value.expireDuration === "custom") {
+    return;
   }
 
-  const now = new Date()
-  const duration = form.value.expireDuration
-  const match = duration.match(/(\d+)([d])/)
+  const now = new Date();
+  const duration = form.value.expireDuration;
+  const match = duration.match(/(\d+)([d])/);
 
   if (match) {
-    const [, value, unit] = match
-    const num = parseInt(value)
+    const [, value, unit] = match;
+    const num = parseInt(value);
 
-    if (unit === 'd') {
-      now.setDate(now.getDate() + num)
+    if (unit === "d") {
+      now.setDate(now.getDate() + num);
     }
 
-    form.value.expiresAt = now.toISOString()
+    form.value.expiresAt = now.toISOString();
   }
-}
+};
 
 // 更新自定义过期时间
 const updateAccountCustomExpireAt = () => {
   if (form.value.customExpireDate) {
-    form.value.expiresAt = new Date(form.value.customExpireDate).toISOString()
+    form.value.expiresAt = new Date(form.value.customExpireDate).toISOString();
   }
-}
+};
 
 // 格式化过期日期
 const formatExpireDate = (dateString) => {
-  if (!dateString) return ''
-  const date = new Date(dateString)
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  return date.toLocaleString("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
 
 // 组件挂载时获取统一 User-Agent 信息
 onMounted(() => {
   // 初始化平台分组
-  platformGroup.value = determinePlatformGroup(form.value.platform)
+  platformGroup.value = determinePlatformGroup(form.value.platform);
 
   // 初始化模型映射表（如果是编辑模式）
   if (isEdit.value) {
-    initModelMappings()
+    initModelMappings();
   }
 
   // 获取Claude Code统一User-Agent信息
-  fetchUnifiedUserAgent()
+  fetchUnifiedUserAgent();
   // 如果是编辑模式且是Claude Console账户，加载使用情况
-  if (isEdit.value && props.account?.platform === 'claude-console') {
-    loadAccountUsage()
+  if (isEdit.value && props.account?.platform === "claude-console") {
+    loadAccountUsage();
   }
-})
+});
 
 // 监听平台变化，当切换到Claude平台时获取统一User-Agent信息
 watch(
   () => form.value.platform,
   (newPlatform) => {
-    if (newPlatform === 'claude') {
-      fetchUnifiedUserAgent()
+    if (newPlatform === "claude") {
+      fetchUnifiedUserAgent();
     }
-  }
-)
+  },
+);
 </script>
 
 <style scoped>
