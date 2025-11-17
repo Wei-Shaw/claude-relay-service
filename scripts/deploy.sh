@@ -39,45 +39,6 @@ log_info "项目目录: $PROJECT_DIR"
 cd "$PROJECT_DIR"
 
 #################################################
-# 0. 检查环境配置
-#################################################
-log_info "🔍 检查环境配置..."
-
-# 检查并提示创建 .env 文件
-if [ ! -f ".env" ]; then
-    log_error ".env 文件不存在！"
-    log_error "请在服务器上手动创建 .env 文件，参考 .env.example"
-    log_info "提示：可以运行 'cp .env.example .env' 然后编辑必要的配置"
-    log_info "必须配置项: JWT_SECRET, ENCRYPTION_KEY, REDIS_HOST, REDIS_PORT"
-    exit 1
-fi
-
-# 检查并自动创建 config.js
-if [ ! -f "config/config.js" ]; then
-    log_warning "config/config.js 文件不存在，从示例文件创建..."
-    if [ -f "config/config.example.js" ]; then
-        cp config/config.example.js config/config.js
-        log_success "✅ 已从 config.example.js 创建 config/config.js"
-    else
-        log_error "config/config.example.js 文件不存在！"
-        exit 1
-    fi
-fi
-
-# 检查 Redis 连接（如果有 redis-cli）
-if command -v redis-cli &> /dev/null; then
-    REDIS_HOST=$(grep -oP "(?<=REDIS_HOST=).*" .env | tr -d ' \r\n' || echo "localhost")
-    REDIS_PORT=$(grep -oP "(?<=REDIS_PORT=).*" .env | tr -d ' \r\n' || echo "6379")
-    if ! redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" ping &> /dev/null; then
-        log_warning "⚠️  Redis 连接失败 ($REDIS_HOST:$REDIS_PORT)，服务可能无法启动"
-    else
-        log_success "✅ Redis 连接正常"
-    fi
-fi
-
-log_success "环境配置检查完成"
-
-#################################################
 # 1. 备份当前代码
 #################################################
 log_info "📦 备份当前代码..."
@@ -138,6 +99,11 @@ if git diff HEAD@{1} HEAD --name-only | grep -q "package-lock.json\|package.json
 else
     log_info "后端依赖无变化，跳过安装"
 fi
+
+# 运行设置脚本（会自动创建 .env 和 config.js，如果不存在）
+log_info "🔧 运行设置脚本..."
+npm run setup 2>&1 | grep -v "⚠️  服务已经初始化过了" || true
+log_success "设置检查完成"
 
 # 检查前端依赖
 if git diff HEAD@{1} HEAD --name-only | grep -q "web/admin-spa/package"; then

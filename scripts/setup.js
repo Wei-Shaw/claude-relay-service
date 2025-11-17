@@ -4,6 +4,16 @@ const crypto = require('crypto')
 const chalk = require('chalk')
 const ora = require('ora')
 
+// 检查并创建 config.js（如果不存在）
+const configPath = path.join(__dirname, '..', 'config', 'config.js')
+if (!fs.existsSync(configPath)) {
+  const configExamplePath = path.join(__dirname, '..', 'config', 'config.example.js')
+  if (fs.existsSync(configExamplePath)) {
+    fs.copyFileSync(configExamplePath, configPath)
+    console.log(chalk.yellow('⚠️  config.js 不存在，已从 config.example.js 自动创建'))
+  }
+}
+
 const config = require('../config/config')
 
 async function setup() {
