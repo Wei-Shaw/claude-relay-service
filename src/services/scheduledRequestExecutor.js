@@ -242,9 +242,9 @@ class ScheduledRequestExecutor {
     let apiUrl = 'https://api.openai.com/v1/chat/completions'
 
     if (accountType === 'openai-responses') {
-      apiKey = account.apiKey // OpenAI Responses使用apiKey字段
+      ;({ apiKey } = account) // OpenAI Responses使用apiKey字段
     } else if (accountType === 'azure-openai') {
-      apiKey = account.apiKey
+      ;({ apiKey } = account)
       // Azure OpenAI使用不同的端点
       if (account.endpoint) {
         apiUrl = `${account.endpoint}/openai/deployments/${model}/chat/completions?api-version=2024-02-15-preview`

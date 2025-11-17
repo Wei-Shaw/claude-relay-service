@@ -40,7 +40,6 @@ class CronScheduler {
    */
   async executeScheduledTasks() {
     const currentHour = new Date().getHours()
-    const currentTime = new Date().toISOString()
     logger.info(`[CronScheduler] ⏰ Checking scheduled tasks for hour ${currentHour}`)
 
     try {
