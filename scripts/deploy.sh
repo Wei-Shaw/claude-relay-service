@@ -87,7 +87,7 @@ log_success "代码已更新到最新版本"
 git log -1 --oneline
 
 #################################################
-# 3. 检查依赖变化
+# 3. 检查依赖变化并构建前端（必须在服务启动之前）
 #################################################
 log_info "🔍 检查依赖变化..."
 
@@ -105,56 +105,69 @@ log_info "🔧 运行设置脚本..."
 npm run setup 2>&1 | grep -v "⚠️  服务已经初始化过了" || true
 log_success "设置检查完成"
 
+#################################################
+# 4. 构建前端（必须在服务启动之前！）
+#################################################
+log_info "🎨 检查前端构建..."
+
+NEED_FRONTEND_BUILD=false
+
 # 检查前端是否需要构建
 if [ ! -d "web/admin-spa/dist" ]; then
-    log_warning "前端未构建，首次构建中..."
-    cd web/admin-spa
-    npm ci
-    npm run build
-    cd "$PROJECT_DIR"
-    log_success "前端首次构建完成"
+    log_warning "前端未构建，需要首次构建"
+    NEED_FRONTEND_BUILD=true
 elif git diff HEAD@{1} HEAD --name-only | grep -q "web/admin-spa/package"; then
-    log_warning "检测到前端依赖变化，重新安装并构建..."
+    log_warning "检测到前端依赖变化"
+    NEED_FRONTEND_BUILD=true
+elif git diff HEAD@{1} HEAD --name-only | grep -q "web/admin-spa/src\|web/admin-spa/public"; then
+    log_warning "检测到前端代码变化"
+    NEED_FRONTEND_BUILD=true
+fi
+
+if [ "$NEED_FRONTEND_BUILD" = true ]; then
+    log_info "📦 开始构建前端..."
     cd web/admin-spa
-    npm ci
+
+    # 检查是否需要安装依赖
+    if [ ! -d "node_modules" ] || git diff HEAD@{1} HEAD --name-only | grep -q "web/admin-spa/package"; then
+        log_info "安装前端依赖..."
+        npm ci
+    fi
+
+    # 构建前端
     npm run build
     cd "$PROJECT_DIR"
-    log_success "前端已重新构建"
-elif git diff HEAD@{1} HEAD --name-only | grep -q "web/admin-spa/src"; then
-    log_warning "检测到前端代码变化，重新构建..."
-    cd web/admin-spa
-    npm run build
-    cd "$PROJECT_DIR"
-    log_success "前端已重新构建"
+    log_success "✅ 前端构建完成"
 else
     log_info "前端无变化，跳过构建"
 fi
 
 #################################################
-# 4. 运行数据库迁移（如果有）
+# 5. 运行数据库迁移（如果有）
 #################################################
 # log_info "🗄️ 运行数据库迁移..."
 # npm run migrate 2>/dev/null || log_info "无需迁移"
 
 #################################################
-# 5. 重启服务
+# 6. 重启服务（前端构建完成后）
 #################################################
 log_info "🔄 重启服务..."
 
 # 读取配置端口
 PORT=$(grep -oP "(?<=port:\s)\d+" config/config.js 2>/dev/null || echo "3000")
 
-# 总是执行重启（更简单可靠）
+# 总是执行重启（确保服务加载最新的前端文件）
 log_info "执行服务重启..."
 npm run service:restart:daemon
 
-# 等待服务启动
-sleep 5
+# 等待服务启动（增加等待时间以确保服务完全启动）
+log_info "等待服务启动..."
+sleep 8
 
 log_success "服务重启命令已执行"
 
 #################################################
-# 6. 健康检查
+# 7. 健康检查
 #################################################
 log_info "🏥 执行健康检查..."
 
@@ -183,7 +196,7 @@ if [ $retry_count -eq $max_retries ]; then
 fi
 
 #################################################
-# 7. 显示部署信息
+# 8. 显示部署信息
 #################################################
 echo ""
 log_success "========================================="
