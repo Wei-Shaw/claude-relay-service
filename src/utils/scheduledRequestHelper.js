@@ -13,6 +13,9 @@ const droidAccountService = require('../services/droidAccountService')
  * @returns {string} 默认模型ID
  */
 function getDefaultModelForAccountType(accountType) {
+  // 标准化 accountType：'claude' -> 'claude-official'
+  const normalizedType = accountType === 'claude' ? 'claude-official' : accountType
+
   const modelMap = {
     'claude-official': 'claude-sonnet-4-5-20250929',
     'claude-console': 'claude-sonnet-4-5-20250929',
@@ -23,7 +26,7 @@ function getDefaultModelForAccountType(accountType) {
     'azure-openai': 'gpt-4o',
     droid: 'claude-3-5-sonnet-20241022'
   }
-  return modelMap[accountType] || 'claude-sonnet-4-5-20250929'
+  return modelMap[normalizedType] || 'claude-sonnet-4-5-20250929'
 }
 
 /**
@@ -32,6 +35,9 @@ function getDefaultModelForAccountType(accountType) {
  * @returns {Object} 账户服务实例
  */
 function getAccountService(accountType) {
+  // 标准化 accountType：'claude' -> 'claude-official'
+  const normalizedType = accountType === 'claude' ? 'claude-official' : accountType
+
   const serviceMap = {
     'claude-official': claudeAccountService,
     'claude-console': claudeConsoleAccountService,
@@ -42,7 +48,7 @@ function getAccountService(accountType) {
     'azure-openai': azureOpenaiAccountService,
     droid: droidAccountService
   }
-  return serviceMap[accountType]
+  return serviceMap[normalizedType]
 }
 
 /**

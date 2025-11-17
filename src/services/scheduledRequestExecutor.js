@@ -107,9 +107,12 @@ class ScheduledRequestExecutor {
    * @returns {Promise<Object>} 响应结果
    */
   async _sendRequestByAccountType(accountType, account, accountService, model) {
+    // 标准化 accountType：'claude' -> 'claude-official'
+    const normalizedType = accountType === 'claude' ? 'claude-official' : accountType
+
     // Claude系列（claude-official, claude-console, bedrock, ccr, droid）
-    if (['claude-official', 'claude-console', 'bedrock', 'ccr', 'droid'].includes(accountType)) {
-      return await this._sendClaudeRequest(account, accountService, model, accountType)
+    if (['claude-official', 'claude-console', 'bedrock', 'ccr', 'droid'].includes(normalizedType)) {
+      return await this._sendClaudeRequest(account, accountService, model, normalizedType)
     }
 
     // Gemini
