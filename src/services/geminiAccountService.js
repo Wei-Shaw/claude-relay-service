@@ -1613,6 +1613,7 @@ module.exports = {
   refreshAccessToken,
   createAccount,
   getAccount,
+  getAccountById: getAccount, // Alias for consistency with other services
   updateAccount,
   deleteAccount,
   getAllAccounts,
