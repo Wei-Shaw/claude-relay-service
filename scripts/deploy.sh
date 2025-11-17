@@ -105,8 +105,15 @@ log_info "🔧 运行设置脚本..."
 npm run setup 2>&1 | grep -v "⚠️  服务已经初始化过了" || true
 log_success "设置检查完成"
 
-# 检查前端依赖
-if git diff HEAD@{1} HEAD --name-only | grep -q "web/admin-spa/package"; then
+# 检查前端是否需要构建
+if [ ! -d "web/admin-spa/dist" ]; then
+    log_warning "前端未构建，首次构建中..."
+    cd web/admin-spa
+    npm ci
+    npm run build
+    cd "$PROJECT_DIR"
+    log_success "前端首次构建完成"
+elif git diff HEAD@{1} HEAD --name-only | grep -q "web/admin-spa/package"; then
     log_warning "检测到前端依赖变化，重新安装并构建..."
     cd web/admin-spa
     npm ci
