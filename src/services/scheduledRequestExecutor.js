@@ -133,10 +133,15 @@ class ScheduledRequestExecutor {
    */
   async _sendClaudeRequest(account, accountService, model, accountType) {
     // 获取有效的access token
-    const accessToken = await accountService.getValidAccessToken(account.id)
+    let accessToken
+    try {
+      accessToken = await accountService.getValidAccessToken(account.id)
+    } catch (tokenError) {
+      throw new Error(`Failed to get valid access token: ${tokenError.message}`)
+    }
 
     if (!accessToken) {
-      throw new Error('Failed to get valid access token')
+      throw new Error('No access token available for this account')
     }
 
     // 构建请求
@@ -181,10 +186,25 @@ class ScheduledRequestExecutor {
       }
     }
 
-    const response = await axios.post(apiUrl, payload, axiosConfig)
+    try {
+      const response = await axios.post(apiUrl, payload, axiosConfig)
 
-    return {
-      usage: response.data.usage || { input_tokens: 5, output_tokens: 2 }
+      return {
+        usage: response.data.usage || { input_tokens: 5, output_tokens: 2 }
+      }
+    } catch (apiError) {
+      // 提供更详细的 API 错误信息
+      if (apiError.response) {
+        const status = apiError.response.status
+        const errorData = apiError.response.data
+        const errorMsg =
+          errorData?.error?.message || errorData?.message || JSON.stringify(errorData)
+
+        throw new Error(
+          `API request failed (${status}): ${errorMsg}. Please check if the account token is valid and has the correct permissions.`
+        )
+      }
+      throw apiError
     }
   }
 
