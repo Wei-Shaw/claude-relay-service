@@ -141,47 +141,17 @@ fi
 #################################################
 log_info "🔄 重启服务..."
 
-# 检查服务是否在运行
-if npm run service:status 2>/dev/null | grep -q "running"; then
-    log_info "服务正在运行，执行重启..."
-    npm run service:restart:daemon
+# 读取配置端口
+PORT=$(grep -oP "(?<=port:\s)\d+" config/config.js 2>/dev/null || echo "3000")
 
-    # 等待服务启动
-    sleep 3
+# 总是执行重启（更简单可靠）
+log_info "执行服务重启..."
+npm run service:restart:daemon
 
-    # 检查服务状态
-    STATUS_OUTPUT=$(npm run service:status 2>&1)
-    if echo "$STATUS_OUTPUT" | grep -qE "running|已在运行"; then
-        log_success "服务重启成功！"
-    else
-        log_error "服务重启失败！正在尝试从备份恢复..."
-        log_error "状态输出: $STATUS_OUTPUT"
-        # 恢复备份
-        tar -xzf "$BACKUP_PATH.tar.gz" -C "$PROJECT_DIR"
-        npm run service:restart:daemon
-        exit 1
-    fi
-else
-    log_warning "服务未运行，启动服务..."
-    npm run service:start:daemon
+# 等待服务启动
+sleep 5
 
-    # 等待服务启动
-    sleep 3
-
-    # 检查服务状态（支持多种状态消息）
-    STATUS_OUTPUT=$(npm run service:status 2>&1)
-    if echo "$STATUS_OUTPUT" | grep -qE "running|已在运行"; then
-        log_success "服务启动成功！"
-    else
-        log_error "服务启动失败！请检查日志"
-        log_error "状态输出: $STATUS_OUTPUT"
-        log_error "最后50行错误日志："
-        tail -50 "$PROJECT_DIR/logs/service-error.log" 2>/dev/null || log_warning "错误日志文件不存在"
-        log_error "最后50行服务日志："
-        tail -50 "$PROJECT_DIR/logs/service.log" 2>/dev/null || log_warning "服务日志文件不存在"
-        exit 1
-    fi
-fi
+log_success "服务重启命令已执行"
 
 #################################################
 # 6. 健康检查
