@@ -150,10 +150,12 @@ if npm run service:status 2>/dev/null | grep -q "running"; then
     sleep 3
 
     # 检查服务状态
-    if npm run service:status 2>/dev/null | grep -q "running"; then
+    STATUS_OUTPUT=$(npm run service:status 2>&1)
+    if echo "$STATUS_OUTPUT" | grep -qE "running|已在运行"; then
         log_success "服务重启成功！"
     else
         log_error "服务重启失败！正在尝试从备份恢复..."
+        log_error "状态输出: $STATUS_OUTPUT"
         # 恢复备份
         tar -xzf "$BACKUP_PATH.tar.gz" -C "$PROJECT_DIR"
         npm run service:restart:daemon
@@ -166,10 +168,13 @@ else
     # 等待服务启动
     sleep 3
 
-    if npm run service:status 2>/dev/null | grep -q "running"; then
+    # 检查服务状态（支持多种状态消息）
+    STATUS_OUTPUT=$(npm run service:status 2>&1)
+    if echo "$STATUS_OUTPUT" | grep -qE "running|已在运行"; then
         log_success "服务启动成功！"
     else
         log_error "服务启动失败！请检查日志"
+        log_error "状态输出: $STATUS_OUTPUT"
         log_error "最后50行错误日志："
         tail -50 "$PROJECT_DIR/logs/service-error.log" 2>/dev/null || log_warning "错误日志文件不存在"
         log_error "最后50行服务日志："
