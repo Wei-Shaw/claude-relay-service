@@ -2879,8 +2879,13 @@ const closeCreateAccountModal = () => {
 
 // 编辑账户
 const editAccount = (account) => {
+  console.log('🔍 编辑账户被点击:', account)
+  console.log('🔍 账户平台:', account?.platform)
+  console.log('🔍 账户ID:', account?.id)
   editingAccount.value = account
   showEditAccountModal.value = true
+  console.log('🔍 模态框状态已设置:', showEditAccountModal.value)
+  console.log('🔍 编辑中的账户:', editingAccount.value)
 }
 
 const getBoundApiKeysForAccount = (account) => {
