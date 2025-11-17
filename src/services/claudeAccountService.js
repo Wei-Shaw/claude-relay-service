@@ -558,7 +558,9 @@ class ClaudeAccountService {
             // 添加停止原因
             stoppedReason: account.stoppedReason || null,
             // 扩展信息
-            extInfo: parsedExtInfo
+            extInfo: parsedExtInfo,
+            // 定时任务配置
+            scheduledRequest: account.scheduledRequest ? JSON.parse(account.scheduledRequest) : null
           }
         })
       )
@@ -566,6 +568,37 @@ class ClaudeAccountService {
       return processedAccounts
     } catch (error) {
       logger.error('❌ Failed to get Claude accounts:', error)
+      throw error
+    }
+  }
+
+  // 📋 获取单个账号详细信息（用于定时任务等需要完整账户数据的场景）
+  async getAccountById(accountId) {
+    try {
+      const account = await redis.getClaudeAccount(accountId)
+
+      if (!account || Object.keys(account).length === 0) {
+        return null
+      }
+
+      // 解析 JSON 字段
+      const parsedAccount = {
+        ...account,
+        proxy: account.proxy ? JSON.parse(account.proxy) : null,
+        scheduledRequest: account.scheduledRequest ? JSON.parse(account.scheduledRequest) : null,
+        subscriptionInfo: account.subscriptionInfo ? JSON.parse(account.subscriptionInfo) : null,
+        // 标准化布尔值字段
+        isActive: account.isActive === 'true',
+        schedulable: account.schedulable !== 'false',
+        autoStopOnWarning: account.autoStopOnWarning === 'true',
+        fiveHourAutoStopped: account.fiveHourAutoStopped === 'true',
+        useUnifiedUserAgent: account.useUnifiedUserAgent === 'true',
+        useUnifiedClientId: account.useUnifiedClientId === 'true'
+      }
+
+      return parsedAccount
+    } catch (error) {
+      logger.error(`❌ Failed to get Claude account ${accountId}:`, error)
       throw error
     }
   }
