@@ -40,7 +40,11 @@ class ScheduledRequestExecutor {
         throw new Error('Account not found')
       }
 
-      if (account.status !== 'active' && account.isActive !== 'true') {
+      // 检查账户是否激活（支持不同的字段名）
+      const isAccountActive =
+        account.status === 'active' || account.isActive === true || account.isActive === 'true'
+
+      if (!isAccountActive) {
         throw new Error('Account is not active')
       }
 
