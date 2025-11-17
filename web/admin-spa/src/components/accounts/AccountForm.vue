@@ -2476,9 +2476,9 @@
               </label>
               <button
                 v-if="form.scheduledRequest.enabled && isEdit"
-                class="rounded-md bg-blue-100 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
-                type="button"
                 :disabled="testingScheduledRequest"
+                type="button"
+                class="rounded-md bg-blue-100 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
                 @click="testScheduledRequest"
               >
                 <i v-if="!testingScheduledRequest" class="fas fa-play mr-1" />
