@@ -5460,8 +5460,10 @@ const testScheduledRequest = async () => {
     }
   } catch (error) {
     console.error('测试定时任务失败:', error)
+    console.error('错误响应数据:', error.response?.data)
+    console.error('完整错误对象:', JSON.stringify(error.response?.data, null, 2))
 
-    const errorMessage = error.response?.data?.error || error.message || '测试失败，请检查账户配置'
+    const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || '测试失败，请检查账户配置'
     showToast(`测试失败: ${errorMessage}`, 'error')
 
     // 更新表单中的执行状态
