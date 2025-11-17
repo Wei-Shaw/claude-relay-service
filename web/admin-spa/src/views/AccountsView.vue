@@ -727,23 +727,23 @@
                       <i class="fas fa-clock text-blue-500" />
                       <span class="font-medium text-gray-700 dark:text-gray-200">
                         每天
-                        {{ String(account.scheduledRequest.scheduleHour || 7).padStart(2, '0') }}:05
+                        {{ String(account.scheduledRequest?.scheduleHour || 7).padStart(2, '0') }}:05
                       </span>
                     </div>
                     <div
-                      v-if="account.scheduledRequest.lastExecutedAt"
+                      v-if="account.scheduledRequest?.lastExecutedAt"
                       class="flex items-center gap-1.5"
                     >
                       <span
-                        v-if="account.scheduledRequest.lastStatus === 'success'"
+                        v-if="account.scheduledRequest?.lastStatus === 'success'"
                         class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700"
                       >
                         <i class="fas fa-check mr-1" />
                         成功
                       </span>
                       <el-tooltip
-                        v-else-if="account.scheduledRequest.lastStatus === 'error'"
-                        :content="account.scheduledRequest.lastError || '执行失败'"
+                        v-else-if="account.scheduledRequest?.lastStatus === 'error'"
+                        :content="account.scheduledRequest?.lastError || '执行失败'"
                         effect="dark"
                         placement="top"
                       >
@@ -756,10 +756,10 @@
                       </el-tooltip>
                     </div>
                     <div
-                      v-if="account.scheduledRequest.lastExecutedAt"
+                      v-if="account.scheduledRequest?.lastExecutedAt"
                       class="text-xs text-gray-500 dark:text-gray-400"
                     >
-                      {{ formatRelativeTime(account.scheduledRequest.lastExecutedAt) }}
+                      {{ formatRelativeTime(account.scheduledRequest?.lastExecutedAt) }}
                     </div>
                   </div>
                   <div v-else class="text-xs text-gray-400 dark:text-gray-500">未启用</div>
@@ -1651,31 +1651,31 @@
                   <i class="fas fa-clock text-blue-500" />
                   <span class="font-medium text-gray-700 dark:text-gray-200">
                     每天
-                    {{ String(account.scheduledRequest.scheduleHour || 7).padStart(2, '0') }}:05
+                    {{ String(account.scheduledRequest?.scheduleHour || 7).padStart(2, '0') }}:05
                   </span>
                 </div>
                 <div v-else class="text-gray-400 dark:text-gray-500">未启用</div>
                 <div
                   v-if="
-                    account.scheduledRequest?.enabled && account.scheduledRequest.lastExecutedAt
+                    account.scheduledRequest?.enabled && account.scheduledRequest?.lastExecutedAt
                   "
                   class="flex items-center gap-1"
                 >
                   <span
-                    v-if="account.scheduledRequest.lastStatus === 'success'"
+                    v-if="account.scheduledRequest?.lastStatus === 'success'"
                     class="inline-flex items-center rounded-full bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700"
                   >
                     <i class="fas fa-check text-[9px]" />
                   </span>
                   <span
-                    v-else-if="account.scheduledRequest.lastStatus === 'error'"
+                    v-else-if="account.scheduledRequest?.lastStatus === 'error'"
                     class="inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700"
-                    :title="account.scheduledRequest.lastError || '执行失败'"
+                    :title="account.scheduledRequest?.lastError || '执行失败'"
                   >
                     <i class="fas fa-times text-[9px]" />
                   </span>
                   <span class="text-gray-500 dark:text-gray-400">
-                    {{ formatRelativeTime(account.scheduledRequest.lastExecutedAt) }}
+                    {{ formatRelativeTime(account.scheduledRequest?.lastExecutedAt) }}
                   </span>
                 </div>
               </div>
