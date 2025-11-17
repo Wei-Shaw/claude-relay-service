@@ -4,7 +4,8 @@
   "description": "Claude Code API relay service with multi-account management, OpenAI compatibility, and API key authentication",
   "main": "src/app.js",
   "scripts": {
-    "start": "npm run lint && node src/app.js",
+    "start": "node src/app.js",
+    "start:dev": "npm run lint && node src/app.js",
     "dev": "nodemon",
     "build:web": "cd web/admin-spa && npm run build",
     "install:web": "cd web/admin-spa && npm install",
