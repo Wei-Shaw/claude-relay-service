@@ -5576,7 +5576,15 @@ watch(
         dailyUsage: newAccount.dailyUsage || 0,
         quotaResetTime: newAccount.quotaResetTime || '00:00',
         // 并发控制字段
-        maxConcurrentTasks: newAccount.maxConcurrentTasks || 0
+        maxConcurrentTasks: newAccount.maxConcurrentTasks || 0,
+        // 定时任务配置
+        scheduledRequest: {
+          enabled: newAccount.scheduledRequest?.enabled || false,
+          scheduleHour: newAccount.scheduledRequest?.scheduleHour || 7,
+          lastExecutedAt: newAccount.scheduledRequest?.lastExecutedAt || null,
+          lastStatus: newAccount.scheduledRequest?.lastStatus || null,
+          lastError: newAccount.scheduledRequest?.lastError || null
+        }
       }
 
       // 如果是Claude Console账户，加载实时使用情况
