@@ -924,76 +924,67 @@ async function handleStreamGenerateContent(req, res) {
     res.setHeader('X-Accel-Buffering', 'no')
 
     // 处理流式响应并捕获usage数据
-    let streamBuffer = '' // 统一的流处理缓冲区
+    // 方案 A++：透明转发 + 异步 usage 提取
+    let streamBuffer = '' // 缓冲区用于处理不完整的行
     let totalUsage = {
       promptTokenCount: 0,
       candidatesTokenCount: 0,
       totalTokenCount: 0
     }
-    const usageReported = false
+    let usageReported = false // 修复：改为 let 以便后续修改
 
     streamResponse.on('data', (chunk) => {
       try {
-        const chunkStr = chunk.toString()
-
-        if (!chunkStr.trim()) {
-          return
+        // 1️⃣ 立即转发原始数据（零延迟，最高优先级）
+        // 对所有版本（v1beta 和 v1internal）都采用透明转发
+        if (!res.destroyed) {
+          res.write(chunk) // 直接转发 Buffer，无需转换和序列化
         }
 
-        // 使用统一缓冲区处理不完整的行
-        streamBuffer += chunkStr
-        const lines = streamBuffer.split('\n')
-        streamBuffer = lines.pop() || '' // 保留最后一个不完整的行
+        // 2️⃣ 异步提取 usage 数据（不阻塞转发）
+        // 使用 setImmediate 将解析放到下一个事件循环
+        setImmediate(() => {
+          try {
+            const chunkStr = chunk.toString()
+            if (!chunkStr.trim()) {
+              return
+            }
 
-        const processedLines = []
+            // 快速检查是否包含 usage 数据（避免不必要的解析）
+            if (!chunkStr.includes('usageMetadata')) {
+              return
+            }
 
-        for (const line of lines) {
-          if (!line.trim()) {
-            continue // 跳过空行，不添加到处理队列
-          }
+            // 处理不完整的行
+            streamBuffer += chunkStr
+            const lines = streamBuffer.split('\n')
+            streamBuffer = lines.pop() || ''
 
-          // 解析 SSE 行
-          const parsed = parseSSELine(line)
-
-          // 提取 usage 数据（适用于所有版本）
-          if (parsed.type === 'data' && parsed.data.response?.usageMetadata) {
-            totalUsage = parsed.data.response.usageMetadata
-            logger.debug('📊 Captured Gemini usage data:', totalUsage)
-          }
-
-          // 根据版本处理输出
-          if (version === 'v1beta') {
-            if (parsed.type === 'data') {
-              if (parsed.data.response) {
-                // 有 response 字段，只返回 response 的内容
-                processedLines.push(`data: ${JSON.stringify(parsed.data.response)}`)
-              } else {
-                // 没有 response 字段，返回整个数据对象
-                processedLines.push(`data: ${JSON.stringify(parsed.data)}`)
+            // 仅解析包含 usage 的行
+            for (const line of lines) {
+              if (!line.trim() || !line.includes('usageMetadata')) {
+                continue
               }
-            } else if (parsed.type === 'control') {
-              // 控制消息（如 [DONE]）保持原样
-              processedLines.push(line)
-            }
-            // 跳过其他类型的行（'other', 'invalid'）
-          }
-        }
 
-        // 发送数据到客户端
-        if (version === 'v1beta') {
-          for (const line of processedLines) {
-            if (!res.destroyed) {
-              res.write(`${line}\n\n`)
+              try {
+                const parsed = parseSSELine(line)
+                if (parsed.type === 'data' && parsed.data.response?.usageMetadata) {
+                  totalUsage = parsed.data.response.usageMetadata
+                  logger.debug('📊 Captured Gemini usage data:', totalUsage)
+                }
+              } catch (parseError) {
+                // 静默失败，不影响转发
+                logger.debug('Failed to parse usage line:', parseError.message)
+              }
             }
+          } catch (error) {
+            // 静默失败，不影响转发
+            logger.debug('Error extracting usage data:', error.message)
           }
-        } else {
-          // v1internal 直接转发原始数据
-          if (!res.destroyed) {
-            res.write(chunkStr)
-          }
-        }
+        })
       } catch (error) {
         logger.error('Error processing stream chunk:', error)
+        // 不中断流，继续处理后续数据
       }
     })
 
@@ -1027,6 +1018,9 @@ async function handleStreamGenerateContent(req, res) {
             model,
             'gemini-stream'
           )
+
+          // 修复：标记 usage 已上报，避免重复上报
+          usageReported = true
         } catch (error) {
           logger.error('Failed to record Gemini usage:', error)
         }
@@ -1038,6 +1032,7 @@ async function handleStreamGenerateContent(req, res) {
     streamResponse.on('error', (error) => {
       logger.error('Stream error:', error)
       if (!res.headersSent) {
+        // 如果还没发送响应头，可以返回正常的错误响应
         res.status(500).json({
           error: {
             message: error.message || 'Stream error',
@@ -1045,6 +1040,27 @@ async function handleStreamGenerateContent(req, res) {
           }
         })
       } else {
+        // 如果已经开始流式传输，发送 SSE 格式的错误事件和结束标记
+        // 这样客户端可以正确识别流的结束，避免 "Premature close" 错误
+        if (!res.destroyed) {
+          try {
+            // 发送错误事件（SSE 格式）
+            res.write(
+              `data: ${JSON.stringify({
+                error: {
+                  message: error.message || 'Stream error',
+                  type: 'stream_error',
+                  code: error.code
+                }
+              })}\n\n`
+            )
+
+            // 发送 SSE 结束标记
+            res.write('data: [DONE]\n\n')
+          } catch (writeError) {
+            logger.error('Error sending error event:', writeError)
+          }
+        }
         res.end()
       }
     })
