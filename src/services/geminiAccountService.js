@@ -1485,7 +1485,7 @@ async function generateContent(
       'Content-Type': 'application/json'
     },
     data: request,
-    timeout: 60000 // 生成内容可能需要更长时间
+    timeout: 600000 // 生成内容可能需要更长时间
   }
 
   // 添加代理配置
