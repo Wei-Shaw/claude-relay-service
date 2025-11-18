@@ -1060,6 +1060,45 @@ async function getOauthClient(accessToken, refreshToken, proxyConfig = null) {
   return client
 }
 
+// 通用的 Code Assist API 转发函数（用于简单的请求/响应端点）
+// 适用于：loadCodeAssist, onboardUser, countTokens, listExperiments 等不需要特殊处理的端点
+async function forwardToCodeAssist(client, apiMethod, requestBody, proxyConfig = null) {
+  const axios = require('axios')
+  const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com'
+  const CODE_ASSIST_API_VERSION = 'v1internal'
+
+  const { token } = await client.getAccessToken()
+  const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+
+  logger.info(`📡 ${apiMethod} API调用开始`)
+
+  const axiosConfig = {
+    url: `${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:${apiMethod}`,
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    data: requestBody,
+    timeout: 30000
+  }
+
+  // 添加代理配置
+  if (proxyAgent) {
+    axiosConfig.httpAgent = proxyAgent
+    axiosConfig.httpsAgent = proxyAgent
+    axiosConfig.proxy = false
+    logger.info(`🌐 Using proxy for ${apiMethod}: ${ProxyHelper.getProxyDescription(proxyConfig)}`)
+  } else {
+    logger.debug(`🌐 No proxy configured for ${apiMethod}`)
+  }
+
+  const response = await axios(axiosConfig)
+
+  logger.info(`✅ ${apiMethod} API调用成功`)
+  return response.data
+}
+
 // 调用 Google Code Assist API 的 loadCodeAssist 方法（支持代理）
 async function loadCodeAssist(client, projectId = null, proxyConfig = null) {
   const axios = require('axios')
@@ -1068,52 +1107,55 @@ async function loadCodeAssist(client, projectId = null, proxyConfig = null) {
 
   const { token } = await client.getAccessToken()
   const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+  // 🔍 只有个人账户（无 projectId）才需要调用 tokeninfo/userinfo
+  // 这些调用有助于 Google 获取临时 projectId
+  if (!projectId) {
+    const tokenInfoConfig = {
+      url: 'https://oauth2.googleapis.com/tokeninfo',
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      data: new URLSearchParams({ access_token: token }).toString(),
+      timeout: 15000
+    }
 
-  const tokenInfoConfig = {
-    url: 'https://oauth2.googleapis.com/tokeninfo',
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    data: new URLSearchParams({ access_token: token }).toString(),
-    timeout: 15000
-  }
+    if (proxyAgent) {
+      tokenInfoConfig.httpAgent = proxyAgent
+      tokenInfoConfig.httpsAgent = proxyAgent
+      tokenInfoConfig.proxy = false
+    }
 
-  if (proxyAgent) {
-    tokenInfoConfig.httpAgent = proxyAgent
-    tokenInfoConfig.httpsAgent = proxyAgent
-    tokenInfoConfig.proxy = false
-  }
+    try {
+      await axios(tokenInfoConfig)
+      logger.info('📋 tokeninfo 接口验证成功')
+    } catch (error) {
+      logger.warn('⚠️ tokeninfo 接口调用失败:', error.message)
+    }
 
-  try {
-    await axios(tokenInfoConfig)
-    logger.info('📋 tokeninfo 接口验证成功')
-  } catch (error) {
-    logger.info('tokeninfo 接口获取失败', error)
-  }
+    const userInfoConfig = {
+      url: 'https://www.googleapis.com/oauth2/v2/userinfo',
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: '*/*'
+      },
+      timeout: 15000
+    }
 
-  const userInfoConfig = {
-    url: 'https://www.googleapis.com/oauth2/v2/userinfo',
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: '*/*'
-    },
-    timeout: 15000
-  }
+    if (proxyAgent) {
+      userInfoConfig.httpAgent = proxyAgent
+      userInfoConfig.httpsAgent = proxyAgent
+      userInfoConfig.proxy = false
+    }
 
-  if (proxyAgent) {
-    userInfoConfig.httpAgent = proxyAgent
-    userInfoConfig.httpsAgent = proxyAgent
-    userInfoConfig.proxy = false
-  }
-
-  try {
-    await axios(userInfoConfig)
-    logger.info('📋 userinfo 接口获取成功')
-  } catch (error) {
-    logger.info('userinfo 接口获取失败', error)
+    try {
+      await axios(userInfoConfig)
+      logger.info('📋 userinfo 接口获取成功')
+    } catch (error) {
+      logger.warn('⚠️ userinfo 接口调用失败:', error.message)
+    }
   }
 
   // 创建ClientMetadata
@@ -1573,6 +1615,7 @@ module.exports = {
   getAccountRateLimitInfo,
   isTokenExpired,
   getOauthClient,
+  forwardToCodeAssist, // 通用转发函数
   loadCodeAssist,
   getOnboardTier,
   onboardUser,
