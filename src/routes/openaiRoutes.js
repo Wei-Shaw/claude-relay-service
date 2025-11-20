@@ -313,13 +313,23 @@ const handleResponses = async (req, res) => {
       }
     }
 
+    // 判断是否访问 compact 端点
+    const isCompactRoute =
+      req.path === '/responses/compact' ||
+      req.path === '/v1/responses/compact' ||
+      (req.originalUrl && req.originalUrl.includes('/responses/compact'))
+
     // 覆盖或新增必要头部
     headers['authorization'] = `Bearer ${accessToken}`
     headers['chatgpt-account-id'] = account.accountId || account.chatgptUserId || accountId
     headers['host'] = 'chatgpt.com'
     headers['accept'] = isStream ? 'text/event-stream' : 'application/json'
     headers['content-type'] = 'application/json'
-    req.body['store'] = false
+    if (!isCompactRoute) {
+      req.body['store'] = false
+    } else if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'store')) {
+      delete req.body['store']
+    }
 
     // 创建代理 agent
     const proxyAgent = createProxyAgent(proxy)
@@ -341,20 +351,20 @@ const handleResponses = async (req, res) => {
       logger.debug('🌐 No proxy configured for OpenAI request')
     }
 
+    const codexEndpoint = isCompactRoute
+      ? 'https://chatgpt.com/backend-api/codex/responses/compact'
+      : 'https://chatgpt.com/backend-api/codex/responses'
+
     // 根据 stream 参数决定请求类型
     if (isStream) {
       // 流式请求
-      upstream = await axios.post('https://chatgpt.com/backend-api/codex/responses', req.body, {
+      upstream = await axios.post(codexEndpoint, req.body, {
         ...axiosConfig,
         responseType: 'stream'
       })
     } else {
       // 非流式请求
-      upstream = await axios.post(
-        'https://chatgpt.com/backend-api/codex/responses',
-        req.body,
-        axiosConfig
-      )
+      upstream = await axios.post(codexEndpoint, req.body, axiosConfig)
     }
 
     const codexUsageSnapshot = extractCodexUsageHeaders(upstream.headers)
@@ -858,6 +868,8 @@ const handleResponses = async (req, res) => {
 // 注册两个路由路径，都使用相同的处理函数
 router.post('/responses', authenticateApiKey, handleResponses)
 router.post('/v1/responses', authenticateApiKey, handleResponses)
+router.post('/responses/compact', authenticateApiKey, handleResponses)
+router.post('/v1/responses/compact', authenticateApiKey, handleResponses)
 
 // 使用情况统计端点
 router.get('/usage', authenticateApiKey, async (req, res) => {
