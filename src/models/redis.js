@@ -647,19 +647,117 @@ class RedisClient {
     }
   }
 
-  async addUsageRecord(keyId, record, maxRecords = 200) {
+  async addUsageRecord(keyId, record, options = {}) {
     const listKey = `usage:records:${keyId}`
     const client = this.getClientSafe()
 
+    // 兼容旧签名：第三个参数为数字时视为 maxRecords
+    if (typeof options === 'number') {
+      options = { maxRecords: options }
+    }
+
+    const {
+      maxRecords = 10000,
+      includeGlobal = true,
+      globalMaxRecords = 10000,
+      globalKey = 'usage:records:global',
+      globalTtlSeconds = 86400 * 30, // 全局日志默认保留至少7天，这里使用30天
+      extraMeta = {}
+    } = options
+
+    const perKeyMax = Math.max(1, Number(maxRecords) || 10000)
+    const safeGlobalMax = Math.max(1, Number(globalMaxRecords) || 10000)
+    // 至少保留7天：604800 秒
+    const safeGlobalTtl = Math.max(604800, Number(globalTtlSeconds) || 86400 * 30)
+
+    // 将 keyId 与额外元数据合并，确保每条记录都能独立关联来源
+    const mergedRecord = {
+      keyId,
+      ...(record || {}),
+      ...extraMeta
+    }
+
     try {
-      await client
+      const multi = client
         .multi()
-        .lpush(listKey, JSON.stringify(record))
-        .ltrim(listKey, 0, Math.max(0, maxRecords - 1))
+        .lpush(listKey, JSON.stringify(mergedRecord))
+        .ltrim(listKey, 0, Math.max(0, perKeyMax - 1))
         .expire(listKey, 86400 * 90) // 默认保留90天
-        .exec()
+
+      if (includeGlobal) {
+        multi
+          .lpush(globalKey, JSON.stringify(mergedRecord))
+          .ltrim(globalKey, 0, Math.max(0, safeGlobalMax - 1))
+          .expire(globalKey, safeGlobalTtl)
+      }
+
+      await multi.exec()
     } catch (error) {
       logger.error(`❌ Failed to append usage record for key ${keyId}:`, error)
+    }
+  }
+
+  async getRecentUsageRecords(limit = 50, listKey = 'usage:records:global') {
+    const client = this.getClient()
+
+    if (!client) {
+      return []
+    }
+
+    const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 10000))
+
+    try {
+      const rawRecords = await client.lrange(listKey, 0, safeLimit - 1)
+      return rawRecords
+        .map((entry) => {
+          try {
+            return JSON.parse(entry)
+          } catch (error) {
+            logger.warn('⚠️ Failed to parse recent usage record entry:', error)
+            return null
+          }
+        })
+        .filter(Boolean)
+    } catch (error) {
+      logger.error('❌ Failed to load recent usage records:', error)
+      return []
+    }
+  }
+
+  async getUsageRecordsPaginated({
+    listKey = 'usage:records:global',
+    offset = 0,
+    limit = 100
+  } = {}) {
+    const client = this.getClient()
+    if (!client) {
+      return { total: 0, records: [] }
+    }
+
+    const safeLimit = Math.max(1, Math.min(Number(limit) || 100, 10000))
+    const safeOffset = Math.max(0, Number(offset) || 0)
+
+    try {
+      const [total, rawRecords] = await Promise.all([
+        client.llen(listKey),
+        client.lrange(listKey, safeOffset, safeOffset + safeLimit - 1)
+      ])
+
+      const records = rawRecords
+        .map((entry) => {
+          try {
+            return JSON.parse(entry)
+          } catch (error) {
+            logger.warn('⚠️ Failed to parse paginated usage record entry:', error)
+            return null
+          }
+        })
+        .filter(Boolean)
+
+      return { total: total || 0, records }
+    } catch (error) {
+      logger.error('❌ Failed to load paginated usage records:', error)
+      return { total: 0, records: [] }
     }
   }
 

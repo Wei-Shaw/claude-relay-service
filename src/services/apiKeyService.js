@@ -969,7 +969,7 @@ class ApiKeyService {
 
       // 记录单次请求的使用详情
       const usageCost = costInfo && costInfo.costs ? costInfo.costs.total || 0 : 0
-      await redis.addUsageRecord(keyId, {
+      const usageRecord = {
         timestamp: new Date().toISOString(),
         model,
         accountId: accountId || null,
@@ -980,7 +980,17 @@ class ApiKeyService {
         totalTokens,
         cost: Number(usageCost.toFixed(6)),
         costBreakdown: costInfo && costInfo.costs ? costInfo.costs : undefined
-      })
+      }
+
+      const usageRecordOptions = {
+        extraMeta: {
+          apiKeyName: keyData?.name,
+          userId: keyData?.userId,
+          ownerType: keyData?.ownerType
+        }
+      }
+
+      await redis.addUsageRecord(keyId, usageRecord, usageRecordOptions)
 
       const logParts = [`Model: ${model}`, `Input: ${inputTokens}`, `Output: ${outputTokens}`]
       if (cacheCreateTokens > 0) {
@@ -1201,7 +1211,15 @@ class ApiKeyService {
         isLongContext: costInfo.isLongContextRequest || false
       }
 
-      await redis.addUsageRecord(keyId, usageRecord)
+      const usageRecordOptions = {
+        extraMeta: {
+          apiKeyName: keyData?.name,
+          userId: keyData?.userId,
+          ownerType: keyData?.ownerType
+        }
+      }
+
+      await redis.addUsageRecord(keyId, usageRecord, usageRecordOptions)
 
       const logParts = [`Model: ${model}`, `Input: ${inputTokens}`, `Output: ${outputTokens}`]
       if (cacheCreateTokens > 0) {

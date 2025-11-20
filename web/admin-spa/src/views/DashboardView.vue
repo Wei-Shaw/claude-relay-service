@@ -673,6 +673,127 @@
         </div>
       </div>
     </div>
+
+    <!-- 最近请求日志 -->
+    <div class="mb-4 sm:mb-6 md:mb-8">
+      <div class="card p-4 sm:p-6">
+        <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 sm:text-lg">
+              最近请求日志
+            </h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              按时间倒序展示最新请求，便于快速定位异常消耗或大模型调用
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              class="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-blue-600 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-700 sm:text-sm"
+              :disabled="requestLogsLoading"
+              @click="loadRequestLogs()"
+            >
+              <i :class="['fas fa-sync-alt', { 'animate-spin': requestLogsLoading }]"></i>
+              <span class="hidden sm:inline">刷新日志</span>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="requestLogsLoading" class="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+          正在加载请求日志...
+        </div>
+        <div
+          v-else-if="!requestLogs || requestLogs.length === 0"
+          class="py-8 text-center text-sm text-gray-500 dark:text-gray-400"
+        >
+          暂无请求日志
+        </div>
+        <div v-else class="overflow-auto">
+          <table class="min-w-full">
+            <thead class="sticky top-0 bg-gray-50 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+              <tr>
+                <th class="px-3 py-2 text-left">时间</th>
+                <th class="px-3 py-2 text-left">API Key</th>
+                <th class="px-3 py-2 text-left">模型</th>
+                <th class="px-3 py-2 text-left">Token</th>
+                <th class="px-3 py-2 text-left">费用</th>
+                <th class="px-3 py-2 text-left">账户</th>
+                <th class="px-3 py-2 text-left">备注</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 text-xs dark:divide-gray-700">
+              <tr v-for="log in requestLogs" :key="`${log.timestamp}-${log.keyId || ''}-${log.model || ''}`" class="hover:bg-gray-50 dark:hover:bg-gray-800/60">
+                <td class="whitespace-nowrap px-3 py-2 text-gray-700 dark:text-gray-200">
+                  {{ formatDateTime(log.timestamp) }}
+                </td>
+                <td class="px-3 py-2">
+                  <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    {{ getKeyLabel(log) }}
+                  </div>
+                  <div class="text-[11px] text-gray-500 dark:text-gray-400" v-if="log.keyId">
+                    {{ log.keyId }}
+                  </div>
+                </td>
+                <td class="px-3 py-2">
+                  <div class="font-medium text-gray-900 dark:text-gray-100">
+                    {{ log.model || 'unknown' }}
+                  </div>
+                  <div class="text-[11px] text-gray-500 dark:text-gray-400" v-if="log.accountType">
+                    来源: {{ log.accountType }}
+                  </div>
+                </td>
+                <td class="px-3 py-2">
+                  <div class="font-semibold text-indigo-600 dark:text-indigo-300">
+                    {{ formatNumber(log.totalTokens || 0) }}
+                  </div>
+                  <div class="text-[11px] text-gray-500 dark:text-gray-400">
+                    in {{ formatNumber(log.inputTokens || 0) }} / out {{ formatNumber(log.outputTokens || 0) }}
+                    <span v-if="log.cacheCreateTokens || log.cacheReadTokens">
+                      / cache {{ formatNumber((log.cacheCreateTokens || 0) + (log.cacheReadTokens || 0)) }}
+                    </span>
+                  </div>
+                </td>
+                <td class="px-3 py-2 text-green-600 dark:text-green-300">
+                  {{ formatCostValue(Number(log.cost || 0)) }}
+                </td>
+                <td class="px-3 py-2 text-gray-700 dark:text-gray-200">
+                  {{ getAccountLabel(log) }}
+                </td>
+                <td class="px-3 py-2">
+                  <div class="flex flex-wrap gap-1">
+                    <span
+                      v-if="log.isLongContext"
+                      class="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-medium text-orange-700 dark:bg-orange-900/40 dark:text-orange-200"
+                      >1M上下文</span
+                    >
+                    <span
+                      v-if="log.cacheCreateTokens > 0"
+                      class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-200"
+                      >缓存写 {{ formatNumber(log.cacheCreateTokens || 0) }}</span
+                    >
+                    <span
+                      v-if="log.cacheReadTokens > 0"
+                      class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-medium text-purple-700 dark:bg-purple-900/40 dark:text-purple-200"
+                      >缓存读 {{ formatNumber(log.cacheReadTokens || 0) }}</span
+                    >
+                    <span
+                      v-if="log.ephemeral5mTokens > 0 || log.ephemeral1hTokens > 0"
+                      class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
+                    >
+                      短缓存 {{ formatNumber((log.ephemeral5mTokens || 0) + (log.ephemeral1hTokens || 0)) }}
+                    </span>
+                    <span
+                      v-if="!log.isLongContext && !log.cacheCreateTokens && !log.cacheReadTokens && !log.ephemeral5mTokens && !log.ephemeral1hTokens"
+                      class="text-[11px] text-gray-500 dark:text-gray-400"
+                      >--</span
+                    >
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -695,6 +816,8 @@ const {
   apiKeysTrendData,
   accountUsageTrendData,
   accountUsageGroup,
+  requestLogs,
+  requestLogsLoading,
   formattedUptime,
   dateFilter,
   trendGranularity,
@@ -709,6 +832,7 @@ const {
   onCustomDateRangeChange,
   setTrendGranularity,
   refreshChartsData,
+  loadRequestLogs,
   setAccountUsageGroup,
   disabledDate
 } = dashboardStore
@@ -774,6 +898,37 @@ function formatCostValue(cost) {
     return `$${cost.toFixed(3)}`
   }
   return `$${cost.toFixed(6)}`
+}
+
+function formatDateTime(value) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hour = String(date.getHours()).padStart(2, '0')
+  const minute = String(date.getMinutes()).padStart(2, '0')
+  const second = String(date.getSeconds()).padStart(2, '0')
+
+  return `${year}-${month}-${day} ${hour}:${minute}:${second}`
+}
+
+function getKeyLabel(log) {
+  if (!log) return '未知'
+  if (log.apiKeyName) return log.apiKeyName
+  if (log.keyId) return `Key ${log.keyId}`
+  return '未知'
+}
+
+function getAccountLabel(log) {
+  if (!log) return '-'
+  if (log.accountId && log.accountType) {
+    return `${log.accountType} / ${log.accountId}`
+  }
+  if (log.accountId) return log.accountId
+  return '未关联'
 }
 
 // 计算百分比
@@ -1483,7 +1638,7 @@ async function refreshAllData() {
 
   isRefreshing.value = true
   try {
-    await Promise.all([loadDashboardData(), refreshChartsData()])
+    await Promise.all([loadDashboardData(), refreshChartsData(), loadRequestLogs()])
   } finally {
     isRefreshing.value = false
   }

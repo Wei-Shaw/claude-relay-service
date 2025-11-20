@@ -37,6 +37,7 @@ const activeTab = ref('dashboard')
 const tabRouteMap = computed(() => {
   const baseMap = {
     dashboard: '/dashboard',
+    logs: '/logs',
     apiKeys: '/api-keys',
     accounts: '/accounts',
     tutorial: '/tutorial',
@@ -65,6 +66,7 @@ const initActiveTab = () => {
     const routeName = route.name
     const nameToTabMap = {
       Dashboard: 'dashboard',
+      Logs: 'logs',
       ApiKeys: 'apiKeys',
       Accounts: 'accounts',
       Tutorial: 'tutorial',
@@ -92,12 +94,13 @@ watch(
     } else {
       // 如果路径不匹配任何标签，尝试从路由名称获取
       const routeName = route.name
-      const nameToTabMap = {
-        Dashboard: 'dashboard',
-        ApiKeys: 'apiKeys',
-        Accounts: 'accounts',
-        Tutorial: 'tutorial',
-        Settings: 'settings'
+    const nameToTabMap = {
+      Dashboard: 'dashboard',
+      Logs: 'logs',
+      ApiKeys: 'apiKeys',
+      Accounts: 'accounts',
+      Tutorial: 'tutorial',
+      Settings: 'settings'
       }
       if (routeName && nameToTabMap[routeName]) {
         activeTab.value = nameToTabMap[routeName]
