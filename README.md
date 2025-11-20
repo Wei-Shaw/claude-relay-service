@@ -410,10 +410,27 @@ export ANTHROPIC_AUTH_TOKEN="后台创建的API密钥"
 
 **Gemini CLI 设置环境变量：**
 
+**方式一（推荐）：通过 Gemini Assist API 方式访问**
+
+每账号每日享受 1000 次请求，每分钟 60 次免费限额。
+
 ```bash
+CODE_ASSIST_ENDPOINT="http://127.0.0.1:3000/gemini"  # 根据实际填写你服务器的ip地址或者域名
+GOOGLE_CLOUD_ACCESS_TOKEN="后台创建的API密钥"
+GOOGLE_GENAI_USE_GCA="true"
 GEMINI_MODEL="gemini-2.5-pro"
-GOOGLE_GEMINI_BASE_URL="http://127.0.0.1:3000/gemini" # 根据实际填写你服务器的ip地址或者域名
-GEMINI_API_KEY="后台创建的API密钥"  # 使用相同的API密钥即可
+```
+
+> **注意**：gemini-cli 控制台会提示 `Failed to fetch user info: 401 Unauthorized`，但使用不受任何影响。
+
+**方式二：通过 Gemini API 方式访问**
+
+免费额度极少，极易触发 429 错误。
+
+```bash
+GOOGLE_GEMINI_BASE_URL="http://127.0.0.1:3000/gemini"  # 根据实际填写你服务器的ip地址或者域名
+GEMINI_API_KEY="后台创建的API密钥"
+GEMINI_MODEL="gemini-2.5-pro"
 ```
 **使用 Claude Code：**
 

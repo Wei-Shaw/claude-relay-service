@@ -232,19 +232,66 @@ Assign a key to each user:
 4. Set usage limits (optional)
 5. Save, note down the generated key
 
-### 4. Start Using Claude Code
+### 4. Start Using Claude Code and Gemini CLI
 
 Now you can replace the official API with your own service:
 
-**Set environment variables:**
+**Claude Code Set Environment Variables:**
+
+Default uses standard Claude account pool:
+
 ```bash
-export ANTHROPIC_BASE_URL="http://127.0.0.1:3000/api/" # Fill in your server's IP address or domain according to actual situation
+export ANTHROPIC_BASE_URL="http://127.0.0.1:3000/api/" # Fill in your server's IP address or domain
 export ANTHROPIC_AUTH_TOKEN="API key created in the backend"
 ```
 
-**Use claude:**
+**VSCode Claude Plugin Configuration:**
+
+If using VSCode Claude plugin, configure in `~/.claude/config.json`:
+
+```json
+{
+    "primaryApiKey": "crs"
+}
+```
+
+If the file doesn't exist, create it manually. Windows users path is `C:\Users\YourUsername\.claude\config.json`.
+
+**Gemini CLI Set Environment Variables:**
+
+**Method 1 (Recommended): Via Gemini Assist API**
+
+Each account enjoys 1000 requests per day, 60 requests per minute free quota.
+
+```bash
+CODE_ASSIST_ENDPOINT="http://127.0.0.1:3000/gemini"  # Fill in your server's IP address or domain
+GOOGLE_CLOUD_ACCESS_TOKEN="API key created in the backend"
+GOOGLE_GENAI_USE_GCA="true"
+GEMINI_MODEL="gemini-2.5-pro"
+```
+
+> **Note**: gemini-cli console will show `Failed to fetch user info: 401 Unauthorized`, but this doesn't affect usage.
+
+**Method 2: Via Gemini API**
+
+Very limited free quota, easily triggers 429 errors.
+
+```bash
+GOOGLE_GEMINI_BASE_URL="http://127.0.0.1:3000/gemini"  # Fill in your server's IP address or domain
+GEMINI_API_KEY="API key created in the backend"
+GEMINI_MODEL="gemini-2.5-pro"
+```
+
+**Use Claude Code:**
+
 ```bash
 claude
+```
+
+**Use Gemini CLI:**
+
+```bash
+gemini
 ```
 
 ---

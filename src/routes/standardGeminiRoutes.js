@@ -510,76 +510,102 @@ async function handleStandardStreamGenerateContent(req, res) {
     res.setHeader('X-Accel-Buffering', 'no')
 
     // 处理流式响应并捕获usage数据
-    let streamBuffer = '' // 统一的流处理缓冲区
+    // 方案 A++：透明转发 + 异步 usage 提取 + SSE 心跳机制
+    let streamBuffer = '' // 缓冲区用于处理不完整的行
     let totalUsage = {
       promptTokenCount: 0,
       candidatesTokenCount: 0,
       totalTokenCount: 0
     }
 
+    // SSE 心跳机制：防止 Clash 等代理 120 秒超时
+    let heartbeatTimer = null
+    let lastDataTime = Date.now()
+    const HEARTBEAT_INTERVAL = 15000 // 15 秒
+
+    const sendHeartbeat = () => {
+      const timeSinceLastData = Date.now() - lastDataTime
+      if (timeSinceLastData >= HEARTBEAT_INTERVAL && !res.destroyed) {
+        res.write('\n') // 发送空行保持连接活跃
+        logger.info(`💓 Sent SSE keepalive (gap: ${(timeSinceLastData / 1000).toFixed(1)}s)`)
+      }
+    }
+
+    heartbeatTimer = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL)
+
     streamResponse.on('data', (chunk) => {
       try {
-        const chunkStr = chunk.toString()
+        // 更新最后数据时间
+        lastDataTime = Date.now()
 
-        if (!chunkStr.trim()) {
-          return
+        // 1️⃣ 立即转发原始数据（零延迟，最高优先级）
+        if (!res.destroyed) {
+          res.write(chunk) // 直接转发 Buffer，无需转换和序列化
         }
 
-        // 使用统一缓冲区处理不完整的行
-        streamBuffer += chunkStr
-        const lines = streamBuffer.split('\n')
-        streamBuffer = lines.pop() || '' // 保留最后一个不完整的行
-
-        for (const line of lines) {
-          if (!line.trim()) {
-            continue // 跳过空行
-          }
-
-          // 解析 SSE 行
-          const parsed = parseSSELine(line)
-
-          // 记录无效的解析（用于调试）
-          if (parsed.type === 'invalid') {
-            logger.warn('Failed to parse SSE line:', {
-              line: parsed.line.substring(0, 100),
-              error: parsed.error.message
-            })
-            continue
-          }
-
-          // 捕获 usage 数据
-          if (parsed.type === 'data' && parsed.data.response?.usageMetadata) {
-            totalUsage = parsed.data.response.usageMetadata
-            logger.debug('📊 Captured Gemini usage data:', totalUsage)
-          }
-
-          // 转换格式并发送
-          if (!res.destroyed) {
-            if (parsed.type === 'data') {
-              // 转换格式：移除 response 包装，直接返回标准 Gemini API 格式
-              if (parsed.data.response) {
-                res.write(`data: ${JSON.stringify(parsed.data.response)}\n\n`)
-              } else {
-                res.write(`data: ${JSON.stringify(parsed.data)}\n\n`)
-              }
-            } else if (parsed.type === 'control') {
-              // 保持控制消息（如 [DONE]）原样
-              res.write(`${parsed.line}\n\n`)
+        // 2️⃣ 异步提取 usage 数据（不阻塞转发）
+        // 使用 setImmediate 将解析放到下一个事件循环
+        setImmediate(() => {
+          try {
+            const chunkStr = chunk.toString()
+            if (!chunkStr.trim()) {
+              return
             }
+
+            // 快速检查是否包含 usage 数据（避免不必要的解析）
+            if (!chunkStr.includes('usageMetadata')) {
+              return
+            }
+
+            // 处理不完整的行
+            streamBuffer += chunkStr
+            const lines = streamBuffer.split('\n')
+            streamBuffer = lines.pop() || ''
+
+            // 仅解析包含 usage 的行
+            for (const line of lines) {
+              if (!line.trim() || !line.includes('usageMetadata')) {
+                continue
+              }
+
+              try {
+                const parsed = parseSSELine(line)
+                if (parsed.type === 'data' && parsed.data.response?.usageMetadata) {
+                  totalUsage = parsed.data.response.usageMetadata
+                  logger.debug('📊 Captured Gemini usage data:', totalUsage)
+                }
+              } catch (parseError) {
+                // 解析失败但不影响转发
+                logger.warn('⚠️ Failed to parse usage line:', parseError.message)
+              }
+            }
+          } catch (error) {
+            // 提取失败但不影响转发
+            logger.warn('⚠️ Error extracting usage data:', error.message)
           }
-        }
+        })
       } catch (error) {
         logger.error('Error processing stream chunk:', error)
+        // 不中断流，继续处理后续数据
       }
     })
 
-    streamResponse.on('end', async () => {
+    streamResponse.on('end', () => {
       logger.info('Stream completed successfully')
 
-      // 记录使用统计
+      // 清理心跳定时器
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer)
+        heartbeatTimer = null
+      }
+
+      // 立即结束响应，不阻塞
+      res.end()
+
+      // 异步记录使用统计（不阻塞响应）
       if (totalUsage.totalTokenCount > 0) {
-        try {
-          await apiKeyService.recordUsage(
+        apiKeyService
+          .recordUsage(
             req.apiKey.id,
             totalUsage.promptTokenCount || 0,
             totalUsage.candidatesTokenCount || 0,
@@ -588,24 +614,32 @@ async function handleStandardStreamGenerateContent(req, res) {
             model,
             account.id
           )
-          logger.info(
-            `📊 Recorded Gemini stream usage - Input: ${totalUsage.promptTokenCount}, Output: ${totalUsage.candidatesTokenCount}, Total: ${totalUsage.totalTokenCount}`
-          )
-        } catch (error) {
-          logger.error('Failed to record Gemini usage:', error)
-        }
+          .then(() => {
+            logger.info(
+              `📊 Recorded Gemini stream usage - Input: ${totalUsage.promptTokenCount}, Output: ${totalUsage.candidatesTokenCount}, Total: ${totalUsage.totalTokenCount}`
+            )
+          })
+          .catch((error) => {
+            logger.error('Failed to record Gemini usage:', error)
+          })
       } else {
         logger.warn(
           `⚠️ Stream completed without usage data - totalTokenCount: ${totalUsage.totalTokenCount}`
         )
       }
-
-      res.end()
     })
 
     streamResponse.on('error', (error) => {
       logger.error('Stream error:', error)
+
+      // 清理心跳定时器
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer)
+        heartbeatTimer = null
+      }
+
       if (!res.headersSent) {
+        // 如果还没发送响应头，可以返回正常的错误响应
         res.status(500).json({
           error: {
             message: error.message || 'Stream error',
@@ -613,6 +647,27 @@ async function handleStandardStreamGenerateContent(req, res) {
           }
         })
       } else {
+        // 如果已经开始流式传输，发送 SSE 格式的错误事件和结束标记
+        // 这样客户端可以正确识别流的结束，避免 "Premature close" 错误
+        if (!res.destroyed) {
+          try {
+            // 发送错误事件（SSE 格式）
+            res.write(
+              `data: ${JSON.stringify({
+                error: {
+                  message: error.message || 'Stream error',
+                  type: 'stream_error',
+                  code: error.code
+                }
+              })}\n\n`
+            )
+
+            // 发送 SSE 结束标记
+            res.write('data: [DONE]\n\n')
+          } catch (writeError) {
+            logger.error('Error sending error event:', writeError)
+          }
+        }
         res.end()
       }
     })
