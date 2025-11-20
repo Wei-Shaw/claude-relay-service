@@ -16,6 +16,7 @@ const cacheMonitor = require('./utils/cacheMonitor')
 const apiRoutes = require('./routes/api')
 const unifiedRoutes = require('./routes/unified')
 const adminRoutes = require('./routes/admin')
+const adminExtensionsRoutes = require('./routes/adminExtensions')
 const webRoutes = require('./routes/web')
 const apiStatsRoutes = require('./routes/apiStats')
 const geminiRoutes = require('./routes/geminiRoutes')
@@ -259,6 +260,7 @@ class Application {
       this.app.use('/api', apiRoutes)
       this.app.use('/api', unifiedRoutes) // 统一智能路由（支持 /v1/chat/completions 等）
       this.app.use('/claude', apiRoutes) // /claude 路由别名，与 /api 功能相同
+      this.app.use('/admin', adminExtensionsRoutes)
       this.app.use('/admin', adminRoutes)
       this.app.use('/users', userRoutes)
       // 使用 web 路由（包含 auth 和页面重定向）
