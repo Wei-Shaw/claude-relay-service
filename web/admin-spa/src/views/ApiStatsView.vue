@@ -285,7 +285,7 @@ watch(apiKey, (newValue) => {
 <style scoped>
 /* 渐变背景 */
 .gradient-bg {
-  background: linear-gradient(135deg, #B31B1B 0%, #8C1515 50%, #E4002B 100%);
+  background: linear-gradient(135deg, #b31b1b 0%, #8c1515 50%, #e4002b 100%);
   background-attachment: fixed;
   min-height: 100vh;
   position: relative;
@@ -353,7 +353,7 @@ watch(apiKey, (newValue) => {
 
 /* 标题渐变 */
 .header-title {
-  background: linear-gradient(135deg, #B31B1B 0%, #8C1515 100%);
+  background: linear-gradient(135deg, #b31b1b 0%, #8c1515 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -430,7 +430,7 @@ watch(apiKey, (newValue) => {
 
 /* 管理后台按钮 - 精致版本 */
 .admin-button-refined {
-  background: linear-gradient(135deg, #B31B1B 0%, #8C1515 100%);
+  background: linear-gradient(135deg, #b31b1b 0%, #8c1515 100%);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.3);
   color: white;
@@ -460,14 +460,14 @@ watch(apiKey, (newValue) => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, #8C1515 0%, #B31B1B 100%);
+  background: linear-gradient(135deg, #8c1515 0%, #b31b1b 100%);
   opacity: 0;
   transition: opacity 0.3s ease;
 }
 
 .admin-button-refined:hover {
   transform: translateY(-2px) scale(1.02);
-  background: linear-gradient(135deg, #8C1515 0%, #B31B1B 100%);
+  background: linear-gradient(135deg, #8c1515 0%, #b31b1b 100%);
   box-shadow:
     0 8px 20px rgba(140, 21, 21, 0.35),
     inset 0 1px 1px rgba(255, 255, 255, 0.3);
@@ -481,7 +481,7 @@ watch(apiKey, (newValue) => {
 
 /* 暗色模式下的悬停效果 */
 :global(.dark) .admin-button-refined:hover {
-  background: linear-gradient(135deg, #B31B1B 0%, #8C1515 100%);
+  background: linear-gradient(135deg, #b31b1b 0%, #8c1515 100%);
   border-color: rgba(147, 51, 234, 0.4);
   box-shadow:
     0 8px 20px rgba(179, 27, 27, 0.3),
@@ -513,7 +513,7 @@ watch(apiKey, (newValue) => {
 }
 
 .period-btn.active {
-  background: linear-gradient(135deg, #B31B1B 0%, #8C1515 100%);
+  background: linear-gradient(135deg, #b31b1b 0%, #8c1515 100%);
   color: white;
   box-shadow:
     0 10px 15px -3px rgba(179, 27, 27, 0.3),
@@ -618,7 +618,7 @@ watch(apiKey, (newValue) => {
 
 .tab-pill-button.active {
   background: white;
-  color: #8C1515;
+  color: #8c1515;
   box-shadow:
     0 4px 6px -1px rgba(0, 0, 0, 0.1),
     0 2px 4px -1px rgba(0, 0, 0, 0.06);
