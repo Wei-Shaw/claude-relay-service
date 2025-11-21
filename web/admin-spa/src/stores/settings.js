@@ -6,7 +6,7 @@ import { getOemSettingsApi, updateOemSettingsApi } from '@/utils/http_apis'
 export const useSettingsStore = defineStore('settings', () => {
   // 状态
   const oemSettings = ref({
-    siteName: 'Claude Relay Service',
+    siteName: 'Whoos Solutions API Hub',
     siteIcon: '',
     siteIconData: '',
     showAdminButton: true,
@@ -42,7 +42,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   const resetOemSettings = async () => {
     const defaultSettings = {
-      siteName: 'Claude Relay Service',
+      siteName: 'Whoos Solutions API Hub',
       siteIcon: '',
       siteIconData: '',
       showAdminButton: true,

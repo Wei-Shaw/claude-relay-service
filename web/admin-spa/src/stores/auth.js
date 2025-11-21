@@ -12,7 +12,7 @@ export const useAuthStore = defineStore('auth', () => {
   const loginError = ref('')
   const loginLoading = ref(false)
   const oemSettings = ref({
-    siteName: 'Claude Relay Service',
+    siteName: 'Whoos Solutions API Hub',
     siteIcon: '',
     siteIconData: '',
     faviconData: ''
