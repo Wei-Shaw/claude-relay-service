@@ -1098,7 +1098,7 @@ async function forwardToCodeAssist(client, apiMethod, requestBody, proxyConfig =
 
   // 添加代理配置
   if (proxyAgent) {
-    axiosConfig.httpAgent = proxyAgent
+    // 只设置 httpsAgent，因为目标 URL 是 HTTPS (cloudcode-pa.googleapis.com)
     axiosConfig.httpsAgent = proxyAgent
     axiosConfig.proxy = false
     logger.info(`🌐 Using proxy for ${apiMethod}: ${ProxyHelper.getProxyDescription(proxyConfig)}`)
@@ -1205,7 +1205,7 @@ async function loadCodeAssist(client, projectId = null, proxyConfig = null) {
 
   // 添加代理配置
   if (proxyAgent) {
-    axiosConfig.httpAgent = proxyAgent
+    // 只设置 httpsAgent，因为目标 URL 是 HTTPS (cloudcode-pa.googleapis.com)
     axiosConfig.httpsAgent = proxyAgent
     axiosConfig.proxy = false
     logger.info(
@@ -1414,7 +1414,7 @@ async function countTokens(client, contents, model = 'gemini-2.0-flash-exp', pro
   // 添加代理配置
   const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
   if (proxyAgent) {
-    axiosConfig.httpAgent = proxyAgent
+    // 只设置 httpsAgent，因为目标 URL 是 HTTPS (cloudcode-pa.googleapis.com)
     axiosConfig.httpsAgent = proxyAgent
     axiosConfig.proxy = false
     logger.info(
@@ -1491,7 +1491,7 @@ async function generateContent(
   // 添加代理配置
   const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
   if (proxyAgent) {
-    axiosConfig.httpAgent = proxyAgent
+    // 只设置 httpsAgent，因为目标 URL 是 HTTPS (cloudcode-pa.googleapis.com)
     axiosConfig.httpsAgent = proxyAgent
     axiosConfig.proxy = false
     logger.info(
@@ -1500,7 +1500,6 @@ async function generateContent(
   } else {
     // 没有代理时，使用 keepAlive agent 防止长时间请求被中断
     axiosConfig.httpsAgent = keepAliveAgent
-    axiosConfig.httpAgent = keepAliveAgent
     logger.debug('🌐 Using keepAlive agent for Gemini generateContent')
   }
 
@@ -1570,7 +1569,8 @@ async function generateContentStream(
   // 添加代理配置
   const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
   if (proxyAgent) {
-    axiosConfig.httpAgent = proxyAgent
+    // 只设置 httpsAgent，因为目标 URL 是 HTTPS (cloudcode-pa.googleapis.com)
+    // 同时设置 httpAgent 和 httpsAgent 可能导致 axios/follow-redirects 选择错误的协议
     axiosConfig.httpsAgent = proxyAgent
     axiosConfig.proxy = false
     logger.info(
@@ -1579,7 +1579,6 @@ async function generateContentStream(
   } else {
     // 没有代理时，使用 keepAlive agent 防止长时间流式请求被中断
     axiosConfig.httpsAgent = keepAliveAgent
-    axiosConfig.httpAgent = keepAliveAgent
     logger.debug('🌐 Using keepAlive agent for Gemini streamGenerateContent')
   }
 
