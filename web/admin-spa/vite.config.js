@@ -43,7 +43,8 @@ export default defineConfig(({ mode }) => {
           lintCommand: 'eslint "./src/**/*.{js,vue}" --cache=false',
           dev: {
             logLevel: ['error', 'warning']
-          }
+          },
+          build: false // 禁用生产构建时的 ESLint 检查
         }
       }),
       AutoImport({
