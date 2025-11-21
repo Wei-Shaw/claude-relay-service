@@ -698,7 +698,10 @@
           </div>
         </div>
 
-        <div v-if="requestLogsLoading" class="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+        <div
+          v-if="requestLogsLoading"
+          class="py-8 text-center text-sm text-gray-500 dark:text-gray-400"
+        >
           正在加载请求日志...
         </div>
         <div
@@ -709,7 +712,9 @@
         </div>
         <div v-else class="overflow-auto">
           <table class="min-w-full">
-            <thead class="sticky top-0 bg-gray-50 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+            <thead
+              class="sticky top-0 bg-gray-50 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+            >
               <tr>
                 <th class="px-3 py-2 text-left">时间</th>
                 <th class="px-3 py-2 text-left">API Key</th>
@@ -721,7 +726,11 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200 text-xs dark:divide-gray-700">
-              <tr v-for="log in requestLogs" :key="`${log.timestamp}-${log.keyId || ''}-${log.model || ''}`" class="hover:bg-gray-50 dark:hover:bg-gray-800/60">
+              <tr
+                v-for="log in requestLogs"
+                :key="`${log.timestamp}-${log.keyId || ''}-${log.model || ''}`"
+                class="hover:bg-gray-50 dark:hover:bg-gray-800/60"
+              >
                 <td class="whitespace-nowrap px-3 py-2 text-gray-700 dark:text-gray-200">
                   {{ formatDateTime(log.timestamp) }}
                 </td>
@@ -729,7 +738,7 @@
                   <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
                     {{ getKeyLabel(log) }}
                   </div>
-                  <div class="text-[11px] text-gray-500 dark:text-gray-400" v-if="log.keyId">
+                  <div v-if="log.keyId" class="text-[11px] text-gray-500 dark:text-gray-400">
                     {{ log.keyId }}
                   </div>
                 </td>
@@ -737,7 +746,7 @@
                   <div class="font-medium text-gray-900 dark:text-gray-100">
                     {{ log.model || 'unknown' }}
                   </div>
-                  <div class="text-[11px] text-gray-500 dark:text-gray-400" v-if="log.accountType">
+                  <div v-if="log.accountType" class="text-[11px] text-gray-500 dark:text-gray-400">
                     来源: {{ log.accountType }}
                   </div>
                 </td>
@@ -746,9 +755,11 @@
                     {{ formatNumber(log.totalTokens || 0) }}
                   </div>
                   <div class="text-[11px] text-gray-500 dark:text-gray-400">
-                    in {{ formatNumber(log.inputTokens || 0) }} / out {{ formatNumber(log.outputTokens || 0) }}
+                    in {{ formatNumber(log.inputTokens || 0) }} / out
+                    {{ formatNumber(log.outputTokens || 0) }}
                     <span v-if="log.cacheCreateTokens || log.cacheReadTokens">
-                      / cache {{ formatNumber((log.cacheCreateTokens || 0) + (log.cacheReadTokens || 0)) }}
+                      / cache
+                      {{ formatNumber((log.cacheCreateTokens || 0) + (log.cacheReadTokens || 0)) }}
                     </span>
                   </div>
                 </td>
@@ -779,10 +790,19 @@
                       v-if="log.ephemeral5mTokens > 0 || log.ephemeral1hTokens > 0"
                       class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
                     >
-                      短缓存 {{ formatNumber((log.ephemeral5mTokens || 0) + (log.ephemeral1hTokens || 0)) }}
+                      短缓存
+                      {{
+                        formatNumber((log.ephemeral5mTokens || 0) + (log.ephemeral1hTokens || 0))
+                      }}
                     </span>
                     <span
-                      v-if="!log.isLongContext && !log.cacheCreateTokens && !log.cacheReadTokens && !log.ephemeral5mTokens && !log.ephemeral1hTokens"
+                      v-if="
+                        !log.isLongContext &&
+                        !log.cacheCreateTokens &&
+                        !log.cacheReadTokens &&
+                        !log.ephemeral5mTokens &&
+                        !log.ephemeral1hTokens
+                      "
                       class="text-[11px] text-gray-500 dark:text-gray-400"
                       >--</span
                     >

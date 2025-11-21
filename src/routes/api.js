@@ -227,7 +227,21 @@ async function handleMessagesRequest(req, res) {
               }
 
               apiKeyService
-                .recordUsageWithDetails(req.apiKey.id, usageObject, model, usageAccountId, 'claude')
+                .recordUsageWithDetails(
+                  req.apiKey.id,
+                  usageObject,
+                  model,
+                  usageAccountId,
+                  'claude',
+                  {
+                    requestBody: req.body,
+                    requestHeaders: req.headers,
+                    path: req.originalUrl,
+                    url: req.originalUrl,
+                    method: req.method,
+                    clientIp: req.ip
+                  }
+                )
                 .catch((error) => {
                   logger.error('❌ Failed to record stream usage:', error)
                 })
@@ -317,7 +331,15 @@ async function handleMessagesRequest(req, res) {
                   usageObject,
                   model,
                   usageAccountId,
-                  'claude-console'
+                  'claude-console',
+                  {
+                    requestBody: req.body,
+                    requestHeaders: req.headers,
+                    path: req.originalUrl,
+                    url: req.originalUrl,
+                    method: req.method,
+                    clientIp: req.ip
+                  }
                 )
                 .catch((error) => {
                   logger.error('❌ Failed to record stream usage:', error)
@@ -453,7 +475,14 @@ async function handleMessagesRequest(req, res) {
               }
 
               apiKeyService
-                .recordUsageWithDetails(req.apiKey.id, usageObject, model, usageAccountId, 'ccr')
+                .recordUsageWithDetails(req.apiKey.id, usageObject, model, usageAccountId, 'ccr', {
+                  requestBody: req.body,
+                  requestHeaders: req.headers,
+                  path: req.originalUrl,
+                  url: req.originalUrl,
+                  method: req.method,
+                  clientIp: req.ip
+                })
                 .catch((error) => {
                   logger.error('❌ Failed to record CCR stream usage:', error)
                 })

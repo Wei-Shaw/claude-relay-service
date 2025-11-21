@@ -110,8 +110,19 @@ class ApiClient {
     // 处理查询参数
     let fullUrl = createApiUrl(url)
     if (options.params) {
-      const params = new URLSearchParams(options.params)
-      fullUrl += '?' + params.toString()
+      // 过滤掉 undefined/null/空字符串，避免传递 "undefined" 等无效值
+      const cleanedParams = Object.entries(options.params).reduce((acc, [key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          acc[key] = value
+        }
+        return acc
+      }, {})
+
+      const params = new URLSearchParams(cleanedParams)
+      const queryString = params.toString()
+      if (queryString) {
+        fullUrl += '?' + queryString
+      }
     }
 
     // 移除 params 避免传递给 fetch

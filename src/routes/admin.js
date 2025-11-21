@@ -5065,21 +5065,31 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
 // 获取最近请求日志
 router.get('/request-logs', authenticateAdmin, async (req, res) => {
   try {
-    const {
-      page = 1,
-      pageSize = 100,
-      keyId,
-      model,
-      accountId,
-      accountType,
-      groupBy
-    } = req.query
+    const { page = 1, pageSize = 100, keyId, model, accountId, accountType, groupBy } = req.query
+
+    // 统一处理 undefined/null/空字符串，避免 "undefined" 被当成真实 keyId
+    const normalizeParam = (value) => {
+      if (value === undefined || value === null) {
+        return undefined
+      }
+      const str = String(value).trim()
+      if (str === '' || str === 'undefined' || str === 'null') {
+        return undefined
+      }
+      return str
+    }
+
+    const safeKeyId = normalizeParam(keyId)
+    const safeModel = normalizeParam(model)
+    const safeAccountId = normalizeParam(accountId)
+    const safeAccountType = normalizeParam(accountType)
+    const safeGroupBy = normalizeParam(groupBy)
 
     const safePage = Math.max(1, parseInt(page, 10) || 1)
     const safePageSize = Math.max(1, Math.min(parseInt(pageSize, 10) || 100, 1000))
     const offset = (safePage - 1) * safePageSize
 
-    const listKey = keyId ? `usage:records:${keyId}` : 'usage:records:global'
+    const listKey = safeKeyId ? `usage:records:${safeKeyId}` : 'usage:records:global'
 
     // 先按分页读取
     const paged = await redis.getUsageRecordsPaginated({ listKey, offset, limit: safePageSize })
@@ -5092,13 +5102,16 @@ router.get('/request-logs', authenticateAdmin, async (req, res) => {
 
     // 过滤
     const filtered = allRecords.filter((item) => {
-      if (model && !(item.model || '').toLowerCase().includes(String(model).toLowerCase())) {
+      if (safeModel && !(item.model || '').toLowerCase().includes(safeModel.toLowerCase())) {
         return false
       }
-      if (accountId && item.accountId !== accountId) {
+      if (safeAccountId && item.accountId !== safeAccountId) {
         return false
       }
-      if (accountType && String(item.accountType || '').toLowerCase() !== String(accountType).toLowerCase()) {
+      if (
+        safeAccountType &&
+        String(item.accountType || '').toLowerCase() !== safeAccountType.toLowerCase()
+      ) {
         return false
       }
       return true
@@ -5108,16 +5121,16 @@ router.get('/request-logs', authenticateAdmin, async (req, res) => {
     records = filtered.slice(offset, offset + safePageSize)
 
     // 追加API Key名称（仅单key查询才补，因为全局已随记录保存）
-    if (keyId) {
-      const keyData = await redis.getApiKey(keyId)
+    if (safeKeyId) {
+      const keyData = await redis.getApiKey(safeKeyId)
       if (keyData && Object.keys(keyData).length > 0) {
-        records = records.map((item) => ({ keyId, apiKeyName: keyData.name, ...item }))
+        records = records.map((item) => ({ keyId: safeKeyId, apiKeyName: keyData.name, ...item }))
       }
     }
 
     // 聚合
     const groups = []
-    if (groupBy === 'key' || groupBy === 'model' || groupBy === 'account') {
+    if (safeGroupBy === 'key' || safeGroupBy === 'model' || safeGroupBy === 'account') {
       const aggregator = new Map()
 
       const addGroup = (key, label, rec) => {
@@ -5129,14 +5142,14 @@ router.get('/request-logs', authenticateAdmin, async (req, res) => {
       }
 
       for (const rec of filtered) {
-        if (groupBy === 'key') {
+        if (safeGroupBy === 'key') {
           const gKey = rec.keyId || rec.apiKeyId || 'unknown'
           const label = rec.apiKeyName || gKey
           addGroup(gKey, label, rec)
-        } else if (groupBy === 'model') {
+        } else if (safeGroupBy === 'model') {
           const gKey = rec.model || 'unknown'
           addGroup(gKey, gKey, rec)
-        } else if (groupBy === 'account') {
+        } else if (safeGroupBy === 'account') {
           const gKey = `${rec.accountType || 'n/a'}:${rec.accountId || 'n/a'}`
           const label = rec.accountId ? `${rec.accountType || 'n/a'} / ${rec.accountId}` : '未关联'
           addGroup(gKey, label, rec)
@@ -5155,7 +5168,7 @@ router.get('/request-logs', authenticateAdmin, async (req, res) => {
       data: records,
       pagination: { page: safePage, pageSize: safePageSize, total },
       groups,
-      groupBy: groupBy || 'none'
+      groupBy: safeGroupBy || 'none'
     })
   } catch (error) {
     logger.error('❌ Failed to get request logs:', error)

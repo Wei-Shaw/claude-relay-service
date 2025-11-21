@@ -1042,9 +1042,27 @@ class ApiKeyService {
     usageObject,
     model = 'unknown',
     accountId = null,
-    accountType = null
+    accountType = null,
+    meta = {}
   ) {
     try {
+      // 将任意对象安全序列化并截断，避免日志过大
+      const safeStringify = (data, maxLen = 20000) => {
+        if (data === undefined || data === null) {
+          return undefined
+        }
+        try {
+          const str = typeof data === 'string' ? data : JSON.stringify(data)
+          if (str.length > maxLen) {
+            return `${str.slice(0, maxLen)}...<truncated>`
+          }
+          return str
+        } catch (err) {
+          logger.warn('⚠️ Failed to stringify meta field for usage log:', err)
+          return '[unserializable]'
+        }
+      }
+
       // 提取 token 数量
       const inputTokens = usageObject.input_tokens || 0
       const outputTokens = usageObject.output_tokens || 0
@@ -1187,6 +1205,25 @@ class ApiKeyService {
         }
       }
 
+      // 获取当前总用量以计算剩余额度（如果配置了 tokenLimit）
+      let remainingTokens = null
+      let totalTokensSoFar = null
+      try {
+        const usageStats = await this.getUsageStats(keyId)
+        if (usageStats && usageStats.total && typeof usageStats.total.allTokens === 'number') {
+          totalTokensSoFar = usageStats.total.allTokens
+        }
+      } catch (statsError) {
+        logger.warn(`⚠️ Failed to load usage stats for key ${keyId}:`, statsError)
+      }
+
+      if (keyData && keyData.tokenLimit) {
+        const limit = Number(keyData.tokenLimit) || 0
+        if (limit > 0 && totalTokensSoFar !== null) {
+          remainingTokens = Math.max(0, limit - totalTokensSoFar)
+        }
+      }
+
       const usageRecord = {
         timestamp: new Date().toISOString(),
         model,
@@ -1208,14 +1245,34 @@ class ApiKeyService {
           ephemeral5m: costInfo.ephemeral5mCost || 0,
           ephemeral1h: costInfo.ephemeral1hCost || 0
         },
-        isLongContext: costInfo.isLongContextRequest || false
+        isLongContext: costInfo.isLongContextRequest || false,
+        // 变化额度与剩余额度（按 tokens 和 cost）
+        deltaTokens: totalTokens,
+        deltaCost: Number((costInfo.totalCost || 0).toFixed(6)),
+        tokenLimit: keyData?.tokenLimit ? Number(keyData.tokenLimit) || 0 : null,
+        totalTokensSoFar,
+        remainingTokens,
+        // 新增：丰富的请求/响应上下文，便于审计
+        requestBody: safeStringify(meta.requestBody),
+        responseBody: safeStringify(meta.responseBody),
+        requestHeaders: safeStringify(meta.requestHeaders),
+        responseHeaders: safeStringify(meta.responseHeaders),
+        path: meta.path,
+        url: meta.url,
+        method: meta.method,
+        statusCode: meta.statusCode,
+        latencyMs: meta.latencyMs,
+        clientIp: meta.clientIp,
+        requestQuery: safeStringify(meta.requestQuery),
+        rawUsage: safeStringify(usageObject)
       }
 
       const usageRecordOptions = {
         extraMeta: {
           apiKeyName: keyData?.name,
           userId: keyData?.userId,
-          ownerType: keyData?.ownerType
+          ownerType: keyData?.ownerType,
+          ...meta.extraMeta
         }
       }
 
