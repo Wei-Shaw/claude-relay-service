@@ -67,6 +67,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
     groupLabel: 'Claude账户'
   })
 
+  const requestLogs = ref([])
+  const requestLogsLoading = ref(false)
+
   // 日期筛选
   const dateFilter = ref({
     type: 'preset', // preset 或 custom
@@ -229,6 +232,30 @@ export const useDashboardStore = defineStore('dashboard', () => {
       console.error('加载仪表板数据失败:', error)
     } finally {
       loading.value = false
+    }
+  }
+
+  async function loadRequestLogs(limit = 30, keyId = null) {
+    requestLogsLoading.value = true
+    try {
+      const params = { limit }
+      if (keyId) {
+        params.keyId = keyId
+      }
+
+      const response = await apiClient.get('/admin/request-logs', { params })
+
+      if (response.success) {
+        requestLogs.value = response.data || []
+      } else {
+        requestLogs.value = []
+        showToast('加载请求日志失败', 'error')
+      }
+    } catch (error) {
+      console.error('加载请求日志失败:', error)
+      showToast('加载请求日志失败', 'error')
+    } finally {
+      requestLogsLoading.value = false
     }
   }
 
@@ -880,6 +907,8 @@ export const useDashboardStore = defineStore('dashboard', () => {
     dashboardModelStats,
     apiKeysTrendData,
     accountUsageTrendData,
+    requestLogs,
+    requestLogsLoading,
     dateFilter,
     trendGranularity,
     apiKeysTrendMetric,
@@ -895,6 +924,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     loadModelStats,
     loadApiKeysTrend,
     loadAccountUsageTrend,
+    loadRequestLogs,
     setDateFilterPreset,
     onCustomDateRangeChange,
     setTrendGranularity,

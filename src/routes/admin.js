@@ -5062,6 +5062,120 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
   }
 })
 
+// 获取最近请求日志
+router.get('/request-logs', authenticateAdmin, async (req, res) => {
+  try {
+    const { page = 1, pageSize = 100, keyId, model, accountId, accountType, groupBy } = req.query
+
+    // 统一处理 undefined/null/空字符串，避免 "undefined" 被当成真实 keyId
+    const normalizeParam = (value) => {
+      if (value === undefined || value === null) {
+        return undefined
+      }
+      const str = String(value).trim()
+      if (str === '' || str === 'undefined' || str === 'null') {
+        return undefined
+      }
+      return str
+    }
+
+    const safeKeyId = normalizeParam(keyId)
+    const safeModel = normalizeParam(model)
+    const safeAccountId = normalizeParam(accountId)
+    const safeAccountType = normalizeParam(accountType)
+    const safeGroupBy = normalizeParam(groupBy)
+
+    const safePage = Math.max(1, parseInt(page, 10) || 1)
+    const safePageSize = Math.max(1, Math.min(parseInt(pageSize, 10) || 100, 1000))
+    const offset = (safePage - 1) * safePageSize
+
+    const listKey = safeKeyId ? `usage:records:${safeKeyId}` : 'usage:records:global'
+
+    // 先按分页读取
+    const paged = await redis.getUsageRecordsPaginated({ listKey, offset, limit: safePageSize })
+
+    let records = paged.records || []
+    let total = paged.total || records.length
+
+    // 获取更多数据用于过滤/聚合（最多 10k），保证筛选准确
+    const allRecords = await redis.getRecentUsageRecords(10000, listKey)
+
+    // 过滤
+    const filtered = allRecords.filter((item) => {
+      if (safeModel && !(item.model || '').toLowerCase().includes(safeModel.toLowerCase())) {
+        return false
+      }
+      if (safeAccountId && item.accountId !== safeAccountId) {
+        return false
+      }
+      if (
+        safeAccountType &&
+        String(item.accountType || '').toLowerCase() !== safeAccountType.toLowerCase()
+      ) {
+        return false
+      }
+      return true
+    })
+
+    total = filtered.length
+    records = filtered.slice(offset, offset + safePageSize)
+
+    // 追加API Key名称（仅单key查询才补，因为全局已随记录保存）
+    if (safeKeyId) {
+      const keyData = await redis.getApiKey(safeKeyId)
+      if (keyData && Object.keys(keyData).length > 0) {
+        records = records.map((item) => ({ keyId: safeKeyId, apiKeyName: keyData.name, ...item }))
+      }
+    }
+
+    // 聚合
+    const groups = []
+    if (safeGroupBy === 'key' || safeGroupBy === 'model' || safeGroupBy === 'account') {
+      const aggregator = new Map()
+
+      const addGroup = (key, label, rec) => {
+        const exists = aggregator.get(key) || { key, label, count: 0, tokens: 0, cost: 0 }
+        exists.count += 1
+        exists.tokens += Number(rec.totalTokens || 0)
+        exists.cost += Number(rec.cost || 0)
+        aggregator.set(key, exists)
+      }
+
+      for (const rec of filtered) {
+        if (safeGroupBy === 'key') {
+          const gKey = rec.keyId || rec.apiKeyId || 'unknown'
+          const label = rec.apiKeyName || gKey
+          addGroup(gKey, label, rec)
+        } else if (safeGroupBy === 'model') {
+          const gKey = rec.model || 'unknown'
+          addGroup(gKey, gKey, rec)
+        } else if (safeGroupBy === 'account') {
+          const gKey = `${rec.accountType || 'n/a'}:${rec.accountId || 'n/a'}`
+          const label = rec.accountId ? `${rec.accountType || 'n/a'} / ${rec.accountId}` : '未关联'
+          addGroup(gKey, label, rec)
+        }
+      }
+
+      // 按费用降序，取前 50 方便前端展示
+      aggregator.forEach((value) => {
+        groups.push(value)
+      })
+      groups.sort((a, b) => b.cost - a.cost).splice(50)
+    }
+
+    return res.json({
+      success: true,
+      data: records,
+      pagination: { page: safePage, pageSize: safePageSize, total },
+      groups,
+      groupBy: safeGroupBy || 'none'
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get request logs:', error)
+    return res.status(500).json({ error: 'Failed to get request logs', message: error.message })
+  }
+})
+
 // 获取使用统计
 router.get('/usage-stats', authenticateAdmin, async (req, res) => {
   try {

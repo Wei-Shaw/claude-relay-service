@@ -10,6 +10,7 @@ const UserDashboardView = () => import('@/views/UserDashboardView.vue')
 const UserManagementView = () => import('@/views/UserManagementView.vue')
 const MainLayout = () => import('@/components/layout/MainLayout.vue')
 const DashboardView = () => import('@/views/DashboardView.vue')
+const LogsView = () => import('@/views/LogsView.vue')
 const ApiKeysView = () => import('@/views/ApiKeysView.vue')
 const AccountsView = () => import('@/views/AccountsView.vue')
 const TutorialView = () => import('@/views/TutorialView.vue')
@@ -70,6 +71,18 @@ const routes = [
         path: '',
         name: 'Dashboard',
         component: DashboardView
+      }
+    ]
+  },
+  {
+    path: '/logs',
+    component: MainLayout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'Logs',
+        component: LogsView
       }
     ]
   },
