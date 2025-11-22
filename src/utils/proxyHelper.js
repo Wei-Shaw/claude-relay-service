@@ -8,6 +8,9 @@ const config = require('../../config/config')
  * 支持 SOCKS5 和 HTTP/HTTPS 代理，可配置 IPv4/IPv6
  */
 class ProxyHelper {
+  // 缓存代理 Agent，避免重复创建浪费连接
+  static _agentCache = new Map()
+
   /**
    * 创建代理 Agent
    * @param {object|string|null} proxyConfig - 代理配置对象或 JSON 字符串
@@ -33,34 +36,91 @@ class ProxyHelper {
       // 获取 IPv4/IPv6 配置
       const useIPv4 = ProxyHelper._getIPFamilyPreference(options.useIPv4)
 
+      // 配置连接池与 Keep-Alive
+      const proxySettings = config.proxy || {}
+      const agentCommonOptions = {}
+
+      if (typeof proxySettings.keepAlive === 'boolean') {
+        agentCommonOptions.keepAlive = proxySettings.keepAlive
+      }
+
+      if (
+        typeof proxySettings.maxSockets === 'number' &&
+        Number.isFinite(proxySettings.maxSockets) &&
+        proxySettings.maxSockets > 0
+      ) {
+        agentCommonOptions.maxSockets = proxySettings.maxSockets
+      }
+
+      if (
+        typeof proxySettings.maxFreeSockets === 'number' &&
+        Number.isFinite(proxySettings.maxFreeSockets) &&
+        proxySettings.maxFreeSockets >= 0
+      ) {
+        agentCommonOptions.maxFreeSockets = proxySettings.maxFreeSockets
+      }
+
+      if (
+        typeof proxySettings.timeout === 'number' &&
+        Number.isFinite(proxySettings.timeout) &&
+        proxySettings.timeout > 0
+      ) {
+        agentCommonOptions.timeout = proxySettings.timeout
+      }
+
+      // 缓存键：保证相同配置的代理可复用
+      const cacheKey = JSON.stringify({
+        type: proxy.type,
+        host: proxy.host,
+        port: proxy.port,
+        username: proxy.username,
+        password: proxy.password,
+        family: useIPv4,
+        keepAlive: agentCommonOptions.keepAlive,
+        maxSockets: agentCommonOptions.maxSockets,
+        maxFreeSockets: agentCommonOptions.maxFreeSockets,
+        timeout: agentCommonOptions.timeout
+      })
+
+      if (ProxyHelper._agentCache.has(cacheKey)) {
+        return ProxyHelper._agentCache.get(cacheKey)
+      }
+
       // 构建认证信息
       const auth = proxy.username && proxy.password ? `${proxy.username}:${proxy.password}@` : ''
+      let agent = null
 
       // 根据代理类型创建 Agent
       if (proxy.type === 'socks5') {
         const socksUrl = `socks5h://${auth}${proxy.host}:${proxy.port}`
-        const socksOptions = {}
+        const socksOptions = { ...agentCommonOptions }
 
         // 设置 IP 协议族（如果指定）
         if (useIPv4 !== null) {
           socksOptions.family = useIPv4 ? 4 : 6
         }
 
-        return new SocksProxyAgent(socksUrl, socksOptions)
+        agent = new SocksProxyAgent(socksUrl, socksOptions)
       } else if (proxy.type === 'http' || proxy.type === 'https') {
         const proxyUrl = `${proxy.type}://${auth}${proxy.host}:${proxy.port}`
-        const httpOptions = {}
+        const httpOptions = { ...agentCommonOptions }
 
         // HttpsProxyAgent 支持 family 参数（通过底层的 agent-base）
         if (useIPv4 !== null) {
           httpOptions.family = useIPv4 ? 4 : 6
         }
 
-        return new HttpsProxyAgent(proxyUrl, httpOptions)
+        agent = new HttpsProxyAgent(proxyUrl, httpOptions)
       } else {
         logger.warn(`⚠️ Unsupported proxy type: ${proxy.type}`)
         return null
       }
+
+      if (agent) {
+        ProxyHelper._agentCache.set(cacheKey, agent)
+      }
+
+      return agent
     } catch (error) {
       logger.warn('⚠️ Failed to create proxy agent:', error.message)
       return null
