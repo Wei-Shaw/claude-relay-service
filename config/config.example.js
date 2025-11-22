@@ -73,6 +73,30 @@ const config = {
   proxy: {
     timeout: parseInt(process.env.DEFAULT_PROXY_TIMEOUT) || 600000, // 10分钟
     maxRetries: parseInt(process.env.MAX_PROXY_RETRIES) || 3,
+    // 连接池与 Keep-Alive 配置（默认关闭，需要显式开启）
+    keepAlive: (() => {
+      if (process.env.PROXY_KEEP_ALIVE === undefined || process.env.PROXY_KEEP_ALIVE === '') {
+        return false
+      }
+      return process.env.PROXY_KEEP_ALIVE === 'true'
+    })(),
+    maxSockets: (() => {
+      if (process.env.PROXY_MAX_SOCKETS === undefined || process.env.PROXY_MAX_SOCKETS === '') {
+        return undefined
+      }
+      const parsed = parseInt(process.env.PROXY_MAX_SOCKETS)
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
+    })(),
+    maxFreeSockets: (() => {
+      if (
+        process.env.PROXY_MAX_FREE_SOCKETS === undefined ||
+        process.env.PROXY_MAX_FREE_SOCKETS === ''
+      ) {
+        return undefined
+      }
+      const parsed = parseInt(process.env.PROXY_MAX_FREE_SOCKETS)
+      return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined
+    })(),
     // IP协议族配置：true=IPv4, false=IPv6, 默认IPv4（兼容性更好）
     useIPv4: process.env.PROXY_USE_IPV4 !== 'false' // 默认 true，只有明确设置为 'false' 才使用 IPv6
   },
