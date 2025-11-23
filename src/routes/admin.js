@@ -5842,16 +5842,32 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
         })
       ]
     } else if (group === 'gemini') {
-      const geminiAccounts = await geminiAccountService.getAllAccounts()
-      accounts = geminiAccounts.map((account) => {
-        const id = String(account.id || '')
-        const shortId = id ? id.slice(0, 8) : '未知'
-        return {
-          id,
-          name: account.name || account.email || `Gemini账号 ${shortId}`,
-          platform: 'gemini'
-        }
-      })
+      const geminiApiAccountService = require('../services/geminiApiAccountService')
+      const [geminiAccounts, geminiApiAccounts] = await Promise.all([
+        geminiAccountService.getAllAccounts(),
+        geminiApiAccountService.getAllAccounts(true)
+      ])
+
+      accounts = [
+        ...geminiAccounts.map((account) => {
+          const id = String(account.id || '')
+          const shortId = id ? id.slice(0, 8) : '未知'
+          return {
+            id,
+            name: account.name || account.email || `Gemini账号 ${shortId}`,
+            platform: 'gemini'
+          }
+        }),
+        ...geminiApiAccounts.map((account) => {
+          const id = String(account.id || '')
+          const shortId = id ? id.slice(0, 8) : '未知'
+          return {
+            id,
+            name: account.name || `Gemini-API账号 ${shortId}`,
+            platform: 'gemini-api'
+          }
+        })
+      ]
     } else if (group === 'droid') {
       const droidAccounts = await droidAccountService.getAllAccounts()
       accounts = droidAccounts.map((account) => {

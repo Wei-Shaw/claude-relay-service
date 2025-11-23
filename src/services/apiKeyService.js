@@ -11,6 +11,7 @@ const ACCOUNT_TYPE_CONFIG = {
   'openai-responses': { prefix: 'openai_responses_account:' },
   'azure-openai': { prefix: 'azure_openai:account:' },
   gemini: { prefix: 'gemini_account:' },
+  'gemini-api': { prefix: 'gemini_api_account:' },
   droid: { prefix: 'droid:account:' }
 }
 
@@ -21,6 +22,7 @@ const ACCOUNT_TYPE_PRIORITY = [
   'claude',
   'claude-console',
   'gemini',
+  'gemini-api',
   'droid'
 ]
 
@@ -31,6 +33,7 @@ const ACCOUNT_CATEGORY_MAP = {
   'openai-responses': 'openai',
   'azure-openai': 'openai',
   gemini: 'gemini',
+  'gemini-api': 'gemini',
   droid: 'droid'
 }
 
@@ -48,6 +51,9 @@ function normalizeAccountTypeKey(type) {
   if (lower === 'azure_openai' || lower === 'azureopenai' || lower === 'azure-openai') {
     return 'azure-openai'
   }
+  if (lower === 'gemini_api' || lower === 'gemini-api') {
+    return 'gemini-api'
+  }
   return lower
 }
 
@@ -57,6 +63,9 @@ function sanitizeAccountIdForType(accountId, accountType) {
   }
   if (accountType === 'openai-responses') {
     return accountId.replace(/^responses:/, '')
+  }
+  if (accountType === 'gemini-api') {
+    return accountId.replace(/^api:/, '')
   }
   return accountId
 }
@@ -1322,6 +1331,9 @@ class ApiKeyService {
       if (typeof rawAccountId === 'string' && rawAccountId.startsWith('responses:')) {
         candidateIds.add(rawAccountId.replace(/^responses:/, ''))
       }
+      if (typeof rawAccountId === 'string' && rawAccountId.startsWith('api:')) {
+        candidateIds.add(rawAccountId.replace(/^api:/, ''))
+      }
     }
 
     if (candidateIds.size === 0) {
@@ -1346,6 +1358,7 @@ class ApiKeyService {
         pushType('azure-openai')
       } else if (lowerModel.includes('gemini')) {
         pushType('gemini')
+        pushType('gemini-api')
       } else if (lowerModel.includes('claude') || lowerModel.includes('anthropic')) {
         pushType('claude')
         pushType('claude-console')

@@ -3814,7 +3814,7 @@ const normalizeFrontendAccountCategory = (type) => {
   ) {
     return 'openai'
   }
-  if (lower === 'gemini') {
+  if (lower === 'gemini' || lower === 'gemini-api' || lower === 'gemini_api') {
     return 'gemini'
   }
   if (lower === 'droid') {
@@ -3843,8 +3843,8 @@ const isLikelyDeletedUsage = (info) => {
 
   const looksLikeUuid = UUID_PATTERN.test(rawId)
   const nameMissingOrSame = !accountName || accountName === rawId
-  const typeUnknown =
-    !accountType || accountType === 'unknown' || ACCOUNT_TYPE_LABELS[accountType] === undefined
+  const normalizedType = normalizeFrontendAccountCategory(accountType)
+  const typeUnknown = !accountType || accountType === 'unknown' || normalizedType === 'other'
 
   return looksLikeUuid && nameMissingOrSame && typeUnknown
 }
