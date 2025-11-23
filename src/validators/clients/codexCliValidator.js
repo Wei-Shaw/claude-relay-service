@@ -42,7 +42,7 @@ class CodexCliValidator {
       // Codex CLI 的 UA 格式:
       // - codex_vscode/0.35.0 (Windows 10.0.26100; x86_64) unknown (Cursor; 0.4.10)
       // - codex_cli_rs/0.38.0 (Ubuntu 22.4.0; x86_64) WindowsTerminal
-      const codexCliPattern = /^(codex_vscode|codex_cli_rs)\/[\d\.]+/i
+      const codexCliPattern = /^(codex_vscode|codex_cli_rs)\/[\d.]+/i
       const uaMatch = userAgent.match(codexCliPattern)
 
       if (!uaMatch) {
