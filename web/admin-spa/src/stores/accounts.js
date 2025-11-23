@@ -374,6 +374,26 @@ export const useAccountsStore = defineStore('accounts', () => {
     }
   }
 
+  // 创建Gemini API账户
+  const createGeminiApiAccount = async (data) => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await apiClient.post('/admin/gemini-api-accounts', data)
+      if (response.success) {
+        await fetchGeminiAccounts()
+        return response.data
+      } else {
+        throw new Error(response.message || '创建Gemini API账户失败')
+      }
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   // 更新Claude账户
   const updateClaudeAccount = async (id, data) => {
     loading.value = true
@@ -505,6 +525,26 @@ export const useAccountsStore = defineStore('accounts', () => {
         return response
       } else {
         throw new Error(response.message || '更新OpenAI-Responses账户失败')
+      }
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 更新Gemini API账户
+  const updateGeminiApiAccount = async (id, data) => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await apiClient.put(`/admin/gemini-api-accounts/${id}`, data)
+      if (response.success) {
+        await fetchGeminiAccounts()
+        return response
+      } else {
+        throw new Error(response.message || '更新Gemini API账户失败')
       }
     } catch (err) {
       error.value = err.message
@@ -858,6 +898,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     updateDroidAccount,
     createAzureOpenAIAccount,
     createOpenAIResponsesAccount,
+    createGeminiApiAccount,
     updateClaudeAccount,
     updateClaudeConsoleAccount,
     updateBedrockAccount,
@@ -865,6 +906,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     updateOpenAIAccount,
     updateAzureOpenAIAccount,
     updateOpenAIResponsesAccount,
+    updateGeminiApiAccount,
     toggleAccount,
     deleteAccount,
     refreshClaudeToken,

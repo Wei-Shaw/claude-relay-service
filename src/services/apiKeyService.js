@@ -1527,7 +1527,15 @@ class ApiKeyService {
         permissions: keyData.permissions,
         dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
         totalCostLimit: parseFloat(keyData.totalCostLimit || 0),
-        droidAccountId: keyData.droidAccountId
+        // 所有平台账户绑定字段
+        claudeAccountId: keyData.claudeAccountId,
+        claudeConsoleAccountId: keyData.claudeConsoleAccountId,
+        geminiAccountId: keyData.geminiAccountId,
+        openaiAccountId: keyData.openaiAccountId,
+        bedrockAccountId: keyData.bedrockAccountId,
+        droidAccountId: keyData.droidAccountId,
+        azureOpenaiAccountId: keyData.azureOpenaiAccountId,
+        ccrAccountId: keyData.ccrAccountId
       }
     } catch (error) {
       logger.error('❌ Failed to get API key by ID:', error)
@@ -1670,6 +1678,7 @@ class ApiKeyService {
         claude: 'claudeAccountId',
         'claude-console': 'claudeConsoleAccountId',
         gemini: 'geminiAccountId',
+        'gemini-api': 'geminiAccountId', // 特殊处理，带 api: 前缀
         openai: 'openaiAccountId',
         'openai-responses': 'openaiAccountId', // 特殊处理，带 responses: 前缀
         azure_openai: 'azureOpenaiAccountId',
@@ -1692,6 +1701,9 @@ class ApiKeyService {
       if (accountType === 'openai-responses') {
         // OpenAI-Responses 特殊处理：查找 openaiAccountId 字段中带 responses: 前缀的
         boundKeys = allKeys.filter((key) => key.openaiAccountId === `responses:${accountId}`)
+      } else if (accountType === 'gemini-api') {
+        // Gemini-API 特殊处理：查找 geminiAccountId 字段中带 api: 前缀的
+        boundKeys = allKeys.filter((key) => key.geminiAccountId === `api:${accountId}`)
       } else {
         // 其他账号类型正常匹配
         boundKeys = allKeys.filter((key) => key[field] === accountId)
@@ -1702,6 +1714,8 @@ class ApiKeyService {
         const updates = {}
         if (accountType === 'openai-responses') {
           updates.openaiAccountId = null
+        } else if (accountType === 'gemini-api') {
+          updates.geminiAccountId = null
         } else if (accountType === 'claude-console') {
           updates.claudeConsoleAccountId = null
         } else {
