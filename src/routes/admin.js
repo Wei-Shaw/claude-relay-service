@@ -4281,6 +4281,48 @@ router.put(
   }
 )
 
+// 重置 Gemini OAuth 账户限流状态
+router.post('/gemini-accounts/:id/reset-rate-limit', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    await geminiAccountService.updateAccount(id, {
+      rateLimitedAt: '',
+      rateLimitStatus: '',
+      status: 'active',
+      errorMessage: ''
+    })
+
+    logger.info(`🔄 Admin manually reset rate limit for Gemini account ${id}`)
+
+    res.json({
+      success: true,
+      message: 'Rate limit reset successfully'
+    })
+  } catch (error) {
+    logger.error('Failed to reset Gemini account rate limit:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// 重置 Gemini OAuth 账户状态（清除所有异常状态）
+router.post('/gemini-accounts/:id/reset-status', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const result = await geminiAccountService.resetAccountStatus(id)
+
+    logger.success(`✅ Admin reset status for Gemini account: ${id}`)
+    return res.json({ success: true, data: result })
+  } catch (error) {
+    logger.error('❌ Failed to reset Gemini account status:', error)
+    return res.status(500).json({ error: 'Failed to reset status', message: error.message })
+  }
+})
+
 // 📊 账户使用统计
 
 // 获取所有账户的使用统计

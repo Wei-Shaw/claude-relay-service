@@ -402,20 +402,20 @@ async function handleStandardGenerateContent(req, res) {
       stack: error.stack
     })
 
-    // 处理速率限制
-    if (error.response?.status === 429 && accountId) {
-      logger.warn(`⚠️ Gemini account ${accountId} rate limited (Standard API), marking as limited`)
-      try {
-        const rateLimitAccountType = isApiAccount ? 'gemini-api' : 'gemini'
-        await unifiedGeminiScheduler.markAccountRateLimited(
-          accountId, // 账户 ID
-          rateLimitAccountType,
-          sessionHash
-        )
-      } catch (limitError) {
-        logger.warn('Failed to mark account as rate limited in scheduler:', limitError)
-      }
-    }
+    // 处理速率限制 暂时去掉此处的标记限流的处理
+    // if (error.response?.status === 429 && accountId) {
+    //   logger.warn(`⚠️ Gemini account ${accountId} rate limited (Standard API), marking as limited`)
+    //   try {
+    //     const rateLimitAccountType = isApiAccount ? 'gemini-api' : 'gemini'
+    //     await unifiedGeminiScheduler.markAccountRateLimited(
+    //       accountId, // 账户 ID
+    //       rateLimitAccountType,
+    //       sessionHash
+    //     )
+    //   } catch (limitError) {
+    //     logger.warn('Failed to mark account as rate limited in scheduler:', limitError)
+    //   }
+    // }
 
     res.status(500).json({
       error: {
