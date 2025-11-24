@@ -25,6 +25,17 @@ jobs:
     - name: Check if version bump is needed
       id: check
       run: |
+        # 检查提交消息是否包含强制发布标记（[force release]）
+        COMMIT_MSG=$(git log -1 --pretty=%B | tr -d '\r')
+        echo "Latest commit message:"
+        echo "$COMMIT_MSG"
+
+        FORCE_RELEASE=false
+        if echo "$COMMIT_MSG" | grep -qi "\[force release\]"; then
+          echo "Detected [force release] marker, forcing version bump"
+          FORCE_RELEASE=true
+        fi
+
         # 检测是否是合并提交
         PARENT_COUNT=$(git rev-list --parents -n 1 HEAD | wc -w)
         PARENT_COUNT=$((PARENT_COUNT - 1))
@@ -72,6 +83,9 @@ jobs:
         # 检查是否是手动触发
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           echo "Manual workflow trigger detected, forcing version bump"
+          echo "needs_bump=true" >> $GITHUB_OUTPUT
+        elif [ "$FORCE_RELEASE" = true ]; then
+          echo "Force release marker detected, forcing version bump"
           echo "needs_bump=true" >> $GITHUB_OUTPUT
         elif [ "$SIGNIFICANT_CHANGES" = true ]; then
           echo "Significant changes detected, version bump needed"

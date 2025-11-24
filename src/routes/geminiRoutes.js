@@ -3,6 +3,7 @@ const router = express.Router()
 const logger = require('../utils/logger')
 const { authenticateApiKey } = require('../middleware/auth')
 const geminiAccountService = require('../services/geminiAccountService')
+const geminiApiAccountService = require('../services/geminiApiAccountService')
 const { sendGeminiRequest, getAvailableModels } = require('../services/geminiRelayService')
 const crypto = require('crypto')
 const sessionHelper = require('../utils/sessionHelper')
@@ -10,6 +11,8 @@ const unifiedGeminiScheduler = require('../services/unifiedGeminiScheduler')
 const apiKeyService = require('../services/apiKeyService')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const { parseSSELine } = require('../utils/sseParser')
+const axios = require('axios')
+const ProxyHelper = require('../utils/proxyHelper')
 // const { OAuth2Client } = require('google-auth-library'); // OAuth2Client is not used in this file
 
 // 生成会话哈希
@@ -77,6 +80,9 @@ async function applyRateLimitTracking(req, usageSummary, model, context = '') {
 router.post('/messages', authenticateApiKey, async (req, res) => {
   const startTime = Date.now()
   let abortController = null
+  let accountId
+  let accountType
+  let sessionHash
 
   try {
     const apiKeyData = req.apiKey
@@ -111,18 +117,17 @@ router.post('/messages', authenticateApiKey, async (req, res) => {
     }
 
     // 生成会话哈希用于粘性会话
-    const sessionHash = generateSessionHash(req)
+    sessionHash = generateSessionHash(req)
 
     // 使用统一调度选择可用的 Gemini 账户（传递请求的模型）
-    let accountId
     try {
       const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
         apiKeyData,
         sessionHash,
-        model // 传递请求的模型进行过滤
+        model, // 传递请求的模型进行过滤
+        { allowApiAccounts: true } // 允许调度 API 账户
       )
-      const { accountId: selectedAccountId } = schedulerResult
-      accountId = selectedAccountId
+      ;({ accountId, accountType } = schedulerResult)
     } catch (error) {
       logger.error('Failed to select Gemini account:', error)
       return res.status(503).json({
@@ -133,21 +138,38 @@ router.post('/messages', authenticateApiKey, async (req, res) => {
       })
     }
 
+    // 判断账户类型：根据 accountType 判断，而非 accountId 前缀
+    const isApiAccount = accountType === 'gemini-api'
+
     // 获取账户详情
-    const account = await geminiAccountService.getAccount(accountId)
-    if (!account) {
-      return res.status(503).json({
-        error: {
-          message: 'Selected account not found',
-          type: 'service_unavailable'
-        }
-      })
+    let account
+    if (isApiAccount) {
+      account = await geminiApiAccountService.getAccount(accountId)
+      if (!account) {
+        return res.status(503).json({
+          error: {
+            message: 'Gemini API account not found',
+            type: 'service_unavailable'
+          }
+        })
+      }
+      logger.info(`Using Gemini API account: ${account.id} for API key: ${apiKeyData.id}`)
+      // 标记 API 账户被使用
+      await geminiApiAccountService.markAccountUsed(account.id)
+    } else {
+      account = await geminiAccountService.getAccount(accountId)
+      if (!account) {
+        return res.status(503).json({
+          error: {
+            message: 'Gemini OAuth account not found',
+            type: 'service_unavailable'
+          }
+        })
+      }
+      logger.info(`Using Gemini OAuth account: ${account.id} for API key: ${apiKeyData.id}`)
+      // 标记 OAuth 账户被使用
+      await geminiAccountService.markAccountUsed(account.id)
     }
-
-    logger.info(`Using Gemini account: ${account.id} for API key: ${apiKeyData.id}`)
-
-    // 标记账户被使用
-    await geminiAccountService.markAccountUsed(account.id)
 
     // 创建中止控制器
     abortController = new AbortController()
@@ -160,20 +182,126 @@ router.post('/messages', authenticateApiKey, async (req, res) => {
       }
     })
 
-    // 发送请求到 Gemini
-    const geminiResponse = await sendGeminiRequest({
-      messages,
-      model,
-      temperature,
-      maxTokens: max_tokens,
-      stream,
-      accessToken: account.accessToken,
-      proxy: account.proxy,
-      apiKeyId: apiKeyData.id,
-      signal: abortController.signal,
-      projectId: account.projectId,
-      accountId: account.id
-    })
+    let geminiResponse
+
+    if (isApiAccount) {
+      // API 账户：直接调用 Google Gemini API
+      // 转换 OpenAI 格式的 messages 为 Gemini 格式的 contents
+      const contents = messages.map((msg) => ({
+        role: msg.role === 'assistant' ? 'model' : msg.role,
+        parts: [{ text: msg.content }]
+      }))
+
+      const requestBody = {
+        contents,
+        generationConfig: {
+          temperature,
+          maxOutputTokens: max_tokens,
+          topP: 0.95,
+          topK: 40
+        }
+      }
+
+      // 解析代理配置
+      let proxyConfig = null
+      if (account.proxy) {
+        try {
+          proxyConfig =
+            typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
+        } catch (e) {
+          logger.warn('Failed to parse proxy configuration:', e)
+        }
+      }
+
+      const apiUrl = stream
+        ? `${account.baseUrl}/v1beta/models/${model}:streamGenerateContent?key=${account.apiKey}&alt=sse`
+        : `${account.baseUrl}/v1beta/models/${model}:generateContent?key=${account.apiKey}`
+
+      const axiosConfig = {
+        method: 'POST',
+        url: apiUrl,
+        data: requestBody,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        responseType: stream ? 'stream' : 'json',
+        signal: abortController.signal
+      }
+
+      // 添加代理配置
+      if (proxyConfig) {
+        const proxyHelper = new ProxyHelper()
+        axiosConfig.httpsAgent = proxyHelper.createProxyAgent(proxyConfig)
+        axiosConfig.httpAgent = proxyHelper.createProxyAgent(proxyConfig)
+      }
+
+      try {
+        const apiResponse = await axios(axiosConfig)
+        if (stream) {
+          geminiResponse = apiResponse.data
+        } else {
+          // 转换为 OpenAI 兼容格式
+          const geminiData = apiResponse.data
+          geminiResponse = {
+            id: crypto.randomUUID(),
+            object: 'chat.completion',
+            created: Math.floor(Date.now() / 1000),
+            model,
+            choices: [
+              {
+                index: 0,
+                message: {
+                  role: 'assistant',
+                  content:
+                    geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated'
+                },
+                finish_reason: 'stop'
+              }
+            ],
+            usage: {
+              prompt_tokens: geminiData.usageMetadata?.promptTokenCount || 0,
+              completion_tokens: geminiData.usageMetadata?.candidatesTokenCount || 0,
+              total_tokens: geminiData.usageMetadata?.totalTokenCount || 0
+            }
+          }
+
+          // 记录使用统计
+          if (geminiData.usageMetadata) {
+            await apiKeyService.recordUsage(
+              apiKeyData.id,
+              geminiData.usageMetadata.promptTokenCount || 0,
+              geminiData.usageMetadata.candidatesTokenCount || 0,
+              0,
+              0,
+              model,
+              accountId // 使用原始 accountId（含 api: 前缀）
+            )
+          }
+        }
+      } catch (error) {
+        logger.error('Gemini API request failed:', {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data
+        })
+        throw error
+      }
+    } else {
+      // OAuth 账户：使用现有的 sendGeminiRequest
+      geminiResponse = await sendGeminiRequest({
+        messages,
+        model,
+        temperature,
+        maxTokens: max_tokens,
+        stream,
+        accessToken: account.accessToken,
+        proxy: account.proxy,
+        apiKeyId: apiKeyData.id,
+        signal: abortController.signal,
+        projectId: account.projectId,
+        accountId: account.id
+      })
+    }
 
     if (stream) {
       // 设置流式响应头
@@ -182,15 +310,90 @@ router.post('/messages', authenticateApiKey, async (req, res) => {
       res.setHeader('Connection', 'keep-alive')
       res.setHeader('X-Accel-Buffering', 'no')
 
-      // 流式传输响应
-      for await (const chunk of geminiResponse) {
-        if (abortController.signal.aborted) {
-          break
+      if (isApiAccount) {
+        // API 账户：处理 SSE 流并记录使用统计
+        let totalUsage = {
+          promptTokenCount: 0,
+          candidatesTokenCount: 0,
+          totalTokenCount: 0
         }
-        res.write(chunk)
-      }
 
-      res.end()
+        geminiResponse.on('data', (chunk) => {
+          try {
+            const chunkStr = chunk.toString()
+            res.write(chunkStr)
+
+            // 尝试从 SSE 流中提取 usage 数据
+            const lines = chunkStr.split('\n')
+            for (const line of lines) {
+              if (line.startsWith('data:')) {
+                const data = line.substring(5).trim()
+                if (data && data !== '[DONE]') {
+                  try {
+                    const parsed = JSON.parse(data)
+                    if (parsed.usageMetadata || parsed.response?.usageMetadata) {
+                      totalUsage = parsed.usageMetadata || parsed.response.usageMetadata
+                    }
+                  } catch (e) {
+                    // 解析失败，忽略
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            logger.error('Error processing stream chunk:', error)
+          }
+        })
+
+        geminiResponse.on('end', () => {
+          res.end()
+
+          // 异步记录使用统计
+          if (totalUsage.totalTokenCount > 0) {
+            apiKeyService
+              .recordUsage(
+                apiKeyData.id,
+                totalUsage.promptTokenCount || 0,
+                totalUsage.candidatesTokenCount || 0,
+                0,
+                0,
+                model,
+                accountId // 使用原始 accountId（含 api: 前缀）
+              )
+              .then(() => {
+                logger.info(
+                  `📊 Recorded Gemini API stream usage - Input: ${totalUsage.promptTokenCount}, Output: ${totalUsage.candidatesTokenCount}`
+                )
+              })
+              .catch((error) => {
+                logger.error('Failed to record Gemini API usage:', error)
+              })
+          }
+        })
+
+        geminiResponse.on('error', (error) => {
+          logger.error('Stream error:', error)
+          if (!res.headersSent) {
+            res.status(500).json({
+              error: {
+                message: error.message || 'Stream error',
+                type: 'api_error'
+              }
+            })
+          } else {
+            res.end()
+          }
+        })
+      } else {
+        // OAuth 账户：使用原有的流式传输逻辑
+        for await (const chunk of geminiResponse) {
+          if (abortController.signal.aborted) {
+            break
+          }
+          res.write(chunk)
+        }
+        res.end()
+      }
     } else {
       // 非流式响应
       res.json(geminiResponse)
@@ -202,14 +405,24 @@ router.post('/messages', authenticateApiKey, async (req, res) => {
     logger.error('Gemini request error:', error)
 
     // 处理速率限制
-    if (error.status === 429) {
-      if (req.apiKey && req.account) {
-        await geminiAccountService.setAccountRateLimited(req.account.id, true)
+    const errorStatus = error.response?.status || error.status
+    if (errorStatus === 429 && accountId) {
+      try {
+        // 使用已有的 accountType 变量，而非检查前缀
+        const rateLimitAccountType = accountType || 'gemini'
+        await unifiedGeminiScheduler.markAccountRateLimited(
+          accountId,
+          rateLimitAccountType,
+          sessionHash
+        )
+        logger.warn(`⚠️ Gemini account ${accountId} rate limited (/messages), marking as limited`)
+      } catch (limitError) {
+        logger.warn('Failed to mark account as rate limited:', limitError)
       }
     }
 
     // 返回错误响应
-    const status = error.status || 500
+    const status = errorStatus || 500
     const errorResponse = {
       error: error.error || {
         message: error.message || 'Internal server error',
@@ -700,13 +913,38 @@ async function handleGenerateContent(req, res) {
       })
     }
 
-    // 使用统一调度选择账号
-    const { accountId } = await unifiedGeminiScheduler.selectAccountForApiKey(
+    // 使用统一调度选择账号（v1internal 不允许 API 账户）
+    const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
       req.apiKey,
       sessionHash,
       model
+      // 不传 allowApiAccounts: true，所以不会调度 API 账户
     )
+    const { accountId, accountType } = schedulerResult
+
+    // v1internal 路由只支持 OAuth 账户，不支持 API Key 账户
+    if (accountType === 'gemini-api') {
+      logger.error(`❌ v1internal routes do not support Gemini API accounts. Account: ${accountId}`)
+      return res.status(400).json({
+        error: {
+          message:
+            'This endpoint only supports Gemini OAuth accounts. Gemini API Key accounts are not compatible with v1internal format.',
+          type: 'invalid_account_type'
+        }
+      })
+    }
+
     const account = await geminiAccountService.getAccount(accountId)
+    if (!account) {
+      logger.error(`❌ Gemini account not found: ${accountId}`)
+      return res.status(404).json({
+        error: {
+          message: 'Gemini account not found',
+          type: 'account_not_found'
+        }
+      })
+    }
+
     const { accessToken, refreshToken } = account
 
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
@@ -854,13 +1092,38 @@ async function handleStreamGenerateContent(req, res) {
       })
     }
 
-    // 使用统一调度选择账号
-    const { accountId } = await unifiedGeminiScheduler.selectAccountForApiKey(
+    // 使用统一调度选择账号（v1internal 不允许 API 账户）
+    const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
       req.apiKey,
       sessionHash,
       model
+      // 不传 allowApiAccounts: true，所以不会调度 API 账户
     )
+    const { accountId, accountType } = schedulerResult
+
+    // v1internal 路由只支持 OAuth 账户，不支持 API Key 账户
+    if (accountType === 'gemini-api') {
+      logger.error(`❌ v1internal routes do not support Gemini API accounts. Account: ${accountId}`)
+      return res.status(400).json({
+        error: {
+          message:
+            'This endpoint only supports Gemini OAuth accounts. Gemini API Key accounts are not compatible with v1internal format.',
+          type: 'invalid_account_type'
+        }
+      })
+    }
+
     const account = await geminiAccountService.getAccount(accountId)
+    if (!account) {
+      logger.error(`❌ Gemini account not found: ${accountId}`)
+      return res.status(404).json({
+        error: {
+          message: 'Gemini account not found',
+          type: 'account_not_found'
+        }
+      })
+    }
+
     const { accessToken, refreshToken } = account
 
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'

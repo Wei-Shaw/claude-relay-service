@@ -2287,6 +2287,7 @@ const loadAccounts = async () => {
       claudeData,
       claudeConsoleData,
       geminiData,
+      geminiApiData,
       openaiData,
       openaiResponsesData,
       bedrockData,
@@ -2296,6 +2297,7 @@ const loadAccounts = async () => {
       apiClient.get('/admin/claude-accounts'),
       apiClient.get('/admin/claude-console-accounts'),
       apiClient.get('/admin/gemini-accounts'),
+      apiClient.get('/admin/gemini-api-accounts'), // 加载 Gemini-API 账号
       apiClient.get('/admin/openai-accounts'),
       apiClient.get('/admin/openai-responses-accounts'), // 加载 OpenAI-Responses 账号
       apiClient.get('/admin/bedrock-accounts'),
@@ -2328,12 +2330,30 @@ const loadAccounts = async () => {
 
     accounts.value.claude = claudeAccounts
 
+    // 合并 Gemini OAuth 和 Gemini API 账户
+    const geminiAccounts = []
+
     if (geminiData.success) {
-      accounts.value.gemini = (geminiData.data || []).map((account) => ({
-        ...account,
-        isDedicated: account.accountType === 'dedicated'
-      }))
+      ;(geminiData.data || []).forEach((account) => {
+        geminiAccounts.push({
+          ...account,
+          platform: 'gemini',
+          isDedicated: account.accountType === 'dedicated'
+        })
+      })
     }
+
+    if (geminiApiData.success) {
+      ;(geminiApiData.data || []).forEach((account) => {
+        geminiAccounts.push({
+          ...account,
+          platform: 'gemini-api',
+          isDedicated: account.accountType === 'dedicated'
+        })
+      })
+    }
+
+    accounts.value.gemini = geminiAccounts
 
     if (openaiData.success) {
       accounts.value.openai = (openaiData.data || []).map((account) => ({
@@ -2501,6 +2521,19 @@ const getBoundAccountName = (accountId) => {
     return `${claudeAccount.name}`
   }
 
+  // 处理 api: 前缀的 Gemini-API 账户
+  if (accountId.startsWith('api:')) {
+    const realAccountId = accountId.replace('api:', '')
+    const geminiApiAccount = accounts.value.gemini.find(
+      (acc) => acc.id === realAccountId && acc.platform === 'gemini-api'
+    )
+    if (geminiApiAccount) {
+      return `${geminiApiAccount.name}`
+    }
+    // 如果找不到，返回ID的前8位
+    return `${realAccountId.substring(0, 8)}`
+  }
+
   // 从Gemini账户列表中查找
   const geminiAccount = accounts.value.gemini.find((acc) => acc.id === accountId)
   if (geminiAccount) {
@@ -2583,7 +2616,23 @@ const getGeminiBindingInfo = (key) => {
     if (key.geminiAccountId.startsWith('group:')) {
       return info
     }
-    // 检查账户是否存在
+
+    // 处理 api: 前缀的 Gemini-API 账户
+    if (key.geminiAccountId.startsWith('api:')) {
+      const realAccountId = key.geminiAccountId.replace('api:', '')
+      const account = accounts.value.gemini.find(
+        (acc) => acc.id === realAccountId && acc.platform === 'gemini-api'
+      )
+      if (!account) {
+        return `⚠️ ${info} (账户不存在)`
+      }
+      if (account.accountType === 'dedicated') {
+        return `🔒 API专属-${info}`
+      }
+      return `API-${info}`
+    }
+
+    // 检查 Gemini OAuth 账户是否存在
     const account = accounts.value.gemini.find((acc) => acc.id === key.geminiAccountId)
     if (!account) {
       return `⚠️ ${info} (账户不存在)`
@@ -3765,7 +3814,7 @@ const normalizeFrontendAccountCategory = (type) => {
   ) {
     return 'openai'
   }
-  if (lower === 'gemini') {
+  if (lower === 'gemini' || lower === 'gemini-api' || lower === 'gemini_api') {
     return 'gemini'
   }
   if (lower === 'droid') {
@@ -3794,8 +3843,8 @@ const isLikelyDeletedUsage = (info) => {
 
   const looksLikeUuid = UUID_PATTERN.test(rawId)
   const nameMissingOrSame = !accountName || accountName === rawId
-  const typeUnknown =
-    !accountType || accountType === 'unknown' || ACCOUNT_TYPE_LABELS[accountType] === undefined
+  const normalizedType = normalizeFrontendAccountCategory(accountType)
+  const typeUnknown = !accountType || accountType === 'unknown' || normalizedType === 'other'
 
   return looksLikeUuid && nameMissingOrSame && typeUnknown
 }

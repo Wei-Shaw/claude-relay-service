@@ -1012,6 +1012,7 @@ const refreshAccounts = async () => {
       claudeData,
       claudeConsoleData,
       geminiData,
+      geminiApiData,
       openaiData,
       openaiResponsesData,
       bedrockData,
@@ -1021,6 +1022,7 @@ const refreshAccounts = async () => {
       apiClient.get('/admin/claude-accounts'),
       apiClient.get('/admin/claude-console-accounts'),
       apiClient.get('/admin/gemini-accounts'),
+      apiClient.get('/admin/gemini-api-accounts'),
       apiClient.get('/admin/openai-accounts'),
       apiClient.get('/admin/openai-responses-accounts'),
       apiClient.get('/admin/bedrock-accounts'),
@@ -1053,12 +1055,30 @@ const refreshAccounts = async () => {
 
     localAccounts.value.claude = claudeAccounts
 
+    // 合并 Gemini OAuth 和 Gemini API 账号
+    const geminiAccounts = []
+
     if (geminiData.success) {
-      localAccounts.value.gemini = (geminiData.data || []).map((account) => ({
-        ...account,
-        isDedicated: account.accountType === 'dedicated'
-      }))
+      ;(geminiData.data || []).forEach((account) => {
+        geminiAccounts.push({
+          ...account,
+          platform: 'gemini',
+          isDedicated: account.accountType === 'dedicated'
+        })
+      })
     }
+
+    if (geminiApiData.success) {
+      ;(geminiApiData.data || []).forEach((account) => {
+        geminiAccounts.push({
+          ...account,
+          platform: 'gemini-api',
+          isDedicated: account.accountType === 'dedicated'
+        })
+      })
+    }
+
+    localAccounts.value.gemini = geminiAccounts
 
     // 合并 OpenAI 和 OpenAI-Responses 账号
     const openaiAccounts = []
@@ -1159,6 +1179,25 @@ onMounted(async () => {
 
   // 初始化账号数据
   if (props.accounts) {
+    // 合并 Gemini OAuth 和 Gemini API 账号
+    const geminiAccounts = []
+    if (props.accounts.gemini) {
+      props.accounts.gemini.forEach((account) => {
+        geminiAccounts.push({
+          ...account,
+          platform: 'gemini'
+        })
+      })
+    }
+    if (props.accounts.geminiApi) {
+      props.accounts.geminiApi.forEach((account) => {
+        geminiAccounts.push({
+          ...account,
+          platform: 'gemini-api'
+        })
+      })
+    }
+
     // 合并 OpenAI 和 OpenAI-Responses 账号
     const openaiAccounts = []
     if (props.accounts.openai) {
@@ -1180,7 +1219,7 @@ onMounted(async () => {
 
     localAccounts.value = {
       claude: props.accounts.claude || [],
-      gemini: props.accounts.gemini || [],
+      gemini: geminiAccounts,
       openai: openaiAccounts,
       bedrock: props.accounts.bedrock || [],
       droid: (props.accounts.droid || []).map((account) => ({

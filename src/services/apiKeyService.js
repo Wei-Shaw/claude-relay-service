@@ -11,6 +11,7 @@ const ACCOUNT_TYPE_CONFIG = {
   'openai-responses': { prefix: 'openai_responses_account:' },
   'azure-openai': { prefix: 'azure_openai:account:' },
   gemini: { prefix: 'gemini_account:' },
+  'gemini-api': { prefix: 'gemini_api_account:' },
   droid: { prefix: 'droid:account:' }
 }
 
@@ -21,6 +22,7 @@ const ACCOUNT_TYPE_PRIORITY = [
   'claude',
   'claude-console',
   'gemini',
+  'gemini-api',
   'droid'
 ]
 
@@ -31,6 +33,7 @@ const ACCOUNT_CATEGORY_MAP = {
   'openai-responses': 'openai',
   'azure-openai': 'openai',
   gemini: 'gemini',
+  'gemini-api': 'gemini',
   droid: 'droid'
 }
 
@@ -48,6 +51,9 @@ function normalizeAccountTypeKey(type) {
   if (lower === 'azure_openai' || lower === 'azureopenai' || lower === 'azure-openai') {
     return 'azure-openai'
   }
+  if (lower === 'gemini_api' || lower === 'gemini-api') {
+    return 'gemini-api'
+  }
   return lower
 }
 
@@ -57,6 +63,9 @@ function sanitizeAccountIdForType(accountId, accountType) {
   }
   if (accountType === 'openai-responses') {
     return accountId.replace(/^responses:/, '')
+  }
+  if (accountType === 'gemini-api') {
+    return accountId.replace(/^api:/, '')
   }
   return accountId
 }
@@ -1322,6 +1331,9 @@ class ApiKeyService {
       if (typeof rawAccountId === 'string' && rawAccountId.startsWith('responses:')) {
         candidateIds.add(rawAccountId.replace(/^responses:/, ''))
       }
+      if (typeof rawAccountId === 'string' && rawAccountId.startsWith('api:')) {
+        candidateIds.add(rawAccountId.replace(/^api:/, ''))
+      }
     }
 
     if (candidateIds.size === 0) {
@@ -1346,6 +1358,7 @@ class ApiKeyService {
         pushType('azure-openai')
       } else if (lowerModel.includes('gemini')) {
         pushType('gemini')
+        pushType('gemini-api')
       } else if (lowerModel.includes('claude') || lowerModel.includes('anthropic')) {
         pushType('claude')
         pushType('claude-console')
@@ -1527,7 +1540,15 @@ class ApiKeyService {
         permissions: keyData.permissions,
         dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
         totalCostLimit: parseFloat(keyData.totalCostLimit || 0),
-        droidAccountId: keyData.droidAccountId
+        // 所有平台账户绑定字段
+        claudeAccountId: keyData.claudeAccountId,
+        claudeConsoleAccountId: keyData.claudeConsoleAccountId,
+        geminiAccountId: keyData.geminiAccountId,
+        openaiAccountId: keyData.openaiAccountId,
+        bedrockAccountId: keyData.bedrockAccountId,
+        droidAccountId: keyData.droidAccountId,
+        azureOpenaiAccountId: keyData.azureOpenaiAccountId,
+        ccrAccountId: keyData.ccrAccountId
       }
     } catch (error) {
       logger.error('❌ Failed to get API key by ID:', error)
@@ -1670,6 +1691,7 @@ class ApiKeyService {
         claude: 'claudeAccountId',
         'claude-console': 'claudeConsoleAccountId',
         gemini: 'geminiAccountId',
+        'gemini-api': 'geminiAccountId', // 特殊处理，带 api: 前缀
         openai: 'openaiAccountId',
         'openai-responses': 'openaiAccountId', // 特殊处理，带 responses: 前缀
         azure_openai: 'azureOpenaiAccountId',
@@ -1692,6 +1714,9 @@ class ApiKeyService {
       if (accountType === 'openai-responses') {
         // OpenAI-Responses 特殊处理：查找 openaiAccountId 字段中带 responses: 前缀的
         boundKeys = allKeys.filter((key) => key.openaiAccountId === `responses:${accountId}`)
+      } else if (accountType === 'gemini-api') {
+        // Gemini-API 特殊处理：查找 geminiAccountId 字段中带 api: 前缀的
+        boundKeys = allKeys.filter((key) => key.geminiAccountId === `api:${accountId}`)
       } else {
         // 其他账号类型正常匹配
         boundKeys = allKeys.filter((key) => key[field] === accountId)
@@ -1702,6 +1727,8 @@ class ApiKeyService {
         const updates = {}
         if (accountType === 'openai-responses') {
           updates.openaiAccountId = null
+        } else if (accountType === 'gemini-api') {
+          updates.geminiAccountId = null
         } else if (accountType === 'claude-console') {
           updates.claudeConsoleAccountId = null
         } else {

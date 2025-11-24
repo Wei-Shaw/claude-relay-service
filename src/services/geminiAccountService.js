@@ -1098,7 +1098,7 @@ async function forwardToCodeAssist(client, apiMethod, requestBody, proxyConfig =
 
   // 添加代理配置
   if (proxyAgent) {
-    axiosConfig.httpAgent = proxyAgent
+    // 只设置 httpsAgent，因为目标 URL 是 HTTPS (cloudcode-pa.googleapis.com)
     axiosConfig.httpsAgent = proxyAgent
     axiosConfig.proxy = false
     logger.info(`🌐 Using proxy for ${apiMethod}: ${ProxyHelper.getProxyDescription(proxyConfig)}`)
@@ -1205,7 +1205,7 @@ async function loadCodeAssist(client, projectId = null, proxyConfig = null) {
 
   // 添加代理配置
   if (proxyAgent) {
-    axiosConfig.httpAgent = proxyAgent
+    // 只设置 httpsAgent，因为目标 URL 是 HTTPS (cloudcode-pa.googleapis.com)
     axiosConfig.httpsAgent = proxyAgent
     axiosConfig.proxy = false
     logger.info(
@@ -1414,7 +1414,7 @@ async function countTokens(client, contents, model = 'gemini-2.0-flash-exp', pro
   // 添加代理配置
   const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
   if (proxyAgent) {
-    axiosConfig.httpAgent = proxyAgent
+    // 只设置 httpsAgent，因为目标 URL 是 HTTPS (cloudcode-pa.googleapis.com)
     axiosConfig.httpsAgent = proxyAgent
     axiosConfig.proxy = false
     logger.info(
@@ -1491,7 +1491,7 @@ async function generateContent(
   // 添加代理配置
   const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
   if (proxyAgent) {
-    axiosConfig.httpAgent = proxyAgent
+    // 只设置 httpsAgent，因为目标 URL 是 HTTPS (cloudcode-pa.googleapis.com)
     axiosConfig.httpsAgent = proxyAgent
     axiosConfig.proxy = false
     logger.info(
@@ -1500,7 +1500,6 @@ async function generateContent(
   } else {
     // 没有代理时，使用 keepAlive agent 防止长时间请求被中断
     axiosConfig.httpsAgent = keepAliveAgent
-    axiosConfig.httpAgent = keepAliveAgent
     logger.debug('🌐 Using keepAlive agent for Gemini generateContent')
   }
 
@@ -1570,7 +1569,8 @@ async function generateContentStream(
   // 添加代理配置
   const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
   if (proxyAgent) {
-    axiosConfig.httpAgent = proxyAgent
+    // 只设置 httpsAgent，因为目标 URL 是 HTTPS (cloudcode-pa.googleapis.com)
+    // 同时设置 httpAgent 和 httpsAgent 可能导致 axios/follow-redirects 选择错误的协议
     axiosConfig.httpsAgent = proxyAgent
     axiosConfig.proxy = false
     logger.info(
@@ -1579,7 +1579,6 @@ async function generateContentStream(
   } else {
     // 没有代理时，使用 keepAlive agent 防止长时间流式请求被中断
     axiosConfig.httpsAgent = keepAliveAgent
-    axiosConfig.httpAgent = keepAliveAgent
     logger.debug('🌐 Using keepAlive agent for Gemini streamGenerateContent')
   }
 
@@ -1617,6 +1616,50 @@ async function updateTempProjectId(accountId, tempProjectId) {
   }
 }
 
+// 重置账户状态（清除所有异常状态）
+async function resetAccountStatus(accountId) {
+  const account = await getAccount(accountId)
+  if (!account) {
+    throw new Error('Account not found')
+  }
+
+  const updates = {
+    // 根据是否有有效的 refreshToken 来设置 status
+    status: account.refreshToken ? 'active' : 'created',
+    // 恢复可调度状态
+    schedulable: 'true',
+    // 清除错误相关字段
+    errorMessage: '',
+    rateLimitedAt: '',
+    rateLimitStatus: ''
+  }
+
+  await updateAccount(accountId, updates)
+  logger.info(`✅ Reset all error status for Gemini account ${accountId}`)
+
+  // 发送 Webhook 通知
+  try {
+    const webhookNotifier = require('../utils/webhookNotifier')
+    await webhookNotifier.sendAccountAnomalyNotification({
+      accountId,
+      accountName: account.name || accountId,
+      platform: 'gemini',
+      status: 'recovered',
+      errorCode: 'STATUS_RESET',
+      reason: 'Account status manually reset',
+      timestamp: new Date().toISOString()
+    })
+    logger.info(`📢 Webhook notification sent for Gemini account ${account.name} status reset`)
+  } catch (webhookError) {
+    logger.error('Failed to send status reset webhook notification:', webhookError)
+  }
+
+  return {
+    success: true,
+    message: 'Account status reset successfully'
+  }
+}
+
 module.exports = {
   generateAuthUrl,
   pollAuthorizationStatus,
@@ -1647,6 +1690,7 @@ module.exports = {
   generateContent,
   generateContentStream,
   updateTempProjectId,
+  resetAccountStatus,
   OAUTH_CLIENT_ID,
   OAUTH_SCOPES
 }
