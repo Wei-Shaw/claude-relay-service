@@ -1139,7 +1139,10 @@
                       (account.platform === 'claude' ||
                         account.platform === 'claude-console' ||
                         account.platform === 'openai' ||
-                        account.platform === 'openai-responses') &&
+                        account.platform === 'openai-responses' ||
+                        account.platform === 'gemini' ||
+                        account.platform === 'gemini-api' ||
+                        account.platform === 'ccr') &&
                       (account.status === 'unauthorized' ||
                         account.status !== 'active' ||
                         account.rateLimitStatus?.isRateLimited ||
