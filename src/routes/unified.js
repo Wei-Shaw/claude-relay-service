@@ -2,10 +2,11 @@ const express = require('express')
 const { authenticateApiKey } = require('../middleware/auth')
 const logger = require('../utils/logger')
 const { handleChatCompletion } = require('./openaiClaudeRoutes')
+// 从 handlers/geminiHandlers.js 导入处理函数
 const {
   handleGenerateContent: geminiHandleGenerateContent,
   handleStreamGenerateContent: geminiHandleStreamGenerateContent
-} = require('./geminiRoutes')
+} = require('../handlers/geminiHandlers')
 const openaiRoutes = require('./openaiRoutes')
 
 const router = express.Router()
@@ -16,25 +17,6 @@ function detectBackendFromModel(modelName) {
     return 'claude' // 默认 Claude
   }
 
-  // 首先尝试使用 modelService 查找模型的 provider
-  try {
-    const modelService = require('../services/modelService')
-    const provider = modelService.getModelProvider(modelName)
-
-    if (provider === 'anthropic') {
-      return 'claude'
-    }
-    if (provider === 'openai') {
-      return 'openai'
-    }
-    if (provider === 'google') {
-      return 'gemini'
-    }
-  } catch (error) {
-    logger.warn(`⚠️ Failed to detect backend from modelService: ${error.message}`)
-  }
-
-  // 降级到前缀匹配作为后备方案
   const model = modelName.toLowerCase()
 
   // Claude 模型
@@ -42,19 +24,14 @@ function detectBackendFromModel(modelName) {
     return 'claude'
   }
 
-  // OpenAI 模型
-  if (
-    model.startsWith('gpt-') ||
-    model.startsWith('o1-') ||
-    model.startsWith('o3-') ||
-    model === 'chatgpt-4o-latest'
-  ) {
-    return 'openai'
-  }
-
   // Gemini 模型
   if (model.startsWith('gemini-')) {
     return 'gemini'
+  }
+
+  // OpenAI 模型
+  if (model.startsWith('gpt-')) {
+    return 'openai'
   }
 
   // 默认使用 Claude

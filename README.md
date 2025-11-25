@@ -412,26 +412,29 @@ export ANTHROPIC_AUTH_TOKEN="后台创建的API密钥"
 
 **方式一（推荐）：通过 Gemini Assist API 方式访问**
 
-每账号每日享受 1000 次请求，每分钟 60 次免费限额。
-
 ```bash
 CODE_ASSIST_ENDPOINT="http://127.0.0.1:3000/gemini"  # 根据实际填写你服务器的ip地址或者域名
 GOOGLE_CLOUD_ACCESS_TOKEN="后台创建的API密钥"
 GOOGLE_GENAI_USE_GCA="true"
-GEMINI_MODEL="gemini-2.5-pro"
+GEMINI_MODEL="gemini-2.5-pro" # 如果你有gemini3权限可以填： gemini-3-pro-preview
 ```
 
-> **注意**：gemini-cli 控制台会提示 `Failed to fetch user info: 401 Unauthorized`，但使用不受任何影响。
+> **认证**：只能选 ```Login with Google``` 进行认证，如果跳 Google请删除 ```~/.gemini/settings.json``` 后再尝试启动```gemini```。  
+> **注意**：gemini-cli 控制台会提示 `Failed to fetch user info: 401 Unauthorized`，但使用不受任何影响。  
 
 **方式二：通过 Gemini API 方式访问**
 
-免费额度极少，极易触发 429 错误。
 
 ```bash
 GOOGLE_GEMINI_BASE_URL="http://127.0.0.1:3000/gemini"  # 根据实际填写你服务器的ip地址或者域名
 GEMINI_API_KEY="后台创建的API密钥"
-GEMINI_MODEL="gemini-2.5-pro"
+GEMINI_MODEL="gemini-2.5-pro" # 如果你有gemini3权限可以填： gemini-3-pro-preview
 ```
+
+> **认证**：只能选 ```Use Gemini API Key``` 进行认证，如果提示 ```Enter Gemini API Key``` 请直接留空按回车。如果一打开就跳 Google请删除 ```~/.gemini/settings.json``` 后再尝试启动```gemini```。
+
+> 💡 **进阶用法**：想在 Claude Code 中直接使用 Gemini 3 模型？请参考 [Claude Code 调用 Gemini 3 模型指南](docs/claude-code-gemini3-guide/README.md)
+
 **使用 Claude Code：**
 
 ```bash
@@ -450,7 +453,7 @@ gemini  # 或其他 Gemini CLI 命令
 
 ```toml
 model_provider = "crs"
-model = "gpt-5-codex"
+model = "gpt-5.1-codex-max"
 model_reasoning_effort = "high"
 disable_response_storage = true
 preferred_auth_method = "apikey"
@@ -940,6 +943,27 @@ proxy_request_buffering off;
 - **GitHub Issues**: 提交详细的错误信息
 - **查看文档**: 仔细阅读错误信息和文档
 - **社区讨论**: 看看其他人是否遇到类似问题
+
+---
+
+## ❤️ 赞助支持
+
+如果您觉得这个项目对您有帮助，请考虑赞助支持项目的持续开发。您的支持是我们最大的动力！
+
+<div align="center">
+
+<a href="https://afdian.com/a/claude-relay-service" target="_blank">
+  <img src="https://img.shields.io/badge/☕_请我喝杯咖啡-爱发电-946ce6?style=for-the-badge&logo=buy-me-a-coffee&logoColor=white" alt="Sponsor">
+</a>
+
+<table>
+  <tr>
+    <td><img src="docs/sponsoring/wechat.jpg" width="200" alt="wechat" /></td>
+    <td><img src="docs/sponsoring/alipay.jpg" width="200" alt="alipay" /></td>
+  </tr>
+</table>
+
+</div>
 
 ---
 

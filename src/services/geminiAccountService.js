@@ -1616,6 +1616,50 @@ async function updateTempProjectId(accountId, tempProjectId) {
   }
 }
 
+// 重置账户状态（清除所有异常状态）
+async function resetAccountStatus(accountId) {
+  const account = await getAccount(accountId)
+  if (!account) {
+    throw new Error('Account not found')
+  }
+
+  const updates = {
+    // 根据是否有有效的 refreshToken 来设置 status
+    status: account.refreshToken ? 'active' : 'created',
+    // 恢复可调度状态
+    schedulable: 'true',
+    // 清除错误相关字段
+    errorMessage: '',
+    rateLimitedAt: '',
+    rateLimitStatus: ''
+  }
+
+  await updateAccount(accountId, updates)
+  logger.info(`✅ Reset all error status for Gemini account ${accountId}`)
+
+  // 发送 Webhook 通知
+  try {
+    const webhookNotifier = require('../utils/webhookNotifier')
+    await webhookNotifier.sendAccountAnomalyNotification({
+      accountId,
+      accountName: account.name || accountId,
+      platform: 'gemini',
+      status: 'recovered',
+      errorCode: 'STATUS_RESET',
+      reason: 'Account status manually reset',
+      timestamp: new Date().toISOString()
+    })
+    logger.info(`📢 Webhook notification sent for Gemini account ${account.name} status reset`)
+  } catch (webhookError) {
+    logger.error('Failed to send status reset webhook notification:', webhookError)
+  }
+
+  return {
+    success: true,
+    message: 'Account status reset successfully'
+  }
+}
+
 module.exports = {
   generateAuthUrl,
   pollAuthorizationStatus,
@@ -1646,6 +1690,7 @@ module.exports = {
   generateContent,
   generateContentStream,
   updateTempProjectId,
+  resetAccountStatus,
   OAUTH_CLIENT_ID,
   OAUTH_SCOPES
 }

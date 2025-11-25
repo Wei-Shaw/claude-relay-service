@@ -477,6 +477,37 @@
                           <i class="fas fa-check text-xs text-white"></i>
                         </div>
                       </label>
+
+                      <label
+                        class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
+                        :class="[
+                          form.platform === 'gemini-api'
+                            ? 'border-amber-500 bg-amber-50 dark:border-amber-400 dark:bg-amber-900/30'
+                            : 'border-gray-300 bg-white hover:border-amber-400 hover:bg-amber-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-amber-500 dark:hover:bg-amber-900/20'
+                        ]"
+                      >
+                        <input
+                          v-model="form.platform"
+                          class="sr-only"
+                          type="radio"
+                          value="gemini-api"
+                        />
+                        <div class="flex items-center gap-2">
+                          <i class="fas fa-key text-sm text-amber-600 dark:text-amber-400"></i>
+                          <div>
+                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
+                              >Gemini API</span
+                            >
+                            <span class="text-xs text-gray-500 dark:text-gray-400">API Key</span>
+                          </div>
+                        </div>
+                        <div
+                          v-if="form.platform === 'gemini-api'"
+                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500"
+                        >
+                          <i class="fas fa-check text-xs text-white"></i>
+                        </div>
+                      </label>
                     </template>
 
                     <!-- Droid 子选项 -->
@@ -519,7 +550,8 @@
                 form.platform !== 'ccr' &&
                 form.platform !== 'bedrock' &&
                 form.platform !== 'azure_openai' &&
-                form.platform !== 'openai-responses'
+                form.platform !== 'openai-responses' &&
+                form.platform !== 'gemini-api'
               "
             >
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -641,8 +673,8 @@
               </p>
             </div>
 
-            <!-- 到期时间 - 仅在创建账户时显示，编辑时使用独立的过期时间编辑弹窗 -->
-            <div v-if="!isEdit">
+            <!-- 到期时间 - 仅在创建账户时显示，编辑时使用独立的过期时间编辑弹窗，Gemini API 不需要 -->
+            <div v-if="!isEdit && form.platform !== 'gemini-api'">
               <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >到期时间 (可选)</label
               >
@@ -1483,6 +1515,63 @@
               <input v-model.number="form.rateLimitDuration" type="hidden" value="60" />
             </div>
 
+            <!-- Gemini API 配置 -->
+            <div v-if="form.platform === 'gemini-api' && !isEdit" class="space-y-4">
+              <div>
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  >API 基础地址 *</label
+                >
+                <input
+                  v-model="form.baseUrl"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  placeholder="https://generativelanguage.googleapis.com"
+                  required
+                  type="url"
+                />
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  填写 API 基础地址（可包含路径前缀），系统会自动拼接
+                  <code class="rounded bg-gray-100 px-1 dark:bg-gray-600"
+                    >/v1beta/models/{model}:generateContent</code
+                  >
+                </p>
+                <p class="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+                  官方:
+                  <code class="rounded bg-gray-100 px-1 dark:bg-gray-600"
+                    >https://generativelanguage.googleapis.com</code
+                  >
+                  | 上游为 CRS:
+                  <code class="rounded bg-gray-100 px-1 dark:bg-gray-600"
+                    >https://your-crs.com/gemini</code
+                  >
+                </p>
+              </div>
+
+              <div>
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  >API 密钥 *</label
+                >
+                <div class="relative">
+                  <input
+                    v-model="form.apiKey"
+                    class="form-input w-full border-gray-300 pr-10 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                    placeholder="AIzaSy..."
+                    required
+                    :type="showApiKey ? 'text' : 'password'"
+                  />
+                  <button
+                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-400"
+                    type="button"
+                    @click="showApiKey = !showApiKey"
+                  >
+                    <i :class="showApiKey ? 'fas fa-eye-slash' : 'fas fa-eye'" />
+                  </button>
+                </div>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  从 Google AI Studio 获取的 API 密钥
+                </p>
+              </div>
+            </div>
+
             <!-- Claude 订阅类型选择 -->
             <div v-if="form.platform === 'claude'">
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -1905,7 +1994,8 @@
                   form.platform !== 'ccr' &&
                   form.platform !== 'bedrock' &&
                   form.platform !== 'azure_openai' &&
-                  form.platform !== 'openai-responses'
+                  form.platform !== 'openai-responses' &&
+                  form.platform !== 'gemini-api'
                 "
                 class="btn btn-primary flex-1 px-6 py-3 font-semibold"
                 :disabled="loading"
@@ -2926,6 +3016,59 @@
             </div>
           </div>
 
+          <!-- Gemini API 特定字段（编辑模式）-->
+          <div v-if="form.platform === 'gemini-api'" class="space-y-4">
+            <div>
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >API 基础地址</label
+              >
+              <input
+                v-model="form.baseUrl"
+                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                placeholder="https://generativelanguage.googleapis.com"
+                type="url"
+              />
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                填写 API 基础地址（可包含路径前缀），系统会自动拼接
+                <code class="rounded bg-gray-100 px-1 dark:bg-gray-600"
+                  >/v1beta/models/{model}:generateContent</code
+                >
+              </p>
+              <p class="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+                官方:
+                <code class="rounded bg-gray-100 px-1 dark:bg-gray-600"
+                  >https://generativelanguage.googleapis.com</code
+                >
+                | 上游为 CRS:
+                <code class="rounded bg-gray-100 px-1 dark:bg-gray-600"
+                  >https://your-crs.com/gemini</code
+                >
+              </p>
+            </div>
+
+            <div>
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >API 密钥</label
+              >
+              <div class="relative">
+                <input
+                  v-model="form.apiKey"
+                  class="form-input w-full border-gray-300 pr-10 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  placeholder="留空表示不更新"
+                  :type="showApiKey ? 'text' : 'password'"
+                />
+                <button
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-400"
+                  type="button"
+                  @click="showApiKey = !showApiKey"
+                >
+                  <i :class="showApiKey ? 'fas fa-eye-slash' : 'fas fa-eye'" />
+                </button>
+              </div>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">留空表示不更新 API Key</p>
+            </div>
+          </div>
+
           <!-- Bedrock 特定字段（编辑模式）-->
           <div v-if="form.platform === 'bedrock'" class="space-y-4">
             <div>
@@ -3410,7 +3553,7 @@ const determinePlatformGroup = (platform) => {
     return 'claude'
   } else if (['openai', 'openai-responses', 'azure_openai'].includes(platform)) {
     return 'openai'
-  } else if (platform === 'gemini') {
+  } else if (['gemini', 'gemini-api'].includes(platform)) {
     return 'gemini'
   } else if (platform === 'droid') {
     return 'droid'
@@ -3636,6 +3779,7 @@ const allowedModels = ref([
 
 // 常用模型列表
 const commonModels = [
+  { value: 'claude-opus-4-5-20251101', label: 'Claude Opus 4.5', color: 'blue' },
   { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4', color: 'blue' },
   { value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5', color: 'indigo' },
   { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku', color: 'green' },
@@ -4333,10 +4477,19 @@ const createAccount = async () => {
     }
     // Claude Console、CCR、OpenAI-Responses 等其他平台不需要 Token 验证
   } else if (form.value.addType === 'apikey') {
-    const apiKeys = parseApiKeysInput(form.value.apiKeysInput)
-    if (apiKeys.length === 0) {
-      errors.value.apiKeys = '请至少填写一个 API Key'
-      hasError = true
+    // Gemini API 使用单个 apiKey 字段
+    if (form.value.platform === 'gemini-api') {
+      if (!form.value.apiKey || form.value.apiKey.trim() === '') {
+        errors.value.apiKey = '请填写 API Key'
+        hasError = true
+      }
+    } else {
+      // 其他平台（如 Droid）使用多 API Key 输入
+      const apiKeys = parseApiKeysInput(form.value.apiKeysInput)
+      if (apiKeys.length === 0) {
+        errors.value.apiKeys = '请至少填写一个 API Key'
+        hasError = true
+      }
     }
   }
 
@@ -4500,6 +4653,14 @@ const createAccount = async () => {
       data.rateLimitDuration = 60 // 默认值60，不从用户输入获取
       data.dailyQuota = form.value.dailyQuota || 0
       data.quotaResetTime = form.value.quotaResetTime || '00:00'
+    } else if (form.value.platform === 'gemini-api') {
+      // Gemini API 账户特定数据
+      data.baseUrl = form.value.baseUrl || 'https://generativelanguage.googleapis.com'
+      data.apiKey = form.value.apiKey
+      data.priority = form.value.priority || 50
+      data.supportedModels = Array.isArray(form.value.supportedModels)
+        ? form.value.supportedModels
+        : []
     } else if (form.value.platform === 'bedrock') {
       // Bedrock 账户特定数据 - 构造 awsCredentials 对象
       data.awsCredentials = {
@@ -4545,6 +4706,8 @@ const createAccount = async () => {
       result = await accountsStore.createAzureOpenAIAccount(data)
     } else if (form.value.platform === 'gemini') {
       result = await accountsStore.createGeminiAccount(data)
+    } else if (form.value.platform === 'gemini-api') {
+      result = await accountsStore.createGeminiApiAccount(data)
     } else {
       throw new Error(`不支持的平台: ${form.value.platform}`)
     }
@@ -4851,6 +5014,19 @@ const updateAccount = async () => {
       }
     }
 
+    // Gemini API 特定更新
+    if (props.account.platform === 'gemini-api') {
+      data.baseUrl = form.value.baseUrl || 'https://generativelanguage.googleapis.com'
+      // 只有当有新的 API Key 时才更新
+      if (form.value.apiKey && form.value.apiKey.trim()) {
+        data.apiKey = form.value.apiKey
+      }
+      data.priority = form.value.priority || 50
+      data.supportedModels = Array.isArray(form.value.supportedModels)
+        ? form.value.supportedModels
+        : []
+    }
+
     if (props.account.platform === 'claude') {
       await accountsStore.updateClaudeAccount(props.account.id, data)
     } else if (props.account.platform === 'claude-console') {
@@ -4865,6 +5041,8 @@ const updateAccount = async () => {
       await accountsStore.updateAzureOpenAIAccount(props.account.id, data)
     } else if (props.account.platform === 'gemini') {
       await accountsStore.updateGeminiAccount(props.account.id, data)
+    } else if (props.account.platform === 'gemini-api') {
+      await accountsStore.updateGeminiApiAccount(props.account.id, data)
     } else if (props.account.platform === 'droid') {
       await accountsStore.updateDroidAccount(props.account.id, data)
     } else {
@@ -4986,6 +5164,10 @@ const filteredGroups = computed(() => {
   else if (form.value.platform === 'openai-responses') {
     platformFilter = 'openai'
   }
+  // Gemini-API 使用 Gemini 分组
+  else if (form.value.platform === 'gemini-api') {
+    platformFilter = 'gemini'
+  }
   return groups.value.filter((g) => g.platform === platformFilter)
 })
 
@@ -5064,6 +5246,9 @@ watch(
     } else if (newPlatform === 'openai') {
       // 切换到 OpenAI 时，使用 OAuth 作为默认方式
       form.value.addType = 'oauth'
+    } else if (newPlatform === 'gemini-api' || newPlatform === 'azure_openai') {
+      // 切换到 Gemini API 或 Azure OpenAI 时，使用 apikey 模式（直接创建，不需要 OAuth 流程）
+      form.value.addType = 'apikey'
     }
 
     // 平台变化时，清空分组选择

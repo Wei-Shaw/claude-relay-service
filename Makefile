@@ -1,7 +1,7 @@
 # Claude Relay Service Makefile
 # 功能完整的 AI API 中转服务，支持 Claude 和 Gemini 双平台
 
-.PHONY: help install setup dev start test lint clean docker-up docker-down service-start service-stop service-status logs cli-admin cli-keys cli-accounts cli-status
+.PHONY: help install setup dev start test lint clean docker-up docker-down service-start service-stop service-status logs cli-admin cli-keys cli-accounts cli-status ci-release-trigger
 
 # 默认目标：显示帮助信息
 help:
@@ -184,6 +184,10 @@ quick-daemon: setup service-daemon
 	@echo "🎉 服务已在后台启动！"
 	@echo "运行 'make service-status' 查看状态"
 	@echo "运行 'make logs-follow' 查看实时日志"
+
+# CI 触发占位目标：用于在不影响功能的情况下触发自动发布
+ci-release-trigger:
+	@echo "⚙️ 触发自动发布流水线的占位目标，避免引入功能变更"
 
 # 全栈开发环境
 dev-full: install install-web build-web setup dev

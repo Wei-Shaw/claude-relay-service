@@ -193,323 +193,55 @@ router.get('/api-keys/:keyId/cost-debug', authenticateAdmin, async (req, res) =>
 // 获取所有API Keys
 router.get('/api-keys', authenticateAdmin, async (req, res) => {
   try {
-    const { timeRange = 'all', startDate, endDate } = req.query // all, 7days, monthly, custom
-    const apiKeys = await apiKeyService.getAllApiKeys()
+    const {
+      // 分页参数
+      page = 1,
+      pageSize = 20,
+      // 搜索参数
+      searchMode = 'apiKey',
+      search = '',
+      // 筛选参数
+      tag = '',
+      isActive = '',
+      // 排序参数
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      // 兼容旧参数（不再用于费用计算，仅标记）
+      timeRange = 'all'
+    } = req.query
+
+    // 验证分页参数
+    const pageNum = Math.max(1, parseInt(page) || 1)
+    const pageSizeNum = [10, 20, 50, 100].includes(parseInt(pageSize)) ? parseInt(pageSize) : 20
+
+    // 验证排序参数（移除费用相关排序）
+    const validSortFields = ['name', 'createdAt', 'expiresAt', 'lastUsedAt', 'isActive', 'status']
+    const validSortBy = validSortFields.includes(sortBy) ? sortBy : 'createdAt'
+    const validSortOrder = ['asc', 'desc'].includes(sortOrder) ? sortOrder : 'desc'
 
     // 获取用户服务来补充owner信息
     const userService = require('../services/userService')
 
-    // 根据时间范围计算查询模式
-    const now = new Date()
-    const searchPatterns = []
-
-    if (timeRange === 'custom' && startDate && endDate) {
-      // 自定义日期范围
-      const redisClient = require('../models/redis')
-      const start = new Date(startDate)
-      const end = new Date(endDate)
-
-      // 确保日期范围有效
-      if (start > end) {
-        return res.status(400).json({ error: 'Start date must be before or equal to end date' })
-      }
-
-      // 限制最大范围为365天
-      const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1
-      if (daysDiff > 365) {
-        return res.status(400).json({ error: 'Date range cannot exceed 365 days' })
-      }
-
-      // 生成日期范围内每天的搜索模式
-      const currentDate = new Date(start)
-      while (currentDate <= end) {
-        const tzDate = redisClient.getDateInTimezone(currentDate)
-        const dateStr = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
-          2,
-          '0'
-        )}-${String(tzDate.getUTCDate()).padStart(2, '0')}`
-        searchPatterns.push(`usage:daily:*:${dateStr}`)
-        currentDate.setDate(currentDate.getDate() + 1)
-      }
-    } else if (timeRange === 'today') {
-      // 今日 - 使用时区日期
-      const redisClient = require('../models/redis')
-      const tzDate = redisClient.getDateInTimezone(now)
-      const dateStr = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
-        2,
-        '0'
-      )}-${String(tzDate.getUTCDate()).padStart(2, '0')}`
-      searchPatterns.push(`usage:daily:*:${dateStr}`)
-    } else if (timeRange === '7days') {
-      // 最近7天
-      const redisClient = require('../models/redis')
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(now)
-        date.setDate(date.getDate() - i)
-        const tzDate = redisClient.getDateInTimezone(date)
-        const dateStr = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
-          2,
-          '0'
-        )}-${String(tzDate.getUTCDate()).padStart(2, '0')}`
-        searchPatterns.push(`usage:daily:*:${dateStr}`)
-      }
-    } else if (timeRange === 'monthly') {
-      // 本月
-      const redisClient = require('../models/redis')
-      const tzDate = redisClient.getDateInTimezone(now)
-      const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
-        2,
-        '0'
-      )}`
-      searchPatterns.push(`usage:monthly:*:${currentMonth}`)
+    // 如果是绑定账号搜索模式，先刷新账户名称缓存
+    if (searchMode === 'bindingAccount' && search) {
+      const accountNameCacheService = require('../services/accountNameCacheService')
+      await accountNameCacheService.refreshIfNeeded()
     }
 
-    // 为每个API Key计算准确的费用和统计数据
-    for (const apiKey of apiKeys) {
-      const client = redis.getClientSafe()
-
-      if (timeRange === 'all') {
-        // 全部时间：保持原有逻辑
-        if (apiKey.usage && apiKey.usage.total) {
-          // 使用与展开模型统计相同的数据源
-          // 获取所有时间的模型统计数据
-          const monthlyKeys = await client.keys(`usage:${apiKey.id}:model:monthly:*:*`)
-          const modelStatsMap = new Map()
-
-          // 汇总所有月份的数据
-          for (const key of monthlyKeys) {
-            const match = key.match(/usage:.+:model:monthly:(.+):\d{4}-\d{2}$/)
-            if (!match) {
-              continue
-            }
-
-            const model = match[1]
-            const data = await client.hgetall(key)
-
-            if (data && Object.keys(data).length > 0) {
-              if (!modelStatsMap.has(model)) {
-                modelStatsMap.set(model, {
-                  inputTokens: 0,
-                  outputTokens: 0,
-                  cacheCreateTokens: 0,
-                  cacheReadTokens: 0
-                })
-              }
-
-              const stats = modelStatsMap.get(model)
-              stats.inputTokens +=
-                parseInt(data.totalInputTokens) || parseInt(data.inputTokens) || 0
-              stats.outputTokens +=
-                parseInt(data.totalOutputTokens) || parseInt(data.outputTokens) || 0
-              stats.cacheCreateTokens +=
-                parseInt(data.totalCacheCreateTokens) || parseInt(data.cacheCreateTokens) || 0
-              stats.cacheReadTokens +=
-                parseInt(data.totalCacheReadTokens) || parseInt(data.cacheReadTokens) || 0
-            }
-          }
-
-          let totalCost = 0
-
-          // 计算每个模型的费用
-          for (const [model, stats] of modelStatsMap) {
-            const usage = {
-              input_tokens: stats.inputTokens,
-              output_tokens: stats.outputTokens,
-              cache_creation_input_tokens: stats.cacheCreateTokens,
-              cache_read_input_tokens: stats.cacheReadTokens
-            }
-
-            const costResult = CostCalculator.calculateCost(usage, model)
-            totalCost += costResult.costs.total
-          }
-
-          // 如果没有详细的模型数据，使用总量数据和默认模型计算
-          if (modelStatsMap.size === 0) {
-            const usage = {
-              input_tokens: apiKey.usage.total.inputTokens || 0,
-              output_tokens: apiKey.usage.total.outputTokens || 0,
-              cache_creation_input_tokens: apiKey.usage.total.cacheCreateTokens || 0,
-              cache_read_input_tokens: apiKey.usage.total.cacheReadTokens || 0
-            }
-
-            const costResult = CostCalculator.calculateCost(usage, 'claude-3-5-haiku-20241022')
-            totalCost = costResult.costs.total
-          }
-
-          // 添加格式化的费用到响应数据
-          apiKey.usage.total.cost = totalCost
-          apiKey.usage.total.formattedCost = CostCalculator.formatCost(totalCost)
-        }
-      } else {
-        // 7天、本月或自定义日期范围：重新计算统计数据
-        const tempUsage = {
-          requests: 0,
-          tokens: 0,
-          allTokens: 0, // 添加allTokens字段
-          inputTokens: 0,
-          outputTokens: 0,
-          cacheCreateTokens: 0,
-          cacheReadTokens: 0
-        }
-
-        // 获取指定时间范围的统计数据
-        for (const pattern of searchPatterns) {
-          const keys = await client.keys(pattern.replace('*', apiKey.id))
-
-          for (const key of keys) {
-            const data = await client.hgetall(key)
-            if (data && Object.keys(data).length > 0) {
-              // 使用与 redis.js incrementTokenUsage 中相同的字段名
-              tempUsage.requests += parseInt(data.totalRequests) || parseInt(data.requests) || 0
-              tempUsage.tokens += parseInt(data.totalTokens) || parseInt(data.tokens) || 0
-              tempUsage.allTokens += parseInt(data.totalAllTokens) || parseInt(data.allTokens) || 0 // 读取包含所有Token的字段
-              tempUsage.inputTokens +=
-                parseInt(data.totalInputTokens) || parseInt(data.inputTokens) || 0
-              tempUsage.outputTokens +=
-                parseInt(data.totalOutputTokens) || parseInt(data.outputTokens) || 0
-              tempUsage.cacheCreateTokens +=
-                parseInt(data.totalCacheCreateTokens) || parseInt(data.cacheCreateTokens) || 0
-              tempUsage.cacheReadTokens +=
-                parseInt(data.totalCacheReadTokens) || parseInt(data.cacheReadTokens) || 0
-            }
-          }
-        }
-
-        // 计算指定时间范围的费用
-        let totalCost = 0
-        const redisClient = require('../models/redis')
-        const tzToday = redisClient.getDateStringInTimezone(now)
-        const tzDate = redisClient.getDateInTimezone(now)
-        const tzMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
-          2,
-          '0'
-        )}`
-
-        let modelKeys = []
-        if (timeRange === 'custom' && startDate && endDate) {
-          // 自定义日期范围：获取范围内所有日期的模型统计
-          const start = new Date(startDate)
-          const end = new Date(endDate)
-          const currentDate = new Date(start)
-
-          while (currentDate <= end) {
-            const tzDateForKey = redisClient.getDateInTimezone(currentDate)
-            const dateStr = `${tzDateForKey.getUTCFullYear()}-${String(
-              tzDateForKey.getUTCMonth() + 1
-            ).padStart(2, '0')}-${String(tzDateForKey.getUTCDate()).padStart(2, '0')}`
-            const dayKeys = await client.keys(`usage:${apiKey.id}:model:daily:*:${dateStr}`)
-            modelKeys = modelKeys.concat(dayKeys)
-            currentDate.setDate(currentDate.getDate() + 1)
-          }
-        } else {
-          modelKeys =
-            timeRange === 'today'
-              ? await client.keys(`usage:${apiKey.id}:model:daily:*:${tzToday}`)
-              : timeRange === '7days'
-                ? await client.keys(`usage:${apiKey.id}:model:daily:*:*`)
-                : await client.keys(`usage:${apiKey.id}:model:monthly:*:${tzMonth}`)
-        }
-
-        const modelStatsMap = new Map()
-
-        // 过滤和汇总相应时间范围的模型数据
-        for (const key of modelKeys) {
-          if (timeRange === '7days') {
-            // 检查是否在最近7天内
-            const dateMatch = key.match(/\d{4}-\d{2}-\d{2}$/)
-            if (dateMatch) {
-              const keyDate = new Date(dateMatch[0])
-              const daysDiff = Math.floor((now - keyDate) / (1000 * 60 * 60 * 24))
-              if (daysDiff > 6) {
-                continue
-              }
-            }
-          } else if (timeRange === 'today' || timeRange === 'custom') {
-            // today和custom选项已经在查询时过滤了，不需要额外处理
-          }
-
-          const modelMatch = key.match(
-            /usage:.+:model:(?:daily|monthly):(.+):\d{4}-\d{2}(?:-\d{2})?$/
-          )
-          if (!modelMatch) {
-            continue
-          }
-
-          const model = modelMatch[1]
-          const data = await client.hgetall(key)
-
-          if (data && Object.keys(data).length > 0) {
-            if (!modelStatsMap.has(model)) {
-              modelStatsMap.set(model, {
-                inputTokens: 0,
-                outputTokens: 0,
-                cacheCreateTokens: 0,
-                cacheReadTokens: 0
-              })
-            }
-
-            const stats = modelStatsMap.get(model)
-            stats.inputTokens += parseInt(data.totalInputTokens) || parseInt(data.inputTokens) || 0
-            stats.outputTokens +=
-              parseInt(data.totalOutputTokens) || parseInt(data.outputTokens) || 0
-            stats.cacheCreateTokens +=
-              parseInt(data.totalCacheCreateTokens) || parseInt(data.cacheCreateTokens) || 0
-            stats.cacheReadTokens +=
-              parseInt(data.totalCacheReadTokens) || parseInt(data.cacheReadTokens) || 0
-          }
-        }
-
-        // 计算费用
-        for (const [model, stats] of modelStatsMap) {
-          const usage = {
-            input_tokens: stats.inputTokens,
-            output_tokens: stats.outputTokens,
-            cache_creation_input_tokens: stats.cacheCreateTokens,
-            cache_read_input_tokens: stats.cacheReadTokens
-          }
-
-          const costResult = CostCalculator.calculateCost(usage, model)
-          totalCost += costResult.costs.total
-        }
-
-        // 如果没有模型数据，使用临时统计数据计算
-        if (modelStatsMap.size === 0 && tempUsage.tokens > 0) {
-          const usage = {
-            input_tokens: tempUsage.inputTokens,
-            output_tokens: tempUsage.outputTokens,
-            cache_creation_input_tokens: tempUsage.cacheCreateTokens,
-            cache_read_input_tokens: tempUsage.cacheReadTokens
-          }
-
-          const costResult = CostCalculator.calculateCost(usage, 'claude-3-5-haiku-20241022')
-          totalCost = costResult.costs.total
-        }
-
-        // 使用从Redis读取的allTokens，如果没有则计算
-        const allTokens =
-          tempUsage.allTokens ||
-          tempUsage.inputTokens +
-            tempUsage.outputTokens +
-            tempUsage.cacheCreateTokens +
-            tempUsage.cacheReadTokens
-
-        // 更新API Key的usage数据为指定时间范围的数据
-        apiKey.usage[timeRange] = {
-          ...tempUsage,
-          tokens: allTokens, // 使用包含所有Token的总数
-          allTokens,
-          cost: totalCost,
-          formattedCost: CostCalculator.formatCost(totalCost)
-        }
-
-        // 为了保持兼容性，也更新total字段
-        apiKey.usage.total = apiKey.usage[timeRange]
-      }
-    }
+    // 使用优化的分页方法获取数据（bindingAccount搜索现在在Redis层处理）
+    const result = await redis.getApiKeysPaginated({
+      page: pageNum,
+      pageSize: pageSizeNum,
+      searchMode,
+      search,
+      tag,
+      isActive,
+      sortBy: validSortBy,
+      sortOrder: validSortOrder
+    })
 
     // 为每个API Key添加owner的displayName
-    for (const apiKey of apiKeys) {
-      // 如果API Key有关联的用户ID，获取用户信息
+    for (const apiKey of result.items) {
       if (apiKey.userId) {
         try {
           const user = await userService.getUserById(apiKey.userId, false)
@@ -523,13 +255,27 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
           apiKey.ownerDisplayName = 'Unknown User'
         }
       } else {
-        // 如果没有userId，使用createdBy字段或默认为Admin
         apiKey.ownerDisplayName =
           apiKey.createdBy === 'admin' ? 'Admin' : apiKey.createdBy || 'Admin'
       }
+
+      // 初始化空的 usage 对象（费用通过 batch-stats 接口获取）
+      if (!apiKey.usage) {
+        apiKey.usage = { total: { requests: 0, tokens: 0, cost: 0, formattedCost: '$0.00' } }
+      }
     }
 
-    return res.json({ success: true, data: apiKeys })
+    // 返回分页数据
+    return res.json({
+      success: true,
+      data: {
+        items: result.items,
+        pagination: result.pagination,
+        availableTags: result.availableTags
+      },
+      // 标记当前请求的时间范围（供前端参考）
+      timeRange
+    })
   } catch (error) {
     logger.error('❌ Failed to get API keys:', error)
     return res.status(500).json({ error: 'Failed to get API keys', message: error.message })
@@ -586,6 +332,529 @@ router.get('/api-keys/tags', authenticateAdmin, async (req, res) => {
   } catch (error) {
     logger.error('❌ Failed to get API key tags:', error)
     return res.status(500).json({ error: 'Failed to get API key tags', message: error.message })
+  }
+})
+
+/**
+ * 获取账户绑定的 API Key 数量统计
+ * GET /admin/accounts/binding-counts
+ *
+ * 返回每种账户类型的绑定数量统计，用于账户列表页面显示"绑定: X 个API Key"
+ * 这是一个轻量级接口，只返回计数而不是完整的 API Key 数据
+ */
+router.get('/accounts/binding-counts', authenticateAdmin, async (req, res) => {
+  try {
+    // 使用优化的分页方法获取所有非删除的 API Keys（只需要绑定字段）
+    const result = await redis.getApiKeysPaginated({
+      page: 1,
+      pageSize: 10000, // 获取所有
+      excludeDeleted: true
+    })
+
+    const apiKeys = result.items
+
+    // 初始化统计对象
+    const bindingCounts = {
+      claudeAccountId: {},
+      claudeConsoleAccountId: {},
+      geminiAccountId: {},
+      openaiAccountId: {},
+      azureOpenaiAccountId: {},
+      bedrockAccountId: {},
+      droidAccountId: {},
+      ccrAccountId: {}
+    }
+
+    // 遍历一次，统计每个账户的绑定数量
+    for (const key of apiKeys) {
+      // Claude 账户
+      if (key.claudeAccountId) {
+        const id = key.claudeAccountId
+        bindingCounts.claudeAccountId[id] = (bindingCounts.claudeAccountId[id] || 0) + 1
+      }
+
+      // Claude Console 账户
+      if (key.claudeConsoleAccountId) {
+        const id = key.claudeConsoleAccountId
+        bindingCounts.claudeConsoleAccountId[id] =
+          (bindingCounts.claudeConsoleAccountId[id] || 0) + 1
+      }
+
+      // Gemini 账户（包括 api: 前缀的 Gemini-API 账户）
+      if (key.geminiAccountId) {
+        const id = key.geminiAccountId
+        bindingCounts.geminiAccountId[id] = (bindingCounts.geminiAccountId[id] || 0) + 1
+      }
+
+      // OpenAI 账户（包括 responses: 前缀的 OpenAI-Responses 账户）
+      if (key.openaiAccountId) {
+        const id = key.openaiAccountId
+        bindingCounts.openaiAccountId[id] = (bindingCounts.openaiAccountId[id] || 0) + 1
+      }
+
+      // Azure OpenAI 账户
+      if (key.azureOpenaiAccountId) {
+        const id = key.azureOpenaiAccountId
+        bindingCounts.azureOpenaiAccountId[id] = (bindingCounts.azureOpenaiAccountId[id] || 0) + 1
+      }
+
+      // Bedrock 账户
+      if (key.bedrockAccountId) {
+        const id = key.bedrockAccountId
+        bindingCounts.bedrockAccountId[id] = (bindingCounts.bedrockAccountId[id] || 0) + 1
+      }
+
+      // Droid 账户
+      if (key.droidAccountId) {
+        const id = key.droidAccountId
+        bindingCounts.droidAccountId[id] = (bindingCounts.droidAccountId[id] || 0) + 1
+      }
+
+      // CCR 账户
+      if (key.ccrAccountId) {
+        const id = key.ccrAccountId
+        bindingCounts.ccrAccountId[id] = (bindingCounts.ccrAccountId[id] || 0) + 1
+      }
+    }
+
+    logger.debug(`📊 Account binding counts calculated from ${apiKeys.length} API keys`)
+    return res.json({ success: true, data: bindingCounts })
+  } catch (error) {
+    logger.error('❌ Failed to get account binding counts:', error)
+    return res.status(500).json({
+      error: 'Failed to get account binding counts',
+      message: error.message
+    })
+  }
+})
+
+/**
+ * 批量获取指定 Keys 的统计数据和费用
+ * POST /admin/api-keys/batch-stats
+ *
+ * 用于 API Keys 列表页面异步加载统计数据
+ */
+router.post('/api-keys/batch-stats', authenticateAdmin, async (req, res) => {
+  try {
+    const {
+      keyIds, // 必需：API Key ID 数组
+      timeRange = 'all', // 时间范围：all, today, 7days, monthly, custom
+      startDate, // custom 时必需
+      endDate // custom 时必需
+    } = req.body
+
+    // 参数验证
+    if (!Array.isArray(keyIds) || keyIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'keyIds is required and must be a non-empty array'
+      })
+    }
+
+    // 限制单次最多处理 100 个 Key
+    if (keyIds.length > 100) {
+      return res.status(400).json({
+        success: false,
+        error: 'Max 100 keys per request'
+      })
+    }
+
+    // 验证 custom 时间范围的参数
+    if (timeRange === 'custom') {
+      if (!startDate || !endDate) {
+        return res.status(400).json({
+          success: false,
+          error: 'startDate and endDate are required for custom time range'
+        })
+      }
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid date format'
+        })
+      }
+      if (start > end) {
+        return res.status(400).json({
+          success: false,
+          error: 'startDate must be before or equal to endDate'
+        })
+      }
+      // 限制最大范围为 365 天
+      const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1
+      if (daysDiff > 365) {
+        return res.status(400).json({
+          success: false,
+          error: 'Date range cannot exceed 365 days'
+        })
+      }
+    }
+
+    logger.info(
+      `📊 Batch stats request: ${keyIds.length} keys, timeRange=${timeRange}`,
+      timeRange === 'custom' ? `, ${startDate} to ${endDate}` : ''
+    )
+
+    const stats = {}
+
+    // 并行计算每个 Key 的统计数据
+    await Promise.all(
+      keyIds.map(async (keyId) => {
+        try {
+          stats[keyId] = await calculateKeyStats(keyId, timeRange, startDate, endDate)
+        } catch (error) {
+          logger.error(`❌ Failed to calculate stats for key ${keyId}:`, error)
+          stats[keyId] = {
+            requests: 0,
+            tokens: 0,
+            inputTokens: 0,
+            outputTokens: 0,
+            cacheCreateTokens: 0,
+            cacheReadTokens: 0,
+            cost: 0,
+            formattedCost: '$0.00',
+            dailyCost: 0,
+            currentWindowCost: 0,
+            windowRemainingSeconds: null,
+            allTimeCost: 0,
+            error: error.message
+          }
+        }
+      })
+    )
+
+    return res.json({ success: true, data: stats })
+  } catch (error) {
+    logger.error('❌ Failed to calculate batch stats:', error)
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to calculate stats',
+      message: error.message
+    })
+  }
+})
+
+/**
+ * 计算单个 Key 的统计数据
+ * @param {string} keyId - API Key ID
+ * @param {string} timeRange - 时间范围
+ * @param {string} startDate - 开始日期 (custom 模式)
+ * @param {string} endDate - 结束日期 (custom 模式)
+ * @returns {Object} 统计数据
+ */
+async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
+  const client = redis.getClientSafe()
+  const tzDate = redis.getDateInTimezone()
+  const today = redis.getDateStringInTimezone()
+
+  // 构建搜索模式
+  const searchPatterns = []
+
+  if (timeRange === 'custom' && startDate && endDate) {
+    // 自定义日期范围
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dateStr = redis.getDateStringInTimezone(d)
+      searchPatterns.push(`usage:${keyId}:model:daily:*:${dateStr}`)
+    }
+  } else if (timeRange === 'today') {
+    searchPatterns.push(`usage:${keyId}:model:daily:*:${today}`)
+  } else if (timeRange === '7days') {
+    // 最近7天
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(tzDate)
+      d.setDate(d.getDate() - i)
+      const dateStr = redis.getDateStringInTimezone(d)
+      searchPatterns.push(`usage:${keyId}:model:daily:*:${dateStr}`)
+    }
+  } else if (timeRange === 'monthly') {
+    // 当月
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
+    searchPatterns.push(`usage:${keyId}:model:monthly:*:${currentMonth}`)
+  } else {
+    // all - 获取所有数据（日和月数据都查）
+    searchPatterns.push(`usage:${keyId}:model:daily:*`)
+    searchPatterns.push(`usage:${keyId}:model:monthly:*`)
+  }
+
+  // 使用 SCAN 收集所有匹配的 keys
+  const allKeys = []
+  for (const pattern of searchPatterns) {
+    let cursor = '0'
+    do {
+      const [newCursor, keys] = await client.scan(cursor, 'MATCH', pattern, 'COUNT', 100)
+      cursor = newCursor
+      allKeys.push(...keys)
+    } while (cursor !== '0')
+  }
+
+  // 去重（避免日数据和月数据重复计算）
+  const uniqueKeys = [...new Set(allKeys)]
+
+  if (uniqueKeys.length === 0) {
+    return {
+      requests: 0,
+      tokens: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheCreateTokens: 0,
+      cacheReadTokens: 0,
+      cost: 0,
+      formattedCost: '$0.00'
+    }
+  }
+
+  // 使用 Pipeline 批量获取数据
+  const pipeline = client.pipeline()
+  for (const key of uniqueKeys) {
+    pipeline.hgetall(key)
+  }
+  const results = await pipeline.exec()
+
+  // 汇总计算
+  const modelStatsMap = new Map()
+  let totalRequests = 0
+
+  // 用于去重：只统计日数据，避免与月数据重复
+  const dailyKeyPattern = /usage:.+:model:daily:(.+):\d{4}-\d{2}-\d{2}$/
+  const monthlyKeyPattern = /usage:.+:model:monthly:(.+):\d{4}-\d{2}$/
+
+  // 检查是否有日数据
+  const hasDailyData = uniqueKeys.some((key) => dailyKeyPattern.test(key))
+
+  for (let i = 0; i < results.length; i++) {
+    const [err, data] = results[i]
+    if (err || !data || Object.keys(data).length === 0) {
+      continue
+    }
+
+    const key = uniqueKeys[i]
+    let model = null
+    let isMonthly = false
+
+    // 提取模型名称
+    const dailyMatch = key.match(dailyKeyPattern)
+    const monthlyMatch = key.match(monthlyKeyPattern)
+
+    if (dailyMatch) {
+      model = dailyMatch[1]
+    } else if (monthlyMatch) {
+      model = monthlyMatch[1]
+      isMonthly = true
+    }
+
+    if (!model) {
+      continue
+    }
+
+    // 如果有日数据，则跳过月数据以避免重复
+    if (hasDailyData && isMonthly) {
+      continue
+    }
+
+    if (!modelStatsMap.has(model)) {
+      modelStatsMap.set(model, {
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheCreateTokens: 0,
+        cacheReadTokens: 0,
+        requests: 0
+      })
+    }
+
+    const stats = modelStatsMap.get(model)
+    stats.inputTokens += parseInt(data.totalInputTokens) || parseInt(data.inputTokens) || 0
+    stats.outputTokens += parseInt(data.totalOutputTokens) || parseInt(data.outputTokens) || 0
+    stats.cacheCreateTokens +=
+      parseInt(data.totalCacheCreateTokens) || parseInt(data.cacheCreateTokens) || 0
+    stats.cacheReadTokens +=
+      parseInt(data.totalCacheReadTokens) || parseInt(data.cacheReadTokens) || 0
+    stats.requests += parseInt(data.totalRequests) || parseInt(data.requests) || 0
+
+    totalRequests += parseInt(data.totalRequests) || parseInt(data.requests) || 0
+  }
+
+  // 计算费用
+  let totalCost = 0
+  let inputTokens = 0
+  let outputTokens = 0
+  let cacheCreateTokens = 0
+  let cacheReadTokens = 0
+
+  for (const [model, stats] of modelStatsMap) {
+    inputTokens += stats.inputTokens
+    outputTokens += stats.outputTokens
+    cacheCreateTokens += stats.cacheCreateTokens
+    cacheReadTokens += stats.cacheReadTokens
+
+    const costResult = CostCalculator.calculateCost(
+      {
+        input_tokens: stats.inputTokens,
+        output_tokens: stats.outputTokens,
+        cache_creation_input_tokens: stats.cacheCreateTokens,
+        cache_read_input_tokens: stats.cacheReadTokens
+      },
+      model
+    )
+    totalCost += costResult.costs.total
+  }
+
+  const tokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
+
+  // 获取实时限制数据
+  let dailyCost = 0
+  let currentWindowCost = 0
+  let windowRemainingSeconds = null
+  let allTimeCost = 0
+
+  try {
+    // 获取当日费用
+    dailyCost = await redis.getDailyCost(keyId)
+
+    // 获取历史总费用（用于总费用限制进度条，不受时间范围影响）
+    const totalCostKey = `usage:cost:total:${keyId}`
+    allTimeCost = parseFloat((await client.get(totalCostKey)) || '0')
+
+    // 获取 API Key 配置信息以判断是否需要窗口数据
+    const apiKey = await redis.getApiKeyById(keyId)
+    if (apiKey && apiKey.rateLimitWindow > 0) {
+      const costCountKey = `rate_limit:cost:${keyId}`
+      const windowStartKey = `rate_limit:window_start:${keyId}`
+
+      currentWindowCost = parseFloat((await client.get(costCountKey)) || '0')
+
+      // 获取窗口开始时间和计算剩余时间
+      const windowStart = await client.get(windowStartKey)
+      if (windowStart) {
+        const now = Date.now()
+        const windowStartTime = parseInt(windowStart)
+        const windowDuration = apiKey.rateLimitWindow * 60 * 1000 // 转换为毫秒
+        const windowEndTime = windowStartTime + windowDuration
+
+        // 如果窗口还有效
+        if (now < windowEndTime) {
+          windowRemainingSeconds = Math.max(0, Math.floor((windowEndTime - now) / 1000))
+        } else {
+          // 窗口已过期
+          windowRemainingSeconds = 0
+          currentWindowCost = 0
+        }
+      }
+    }
+  } catch (error) {
+    logger.debug(`获取实时限制数据失败 (key: ${keyId}):`, error.message)
+  }
+
+  return {
+    requests: totalRequests,
+    tokens,
+    inputTokens,
+    outputTokens,
+    cacheCreateTokens,
+    cacheReadTokens,
+    cost: totalCost,
+    formattedCost: CostCalculator.formatCost(totalCost),
+    // 实时限制数据
+    dailyCost,
+    currentWindowCost,
+    windowRemainingSeconds,
+    allTimeCost // 历史总费用（用于总费用限制）
+  }
+}
+
+/**
+ * 批量获取指定 Keys 的最后使用账号信息
+ * POST /admin/api-keys/batch-last-usage
+ *
+ * 用于 API Keys 列表页面异步加载最后使用账号数据
+ */
+router.post('/api-keys/batch-last-usage', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyIds } = req.body
+
+    // 参数验证
+    if (!Array.isArray(keyIds) || keyIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'keyIds is required and must be a non-empty array'
+      })
+    }
+
+    // 限制单次最多处理 100 个 Key
+    if (keyIds.length > 100) {
+      return res.status(400).json({
+        success: false,
+        error: 'Max 100 keys per request'
+      })
+    }
+
+    logger.debug(`📊 Batch last-usage request: ${keyIds.length} keys`)
+
+    const client = redis.getClientSafe()
+    const lastUsageData = {}
+    const accountInfoCache = new Map()
+
+    // 并行获取每个 Key 的最后使用记录
+    await Promise.all(
+      keyIds.map(async (keyId) => {
+        try {
+          // 获取最新的使用记录
+          const usageRecords = await redis.getUsageRecords(keyId, 1)
+          if (!Array.isArray(usageRecords) || usageRecords.length === 0) {
+            lastUsageData[keyId] = null
+            return
+          }
+
+          const lastUsageRecord = usageRecords[0]
+          if (!lastUsageRecord || (!lastUsageRecord.accountId && !lastUsageRecord.accountType)) {
+            lastUsageData[keyId] = null
+            return
+          }
+
+          // 解析账号信息
+          const resolvedAccount = await apiKeyService._resolveAccountByUsageRecord(
+            lastUsageRecord,
+            accountInfoCache,
+            client
+          )
+
+          if (resolvedAccount) {
+            lastUsageData[keyId] = {
+              accountId: resolvedAccount.accountId,
+              rawAccountId: lastUsageRecord.accountId || resolvedAccount.accountId,
+              accountType: resolvedAccount.accountType,
+              accountCategory: resolvedAccount.accountCategory,
+              accountName: resolvedAccount.accountName,
+              recordedAt: lastUsageRecord.timestamp || null
+            }
+          } else {
+            // 账号已删除
+            lastUsageData[keyId] = {
+              accountId: null,
+              rawAccountId: lastUsageRecord.accountId || null,
+              accountType: 'deleted',
+              accountCategory: 'deleted',
+              accountName: '已删除',
+              recordedAt: lastUsageRecord.timestamp || null
+            }
+          }
+        } catch (error) {
+          logger.debug(`获取 API Key ${keyId} 的最后使用记录失败:`, error)
+          lastUsageData[keyId] = null
+        }
+      })
+    )
+
+    return res.json({ success: true, data: lastUsageData })
+  } catch (error) {
+    logger.error('❌ Failed to get batch last-usage:', error)
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get last-usage data',
+      message: error.message
+    })
   }
 })
 
@@ -4281,6 +4550,48 @@ router.put(
   }
 )
 
+// 重置 Gemini OAuth 账户限流状态
+router.post('/gemini-accounts/:id/reset-rate-limit', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    await geminiAccountService.updateAccount(id, {
+      rateLimitedAt: '',
+      rateLimitStatus: '',
+      status: 'active',
+      errorMessage: ''
+    })
+
+    logger.info(`🔄 Admin manually reset rate limit for Gemini account ${id}`)
+
+    res.json({
+      success: true,
+      message: 'Rate limit reset successfully'
+    })
+  } catch (error) {
+    logger.error('Failed to reset Gemini account rate limit:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// 重置 Gemini OAuth 账户状态（清除所有异常状态）
+router.post('/gemini-accounts/:id/reset-status', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const result = await geminiAccountService.resetAccountStatus(id)
+
+    logger.success(`✅ Admin reset status for Gemini account: ${id}`)
+    return res.json({ success: true, data: result })
+  } catch (error) {
+    logger.error('❌ Failed to reset Gemini account status:', error)
+    return res.status(500).json({ error: 'Failed to reset status', message: error.message })
+  }
+})
+
 // 📊 账户使用统计
 
 // 获取所有账户的使用统计
@@ -4366,6 +4677,7 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
       'openai',
       'openai-responses',
       'gemini',
+      'gemini-api',
       'droid'
     ]
     if (!allowedPlatforms.includes(platform)) {
@@ -4378,6 +4690,7 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
     const accountTypeMap = {
       openai: 'openai',
       'openai-responses': 'openai-responses',
+      'gemini-api': 'gemini-api',
       droid: 'droid'
     }
 
@@ -4387,6 +4700,7 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
       openai: 'gpt-4o-mini-2024-07-18',
       'openai-responses': 'gpt-4o-mini-2024-07-18',
       gemini: 'gemini-1.5-flash',
+      'gemini-api': 'gemini-2.0-flash',
       droid: 'unknown'
     }
 
@@ -4411,6 +4725,11 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
         case 'gemini':
           accountData = await geminiAccountService.getAccount(accountId)
           break
+        case 'gemini-api': {
+          const geminiApiAccountService = require('../services/geminiApiAccountService')
+          accountData = await geminiApiAccountService.getAccount(accountId)
+          break
+        }
         case 'droid':
           accountData = await droidAccountService.getAccount(accountId)
           break
@@ -5948,16 +6267,32 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
         })
       ]
     } else if (group === 'gemini') {
-      const geminiAccounts = await geminiAccountService.getAllAccounts()
-      accounts = geminiAccounts.map((account) => {
-        const id = String(account.id || '')
-        const shortId = id ? id.slice(0, 8) : '未知'
-        return {
-          id,
-          name: account.name || account.email || `Gemini账号 ${shortId}`,
-          platform: 'gemini'
-        }
-      })
+      const geminiApiAccountService = require('../services/geminiApiAccountService')
+      const [geminiAccounts, geminiApiAccounts] = await Promise.all([
+        geminiAccountService.getAllAccounts(),
+        geminiApiAccountService.getAllAccounts(true)
+      ])
+
+      accounts = [
+        ...geminiAccounts.map((account) => {
+          const id = String(account.id || '')
+          const shortId = id ? id.slice(0, 8) : '未知'
+          return {
+            id,
+            name: account.name || account.email || `Gemini账号 ${shortId}`,
+            platform: 'gemini'
+          }
+        }),
+        ...geminiApiAccounts.map((account) => {
+          const id = String(account.id || '')
+          const shortId = id ? id.slice(0, 8) : '未知'
+          return {
+            id,
+            name: account.name || `Gemini-API账号 ${shortId}`,
+            platform: 'gemini-api'
+          }
+        })
+      ]
     } else if (group === 'droid') {
       const droidAccounts = await droidAccountService.getAllAccounts()
       accounts = droidAccounts.map((account) => {
@@ -9292,6 +9627,403 @@ router.post('/droid-accounts/:id/refresh-token', authenticateAdmin, async (req, 
   } catch (error) {
     logger.error(`Failed to refresh Droid account token ${req.params.id}:`, error)
     return res.status(500).json({ error: 'Failed to refresh token', message: error.message })
+  }
+})
+
+// ==================== Gemini-API 账户管理 API ====================
+
+// 获取所有 Gemini-API 账户
+router.get('/gemini-api-accounts', authenticateAdmin, async (req, res) => {
+  try {
+    const geminiApiAccountService = require('../services/geminiApiAccountService')
+    const { platform, groupId } = req.query
+    let accounts = await geminiApiAccountService.getAllAccounts(true)
+
+    // 根据查询参数进行筛选
+    if (platform && platform !== 'gemini-api') {
+      accounts = []
+    }
+
+    // 根据分组ID筛选
+    if (groupId) {
+      const group = await accountGroupService.getGroup(groupId)
+      if (group && group.platform === 'gemini' && group.memberIds && group.memberIds.length > 0) {
+        accounts = accounts.filter((account) => group.memberIds.includes(account.id))
+      } else {
+        accounts = []
+      }
+    }
+
+    // 处理使用统计和绑定的 API Key 数量
+    const accountsWithStats = await Promise.all(
+      accounts.map(async (account) => {
+        // 检查并清除过期的限流状态
+        await geminiApiAccountService.checkAndClearRateLimit(account.id)
+
+        // 获取使用统计信息
+        let usageStats
+        try {
+          usageStats = await redis.getAccountUsageStats(account.id, 'gemini-api')
+        } catch (error) {
+          logger.debug(`Failed to get usage stats for Gemini-API account ${account.id}:`, error)
+          usageStats = {
+            daily: { requests: 0, tokens: 0, allTokens: 0 },
+            total: { requests: 0, tokens: 0, allTokens: 0 },
+            monthly: { requests: 0, tokens: 0, allTokens: 0 }
+          }
+        }
+
+        // 计算绑定的API Key数量（支持 api: 前缀）
+        const allKeys = await redis.getAllApiKeys()
+        let boundCount = 0
+
+        for (const key of allKeys) {
+          if (key.geminiAccountId) {
+            // 检查是否绑定了此 Gemini-API 账户（支持 api: 前缀）
+            if (key.geminiAccountId === `api:${account.id}`) {
+              boundCount++
+            }
+          }
+        }
+
+        return {
+          ...account,
+          usage: {
+            daily: usageStats.daily,
+            total: usageStats.total,
+            averages: usageStats.averages || usageStats.monthly
+          },
+          boundApiKeys: boundCount
+        }
+      })
+    )
+
+    res.json({ success: true, data: accountsWithStats })
+  } catch (error) {
+    logger.error('Failed to get Gemini-API accounts:', error)
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// 创建 Gemini-API 账户
+router.post('/gemini-api-accounts', authenticateAdmin, async (req, res) => {
+  try {
+    const geminiApiAccountService = require('../services/geminiApiAccountService')
+    const { accountType, groupId, groupIds } = req.body
+
+    // 验证accountType的有效性
+    if (accountType && !['shared', 'dedicated', 'group'].includes(accountType)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid account type. Must be "shared", "dedicated" or "group"'
+      })
+    }
+
+    // 如果是分组类型，验证groupId或groupIds
+    if (accountType === 'group' && !groupId && (!groupIds || groupIds.length === 0)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Group ID or Group IDs are required for group type accounts'
+      })
+    }
+
+    const account = await geminiApiAccountService.createAccount(req.body)
+
+    // 如果是分组类型，将账户添加到分组
+    if (accountType === 'group') {
+      if (groupIds && groupIds.length > 0) {
+        // 使用多分组设置
+        await accountGroupService.setAccountGroups(account.id, groupIds, 'gemini')
+      } else if (groupId) {
+        // 兼容单分组模式
+        await accountGroupService.addAccountToGroup(account.id, groupId, 'gemini')
+      }
+    }
+
+    logger.success(
+      `🏢 Admin created new Gemini-API account: ${account.name} (${accountType || 'shared'})`
+    )
+
+    res.json({ success: true, data: account })
+  } catch (error) {
+    logger.error('Failed to create Gemini-API account:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// 获取单个 Gemini-API 账户
+router.get('/gemini-api-accounts/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const geminiApiAccountService = require('../services/geminiApiAccountService')
+    const { id } = req.params
+    const account = await geminiApiAccountService.getAccount(id)
+
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        message: 'Account not found'
+      })
+    }
+
+    // 隐藏敏感信息
+    account.apiKey = '***'
+
+    res.json({ success: true, data: account })
+  } catch (error) {
+    logger.error('Failed to get Gemini-API account:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// 更新 Gemini-API 账户
+router.put('/gemini-api-accounts/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const geminiApiAccountService = require('../services/geminiApiAccountService')
+    const { id } = req.params
+    const updates = req.body
+
+    // 验证priority的有效性（1-100）
+    if (updates.priority !== undefined) {
+      const priority = parseInt(updates.priority)
+      if (isNaN(priority) || priority < 1 || priority > 100) {
+        return res.status(400).json({
+          success: false,
+          message: 'Priority must be a number between 1 and 100'
+        })
+      }
+    }
+
+    // 验证accountType的有效性
+    if (updates.accountType && !['shared', 'dedicated', 'group'].includes(updates.accountType)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid account type. Must be "shared", "dedicated" or "group"'
+      })
+    }
+
+    // 如果更新为分组类型，验证groupId或groupIds
+    if (
+      updates.accountType === 'group' &&
+      !updates.groupId &&
+      (!updates.groupIds || updates.groupIds.length === 0)
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: 'Group ID or Group IDs are required for group type accounts'
+      })
+    }
+
+    // 获取账户当前信息以处理分组变更
+    const currentAccount = await geminiApiAccountService.getAccount(id)
+    if (!currentAccount) {
+      return res.status(404).json({
+        success: false,
+        error: 'Account not found'
+      })
+    }
+
+    // 处理分组的变更
+    if (updates.accountType !== undefined) {
+      // 如果之前是分组类型，需要从所有分组中移除
+      if (currentAccount.accountType === 'group') {
+        await accountGroupService.removeAccountFromAllGroups(id)
+      }
+
+      // 如果新类型是分组，添加到新分组
+      if (updates.accountType === 'group') {
+        // 处理多分组/单分组的兼容性
+        if (Object.prototype.hasOwnProperty.call(updates, 'groupIds')) {
+          if (updates.groupIds && updates.groupIds.length > 0) {
+            // 使用多分组设置
+            await accountGroupService.setAccountGroups(id, updates.groupIds, 'gemini')
+          }
+        } else if (updates.groupId) {
+          // 兼容单分组模式
+          await accountGroupService.addAccountToGroup(id, updates.groupId, 'gemini')
+        }
+      }
+    }
+
+    const result = await geminiApiAccountService.updateAccount(id, updates)
+
+    if (!result.success) {
+      return res.status(400).json(result)
+    }
+
+    logger.success(`📝 Admin updated Gemini-API account: ${currentAccount.name}`)
+
+    res.json({ success: true, ...result })
+  } catch (error) {
+    logger.error('Failed to update Gemini-API account:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// 删除 Gemini-API 账户
+router.delete('/gemini-api-accounts/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const geminiApiAccountService = require('../services/geminiApiAccountService')
+    const { id } = req.params
+
+    const account = await geminiApiAccountService.getAccount(id)
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        message: 'Account not found'
+      })
+    }
+
+    // 自动解绑所有绑定的 API Keys（支持 api: 前缀）
+    const unboundCount = await apiKeyService.unbindAccountFromAllKeys(id, 'gemini-api')
+
+    // 检查是否在分组中
+    const groups = await accountGroupService.getAllGroups()
+    for (const group of groups) {
+      if (group.platform === 'gemini' && group.memberIds && group.memberIds.includes(id)) {
+        await accountGroupService.removeMemberFromGroup(group.id, id)
+        logger.info(`Removed Gemini-API account ${id} from group ${group.id}`)
+      }
+    }
+
+    const result = await geminiApiAccountService.deleteAccount(id)
+
+    let message = 'Gemini-API账号已成功删除'
+    if (unboundCount > 0) {
+      message += `，${unboundCount} 个 API Key 已切换为共享池模式`
+    }
+
+    logger.success(`✅ ${message}`)
+
+    res.json({
+      success: true,
+      ...result,
+      message,
+      unboundKeys: unboundCount
+    })
+  } catch (error) {
+    logger.error('Failed to delete Gemini-API account:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// 切换 Gemini-API 账户调度状态
+router.put('/gemini-api-accounts/:id/toggle-schedulable', authenticateAdmin, async (req, res) => {
+  try {
+    const geminiApiAccountService = require('../services/geminiApiAccountService')
+    const { id } = req.params
+
+    const result = await geminiApiAccountService.toggleSchedulable(id)
+
+    if (!result.success) {
+      return res.status(400).json(result)
+    }
+
+    // 仅在停止调度时发送通知
+    if (!result.schedulable) {
+      await webhookNotifier.sendAccountEvent('account.status_changed', {
+        accountId: id,
+        platform: 'gemini-api',
+        schedulable: result.schedulable,
+        changedBy: 'admin',
+        action: 'stopped_scheduling'
+      })
+    }
+
+    res.json(result)
+  } catch (error) {
+    logger.error('Failed to toggle Gemini-API account schedulable status:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// 切换 Gemini-API 账户激活状态
+router.put('/gemini-api-accounts/:id/toggle', authenticateAdmin, async (req, res) => {
+  try {
+    const geminiApiAccountService = require('../services/geminiApiAccountService')
+    const { id } = req.params
+
+    const account = await geminiApiAccountService.getAccount(id)
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        message: 'Account not found'
+      })
+    }
+
+    const newActiveStatus = account.isActive === 'true' ? 'false' : 'true'
+    await geminiApiAccountService.updateAccount(id, {
+      isActive: newActiveStatus
+    })
+
+    res.json({
+      success: true,
+      isActive: newActiveStatus === 'true'
+    })
+  } catch (error) {
+    logger.error('Failed to toggle Gemini-API account status:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// 重置 Gemini-API 账户限流状态
+router.post('/gemini-api-accounts/:id/reset-rate-limit', authenticateAdmin, async (req, res) => {
+  try {
+    const geminiApiAccountService = require('../services/geminiApiAccountService')
+    const { id } = req.params
+
+    await geminiApiAccountService.updateAccount(id, {
+      rateLimitedAt: '',
+      rateLimitStatus: '',
+      status: 'active',
+      errorMessage: ''
+    })
+
+    logger.info(`🔄 Admin manually reset rate limit for Gemini-API account ${id}`)
+
+    res.json({
+      success: true,
+      message: 'Rate limit reset successfully'
+    })
+  } catch (error) {
+    logger.error('Failed to reset Gemini-API account rate limit:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// 重置 Gemini-API 账户状态（清除所有异常状态）
+router.post('/gemini-api-accounts/:id/reset-status', authenticateAdmin, async (req, res) => {
+  try {
+    const geminiApiAccountService = require('../services/geminiApiAccountService')
+    const { id } = req.params
+
+    const result = await geminiApiAccountService.resetAccountStatus(id)
+
+    logger.success(`✅ Admin reset status for Gemini-API account: ${id}`)
+    return res.json({ success: true, data: result })
+  } catch (error) {
+    logger.error('❌ Failed to reset Gemini-API account status:', error)
+    return res.status(500).json({ error: 'Failed to reset status', message: error.message })
   }
 })
 
