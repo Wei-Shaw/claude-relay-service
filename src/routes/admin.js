@@ -222,56 +222,23 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
     // 获取用户服务来补充owner信息
     const userService = require('../services/userService')
 
-    // 使用优化的分页方法获取数据
-    let result = await redis.getApiKeysPaginated({
+    // 如果是绑定账号搜索模式，先刷新账户名称缓存
+    if (searchMode === 'bindingAccount' && search) {
+      const accountNameCacheService = require('../services/accountNameCacheService')
+      await accountNameCacheService.refreshIfNeeded()
+    }
+
+    // 使用优化的分页方法获取数据（bindingAccount搜索现在在Redis层处理）
+    const result = await redis.getApiKeysPaginated({
       page: pageNum,
       pageSize: pageSizeNum,
       searchMode,
-      search: searchMode === 'apiKey' ? search : '', // apiKey 模式的搜索在 redis 层处理
+      search,
       tag,
       isActive,
       sortBy: validSortBy,
       sortOrder: validSortOrder
     })
-
-    // 如果是绑定账号搜索模式，需要在这里处理
-    if (searchMode === 'bindingAccount' && search) {
-      const accountNameCacheService = require('../services/accountNameCacheService')
-      await accountNameCacheService.refreshIfNeeded()
-
-      // 获取所有数据进行绑定账号搜索
-      const allResult = await redis.getApiKeysPaginated({
-        page: 1,
-        pageSize: 10000, // 获取所有数据
-        searchMode: 'apiKey',
-        search: '',
-        tag,
-        isActive,
-        sortBy: validSortBy,
-        sortOrder: validSortOrder
-      })
-
-      // 使用缓存服务进行绑定账号搜索
-      const filteredKeys = accountNameCacheService.searchByBindingAccount(allResult.items, search)
-
-      // 重新分页
-      const total = filteredKeys.length
-      const totalPages = Math.ceil(total / pageSizeNum) || 1
-      const validPage = Math.min(Math.max(1, pageNum), totalPages)
-      const start = (validPage - 1) * pageSizeNum
-      const items = filteredKeys.slice(start, start + pageSizeNum)
-
-      result = {
-        items,
-        pagination: {
-          page: validPage,
-          pageSize: pageSizeNum,
-          total,
-          totalPages
-        },
-        availableTags: allResult.availableTags
-      }
-    }
 
     // 为每个API Key添加owner的displayName
     for (const apiKey of result.items) {
@@ -547,6 +514,10 @@ router.post('/api-keys/batch-stats', authenticateAdmin, async (req, res) => {
             cacheReadTokens: 0,
             cost: 0,
             formattedCost: '$0.00',
+            dailyCost: 0,
+            currentWindowCost: 0,
+            windowRemainingSeconds: null,
+            allTimeCost: 0,
             error: error.message
           }
         }
@@ -732,6 +703,50 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
 
   const tokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
 
+  // 获取实时限制数据
+  let dailyCost = 0
+  let currentWindowCost = 0
+  let windowRemainingSeconds = null
+  let allTimeCost = 0
+
+  try {
+    // 获取当日费用
+    dailyCost = await redis.getDailyCost(keyId)
+
+    // 获取历史总费用（用于总费用限制进度条，不受时间范围影响）
+    const totalCostKey = `usage:cost:total:${keyId}`
+    allTimeCost = parseFloat((await client.get(totalCostKey)) || '0')
+
+    // 获取 API Key 配置信息以判断是否需要窗口数据
+    const apiKey = await redis.getApiKeyById(keyId)
+    if (apiKey && apiKey.rateLimitWindow > 0) {
+      const costCountKey = `rate_limit:cost:${keyId}`
+      const windowStartKey = `rate_limit:window_start:${keyId}`
+
+      currentWindowCost = parseFloat((await client.get(costCountKey)) || '0')
+
+      // 获取窗口开始时间和计算剩余时间
+      const windowStart = await client.get(windowStartKey)
+      if (windowStart) {
+        const now = Date.now()
+        const windowStartTime = parseInt(windowStart)
+        const windowDuration = apiKey.rateLimitWindow * 60 * 1000 // 转换为毫秒
+        const windowEndTime = windowStartTime + windowDuration
+
+        // 如果窗口还有效
+        if (now < windowEndTime) {
+          windowRemainingSeconds = Math.max(0, Math.floor((windowEndTime - now) / 1000))
+        } else {
+          // 窗口已过期
+          windowRemainingSeconds = 0
+          currentWindowCost = 0
+        }
+      }
+    }
+  } catch (error) {
+    logger.debug(`获取实时限制数据失败 (key: ${keyId}):`, error.message)
+  }
+
   return {
     requests: totalRequests,
     tokens,
@@ -740,9 +755,108 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
     cacheCreateTokens,
     cacheReadTokens,
     cost: totalCost,
-    formattedCost: CostCalculator.formatCost(totalCost)
+    formattedCost: CostCalculator.formatCost(totalCost),
+    // 实时限制数据
+    dailyCost,
+    currentWindowCost,
+    windowRemainingSeconds,
+    allTimeCost // 历史总费用（用于总费用限制）
   }
 }
+
+/**
+ * 批量获取指定 Keys 的最后使用账号信息
+ * POST /admin/api-keys/batch-last-usage
+ *
+ * 用于 API Keys 列表页面异步加载最后使用账号数据
+ */
+router.post('/api-keys/batch-last-usage', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyIds } = req.body
+
+    // 参数验证
+    if (!Array.isArray(keyIds) || keyIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'keyIds is required and must be a non-empty array'
+      })
+    }
+
+    // 限制单次最多处理 100 个 Key
+    if (keyIds.length > 100) {
+      return res.status(400).json({
+        success: false,
+        error: 'Max 100 keys per request'
+      })
+    }
+
+    logger.debug(`📊 Batch last-usage request: ${keyIds.length} keys`)
+
+    const client = redis.getClientSafe()
+    const lastUsageData = {}
+    const accountInfoCache = new Map()
+
+    // 并行获取每个 Key 的最后使用记录
+    await Promise.all(
+      keyIds.map(async (keyId) => {
+        try {
+          // 获取最新的使用记录
+          const usageRecords = await redis.getUsageRecords(keyId, 1)
+          if (!Array.isArray(usageRecords) || usageRecords.length === 0) {
+            lastUsageData[keyId] = null
+            return
+          }
+
+          const lastUsageRecord = usageRecords[0]
+          if (!lastUsageRecord || (!lastUsageRecord.accountId && !lastUsageRecord.accountType)) {
+            lastUsageData[keyId] = null
+            return
+          }
+
+          // 解析账号信息
+          const resolvedAccount = await apiKeyService._resolveAccountByUsageRecord(
+            lastUsageRecord,
+            accountInfoCache,
+            client
+          )
+
+          if (resolvedAccount) {
+            lastUsageData[keyId] = {
+              accountId: resolvedAccount.accountId,
+              rawAccountId: lastUsageRecord.accountId || resolvedAccount.accountId,
+              accountType: resolvedAccount.accountType,
+              accountCategory: resolvedAccount.accountCategory,
+              accountName: resolvedAccount.accountName,
+              recordedAt: lastUsageRecord.timestamp || null
+            }
+          } else {
+            // 账号已删除
+            lastUsageData[keyId] = {
+              accountId: null,
+              rawAccountId: lastUsageRecord.accountId || null,
+              accountType: 'deleted',
+              accountCategory: 'deleted',
+              accountName: '已删除',
+              recordedAt: lastUsageRecord.timestamp || null
+            }
+          }
+        } catch (error) {
+          logger.debug(`获取 API Key ${keyId} 的最后使用记录失败:`, error)
+          lastUsageData[keyId] = null
+        }
+      })
+    )
+
+    return res.json({ success: true, data: lastUsageData })
+  } catch (error) {
+    logger.error('❌ Failed to get batch last-usage:', error)
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get last-usage data',
+      message: error.message
+    })
+  }
+})
 
 // 创建新的API Key
 router.post('/api-keys', authenticateAdmin, async (req, res) => {

@@ -427,84 +427,98 @@
                       <!-- 所属账号列 -->
                       <td class="px-3 py-3">
                         <div class="space-y-1">
-                          <!-- Claude 绑定 -->
+                          <!-- 账号数据加载中 -->
                           <div
-                            v-if="key.claudeAccountId || key.claudeConsoleAccountId"
-                            class="flex items-center gap-1 text-xs"
+                            v-if="accountsLoading && hasAnyBinding(key)"
+                            class="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500"
                           >
-                            <span
-                              class="inline-flex items-center rounded bg-indigo-100 px-1.5 py-0.5 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+                            <i class="fas fa-spinner fa-spin mr-1"></i>
+                            加载中...
+                          </div>
+                          <!-- 账号数据已加载或无绑定 -->
+                          <template v-else>
+                            <!-- Claude 绑定 -->
+                            <div
+                              v-if="key.claudeAccountId || key.claudeConsoleAccountId"
+                              class="flex items-center gap-1 text-xs"
                             >
-                              <i class="fas fa-brain mr-1 text-[10px]" />
-                              Claude
-                            </span>
-                            <span class="truncate text-gray-600 dark:text-gray-400">
-                              {{ getClaudeBindingInfo(key) }}
-                            </span>
-                          </div>
-                          <!-- Gemini 绑定 -->
-                          <div v-if="key.geminiAccountId" class="flex items-center gap-1 text-xs">
-                            <span
-                              class="inline-flex items-center rounded bg-yellow-100 px-1.5 py-0.5 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
+                              <span
+                                class="inline-flex items-center rounded bg-indigo-100 px-1.5 py-0.5 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+                              >
+                                <i class="fas fa-brain mr-1 text-[10px]" />
+                                Claude
+                              </span>
+                              <span class="truncate text-gray-600 dark:text-gray-400">
+                                {{ getClaudeBindingInfo(key) }}
+                              </span>
+                            </div>
+                            <!-- Gemini 绑定 -->
+                            <div v-if="key.geminiAccountId" class="flex items-center gap-1 text-xs">
+                              <span
+                                class="inline-flex items-center rounded bg-yellow-100 px-1.5 py-0.5 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
+                              >
+                                <i class="fas fa-robot mr-1 text-[10px]" />
+                                Gemini
+                              </span>
+                              <span class="truncate text-gray-600 dark:text-gray-400">
+                                {{ getGeminiBindingInfo(key) }}
+                              </span>
+                            </div>
+                            <!-- OpenAI 绑定 -->
+                            <div v-if="key.openaiAccountId" class="flex items-center gap-1 text-xs">
+                              <span
+                                class="inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
+                              >
+                                <i class="fa-openai mr-1 text-[10px]" />
+                                OpenAI
+                              </span>
+                              <span class="truncate text-gray-600 dark:text-gray-400">
+                                {{ getOpenAIBindingInfo(key) }}
+                              </span>
+                            </div>
+                            <!-- Bedrock 绑定 -->
+                            <div
+                              v-if="key.bedrockAccountId"
+                              class="flex items-center gap-1 text-xs"
                             >
-                              <i class="fas fa-robot mr-1 text-[10px]" />
-                              Gemini
-                            </span>
-                            <span class="truncate text-gray-600 dark:text-gray-400">
-                              {{ getGeminiBindingInfo(key) }}
-                            </span>
-                          </div>
-                          <!-- OpenAI 绑定 -->
-                          <div v-if="key.openaiAccountId" class="flex items-center gap-1 text-xs">
-                            <span
-                              class="inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
+                              <span
+                                class="inline-flex items-center rounded bg-orange-100 px-1.5 py-0.5 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
+                              >
+                                <i class="fas fa-cloud mr-1 text-[10px]" />
+                                Bedrock
+                              </span>
+                              <span class="truncate text-gray-600 dark:text-gray-400">
+                                {{ getBedrockBindingInfo(key) }}
+                              </span>
+                            </div>
+                            <!-- Droid 绑定 -->
+                            <div v-if="key.droidAccountId" class="flex items-center gap-1 text-xs">
+                              <span
+                                class="inline-flex items-center rounded bg-cyan-100 px-1.5 py-0.5 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300"
+                              >
+                                <i class="fas fa-robot mr-1 text-[10px]" />
+                                Droid
+                              </span>
+                              <span class="truncate text-gray-600 dark:text-gray-400">
+                                {{ getDroidBindingInfo(key) }}
+                              </span>
+                            </div>
+                            <!-- 共享池 -->
+                            <div
+                              v-if="
+                                !key.claudeAccountId &&
+                                !key.claudeConsoleAccountId &&
+                                !key.geminiAccountId &&
+                                !key.openaiAccountId &&
+                                !key.bedrockAccountId &&
+                                !key.droidAccountId
+                              "
+                              class="text-xs text-gray-500 dark:text-gray-400"
                             >
-                              <i class="fa-openai mr-1 text-[10px]" />
-                              OpenAI
-                            </span>
-                            <span class="truncate text-gray-600 dark:text-gray-400">
-                              {{ getOpenAIBindingInfo(key) }}
-                            </span>
-                          </div>
-                          <!-- Bedrock 绑定 -->
-                          <div v-if="key.bedrockAccountId" class="flex items-center gap-1 text-xs">
-                            <span
-                              class="inline-flex items-center rounded bg-orange-100 px-1.5 py-0.5 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
-                            >
-                              <i class="fas fa-cloud mr-1 text-[10px]" />
-                              Bedrock
-                            </span>
-                            <span class="truncate text-gray-600 dark:text-gray-400">
-                              {{ getBedrockBindingInfo(key) }}
-                            </span>
-                          </div>
-                          <!-- Droid 绑定 -->
-                          <div v-if="key.droidAccountId" class="flex items-center gap-1 text-xs">
-                            <span
-                              class="inline-flex items-center rounded bg-cyan-100 px-1.5 py-0.5 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300"
-                            >
-                              <i class="fas fa-robot mr-1 text-[10px]" />
-                              Droid
-                            </span>
-                            <span class="truncate text-gray-600 dark:text-gray-400">
-                              {{ getDroidBindingInfo(key) }}
-                            </span>
-                          </div>
-                          <!-- 共享池 -->
-                          <div
-                            v-if="
-                              !key.claudeAccountId &&
-                              !key.claudeConsoleAccountId &&
-                              !key.geminiAccountId &&
-                              !key.openaiAccountId &&
-                              !key.bedrockAccountId &&
-                              !key.droidAccountId
-                            "
-                            class="text-xs text-gray-500 dark:text-gray-400"
-                          >
-                            <i class="fas fa-share-alt mr-1" />
-                            共享池
-                          </div>
+                              <i class="fas fa-share-alt mr-1" />
+                              共享池
+                            </div>
+                          </template>
                         </div>
                       </td>
                       <!-- 标签列 -->
@@ -544,10 +558,12 @@
                       </td>
                       <!-- 费用 -->
                       <td class="whitespace-nowrap px-3 py-3 text-right" style="font-size: 13px">
-                        <!-- 加载中状态 -->
+                        <!-- 加载中状态 - 骨架屏 -->
                         <template v-if="isStatsLoading(key.id)">
                           <div class="flex items-center justify-end">
-                            <i class="fas fa-spinner fa-spin text-gray-400"></i>
+                            <div
+                              class="h-5 w-14 animate-pulse rounded bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"
+                            />
                           </div>
                         </template>
                         <!-- 已加载状态 -->
@@ -567,83 +583,108 @@
                       <!-- 限制 -->
                       <td class="px-2 py-2" style="font-size: 12px">
                         <div class="flex flex-col gap-2">
-                          <!-- 每日费用限制进度条 -->
-                          <LimitProgressBar
-                            v-if="key.dailyCostLimit > 0"
-                            :current="key.dailyCost || 0"
-                            label="每日限制"
-                            :limit="key.dailyCostLimit"
-                            type="daily"
-                            variant="compact"
-                          />
-
-                          <!-- 总费用限制进度条（无每日限制时展示） -->
-                          <LimitProgressBar
-                            v-else-if="key.totalCostLimit > 0"
-                            :current="getCachedStats(key.id)?.cost || key.usage?.total?.cost || 0"
-                            label="总费用限制"
-                            :limit="key.totalCostLimit"
-                            type="total"
-                            variant="compact"
-                          />
-
-                          <!-- 时间窗口费用限制（无每日和总费用限制时展示） -->
-                          <div
-                            v-else-if="
-                              key.rateLimitWindow > 0 &&
-                              key.rateLimitCost > 0 &&
-                              (!key.dailyCostLimit || key.dailyCostLimit === 0) &&
-                              (!key.totalCostLimit || key.totalCostLimit === 0)
+                          <!-- 加载中状态 - 骨架屏（仅在有费用限制配置时显示） -->
+                          <template
+                            v-if="
+                              isStatsLoading(key.id) &&
+                              (key.dailyCostLimit > 0 ||
+                                key.totalCostLimit > 0 ||
+                                (key.rateLimitWindow > 0 && key.rateLimitCost > 0))
                             "
-                            class="space-y-1.5"
                           >
-                            <!-- 费用进度条 -->
+                            <div class="space-y-2">
+                              <div
+                                class="h-4 w-full animate-pulse rounded bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"
+                              />
+                              <div
+                                class="h-3 w-2/3 animate-pulse rounded bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"
+                              />
+                            </div>
+                          </template>
+                          <!-- 已加载状态 -->
+                          <template v-else>
+                            <!-- 每日费用限制进度条 -->
                             <LimitProgressBar
-                              :current="key.currentWindowCost || 0"
-                              label="窗口费用"
-                              :limit="key.rateLimitCost"
-                              type="window"
+                              v-if="key.dailyCostLimit > 0"
+                              :current="getCachedStats(key.id)?.dailyCost || 0"
+                              label="每日限制"
+                              :limit="key.dailyCostLimit"
+                              type="daily"
                               variant="compact"
                             />
-                            <!-- 重置倒计时 -->
-                            <div class="flex items-center justify-between text-[10px]">
-                              <div class="flex items-center gap-1 text-sky-600 dark:text-sky-300">
-                                <i class="fas fa-clock text-[10px]" />
-                                <span class="font-medium">{{ key.rateLimitWindow }}分钟窗口</span>
-                              </div>
-                              <span
-                                class="font-bold"
-                                :class="
-                                  key.windowRemainingSeconds > 0
-                                    ? 'text-sky-700 dark:text-sky-300'
-                                    : 'text-gray-400 dark:text-gray-500'
-                                "
-                              >
-                                {{
-                                  key.windowRemainingSeconds > 0
-                                    ? formatWindowTime(key.windowRemainingSeconds)
-                                    : '未激活'
-                                }}
-                              </span>
-                            </div>
-                          </div>
 
-                          <!-- 如果没有任何限制 -->
-                          <div
-                            v-else
-                            class="flex items-center justify-center gap-1.5 py-2 text-gray-500 dark:text-gray-400"
-                          >
-                            <i class="fas fa-infinity text-base" />
-                            <span class="text-xs font-medium">无限制</span>
-                          </div>
+                            <!-- 总费用限制进度条（无每日限制时展示） -->
+                            <LimitProgressBar
+                              v-else-if="key.totalCostLimit > 0"
+                              :current="getCachedStats(key.id)?.allTimeCost || 0"
+                              label="总费用限制"
+                              :limit="key.totalCostLimit"
+                              type="total"
+                              variant="compact"
+                            />
+
+                            <!-- 时间窗口费用限制（无每日和总费用限制时展示） -->
+                            <div
+                              v-else-if="
+                                key.rateLimitWindow > 0 &&
+                                key.rateLimitCost > 0 &&
+                                (!key.dailyCostLimit || key.dailyCostLimit === 0) &&
+                                (!key.totalCostLimit || key.totalCostLimit === 0)
+                              "
+                              class="space-y-1.5"
+                            >
+                              <!-- 费用进度条 -->
+                              <LimitProgressBar
+                                :current="getCachedStats(key.id)?.currentWindowCost || 0"
+                                label="窗口费用"
+                                :limit="key.rateLimitCost"
+                                type="window"
+                                variant="compact"
+                              />
+                              <!-- 重置倒计时 -->
+                              <div class="flex items-center justify-between text-[10px]">
+                                <div class="flex items-center gap-1 text-sky-600 dark:text-sky-300">
+                                  <i class="fas fa-clock text-[10px]" />
+                                  <span class="font-medium">{{ key.rateLimitWindow }}分钟窗口</span>
+                                </div>
+                                <span
+                                  class="font-bold"
+                                  :class="
+                                    (getCachedStats(key.id)?.windowRemainingSeconds || 0) > 0
+                                      ? 'text-sky-700 dark:text-sky-300'
+                                      : 'text-gray-400 dark:text-gray-500'
+                                  "
+                                >
+                                  {{
+                                    (getCachedStats(key.id)?.windowRemainingSeconds || 0) > 0
+                                      ? formatWindowTime(
+                                          getCachedStats(key.id)?.windowRemainingSeconds || 0
+                                        )
+                                      : '未激活'
+                                  }}
+                                </span>
+                              </div>
+                            </div>
+
+                            <!-- 如果没有任何限制 -->
+                            <div
+                              v-else
+                              class="flex items-center justify-center gap-1.5 py-2 text-gray-500 dark:text-gray-400"
+                            >
+                              <i class="fas fa-infinity text-base" />
+                              <span class="text-xs font-medium">无限制</span>
+                            </div>
+                          </template>
                         </div>
                       </td>
                       <!-- Token数量 -->
                       <td class="whitespace-nowrap px-3 py-3 text-right" style="font-size: 13px">
-                        <!-- 加载中状态 -->
+                        <!-- 加载中状态 - 骨架屏 -->
                         <template v-if="isStatsLoading(key.id)">
                           <div class="flex items-center justify-end">
-                            <i class="fas fa-spinner fa-spin text-gray-400"></i>
+                            <div
+                              class="h-5 w-16 animate-pulse rounded bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"
+                            />
                           </div>
                         </template>
                         <!-- 已加载状态 -->
@@ -664,10 +705,12 @@
                       </td>
                       <!-- 请求数 -->
                       <td class="whitespace-nowrap px-3 py-3 text-right" style="font-size: 13px">
-                        <!-- 加载中状态 -->
+                        <!-- 加载中状态 - 骨架屏 -->
                         <template v-if="isStatsLoading(key.id)">
                           <div class="flex items-center justify-end">
-                            <i class="fas fa-spinner fa-spin text-gray-400"></i>
+                            <div
+                              class="h-5 w-12 animate-pulse rounded bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"
+                            />
                           </div>
                         </template>
                         <!-- 已加载状态 -->
@@ -702,8 +745,16 @@
                             {{ formatLastUsed(key.lastUsedAt) }}
                           </span>
                           <span v-else class="text-gray-400" style="font-size: 13px">从未使用</span>
+                          <!-- 最后使用账号 loading 状态 -->
                           <span
-                            v-if="hasLastUsageAccount(key)"
+                            v-if="key.lastUsedAt && isLastUsageLoading(key.id)"
+                            class="mt-1 text-xs text-gray-400 dark:text-gray-500"
+                          >
+                            <i class="fas fa-spinner fa-spin mr-1"></i>
+                            加载中...
+                          </span>
+                          <span
+                            v-else-if="hasLastUsageAccount(key)"
                             class="mt-1 text-xs text-gray-500 dark:text-gray-400"
                             :title="getLastUsageFullName(key)"
                           >
@@ -1272,9 +1323,9 @@
                     <div>
                       <!-- 请求数 - 使用缓存统计 -->
                       <template v-if="isStatsLoading(key.id)">
-                        <p class="text-sm font-semibold text-gray-400">
-                          <i class="fas fa-spinner fa-spin"></i>
-                        </p>
+                        <div
+                          class="h-5 w-12 animate-pulse rounded bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"
+                        />
                       </template>
                       <template v-else-if="getCachedStats(key.id)">
                         <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
@@ -1289,9 +1340,9 @@
                     <div>
                       <!-- 费用 - 使用缓存统计 -->
                       <template v-if="isStatsLoading(key.id)">
-                        <p class="text-sm font-semibold text-gray-400">
-                          <i class="fas fa-spinner fa-spin"></i>
-                        </p>
+                        <div
+                          class="h-5 w-14 animate-pulse rounded bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"
+                        />
                       </template>
                       <template v-else-if="getCachedStats(key.id)">
                         <p class="text-sm font-semibold text-green-600">
@@ -1313,8 +1364,16 @@
                     </div>
                     <div class="mt-1 flex items-center justify-between">
                       <span>账号</span>
+                      <!-- 最后使用账号 loading 状态 -->
                       <span
-                        v-if="hasLastUsageAccount(key)"
+                        v-if="key.lastUsedAt && isLastUsageLoading(key.id)"
+                        class="text-gray-400 dark:text-gray-500"
+                      >
+                        <i class="fas fa-spinner fa-spin mr-1"></i>
+                        加载中...
+                      </span>
+                      <span
+                        v-else-if="hasLastUsageAccount(key)"
                         class="truncate text-gray-500 dark:text-gray-400"
                         style="max-width: 180px"
                         :title="getLastUsageFullName(key)"
@@ -1334,75 +1393,98 @@
 
                 <!-- 限制进度条 -->
                 <div class="space-y-2">
-                  <!-- 每日费用限制 -->
-                  <LimitProgressBar
-                    v-if="key.dailyCostLimit > 0"
-                    :current="key.dailyCost || 0"
-                    label="每日限制"
-                    :limit="key.dailyCostLimit"
-                    type="daily"
-                    variant="compact"
-                  />
-
-                  <!-- 总费用限制（无每日限制时展示） -->
-                  <LimitProgressBar
-                    v-else-if="key.totalCostLimit > 0"
-                    :current="getCachedStats(key.id)?.cost || key.usage?.total?.cost || 0"
-                    label="总费用限制"
-                    :limit="key.totalCostLimit"
-                    type="total"
-                    variant="compact"
-                  />
-
-                  <!-- 时间窗口费用限制（无每日和总费用限制时展示） -->
-                  <div
-                    v-else-if="
-                      key.rateLimitWindow > 0 &&
-                      key.rateLimitCost > 0 &&
-                      (!key.dailyCostLimit || key.dailyCostLimit === 0) &&
-                      (!key.totalCostLimit || key.totalCostLimit === 0)
+                  <!-- 加载中状态 - 骨架屏（仅在有费用限制配置时显示） -->
+                  <template
+                    v-if="
+                      isStatsLoading(key.id) &&
+                      (key.dailyCostLimit > 0 ||
+                        key.totalCostLimit > 0 ||
+                        (key.rateLimitWindow > 0 && key.rateLimitCost > 0))
                     "
-                    class="space-y-2"
                   >
-                    <!-- 费用进度条 -->
+                    <div class="space-y-2">
+                      <div
+                        class="h-4 w-full animate-pulse rounded bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"
+                      />
+                      <div
+                        class="h-3 w-2/3 animate-pulse rounded bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700"
+                      />
+                    </div>
+                  </template>
+                  <!-- 已加载状态 -->
+                  <template v-else>
+                    <!-- 每日费用限制 -->
                     <LimitProgressBar
-                      :current="key.currentWindowCost || 0"
-                      label="窗口费用"
-                      :limit="key.rateLimitCost"
-                      type="window"
+                      v-if="key.dailyCostLimit > 0"
+                      :current="getCachedStats(key.id)?.dailyCost || 0"
+                      label="每日限制"
+                      :limit="key.dailyCostLimit"
+                      type="daily"
                       variant="compact"
                     />
-                    <!-- 重置倒计时 -->
-                    <div class="flex items-center justify-between text-xs">
-                      <div class="flex items-center gap-1.5 text-sky-600 dark:text-sky-300">
-                        <i class="fas fa-clock text-xs" />
-                        <span class="font-medium">{{ key.rateLimitWindow }}分钟窗口</span>
-                      </div>
-                      <span
-                        class="font-bold"
-                        :class="
-                          key.windowRemainingSeconds > 0
-                            ? 'text-sky-700 dark:text-sky-300'
-                            : 'text-gray-400 dark:text-gray-500'
-                        "
-                      >
-                        {{
-                          key.windowRemainingSeconds > 0
-                            ? formatWindowTime(key.windowRemainingSeconds)
-                            : '未激活'
-                        }}
-                      </span>
-                    </div>
-                  </div>
 
-                  <!-- 无限制显示 -->
-                  <div
-                    v-else
-                    class="flex items-center justify-center gap-1.5 py-2 text-gray-500 dark:text-gray-400"
-                  >
-                    <i class="fas fa-infinity text-base" />
-                    <span class="text-xs font-medium">无限制</span>
-                  </div>
+                    <!-- 总费用限制（无每日限制时展示） -->
+                    <LimitProgressBar
+                      v-else-if="key.totalCostLimit > 0"
+                      :current="getCachedStats(key.id)?.allTimeCost || 0"
+                      label="总费用限制"
+                      :limit="key.totalCostLimit"
+                      type="total"
+                      variant="compact"
+                    />
+
+                    <!-- 时间窗口费用限制（无每日和总费用限制时展示） -->
+                    <div
+                      v-else-if="
+                        key.rateLimitWindow > 0 &&
+                        key.rateLimitCost > 0 &&
+                        (!key.dailyCostLimit || key.dailyCostLimit === 0) &&
+                        (!key.totalCostLimit || key.totalCostLimit === 0)
+                      "
+                      class="space-y-2"
+                    >
+                      <!-- 费用进度条 -->
+                      <LimitProgressBar
+                        :current="getCachedStats(key.id)?.currentWindowCost || 0"
+                        label="窗口费用"
+                        :limit="key.rateLimitCost"
+                        type="window"
+                        variant="compact"
+                      />
+                      <!-- 重置倒计时 -->
+                      <div class="flex items-center justify-between text-xs">
+                        <div class="flex items-center gap-1.5 text-sky-600 dark:text-sky-300">
+                          <i class="fas fa-clock text-xs" />
+                          <span class="font-medium">{{ key.rateLimitWindow }}分钟窗口</span>
+                        </div>
+                        <span
+                          class="font-bold"
+                          :class="
+                            (getCachedStats(key.id)?.windowRemainingSeconds || 0) > 0
+                              ? 'text-sky-700 dark:text-sky-300'
+                              : 'text-gray-400 dark:text-gray-500'
+                          "
+                        >
+                          {{
+                            (getCachedStats(key.id)?.windowRemainingSeconds || 0) > 0
+                              ? formatWindowTime(
+                                  getCachedStats(key.id)?.windowRemainingSeconds || 0
+                                )
+                              : '未激活'
+                          }}
+                        </span>
+                      </div>
+                    </div>
+
+                    <!-- 无限制显示 -->
+                    <div
+                      v-else
+                      class="flex items-center justify-center gap-1.5 py-2 text-gray-500 dark:text-gray-400"
+                    >
+                      <i class="fas fa-infinity text-base" />
+                      <span class="text-xs font-medium">无限制</span>
+                    </div>
+                  </template>
                 </div>
               </div>
 
@@ -1840,8 +1922,16 @@
                             {{ formatLastUsed(key.lastUsedAt) }}
                           </span>
                           <span v-else class="text-gray-400" style="font-size: 13px">从未使用</span>
+                          <!-- 最后使用账号 loading 状态 -->
                           <span
-                            v-if="hasLastUsageAccount(key)"
+                            v-if="key.lastUsedAt && isLastUsageLoading(key.id)"
+                            class="mt-1 text-xs text-gray-400 dark:text-gray-500"
+                          >
+                            <i class="fas fa-spinner fa-spin mr-1"></i>
+                            加载中...
+                          </span>
+                          <span
+                            v-else-if="hasLastUsageAccount(key)"
                             class="mt-1 text-xs text-gray-500 dark:text-gray-400"
                             :title="getLastUsageFullName(key)"
                           >
@@ -2039,6 +2129,10 @@ const serverPagination = ref({
 const statsCache = ref(new Map())
 // 正在加载统计的 keyIds
 const statsLoading = ref(new Set())
+// 最后使用账号缓存: Map<keyId, lastUsageInfo>
+const lastUsageCache = ref(new Map())
+// 正在加载最后使用账号的 keyIds
+const lastUsageLoading = ref(new Set())
 const apiKeyModelStats = ref({})
 const apiKeyDateFilters = ref({})
 const defaultTime = ref([new Date(2000, 1, 1, 0, 0, 0), new Date(2000, 2, 1, 23, 59, 59)])
@@ -2054,6 +2148,9 @@ const accounts = ref({
   openaiGroups: [],
   droidGroups: []
 })
+// 账号数据加载状态
+const accountsLoading = ref(false)
+const accountsLoaded = ref(false)
 const editingExpiryKey = ref(null)
 const expiryEditModalRef = ref(null)
 const showUsageDetailModal = ref(false)
@@ -2186,8 +2283,14 @@ const paginatedApiKeys = computed(() => {
   return apiKeys.value
 })
 
-// 加载账户列表
-const loadAccounts = async () => {
+// 加载账户列表（支持缓存和强制刷新）
+const loadAccounts = async (forceRefresh = false) => {
+  // 如果已加载且不强制刷新，则跳过
+  if (accountsLoaded.value && !forceRefresh) {
+    return
+  }
+
+  accountsLoading.value = true
   try {
     const [
       claudeData,
@@ -2298,8 +2401,13 @@ const loadAccounts = async () => {
       accounts.value.openaiGroups = allGroups.filter((g) => g.platform === 'openai')
       accounts.value.droidGroups = allGroups.filter((g) => g.platform === 'droid')
     }
-  } catch (error) {
-    // console.error('加载账户列表失败:', error)
+
+    // 标记账号数据已加载
+    accountsLoaded.value = true
+  } catch {
+    // 静默处理错误
+  } finally {
+    accountsLoading.value = false
   }
 }
 
@@ -2307,9 +2415,10 @@ const loadAccounts = async () => {
 const loadApiKeys = async (clearStatsCache = true) => {
   apiKeysLoading.value = true
   try {
-    // 清除统计缓存（刷新时）
+    // 清除缓存（刷新时）
     if (clearStatsCache) {
       statsCache.value.clear()
+      lastUsageCache.value.clear()
     }
 
     // 构建请求参数
@@ -2375,11 +2484,12 @@ const loadApiKeys = async (clearStatsCache = true) => {
         availableTags.value = data.data.availableTags
       }
 
-      // 异步加载当前页的统计数据
-      await loadPageStats()
+      // 异步加载当前页的统计数据（不等待，让页面先显示基础数据）
+      loadPageStats()
+      // 异步加载当前页的最后使用账号数据
+      loadPageLastUsage()
     }
-  } catch (error) {
-    console.error('加载 API Keys 失败:', error)
+  } catch {
     showToast('加载 API Keys 失败', 'error')
   } finally {
     apiKeysLoading.value = false
@@ -2464,6 +2574,53 @@ const getCachedStats = (keyId) => {
 // 检查是否正在加载统计
 const isStatsLoading = (keyId) => {
   return statsLoading.value.has(keyId)
+}
+
+// 异步加载当前页的最后使用账号数据
+const loadPageLastUsage = async () => {
+  const currentPageKeys = apiKeys.value
+  if (!currentPageKeys || currentPageKeys.length === 0) return
+
+  // 筛选出需要加载的 keys（未缓存且有 lastUsedAt 的）
+  const keysNeedLastUsage = currentPageKeys.filter((key) => {
+    // 没有使用过的不需要加载
+    if (!key.lastUsedAt) return false
+    // 已经有缓存的不需要加载
+    if (lastUsageCache.value.has(key.id)) return false
+    return true
+  })
+
+  if (keysNeedLastUsage.length === 0) return
+
+  // 标记为加载中
+  const keyIds = keysNeedLastUsage.map((k) => k.id)
+  keyIds.forEach((id) => lastUsageLoading.value.add(id))
+
+  try {
+    const response = await apiClient.post('/admin/api-keys/batch-last-usage', { keyIds })
+
+    if (response.success && response.data) {
+      // 更新缓存
+      for (const [keyId, lastUsage] of Object.entries(response.data)) {
+        lastUsageCache.value.set(keyId, lastUsage)
+      }
+    }
+  } catch (error) {
+    console.error('加载最后使用账号数据失败:', error)
+    // 不显示 toast，避免打扰用户
+  } finally {
+    keyIds.forEach((id) => lastUsageLoading.value.delete(id))
+  }
+}
+
+// 获取缓存的最后使用账号数据
+const getCachedLastUsage = (keyId) => {
+  return lastUsageCache.value.get(keyId) || null
+}
+
+// 检查是否正在加载最后使用账号
+const isLastUsageLoading = (keyId) => {
+  return lastUsageLoading.value.has(keyId)
 }
 
 // 加载已删除的API Keys
@@ -2607,6 +2764,18 @@ const getBoundAccountName = (accountId) => {
 
   // 如果找不到，返回账户ID的前8位
   return `${accountId.substring(0, 8)}`
+}
+
+// 检查 API Key 是否有任何账号绑定
+const hasAnyBinding = (key) => {
+  return !!(
+    key.claudeAccountId ||
+    key.claudeConsoleAccountId ||
+    key.geminiAccountId ||
+    key.openaiAccountId ||
+    key.bedrockAccountId ||
+    key.droidAccountId
+  )
 }
 
 // 获取Claude绑定信息
@@ -3304,18 +3473,24 @@ const resetApiKeyDateFilter = (keyId) => {
 }
 
 // 打开创建模态框
-const openCreateApiKeyModal = async () => {
-  // 重新加载账号数据，确保显示最新的专属账号
-  await loadAccounts()
+const openCreateApiKeyModal = () => {
+  // 使用缓存的账号数据（如果需要最新数据，用户可以点击"刷新账号"按钮）
   showCreateApiKeyModal.value = true
+  // 如果账号数据未加载，异步加载
+  if (!accountsLoaded.value) {
+    loadAccounts()
+  }
 }
 
 // 打开编辑模态框
-const openEditApiKeyModal = async (apiKey) => {
-  // 重新加载账号数据，确保显示最新的专属账号
-  await loadAccounts()
+const openEditApiKeyModal = (apiKey) => {
+  // 使用缓存的账号数据（如果需要最新数据，用户可以点击"刷新账号"按钮）
   editingApiKey.value = apiKey
   showEditApiKeyModal.value = true
+  // 如果账号数据未加载，异步加载
+  if (!accountsLoaded.value) {
+    loadAccounts()
+  }
 }
 
 // 打开续期模态框
@@ -3341,15 +3516,18 @@ const handleBatchCreateSuccess = (data) => {
 }
 
 // 打开批量编辑模态框
-const openBatchEditModal = async () => {
+const openBatchEditModal = () => {
   if (selectedApiKeys.value.length === 0) {
     showToast('请先选择要编辑的 API Keys', 'warning')
     return
   }
 
-  // 重新加载账号数据，确保显示最新的专属账号
-  await loadAccounts()
+  // 使用缓存的账号数据（如果需要最新数据，用户可以点击"刷新账号"按钮）
   showBatchEditModal.value = true
+  // 如果账号数据未加载，异步加载
+  if (!accountsLoaded.value) {
+    loadAccounts()
+  }
 }
 
 // 处理批量编辑成功
@@ -3781,7 +3959,34 @@ const formatWindowTime = (seconds) => {
 
 // 显示使用详情
 const showUsageDetails = (apiKey) => {
-  selectedApiKeyForDetail.value = apiKey
+  // 获取异步加载的统计数据
+  const cachedStats = getCachedStats(apiKey.id)
+
+  // 合并异步统计数据到 apiKey 对象
+  const enrichedApiKey = {
+    ...apiKey,
+    // 合并实时限制数据
+    dailyCost: cachedStats?.dailyCost ?? apiKey.dailyCost ?? 0,
+    currentWindowCost: cachedStats?.currentWindowCost ?? apiKey.currentWindowCost ?? 0,
+    windowRemainingSeconds: cachedStats?.windowRemainingSeconds ?? apiKey.windowRemainingSeconds,
+    // 合并 usage 数据（用于详情弹窗中的统计卡片）
+    usage: {
+      ...apiKey.usage,
+      total: {
+        ...apiKey.usage?.total,
+        requests: cachedStats?.requests ?? apiKey.usage?.total?.requests ?? 0,
+        tokens: cachedStats?.tokens ?? apiKey.usage?.total?.tokens ?? 0,
+        cost: cachedStats?.allTimeCost ?? apiKey.usage?.total?.cost ?? 0,
+        inputTokens: cachedStats?.inputTokens ?? apiKey.usage?.total?.inputTokens ?? 0,
+        outputTokens: cachedStats?.outputTokens ?? apiKey.usage?.total?.outputTokens ?? 0,
+        cacheCreateTokens:
+          cachedStats?.cacheCreateTokens ?? apiKey.usage?.total?.cacheCreateTokens ?? 0,
+        cacheReadTokens: cachedStats?.cacheReadTokens ?? apiKey.usage?.total?.cacheReadTokens ?? 0
+      }
+    }
+  }
+
+  selectedApiKeyForDetail.value = enrichedApiKey
   showUsageDetailModal.value = true
 }
 
@@ -3852,9 +4057,19 @@ const normalizeFrontendAccountCategory = (type) => {
   return 'other'
 }
 
-const getLastUsageInfo = (apiKey) => apiKey?.lastUsage || null
+// 获取最后使用账号信息（优先从缓存获取）
+const getLastUsageInfo = (apiKey) => {
+  if (!apiKey) return null
+  // 优先从缓存获取
+  const cached = getCachedLastUsage(apiKey.id)
+  if (cached !== null) return cached
+  // 兼容旧数据（如果后端直接返回了 lastUsage）
+  return apiKey.lastUsage || null
+}
 
 const hasLastUsageAccount = (apiKey) => {
+  // 如果正在加载，返回 false（让 loading 状态显示）
+  if (isLastUsageLoading(apiKey?.id)) return false
   const info = getLastUsageInfo(apiKey)
   return !!(info && (info.accountName || info.accountId || info.rawAccountId))
 }
@@ -4285,11 +4500,14 @@ watch(apiKeys, () => {
 })
 
 onMounted(async () => {
-  // 并行加载所有需要的数据
-  await Promise.all([clientsStore.loadSupportedClients(), loadAccounts(), loadApiKeys()])
+  // 先加载 API Keys（优先显示列表）
+  await Promise.all([clientsStore.loadSupportedClients(), loadApiKeys()])
 
   // 初始化全选状态
   updateSelectAllState()
+
+  // 异步加载账号数据（不阻塞页面显示）
+  loadAccounts()
 })
 </script>
 
