@@ -417,6 +417,9 @@ async function handleMessages(req, res) {
       }
     } else {
       // OAuth 账户：使用现有的 sendGeminiRequest
+      // 智能处理项目ID：优先使用配置的 projectId，降级到临时 tempProjectId
+      const effectiveProjectId = account.projectId || account.tempProjectId || null
+
       geminiResponse = await sendGeminiRequest({
         messages,
         model,
@@ -427,7 +430,7 @@ async function handleMessages(req, res) {
         proxy: account.proxy,
         apiKeyId: apiKeyData.id,
         signal: abortController.signal,
-        projectId: account.projectId,
+        projectId: effectiveProjectId,
         accountId: account.id
       })
     }
@@ -1101,14 +1104,46 @@ async function handleGenerateContent(req, res) {
 
     const client = await geminiAccountService.getOauthClient(accessToken, refreshToken, proxyConfig)
 
-    // 智能处理项目ID
-    const effectiveProjectId = account.projectId || project || null
+    // 智能处理项目ID：优先使用配置的 projectId，降级到临时 tempProjectId
+    let effectiveProjectId = account.projectId || account.tempProjectId || null
+
+    // 如果没有任何项目ID，尝试调用 loadCodeAssist 获取
+    if (!effectiveProjectId) {
+      try {
+        logger.info('📋 No projectId available, attempting to fetch from loadCodeAssist...')
+        const loadResponse = await geminiAccountService.loadCodeAssist(client, null, proxyConfig)
+
+        if (loadResponse.cloudaicompanionProject) {
+          effectiveProjectId = loadResponse.cloudaicompanionProject
+          // 保存临时项目ID
+          await geminiAccountService.updateTempProjectId(accountId, effectiveProjectId)
+          logger.info(`📋 Fetched and cached temporary projectId: ${effectiveProjectId}`)
+        }
+      } catch (loadError) {
+        logger.warn('Failed to fetch projectId from loadCodeAssist:', loadError.message)
+      }
+    }
+
+    // 如果还是没有项目ID，返回错误
+    if (!effectiveProjectId) {
+      return res.status(403).json({
+        error: {
+          message:
+            'This account requires a project ID to be configured. Please configure a project ID in the account settings.',
+          type: 'configuration_required'
+        }
+      })
+    }
 
     logger.info('📋 项目ID处理逻辑', {
       accountProjectId: account.projectId,
-      requestProjectId: project,
+      accountTempProjectId: account.tempProjectId,
       effectiveProjectId,
-      decision: account.projectId ? '使用账户配置' : project ? '使用请求参数' : '不使用项目ID'
+      decision: account.projectId
+        ? '使用账户配置'
+        : account.tempProjectId
+          ? '使用临时项目ID'
+          : '从loadCodeAssist获取'
     })
 
     const response = await geminiAccountService.generateContent(
@@ -1281,14 +1316,46 @@ async function handleStreamGenerateContent(req, res) {
 
     const client = await geminiAccountService.getOauthClient(accessToken, refreshToken, proxyConfig)
 
-    // 智能处理项目ID
-    const effectiveProjectId = account.projectId || project || null
+    // 智能处理项目ID：优先使用配置的 projectId，降级到临时 tempProjectId
+    let effectiveProjectId = account.projectId || account.tempProjectId || null
+
+    // 如果没有任何项目ID，尝试调用 loadCodeAssist 获取
+    if (!effectiveProjectId) {
+      try {
+        logger.info('📋 No projectId available, attempting to fetch from loadCodeAssist...')
+        const loadResponse = await geminiAccountService.loadCodeAssist(client, null, proxyConfig)
+
+        if (loadResponse.cloudaicompanionProject) {
+          effectiveProjectId = loadResponse.cloudaicompanionProject
+          // 保存临时项目ID
+          await geminiAccountService.updateTempProjectId(accountId, effectiveProjectId)
+          logger.info(`📋 Fetched and cached temporary projectId: ${effectiveProjectId}`)
+        }
+      } catch (loadError) {
+        logger.warn('Failed to fetch projectId from loadCodeAssist:', loadError.message)
+      }
+    }
+
+    // 如果还是没有项目ID，返回错误
+    if (!effectiveProjectId) {
+      return res.status(403).json({
+        error: {
+          message:
+            'This account requires a project ID to be configured. Please configure a project ID in the account settings.',
+          type: 'configuration_required'
+        }
+      })
+    }
 
     logger.info('📋 流式请求项目ID处理逻辑', {
       accountProjectId: account.projectId,
-      requestProjectId: project,
+      accountTempProjectId: account.tempProjectId,
       effectiveProjectId,
-      decision: account.projectId ? '使用账户配置' : project ? '使用请求参数' : '不使用项目ID'
+      decision: account.projectId
+        ? '使用账户配置'
+        : account.tempProjectId
+          ? '使用临时项目ID'
+          : '从loadCodeAssist获取'
     })
 
     const streamResponse = await geminiAccountService.generateContentStream(
