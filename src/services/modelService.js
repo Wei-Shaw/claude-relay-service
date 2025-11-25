@@ -1,5 +1,3 @@
-const fs = require('fs')
-const path = require('path')
 const logger = require('../utils/logger')
 
 /**
@@ -9,54 +7,22 @@ const logger = require('../utils/logger')
  */
 class ModelService {
   constructor() {
-    this.modelsFile = path.join(process.cwd(), 'data', 'supported_models.json')
-    this.supportedModels = null
-    this.fileWatcher = null
+    this.supportedModels = this.getDefaultModels()
   }
 
   /**
    * 初始化模型服务
    */
   async initialize() {
-    try {
-      this.loadModels()
-      this.setupFileWatcher()
-      logger.success('✅ Model service initialized successfully')
-    } catch (error) {
-      logger.error('❌ Failed to initialize model service:', error)
-    }
+    const totalModels = Object.values(this.supportedModels).reduce(
+      (sum, config) => sum + config.models.length,
+      0
+    )
+    logger.success(`✅ Model service initialized with ${totalModels} models`)
   }
 
   /**
-   * 加载支持的模型配置
-   */
-  loadModels() {
-    try {
-      if (fs.existsSync(this.modelsFile)) {
-        const data = fs.readFileSync(this.modelsFile, 'utf8')
-        this.supportedModels = JSON.parse(data)
-
-        const totalModels = Object.values(this.supportedModels).reduce(
-          (sum, config) => sum + config.models.length,
-          0
-        )
-
-        logger.info(`📋 Loaded ${totalModels} supported models from configuration`)
-      } else {
-        logger.warn('⚠️ Supported models file not found, using defaults')
-        this.supportedModels = this.getDefaultModels()
-
-        // 创建默认配置文件
-        this.saveDefaultConfig()
-      }
-    } catch (error) {
-      logger.error('❌ Failed to load supported models:', error)
-      this.supportedModels = this.getDefaultModels()
-    }
-  }
-
-  /**
-   * 获取默认模型配置（后备方案）
+   * 获取支持的模型配置
    */
   getDefaultModels() {
     return {
@@ -64,6 +30,8 @@ class ModelService {
         provider: 'anthropic',
         description: 'Claude models from Anthropic',
         models: [
+          'claude-opus-4-5-20251101',
+          'claude-haiku-4-5-20251001',
           'claude-sonnet-4-5-20250929',
           'claude-opus-4-1-20250805',
           'claude-sonnet-4-20250514',
@@ -79,52 +47,19 @@ class ModelService {
         provider: 'openai',
         description: 'OpenAI GPT models',
         models: [
-          'gpt-4o',
-          'gpt-4o-mini',
-          'gpt-4.1',
-          'gpt-4.1-mini',
-          'gpt-4.1-nano',
-          'gpt-4-turbo',
-          'gpt-4',
-          'gpt-3.5-turbo',
-          'o3',
-          'o4-mini',
-          'chatgpt-4o-latest'
+          'gpt-5.1-2025-11-13',
+          'gpt-5.1-codex-mini',
+          'gpt-5.1-codex',
+          'gpt-5.1-codex-max',
+          'gpt-5-2025-08-07',
+          'gpt-5-codex'
         ]
       },
       gemini: {
         provider: 'google',
         description: 'Google Gemini models',
-        models: [
-          'gemini-1.5-pro',
-          'gemini-1.5-flash',
-          'gemini-2.0-flash',
-          'gemini-2.0-flash-exp',
-          'gemini-2.0-flash-thinking',
-          'gemini-2.0-flash-thinking-exp',
-          'gemini-2.0-pro',
-          'gemini-2.5-flash',
-          'gemini-2.5-flash-lite',
-          'gemini-2.5-pro'
-        ]
+        models: ['gemini-2.5-pro', 'gemini-3-pro-preview', 'gemini-2.5-flash']
       }
-    }
-  }
-
-  /**
-   * 保存默认配置到文件
-   */
-  saveDefaultConfig() {
-    try {
-      const dataDir = path.dirname(this.modelsFile)
-      if (!fs.existsSync(dataDir)) {
-        fs.mkdirSync(dataDir, { recursive: true })
-      }
-
-      fs.writeFileSync(this.modelsFile, JSON.stringify(this.supportedModels, null, 2))
-      logger.info('💾 Created default supported_models.json configuration')
-    } catch (error) {
-      logger.error('❌ Failed to save default config:', error)
     }
   }
 
@@ -184,82 +119,26 @@ class ModelService {
   }
 
   /**
-   * 重新加载模型配置
-   */
-  reloadModels() {
-    logger.info('🔄 Reloading supported models configuration...')
-    this.loadModels()
-  }
-
-  /**
-   * 设置文件监听器（监听配置文件变化）
-   */
-  setupFileWatcher() {
-    try {
-      // 如果已有监听器，先关闭
-      if (this.fileWatcher) {
-        this.fileWatcher.close()
-        this.fileWatcher = null
-      }
-
-      // 只有文件存在时才设置监听器
-      if (!fs.existsSync(this.modelsFile)) {
-        logger.debug('📋 Models file does not exist yet, skipping file watcher setup')
-        return
-      }
-
-      // 使用 fs.watchFile 监听文件变化
-      const watchOptions = {
-        persistent: true,
-        interval: 60000 // 每60秒检查一次
-      }
-
-      let lastMtime = fs.statSync(this.modelsFile).mtimeMs
-
-      fs.watchFile(this.modelsFile, watchOptions, (curr, _prev) => {
-        if (curr.mtimeMs !== lastMtime) {
-          lastMtime = curr.mtimeMs
-          logger.info('📋 Detected change in supported_models.json, reloading...')
-          this.reloadModels()
-        }
-      })
-
-      // 保存引用以便清理
-      this.fileWatcher = {
-        close: () => fs.unwatchFile(this.modelsFile)
-      }
-
-      logger.info('👁️  File watcher set up for supported_models.json')
-    } catch (error) {
-      logger.error('❌ Failed to setup file watcher:', error)
-    }
-  }
-
-  /**
    * 获取服务状态
    */
   getStatus() {
-    const totalModels = this.supportedModels
-      ? Object.values(this.supportedModels).reduce((sum, config) => sum + config.models.length, 0)
-      : 0
+    const totalModels = Object.values(this.supportedModels).reduce(
+      (sum, config) => sum + config.models.length,
+      0
+    )
 
     return {
-      initialized: this.supportedModels !== null,
+      initialized: true,
       totalModels,
-      providers: this.supportedModels ? Object.keys(this.supportedModels) : [],
-      fileExists: fs.existsSync(this.modelsFile)
+      providers: Object.keys(this.supportedModels)
     }
   }
 
   /**
-   * 清理资源
+   * 清理资源（保留接口兼容性）
    */
   cleanup() {
-    if (this.fileWatcher) {
-      this.fileWatcher.close()
-      this.fileWatcher = null
-      logger.debug('📋 Model service file watcher closed')
-    }
+    logger.debug('📋 Model service cleanup (no-op)')
   }
 }
 

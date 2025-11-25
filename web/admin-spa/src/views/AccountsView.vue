@@ -872,7 +872,7 @@
                         <span
                           class="inline-flex min-w-[32px] justify-center rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-medium text-purple-600 dark:bg-purple-500/20 dark:text-purple-300"
                         >
-                          Opus
+                          sonnet
                         </span>
                         <div class="flex-1">
                           <div class="flex items-center gap-2">
