@@ -106,7 +106,6 @@
                     icon-color="text-purple-500"
                     :options="tagOptions"
                     placeholder="所有标签"
-                    @change="currentPage = 1"
                   />
                   <span
                     v-if="selectedTagFilter"
@@ -126,7 +125,6 @@
                     icon-color="text-cyan-500"
                     :options="searchModeOptions"
                     placeholder="选择搜索类型"
-                    @change="currentPage = 1"
                   />
                 </div>
                 <div class="group relative flex-1">
@@ -145,7 +143,6 @@
                             : '搜索名称...'
                       "
                       type="text"
-                      @input="currentPage = 1"
                     />
                     <i class="fas fa-search absolute left-3 text-sm text-cyan-500" />
                     <button
@@ -313,19 +310,9 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[4%] min-w-[40px] cursor-pointer px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
-                      @click="sortApiKeys('periodCost')"
+                      class="w-[4%] min-w-[40px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                     >
                       费用
-                      <i
-                        v-if="apiKeysSortBy === 'periodCost'"
-                        :class="[
-                          'fas',
-                          apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down',
-                          'ml-1'
-                        ]"
-                      />
-                      <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
                       class="w-[14%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
@@ -333,34 +320,14 @@
                       限制
                     </th>
                     <th
-                      class="w-[5%] min-w-[45px] cursor-pointer px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
-                      @click="sortApiKeys('periodTokens')"
+                      class="w-[5%] min-w-[45px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                     >
                       Token
-                      <i
-                        v-if="apiKeysSortBy === 'periodTokens'"
-                        :class="[
-                          'fas',
-                          apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down',
-                          'ml-1'
-                        ]"
-                      />
-                      <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[5%] min-w-[45px] cursor-pointer px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
-                      @click="sortApiKeys('periodRequests')"
+                      class="w-[5%] min-w-[45px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                     >
                       请求数
-                      <i
-                        v-if="apiKeysSortBy === 'periodRequests'"
-                        :class="[
-                          'fas',
-                          apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down',
-                          'ml-1'
-                        ]"
-                      />
-                      <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
                       class="w-[8%] min-w-[70px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
@@ -577,12 +544,25 @@
                       </td>
                       <!-- 费用 -->
                       <td class="whitespace-nowrap px-3 py-3 text-right" style="font-size: 13px">
-                        <span
-                          class="font-semibold text-blue-600 dark:text-blue-400"
-                          style="font-size: 14px"
-                        >
-                          ${{ getPeriodCost(key).toFixed(2) }}
-                        </span>
+                        <!-- 加载中状态 -->
+                        <template v-if="isStatsLoading(key.id)">
+                          <div class="flex items-center justify-end">
+                            <i class="fas fa-spinner fa-spin text-gray-400"></i>
+                          </div>
+                        </template>
+                        <!-- 已加载状态 -->
+                        <template v-else-if="getCachedStats(key.id)">
+                          <span
+                            class="font-semibold text-blue-600 dark:text-blue-400"
+                            style="font-size: 14px"
+                          >
+                            {{ getCachedStats(key.id).formattedCost || '$0.00' }}
+                          </span>
+                        </template>
+                        <!-- 未加载状态 -->
+                        <template v-else>
+                          <span class="text-gray-400">-</span>
+                        </template>
                       </td>
                       <!-- 限制 -->
                       <td class="px-2 py-2" style="font-size: 12px">
@@ -600,7 +580,7 @@
                           <!-- 总费用限制进度条（无每日限制时展示） -->
                           <LimitProgressBar
                             v-else-if="key.totalCostLimit > 0"
-                            :current="key.usage?.total?.cost || 0"
+                            :current="getCachedStats(key.id)?.cost || key.usage?.total?.cost || 0"
                             label="总费用限制"
                             :limit="key.totalCostLimit"
                             type="total"
@@ -660,26 +640,52 @@
                       </td>
                       <!-- Token数量 -->
                       <td class="whitespace-nowrap px-3 py-3 text-right" style="font-size: 13px">
-                        <div class="flex items-center justify-end gap-1">
-                          <span
-                            class="font-medium text-purple-600 dark:text-purple-400"
-                            style="font-size: 13px"
-                          >
-                            {{ formatTokenCount(getPeriodTokens(key)) }}
-                          </span>
-                        </div>
+                        <!-- 加载中状态 -->
+                        <template v-if="isStatsLoading(key.id)">
+                          <div class="flex items-center justify-end">
+                            <i class="fas fa-spinner fa-spin text-gray-400"></i>
+                          </div>
+                        </template>
+                        <!-- 已加载状态 -->
+                        <template v-else-if="getCachedStats(key.id)">
+                          <div class="flex items-center justify-end gap-1">
+                            <span
+                              class="font-medium text-purple-600 dark:text-purple-400"
+                              style="font-size: 13px"
+                            >
+                              {{ formatTokenCount(getCachedStats(key.id).tokens || 0) }}
+                            </span>
+                          </div>
+                        </template>
+                        <!-- 未加载状态 -->
+                        <template v-else>
+                          <span class="text-gray-400">-</span>
+                        </template>
                       </td>
                       <!-- 请求数 -->
                       <td class="whitespace-nowrap px-3 py-3 text-right" style="font-size: 13px">
-                        <div class="flex items-center justify-end gap-1">
-                          <span
-                            class="font-medium text-gray-900 dark:text-gray-100"
-                            style="font-size: 13px"
-                          >
-                            {{ formatNumber(getPeriodRequests(key)) }}
-                          </span>
-                          <span class="text-xs text-gray-500">次</span>
-                        </div>
+                        <!-- 加载中状态 -->
+                        <template v-if="isStatsLoading(key.id)">
+                          <div class="flex items-center justify-end">
+                            <i class="fas fa-spinner fa-spin text-gray-400"></i>
+                          </div>
+                        </template>
+                        <!-- 已加载状态 -->
+                        <template v-else-if="getCachedStats(key.id)">
+                          <div class="flex items-center justify-end gap-1">
+                            <span
+                              class="font-medium text-gray-900 dark:text-gray-100"
+                              style="font-size: 13px"
+                            >
+                              {{ formatNumber(getCachedStats(key.id).requests || 0) }}
+                            </span>
+                            <span class="text-xs text-gray-500">次</span>
+                          </div>
+                        </template>
+                        <!-- 未加载状态 -->
+                        <template v-else>
+                          <span class="text-gray-400">-</span>
+                        </template>
                       </td>
                       <!-- 最后使用 -->
                       <td
@@ -1264,15 +1270,37 @@
                   </div>
                   <div class="grid grid-cols-2 gap-3">
                     <div>
-                      <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                        {{ formatNumber(key.usage?.daily?.requests || 0) }} 次
-                      </p>
+                      <!-- 请求数 - 使用缓存统计 -->
+                      <template v-if="isStatsLoading(key.id)">
+                        <p class="text-sm font-semibold text-gray-400">
+                          <i class="fas fa-spinner fa-spin"></i>
+                        </p>
+                      </template>
+                      <template v-else-if="getCachedStats(key.id)">
+                        <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                          {{ formatNumber(getCachedStats(key.id).requests || 0) }} 次
+                        </p>
+                      </template>
+                      <template v-else>
+                        <p class="text-sm font-semibold text-gray-400">-</p>
+                      </template>
                       <p class="text-xs text-gray-500 dark:text-gray-400">请求</p>
                     </div>
                     <div>
-                      <p class="text-sm font-semibold text-green-600">
-                        ${{ (key.dailyCost || 0).toFixed(2) }}
-                      </p>
+                      <!-- 费用 - 使用缓存统计 -->
+                      <template v-if="isStatsLoading(key.id)">
+                        <p class="text-sm font-semibold text-gray-400">
+                          <i class="fas fa-spinner fa-spin"></i>
+                        </p>
+                      </template>
+                      <template v-else-if="getCachedStats(key.id)">
+                        <p class="text-sm font-semibold text-green-600">
+                          {{ getCachedStats(key.id).formattedCost || '$0.00' }}
+                        </p>
+                      </template>
+                      <template v-else>
+                        <p class="text-sm font-semibold text-gray-400">-</p>
+                      </template>
                       <p class="text-xs text-gray-500 dark:text-gray-400">费用</p>
                     </div>
                   </div>
@@ -1319,7 +1347,7 @@
                   <!-- 总费用限制（无每日限制时展示） -->
                   <LimitProgressBar
                     v-else-if="key.totalCostLimit > 0"
-                    :current="key.usage?.total?.cost || 0"
+                    :current="getCachedStats(key.id)?.cost || key.usage?.total?.cost || 0"
                     label="总费用限制"
                     :limit="key.totalCostLimit"
                     type="total"
@@ -1486,7 +1514,6 @@
                 <select
                   v-model="pageSize"
                   class="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 transition-colors hover:border-gray-300 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 sm:text-sm"
-                  @change="currentPage = 1"
                 >
                   <option v-for="size in pageSizeOptions" :key="size" :value="size">
                     {{ size }}
@@ -1996,9 +2023,22 @@ const timeRangeDropdownOptions = computed(() => [
 const activeTab = ref('active')
 const deletedApiKeys = ref([])
 const deletedApiKeysLoading = ref(false)
-const apiKeysSortBy = ref('periodCost')
+const apiKeysSortBy = ref('createdAt') // 修改默认排序为创建时间（移除费用排序支持）
 const apiKeysSortOrder = ref('desc')
 const expandedApiKeys = ref({})
+
+// 后端分页相关状态
+const serverPagination = ref({
+  page: 1,
+  pageSize: 20,
+  total: 0,
+  totalPages: 0
+})
+
+// 统计数据缓存: Map<keyId, { stats, timeRange, timestamp }>
+const statsCache = ref(new Map())
+// 正在加载统计的 keyIds
+const statsLoading = ref(new Set())
 const apiKeyModelStats = ref({})
 const apiKeyDateFilters = ref({})
 const defaultTime = ref([new Date(2000, 1, 1, 0, 0, 0), new Date(2000, 2, 1, 23, 59, 59)])
@@ -2074,148 +2114,15 @@ const renewingApiKey = ref(null)
 const newApiKeyData = ref(null)
 const batchApiKeyData = ref([])
 
-// 提取“所属账号”列直接展示的文本
-const getBindingDisplayStrings = (key) => {
-  const values = new Set()
-
-  const collect = (...items) => {
-    items.forEach((item) => {
-      if (typeof item !== 'string') return
-      const trimmed = item.trim()
-      if (trimmed) {
-        values.add(trimmed)
-      }
-    })
-  }
-
-  const sanitize = (text) => {
-    if (typeof text !== 'string') return ''
-    return text
-      .replace(/^⚠️\s*/, '')
-      .replace(/^🔒\s*/, '')
-      .trim()
-  }
-
-  const appendBindingRow = (label, info) => {
-    const infoSanitized = sanitize(info)
-    collect(label, info, infoSanitized)
-    if (infoSanitized) {
-      collect(`${label} ${infoSanitized}`)
-    }
-  }
-
-  if (key.claudeAccountId || key.claudeConsoleAccountId) {
-    appendBindingRow('Claude', getClaudeBindingInfo(key))
-  }
-
-  if (key.geminiAccountId) {
-    appendBindingRow('Gemini', getGeminiBindingInfo(key))
-  }
-
-  if (key.openaiAccountId) {
-    appendBindingRow('OpenAI', getOpenAIBindingInfo(key))
-  }
-
-  if (key.bedrockAccountId) {
-    appendBindingRow('Bedrock', getBedrockBindingInfo(key))
-  }
-
-  if (key.droidAccountId) {
-    appendBindingRow('Droid', getDroidBindingInfo(key))
-  }
-
-  if (
-    !key.claudeAccountId &&
-    !key.claudeConsoleAccountId &&
-    !key.geminiAccountId &&
-    !key.openaiAccountId &&
-    !key.bedrockAccountId &&
-    !key.droidAccountId
-  ) {
-    collect('共享池')
-  }
-
-  return Array.from(values)
-}
-
-// 计算排序后的API Keys
+// 计算排序后的API Keys（现在由后端处理，这里直接返回）
 const sortedApiKeys = computed(() => {
-  // 先进行标签筛选
-  let filteredKeys = apiKeys.value
-  if (selectedTagFilter.value) {
-    filteredKeys = apiKeys.value.filter(
-      (key) => key.tags && key.tags.includes(selectedTagFilter.value)
-    )
-  }
-
-  // 然后进行搜索过滤
-  if (searchKeyword.value) {
-    const keyword = searchKeyword.value.toLowerCase().trim()
-    filteredKeys = filteredKeys.filter((key) => {
-      if (searchMode.value === 'bindingAccount') {
-        const bindings = getBindingDisplayStrings(key)
-        if (bindings.length === 0) return false
-        return bindings.some((text) => text.toLowerCase().includes(keyword))
-      }
-
-      const nameMatch = key.name && key.name.toLowerCase().includes(keyword)
-      if (isLdapEnabled.value) {
-        const ownerMatch =
-          key.ownerDisplayName && key.ownerDisplayName.toLowerCase().includes(keyword)
-        return nameMatch || ownerMatch
-      }
-      return nameMatch
-    })
-  }
-
-  // 如果没有排序字段，返回筛选后的结果
-  if (!apiKeysSortBy.value) return filteredKeys
-
-  // 排序
-  const sorted = [...filteredKeys].sort((a, b) => {
-    let aVal = a[apiKeysSortBy.value]
-    let bVal = b[apiKeysSortBy.value]
-
-    // 处理特殊排序字段
-    if (apiKeysSortBy.value === 'status') {
-      aVal = a.isActive ? 1 : 0
-      bVal = b.isActive ? 1 : 0
-    } else if (apiKeysSortBy.value === 'periodRequests') {
-      aVal = getPeriodRequests(a)
-      bVal = getPeriodRequests(b)
-    } else if (apiKeysSortBy.value === 'periodCost') {
-      aVal = calculatePeriodCost(a)
-      bVal = calculatePeriodCost(b)
-    } else if (apiKeysSortBy.value === 'periodTokens') {
-      aVal = getPeriodTokens(a)
-      bVal = getPeriodTokens(b)
-    } else if (apiKeysSortBy.value === 'dailyCost') {
-      aVal = a.dailyCost || 0
-      bVal = b.dailyCost || 0
-    } else if (apiKeysSortBy.value === 'totalCost') {
-      aVal = a.totalCost || 0
-      bVal = b.totalCost || 0
-    } else if (
-      apiKeysSortBy.value === 'createdAt' ||
-      apiKeysSortBy.value === 'expiresAt' ||
-      apiKeysSortBy.value === 'lastUsedAt'
-    ) {
-      aVal = aVal ? new Date(aVal).getTime() : 0
-      bVal = bVal ? new Date(bVal).getTime() : 0
-    }
-
-    if (aVal < bVal) return apiKeysSortOrder.value === 'asc' ? -1 : 1
-    if (aVal > bVal) return apiKeysSortOrder.value === 'asc' ? 1 : -1
-    return 0
-  })
-
-  return sorted
+  // 后端已经处理了筛选、搜索和排序，直接返回
+  return apiKeys.value
 })
 
-// 计算总页数
+// 计算总页数（使用后端分页信息）
 const totalPages = computed(() => {
-  const total = sortedApiKeys.value.length
-  return Math.ceil(total / pageSize.value) || 0
+  return serverPagination.value.totalPages || 0
 })
 
 // 计算显示的页码数组
@@ -2273,11 +2180,10 @@ const showTrailingEllipsis = computed(() => {
   return shouldShowLastPage.value && pages[pages.length - 1] < totalPages.value - 1
 })
 
-// 获取分页后的数据
+// 获取分页后的数据（现在由后端处理，直接返回当前数据）
 const paginatedApiKeys = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-  return sortedApiKeys.value.slice(start, end)
+  // 后端已经分页，直接返回
+  return apiKeys.value
 })
 
 // 加载账户列表
@@ -2397,44 +2303,167 @@ const loadAccounts = async () => {
   }
 }
 
-// 加载API Keys
-const loadApiKeys = async () => {
+// 加载API Keys（使用后端分页）
+const loadApiKeys = async (clearStatsCache = true) => {
   apiKeysLoading.value = true
   try {
+    // 清除统计缓存（刷新时）
+    if (clearStatsCache) {
+      statsCache.value.clear()
+    }
+
     // 构建请求参数
-    let params = {}
+    const params = new URLSearchParams()
+
+    // 分页参数
+    params.set('page', currentPage.value.toString())
+    params.set('pageSize', pageSize.value.toString())
+
+    // 搜索参数
+    params.set('searchMode', searchMode.value)
+    if (searchKeyword.value) {
+      params.set('search', searchKeyword.value)
+    }
+
+    // 筛选参数
+    if (selectedTagFilter.value) {
+      params.set('tag', selectedTagFilter.value)
+    }
+
+    // 排序参数（只支持非费用字段）
+    const validSortFields = ['name', 'createdAt', 'expiresAt', 'lastUsedAt', 'isActive', 'status']
+    const effectiveSortBy = validSortFields.includes(apiKeysSortBy.value)
+      ? apiKeysSortBy.value
+      : 'createdAt'
+    params.set('sortBy', effectiveSortBy)
+    params.set('sortOrder', apiKeysSortOrder.value)
+
+    // 时间范围（用于标记，不用于费用计算）
     if (
       globalDateFilter.type === 'custom' &&
       globalDateFilter.customStart &&
       globalDateFilter.customEnd
     ) {
-      params.startDate = globalDateFilter.customStart
-      params.endDate = globalDateFilter.customEnd
-      params.timeRange = 'custom'
+      params.set('startDate', globalDateFilter.customStart)
+      params.set('endDate', globalDateFilter.customEnd)
+      params.set('timeRange', 'custom')
     } else if (globalDateFilter.preset === 'all') {
-      params.timeRange = 'all'
+      params.set('timeRange', 'all')
     } else {
-      params.timeRange = globalDateFilter.preset
+      params.set('timeRange', globalDateFilter.preset)
     }
 
-    const queryString = new URLSearchParams(params).toString()
-    const data = await apiClient.get(`/admin/api-keys?${queryString}`)
+    const data = await apiClient.get(`/admin/api-keys?${params.toString()}`)
     if (data.success) {
-      apiKeys.value = data.data || []
-      // 更新可用标签列表
-      const tagsSet = new Set()
-      apiKeys.value.forEach((key) => {
-        if (key.tags && Array.isArray(key.tags)) {
-          key.tags.forEach((tag) => tagsSet.add(tag))
+      // 更新数据
+      apiKeys.value = data.data?.items || []
+
+      // 更新分页信息
+      if (data.data?.pagination) {
+        serverPagination.value = data.data.pagination
+        // 同步当前页码（处理页面超出范围的情况）
+        if (
+          currentPage.value > serverPagination.value.totalPages &&
+          serverPagination.value.totalPages > 0
+        ) {
+          currentPage.value = serverPagination.value.totalPages
         }
-      })
-      availableTags.value = Array.from(tagsSet).sort()
+      }
+
+      // 更新可用标签列表
+      if (data.data?.availableTags) {
+        availableTags.value = data.data.availableTags
+      }
+
+      // 异步加载当前页的统计数据
+      await loadPageStats()
     }
   } catch (error) {
+    console.error('加载 API Keys 失败:', error)
     showToast('加载 API Keys 失败', 'error')
   } finally {
     apiKeysLoading.value = false
   }
+}
+
+// 异步加载当前页的统计数据
+const loadPageStats = async () => {
+  const currentPageKeys = apiKeys.value
+  if (!currentPageKeys || currentPageKeys.length === 0) return
+
+  // 获取当前时间范围
+  let currentTimeRange = globalDateFilter.preset
+  let startDate = null
+  let endDate = null
+
+  if (
+    globalDateFilter.type === 'custom' &&
+    globalDateFilter.customStart &&
+    globalDateFilter.customEnd
+  ) {
+    currentTimeRange = 'custom'
+    startDate = globalDateFilter.customStart
+    endDate = globalDateFilter.customEnd
+  }
+
+  // 筛选出需要加载的 keys（未缓存或时间范围变化）
+  const keysNeedStats = currentPageKeys.filter((key) => {
+    const cached = statsCache.value.get(key.id)
+    if (!cached) return true
+    if (cached.timeRange !== currentTimeRange) return true
+    if (currentTimeRange === 'custom') {
+      if (cached.startDate !== startDate || cached.endDate !== endDate) return true
+    }
+    return false
+  })
+
+  if (keysNeedStats.length === 0) return
+
+  // 标记为加载中
+  const keyIds = keysNeedStats.map((k) => k.id)
+  keyIds.forEach((id) => statsLoading.value.add(id))
+
+  try {
+    const requestBody = {
+      keyIds,
+      timeRange: currentTimeRange
+    }
+    if (currentTimeRange === 'custom') {
+      requestBody.startDate = startDate
+      requestBody.endDate = endDate
+    }
+
+    const response = await apiClient.post('/admin/api-keys/batch-stats', requestBody)
+
+    if (response.success && response.data) {
+      // 更新缓存
+      for (const [keyId, stats] of Object.entries(response.data)) {
+        statsCache.value.set(keyId, {
+          stats,
+          timeRange: currentTimeRange,
+          startDate,
+          endDate,
+          timestamp: Date.now()
+        })
+      }
+    }
+  } catch (error) {
+    console.error('加载统计数据失败:', error)
+    // 不显示 toast，避免打扰用户
+  } finally {
+    keyIds.forEach((id) => statsLoading.value.delete(id))
+  }
+}
+
+// 获取缓存的统计数据
+const getCachedStats = (keyId) => {
+  const cached = statsCache.value.get(keyId)
+  return cached?.stats || null
+}
+
+// 检查是否正在加载统计
+const isStatsLoading = (keyId) => {
+  return statsLoading.value.has(keyId)
 }
 
 // 加载已删除的API Keys
@@ -4198,21 +4227,45 @@ watch([selectedTagFilter, apiKeyStatsTimeRange], () => {
   updateSelectAllState()
 })
 
-// 监听搜索关键词变化，只重置分页，保持选中状态
+// 搜索防抖定时器
+let searchDebounceTimer = null
+
+// 监听搜索关键词变化，使用防抖重新加载数据
 watch(searchKeyword, () => {
-  currentPage.value = 1
-  // 不清空选中状态，允许跨搜索保持勾选
-  updateSelectAllState()
+  // 清除之前的定时器
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+  }
+  // 设置防抖（300ms）
+  searchDebounceTimer = setTimeout(() => {
+    currentPage.value = 1
+    loadApiKeys(false) // 不清除统计缓存
+  }, 300)
 })
 
-// 监听搜索模式变化，重置分页并更新选中状态
+// 监听搜索模式变化，重新加载数据
 watch(searchMode, () => {
   currentPage.value = 1
-  updateSelectAllState()
+  loadApiKeys(false)
 })
 
-// 监听分页变化，更新全选状态
-watch([currentPage, pageSize], () => {
+// 监听标签筛选变化，重新加载数据
+watch(selectedTagFilter, () => {
+  currentPage.value = 1
+  loadApiKeys(false)
+})
+
+// 监听排序变化，重新加载数据
+watch([apiKeysSortBy, apiKeysSortOrder], () => {
+  loadApiKeys(false)
+})
+
+// 监听分页变化，重新加载数据
+watch([currentPage, pageSize], ([newPage, newPageSize], [oldPage, oldPageSize]) => {
+  // 只有页码或每页数量真正变化时才重新加载
+  if (newPage !== oldPage || newPageSize !== oldPageSize) {
+    loadApiKeys(false)
+  }
   updateSelectAllState()
 })
 

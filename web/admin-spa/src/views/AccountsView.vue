@@ -1808,7 +1808,8 @@ const accountsLoading = ref(false)
 const accountSortBy = ref('name')
 const accountsSortBy = ref('')
 const accountsSortOrder = ref('asc')
-const apiKeys = ref([])
+const apiKeys = ref([]) // 保留用于其他功能（如删除账户时显示绑定信息）
+const bindingCounts = ref({}) // 轻量级绑定计数，用于显示"绑定: X 个API Key"
 const accountGroups = ref([])
 const groupFilter = ref('all')
 const platformFilter = ref('all')
@@ -1858,7 +1859,8 @@ const editingExpiryAccount = ref(null)
 const expiryEditModalRef = ref(null)
 
 // 缓存状态标志
-const apiKeysLoaded = ref(false)
+const apiKeysLoaded = ref(false) // 用于其他功能
+const bindingCountsLoaded = ref(false) // 轻量级绑定计数缓存
 const groupsLoaded = ref(false)
 const groupMembersLoaded = ref(false)
 const accountGroupMap = ref(new Map()) // Map<accountId, Array<groupInfo>>
@@ -2372,8 +2374,8 @@ const loadAccounts = async (forceReload = false) => {
       }
     }
 
-    // 使用缓存机制加载 API Keys 和分组数据
-    await Promise.all([loadApiKeys(forceReload), loadAccountGroups(forceReload)])
+    // 使用缓存机制加载绑定计数和分组数据（不再加载完整的 API Keys 数据）
+    await Promise.all([loadBindingCounts(forceReload), loadAccountGroups(forceReload)])
 
     // 后端账户API已经包含分组信息，不需要单独加载分组成员关系
     // await loadGroupMembers(forceReload)
@@ -2393,12 +2395,13 @@ const loadAccounts = async (forceReload = false) => {
 
     const allAccounts = []
 
+    // 获取绑定计数数据
+    const counts = bindingCounts.value
+
     if (claudeData.success) {
       const claudeAccounts = (claudeData.data || []).map((acc) => {
-        // 计算每个Claude账户绑定的API Key数量
-        const boundApiKeysCount = apiKeys.value.filter(
-          (key) => key.claudeAccountId === acc.id
-        ).length
+        // 从绑定计数缓存获取数量
+        const boundApiKeysCount = counts.claudeAccountId?.[acc.id] || 0
         // 后端已经包含了groupInfos，直接使用
         return { ...acc, platform: 'claude', boundApiKeysCount }
       })
@@ -2407,10 +2410,8 @@ const loadAccounts = async (forceReload = false) => {
 
     if (claudeConsoleData.success) {
       const claudeConsoleAccounts = (claudeConsoleData.data || []).map((acc) => {
-        // 计算每个Claude Console账户绑定的API Key数量
-        const boundApiKeysCount = apiKeys.value.filter(
-          (key) => key.claudeConsoleAccountId === acc.id
-        ).length
+        // 从绑定计数缓存获取数量
+        const boundApiKeysCount = counts.claudeConsoleAccountId?.[acc.id] || 0
         // 后端已经包含了groupInfos，直接使用
         return { ...acc, platform: 'claude-console', boundApiKeysCount }
       })
@@ -2428,10 +2429,8 @@ const loadAccounts = async (forceReload = false) => {
 
     if (geminiData.success) {
       const geminiAccounts = (geminiData.data || []).map((acc) => {
-        // 计算每个Gemini账户绑定的API Key数量
-        const boundApiKeysCount = apiKeys.value.filter(
-          (key) => key.geminiAccountId === acc.id
-        ).length
+        // 从绑定计数缓存获取数量
+        const boundApiKeysCount = counts.geminiAccountId?.[acc.id] || 0
         // 后端已经包含了groupInfos，直接使用
         return { ...acc, platform: 'gemini', boundApiKeysCount }
       })
@@ -2439,10 +2438,8 @@ const loadAccounts = async (forceReload = false) => {
     }
     if (openaiData.success) {
       const openaiAccounts = (openaiData.data || []).map((acc) => {
-        // 计算每个OpenAI账户绑定的API Key数量
-        const boundApiKeysCount = apiKeys.value.filter(
-          (key) => key.openaiAccountId === acc.id
-        ).length
+        // 从绑定计数缓存获取数量
+        const boundApiKeysCount = counts.openaiAccountId?.[acc.id] || 0
         // 后端已经包含了groupInfos，直接使用
         return { ...acc, platform: 'openai', boundApiKeysCount }
       })
@@ -2450,10 +2447,8 @@ const loadAccounts = async (forceReload = false) => {
     }
     if (azureOpenaiData && azureOpenaiData.success) {
       const azureOpenaiAccounts = (azureOpenaiData.data || []).map((acc) => {
-        // 计算每个Azure OpenAI账户绑定的API Key数量
-        const boundApiKeysCount = apiKeys.value.filter(
-          (key) => key.azureOpenaiAccountId === acc.id
-        ).length
+        // 从绑定计数缓存获取数量
+        const boundApiKeysCount = counts.azureOpenaiAccountId?.[acc.id] || 0
         // 后端已经包含了groupInfos，直接使用
         return { ...acc, platform: 'azure_openai', boundApiKeysCount }
       })
@@ -2462,11 +2457,9 @@ const loadAccounts = async (forceReload = false) => {
 
     if (openaiResponsesData && openaiResponsesData.success) {
       const openaiResponsesAccounts = (openaiResponsesData.data || []).map((acc) => {
-        // 计算每个OpenAI-Responses账户绑定的API Key数量
+        // 从绑定计数缓存获取数量
         // OpenAI-Responses账户使用 responses: 前缀
-        const boundApiKeysCount = apiKeys.value.filter(
-          (key) => key.openaiAccountId === `responses:${acc.id}`
-        ).length
+        const boundApiKeysCount = counts.openaiAccountId?.[`responses:${acc.id}`] || 0
         // 后端已经包含了groupInfos，直接使用
         return { ...acc, platform: 'openai-responses', boundApiKeysCount }
       })
@@ -2485,10 +2478,12 @@ const loadAccounts = async (forceReload = false) => {
     // Droid 账户
     if (droidData && droidData.success) {
       const droidAccounts = (droidData.data || []).map((acc) => {
+        // 从绑定计数缓存获取数量
+        const boundApiKeysCount = counts.droidAccountId?.[acc.id] || acc.boundApiKeysCount || 0
         return {
           ...acc,
           platform: 'droid',
-          boundApiKeysCount: acc.boundApiKeysCount ?? 0
+          boundApiKeysCount
         }
       })
       allAccounts.push(...droidAccounts)
@@ -2497,11 +2492,9 @@ const loadAccounts = async (forceReload = false) => {
     // Gemini API 账户
     if (geminiApiData && geminiApiData.success) {
       const geminiApiAccounts = (geminiApiData.data || []).map((acc) => {
-        // 计算每个Gemini-API账户绑定的API Key数量
+        // 从绑定计数缓存获取数量
         // Gemini-API账户使用 api: 前缀
-        const boundApiKeysCount = apiKeys.value.filter(
-          (key) => key.geminiAccountId === `api:${acc.id}`
-        ).length
+        const boundApiKeysCount = counts.geminiAccountId?.[`api:${acc.id}`] || 0
         // 后端已经包含了groupInfos，直接使用
         return { ...acc, platform: 'gemini-api', boundApiKeysCount }
       })
@@ -2620,7 +2613,25 @@ const clearSearch = () => {
   currentPage.value = 1
 }
 
-// 加载API Keys列表（缓存版本）
+// 加载绑定计数（轻量级接口，用于显示"绑定: X 个API Key"）
+const loadBindingCounts = async (forceReload = false) => {
+  if (!forceReload && bindingCountsLoaded.value) {
+    return // 使用缓存数据
+  }
+
+  try {
+    const response = await apiClient.get('/admin/accounts/binding-counts')
+    if (response.success) {
+      bindingCounts.value = response.data || {}
+      bindingCountsLoaded.value = true
+    }
+  } catch (error) {
+    // 静默处理错误，绑定计数显示为 0
+    bindingCounts.value = {}
+  }
+}
+
+// 加载API Keys列表（保留用于其他功能，如删除账户时显示绑定信息）
 const loadApiKeys = async (forceReload = false) => {
   if (!forceReload && apiKeysLoaded.value) {
     return // 使用缓存数据
@@ -2629,7 +2640,7 @@ const loadApiKeys = async (forceReload = false) => {
   try {
     const response = await apiClient.get('/admin/api-keys')
     if (response.success) {
-      apiKeys.value = response.data || []
+      apiKeys.value = response.data?.items || response.data || []
       apiKeysLoaded.value = true
     }
   } catch (error) {
@@ -2657,6 +2668,7 @@ const loadAccountGroups = async (forceReload = false) => {
 // 清空缓存的函数
 const clearCache = () => {
   apiKeysLoaded.value = false
+  bindingCountsLoaded.value = false
   groupsLoaded.value = false
   groupMembersLoaded.value = false
   accountGroupMap.value.clear()
@@ -2929,8 +2941,10 @@ const deleteAccount = async (account) => {
 
     groupMembersLoaded.value = false
     apiKeysLoaded.value = false
+    bindingCountsLoaded.value = false
     loadAccounts()
-    loadApiKeys(true)
+    loadApiKeys(true) // 刷新完整 API Keys 列表（用于其他功能）
+    loadBindingCounts(true) // 刷新绑定计数
   } else {
     showToast(result.message || '删除失败', 'error')
   }

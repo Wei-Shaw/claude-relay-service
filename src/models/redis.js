@@ -166,6 +166,224 @@ class RedisClient {
     return apiKeys
   }
 
+  /**
+   * 使用 SCAN 获取所有 API Key ID（避免 KEYS 命令阻塞）
+   * @returns {Promise<string[]>} API Key ID 列表
+   */
+  async scanApiKeyIds() {
+    const keyIds = []
+    let cursor = '0'
+
+    do {
+      const [newCursor, keys] = await this.client.scan(cursor, 'MATCH', 'apikey:*', 'COUNT', 100)
+      cursor = newCursor
+
+      for (const key of keys) {
+        if (key !== 'apikey:hash_map') {
+          keyIds.push(key.replace('apikey:', ''))
+        }
+      }
+    } while (cursor !== '0')
+
+    return keyIds
+  }
+
+  /**
+   * 批量获取 API Key 数据（使用 Pipeline 优化）
+   * @param {string[]} keyIds - API Key ID 列表
+   * @returns {Promise<Object[]>} API Key 数据列表
+   */
+  async batchGetApiKeys(keyIds) {
+    if (!keyIds || keyIds.length === 0) {
+      return []
+    }
+
+    const pipeline = this.client.pipeline()
+    for (const keyId of keyIds) {
+      pipeline.hgetall(`apikey:${keyId}`)
+    }
+
+    const results = await pipeline.exec()
+    const apiKeys = []
+
+    for (let i = 0; i < results.length; i++) {
+      const [err, data] = results[i]
+      if (!err && data && Object.keys(data).length > 0) {
+        apiKeys.push({ id: keyIds[i], ...this._parseApiKeyData(data) })
+      }
+    }
+
+    return apiKeys
+  }
+
+  /**
+   * 解析 API Key 数据，将字符串转换为正确的类型
+   * @param {Object} data - 原始数据
+   * @returns {Object} 解析后的数据
+   */
+  _parseApiKeyData(data) {
+    if (!data) {
+      return data
+    }
+
+    const parsed = { ...data }
+
+    // 布尔字段
+    const boolFields = ['isActive', 'enableModelRestriction', 'isDeleted']
+    for (const field of boolFields) {
+      if (parsed[field] !== undefined) {
+        parsed[field] = parsed[field] === 'true'
+      }
+    }
+
+    // 数字字段
+    const numFields = [
+      'tokenLimit',
+      'dailyCostLimit',
+      'totalCostLimit',
+      'rateLimitRequests',
+      'rateLimitTokens',
+      'rateLimitWindow',
+      'rateLimitCost',
+      'maxConcurrency',
+      'activationDuration'
+    ]
+    for (const field of numFields) {
+      if (parsed[field] !== undefined && parsed[field] !== '') {
+        parsed[field] = parseFloat(parsed[field]) || 0
+      }
+    }
+
+    // 数组字段（JSON 解析）
+    const arrayFields = ['tags', 'restrictedModels', 'allowedClients']
+    for (const field of arrayFields) {
+      if (parsed[field]) {
+        try {
+          parsed[field] = JSON.parse(parsed[field])
+        } catch (e) {
+          parsed[field] = []
+        }
+      }
+    }
+
+    return parsed
+  }
+
+  /**
+   * 获取 API Keys 分页数据（不含费用，用于优化列表加载）
+   * @param {Object} options - 分页和筛选选项
+   * @returns {Promise<{items: Object[], pagination: Object, availableTags: string[]}>}
+   */
+  async getApiKeysPaginated(options = {}) {
+    const {
+      page = 1,
+      pageSize = 20,
+      searchMode = 'apiKey',
+      search = '',
+      tag = '',
+      isActive = '',
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      excludeDeleted = true // 默认排除已删除的 API Keys
+    } = options
+
+    // 1. 使用 SCAN 获取所有 apikey:* 的 ID 列表（避免阻塞）
+    const keyIds = await this.scanApiKeyIds()
+
+    // 2. 使用 Pipeline 批量获取基础数据
+    const apiKeys = await this.batchGetApiKeys(keyIds)
+
+    // 3. 应用筛选条件
+    let filteredKeys = apiKeys
+
+    // 排除已删除的 API Keys（默认行为）
+    if (excludeDeleted) {
+      filteredKeys = filteredKeys.filter((k) => !k.isDeleted)
+    }
+
+    // 状态筛选
+    if (isActive !== '' && isActive !== undefined && isActive !== null) {
+      const activeValue = isActive === 'true' || isActive === true
+      filteredKeys = filteredKeys.filter((k) => k.isActive === activeValue)
+    }
+
+    // 标签筛选
+    if (tag) {
+      filteredKeys = filteredKeys.filter((k) => {
+        const tags = Array.isArray(k.tags) ? k.tags : []
+        return tags.includes(tag)
+      })
+    }
+
+    // 搜索（apiKey 模式在这里处理，bindingAccount 模式在路由层处理）
+    if (search && searchMode === 'apiKey') {
+      const lowerSearch = search.toLowerCase().trim()
+      filteredKeys = filteredKeys.filter(
+        (k) =>
+          (k.name && k.name.toLowerCase().includes(lowerSearch)) ||
+          (k.ownerDisplayName && k.ownerDisplayName.toLowerCase().includes(lowerSearch))
+      )
+    }
+
+    // 4. 排序
+    filteredKeys.sort((a, b) => {
+      let aVal = a[sortBy]
+      let bVal = b[sortBy]
+
+      // 日期字段转时间戳
+      if (['createdAt', 'expiresAt', 'lastUsedAt'].includes(sortBy)) {
+        aVal = aVal ? new Date(aVal).getTime() : 0
+        bVal = bVal ? new Date(bVal).getTime() : 0
+      }
+
+      // 布尔字段转数字
+      if (sortBy === 'isActive' || sortBy === 'status') {
+        aVal = aVal ? 1 : 0
+        bVal = bVal ? 1 : 0
+      }
+
+      // 字符串字段
+      if (sortBy === 'name') {
+        aVal = (aVal || '').toLowerCase()
+        bVal = (bVal || '').toLowerCase()
+      }
+
+      if (aVal < bVal) {
+        return sortOrder === 'asc' ? -1 : 1
+      }
+      if (aVal > bVal) {
+        return sortOrder === 'asc' ? 1 : -1
+      }
+      return 0
+    })
+
+    // 5. 收集所有可用标签（在分页之前）
+    const allTags = new Set()
+    for (const key of apiKeys) {
+      const tags = Array.isArray(key.tags) ? key.tags : []
+      tags.forEach((t) => allTags.add(t))
+    }
+    const availableTags = [...allTags].sort()
+
+    // 6. 分页
+    const total = filteredKeys.length
+    const totalPages = Math.ceil(total / pageSize) || 1
+    const validPage = Math.min(Math.max(1, page), totalPages)
+    const start = (validPage - 1) * pageSize
+    const items = filteredKeys.slice(start, start + pageSize)
+
+    return {
+      items,
+      pagination: {
+        page: validPage,
+        pageSize,
+        total,
+        totalPages
+      },
+      availableTags
+    }
+  }
+
   // 🔍 通过哈希值查找API Key（性能优化）
   async findApiKeyByHash(hashedKey) {
     // 使用反向映射表：hash -> keyId
