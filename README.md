@@ -953,7 +953,7 @@ proxy_request_buffering off;
 <div align="center">
 
 <a href="https://afdian.com/a/claude-relay-service" target="_blank">
-  <img src="https://img.shields.io/badge/☕_请我喝杯咖啡-爱发电-946ce6?style=for-the-badge&logo=buy-me-a-coffee&logoColor=white" alt="Sponsor">
+  <img src="https://img.shields.io/badge/请我喝杯咖啡-爱发电-946ce6?style=for-the-badge&logo=buy-me-a-coffee&logoColor=white" alt="Sponsor">
 </a>
 
 <table>

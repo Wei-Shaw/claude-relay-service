@@ -718,7 +718,7 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
     allTimeCost = parseFloat((await client.get(totalCostKey)) || '0')
 
     // 获取 API Key 配置信息以判断是否需要窗口数据
-    const apiKey = await redis.getApiKeyById(keyId)
+    const apiKey = await redis.getApiKey(keyId)
     if (apiKey && apiKey.rateLimitWindow > 0) {
       const costCountKey = `rate_limit:cost:${keyId}`
       const windowStartKey = `rate_limit:window_start:${keyId}`
