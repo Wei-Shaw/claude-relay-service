@@ -334,17 +334,19 @@ class RedisClient {
 
     // 4. 排序
     filteredKeys.sort((a, b) => {
-      let aVal = a[sortBy]
-      let bVal = b[sortBy]
+      // status 排序实际上使用 isActive 字段（API Key 没有 status 字段）
+      const effectiveSortBy = sortBy === 'status' ? 'isActive' : sortBy
+      let aVal = a[effectiveSortBy]
+      let bVal = b[effectiveSortBy]
 
       // 日期字段转时间戳
-      if (['createdAt', 'expiresAt', 'lastUsedAt'].includes(sortBy)) {
+      if (['createdAt', 'expiresAt', 'lastUsedAt'].includes(effectiveSortBy)) {
         aVal = aVal ? new Date(aVal).getTime() : 0
         bVal = bVal ? new Date(bVal).getTime() : 0
       }
 
       // 布尔字段转数字
-      if (sortBy === 'isActive' || sortBy === 'status') {
+      if (effectiveSortBy === 'isActive') {
         aVal = aVal ? 1 : 0
         bVal = bVal ? 1 : 0
       }
