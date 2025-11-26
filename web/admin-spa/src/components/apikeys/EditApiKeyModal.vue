@@ -936,7 +936,11 @@ const removeRestrictedModel = (index) => {
 }
 
 // 常用模型列表
-const commonModels = ref(['claude-opus-4-20250514', 'claude-opus-4-1-20250805'])
+const commonModels = ref([
+  'claude-opus-4-5-20251101',
+  'claude-opus-4-1-20250805',
+  'claude-opus-4-20250514'
+])
 
 // 可用的快捷模型（过滤掉已在限制列表中的）
 const availableQuickModels = computed(() => {

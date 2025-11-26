@@ -233,11 +233,59 @@ npm run build:web
 # ✓ built in X.XXs
 ```
 
+### 🎯 新模型同步检查清单（重要！）
+
+**当上游添加新模型时，必须检查以下文件是否需要同步更新：**
+
+#### 后端检查
+- [ ] **src/services/modelService.js** - 模型列表是否已更新
+  ```bash
+  # 检查命令：
+  grep -A 15 "getDefaultModels()" src/services/modelService.js
+  ```
+
+#### 前端检查（这些文件容易遗漏！）
+- [ ] **web/admin-spa/src/components/apikeys/CreateApiKeyModal.vue** - commonModels 列表
+  ```bash
+  # 检查命令：
+  grep -A 5 "常用模型列表" web/admin-spa/src/components/apikeys/CreateApiKeyModal.vue
+  ```
+
+- [ ] **web/admin-spa/src/components/apikeys/EditApiKeyModal.vue** - commonModels 列表
+  ```bash
+  # 检查命令：
+  grep -A 5 "常用模型列表" web/admin-spa/src/components/apikeys/EditApiKeyModal.vue
+  ```
+
+- [ ] **web/admin-spa/src/components/accounts/AccountForm.vue** - commonModels 数组
+  ```bash
+  # 检查命令：
+  grep -A 15 "常用模型列表" web/admin-spa/src/components/accounts/AccountForm.vue
+  ```
+
+#### 自动化检查脚本
+```bash
+# 一键检查所有模型配置文件
+echo "=== 后端模型列表 ==="
+grep "claude-opus-4-5\|claude-sonnet-4-5\|claude-haiku-4-5" src/services/modelService.js
+
+echo -e "\n=== 前端 CreateApiKeyModal ==="
+grep -A 3 "commonModels.*ref" web/admin-spa/src/components/apikeys/CreateApiKeyModal.vue
+
+echo -e "\n=== 前端 EditApiKeyModal ==="
+grep -A 3 "commonModels.*ref" web/admin-spa/src/components/apikeys/EditApiKeyModal.vue
+
+echo -e "\n=== 前端 AccountForm ==="
+grep "claude-opus-4-5\|claude-sonnet-4-5\|claude-haiku-4-5" web/admin-spa/src/components/accounts/AccountForm.vue | head -5
+```
+
 ### 视觉验证（部署后）
 - [ ] 访问管理后台 URL
 - [ ] 确认 Logo 是 Whoos Solutions
 - [ ] 确认配色是红金渐变
 - [ ] 确认页面标题是 "Whoos Solutions API Hub"
+- [ ] **测试新模型是否在 API Key 创建/编辑界面的快捷选择中可见**
+- [ ] **测试新模型是否在账户配置界面的模型映射中可选**
 - [ ] 测试新功能是否正常工作
 
 ## 🔧 故障排除
@@ -579,9 +627,10 @@ git push origin main
 
 ## 📝 版本记录
 
-| 日期 | 上游版本 | 操作 | 冲突 | 状态 |
-|------|---------|------|------|------|
-| 2025-11-26 | v1.1.209 | 首次同步 56 个版本 + 模型更新 | 无冲突 | ✅ 成功 |
+| 日期 | 上游版本 | 操作 | 冲突 | 状态 | 备注 |
+|------|---------|------|------|------|------|
+| 2025-11-26 | v1.1.209 | 首次同步 56 个版本 + 模型更新 | 无冲突 | ✅ 成功 | 遗漏前端模型列表更新 |
+| 2025-11-26 | - | 修复前端模型列表 | 无 | ✅ 完成 | 更新 CreateApiKeyModal 和 EditApiKeyModal 的 commonModels |
 
 **下次更新请在此添加记录**
 
