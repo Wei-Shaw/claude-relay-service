@@ -371,7 +371,8 @@ class ApiKeyService {
 
       // 检查是否激活
       if (keyData.isActive !== 'true') {
-        return { valid: false, error: 'API key is disabled' }
+        const keyName = keyData.name || 'Unknown'
+        return { valid: false, error: `API Key "${keyName}" 已被禁用`, keyName }
       }
 
       // 注意：这里不处理激活逻辑，保持 API Key 的未激活状态
@@ -382,7 +383,8 @@ class ApiKeyService {
         keyData.expiresAt &&
         new Date() > new Date(keyData.expiresAt)
       ) {
-        return { valid: false, error: 'API key has expired' }
+        const keyName = keyData.name || 'Unknown'
+        return { valid: false, error: `API Key "${keyName}" 已过期`, keyName }
       }
 
       // 如果API Key属于某个用户，检查用户是否被禁用
