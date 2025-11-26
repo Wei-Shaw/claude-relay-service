@@ -149,17 +149,22 @@ git rebase upstream/main
 # 第三阶段：测试和更新
 # ========================================
 
-# 7. 测试 Web 界面构建（重要！）
+# 7. 检查模型配置同步（重要！新增步骤）
+bash scripts/check-model-sync.sh
+# 如果检查失败，手动更新缺失的前端模型列表
+
+# 8. 测试 Web 界面构建（重要！）
 npm run build:web
 
-# 8. 更新模型定价数据（如果上游有新模型）
+# 9. 更新模型定价数据（如果上游有新模型）
 npm run update:pricing
 
-# 9. 提交定价更新（如果有变化）
+# 10. 提交定价更新（如果有变化）
 git status
-# 如果 resources/model-pricing/model_prices_and_context_window.json 有变化：
+# 如果有变化（定价文件或模型配置）：
 git add resources/model-pricing/model_prices_and_context_window.json
-git commit -m "chore: 同步上游 v<版本号> + 更新模型定价数据"
+git add web/admin-spa/src/components/  # 如果有模型列表更新
+git commit -m "chore: 同步上游 v<版本号> + 更新模型配置和定价数据"
 
 # ========================================
 # 第四阶段：推送和部署
@@ -263,7 +268,18 @@ npm run build:web
   grep -A 15 "常用模型列表" web/admin-spa/src/components/accounts/AccountForm.vue
   ```
 
-#### 自动化检查脚本
+#### 自动化检查脚本（推荐使用）
+
+**方式 1：使用专用检查脚本（最简单）**
+```bash
+# 运行自动化检查脚本
+bash scripts/check-model-sync.sh
+
+# 如果所有检查通过，会显示：
+# ✅ 所有检查通过！模型配置已同步
+```
+
+**方式 2：手动检查命令**
 ```bash
 # 一键检查所有模型配置文件
 echo "=== 后端模型列表 ==="
