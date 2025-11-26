@@ -91,7 +91,8 @@ git push origin main --force-with-lease
 
 ```
 请按照 SYNC_UPSTREAM.md 文档执行上游同步，使用 Rebase 策略，
-遇到冲突自动处理（功能保留上游，UI保留我的定制）
+遇到冲突自动处理（功能保留上游，UI保留我的定制），
+同步完成后更新模型定价数据并推送到 GitHub
 ```
 
 **Claude Code 会自动：**
@@ -101,7 +102,8 @@ git push origin main --force-with-lease
 4. ✅ 执行 rebase 合并
 5. ✅ 自动处理冲突（按策略：功能保留上游，UI保留定制）
 6. ✅ 测试构建
-7. ✅ 推送到 GitHub
+7. ✅ 更新模型定价数据（`npm run update:pricing`）
+8. ✅ 提交并推送到 GitHub（触发 Zeabur 自动部署）
 
 ## ⚠️ 冲突处理策略
 
@@ -187,11 +189,82 @@ npm run build
 node --version  # 应该是 >= 18.0.0
 ```
 
+## 🔄 新模型支持和定价更新
+
+### 当上游发布新模型支持时（如 Claude Opus 4.5）
+
+新模型通常会通过以下方式集成到项目中：
+
+1. **模型 ID 注册** - 在 `src/services/modelService.js` 中添加模型 ID
+2. **定价数据更新** - 通过 price-mirror 分支自动同步
+3. **服务重启** - 自动部署时重新加载配置
+
+### 同步后的模型更新步骤
+
+**在完成上游同步后，需要更新模型定价数据：**
+
+```bash
+# 1. 更新模型定价数据（拉取最新价格）
+npm run update:pricing
+
+# 2. 验证新模型是否已注册
+grep -A 5 "getDefaultModels()" src/services/modelService.js
+
+# 3. （可选）检查定价文件中的模型数量
+grep -c '"litellm_provider":' resources/model-pricing/model_prices_and_context_window.json
+
+# 4. 提交定价文件更新（如果有变化）
+git add resources/model-pricing/model_prices_and_context_window.json
+git commit -m "chore: 更新模型定价数据"
+
+# 5. 推送到 GitHub 触发 Zeabur 自动部署
+git push origin main
+```
+
+### Zeabur 自动部署机制
+
+**重要：Zeabur 部署说明**
+
+- ✅ **代码推送后自动部署**: 推送到 GitHub 后，Zeabur 会自动检测并重新部署
+- ✅ **部署包含最新模型**: 新的模型 ID 和定价数据会在部署时生效
+- ✅ **无需手动重启**: 部署完成后服务自动重启，新模型立即可用
+- ⏱️ **部署时间**: 通常 2-5 分钟完成（取决于依赖安装）
+
+**检查部署状态：**
+1. 访问 [Zeabur 控制台](https://zeabur.com)
+2. 查看 claude-relay-service 项目的部署日志
+3. 等待 "Running" 状态显示
+
+### 新模型验证清单
+
+部署完成后，验证新模型可用性：
+
+- [ ] Zeabur 部署状态显示 "Running"
+- [ ] 访问 `/api/v1/models` 端点，确认新模型在列表中
+- [ ] 在 Claude Code CLI 中选择新模型（如 `claude-opus-4-5-20251101`）
+- [ ] 发送测试请求，确认返回正常响应
+- [ ] 检查管理后台的使用统计是否正常记录
+
+### 模型定价回退机制
+
+**如果定价文件中缺少新模型的价格数据：**
+
+项目有内置的回退机制（见 `src/services/pricingService.js`）：
+
+1. **硬编码价格**: Opus 系列默认使用 `$30/MTok` (1小时缓存)
+2. **相似模型参考**: 系统会使用同系列模型的价格
+3. **不影响功能**: 即使没有准确价格，模型仍然可用
+
+**常见模型系列的回退价格：**
+- Opus 系列: `$15/MTok` (input), `$75/MTok` (output)
+- Sonnet 系列: `$3/MTok` (input), `$15/MTok` (output)
+- Haiku 系列: `$0.8/MTok` (input), `$4/MTok` (output)
+
 ## 📝 版本记录
 
 | 日期 | 上游版本 | 操作 | 冲突 | 状态 |
 |------|---------|------|------|------|
-| 2025-11-26 | v1.1.209 | 首次同步 56 个版本 | 无冲突 | ✅ 成功 |
+| 2025-11-26 | v1.1.209 | 首次同步 56 个版本 + 模型更新 | 无冲突 | ✅ 成功 |
 
 **下次更新请在此添加记录**
 
