@@ -848,6 +848,7 @@ class ClaudeRelayService {
       'user-agent',
       'x-api-key',
       'authorization',
+      'x-authorization',
       'host',
       'content-length',
       'connection',
