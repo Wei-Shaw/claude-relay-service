@@ -212,6 +212,8 @@ class ApiKeyService {
       const keyData = await redis.findApiKeyByHash(hashedKey)
 
       if (!keyData) {
+        // ⚠️ 警告：映射表查找失败，可能是竞态条件或映射表损坏
+        logger.warn(`⚠️ API key not found in hash map: ${hashedKey.substring(0, 16)}... (possible race condition or corrupted hash map)`)
         return { valid: false, error: 'API key not found' }
       }
 
@@ -714,10 +716,11 @@ class ApiKeyService {
 
       updatedData.updatedAt = new Date().toISOString()
 
-      // 更新时不需要重新建立哈希映射，因为API Key本身没有变化
-      await redis.setApiKey(keyId, updatedData)
+      // 传递hashedKey以确保映射表一致性
+      // keyData.apiKey 存储的就是 hashedKey（见generateApiKey第123行）
+      await redis.setApiKey(keyId, updatedData, keyData.apiKey)
 
-      logger.success(`📝 Updated API key: ${keyId}`)
+      logger.success(`📝 Updated API key: ${keyId}, hashMap updated`)
 
       return { success: true }
     } catch (error) {
