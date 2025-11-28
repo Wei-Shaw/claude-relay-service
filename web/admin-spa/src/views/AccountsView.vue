@@ -362,7 +362,7 @@
                             <div class="flex items-start gap-2">
                               <i class="fas fa-gem mt-[2px] text-[10px] text-purple-500"></i>
                               <span class="font-medium text-white dark:text-gray-900"
-                                >Opus 窗口：7天Opus模型专用限额。</span
+                                >Sonnet窗口：7天Sonnet模型专用限额。</span
                               >
                             </div>
                             <div class="flex items-start gap-2">

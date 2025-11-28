@@ -12,9 +12,7 @@ const claudeCodeHeadersService = require('./claudeCodeHeadersService')
 const redis = require('../models/redis')
 const ClaudeCodeValidator = require('../validators/clients/claudeCodeValidator')
 const { formatDateWithTimezone } = require('../utils/dateHelper')
-const runtimeAddon = require('../utils/runtimeAddon')
-
-const RUNTIME_EVENT_FMT_CLAUDE_REQ = 'fmtClaudeReq'
+const requestIdentityService = require('./requestIdentityService')
 
 class ClaudeRelayService {
   constructor() {
@@ -941,7 +939,7 @@ class ClaudeRelayService {
     return filteredHeaders
   }
 
-  _applyLocalRequestFormatters(body, headers, context = {}) {
+  _applyRequestIdentityTransform(body, headers, context = {}) {
     const normalizedHeaders = headers && typeof headers === 'object' ? { ...headers } : {}
 
     try {
@@ -951,7 +949,7 @@ class ClaudeRelayService {
         ...context
       }
 
-      const result = runtimeAddon.emitSync(RUNTIME_EVENT_FMT_CLAUDE_REQ, payload)
+      const result = requestIdentityService.transform(payload)
       if (!result || typeof result !== 'object') {
         return { body, headers: normalizedHeaders }
       }
@@ -966,7 +964,7 @@ class ClaudeRelayService {
 
       return { body: nextBody, headers: nextHeaders, abortResponse }
     } catch (error) {
-      logger.warn('⚠️ 应用本地 fmtClaudeReq 插件失败:', error)
+      logger.warn('⚠️ 应用请求身份转换失败:', error)
       return { body, headers: normalizedHeaders }
     }
   }
@@ -1012,7 +1010,7 @@ class ClaudeRelayService {
       })
     }
 
-    const extensionResult = this._applyLocalRequestFormatters(requestPayload, finalHeaders, {
+    const extensionResult = this._applyRequestIdentityTransform(requestPayload, finalHeaders, {
       account,
       accountId,
       clientHeaders,
@@ -1332,7 +1330,7 @@ class ClaudeRelayService {
       })
     }
 
-    const extensionResult = this._applyLocalRequestFormatters(requestPayload, finalHeaders, {
+    const extensionResult = this._applyRequestIdentityTransform(requestPayload, finalHeaders, {
       account,
       accountId,
       accountType,
