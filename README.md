@@ -504,6 +504,22 @@ Droid CLI 读取 `~/.factory/config.json`。可以在该文件中添加自定义
       "api_key": "后台创建的API密钥",
       "provider": "openai",
       "max_tokens": 16384
+    },
+    {
+      "model_display_name": "Gemini-3-Pro [crs]",
+      "model": "gemini-3-pro-preview",
+      "base_url": "http://127.0.0.1:3000/droid/comm/v1/",
+      "api_key": "后台创建的API密钥",
+      "provider": "generic-chat-completion-api",
+      "max_tokens": 32000
+    },
+    {
+      "model_display_name": "GLM-4.6 [crs]",
+      "model": "glm-4.6",
+      "base_url": "http://127.0.0.1:3000/droid/comm/v1/",
+      "api_key": "后台创建的API密钥",
+      "provider": "generic-chat-completion-api",
+      "max_tokens": 32000
     }
   ]
 }
