@@ -620,6 +620,8 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
   let dailyCost = 0
   let currentWindowCost = 0
   let windowRemainingSeconds = null
+  let windowStartTime = null
+  let windowEndTime = null
   let allTimeCost = 0
 
   try {
@@ -642,9 +644,9 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
       const windowStart = await client.get(windowStartKey)
       if (windowStart) {
         const now = Date.now()
-        const windowStartTime = parseInt(windowStart)
+        windowStartTime = parseInt(windowStart)
         const windowDuration = apiKey.rateLimitWindow * 60 * 1000 // 转换为毫秒
-        const windowEndTime = windowStartTime + windowDuration
+        windowEndTime = windowStartTime + windowDuration
 
         // 如果窗口还有效
         if (now < windowEndTime) {
@@ -673,6 +675,8 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
     dailyCost,
     currentWindowCost,
     windowRemainingSeconds,
+    windowStartTime,
+    windowEndTime,
     allTimeCost // 历史总费用（用于总费用限制）
   }
 }

@@ -3969,6 +3969,8 @@ const showUsageDetails = (apiKey) => {
     dailyCost: cachedStats?.dailyCost ?? apiKey.dailyCost ?? 0,
     currentWindowCost: cachedStats?.currentWindowCost ?? apiKey.currentWindowCost ?? 0,
     windowRemainingSeconds: cachedStats?.windowRemainingSeconds ?? apiKey.windowRemainingSeconds,
+    windowStartTime: cachedStats?.windowStartTime ?? apiKey.windowStartTime ?? null,
+    windowEndTime: cachedStats?.windowEndTime ?? apiKey.windowEndTime ?? null,
     // 合并 usage 数据（用于详情弹窗中的统计卡片）
     usage: {
       ...apiKey.usage,
