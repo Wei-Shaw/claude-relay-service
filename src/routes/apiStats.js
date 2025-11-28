@@ -790,6 +790,283 @@ router.post('/api/batch-model-stats', async (req, res) => {
   }
 })
 
+// 🧪 API Key 端点测试接口 - 测试API Key是否能正常访问服务
+router.post('/api-key/test', async (req, res) => {
+  const axios = require('axios')
+  const config = require('../../config/config')
+
+  try {
+    const { apiKey, model = 'claude-sonnet-4-5-20250929' } = req.body
+
+    if (!apiKey) {
+      return res.status(400).json({
+        error: 'API Key is required',
+        message: 'Please provide your API Key'
+      })
+    }
+
+    // 基本格式验证
+    if (typeof apiKey !== 'string' || apiKey.length < 10 || apiKey.length > 512) {
+      return res.status(400).json({
+        error: 'Invalid API key format',
+        message: 'API key format is invalid'
+      })
+    }
+
+    // 首先验证API Key是否有效（不触发激活）
+    const validation = await apiKeyService.validateApiKeyForStats(apiKey)
+    if (!validation.valid) {
+      return res.status(401).json({
+        error: 'Invalid API key',
+        message: validation.error
+      })
+    }
+
+    logger.api(`🧪 API Key test started for: ${validation.keyData.name} (${validation.keyData.id})`)
+
+    // 设置SSE响应头
+    res.setHeader('Content-Type', 'text/event-stream')
+    res.setHeader('Cache-Control', 'no-cache')
+    res.setHeader('Connection', 'keep-alive')
+    res.setHeader('X-Accel-Buffering', 'no')
+
+    // 发送测试开始事件
+    res.write(`data: ${JSON.stringify({ type: 'test_start', message: 'Test started' })}\n\n`)
+
+    // 构建测试请求，模拟 Claude CLI 客户端
+    const port = config.server.port || 3000
+    const baseURL = `http://127.0.0.1:${port}`
+
+    const testPayload = {
+      model,
+      messages: [
+        {
+          role: 'user',
+          content: 'hi'
+        }
+      ],
+      system: [
+        {
+          type: 'text',
+          text: "You are Claude Code, Anthropic's official CLI for Claude."
+        }
+      ],
+      max_tokens: 32000,
+      temperature: 1,
+      stream: true
+    }
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'User-Agent': 'claude-cli/2.0.52 (external, cli)',
+      'x-api-key': apiKey,
+      'anthropic-version': config.claude.apiVersion || '2023-06-01'
+    }
+
+    // 向自身服务发起测试请求
+    // 使用 validateStatus 允许所有状态码通过，以便我们可以处理流式错误响应
+    const response = await axios.post(`${baseURL}/api/v1/messages`, testPayload, {
+      headers,
+      responseType: 'stream',
+      timeout: 60000, // 60秒超时
+      validateStatus: () => true // 接受所有状态码，自行处理错误
+    })
+
+    // 检查响应状态码，如果不是2xx，尝试读取错误信息
+    if (response.status >= 400) {
+      logger.error(
+        `🧪 API Key test received error status ${response.status} for: ${validation.keyData.name}`
+      )
+
+      // 尝试从流中读取错误信息
+      let errorBody = ''
+      for await (const chunk of response.data) {
+        errorBody += chunk.toString()
+      }
+
+      let errorMessage = `HTTP ${response.status}`
+      try {
+        // 尝试解析SSE格式的错误
+        const lines = errorBody.split('\n')
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const dataStr = line.substring(6).trim()
+            if (dataStr && dataStr !== '[DONE]') {
+              const data = JSON.parse(dataStr)
+              if (data.error?.message) {
+                errorMessage = data.error.message
+                break
+              } else if (data.message) {
+                errorMessage = data.message
+                break
+              } else if (typeof data.error === 'string') {
+                errorMessage = data.error
+                break
+              }
+            }
+          }
+        }
+        // 如果不是SSE格式，尝试直接解析JSON
+        if (errorMessage === `HTTP ${response.status}`) {
+          const jsonError = JSON.parse(errorBody)
+          errorMessage =
+            jsonError.error?.message || jsonError.message || jsonError.error || errorMessage
+        }
+      } catch {
+        // 解析失败，使用原始错误体或默认消息
+        if (errorBody && errorBody.length < 500) {
+          errorMessage = errorBody
+        }
+      }
+
+      res.write(`data: ${JSON.stringify({ type: 'error', error: errorMessage })}\n\n`)
+      res.write(
+        `data: ${JSON.stringify({ type: 'test_complete', success: false, error: errorMessage })}\n\n`
+      )
+      res.end()
+      return
+    }
+
+    let receivedContent = ''
+    let testSuccess = false
+    let upstreamError = null
+
+    // 处理流式响应
+    response.data.on('data', (chunk) => {
+      const lines = chunk.toString().split('\n')
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const dataStr = line.substring(6).trim()
+          if (dataStr === '[DONE]') {
+            continue
+          }
+
+          try {
+            const data = JSON.parse(dataStr)
+
+            // 检查上游返回的错误事件
+            if (data.type === 'error' || data.error) {
+              let errorMsg = 'Unknown upstream error'
+
+              // 优先从 data.error 提取（如果是对象，获取其 message）
+              if (typeof data.error === 'object' && data.error?.message) {
+                errorMsg = data.error.message
+              } else if (typeof data.error === 'string' && data.error !== 'Claude API error') {
+                // 如果 error 是字符串且不是通用错误，直接使用
+                errorMsg = data.error
+              } else if (data.details) {
+                // 尝试从 details 字段解析详细错误（claudeRelayService 格式）
+                try {
+                  const details =
+                    typeof data.details === 'string' ? JSON.parse(data.details) : data.details
+                  if (details.error?.message) {
+                    errorMsg = details.error.message
+                  } else if (details.message) {
+                    errorMsg = details.message
+                  }
+                } catch {
+                  // details 不是有效 JSON，尝试直接使用
+                  if (typeof data.details === 'string' && data.details.length < 500) {
+                    errorMsg = data.details
+                  }
+                }
+              } else if (data.message) {
+                errorMsg = data.message
+              }
+
+              // 添加状态码信息（如果有）
+              if (data.status && errorMsg !== 'Unknown upstream error') {
+                errorMsg = `[${data.status}] ${errorMsg}`
+              }
+
+              upstreamError = errorMsg
+              logger.error(`🧪 Upstream error in test for: ${validation.keyData.name}:`, errorMsg)
+              res.write(`data: ${JSON.stringify({ type: 'error', error: errorMsg })}\n\n`)
+              continue
+            }
+
+            // 提取文本内容
+            if (data.type === 'content_block_delta' && data.delta?.text) {
+              receivedContent += data.delta.text
+              res.write(`data: ${JSON.stringify({ type: 'content', text: data.delta.text })}\n\n`)
+            }
+
+            // 消息结束
+            if (data.type === 'message_stop') {
+              testSuccess = true
+              res.write(`data: ${JSON.stringify({ type: 'message_stop' })}\n\n`)
+            }
+          } catch {
+            // 忽略解析错误
+          }
+        }
+      }
+    })
+
+    response.data.on('end', () => {
+      // 如果有上游错误，标记为失败
+      if (upstreamError) {
+        testSuccess = false
+      }
+
+      logger.api(
+        `🧪 API Key test completed for: ${validation.keyData.name}, success: ${testSuccess}, content length: ${receivedContent.length}${upstreamError ? `, error: ${upstreamError}` : ''}`
+      )
+      res.write(
+        `data: ${JSON.stringify({
+          type: 'test_complete',
+          success: testSuccess,
+          contentLength: receivedContent.length,
+          error: upstreamError || undefined
+        })}\n\n`
+      )
+      res.end()
+    })
+
+    response.data.on('error', (err) => {
+      logger.error(`🧪 API Key test stream error for: ${validation.keyData.name}`, err)
+
+      // 如果已经捕获了上游错误，优先使用那个
+      let errorMsg = upstreamError || err.message || 'Stream error'
+
+      // 如果错误消息是通用的 "Claude API error: xxx"，提供更友好的提示
+      if (errorMsg.startsWith('Claude API error:') && upstreamError) {
+        errorMsg = upstreamError
+      }
+
+      res.write(`data: ${JSON.stringify({ type: 'error', error: errorMsg })}\n\n`)
+      res.write(
+        `data: ${JSON.stringify({ type: 'test_complete', success: false, error: errorMsg })}\n\n`
+      )
+      res.end()
+    })
+
+    // 处理客户端断开连接
+    req.on('close', () => {
+      if (!res.writableEnded) {
+        response.data.destroy()
+      }
+    })
+  } catch (error) {
+    logger.error('❌ API Key test failed:', error)
+
+    // 如果还未发送响应头，返回JSON错误
+    if (!res.headersSent) {
+      return res.status(500).json({
+        error: 'Test failed',
+        message: error.response?.data?.error?.message || error.message || 'Internal server error'
+      })
+    }
+
+    // 如果已经是SSE流，发送错误事件
+    res.write(
+      `data: ${JSON.stringify({ type: 'error', error: error.response?.data?.error?.message || error.message || 'Test failed' })}\n\n`
+    )
+    res.end()
+  }
+})
+
 // 📊 用户模型统计查询接口 - 安全的自查询接口
 router.post('/api/user-model-stats', async (req, res) => {
   try {

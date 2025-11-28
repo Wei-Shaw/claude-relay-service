@@ -490,12 +490,12 @@ Droid CLI 读取 `~/.factory/config.json`。可以在该文件中添加自定义
 {
   "custom_models": [
     {
-      "model_display_name": "Sonnet 4.5 [crs]",
-      "model": "claude-sonnet-4-5-20250929",
+      "model_display_name": "Opus 4.5 [crs]",
+      "model": "claude-opus-4-5-20251101",
       "base_url": "http://127.0.0.1:3000/droid/claude",
       "api_key": "后台创建的API密钥",
       "provider": "anthropic",
-      "max_tokens": 8192
+      "max_tokens": 64000
     },
     {
       "model_display_name": "GPT5-Codex [crs]",
@@ -511,7 +511,7 @@ Droid CLI 读取 `~/.factory/config.json`。可以在该文件中添加自定义
       "base_url": "http://127.0.0.1:3000/droid/comm/v1/",
       "api_key": "后台创建的API密钥",
       "provider": "generic-chat-completion-api",
-      "max_tokens": 32000
+      "max_tokens": 65535
     },
     {
       "model_display_name": "GLM-4.6 [crs]",
@@ -519,7 +519,7 @@ Droid CLI 读取 `~/.factory/config.json`。可以在该文件中添加自定义
       "base_url": "http://127.0.0.1:3000/droid/comm/v1/",
       "api_key": "后台创建的API密钥",
       "provider": "generic-chat-completion-api",
-      "max_tokens": 32000
+      "max_tokens": 202800
     }
   ]
 }
