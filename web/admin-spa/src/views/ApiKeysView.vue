@@ -2158,6 +2158,7 @@ const defaultTime = ref([new Date(2000, 1, 1, 0, 0, 0), new Date(2000, 2, 1, 23,
 const accounts = ref({
   claude: [],
   gemini: [],
+  geminiApi: [], // 添加 Gemini-API 账号列表（用于传递给子组件初始化）
   openai: [],
   openaiResponses: [], // 添加 OpenAI-Responses 账号列表
   bedrock: [],
@@ -2372,12 +2373,15 @@ const loadAccounts = async (forceRefresh = false) => {
     }
 
     if (geminiApiData.success) {
-      ;(geminiApiData.data || []).forEach((account) => {
-        geminiAccounts.push({
-          ...account,
-          platform: 'gemini-api',
-          isDedicated: account.accountType === 'dedicated'
-        })
+      // 保存原始 Gemini-API 账号列表供子组件初始化使用
+      accounts.value.geminiApi = (geminiApiData.data || []).map((account) => ({
+        ...account,
+        platform: 'gemini-api',
+        isDedicated: account.accountType === 'dedicated'
+      }))
+      // 同时添加到合并列表
+      accounts.value.geminiApi.forEach((account) => {
+        geminiAccounts.push(account)
       })
     }
 
