@@ -311,8 +311,24 @@
                     </th>
                     <th
                       class="w-[4%] min-w-[40px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                      :class="{
+                        'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600': canSortByCost,
+                        'cursor-not-allowed opacity-60': !canSortByCost
+                      }"
+                      :title="costSortTooltip"
+                      @click="sortApiKeys('cost')"
                     >
                       费用
+                      <i
+                        v-if="apiKeysSortBy === 'cost'"
+                        :class="[
+                          'fas',
+                          apiKeysSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down',
+                          'ml-1'
+                        ]"
+                      />
+                      <i v-else-if="canSortByCost" class="fas fa-sort ml-1 text-gray-400" />
+                      <i v-else class="fas fa-clock ml-1 text-gray-400" title="索引更新中" />
                     </th>
                     <th
                       class="w-[14%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
@@ -2042,7 +2058,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
 import { useClientsStore } from '@/stores/clients'
@@ -2113,9 +2129,12 @@ const timeRangeDropdownOptions = computed(() => [
 const activeTab = ref('active')
 const deletedApiKeys = ref([])
 const deletedApiKeysLoading = ref(false)
-const apiKeysSortBy = ref('createdAt') // 修改默认排序为创建时间（移除费用排序支持）
+const apiKeysSortBy = ref('createdAt') // 默认排序为创建时间
 const apiKeysSortOrder = ref('desc')
 const expandedApiKeys = ref({})
+
+// 费用排序相关状态
+const costSortStatus = ref({}) // 各时间范围的索引状态
 
 // 后端分页相关状态
 const serverPagination = ref({
@@ -2439,13 +2458,37 @@ const loadApiKeys = async (clearStatsCache = true) => {
       params.set('tag', selectedTagFilter.value)
     }
 
-    // 排序参数（只支持非费用字段）
-    const validSortFields = ['name', 'createdAt', 'expiresAt', 'lastUsedAt', 'isActive', 'status']
+    // 排序参数（支持费用排序）
+    const validSortFields = [
+      'name',
+      'createdAt',
+      'expiresAt',
+      'lastUsedAt',
+      'isActive',
+      'status',
+      'cost'
+    ]
     const effectiveSortBy = validSortFields.includes(apiKeysSortBy.value)
       ? apiKeysSortBy.value
       : 'createdAt'
     params.set('sortBy', effectiveSortBy)
     params.set('sortOrder', apiKeysSortOrder.value)
+
+    // 如果是费用排序，添加费用相关参数
+    if (effectiveSortBy === 'cost') {
+      if (
+        globalDateFilter.type === 'custom' &&
+        globalDateFilter.customStart &&
+        globalDateFilter.customEnd
+      ) {
+        params.set('costTimeRange', 'custom')
+        params.set('costStartDate', globalDateFilter.customStart)
+        params.set('costEndDate', globalDateFilter.customEnd)
+      } else {
+        // 使用当前的时间范围预设
+        params.set('costTimeRange', globalDateFilter.preset || '7days')
+      }
+    }
 
     // 时间范围（用于标记，不用于费用计算）
     if (
@@ -2641,12 +2684,100 @@ const loadDeletedApiKeys = async () => {
 
 // 排序API Keys
 const sortApiKeys = (field) => {
+  // 费用排序特殊处理
+  if (field === 'cost') {
+    if (!canSortByCost.value) {
+      showToast('费用排序索引正在更新中，请稍后重试', 'warning')
+      return
+    }
+
+    // 如果是 custom 时间范围，提示可能需要等待
+    if (globalDateFilter.type === 'custom') {
+      showToast('正在计算费用排序，可能需要几秒钟...', 'info')
+    }
+  }
+
   if (apiKeysSortBy.value === field) {
     apiKeysSortOrder.value = apiKeysSortOrder.value === 'asc' ? 'desc' : 'asc'
   } else {
     apiKeysSortBy.value = field
-    apiKeysSortOrder.value = 'asc'
+    // 费用排序默认降序（高费用在前）
+    apiKeysSortOrder.value = field === 'cost' ? 'desc' : 'asc'
   }
+}
+
+// 计算是否可以进行费用排序
+const canSortByCost = computed(() => {
+  // custom 时间范围始终允许（实时计算）
+  if (globalDateFilter.type === 'custom') {
+    return true
+  }
+
+  // 检查对应时间范围的索引状态
+  const timeRange = globalDateFilter.preset
+  const status = costSortStatus.value[timeRange]
+  return status?.status === 'ready'
+})
+
+// 费用排序提示文字
+const costSortTooltip = computed(() => {
+  if (globalDateFilter.type === 'custom') {
+    return '点击按费用排序（实时计算，可能需要几秒钟）'
+  }
+
+  const timeRange = globalDateFilter.preset
+  const status = costSortStatus.value[timeRange]
+
+  if (!status) {
+    return '费用排序索引未初始化'
+  }
+
+  if (status.status === 'updating') {
+    return '费用排序索引正在更新中...'
+  }
+
+  if (status.status === 'ready') {
+    const lastUpdate = status.lastUpdate ? new Date(status.lastUpdate).toLocaleString() : '未知'
+    return `点击按费用排序（索引更新于: ${lastUpdate}）`
+  }
+
+  return '费用排序索引状态未知'
+})
+
+// 费用排序索引状态刷新定时器
+let costSortStatusTimer = null
+
+// 获取费用排序索引状态
+const fetchCostSortStatus = async () => {
+  try {
+    const data = await apiClient.get('/admin/api-keys/cost-sort-status')
+    if (data.success) {
+      costSortStatus.value = data.data || {}
+
+      // 根据索引状态动态调整刷新间隔
+      scheduleNextCostSortStatusRefresh()
+    }
+  } catch (error) {
+    console.error('Failed to fetch cost sort status:', error)
+  }
+}
+
+// 智能调度下次状态刷新
+const scheduleNextCostSortStatusRefresh = () => {
+  // 清除旧的定时器
+  if (costSortStatusTimer) {
+    clearTimeout(costSortStatusTimer)
+  }
+
+  // 检查是否有任何索引正在更新中
+  const hasUpdating = Object.values(costSortStatus.value).some(
+    (status) => status?.status === 'updating'
+  )
+
+  // 如果有索引正在更新，使用短间隔（10秒）；否则使用长间隔（60秒）
+  const interval = hasUpdating ? 10000 : 60000
+
+  costSortStatusTimer = setTimeout(fetchCostSortStatus, interval)
 }
 
 // 格式化数字
@@ -3268,6 +3399,23 @@ const calculatePeriodCost = (key) => {
 // 处理时间范围下拉框变化
 const handleTimeRangeChange = (value) => {
   setGlobalDateFilterPreset(value)
+
+  // 如果当前是费用排序，检查新时间范围的索引是否就绪
+  if (apiKeysSortBy.value === 'cost') {
+    // custom 时间范围始终允许（实时计算）
+    if (value === 'custom') {
+      return
+    }
+
+    // 检查新时间范围的索引状态
+    const status = costSortStatus.value[value]
+    if (!status || status.status !== 'ready') {
+      // 索引未就绪，回退到默认排序
+      apiKeysSortBy.value = 'createdAt'
+      apiKeysSortOrder.value = 'desc'
+      showToast('当前时间范围的费用排序索引未就绪，已切换到默认排序', 'info')
+    }
+  }
 }
 
 // 设置全局日期预设
@@ -4502,6 +4650,9 @@ watch(apiKeys, () => {
 })
 
 onMounted(async () => {
+  // 获取费用排序索引状态（不阻塞，会自动调度后续刷新）
+  fetchCostSortStatus()
+
   // 先加载 API Keys（优先显示列表）
   await Promise.all([clientsStore.loadSupportedClients(), loadApiKeys()])
 
@@ -4510,6 +4661,14 @@ onMounted(async () => {
 
   // 异步加载账号数据（不阻塞页面显示）
   loadAccounts()
+})
+
+// 组件卸载时清理定时器
+onUnmounted(() => {
+  if (costSortStatusTimer) {
+    clearTimeout(costSortStatusTimer)
+    costSortStatusTimer = null
+  }
 })
 </script>
 

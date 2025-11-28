@@ -119,6 +119,10 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
       // 排序参数
       sortBy = 'createdAt',
       sortOrder = 'desc',
+      // 费用排序参数
+      costTimeRange = '7days', // 费用排序的时间范围
+      costStartDate = '', // custom 时间范围的开始日期
+      costEndDate = '', // custom 时间范围的结束日期
       // 兼容旧参数（不再用于费用计算，仅标记）
       timeRange = 'all'
     } = req.query
@@ -127,8 +131,16 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
     const pageNum = Math.max(1, parseInt(page) || 1)
     const pageSizeNum = [10, 20, 50, 100].includes(parseInt(pageSize)) ? parseInt(pageSize) : 20
 
-    // 验证排序参数（移除费用相关排序）
-    const validSortFields = ['name', 'createdAt', 'expiresAt', 'lastUsedAt', 'isActive', 'status']
+    // 验证排序参数（新增 cost 排序）
+    const validSortFields = [
+      'name',
+      'createdAt',
+      'expiresAt',
+      'lastUsedAt',
+      'isActive',
+      'status',
+      'cost'
+    ]
     const validSortBy = validSortFields.includes(sortBy) ? sortBy : 'createdAt'
     const validSortOrder = ['asc', 'desc'].includes(sortOrder) ? sortOrder : 'desc'
 
@@ -141,17 +153,121 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
       await accountNameCacheService.refreshIfNeeded()
     }
 
-    // 使用优化的分页方法获取数据（bindingAccount搜索现在在Redis层处理）
-    const result = await redis.getApiKeysPaginated({
-      page: pageNum,
-      pageSize: pageSizeNum,
-      searchMode,
-      search,
-      tag,
-      isActive,
-      sortBy: validSortBy,
-      sortOrder: validSortOrder
-    })
+    let result
+    let costSortStatus = null
+
+    // 如果是费用排序
+    if (validSortBy === 'cost') {
+      const costRankService = require('../../services/costRankService')
+
+      // 验证费用排序的时间范围
+      const validCostTimeRanges = ['today', '7days', '30days', 'all', 'custom']
+      const effectiveCostTimeRange = validCostTimeRanges.includes(costTimeRange)
+        ? costTimeRange
+        : '7days'
+
+      // 如果是 custom 时间范围，使用实时计算
+      if (effectiveCostTimeRange === 'custom') {
+        // 验证日期参数
+        if (!costStartDate || !costEndDate) {
+          return res.status(400).json({
+            success: false,
+            error: 'INVALID_DATE_RANGE',
+            message: '自定义时间范围需要提供 costStartDate 和 costEndDate 参数'
+          })
+        }
+
+        const start = new Date(costStartDate)
+        const end = new Date(costEndDate)
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+          return res.status(400).json({
+            success: false,
+            error: 'INVALID_DATE_FORMAT',
+            message: '日期格式无效'
+          })
+        }
+
+        if (start > end) {
+          return res.status(400).json({
+            success: false,
+            error: 'INVALID_DATE_RANGE',
+            message: '开始日期不能晚于结束日期'
+          })
+        }
+
+        // 限制最大范围为 365 天
+        const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1
+        if (daysDiff > 365) {
+          return res.status(400).json({
+            success: false,
+            error: 'DATE_RANGE_TOO_LARGE',
+            message: '日期范围不能超过365天'
+          })
+        }
+
+        logger.info(`📊 Cost sort with custom range: ${costStartDate} to ${costEndDate}`)
+
+        // 实时计算费用排序
+        result = await getApiKeysSortedByCostCustom({
+          page: pageNum,
+          pageSize: pageSizeNum,
+          sortOrder: validSortOrder,
+          startDate: costStartDate,
+          endDate: costEndDate,
+          search,
+          searchMode,
+          tag,
+          isActive
+        })
+
+        costSortStatus = {
+          status: 'ready',
+          isRealTimeCalculation: true
+        }
+      } else {
+        // 使用预计算索引
+        const rankStatus = await costRankService.getRankStatus()
+        costSortStatus = rankStatus[effectiveCostTimeRange]
+
+        // 检查索引是否就绪
+        if (!costSortStatus || costSortStatus.status !== 'ready') {
+          return res.status(503).json({
+            success: false,
+            error: 'RANK_NOT_READY',
+            message: `费用排序索引 (${effectiveCostTimeRange}) 正在更新中，请稍后重试`,
+            costSortStatus: costSortStatus || { status: 'unknown' }
+          })
+        }
+
+        logger.info(`📊 Cost sort using precomputed index: ${effectiveCostTimeRange}`)
+
+        // 使用预计算索引排序
+        result = await getApiKeysSortedByCostPrecomputed({
+          page: pageNum,
+          pageSize: pageSizeNum,
+          sortOrder: validSortOrder,
+          costTimeRange: effectiveCostTimeRange,
+          search,
+          searchMode,
+          tag,
+          isActive
+        })
+
+        costSortStatus.isRealTimeCalculation = false
+      }
+    } else {
+      // 原有的非费用排序逻辑
+      result = await redis.getApiKeysPaginated({
+        page: pageNum,
+        pageSize: pageSizeNum,
+        searchMode,
+        search,
+        tag,
+        isActive,
+        sortBy: validSortBy,
+        sortOrder: validSortOrder
+      })
+    }
 
     // 为每个API Key添加owner的displayName
     for (const apiKey of result.items) {
@@ -179,7 +295,7 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
     }
 
     // 返回分页数据
-    return res.json({
+    const responseData = {
       success: true,
       data: {
         items: result.items,
@@ -188,10 +304,251 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
       },
       // 标记当前请求的时间范围（供前端参考）
       timeRange
-    })
+    }
+
+    // 如果是费用排序，附加排序状态
+    if (costSortStatus) {
+      responseData.data.costSortStatus = costSortStatus
+    }
+
+    return res.json(responseData)
   } catch (error) {
     logger.error('❌ Failed to get API keys:', error)
     return res.status(500).json({ error: 'Failed to get API keys', message: error.message })
+  }
+})
+
+/**
+ * 使用预计算索引进行费用排序的分页查询
+ */
+async function getApiKeysSortedByCostPrecomputed(options) {
+  const { page, pageSize, sortOrder, costTimeRange, search, searchMode, tag, isActive } = options
+  const costRankService = require('../../services/costRankService')
+
+  // 1. 获取排序后的全量 keyId 列表
+  const rankedKeyIds = await costRankService.getSortedKeyIds(costTimeRange, sortOrder)
+
+  if (rankedKeyIds.length === 0) {
+    return {
+      items: [],
+      pagination: { page: 1, pageSize, total: 0, totalPages: 1 },
+      availableTags: []
+    }
+  }
+
+  // 2. 批量获取 API Key 基础数据
+  const allKeys = await redis.batchGetApiKeys(rankedKeyIds)
+
+  // 3. 保持排序顺序（使用 Map 优化查找）
+  const keyMap = new Map(allKeys.map((k) => [k.id, k]))
+  let orderedKeys = rankedKeyIds.map((id) => keyMap.get(id)).filter((k) => k && !k.isDeleted)
+
+  // 4. 应用筛选条件
+  // 状态筛选
+  if (isActive !== '' && isActive !== undefined && isActive !== null) {
+    const activeValue = isActive === 'true' || isActive === true
+    orderedKeys = orderedKeys.filter((k) => k.isActive === activeValue)
+  }
+
+  // 标签筛选
+  if (tag) {
+    orderedKeys = orderedKeys.filter((k) => {
+      const tags = Array.isArray(k.tags) ? k.tags : []
+      return tags.includes(tag)
+    })
+  }
+
+  // 搜索筛选
+  if (search) {
+    const lowerSearch = search.toLowerCase().trim()
+    if (searchMode === 'apiKey') {
+      orderedKeys = orderedKeys.filter((k) => k.name && k.name.toLowerCase().includes(lowerSearch))
+    } else if (searchMode === 'bindingAccount') {
+      const accountNameCacheService = require('../../services/accountNameCacheService')
+      orderedKeys = accountNameCacheService.searchByBindingAccount(orderedKeys, lowerSearch)
+    }
+  }
+
+  // 5. 收集所有可用标签
+  const allTags = new Set()
+  for (const key of allKeys) {
+    if (!key.isDeleted) {
+      const tags = Array.isArray(key.tags) ? key.tags : []
+      tags.forEach((t) => allTags.add(t))
+    }
+  }
+  const availableTags = [...allTags].sort()
+
+  // 6. 分页
+  const total = orderedKeys.length
+  const totalPages = Math.ceil(total / pageSize) || 1
+  const validPage = Math.min(Math.max(1, page), totalPages)
+  const start = (validPage - 1) * pageSize
+  const items = orderedKeys.slice(start, start + pageSize)
+
+  // 7. 为当前页的 Keys 附加费用数据
+  const keyCosts = await costRankService.getBatchKeyCosts(
+    costTimeRange,
+    items.map((k) => k.id)
+  )
+  for (const key of items) {
+    key._cost = keyCosts.get(key.id) || 0
+  }
+
+  return {
+    items,
+    pagination: {
+      page: validPage,
+      pageSize,
+      total,
+      totalPages
+    },
+    availableTags
+  }
+}
+
+/**
+ * 使用实时计算进行 custom 时间范围的费用排序
+ */
+async function getApiKeysSortedByCostCustom(options) {
+  const { page, pageSize, sortOrder, startDate, endDate, search, searchMode, tag, isActive } =
+    options
+  const costRankService = require('../../services/costRankService')
+
+  // 1. 实时计算所有 Keys 的费用
+  const costs = await costRankService.calculateCustomRangeCosts(startDate, endDate)
+
+  if (costs.size === 0) {
+    return {
+      items: [],
+      pagination: { page: 1, pageSize, total: 0, totalPages: 1 },
+      availableTags: []
+    }
+  }
+
+  // 2. 转换为数组并排序
+  const sortedEntries = [...costs.entries()].sort((a, b) => {
+    return sortOrder === 'desc' ? b[1] - a[1] : a[1] - b[1]
+  })
+  const rankedKeyIds = sortedEntries.map(([keyId]) => keyId)
+
+  // 3. 批量获取 API Key 基础数据
+  const allKeys = await redis.batchGetApiKeys(rankedKeyIds)
+
+  // 4. 保持排序顺序
+  const keyMap = new Map(allKeys.map((k) => [k.id, k]))
+  let orderedKeys = rankedKeyIds.map((id) => keyMap.get(id)).filter((k) => k && !k.isDeleted)
+
+  // 5. 应用筛选条件
+  // 状态筛选
+  if (isActive !== '' && isActive !== undefined && isActive !== null) {
+    const activeValue = isActive === 'true' || isActive === true
+    orderedKeys = orderedKeys.filter((k) => k.isActive === activeValue)
+  }
+
+  // 标签筛选
+  if (tag) {
+    orderedKeys = orderedKeys.filter((k) => {
+      const tags = Array.isArray(k.tags) ? k.tags : []
+      return tags.includes(tag)
+    })
+  }
+
+  // 搜索筛选
+  if (search) {
+    const lowerSearch = search.toLowerCase().trim()
+    if (searchMode === 'apiKey') {
+      orderedKeys = orderedKeys.filter((k) => k.name && k.name.toLowerCase().includes(lowerSearch))
+    } else if (searchMode === 'bindingAccount') {
+      const accountNameCacheService = require('../../services/accountNameCacheService')
+      orderedKeys = accountNameCacheService.searchByBindingAccount(orderedKeys, lowerSearch)
+    }
+  }
+
+  // 6. 收集所有可用标签
+  const allTags = new Set()
+  for (const key of allKeys) {
+    if (!key.isDeleted) {
+      const tags = Array.isArray(key.tags) ? key.tags : []
+      tags.forEach((t) => allTags.add(t))
+    }
+  }
+  const availableTags = [...allTags].sort()
+
+  // 7. 分页
+  const total = orderedKeys.length
+  const totalPages = Math.ceil(total / pageSize) || 1
+  const validPage = Math.min(Math.max(1, page), totalPages)
+  const start = (validPage - 1) * pageSize
+  const items = orderedKeys.slice(start, start + pageSize)
+
+  // 8. 为当前页的 Keys 附加费用数据
+  for (const key of items) {
+    key._cost = costs.get(key.id) || 0
+  }
+
+  return {
+    items,
+    pagination: {
+      page: validPage,
+      pageSize,
+      total,
+      totalPages
+    },
+    availableTags
+  }
+}
+
+// 获取费用排序索引状态
+router.get('/api-keys/cost-sort-status', authenticateAdmin, async (req, res) => {
+  try {
+    const costRankService = require('../../services/costRankService')
+    const status = await costRankService.getRankStatus()
+    return res.json({ success: true, data: status })
+  } catch (error) {
+    logger.error('❌ Failed to get cost sort status:', error)
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get cost sort status',
+      message: error.message
+    })
+  }
+})
+
+// 强制刷新费用排序索引
+router.post('/api-keys/cost-sort-refresh', authenticateAdmin, async (req, res) => {
+  try {
+    const { timeRange } = req.body
+    const costRankService = require('../../services/costRankService')
+
+    // 验证时间范围
+    if (timeRange) {
+      const validTimeRanges = ['today', '7days', '30days', 'all']
+      if (!validTimeRanges.includes(timeRange)) {
+        return res.status(400).json({
+          success: false,
+          error: 'INVALID_TIME_RANGE',
+          message: '无效的时间范围，可选值：today, 7days, 30days, all'
+        })
+      }
+    }
+
+    // 异步刷新，不等待完成
+    costRankService.forceRefresh(timeRange || null).catch((err) => {
+      logger.error('❌ Failed to refresh cost rank:', err)
+    })
+
+    return res.json({
+      success: true,
+      message: timeRange ? `费用排序索引 (${timeRange}) 刷新已开始` : '所有费用排序索引刷新已开始'
+    })
+  } catch (error) {
+    logger.error('❌ Failed to trigger cost sort refresh:', error)
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to trigger refresh',
+      message: error.message
+    })
   }
 })
 
