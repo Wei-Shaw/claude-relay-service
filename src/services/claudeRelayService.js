@@ -25,6 +25,47 @@ class ClaudeRelayService {
     this.claudeCodeSystemPrompt = "You are Claude Code, Anthropic's official CLI for Claude."
   }
 
+  // 🔧 根据模型ID和客户端传递的 anthropic-beta 获取最终的 header
+  // 规则：
+  // 1. 如果客户端传递了 anthropic-beta，检查是否包含 oauth-2025-04-20
+  // 2. 如果没有 oauth-2025-04-20，则添加到 claude-code-20250219 后面（如果有的话），否则放在第一位
+  // 3. 如果客户端没传递，则根据模型判断：haiku 不需要 claude-code，其他模型需要
+  _getBetaHeader(modelId, clientBetaHeader) {
+    const OAUTH_BETA = 'oauth-2025-04-20'
+    const CLAUDE_CODE_BETA = 'claude-code-20250219'
+
+    // 如果客户端传递了 anthropic-beta
+    if (clientBetaHeader) {
+      // 检查是否已包含 oauth-2025-04-20
+      if (clientBetaHeader.includes(OAUTH_BETA)) {
+        return clientBetaHeader
+      }
+
+      // 需要添加 oauth-2025-04-20
+      const parts = clientBetaHeader.split(',').map((p) => p.trim())
+
+      // 找到 claude-code-20250219 的位置
+      const claudeCodeIndex = parts.findIndex((p) => p === CLAUDE_CODE_BETA)
+
+      if (claudeCodeIndex !== -1) {
+        // 在 claude-code-20250219 后面插入
+        parts.splice(claudeCodeIndex + 1, 0, OAUTH_BETA)
+      } else {
+        // 放在第一位
+        parts.unshift(OAUTH_BETA)
+      }
+
+      return parts.join(',')
+    }
+
+    // 客户端没有传递，根据模型判断
+    const isHaikuModel = modelId && modelId.toLowerCase().includes('haiku')
+    if (isHaikuModel) {
+      return 'oauth-2025-04-20,interleaved-thinking-2025-05-14'
+    }
+    return 'claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14'
+  }
+
   _buildStandardRateLimitMessage(resetTime) {
     if (!resetTime) {
       return '此专属账号已触发 Anthropic 限流控制。'
@@ -1018,12 +1059,10 @@ class ClaudeRelayService {
 
       logger.info(`🔗 指纹是这个: ${options.headers['user-agent']}`)
 
-      // 使用自定义的 betaHeader 或默认值
-      const betaHeader =
-        requestOptions?.betaHeader !== undefined ? requestOptions.betaHeader : this.betaHeader
-      if (betaHeader) {
-        options.headers['anthropic-beta'] = betaHeader
-      }
+      // 根据模型和客户端传递的 anthropic-beta 动态设置 header
+      const modelId = requestPayload?.model || body?.model
+      const clientBetaHeader = clientHeaders?.['anthropic-beta']
+      options.headers['anthropic-beta'] = this._getBetaHeader(modelId, clientBetaHeader)
 
       const req = https.request(options, (res) => {
         let responseData = Buffer.alloc(0)
@@ -1229,7 +1268,9 @@ class ClaudeRelayService {
         responseStream,
         (usageData) => {
           // 在usageCallback中添加accountId
-          usageCallback({ ...usageData, accountId })
+          if (usageCallback && typeof usageCallback === 'function') {
+            usageCallback({ ...usageData, accountId })
+          }
         },
         accountId,
         accountType,
@@ -1333,12 +1374,10 @@ class ClaudeRelayService {
       }
 
       logger.info(`🔗 指纹是这个: ${options.headers['user-agent']}`)
-      // 使用自定义的 betaHeader 或默认值
-      const betaHeader =
-        requestOptions?.betaHeader !== undefined ? requestOptions.betaHeader : this.betaHeader
-      if (betaHeader) {
-        options.headers['anthropic-beta'] = betaHeader
-      }
+      // 根据模型和客户端传递的 anthropic-beta 动态设置 header
+      const modelId = body?.model
+      const clientBetaHeader = clientHeaders?.['anthropic-beta']
+      options.headers['anthropic-beta'] = this._getBetaHeader(modelId, clientBetaHeader)
 
       const req = https.request(options, async (res) => {
         logger.debug(`🌊 Claude stream response status: ${res.statusCode}`)
@@ -1509,16 +1548,36 @@ class ClaudeRelayService {
               })()
             }
             if (!responseStream.destroyed) {
-              // 发送错误事件
-              responseStream.write('event: error\n')
-              responseStream.write(
-                `data: ${JSON.stringify({
-                  error: 'Claude API error',
-                  status: res.statusCode,
-                  details: errorData,
-                  timestamp: new Date().toISOString()
-                })}\n\n`
-              )
+              // 解析 Claude API 返回的错误详情
+              let errorMessage = `Claude API error: ${res.statusCode}`
+              try {
+                const parsedError = JSON.parse(errorData)
+                if (parsedError.error?.message) {
+                  errorMessage = parsedError.error.message
+                } else if (parsedError.message) {
+                  errorMessage = parsedError.message
+                }
+              } catch {
+                // 使用默认错误消息
+              }
+
+              // 如果有 streamTransformer（如测试请求），使用前端期望的格式
+              if (streamTransformer) {
+                responseStream.write(
+                  `data: ${JSON.stringify({ type: 'error', error: errorMessage })}\n\n`
+                )
+              } else {
+                // 标准错误格式
+                responseStream.write('event: error\n')
+                responseStream.write(
+                  `data: ${JSON.stringify({
+                    error: 'Claude API error',
+                    status: res.statusCode,
+                    details: errorData,
+                    timestamp: new Date().toISOString()
+                  })}\n\n`
+                )
+              }
               responseStream.end()
             }
             reject(new Error(`Claude API error: ${res.statusCode}`))
@@ -1758,7 +1817,9 @@ class ClaudeRelayService {
             }
 
             // 调用一次usageCallback记录合并后的数据
-            usageCallback(finalUsage)
+            if (usageCallback && typeof usageCallback === 'function') {
+              usageCallback(finalUsage)
+            }
           }
 
           // 提取5小时会话窗口状态
@@ -2127,6 +2188,151 @@ class ClaudeRelayService {
     }
 
     return 0 // 两个版本号相等
+  }
+
+  // 🧪 创建测试用的流转换器，将 Claude API SSE 格式转换为前端期望的格式
+  _createTestStreamTransformer() {
+    let testStartSent = false
+
+    return (rawData) => {
+      const lines = rawData.split('\n')
+      const outputLines = []
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) {
+          // 保留空行用于 SSE 分隔
+          if (line.trim() === '') {
+            outputLines.push('')
+          }
+          continue
+        }
+
+        const jsonStr = line.substring(6).trim()
+        if (!jsonStr || jsonStr === '[DONE]') {
+          continue
+        }
+
+        try {
+          const data = JSON.parse(jsonStr)
+
+          // 发送 test_start 事件（只在第一次 message_start 时发送）
+          if (data.type === 'message_start' && !testStartSent) {
+            testStartSent = true
+            outputLines.push(`data: ${JSON.stringify({ type: 'test_start' })}`)
+            outputLines.push('')
+          }
+
+          // 转换 content_block_delta 为 content
+          if (data.type === 'content_block_delta' && data.delta && data.delta.text) {
+            outputLines.push(`data: ${JSON.stringify({ type: 'content', text: data.delta.text })}`)
+            outputLines.push('')
+          }
+
+          // 转换 message_stop 为 test_complete
+          if (data.type === 'message_stop') {
+            outputLines.push(`data: ${JSON.stringify({ type: 'test_complete', success: true })}`)
+            outputLines.push('')
+          }
+
+          // 处理错误事件
+          if (data.type === 'error') {
+            const errorMsg = data.error?.message || data.message || '未知错误'
+            outputLines.push(`data: ${JSON.stringify({ type: 'error', error: errorMsg })}`)
+            outputLines.push('')
+          }
+        } catch {
+          // 忽略解析错误
+        }
+      }
+
+      return outputLines.length > 0 ? outputLines.join('\n') : null
+    }
+  }
+
+  // 🧪 测试账号连接（供Admin API使用，直接复用 _makeClaudeStreamRequestWithUsageCapture）
+  async testAccountConnection(accountId, responseStream) {
+    const testRequestBody = {
+      model: 'claude-sonnet-4-5-20250929',
+      max_tokens: 100,
+      stream: true,
+      system: [
+        {
+          type: 'text',
+          text: this.claudeCodeSystemPrompt,
+          cache_control: {
+            type: 'ephemeral'
+          }
+        }
+      ],
+      messages: [
+        {
+          role: 'user',
+          content: 'hi'
+        }
+      ]
+    }
+
+    try {
+      // 获取账户信息
+      const account = await claudeAccountService.getAccount(accountId)
+      if (!account) {
+        throw new Error('Account not found')
+      }
+
+      logger.info(`🧪 Testing Claude account connection: ${account.name} (${accountId})`)
+
+      // 获取有效的访问token
+      const accessToken = await claudeAccountService.getValidAccessToken(accountId)
+      if (!accessToken) {
+        throw new Error('Failed to get valid access token')
+      }
+
+      // 获取代理配置
+      const proxyAgent = await this._getProxyAgent(accountId)
+
+      // 设置响应头
+      if (!responseStream.headersSent) {
+        responseStream.writeHead(200, {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+          'X-Accel-Buffering': 'no'
+        })
+      }
+
+      // 创建流转换器，将 Claude API 格式转换为前端测试页面期望的格式
+      const streamTransformer = this._createTestStreamTransformer()
+
+      // 直接复用现有的流式请求方法
+      await this._makeClaudeStreamRequestWithUsageCapture(
+        testRequestBody,
+        accessToken,
+        proxyAgent,
+        {}, // clientHeaders - 测试不需要客户端headers
+        responseStream,
+        null, // usageCallback - 测试不需要统计
+        accountId,
+        'claude-official', // accountType
+        null, // sessionHash - 测试不需要会话
+        streamTransformer, // 使用转换器将 Claude API 格式转为前端期望格式
+        {}, // requestOptions
+        false // isDedicatedOfficialAccount
+      )
+
+      logger.info(`✅ Test request completed for account: ${account.name}`)
+    } catch (error) {
+      logger.error(`❌ Test account connection failed:`, error)
+      // 发送错误事件给前端
+      if (!responseStream.destroyed && !responseStream.writableEnded) {
+        try {
+          const errorMsg = error.message || '测试失败'
+          responseStream.write(`data: ${JSON.stringify({ type: 'error', error: errorMsg })}\n\n`)
+        } catch {
+          // 忽略写入错误
+        }
+      }
+      throw error
+    }
   }
 
   // 🎯 健康检查

@@ -1188,6 +1188,15 @@
                     <span class="ml-1">详情</span>
                   </button>
                   <button
+                    v-if="canTestAccount(account)"
+                    class="rounded bg-cyan-100 px-2.5 py-1 text-xs font-medium text-cyan-700 transition-colors hover:bg-cyan-200 dark:bg-cyan-900/40 dark:text-cyan-300 dark:hover:bg-cyan-800/50"
+                    :title="'测试账户连通性'"
+                    @click="openAccountTestModal(account)"
+                  >
+                    <i class="fas fa-vial" />
+                    <span class="ml-1">测试</span>
+                  </button>
+                  <button
                     class="rounded bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200"
                     :title="'编辑账户'"
                     @click="editAccount(account)"
@@ -1620,6 +1629,15 @@
             </button>
 
             <button
+              v-if="canTestAccount(account)"
+              class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-cyan-50 px-3 py-2 text-xs text-cyan-600 transition-colors hover:bg-cyan-100 dark:bg-cyan-900/40 dark:text-cyan-300 dark:hover:bg-cyan-800/50"
+              @click="openAccountTestModal(account)"
+            >
+              <i class="fas fa-vial" />
+              测试
+            </button>
+
+            <button
               class="flex-1 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600 transition-colors hover:bg-gray-100"
               @click="editAccount(account)"
             >
@@ -1784,6 +1802,13 @@
       @close="closeAccountExpiryEdit"
       @save="handleSaveAccountExpiry"
     />
+
+    <!-- 账户测试弹窗 -->
+    <AccountTestModal
+      :account="testingAccount"
+      :show="showAccountTestModal"
+      @close="closeAccountTestModal"
+    />
   </div>
 </template>
 
@@ -1796,6 +1821,7 @@ import AccountForm from '@/components/accounts/AccountForm.vue'
 import CcrAccountForm from '@/components/accounts/CcrAccountForm.vue'
 import AccountUsageDetailModal from '@/components/accounts/AccountUsageDetailModal.vue'
 import AccountExpiryEditModal from '@/components/accounts/AccountExpiryEditModal.vue'
+import AccountTestModal from '@/components/accounts/AccountTestModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 
@@ -1857,6 +1883,10 @@ const supportedUsagePlatforms = [
 // 过期时间编辑弹窗状态
 const editingExpiryAccount = ref(null)
 const expiryEditModalRef = ref(null)
+
+// 测试弹窗状态
+const showAccountTestModal = ref(false)
+const testingAccount = ref(null)
 
 // 缓存状态标志
 const apiKeysLoaded = ref(false) // 用于其他功能
@@ -2019,6 +2049,27 @@ const closeAccountUsageModal = () => {
   showAccountUsageModal.value = false
   accountUsageLoading.value = false
   selectedAccountForUsage.value = null
+}
+
+// 测试账户连通性相关函数
+const supportedTestPlatforms = ['claude', 'claude-console']
+
+const canTestAccount = (account) => {
+  return !!account && supportedTestPlatforms.includes(account.platform)
+}
+
+const openAccountTestModal = (account) => {
+  if (!canTestAccount(account)) {
+    showToast('该账户类型暂不支持测试', 'warning')
+    return
+  }
+  testingAccount.value = account
+  showAccountTestModal.value = true
+}
+
+const closeAccountTestModal = () => {
+  showAccountTestModal.value = false
+  testingAccount.value = null
 }
 
 // 计算排序后的账户列表

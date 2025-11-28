@@ -7,6 +7,7 @@ const express = require('express')
 const router = express.Router()
 
 const claudeConsoleAccountService = require('../../services/claudeConsoleAccountService')
+const claudeConsoleRelayService = require('../../services/claudeConsoleRelayService')
 const accountGroupService = require('../../services/accountGroupService')
 const apiKeyService = require('../../services/apiKeyService')
 const redis = require('../../models/redis')
@@ -463,6 +464,19 @@ router.post('/claude-console-accounts/reset-all-usage', authenticateAdmin, async
     return res
       .status(500)
       .json({ error: 'Failed to reset all daily usage', message: error.message })
+  }
+})
+
+// 测试Claude Console账户连通性（流式响应）- 复用 claudeConsoleRelayService
+router.post('/claude-console-accounts/:accountId/test', authenticateAdmin, async (req, res) => {
+  const { accountId } = req.params
+
+  try {
+    // 直接调用服务层的测试方法
+    await claudeConsoleRelayService.testAccountConnection(accountId, res)
+  } catch (error) {
+    logger.error(`❌ Failed to test Claude Console account:`, error)
+    // 错误已在服务层处理，这里仅做日志记录
   }
 })
 

@@ -812,7 +812,9 @@ class ClaudeConsoleRelayService {
                             '🎯 [Console] Complete usage data collected:',
                             JSON.stringify(collectedUsageData)
                           )
-                          usageCallback({ ...collectedUsageData, accountId })
+                          if (usageCallback && typeof usageCallback === 'function') {
+                            usageCallback({ ...collectedUsageData, accountId })
+                          }
                           finalUsageReported = true
                         }
                       }
@@ -830,14 +832,21 @@ class ClaudeConsoleRelayService {
                 error
               )
               if (!responseStream.destroyed) {
-                responseStream.write('event: error\n')
-                responseStream.write(
-                  `data: ${JSON.stringify({
-                    error: 'Stream processing error',
-                    message: error.message,
-                    timestamp: new Date().toISOString()
-                  })}\n\n`
-                )
+                // 如果有 streamTransformer（如测试请求），使用前端期望的格式
+                if (streamTransformer) {
+                  responseStream.write(
+                    `data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`
+                  )
+                } else {
+                  responseStream.write('event: error\n')
+                  responseStream.write(
+                    `data: ${JSON.stringify({
+                      error: 'Stream processing error',
+                      message: error.message,
+                      timestamp: new Date().toISOString()
+                    })}\n\n`
+                  )
+                }
               }
             }
           })
@@ -882,7 +891,9 @@ class ClaudeConsoleRelayService {
                   logger.info(
                     `📊 [Console] Saving incomplete usage data via fallback: ${JSON.stringify(collectedUsageData)}`
                   )
-                  usageCallback({ ...collectedUsageData, accountId })
+                  if (usageCallback && typeof usageCallback === 'function') {
+                    usageCallback({ ...collectedUsageData, accountId })
+                  }
                   finalUsageReported = true
                 } else {
                   logger.warn(
@@ -910,14 +921,21 @@ class ClaudeConsoleRelayService {
               error
             )
             if (!responseStream.destroyed) {
-              responseStream.write('event: error\n')
-              responseStream.write(
-                `data: ${JSON.stringify({
-                  error: 'Stream error',
-                  message: error.message,
-                  timestamp: new Date().toISOString()
-                })}\n\n`
-              )
+              // 如果有 streamTransformer（如测试请求），使用前端期望的格式
+              if (streamTransformer) {
+                responseStream.write(
+                  `data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`
+                )
+              } else {
+                responseStream.write('event: error\n')
+                responseStream.write(
+                  `data: ${JSON.stringify({
+                    error: 'Stream error',
+                    message: error.message,
+                    timestamp: new Date().toISOString()
+                  })}\n\n`
+                )
+              }
               responseStream.end()
             }
             reject(error)
@@ -958,14 +976,21 @@ class ClaudeConsoleRelayService {
           }
 
           if (!responseStream.destroyed) {
-            responseStream.write('event: error\n')
-            responseStream.write(
-              `data: ${JSON.stringify({
-                error: error.message,
-                code: error.code,
-                timestamp: new Date().toISOString()
-              })}\n\n`
-            )
+            // 如果有 streamTransformer（如测试请求），使用前端期望的格式
+            if (streamTransformer) {
+              responseStream.write(
+                `data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`
+              )
+            } else {
+              responseStream.write('event: error\n')
+              responseStream.write(
+                `data: ${JSON.stringify({
+                  error: error.message,
+                  code: error.code,
+                  timestamp: new Date().toISOString()
+                })}\n\n`
+              )
+            }
             responseStream.end()
           }
 
@@ -1026,6 +1051,133 @@ class ClaudeConsoleRelayService {
         `⚠️ Failed to update last used time for Claude Console account ${accountId}:`,
         error.message
       )
+    }
+  }
+
+  // 🧪 创建测试用的流转换器，将 Claude API SSE 格式转换为前端期望的格式
+  _createTestStreamTransformer() {
+    let testStartSent = false
+
+    return (rawData) => {
+      const lines = rawData.split('\n')
+      const outputLines = []
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) {
+          // 保留空行用于 SSE 分隔
+          if (line.trim() === '') {
+            outputLines.push('')
+          }
+          continue
+        }
+
+        const jsonStr = line.substring(6).trim()
+        if (!jsonStr || jsonStr === '[DONE]') {
+          continue
+        }
+
+        try {
+          const data = JSON.parse(jsonStr)
+
+          // 发送 test_start 事件（只在第一次 message_start 时发送）
+          if (data.type === 'message_start' && !testStartSent) {
+            testStartSent = true
+            outputLines.push(`data: ${JSON.stringify({ type: 'test_start' })}`)
+            outputLines.push('')
+          }
+
+          // 转换 content_block_delta 为 content
+          if (data.type === 'content_block_delta' && data.delta && data.delta.text) {
+            outputLines.push(`data: ${JSON.stringify({ type: 'content', text: data.delta.text })}`)
+            outputLines.push('')
+          }
+
+          // 转换 message_stop 为 test_complete
+          if (data.type === 'message_stop') {
+            outputLines.push(`data: ${JSON.stringify({ type: 'test_complete', success: true })}`)
+            outputLines.push('')
+          }
+
+          // 处理错误事件
+          if (data.type === 'error') {
+            const errorMsg = data.error?.message || data.message || '未知错误'
+            outputLines.push(`data: ${JSON.stringify({ type: 'error', error: errorMsg })}`)
+            outputLines.push('')
+          }
+        } catch {
+          // 忽略解析错误
+        }
+      }
+
+      return outputLines.length > 0 ? outputLines.join('\n') : null
+    }
+  }
+
+  // 🧪 测试账号连接（供Admin API使用，直接复用 _makeClaudeConsoleStreamRequest）
+  async testAccountConnection(accountId, responseStream) {
+    const testRequestBody = {
+      model: 'claude-sonnet-4-5-20250929',
+      max_tokens: 100,
+      stream: true,
+      messages: [
+        {
+          role: 'user',
+          content: 'hi'
+        }
+      ]
+    }
+
+    try {
+      // 获取账户信息
+      const account = await claudeConsoleAccountService.getAccount(accountId)
+      if (!account) {
+        throw new Error('Account not found')
+      }
+
+      logger.info(`🧪 Testing Claude Console account connection: ${account.name} (${accountId})`)
+
+      // 创建代理agent
+      const proxyAgent = claudeConsoleAccountService._createProxyAgent(account.proxy)
+
+      // 设置响应头
+      if (!responseStream.headersSent) {
+        responseStream.writeHead(200, {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+          'X-Accel-Buffering': 'no'
+        })
+      }
+
+      // 创建流转换器，将 Claude API 格式转换为前端测试页面期望的格式
+      const streamTransformer = this._createTestStreamTransformer()
+
+      // 直接复用现有的流式请求方法
+      await this._makeClaudeConsoleStreamRequest(
+        testRequestBody,
+        account,
+        proxyAgent,
+        {}, // clientHeaders - 测试不需要客户端headers
+        responseStream,
+        accountId,
+        null, // usageCallback - 测试不需要统计
+        streamTransformer, // 使用转换器将 Claude API 格式转为前端期望格式
+        {} // requestOptions
+      )
+
+      logger.info(`✅ Test request completed for account: ${account.name}`)
+    } catch (error) {
+      logger.error(`❌ Test account connection failed:`, error)
+      // 发送错误事件给前端
+      if (!responseStream.destroyed && !responseStream.writableEnded) {
+        try {
+          const errorMsg = error.message || '测试失败'
+          responseStream.write(`data: ${JSON.stringify({ type: 'error', error: errorMsg })}\n\n`)
+        } catch {
+          // 忽略写入错误
+        }
+      }
+      throw error
     }
   }
 

@@ -7,6 +7,7 @@ const express = require('express')
 const router = express.Router()
 
 const claudeAccountService = require('../../services/claudeAccountService')
+const claudeRelayService = require('../../services/claudeRelayService')
 const accountGroupService = require('../../services/accountGroupService')
 const apiKeyService = require('../../services/apiKeyService')
 const redis = require('../../models/redis')
@@ -786,5 +787,18 @@ router.put(
     }
   }
 )
+
+// 测试Claude OAuth账户连通性（流式响应）- 复用 claudeRelayService
+router.post('/claude-accounts/:accountId/test', authenticateAdmin, async (req, res) => {
+  const { accountId } = req.params
+
+  try {
+    // 直接调用服务层的测试方法
+    await claudeRelayService.testAccountConnection(accountId, res)
+  } catch (error) {
+    logger.error(`❌ Failed to test Claude OAuth account:`, error)
+    // 错误已在服务层处理，这里仅做日志记录
+  }
+})
 
 module.exports = router
