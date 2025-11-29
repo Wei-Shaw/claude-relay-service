@@ -113,21 +113,4 @@ router.post('/api-keys', authenticateAdminOrPermanentKey, async (req, res) => {
   }
 })
 
-// GET /admin/api-keys - 支持永久API-KEY认证
-router.get('/api-keys', authenticateAdminOrPermanentKey, async (req, res) => {
-  try {
-    const apiKeys = await apiKeyService.getAllApiKeys()
-    return res.json({
-      success: true,
-      data: apiKeys.map((key) => ({
-        ...key,
-        apiKey: key.apiKey ? `${key.apiKey.substring(0, 8)}...` : undefined
-      }))
-    })
-  } catch (error) {
-    logger.error('❌ Failed to get API keys:', error)
-    return res.status(500).json({ error: 'Failed to get API keys', message: error.message })
-  }
-})
-
 module.exports = router
