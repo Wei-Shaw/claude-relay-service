@@ -23,6 +23,54 @@ const ProxyHelper = require('../utils/proxyHelper')
 // ============================================================================
 
 /**
+ * 构建 Gemini API URL
+ * 兼容新旧 baseUrl 格式：
+ * - 新格式（以 /models 结尾）: https://xxx.com/v1beta/models -> 直接拼接 /{model}:action
+ * - 旧格式（不以 /models 结尾）: https://xxx.com -> 拼接 /v1beta/models/{model}:action
+ *
+ * @param {string} baseUrl - 账户配置的基础地址
+ * @param {string} model - 模型名称
+ * @param {string} action - API 动作 (generateContent, streamGenerateContent, countTokens)
+ * @param {string} apiKey - API Key
+ * @param {object} options - 额外选项 { stream: boolean, listModels: boolean }
+ * @returns {string} 完整的 API URL
+ */
+function buildGeminiApiUrl(baseUrl, model, action, apiKey, options = {}) {
+  const { stream = false, listModels = false } = options
+
+  // 移除末尾的斜杠（如果有）
+  const normalizedBaseUrl = baseUrl.replace(/\/+$/, '')
+
+  // 检查是否为新格式（以 /models 结尾）
+  const isNewFormat = normalizedBaseUrl.endsWith('/models')
+
+  let url
+  if (listModels) {
+    // 获取模型列表
+    if (isNewFormat) {
+      // 新格式: baseUrl 已包含 /v1beta/models，直接添加查询参数
+      url = `${normalizedBaseUrl}?key=${apiKey}`
+    } else {
+      // 旧格式: 需要拼接 /v1beta/models
+      url = `${normalizedBaseUrl}/v1beta/models?key=${apiKey}`
+    }
+  } else {
+    // 模型操作 (generateContent, streamGenerateContent, countTokens)
+    const streamParam = stream ? '&alt=sse' : ''
+
+    if (isNewFormat) {
+      // 新格式: baseUrl 已包含 /v1beta/models，直接拼接 /{model}:action
+      url = `${normalizedBaseUrl}/${model}:${action}?key=${apiKey}${streamParam}`
+    } else {
+      // 旧格式: 需要拼接 /v1beta/models/{model}:action
+      url = `${normalizedBaseUrl}/v1beta/models/${model}:${action}?key=${apiKey}${streamParam}`
+    }
+  }
+
+  return url
+}
+
+/**
  * 生成会话哈希
  */
 function generateSessionHash(req) {
@@ -378,9 +426,13 @@ async function handleMessages(req, res) {
       // 解析代理配置
       const proxyConfig = parseProxyConfig(account)
 
-      const apiUrl = stream
-        ? `${account.baseUrl}/v1beta/models/${model}:streamGenerateContent?key=${account.apiKey}&alt=sse`
-        : `${account.baseUrl}/v1beta/models/${model}:generateContent?key=${account.apiKey}`
+      const apiUrl = buildGeminiApiUrl(
+        account.baseUrl,
+        model,
+        stream ? 'streamGenerateContent' : 'generateContent',
+        account.apiKey,
+        { stream }
+      )
 
       const axiosConfig = {
         method: 'POST',
@@ -671,7 +723,9 @@ async function handleModels(req, res) {
       // API Key 账户：使用 API Key 获取模型列表
       const proxyConfig = parseProxyConfig(account)
       try {
-        const apiUrl = `${account.baseUrl}/v1beta/models?key=${account.apiKey}`
+        const apiUrl = buildGeminiApiUrl(account.baseUrl, null, null, account.apiKey, {
+          listModels: true
+        })
         const axiosConfig = {
           method: 'GET',
           url: apiUrl,
@@ -1169,8 +1223,8 @@ async function handleCountTokens(req, res) {
     let response
     if (isApiAccount) {
       // API Key 账户：直接使用 API Key 请求
-      const modelPath = model.startsWith('models/') ? model : `models/${model}`
-      const apiUrl = `${account.baseUrl}/v1beta/${modelPath}:countTokens?key=${account.apiKey}`
+      const modelName = model.startsWith('models/') ? model.replace('models/', '') : model
+      const apiUrl = buildGeminiApiUrl(account.baseUrl, modelName, 'countTokens', account.apiKey)
 
       const axiosConfig = {
         method: 'POST',
@@ -1897,7 +1951,7 @@ async function handleStandardGenerateContent(req, res) {
 
     if (isApiAccount) {
       // Gemini API 账户：直接使用 API Key 请求
-      const apiUrl = `${account.baseUrl}/v1beta/models/${model}:generateContent?key=${account.apiKey}`
+      const apiUrl = buildGeminiApiUrl(account.baseUrl, model, 'generateContent', account.apiKey)
 
       const axiosConfig = {
         method: 'POST',
@@ -2168,7 +2222,15 @@ async function handleStandardStreamGenerateContent(req, res) {
 
     if (isApiAccount) {
       // Gemini API 账户：直接使用 API Key 请求流式接口
-      const apiUrl = `${account.baseUrl}/v1beta/models/${model}:streamGenerateContent?key=${account.apiKey}&alt=sse`
+      const apiUrl = buildGeminiApiUrl(
+        account.baseUrl,
+        model,
+        'streamGenerateContent',
+        account.apiKey,
+        {
+          stream: true
+        }
+      )
 
       const axiosConfig = {
         method: 'POST',
