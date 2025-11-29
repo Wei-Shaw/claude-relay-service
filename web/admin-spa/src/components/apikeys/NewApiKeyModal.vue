@@ -230,8 +230,8 @@ const copyFullConfig = async () => {
   }
 
   // 构建环境变量配置格式
-  const configText = `ANTHROPIC_BASE_URL="${currentBaseUrl.value}"
-ANTHROPIC_AUTH_TOKEN="${key}"`
+  const configText = `export ANTHROPIC_BASE_URL="${currentBaseUrl.value}"
+export ANTHROPIC_AUTH_TOKEN="${key}"`
 
   await copyTextWithFallback(configText, '配置信息已复制到剪贴板')
 }

@@ -13,8 +13,14 @@ class DroidScheduler {
       return 'anthropic'
     }
     const normalized = String(endpointType).toLowerCase()
-    if (normalized === 'openai' || normalized === 'common') {
+    if (normalized === 'openai') {
       return 'openai'
+    }
+    if (normalized === 'comm') {
+      return 'comm'
+    }
+    if (normalized === 'anthropic') {
+      return 'anthropic'
     }
     return 'anthropic'
   }
@@ -54,6 +60,11 @@ class DroidScheduler {
     const normalizedEndpoint = this._normalizeEndpointType(endpointType)
     const accountEndpoint = this._normalizeEndpointType(account?.endpointType)
     if (normalizedEndpoint === accountEndpoint) {
+      return true
+    }
+
+    // comm 端点可以使用任何类型的账户
+    if (normalizedEndpoint === 'comm') {
       return true
     }
 

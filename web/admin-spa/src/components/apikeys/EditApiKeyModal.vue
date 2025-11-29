@@ -1179,32 +1179,20 @@ onMounted(async () => {
 
   // 初始化账号数据
   if (props.accounts) {
-    // 合并 Gemini OAuth 和 Gemini API 账号
-    const geminiAccounts = []
-    if (props.accounts.gemini) {
-      props.accounts.gemini.forEach((account) => {
-        geminiAccounts.push({
-          ...account,
-          platform: 'gemini'
-        })
-      })
-    }
-    if (props.accounts.geminiApi) {
-      props.accounts.geminiApi.forEach((account) => {
-        geminiAccounts.push({
-          ...account,
-          platform: 'gemini-api'
-        })
-      })
-    }
+    // props.accounts.gemini 已经包含了 OAuth 和 API 两种类型的账号（父组件已合并）
+    // 保留原有的 platform 属性，不要覆盖
+    const geminiAccounts = (props.accounts.gemini || []).map((account) => ({
+      ...account,
+      platform: account.platform || 'gemini' // 保留原有 platform，只在没有时设默认值
+    }))
 
-    // 合并 OpenAI 和 OpenAI-Responses 账号
+    // props.accounts.openai 只包含 openai 类型，openaiResponses 需要单独处理
     const openaiAccounts = []
     if (props.accounts.openai) {
       props.accounts.openai.forEach((account) => {
         openaiAccounts.push({
           ...account,
-          platform: 'openai'
+          platform: account.platform || 'openai'
         })
       })
     }
@@ -1212,7 +1200,7 @@ onMounted(async () => {
       props.accounts.openaiResponses.forEach((account) => {
         openaiAccounts.push({
           ...account,
-          platform: 'openai-responses'
+          platform: account.platform || 'openai-responses'
         })
       })
     }
@@ -1224,7 +1212,7 @@ onMounted(async () => {
       bedrock: props.accounts.bedrock || [],
       droid: (props.accounts.droid || []).map((account) => ({
         ...account,
-        platform: 'droid'
+        platform: account.platform || 'droid'
       })),
       claudeGroups: props.accounts.claudeGroups || [],
       geminiGroups: props.accounts.geminiGroups || [],
@@ -1233,8 +1221,7 @@ onMounted(async () => {
     }
   }
 
-  // 自动加载账号数据
-  await refreshAccounts()
+  // 使用缓存的账号数据，不自动刷新（用户可点击"刷新账号"按钮手动刷新）
 
   form.name = props.apiKey.name
 
@@ -1271,11 +1258,16 @@ onMounted(async () => {
   form.restrictedModels = props.apiKey.restrictedModels || []
   form.allowedClients = props.apiKey.allowedClients || []
   form.tags = props.apiKey.tags || []
-  // 从后端数据中获取实际的启用状态，而不是根据数组长度推断
-  form.enableModelRestriction = props.apiKey.enableModelRestriction || false
-  form.enableClientRestriction = props.apiKey.enableClientRestriction || false
-  // 初始化活跃状态，默认为 true
-  form.isActive = props.apiKey.isActive !== undefined ? props.apiKey.isActive : true
+  // 从后端数据中获取实际的启用状态，强制转换为布尔值（Redis返回的是字符串）
+  form.enableModelRestriction =
+    props.apiKey.enableModelRestriction === true || props.apiKey.enableModelRestriction === 'true'
+  form.enableClientRestriction =
+    props.apiKey.enableClientRestriction === true || props.apiKey.enableClientRestriction === 'true'
+  // 初始化活跃状态，默认为 true（强制转换为布尔值，因为Redis返回字符串）
+  form.isActive =
+    props.apiKey.isActive === undefined ||
+    props.apiKey.isActive === true ||
+    props.apiKey.isActive === 'true'
 
   // 初始化所有者
   form.ownerId = props.apiKey.userId || 'admin'

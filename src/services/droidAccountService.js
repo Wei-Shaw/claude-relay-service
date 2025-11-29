@@ -18,7 +18,7 @@ class DroidAccountService {
   constructor() {
     // WorkOS OAuth 配置
     this.oauthTokenUrl = 'https://api.workos.com/user_management/authenticate'
-    this.factoryApiBaseUrl = 'https://app.factory.ai/api/llm'
+    this.factoryApiBaseUrl = 'https://api.factory.ai/api/llm'
 
     this.workosClientId = 'client_01HNM792M5G5G1A2THWPXKFMXB'
 
@@ -45,7 +45,7 @@ class DroidAccountService {
       10 * 60 * 1000
     )
 
-    this.supportedEndpointTypes = new Set(['anthropic', 'openai'])
+    this.supportedEndpointTypes = new Set(['anthropic', 'openai', 'comm'])
   }
 
   _sanitizeEndpointType(endpointType) {
@@ -54,8 +54,12 @@ class DroidAccountService {
     }
 
     const normalized = String(endpointType).toLowerCase()
-    if (normalized === 'openai' || normalized === 'common') {
+    if (normalized === 'openai') {
       return 'openai'
+    }
+
+    if (normalized === 'comm') {
+      return 'comm'
     }
 
     if (this.supportedEndpointTypes.has(normalized)) {
@@ -544,7 +548,7 @@ class DroidAccountService {
       platform = 'droid',
       priority = 50, // 调度优先级 (1-100)
       schedulable = true, // 是否可被调度
-      endpointType = 'anthropic', // 默认端点类型: 'anthropic' 或 'openai'
+      endpointType = 'anthropic', // 默认端点类型: 'anthropic', 'openai' 或 'comm'
       organizationId = '',
       ownerEmail = '',
       ownerName = '',
@@ -812,7 +816,7 @@ class DroidAccountService {
       status, // created, active, expired, error
       errorMessage: '',
       schedulable: schedulable.toString(),
-      endpointType: normalizedEndpointType, // anthropic 或 openai
+      endpointType: normalizedEndpointType, // anthropic, openai 或 comm
       organizationId: normalizedOrganizationId || '',
       owner: normalizedOwnerName || normalizedOwnerEmail || '',
       ownerEmail: normalizedOwnerEmail || '',
@@ -1475,6 +1479,11 @@ class DroidAccountService {
           return accountEndpoint === 'anthropic' || accountEndpoint === 'openai'
         }
 
+        // comm 端点可以使用任何类型的账户
+        if (normalizedFilter === 'comm') {
+          return true
+        }
+
         return accountEndpoint === normalizedFilter
       })
       .map((account) => ({
@@ -1540,7 +1549,8 @@ class DroidAccountService {
     const normalizedType = this._sanitizeEndpointType(endpointType)
     const baseUrls = {
       anthropic: `${this.factoryApiBaseUrl}/a${endpoint}`,
-      openai: `${this.factoryApiBaseUrl}/o${endpoint}`
+      openai: `${this.factoryApiBaseUrl}/o${endpoint}`,
+      comm: `${this.factoryApiBaseUrl}/o${endpoint}`
     }
 
     return baseUrls[normalizedType] || baseUrls.openai

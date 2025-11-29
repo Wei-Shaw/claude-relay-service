@@ -3716,6 +3716,8 @@ const form = ref({
   endpointType: props.account?.endpointType || 'anthropic',
   // OpenAI-Responses 特定字段
   baseApi: props.account?.baseApi || '',
+  // Gemini-API 特定字段
+  baseUrl: props.account?.baseUrl || 'https://generativelanguage.googleapis.com',
   rateLimitDuration: props.account?.rateLimitDuration || 60,
   supportedModels: (() => {
     const models = props.account?.supportedModels
@@ -5567,6 +5569,8 @@ watch(
         deploymentName: newAccount.deploymentName || '',
         // OpenAI-Responses 特定字段
         baseApi: newAccount.baseApi || '',
+        // Gemini-API 特定字段
+        baseUrl: newAccount.baseUrl || 'https://generativelanguage.googleapis.com',
         // 额度管理字段
         dailyQuota: newAccount.dailyQuota || 0,
         dailyUsage: newAccount.dailyUsage || 0,
@@ -5586,12 +5590,27 @@ watch(
         loadGroups().then(async () => {
           const foundGroupIds = []
 
-          // 如果账户有 groupInfo，直接使用它的 groupId
-          if (newAccount.groupInfo && newAccount.groupInfo.id) {
+          // 优先使用 groupInfos 数组（后端返回的标准格式）
+          if (
+            newAccount.groupInfos &&
+            Array.isArray(newAccount.groupInfos) &&
+            newAccount.groupInfos.length > 0
+          ) {
+            // 从 groupInfos 数组中提取所有分组 ID
+            newAccount.groupInfos.forEach((group) => {
+              if (group && group.id) {
+                foundGroupIds.push(group.id)
+              }
+            })
+            if (foundGroupIds.length > 0) {
+              form.value.groupId = foundGroupIds[0]
+            }
+          } else if (newAccount.groupInfo && newAccount.groupInfo.id) {
+            // 兼容旧的 groupInfo 单对象格式
             form.value.groupId = newAccount.groupInfo.id
             foundGroupIds.push(newAccount.groupInfo.id)
           } else if (newAccount.groupId) {
-            // 如果账户有 groupId 字段，直接使用（OpenAI-Responses 等账户）
+            // 如果账户有 groupId 字段，直接使用
             form.value.groupId = newAccount.groupId
             foundGroupIds.push(newAccount.groupId)
           } else if (

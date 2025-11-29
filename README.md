@@ -490,12 +490,12 @@ Droid CLI 读取 `~/.factory/config.json`。可以在该文件中添加自定义
 {
   "custom_models": [
     {
-      "model_display_name": "Sonnet 4.5 [crs]",
-      "model": "claude-sonnet-4-5-20250929",
+      "model_display_name": "Opus 4.5 [crs]",
+      "model": "claude-opus-4-5-20251101",
       "base_url": "http://127.0.0.1:3000/droid/claude",
       "api_key": "后台创建的API密钥",
       "provider": "anthropic",
-      "max_tokens": 8192
+      "max_tokens": 64000
     },
     {
       "model_display_name": "GPT5-Codex [crs]",
@@ -504,6 +504,22 @@ Droid CLI 读取 `~/.factory/config.json`。可以在该文件中添加自定义
       "api_key": "后台创建的API密钥",
       "provider": "openai",
       "max_tokens": 16384
+    },
+    {
+      "model_display_name": "Gemini-3-Pro [crs]",
+      "model": "gemini-3-pro-preview",
+      "base_url": "http://127.0.0.1:3000/droid/comm/v1/",
+      "api_key": "后台创建的API密钥",
+      "provider": "generic-chat-completion-api",
+      "max_tokens": 65535
+    },
+    {
+      "model_display_name": "GLM-4.6 [crs]",
+      "model": "glm-4.6",
+      "base_url": "http://127.0.0.1:3000/droid/comm/v1/",
+      "api_key": "后台创建的API密钥",
+      "provider": "generic-chat-completion-api",
+      "max_tokens": 202800
     }
   ]
 }
@@ -943,6 +959,27 @@ proxy_request_buffering off;
 - **GitHub Issues**: 提交详细的错误信息
 - **查看文档**: 仔细阅读错误信息和文档
 - **社区讨论**: 看看其他人是否遇到类似问题
+
+---
+
+## ❤️ 赞助支持
+
+如果您觉得这个项目对您有帮助，请考虑赞助支持项目的持续开发。您的支持是我们最大的动力！
+
+<div align="center">
+
+<a href="https://afdian.com/a/claude-relay-service" target="_blank">
+  <img src="https://img.shields.io/badge/请我喝杯咖啡-爱发电-946ce6?style=for-the-badge&logo=buy-me-a-coffee&logoColor=white" alt="Sponsor">
+</a>
+
+<table>
+  <tr>
+    <td><img src="docs/sponsoring/wechat.jpg" width="200" alt="wechat" /></td>
+    <td><img src="docs/sponsoring/alipay.jpg" width="200" alt="alipay" /></td>
+  </tr>
+</table>
+
+</div>
 
 ---
 
