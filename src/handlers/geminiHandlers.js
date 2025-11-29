@@ -630,15 +630,22 @@ async function handleModels(req, res) {
       })
     }
 
-    // 选择账户获取模型列表
+    // 选择账户获取模型列表（允许 API 账户）
     let account = null
+    let isApiAccount = false
     try {
       const accountSelection = await unifiedGeminiScheduler.selectAccountForApiKey(
         apiKeyData,
         null,
-        null
+        null,
+        { allowApiAccounts: true }
       )
-      account = await geminiAccountService.getAccount(accountSelection.accountId)
+      isApiAccount = accountSelection.accountType === 'gemini-api'
+      if (isApiAccount) {
+        account = await geminiApiAccountService.getAccount(accountSelection.accountId)
+      } else {
+        account = await geminiAccountService.getAccount(accountSelection.accountId)
+      }
     } catch (error) {
       logger.warn('Failed to select Gemini account for models endpoint:', error)
     }
@@ -659,7 +666,45 @@ async function handleModels(req, res) {
     }
 
     // 获取模型列表
-    const models = await getAvailableModels(account.accessToken, account.proxy)
+    let models
+    if (isApiAccount) {
+      // API Key 账户：使用 API Key 获取模型列表
+      const proxyConfig = parseProxyConfig(account)
+      try {
+        const apiUrl = `${account.baseUrl}/v1beta/models?key=${account.apiKey}`
+        const axiosConfig = {
+          method: 'GET',
+          url: apiUrl,
+          headers: { 'Content-Type': 'application/json' }
+        }
+        if (proxyConfig) {
+          const proxyHelper = new ProxyHelper()
+          axiosConfig.httpsAgent = proxyHelper.createProxyAgent(proxyConfig)
+          axiosConfig.httpAgent = proxyHelper.createProxyAgent(proxyConfig)
+        }
+        const response = await axios(axiosConfig)
+        models = (response.data.models || []).map((m) => ({
+          id: m.name?.replace('models/', '') || m.name,
+          object: 'model',
+          created: Date.now() / 1000,
+          owned_by: 'google'
+        }))
+      } catch (error) {
+        logger.warn('Failed to fetch models from Gemini API:', error.message)
+        // 返回默认模型列表
+        models = [
+          {
+            id: 'gemini-2.5-flash',
+            object: 'model',
+            created: Date.now() / 1000,
+            owned_by: 'google'
+          }
+        ]
+      }
+    } else {
+      // OAuth 账户：使用 OAuth token 获取模型列表
+      models = await getAvailableModels(account.accessToken, account.proxy)
+    }
 
     res.json({
       object: 'list',
@@ -786,12 +831,36 @@ function handleSimpleEndpoint(apiMethod) {
 
       // 从路径参数或请求体中获取模型名
       const requestedModel = req.body.model || req.params.modelName || 'gemini-2.5-flash'
-      const { accountId } = await unifiedGeminiScheduler.selectAccountForApiKey(
+      const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
         req.apiKey,
         sessionHash,
         requestedModel
       )
+      const { accountId, accountType } = schedulerResult
+
+      // v1internal 路由只支持 OAuth 账户，不支持 API Key 账户
+      if (accountType === 'gemini-api') {
+        logger.error(
+          `❌ v1internal routes do not support Gemini API accounts. Account: ${accountId}`
+        )
+        return res.status(400).json({
+          error: {
+            message:
+              'This endpoint only supports Gemini OAuth accounts. Gemini API Key accounts are not compatible with v1internal format.',
+            type: 'invalid_account_type'
+          }
+        })
+      }
+
       const account = await geminiAccountService.getAccount(accountId)
+      if (!account) {
+        return res.status(404).json({
+          error: {
+            message: 'Gemini account not found',
+            type: 'account_not_found'
+          }
+        })
+      }
       const { accessToken, refreshToken } = account
 
       const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
@@ -842,12 +911,34 @@ async function handleLoadCodeAssist(req, res) {
 
     // 从路径参数或请求体中获取模型名
     const requestedModel = req.body.model || req.params.modelName || 'gemini-2.5-flash'
-    const { accountId } = await unifiedGeminiScheduler.selectAccountForApiKey(
+    const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
       req.apiKey,
       sessionHash,
       requestedModel
     )
+    const { accountId, accountType } = schedulerResult
+
+    // v1internal 路由只支持 OAuth 账户，不支持 API Key 账户
+    if (accountType === 'gemini-api') {
+      logger.error(`❌ v1internal routes do not support Gemini API accounts. Account: ${accountId}`)
+      return res.status(400).json({
+        error: {
+          message:
+            'This endpoint only supports Gemini OAuth accounts. Gemini API Key accounts are not compatible with v1internal format.',
+          type: 'invalid_account_type'
+        }
+      })
+    }
+
     const account = await geminiAccountService.getAccount(accountId)
+    if (!account) {
+      return res.status(404).json({
+        error: {
+          message: 'Gemini account not found',
+          type: 'account_not_found'
+        }
+      })
+    }
     const { accessToken, refreshToken, projectId } = account
 
     const { metadata, cloudaicompanionProject } = req.body
@@ -919,12 +1010,34 @@ async function handleOnboardUser(req, res) {
 
     // 从路径参数或请求体中获取模型名
     const requestedModel = req.body.model || req.params.modelName || 'gemini-2.5-flash'
-    const { accountId } = await unifiedGeminiScheduler.selectAccountForApiKey(
+    const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
       req.apiKey,
       sessionHash,
       requestedModel
     )
+    const { accountId, accountType } = schedulerResult
+
+    // v1internal 路由只支持 OAuth 账户，不支持 API Key 账户
+    if (accountType === 'gemini-api') {
+      logger.error(`❌ v1internal routes do not support Gemini API accounts. Account: ${accountId}`)
+      return res.status(400).json({
+        error: {
+          message:
+            'This endpoint only supports Gemini OAuth accounts. Gemini API Key accounts are not compatible with v1internal format.',
+          type: 'invalid_account_type'
+        }
+      })
+    }
+
     const account = await geminiAccountService.getAccount(accountId)
+    if (!account) {
+      return res.status(404).json({
+        error: {
+          message: 'Gemini account not found',
+          type: 'account_not_found'
+        }
+      })
+    }
     const { accessToken, refreshToken, projectId } = account
 
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
@@ -1013,31 +1126,93 @@ async function handleCountTokens(req, res) {
       })
     }
 
-    // 使用统一调度选择账号
-    const { accountId } = await unifiedGeminiScheduler.selectAccountForApiKey(
+    // 使用统一调度选择账号（允许 API 账户）
+    const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
       req.apiKey,
       sessionHash,
-      model
-    )
-    const account = await geminiAccountService.getAccount(accountId)
-    const { accessToken, refreshToken } = account
-
-    const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
-    logger.info(`CountTokens request (${version})`, {
       model,
-      contentsLength: contents.length,
-      apiKeyId: req.apiKey?.id || 'unknown'
-    })
+      { allowApiAccounts: true }
+    )
+    const { accountId, accountType } = schedulerResult
+    const isApiAccount = accountType === 'gemini-api'
+
+    let account
+    if (isApiAccount) {
+      account = await geminiApiAccountService.getAccount(accountId)
+    } else {
+      account = await geminiAccountService.getAccount(accountId)
+    }
+
+    if (!account) {
+      return res.status(404).json({
+        error: {
+          message: `${isApiAccount ? 'Gemini API' : 'Gemini'} account not found`,
+          type: 'account_not_found'
+        }
+      })
+    }
+
+    const version = req.path.includes('v1beta') ? 'v1beta' : 'v1'
+    logger.info(
+      `CountTokens request (${version}) - ${isApiAccount ? 'API Key' : 'OAuth'} Account`,
+      {
+        model,
+        contentsLength: contents.length,
+        accountId,
+        apiKeyId: req.apiKey?.id || 'unknown'
+      }
+    )
 
     // 解析账户的代理配置
     const proxyConfig = parseProxyConfig(account)
 
-    const client = await geminiAccountService.getOauthClient(accessToken, refreshToken, proxyConfig)
-    const response = await geminiAccountService.countTokens(client, contents, model, proxyConfig)
+    let response
+    if (isApiAccount) {
+      // API Key 账户：直接使用 API Key 请求
+      const modelPath = model.startsWith('models/') ? model : `models/${model}`
+      const apiUrl = `${account.baseUrl}/v1beta/${modelPath}:countTokens?key=${account.apiKey}`
+
+      const axiosConfig = {
+        method: 'POST',
+        url: apiUrl,
+        data: { contents },
+        headers: { 'Content-Type': 'application/json' }
+      }
+
+      if (proxyConfig) {
+        const proxyHelper = new ProxyHelper()
+        axiosConfig.httpsAgent = proxyHelper.createProxyAgent(proxyConfig)
+        axiosConfig.httpAgent = proxyHelper.createProxyAgent(proxyConfig)
+      }
+
+      try {
+        const apiResponse = await axios(axiosConfig)
+        response = {
+          totalTokens: apiResponse.data.totalTokens || 0,
+          totalBillableCharacters: apiResponse.data.totalBillableCharacters || 0,
+          ...apiResponse.data
+        }
+      } catch (error) {
+        logger.error('Gemini API countTokens request failed:', {
+          status: error.response?.status,
+          data: error.response?.data
+        })
+        throw error
+      }
+    } else {
+      // OAuth 账户
+      const { accessToken, refreshToken } = account
+      const client = await geminiAccountService.getOauthClient(
+        accessToken,
+        refreshToken,
+        proxyConfig
+      )
+      response = await geminiAccountService.countTokens(client, contents, model, proxyConfig)
+    }
 
     res.json(response)
   } catch (error) {
-    const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
+    const version = req.path.includes('v1beta') ? 'v1beta' : 'v1'
     logger.error(`Error in countTokens endpoint (${version})`, { error: error.message })
     res.status(500).json({
       error: {
