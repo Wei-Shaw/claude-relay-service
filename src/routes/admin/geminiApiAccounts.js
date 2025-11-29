@@ -23,8 +23,9 @@ router.get('/gemini-api-accounts', authenticateAdmin, async (req, res) => {
     // 根据分组ID筛选
     if (groupId) {
       const group = await accountGroupService.getGroup(groupId)
-      if (group && group.platform === 'gemini' && group.memberIds && group.memberIds.length > 0) {
-        accounts = accounts.filter((account) => group.memberIds.includes(account.id))
+      if (group && group.platform === 'gemini') {
+        const groupMembers = await accountGroupService.getGroupMembers(groupId)
+        accounts = accounts.filter((account) => groupMembers.includes(account.id))
       } else {
         accounts = []
       }
@@ -62,8 +63,12 @@ router.get('/gemini-api-accounts', authenticateAdmin, async (req, res) => {
           }
         }
 
+        // 获取分组信息
+        const groupInfos = await accountGroupService.getAccountGroups(account.id)
+
         return {
           ...account,
+          groupInfos,
           usage: {
             daily: usageStats.daily,
             total: usageStats.total,
@@ -257,13 +262,10 @@ router.delete('/gemini-api-accounts/:id', authenticateAdmin, async (req, res) =>
     // 自动解绑所有绑定的 API Keys（支持 api: 前缀）
     const unboundCount = await apiKeyService.unbindAccountFromAllKeys(id, 'gemini-api')
 
-    // 检查是否在分组中
-    const groups = await accountGroupService.getAllGroups()
-    for (const group of groups) {
-      if (group.platform === 'gemini' && group.memberIds && group.memberIds.includes(id)) {
-        await accountGroupService.removeMemberFromGroup(group.id, id)
-        logger.info(`Removed Gemini-API account ${id} from group ${group.id}`)
-      }
+    // 从所有分组中移除此账户
+    if (account.accountType === 'group') {
+      await accountGroupService.removeAccountFromAllGroups(id)
+      logger.info(`Removed Gemini-API account ${id} from all groups`)
     }
 
     const result = await geminiApiAccountService.deleteAccount(id)

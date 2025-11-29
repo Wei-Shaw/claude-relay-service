@@ -248,16 +248,29 @@ router.post('/', authenticateAdmin, async (req, res) => {
         .json({ error: 'Invalid account type. Must be "shared", "dedicated" or "group"' })
     }
 
-    // 如果是分组类型，验证groupId
-    if (accountData.accountType === 'group' && !accountData.groupId) {
+    // 如果是分组类型，验证groupId或groupIds
+    if (
+      accountData.accountType === 'group' &&
+      !accountData.groupId &&
+      (!accountData.groupIds || accountData.groupIds.length === 0)
+    ) {
       return res.status(400).json({ error: 'Group ID is required for group type accounts' })
     }
 
     const newAccount = await geminiAccountService.createAccount(accountData)
 
-    // 如果是分组类型，将账户添加到分组
-    if (accountData.accountType === 'group' && accountData.groupId) {
-      await accountGroupService.addAccountToGroup(newAccount.id, accountData.groupId, 'gemini')
+    // 如果是分组类型，处理分组绑定
+    if (accountData.accountType === 'group') {
+      if (accountData.groupIds && accountData.groupIds.length > 0) {
+        // 多分组模式
+        await accountGroupService.setAccountGroups(newAccount.id, accountData.groupIds, 'gemini')
+        logger.info(
+          `🏢 Added Gemini account ${newAccount.id} to groups: ${accountData.groupIds.join(', ')}`
+        )
+      } else if (accountData.groupId) {
+        // 单分组模式（向后兼容）
+        await accountGroupService.addAccountToGroup(newAccount.id, accountData.groupId, 'gemini')
+      }
     }
 
     logger.success(`🏢 Admin created new Gemini account: ${accountData.name}`)
@@ -282,8 +295,12 @@ router.put('/:accountId', authenticateAdmin, async (req, res) => {
         .json({ error: 'Invalid account type. Must be "shared", "dedicated" or "group"' })
     }
 
-    // 如果更新为分组类型，验证groupId
-    if (updates.accountType === 'group' && !updates.groupId) {
+    // 如果更新为分组类型，验证groupId或groupIds
+    if (
+      updates.accountType === 'group' &&
+      !updates.groupId &&
+      (!updates.groupIds || updates.groupIds.length === 0)
+    ) {
       return res.status(400).json({ error: 'Group ID is required for group type accounts' })
     }
 
