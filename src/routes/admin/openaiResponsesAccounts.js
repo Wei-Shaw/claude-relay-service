@@ -31,8 +31,9 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
     // 根据分组ID筛选
     if (groupId) {
       const group = await accountGroupService.getGroup(groupId)
-      if (group && group.platform === 'openai' && group.memberIds && group.memberIds.length > 0) {
-        accounts = accounts.filter((account) => group.memberIds.includes(account.id))
+      if (group && group.platform === 'openai') {
+        const groupMembers = await accountGroupService.getGroupMembers(groupId)
+        accounts = accounts.filter((account) => groupMembers.includes(account.id))
       } else {
         accounts = []
       }
@@ -94,9 +95,13 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
             logger.info(`OpenAI-Responses account ${account.id} has ${boundCount} bound API keys`)
           }
 
+          // 获取分组信息
+          const groupInfos = await accountGroupService.getAccountGroups(account.id)
+
           const formattedAccount = formatAccountExpiry(account)
           return {
             ...formattedAccount,
+            groupInfos,
             boundApiKeysCount: boundCount,
             usage: {
               daily: usageStats.daily,
@@ -109,6 +114,7 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
           const formattedAccount = formatAccountExpiry(account)
           return {
             ...formattedAccount,
+            groupInfos: [],
             boundApiKeysCount: 0,
             usage: {
               daily: { requests: 0, tokens: 0, allTokens: 0 },
@@ -130,7 +136,39 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
 // 创建 OpenAI-Responses 账户
 router.post('/openai-responses-accounts', authenticateAdmin, async (req, res) => {
   try {
-    const account = await openaiResponsesAccountService.createAccount(req.body)
+    const accountData = req.body
+
+    // 验证分组类型
+    if (
+      accountData.accountType === 'group' &&
+      !accountData.groupId &&
+      (!accountData.groupIds || accountData.groupIds.length === 0)
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: 'Group ID is required for group type accounts'
+      })
+    }
+
+    const account = await openaiResponsesAccountService.createAccount(accountData)
+
+    // 如果是分组类型，处理分组绑定
+    if (accountData.accountType === 'group') {
+      if (accountData.groupIds && accountData.groupIds.length > 0) {
+        // 多分组模式
+        await accountGroupService.setAccountGroups(account.id, accountData.groupIds, 'openai')
+        logger.info(
+          `🏢 Added OpenAI-Responses account ${account.id} to groups: ${accountData.groupIds.join(', ')}`
+        )
+      } else if (accountData.groupId) {
+        // 单分组模式（向后兼容）
+        await accountGroupService.addAccountToGroup(account.id, accountData.groupId, 'openai')
+        logger.info(
+          `🏢 Added OpenAI-Responses account ${account.id} to group: ${accountData.groupId}`
+        )
+      }
+    }
+
     const formattedAccount = formatAccountExpiry(account)
     res.json({ success: true, data: formattedAccount })
   } catch (error) {
@@ -148,6 +186,15 @@ router.put('/openai-responses-accounts/:id', authenticateAdmin, async (req, res)
     const { id } = req.params
     const updates = req.body
 
+    // 获取当前账户信息
+    const currentAccount = await openaiResponsesAccountService.getAccount(id)
+    if (!currentAccount) {
+      return res.status(404).json({
+        success: false,
+        error: 'Account not found'
+      })
+    }
+
     // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
     const mappedUpdates = mapExpiryField(updates, 'OpenAI-Responses', id)
 
@@ -163,12 +210,48 @@ router.put('/openai-responses-accounts/:id', authenticateAdmin, async (req, res)
       mappedUpdates.priority = priority.toString()
     }
 
+    // 处理分组变更
+    if (mappedUpdates.accountType !== undefined) {
+      // 如果之前是分组类型，需要从所有分组中移除
+      if (currentAccount.accountType === 'group') {
+        const oldGroups = await accountGroupService.getAccountGroups(id)
+        for (const oldGroup of oldGroups) {
+          await accountGroupService.removeAccountFromGroup(id, oldGroup.id)
+        }
+        logger.info(`📤 Removed OpenAI-Responses account ${id} from all groups`)
+      }
+
+      // 如果新类型是分组，处理多分组支持
+      if (mappedUpdates.accountType === 'group') {
+        if (Object.prototype.hasOwnProperty.call(mappedUpdates, 'groupIds')) {
+          if (mappedUpdates.groupIds && mappedUpdates.groupIds.length > 0) {
+            // 设置新的多分组
+            await accountGroupService.setAccountGroups(id, mappedUpdates.groupIds, 'openai')
+            logger.info(
+              `📥 Added OpenAI-Responses account ${id} to groups: ${mappedUpdates.groupIds.join(', ')}`
+            )
+          } else {
+            // groupIds 为空数组，从所有分组中移除
+            await accountGroupService.removeAccountFromAllGroups(id)
+            logger.info(
+              `📤 Removed OpenAI-Responses account ${id} from all groups (empty groupIds)`
+            )
+          }
+        } else if (mappedUpdates.groupId) {
+          // 向后兼容：仅当没有 groupIds 但有 groupId 时使用单分组逻辑
+          await accountGroupService.addAccountToGroup(id, mappedUpdates.groupId, 'openai')
+          logger.info(`📥 Added OpenAI-Responses account ${id} to group: ${mappedUpdates.groupId}`)
+        }
+      }
+    }
+
     const result = await openaiResponsesAccountService.updateAccount(id, mappedUpdates)
 
     if (!result.success) {
       return res.status(400).json(result)
     }
 
+    logger.success(`📝 Admin updated OpenAI-Responses account: ${id}`)
     res.json({ success: true, ...result })
   } catch (error) {
     logger.error('Failed to update OpenAI-Responses account:', error)
@@ -195,13 +278,10 @@ router.delete('/openai-responses-accounts/:id', authenticateAdmin, async (req, r
     // 自动解绑所有绑定的 API Keys
     const unboundCount = await apiKeyService.unbindAccountFromAllKeys(id, 'openai-responses')
 
-    // 检查是否在分组中
-    const groups = await accountGroupService.getAllGroups()
-    for (const group of groups) {
-      if (group.platform === 'openai' && group.memberIds && group.memberIds.includes(id)) {
-        await accountGroupService.removeMemberFromGroup(group.id, id)
-        logger.info(`Removed OpenAI-Responses account ${id} from group ${group.id}`)
-      }
+    // 从所有分组中移除此账户
+    if (account.accountType === 'group') {
+      await accountGroupService.removeAccountFromAllGroups(id)
+      logger.info(`Removed OpenAI-Responses account ${id} from all groups`)
     }
 
     const result = await openaiResponsesAccountService.deleteAccount(id)

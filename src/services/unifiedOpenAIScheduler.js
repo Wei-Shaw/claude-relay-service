@@ -834,11 +834,24 @@ class UnifiedOpenAIScheduler {
         throw error
       }
 
-      // 获取可用的分组成员账户
+      // 获取可用的分组成员账户（支持 OpenAI 和 OpenAI-Responses 两种类型）
       const availableAccounts = []
       for (const memberId of memberIds) {
-        const account = await openaiAccountService.getAccount(memberId)
-        if (account && account.isActive && account.status !== 'error') {
+        // 首先尝试从 OpenAI 账户服务获取
+        let account = await openaiAccountService.getAccount(memberId)
+        let accountType = 'openai'
+
+        // 如果 OpenAI 账户不存在，尝试从 OpenAI-Responses 账户服务获取
+        if (!account) {
+          account = await openaiResponsesAccountService.getAccount(memberId)
+          accountType = 'openai-responses'
+        }
+
+        if (
+          account &&
+          (account.isActive === true || account.isActive === 'true') &&
+          account.status !== 'error'
+        ) {
           const readiness = await this._ensureAccountReadyForScheduling(account, account.id, {
             sanitized: false
           })
@@ -846,23 +859,25 @@ class UnifiedOpenAIScheduler {
           if (!readiness.canUse) {
             if (readiness.reason === 'rate_limited') {
               logger.debug(
-                `⏭️ Skipping group member OpenAI account ${account.name} - still rate limited`
+                `⏭️ Skipping group member ${accountType} account ${account.name} - still rate limited`
               )
             } else {
               logger.debug(
-                `⏭️ Skipping group member OpenAI account ${account.name} - not schedulable`
+                `⏭️ Skipping group member ${accountType} account ${account.name} - not schedulable`
               )
             }
             continue
           }
 
-          // 检查token是否过期
-          const isExpired = openaiAccountService.isTokenExpired(account)
-          if (isExpired && !account.refreshToken) {
-            logger.warn(
-              `⚠️ Group member OpenAI account ${account.name} token expired and no refresh token available`
-            )
-            continue
+          // 检查token是否过期（仅对 OpenAI OAuth 账户检查）
+          if (accountType === 'openai') {
+            const isExpired = openaiAccountService.isTokenExpired(account)
+            if (isExpired && !account.refreshToken) {
+              logger.warn(
+                `⚠️ Group member OpenAI account ${account.name} token expired and no refresh token available`
+              )
+              continue
+            }
           }
 
           // 检查模型支持（仅在明确设置了supportedModels且不为空时才检查）
@@ -871,17 +886,17 @@ class UnifiedOpenAIScheduler {
             const modelSupported = account.supportedModels.includes(requestedModel)
             if (!modelSupported) {
               logger.debug(
-                `⏭️ Skipping group member OpenAI account ${account.name} - doesn't support model ${requestedModel}`
+                `⏭️ Skipping group member ${accountType} account ${account.name} - doesn't support model ${requestedModel}`
               )
               continue
             }
           }
 
-          // 检查是否被限流
+          // 添加到可用账户列表
           availableAccounts.push({
             ...account,
             accountId: account.id,
-            accountType: 'openai',
+            accountType,
             priority: parseInt(account.priority) || 50,
             lastUsedAt: account.lastUsedAt || '0'
           })
