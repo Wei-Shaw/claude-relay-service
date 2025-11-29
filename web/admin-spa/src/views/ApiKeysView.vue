@@ -253,12 +253,15 @@
           <!-- 桌面端表格视图 -->
           <div v-else class="table-wrapper hidden md:block">
             <div class="table-container">
-              <table class="w-full table-fixed">
+              <table class="w-full">
                 <thead
                   class="sticky top-0 z-10 bg-gradient-to-b from-gray-50 to-gray-100/90 backdrop-blur-sm dark:from-gray-700 dark:to-gray-800/90"
                 >
                   <tr>
-                    <th v-if="shouldShowCheckboxes" class="w-[50px] px-3 py-4 text-left">
+                    <th
+                      v-if="shouldShowCheckboxes"
+                      class="checkbox-column sticky left-0 z-20 min-w-[50px] px-3 py-4 text-left"
+                    >
                       <div class="flex items-center">
                         <input
                           v-model="selectAllChecked"
@@ -270,7 +273,8 @@
                       </div>
                     </th>
                     <th
-                      class="w-[14%] min-w-[120px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                      class="name-column sticky z-20 min-w-[140px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                      :class="shouldShowCheckboxes ? 'left-[50px]' : 'left-0'"
                       @click="sortApiKeys('name')"
                     >
                       名称
@@ -285,17 +289,17 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[15%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                      class="min-w-[140px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                     >
                       所属账号
                     </th>
                     <th
-                      class="w-[10%] min-w-[80px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                      class="min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                     >
                       标签
                     </th>
                     <th
-                      class="w-[6%] min-w-[60px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                      class="min-w-[80px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                       @click="sortApiKeys('status')"
                     >
                       状态
@@ -310,7 +314,7 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[4%] min-w-[40px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                      class="min-w-[70px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                       :class="{
                         'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600': canSortByCost,
                         'cursor-not-allowed opacity-60': !canSortByCost
@@ -331,22 +335,22 @@
                       <i v-else class="fas fa-clock ml-1 text-gray-400" title="索引更新中" />
                     </th>
                     <th
-                      class="w-[14%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                      class="min-w-[180px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                     >
                       限制
                     </th>
                     <th
-                      class="w-[5%] min-w-[45px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                      class="min-w-[80px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                     >
                       Token
                     </th>
                     <th
-                      class="w-[5%] min-w-[45px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                      class="min-w-[80px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                     >
                       请求数
                     </th>
                     <th
-                      class="w-[8%] min-w-[70px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                      class="min-w-[100px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                       @click="sortApiKeys('lastUsedAt')"
                     >
                       最后使用
@@ -361,7 +365,7 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[8%] min-w-[70px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                      class="min-w-[100px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                       @click="sortApiKeys('createdAt')"
                     >
                       创建时间
@@ -376,7 +380,7 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="w-[8%] min-w-[70px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                      class="min-w-[100px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                       @click="sortApiKeys('expiresAt')"
                     >
                       过期时间
@@ -391,7 +395,7 @@
                       <i v-else class="fas fa-sort ml-1 text-gray-400" />
                     </th>
                     <th
-                      class="operations-column sticky right-0 w-[23%] min-w-[200px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                      class="operations-column sticky right-0 min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                     >
                       操作
                     </th>
@@ -410,7 +414,10 @@
                         'hover:bg-blue-50/60 hover:shadow-sm dark:hover:bg-blue-900/20'
                       ]"
                     >
-                      <td v-if="shouldShowCheckboxes" class="px-3 py-3">
+                      <td
+                        v-if="shouldShowCheckboxes"
+                        class="checkbox-column sticky left-0 z-10 px-3 py-3"
+                      >
                         <div class="flex items-center">
                           <input
                             v-model="selectedApiKeys"
@@ -421,7 +428,10 @@
                           />
                         </div>
                       </td>
-                      <td class="px-3 py-3">
+                      <td
+                        class="name-column sticky z-10 px-3 py-3"
+                        :class="shouldShowCheckboxes ? 'left-[50px]' : 'left-0'"
+                      >
                         <div class="min-w-0">
                           <!-- 名称 -->
                           <div
@@ -854,14 +864,15 @@
                         class="operations-column operations-cell whitespace-nowrap px-3 py-3"
                         style="font-size: 13px"
                       >
-                        <div class="flex gap-1">
+                        <!-- 大屏幕：展开所有按钮 -->
+                        <div class="hidden gap-1 2xl:flex">
                           <button
                             class="rounded px-2 py-1 text-xs font-medium text-purple-600 transition-colors hover:bg-purple-50 hover:text-purple-900 dark:hover:bg-purple-900/20"
                             title="查看详细统计"
                             @click="showUsageDetails(key)"
                           >
                             <i class="fas fa-chart-line" />
-                            <span class="ml-1 hidden xl:inline">详情</span>
+                            <span class="ml-1">详情</span>
                           </button>
                           <button
                             v-if="key && key.id"
@@ -875,7 +886,7 @@
                                 expandedApiKeys[key.id] ? 'fa-chevron-up' : 'fa-chevron-down'
                               ]"
                             />
-                            <span class="ml-1 hidden xl:inline">模型</span>
+                            <span class="ml-1">模型</span>
                           </button>
                           <button
                             class="rounded px-2 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-900 dark:hover:bg-blue-900/20"
@@ -883,7 +894,7 @@
                             @click="openEditApiKeyModal(key)"
                           >
                             <i class="fas fa-edit" />
-                            <span class="ml-1 hidden xl:inline">编辑</span>
+                            <span class="ml-1">编辑</span>
                           </button>
                           <button
                             v-if="
@@ -896,7 +907,7 @@
                             @click="openRenewApiKeyModal(key)"
                           >
                             <i class="fas fa-clock" />
-                            <span class="ml-1 hidden xl:inline">续期</span>
+                            <span class="ml-1">续期</span>
                           </button>
                           <button
                             :class="[
@@ -909,9 +920,7 @@
                             @click="toggleApiKeyStatus(key)"
                           >
                             <i :class="['fas', key.isActive ? 'fa-ban' : 'fa-check-circle']" />
-                            <span class="ml-1 hidden xl:inline">{{
-                              key.isActive ? '禁用' : '激活'
-                            }}</span>
+                            <span class="ml-1">{{ key.isActive ? '禁用' : '激活' }}</span>
                           </button>
                           <button
                             class="rounded px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-900 dark:hover:bg-red-900/20"
@@ -919,8 +928,34 @@
                             @click="deleteApiKey(key.id)"
                           >
                             <i class="fas fa-trash" />
-                            <span class="ml-1 hidden xl:inline">删除</span>
+                            <span class="ml-1">删除</span>
                           </button>
+                        </div>
+                        <!-- 小屏幕：常用按钮 + 下拉菜单 -->
+                        <div class="flex items-center gap-1 2xl:hidden">
+                          <!-- 始终显示的快捷按钮 -->
+                          <button
+                            class="rounded px-2 py-1 text-xs font-medium text-purple-600 transition-colors hover:bg-purple-50 hover:text-purple-900 dark:hover:bg-purple-900/20"
+                            title="查看详细统计"
+                            @click="showUsageDetails(key)"
+                          >
+                            <i class="fas fa-chart-line" />
+                          </button>
+                          <button
+                            v-if="key && key.id"
+                            class="rounded px-2 py-1 text-xs font-medium text-indigo-600 transition-colors hover:bg-indigo-50 hover:text-indigo-900 dark:hover:bg-indigo-900/20"
+                            title="模型使用分布"
+                            @click="toggleApiKeyModelStats(key.id)"
+                          >
+                            <i
+                              :class="[
+                                'fas',
+                                expandedApiKeys[key.id] ? 'fa-chevron-up' : 'fa-chevron-down'
+                              ]"
+                            />
+                          </button>
+                          <!-- 更多操作下拉菜单 -->
+                          <ActionDropdown :actions="getApiKeyActions(key)" />
                         </div>
                       </td>
                     </tr>
@@ -1722,62 +1757,64 @@
 
             <div class="table-wrapper">
               <div class="table-container">
-                <table class="w-full table-fixed">
-                  <thead class="bg-gray-50/80 backdrop-blur-sm dark:bg-gray-700/80">
+                <table class="w-full">
+                  <thead
+                    class="sticky top-0 z-10 bg-gradient-to-b from-gray-50 to-gray-100/90 backdrop-blur-sm dark:from-gray-700 dark:to-gray-800/90"
+                  >
                     <tr>
                       <th
-                        class="w-[14%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                        class="name-column sticky left-0 z-20 min-w-[140px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                       >
                         名称
                       </th>
                       <th
-                        class="w-[15%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                        class="min-w-[140px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                       >
                         所属账号
                       </th>
                       <th
                         v-if="isLdapEnabled"
-                        class="w-[15%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                        class="min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                       >
                         创建者
                       </th>
                       <th
-                        class="w-[15%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                        class="min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                       >
                         创建时间
                       </th>
                       <th
-                        class="w-[10%] min-w-[90px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                        class="min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                       >
                         删除者
                       </th>
                       <th
-                        class="w-[10%] min-w-[90px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                        class="min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                       >
                         删除时间
                       </th>
                       <th
-                        class="w-[8%] min-w-[60px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                        class="min-w-[70px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                       >
                         费用
                       </th>
                       <th
-                        class="w-[8%] min-w-[60px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                        class="min-w-[80px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                       >
                         Token
                       </th>
                       <th
-                        class="w-[8%] min-w-[60px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                        class="min-w-[80px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                       >
                         请求数
                       </th>
                       <th
-                        class="w-[9%] min-w-[80px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                        class="min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                       >
                         最后使用
                       </th>
                       <th
-                        class="operations-column sticky right-0 w-[15%] min-w-[160px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                        class="operations-column sticky right-0 min-w-[140px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                       >
                         操作
                       </th>
@@ -1785,7 +1822,7 @@
                   </thead>
                   <tbody class="divide-y divide-gray-200/50 dark:divide-gray-600/50">
                     <tr v-for="key in deletedApiKeys" :key="key.id" class="table-row">
-                      <td class="px-3 py-3">
+                      <td class="name-column sticky left-0 z-10 px-3 py-3">
                         <div class="flex items-center">
                           <div
                             class="mr-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-red-500 to-red-600"
@@ -2074,6 +2111,7 @@ import ExpiryEditModal from '@/components/apikeys/ExpiryEditModal.vue'
 import UsageDetailModal from '@/components/apikeys/UsageDetailModal.vue'
 import LimitProgressBar from '@/components/apikeys/LimitProgressBar.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
+import ActionDropdown from '@/components/common/ActionDropdown.vue'
 
 // 响应式数据
 const clientsStore = useClientsStore()
@@ -3705,6 +3743,50 @@ const handleRenewSuccess = () => {
   loadApiKeys()
 }
 
+// 获取API Key的操作菜单项（用于ActionDropdown）
+const getApiKeyActions = (key) => {
+  const actions = [
+    {
+      key: 'edit',
+      label: '编辑',
+      icon: 'fa-edit',
+      color: 'blue',
+      handler: () => openEditApiKeyModal(key)
+    }
+  ]
+
+  // 如果需要续期
+  if (key.expiresAt && (isApiKeyExpired(key.expiresAt) || isApiKeyExpiringSoon(key.expiresAt))) {
+    actions.push({
+      key: 'renew',
+      label: '续期',
+      icon: 'fa-clock',
+      color: 'green',
+      handler: () => openRenewApiKeyModal(key)
+    })
+  }
+
+  // 激活/禁用
+  actions.push({
+    key: 'toggle',
+    label: key.isActive ? '禁用' : '激活',
+    icon: key.isActive ? 'fa-ban' : 'fa-check-circle',
+    color: key.isActive ? 'orange' : 'green',
+    handler: () => toggleApiKeyStatus(key)
+  })
+
+  // 删除
+  actions.push({
+    key: 'delete',
+    label: '删除',
+    icon: 'fa-trash',
+    color: 'red',
+    handler: () => deleteApiKey(key.id)
+  })
+
+  return actions
+}
+
 // 切换API Key状态（激活/禁用）
 const toggleApiKeyStatus = async (key) => {
   let confirmed = true
@@ -4689,6 +4771,10 @@ onUnmounted(() => {
   position: relative;
 }
 
+.dark .table-wrapper {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
 .table-container {
   overflow-x: auto;
   overflow-y: hidden;
@@ -4696,12 +4782,14 @@ onUnmounted(() => {
   padding: 0;
   max-width: 100%;
   position: relative;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* 防止表格内容溢出，保证横向滚动 */
 .table-container table {
-  min-width: 1200px;
+  min-width: 1400px;
   border-collapse: collapse;
+  table-layout: auto;
 }
 
 .table-container::-webkit-scrollbar {
@@ -4722,6 +4810,18 @@ onUnmounted(() => {
   background: #9ca3af;
 }
 
+.dark .table-container::-webkit-scrollbar-track {
+  background: #374151;
+}
+
+.dark .table-container::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+.dark .table-container::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
 .table-row {
   transition: background-color 0.2s ease;
 }
@@ -4738,13 +4838,43 @@ onUnmounted(() => {
 .operations-column {
   position: sticky;
   right: 0;
-  background: inherit;
-  background-color: inherit;
   z-index: 12;
 }
 
+/* 确保操作列在浅色模式下有正确的背景 */
 .table-container thead .operations-column {
   z-index: 30;
+  background: linear-gradient(to bottom, #f9fafb, rgba(243, 244, 246, 0.9));
+}
+
+.dark .table-container thead .operations-column {
+  background: linear-gradient(to bottom, #374151, rgba(31, 41, 55, 0.9));
+}
+
+/* tbody 中的操作列背景处理 */
+.table-container tbody tr:nth-child(odd) .operations-column {
+  background-color: #ffffff;
+}
+
+.table-container tbody tr:nth-child(even) .operations-column {
+  background-color: rgba(249, 250, 251, 0.7);
+}
+
+.dark .table-container tbody tr:nth-child(odd) .operations-column {
+  background-color: rgba(31, 41, 55, 0.4);
+}
+
+.dark .table-container tbody tr:nth-child(even) .operations-column {
+  background-color: rgba(55, 65, 81, 0.3);
+}
+
+/* hover 状态下的操作列背景 */
+.table-container tbody tr:hover .operations-column {
+  background-color: rgba(239, 246, 255, 0.6);
+}
+
+.dark .table-container tbody tr:hover .operations-column {
+  background-color: rgba(30, 58, 138, 0.2);
 }
 
 .table-container tbody .operations-column {
@@ -4753,6 +4883,66 @@ onUnmounted(() => {
 
 .dark .table-container tbody .operations-column {
   box-shadow: -8px 0 12px -8px rgba(30, 41, 59, 0.45);
+}
+
+/* 固定左侧列（复选框和名称列）*/
+.checkbox-column,
+.name-column {
+  position: sticky;
+  z-index: 12;
+}
+
+/* 表头左侧固定列背景 */
+.table-container thead .checkbox-column,
+.table-container thead .name-column {
+  z-index: 30;
+  background: linear-gradient(to bottom, #f9fafb, rgba(243, 244, 246, 0.9));
+}
+
+.dark .table-container thead .checkbox-column,
+.dark .table-container thead .name-column {
+  background: linear-gradient(to bottom, #374151, rgba(31, 41, 55, 0.9));
+}
+
+/* tbody 中的左侧固定列背景处理 */
+.table-container tbody tr:nth-child(odd) .checkbox-column,
+.table-container tbody tr:nth-child(odd) .name-column {
+  background-color: #ffffff;
+}
+
+.table-container tbody tr:nth-child(even) .checkbox-column,
+.table-container tbody tr:nth-child(even) .name-column {
+  background-color: rgba(249, 250, 251, 0.7);
+}
+
+.dark .table-container tbody tr:nth-child(odd) .checkbox-column,
+.dark .table-container tbody tr:nth-child(odd) .name-column {
+  background-color: rgba(31, 41, 55, 0.4);
+}
+
+.dark .table-container tbody tr:nth-child(even) .checkbox-column,
+.dark .table-container tbody tr:nth-child(even) .name-column {
+  background-color: rgba(55, 65, 81, 0.3);
+}
+
+/* hover 状态下的左侧固定列背景 */
+.table-container tbody tr:hover .checkbox-column,
+.table-container tbody tr:hover .name-column {
+  background-color: rgba(239, 246, 255, 0.6);
+}
+
+.dark .table-container tbody tr:hover .checkbox-column,
+.dark .table-container tbody tr:hover .name-column {
+  background-color: rgba(30, 58, 138, 0.2);
+}
+
+/* 名称列右侧阴影（分隔效果） */
+.table-container tbody .name-column {
+  box-shadow: 8px 0 12px -8px rgba(15, 23, 42, 0.16);
+}
+
+.dark .table-container tbody .name-column {
+  box-shadow: 8px 0 12px -8px rgba(30, 41, 59, 0.45);
 }
 
 .loading-spinner {
