@@ -649,6 +649,7 @@ git push origin main
 | 2025-11-26 | - | 修复前端模型列表 | 无 | ✅ 完成 | 更新 CreateApiKeyModal 和 EditApiKeyModal 的 commonModels |
 | 2025-11-26 | v1.1.211 | 同步 7 个提交 (v1.1.210 + v1.1.211) | 无冲突 | ✅ 成功 | 修复apikeys排序、移除x-authorization头、增加export等 |
 | 2025-11-29 | v1.1.214 | 同步 6 个提交 (v1.1.212-214) | 无冲突 | ✅ 成功 | 修复Gemini/OpenAI账户分组调度、Claude Console测试、表格列宽优化 |
+| 2025-11-30 | v1.1.215 | 同步 2 个提交 | 无冲突 | ✅ 成功 | 调整Gemini-API BaseApi后缀适配更多端点 |
 
 **下次更新请在此添加记录**
 
