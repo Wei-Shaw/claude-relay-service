@@ -1,0 +1,248 @@
+name: Sync Upstream
+
+on:
+  schedule:
+    # 每小时检查一次 (UTC 时间)
+    - cron: '0 * * * *'
+  workflow_dispatch:
+    # 支持手动触发
+    inputs:
+      dry_run:
+        description: 'Dry run mode (只检查不推送)'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  UPSTREAM_REPO: 'Wei-Shaw/claude-relay-service'
+  UPSTREAM_BRANCH: 'main'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream remote
+        run: |
+          git remote add upstream https://github.com/${{ env.UPSTREAM_REPO }}.git || \
+          git remote set-url upstream https://github.com/${{ env.UPSTREAM_REPO }}.git
+
+      - name: Fetch upstream
+        run: git fetch upstream ${{ env.UPSTREAM_BRANCH }}
+
+      - name: Check for updates
+        id: check
+        run: |
+          BEHIND=$(git rev-list --count HEAD..upstream/${{ env.UPSTREAM_BRANCH }})
+          echo "behind=$BEHIND" >> $GITHUB_OUTPUT
+
+          if [ "$BEHIND" -eq 0 ]; then
+            echo "status=up-to-date" >> $GITHUB_OUTPUT
+            echo "::notice::Already up to date with upstream"
+          else
+            echo "status=needs-sync" >> $GITHUB_OUTPUT
+            echo "::notice::Behind upstream by $BEHIND commits"
+
+            # 获取新提交信息
+            echo "## New commits from upstream:" >> $GITHUB_STEP_SUMMARY
+            git log --oneline HEAD..upstream/${{ env.UPSTREAM_BRANCH }} >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Attempt rebase
+        id: rebase
+        if: steps.check.outputs.status == 'needs-sync'
+        run: |
+          echo "Attempting rebase onto upstream/${{ env.UPSTREAM_BRANCH }}..."
+
+          if git rebase upstream/${{ env.UPSTREAM_BRANCH }}; then
+            echo "result=success" >> $GITHUB_OUTPUT
+            echo "::notice::Rebase successful"
+          else
+            echo "result=conflict" >> $GITHUB_OUTPUT
+            echo "::error::Rebase failed due to conflicts"
+            git rebase --abort
+            exit 1
+          fi
+        continue-on-error: true
+
+      - name: Setup Node.js
+        if: steps.rebase.outputs.result == 'success'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        if: steps.rebase.outputs.result == 'success'
+        run: npm ci
+
+      - name: Install web dependencies
+        if: steps.rebase.outputs.result == 'success'
+        run: cd web/admin-spa && npm ci
+
+      - name: Build web interface
+        id: build
+        if: steps.rebase.outputs.result == 'success'
+        run: |
+          if npm run build:web; then
+            echo "result=success" >> $GITHUB_OUTPUT
+            echo "::notice::Build successful"
+          else
+            echo "result=failed" >> $GITHUB_OUTPUT
+            echo "::error::Build failed"
+            exit 1
+          fi
+        continue-on-error: true
+
+      - name: Verify brand files
+        id: verify
+        if: steps.build.outputs.result == 'success'
+        run: |
+          echo "Verifying brand customization files..."
+
+          ERRORS=0
+
+          # 检查 logo
+          if [ ! -f "web/admin-spa/public/logo.svg" ]; then
+            echo "::error::Missing logo.svg"
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          # 检查 favicon
+          if [ ! -f "web/admin-spa/public/favicon.ico" ]; then
+            echo "::error::Missing favicon.ico"
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          # 检查品牌名称
+          if ! grep -q "Whoos Solutions" web/admin-spa/index.html; then
+            echo "::error::Brand name missing in index.html"
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          # 检查配色
+          if ! grep -q "#b31b1b\|#e4002b\|#ffcd00" web/admin-spa/src/styles/global.css; then
+            echo "::warning::Brand colors may have been modified in global.css"
+          fi
+
+          if [ $ERRORS -gt 0 ]; then
+            echo "result=failed" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "result=success" >> $GITHUB_OUTPUT
+            echo "::notice::Brand verification passed"
+          fi
+        continue-on-error: true
+
+      - name: Get upstream version
+        id: version
+        if: steps.verify.outputs.result == 'success'
+        run: |
+          # 获取最新的版本标签
+          VERSION=$(git describe --tags upstream/${{ env.UPSTREAM_BRANCH }} --abbrev=0 2>/dev/null || echo "unknown")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "::notice::Upstream version: $VERSION"
+
+      - name: Update sync record
+        if: steps.verify.outputs.result == 'success'
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          VERSION="${{ steps.version.outputs.version }}"
+          COMMITS="${{ steps.check.outputs.behind }}"
+
+          # 在 "下次更新请在此添加记录" 之前插入新记录
+          sed -i "/\*\*下次更新请在此添加记录\*\*/i | $DATE | $VERSION | 同步 $COMMITS 个提交 (自动) | 无冲突 | ✅ 成功 | GitHub Actions 自动同步 |" SYNC_UPSTREAM.md
+
+          git add SYNC_UPSTREAM.md
+          git commit -m "docs: 更新同步记录 - $VERSION (自动同步)"
+
+      - name: Push changes
+        if: steps.verify.outputs.result == 'success' && github.event.inputs.dry_run != 'true'
+        run: |
+          echo "Pushing changes to origin..."
+          git push origin ${{ env.UPSTREAM_BRANCH }} --force-with-lease
+          echo "::notice::Successfully pushed to origin"
+
+      - name: Dry run notice
+        if: steps.verify.outputs.result == 'success' && github.event.inputs.dry_run == 'true'
+        run: |
+          echo "::warning::Dry run mode - changes were NOT pushed"
+          echo "## Dry Run Summary" >> $GITHUB_STEP_SUMMARY
+          echo "Rebase and build successful, but changes were not pushed (dry run mode)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Create issue on failure
+        if: failure() && steps.check.outputs.status == 'needs-sync'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const rebaseResult = '${{ steps.rebase.outputs.result }}';
+            const buildResult = '${{ steps.build.outputs.result }}';
+            const verifyResult = '${{ steps.verify.outputs.result }}';
+            const behind = '${{ steps.check.outputs.behind }}';
+
+            let title, body;
+
+            if (rebaseResult === 'conflict') {
+              title = '🔴 上游同步失败: Rebase 冲突';
+              body = `## 同步失败通知\n\n上游有 ${behind} 个新提交，但自动 rebase 遇到冲突。\n\n### 需要手动处理\n\n请在本地执行以下命令：\n\n\`\`\`bash\ncd /Users/jeffreyhu/DEV/claude-relay-service\ngit fetch upstream\ngit rebase upstream/main\n# 解决冲突后\ngit add .\ngit rebase --continue\nnpm run build:web\ngit push origin main --force-with-lease\n\`\`\`\n\n### 冲突处理策略\n- UI/样式文件 → 保留我们的版本 (\`git checkout --ours\`)\n- 功能代码 → 保留上游版本 (\`git checkout --theirs\`)`;
+            } else if (buildResult === 'failed') {
+              title = '🔴 上游同步失败: 构建错误';
+              body = `## 同步失败通知\n\nRebase 成功，但 \`npm run build:web\` 构建失败。\n\n请检查构建日志并手动修复。`;
+            } else if (verifyResult === 'failed') {
+              title = '🔴 上游同步失败: 品牌文件验证失败';
+              body = `## 同步失败通知\n\nRebase 和构建成功，但品牌定制文件验证失败。\n\n可能是上游更新覆盖了我们的定制内容，请手动检查：\n- \`web/admin-spa/public/logo.svg\`\n- \`web/admin-spa/public/favicon.ico\`\n- \`web/admin-spa/index.html\` (品牌名称)\n- \`web/admin-spa/src/styles/global.css\` (配色)`;
+            } else {
+              title = '🔴 上游同步失败: 未知错误';
+              body = `## 同步失败通知\n\n请检查 GitHub Actions 日志了解详情。`;
+            }
+
+            // 检查是否已有未关闭的同步失败 issue
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'sync-failure'
+            });
+
+            if (issues.data.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['sync-failure']
+              });
+            } else {
+              // 更新现有 issue
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issues.data[0].number,
+                body: `## 新的同步尝试失败\n\n${body}\n\n---\n时间: ${new Date().toISOString()}`
+              });
+            }
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Sync Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Step | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Check updates | ${{ steps.check.outputs.status }} (${{ steps.check.outputs.behind }} commits behind) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Rebase | ${{ steps.rebase.outputs.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ${{ steps.build.outputs.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Verify | ${{ steps.verify.outputs.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
