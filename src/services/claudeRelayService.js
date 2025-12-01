@@ -13,6 +13,7 @@ const redis = require('../models/redis')
 const ClaudeCodeValidator = require('../validators/clients/claudeCodeValidator')
 const { formatDateWithTimezone } = require('../utils/dateHelper')
 const requestIdentityService = require('./requestIdentityService')
+const { createClaudeTestPayload } = require('../utils/testPayloadHelper')
 
 class ClaudeRelayService {
   constructor() {
@@ -2244,26 +2245,7 @@ class ClaudeRelayService {
 
   // 🧪 测试账号连接（供Admin API使用，直接复用 _makeClaudeStreamRequestWithUsageCapture）
   async testAccountConnection(accountId, responseStream) {
-    const testRequestBody = {
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 100,
-      stream: true,
-      system: [
-        {
-          type: 'text',
-          text: this.claudeCodeSystemPrompt,
-          cache_control: {
-            type: 'ephemeral'
-          }
-        }
-      ],
-      messages: [
-        {
-          role: 'user',
-          content: 'hi'
-        }
-      ]
-    }
+    const testRequestBody = createClaudeTestPayload('claude-sonnet-4-5-20250929', { stream: true })
 
     try {
       // 获取账户信息
