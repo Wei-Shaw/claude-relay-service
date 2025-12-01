@@ -4841,40 +4841,40 @@ onUnmounted(() => {
   z-index: 12;
 }
 
-/* 确保操作列在浅色模式下有正确的背景 */
+/* 确保操作列在浅色模式下有正确的背景 - 使用纯色避免滚动时重叠 */
 .table-container thead .operations-column {
   z-index: 30;
-  background: linear-gradient(to bottom, #f9fafb, rgba(243, 244, 246, 0.9));
+  background: linear-gradient(to bottom, #f9fafb, #f3f4f6);
 }
 
 .dark .table-container thead .operations-column {
-  background: linear-gradient(to bottom, #374151, rgba(31, 41, 55, 0.9));
+  background: linear-gradient(to bottom, #374151, #1f2937);
 }
 
-/* tbody 中的操作列背景处理 */
+/* tbody 中的操作列背景处理 - 使用纯色避免滚动时重叠 */
 .table-container tbody tr:nth-child(odd) .operations-column {
   background-color: #ffffff;
 }
 
 .table-container tbody tr:nth-child(even) .operations-column {
-  background-color: rgba(249, 250, 251, 0.7);
+  background-color: #f9fafb;
 }
 
 .dark .table-container tbody tr:nth-child(odd) .operations-column {
-  background-color: rgba(31, 41, 55, 0.4);
+  background-color: #1f2937;
 }
 
 .dark .table-container tbody tr:nth-child(even) .operations-column {
-  background-color: rgba(55, 65, 81, 0.3);
+  background-color: #374151;
 }
 
 /* hover 状态下的操作列背景 */
 .table-container tbody tr:hover .operations-column {
-  background-color: rgba(239, 246, 255, 0.6);
+  background-color: #eff6ff;
 }
 
 .dark .table-container tbody tr:hover .operations-column {
-  background-color: rgba(30, 58, 138, 0.2);
+  background-color: #1e3a5f;
 }
 
 .table-container tbody .operations-column {
@@ -4892,19 +4892,19 @@ onUnmounted(() => {
   z-index: 12;
 }
 
-/* 表头左侧固定列背景 */
+/* 表头左侧固定列背景 - 使用纯色避免滚动时重叠 */
 .table-container thead .checkbox-column,
 .table-container thead .name-column {
   z-index: 30;
-  background: linear-gradient(to bottom, #f9fafb, rgba(243, 244, 246, 0.9));
+  background: linear-gradient(to bottom, #f9fafb, #f3f4f6);
 }
 
 .dark .table-container thead .checkbox-column,
 .dark .table-container thead .name-column {
-  background: linear-gradient(to bottom, #374151, rgba(31, 41, 55, 0.9));
+  background: linear-gradient(to bottom, #374151, #1f2937);
 }
 
-/* tbody 中的左侧固定列背景处理 */
+/* tbody 中的左侧固定列背景处理 - 使用纯色避免滚动时重叠 */
 .table-container tbody tr:nth-child(odd) .checkbox-column,
 .table-container tbody tr:nth-child(odd) .name-column {
   background-color: #ffffff;
@@ -4912,28 +4912,28 @@ onUnmounted(() => {
 
 .table-container tbody tr:nth-child(even) .checkbox-column,
 .table-container tbody tr:nth-child(even) .name-column {
-  background-color: rgba(249, 250, 251, 0.7);
+  background-color: #f9fafb;
 }
 
 .dark .table-container tbody tr:nth-child(odd) .checkbox-column,
 .dark .table-container tbody tr:nth-child(odd) .name-column {
-  background-color: rgba(31, 41, 55, 0.4);
+  background-color: #1f2937;
 }
 
 .dark .table-container tbody tr:nth-child(even) .checkbox-column,
 .dark .table-container tbody tr:nth-child(even) .name-column {
-  background-color: rgba(55, 65, 81, 0.3);
+  background-color: #374151;
 }
 
 /* hover 状态下的左侧固定列背景 */
 .table-container tbody tr:hover .checkbox-column,
 .table-container tbody tr:hover .name-column {
-  background-color: rgba(239, 246, 255, 0.6);
+  background-color: #eff6ff;
 }
 
 .dark .table-container tbody tr:hover .checkbox-column,
 .dark .table-container tbody tr:hover .name-column {
-  background-color: rgba(30, 58, 138, 0.2);
+  background-color: #1e3a5f;
 }
 
 /* 名称列右侧阴影（分隔效果） */

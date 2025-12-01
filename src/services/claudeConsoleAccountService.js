@@ -1510,6 +1510,71 @@ class ClaudeConsoleAccountService {
     const expiryDate = new Date(account.subscriptionExpiresAt)
     return expiryDate <= new Date()
   }
+
+  // 🚫 标记账户的 count_tokens 端点不可用
+  async markCountTokensUnavailable(accountId) {
+    try {
+      const client = redis.getClientSafe()
+      const accountKey = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+
+      // 检查账户是否存在
+      const exists = await client.exists(accountKey)
+      if (!exists) {
+        logger.warn(
+          `⚠️ Cannot mark count_tokens unavailable for non-existent account: ${accountId}`
+        )
+        return { success: false, reason: 'Account not found' }
+      }
+
+      await client.hset(accountKey, {
+        countTokensUnavailable: 'true',
+        countTokensUnavailableAt: new Date().toISOString()
+      })
+
+      logger.info(
+        `🚫 Marked count_tokens endpoint as unavailable for Claude Console account: ${accountId}`
+      )
+      return { success: true }
+    } catch (error) {
+      logger.error(`❌ Failed to mark count_tokens unavailable for account ${accountId}:`, error)
+      throw error
+    }
+  }
+
+  // ✅ 移除账户的 count_tokens 不可用标记
+  async removeCountTokensUnavailable(accountId) {
+    try {
+      const client = redis.getClientSafe()
+      const accountKey = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+
+      await client.hdel(accountKey, 'countTokensUnavailable', 'countTokensUnavailableAt')
+
+      logger.info(
+        `✅ Removed count_tokens unavailable mark for Claude Console account: ${accountId}`
+      )
+      return { success: true }
+    } catch (error) {
+      logger.error(
+        `❌ Failed to remove count_tokens unavailable mark for account ${accountId}:`,
+        error
+      )
+      throw error
+    }
+  }
+
+  // 🔍 检查账户的 count_tokens 端点是否不可用
+  async isCountTokensUnavailable(accountId) {
+    try {
+      const client = redis.getClientSafe()
+      const accountKey = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+
+      const value = await client.hget(accountKey, 'countTokensUnavailable')
+      return value === 'true'
+    } catch (error) {
+      logger.error(`❌ Failed to check count_tokens availability for account ${accountId}:`, error)
+      return false // 出错时默认返回可用，避免误阻断
+    }
+  }
 }
 
 module.exports = new ClaudeConsoleAccountService()
