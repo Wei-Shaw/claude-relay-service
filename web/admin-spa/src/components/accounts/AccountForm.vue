@@ -1673,6 +1673,24 @@
                   </div>
                 </div>
               </label>
+              <label
+                v-if="form.useUnifiedUserAgent"
+                class="ml-6 mt-3 flex items-start rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50"
+              >
+                <input
+                  v-model="form.limitUnifiedDefaultModels"
+                  class="mt-1 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  type="checkbox"
+                />
+                <div class="ml-3">
+                  <span class="text-xs font-medium text-gray-600 dark:text-gray-400">
+                    限定访问该版本的默认模型
+                  </span>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    仅允许使用当前 Claude Code 版本的默认模型，其他模型将直接拒绝
+                  </p>
+                </div>
+              </label>
             </div>
 
             <!-- Claude 统一客户端标识配置 -->
@@ -2479,6 +2497,24 @@
                     或联系开发者检查 User-Agent 格式是否发生变化
                   </p>
                 </div>
+              </div>
+            </label>
+            <label
+              v-if="form.useUnifiedUserAgent"
+              class="ml-6 mt-3 flex items-start rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50"
+            >
+              <input
+                v-model="form.limitUnifiedDefaultModels"
+                class="mt-1 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                type="checkbox"
+              />
+              <div class="ml-3">
+                <span class="text-xs font-medium text-gray-600 dark:text-gray-400">
+                  限定访问该版本的默认模型
+                </span>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  仅允许使用当前 Claude Code 版本的默认模型，其他模型将直接拒绝
+                </p>
               </div>
             </label>
           </div>
@@ -3717,6 +3753,7 @@ const form = ref({
   useUnifiedUserAgent: props.account?.useUnifiedUserAgent || false, // 使用统一Claude Code版本
   useUnifiedClientId: props.account?.useUnifiedClientId || false, // 使用统一的客户端标识
   unifiedClientId: props.account?.unifiedClientId || '', // 统一的客户端标识
+  limitUnifiedDefaultModels: props.account?.limitUnifiedDefaultModels || false, // 限制到统一版本默认模型
   groupId: '',
   groupIds: [],
   projectId: props.account?.projectId || '',
@@ -4256,6 +4293,7 @@ const handleOAuthSuccess = async (tokenInfo) => {
       data.useUnifiedUserAgent = form.value.useUnifiedUserAgent || false
       data.useUnifiedClientId = form.value.useUnifiedClientId || false
       data.unifiedClientId = form.value.unifiedClientId || ''
+      data.limitUnifiedDefaultModels = form.value.limitUnifiedDefaultModels || false
       // 添加订阅类型信息
       data.subscriptionInfo = {
         accountType: form.value.subscriptionType || 'claude_max',
@@ -4577,6 +4615,7 @@ const createAccount = async () => {
       data.useUnifiedUserAgent = form.value.useUnifiedUserAgent || false
       data.useUnifiedClientId = form.value.useUnifiedClientId || false
       data.unifiedClientId = form.value.unifiedClientId || ''
+      data.limitUnifiedDefaultModels = form.value.limitUnifiedDefaultModels || false
       // 添加订阅类型信息
       data.subscriptionInfo = {
         accountType: form.value.subscriptionType || 'claude_max',
@@ -5564,6 +5603,7 @@ watch(
         useUnifiedUserAgent: newAccount.useUnifiedUserAgent || false,
         useUnifiedClientId: newAccount.useUnifiedClientId || false,
         unifiedClientId: newAccount.unifiedClientId || '',
+        limitUnifiedDefaultModels: newAccount.limitUnifiedDefaultModels || false,
         groupId: groupId,
         groupIds: [],
         projectId: newAccount.projectId || '',
