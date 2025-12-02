@@ -369,7 +369,9 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
         logger.info(`  endDate (raw): ${endDate}`)
         logger.info(`  startTime (parsed): ${startTime.toISOString()}`)
         logger.info(`  endTime (parsed): ${endTime.toISOString()}`)
-        logger.info(`  System timezone offset: ${require('../../../config/config').system.timezoneOffset || 8}`)
+        logger.info(
+          `  System timezone offset: ${require('../../../config/config').system.timezoneOffset || 8}`
+        )
       } else {
         // 默认最近24小时
         endTime = new Date()
