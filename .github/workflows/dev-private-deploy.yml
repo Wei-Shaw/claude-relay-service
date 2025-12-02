@@ -12,28 +12,31 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 新增步骤：配置宿主机 Docker Daemon 信任不安全仓库
-      - name: Configure Docker Daemon
+      # 方案更新：显式信任自签名证书，解决 Docker 协议协商问题
+      - name: Trust Self-Signed Certificate
         run: |
-          sudo mkdir -p /etc/docker
-          # 读取现有配置（如果存在）或者创建新的，并添加 insecure-registries
-          if [ -f /etc/docker/daemon.json ]; then
-            sudo cat /etc/docker/daemon.json | jq '."insecure-registries" += ["154.12.35.169:5000"]' | sudo tee /etc/docker/daemon.json.tmp
-            sudo mv /etc/docker/daemon.json.tmp /etc/docker/daemon.json
-          else
-            echo '{"insecure-registries": ["154.12.35.169:5000"]}' | sudo tee /etc/docker/daemon.json
+          # 获取服务器证书
+          echo "Fetching certificate from 154.12.35.169:5000..."
+          echo -n | openssl s_client -showcerts -connect 154.12.35.169:5000 2>/dev/null | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > custom-registry.crt
+
+          # 验证证书内容是否获取成功
+          if [ ! -s custom-registry.crt ]; then
+            echo "Failed to fetch certificate!"
+            exit 1
           fi
 
-          # 打印配置以验证
-          cat /etc/docker/daemon.json
+          # 安装证书到系统信任库
+          sudo cp custom-registry.crt /usr/local/share/ca-certificates/custom-registry.crt
+          sudo update-ca-certificates
 
-          # 重启 Docker 服务使配置生效
+          # 同时配置 Docker Daemon (作为双重保险)
+          sudo mkdir -p /etc/docker
+          echo '{"insecure-registries": ["154.12.35.169:5000"]}' | sudo tee /etc/docker/daemon.json
+
+          # 重启 Docker
           sudo systemctl restart docker
-
-          # 等待 Docker 启动
           while ! docker info > /dev/null 2>&1; do echo "Waiting for Docker to start..."; sleep 1; done
 
-      # Debug: 检查仓库连通性
       - name: Check Registry Connectivity
         run: |
           echo "Checking HTTP..."
