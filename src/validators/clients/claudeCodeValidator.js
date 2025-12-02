@@ -100,7 +100,10 @@ class ClaudeCodeValidator {
       }
     }
 
-    CLAUDE_CODE_MODEL_VERSION_CACHE.set(targetVersion, [result.opus, result.sonnet, result.haiku].filter(Boolean))
+    CLAUDE_CODE_MODEL_VERSION_CACHE.set(
+      targetVersion,
+      [result.opus, result.sonnet, result.haiku].filter(Boolean)
+    )
 
     return CLAUDE_CODE_MODEL_VERSION_CACHE.get(targetVersion)
   }
