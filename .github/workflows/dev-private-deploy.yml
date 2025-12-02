@@ -29,11 +29,11 @@ jobs:
           sudo cp custom-registry.crt /usr/local/share/ca-certificates/custom-registry.crt
           sudo update-ca-certificates
 
-          # 同时配置 Docker Daemon (作为双重保险)
-          sudo mkdir -p /etc/docker
-          echo '{"insecure-registries": ["154.12.35.169:5000"]}' | sudo tee /etc/docker/daemon.json
+          # 关键修改：不再配置 insecure-registries
+          # 因为证书已被信任，Docker 应将其视为正常的 HTTPS 仓库
+          # 之前配置 insecure-registries 反而导致 Docker 优先尝试 HTTP (400)
 
-          # 重启 Docker
+          # 重启 Docker 确保加载新的 CA 证书
           sudo systemctl restart docker
           while ! docker info > /dev/null 2>&1; do echo "Waiting for Docker to start..."; sleep 1; done
 
@@ -49,9 +49,7 @@ jobs:
         with:
           driver-opts: |
             network=host
-          config-inline: |
-            [registry."154.12.35.169:5000"]
-              insecure = true
+          # 移除 config-inline 中的 insecure = true，强制走 HTTPS
 
       - name: Log in to Private Registry (Manual)
         run: |
