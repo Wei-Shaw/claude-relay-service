@@ -750,6 +750,39 @@ export const useAccountsStore = defineStore('accounts', () => {
     }
   }
 
+  // Cookie自动授权 - 普通OAuth
+  const oauthWithCookie = async (payload) => {
+    try {
+      const response = await apiClient.post('/admin/claude-accounts/oauth-with-cookie', payload)
+      if (response.success) {
+        return response.data
+      } else {
+        throw new Error(response.message || 'Cookie授权失败')
+      }
+    } catch (err) {
+      error.value = err.message
+      throw err
+    }
+  }
+
+  // Cookie自动授权 - Setup Token
+  const oauthSetupTokenWithCookie = async (payload) => {
+    try {
+      const response = await apiClient.post(
+        '/admin/claude-accounts/setup-token-with-cookie',
+        payload
+      )
+      if (response.success) {
+        return response.data
+      } else {
+        throw new Error(response.message || 'Cookie授权失败')
+      }
+    } catch (err) {
+      error.value = err.message
+      throw err
+    }
+  }
+
   // 生成Gemini OAuth URL
   const generateGeminiAuthUrl = async (proxyConfig) => {
     try {
@@ -914,6 +947,8 @@ export const useAccountsStore = defineStore('accounts', () => {
     exchangeClaudeCode,
     generateClaudeSetupTokenUrl,
     exchangeClaudeSetupTokenCode,
+    oauthWithCookie,
+    oauthSetupTokenWithCookie,
     generateGeminiAuthUrl,
     exchangeGeminiCode,
     generateOpenAIAuthUrl,
