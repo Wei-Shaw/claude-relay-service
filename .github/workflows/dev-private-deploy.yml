@@ -49,7 +49,10 @@ jobs:
         with:
           driver-opts: |
             network=host
-          # 移除 config-inline 中的 insecure = true，强制走 HTTPS
+          # BuildKit 容器内可能没有宿主机的 CA 证书，所以这里允许 insecure 以确保 push 成功
+          config-inline: |
+            [registry."154.12.35.169:5000"]
+              insecure = true
 
       - name: Log in to Private Registry (Manual)
         run: |
