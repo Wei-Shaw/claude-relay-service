@@ -12,10 +12,33 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 新增步骤：配置宿主机 Docker Daemon 信任不安全仓库
+      - name: Configure Docker Daemon
+        run: |
+          sudo mkdir -p /etc/docker
+          # 读取现有配置（如果存在）或者创建新的，并添加 insecure-registries
+          if [ -f /etc/docker/daemon.json ]; then
+            sudo cat /etc/docker/daemon.json | jq '."insecure-registries" += ["154.12.35.169:5000"]' | sudo tee /etc/docker/daemon.json.tmp
+            sudo mv /etc/docker/daemon.json.tmp /etc/docker/daemon.json
+          else
+            echo '{"insecure-registries": ["154.12.35.169:5000"]}' | sudo tee /etc/docker/daemon.json
+          fi
+
+          # 打印配置以验证
+          cat /etc/docker/daemon.json
+
+          # 重启 Docker 服务使配置生效
+          sudo systemctl restart docker
+
+          # 等待 Docker 启动
+          while ! docker info > /dev/null 2>&1; do echo "Waiting for Docker to start..."; sleep 1; done
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
-          # 配置 BuildKit 信任不安全的私有仓库（HTTP/自签名证书）
+          # 这里依然保留 BuildKit 的配置，确保构建阶段也信任
+          driver-opts: |
+            network=host
           config-inline: |
             [registry."154.12.35.169:5000"]
               http = true
