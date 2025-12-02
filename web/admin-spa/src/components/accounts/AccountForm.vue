@@ -551,7 +551,8 @@
                 form.platform !== 'bedrock' &&
                 form.platform !== 'azure_openai' &&
                 form.platform !== 'openai-responses' &&
-                form.platform !== 'gemini-api'
+                form.platform !== 'gemini-api' &&
+                !(form.platform === 'gemini' && form.enableRateLimit)
               "
             >
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -768,6 +769,44 @@
                 >
                   <i class="fas fa-sync-alt" :class="{ 'animate-spin': loadingGroups }" />
                 </button>
+              </div>
+            </div>
+
+            <!-- Gemini / Gemini API 限流机制 -->
+            <div v-if="form.platform === 'gemini' || form.platform === 'gemini-api'">
+              <div class="mb-6">
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  >限流机制</label
+                >
+                <div class="mb-3">
+                  <label class="inline-flex cursor-pointer items-center">
+                    <input
+                      v-model="form.enableRateLimit"
+                      class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700"
+                      type="checkbox"
+                    />
+                    <span class="text-sm text-gray-700 dark:text-gray-300">启用限流机制</span>
+                  </label>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    启用后，当账号返回429错误时将暂停调度一段时间
+                  </p>
+                </div>
+
+                <div v-if="form.enableRateLimit">
+                  <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                    >限流时间 (分钟)</label
+                  >
+                  <input
+                    v-model.number="form.rateLimitDuration"
+                    class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                    min="1"
+                    placeholder="默认60分钟"
+                    type="number"
+                  />
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    账号被限流后暂停调度的时间（分钟）
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -2541,6 +2580,44 @@
             </label>
           </div>
 
+          <!-- Gemini 限流机制（编辑模式） -->
+          <div v-if="form.platform === 'gemini'" class="mt-4">
+            <div class="mb-6">
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >限流机制</label
+              >
+              <div class="mb-3">
+                <label class="inline-flex cursor-pointer items-center">
+                  <input
+                    v-model="form.enableRateLimit"
+                    class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700"
+                    type="checkbox"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">启用限流机制</span>
+                </label>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  启用后，当账号返回429错误时将暂停调度一段时间
+                </p>
+              </div>
+
+              <div v-if="form.enableRateLimit">
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  >限流时间 (分钟)</label
+                >
+                <input
+                  v-model.number="form.rateLimitDuration"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  min="1"
+                  placeholder="默认60分钟"
+                  type="number"
+                />
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  账号被限流后暂停调度的时间（分钟）
+                </p>
+              </div>
+            </div>
+          </div>
+
           <!-- 所有平台的优先级设置（编辑模式） -->
           <div>
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -3026,6 +3103,42 @@
 
           <!-- Gemini API 特定字段（编辑模式）-->
           <div v-if="form.platform === 'gemini-api'" class="space-y-4">
+            <!-- 限流机制 -->
+            <div class="mb-6">
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >限流机制</label
+              >
+              <div class="mb-3">
+                <label class="inline-flex cursor-pointer items-center">
+                  <input
+                    v-model="form.enableRateLimit"
+                    class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700"
+                    type="checkbox"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">启用限流机制</span>
+                </label>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  启用后，当账号返回429错误时将暂停调度一段时间
+                </p>
+              </div>
+
+              <div v-if="form.enableRateLimit">
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  >限流时间 (分钟)</label
+                >
+                <input
+                  v-model.number="form.rateLimitDuration"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  min="1"
+                  placeholder="默认60分钟"
+                  type="number"
+                />
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  账号被限流后暂停调度的时间（分钟）
+                </p>
+              </div>
+            </div>
+
             <div>
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >API 基础地址</label
@@ -4271,6 +4384,8 @@ const handleOAuthSuccess = async (tokenInfo) => {
       }
       // 添加 Gemini 优先级
       data.priority = form.value.priority || 50
+      // 如果不启用限流，传递 0 表示不限流
+      data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
     } else if (currentPlatform === 'openai') {
       data.openaiOauth = tokenInfo.tokens || tokenInfo
       data.accountInfo = tokenInfo.accountInfo
@@ -4604,6 +4719,8 @@ const createAccount = async () => {
 
       // 添加 Gemini 优先级
       data.priority = form.value.priority || 50
+      // 如果不启用限流，传递 0 表示不限流
+      data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
     } else if (form.value.platform === 'openai') {
       // OpenAI手动模式需要构建openaiOauth对象
       const expiresInMs = form.value.refreshToken
@@ -4944,6 +5061,8 @@ const updateAccount = async () => {
 
     if (props.account.platform === 'gemini') {
       data.projectId = form.value.projectId || ''
+      // 如果不启用限流，传递 0 表示不限流
+      data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
     }
 
     if (props.account.platform === 'droid') {
@@ -5065,6 +5184,8 @@ const updateAccount = async () => {
       data.supportedModels = Array.isArray(form.value.supportedModels)
         ? form.value.supportedModels
         : []
+      // 如果不启用限流，传递 0 表示不限流
+      data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
     }
 
     if (props.account.platform === 'claude') {

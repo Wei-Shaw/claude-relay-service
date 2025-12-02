@@ -393,6 +393,10 @@ async function createAccount(accountData) {
     schedulable: accountData.schedulable !== undefined ? String(accountData.schedulable) : 'true',
     priority: accountData.priority || 50, // 调度优先级 (1-100，数字越小优先级越高)
 
+    // 限流配置 (分钟)
+    rateLimitDuration:
+      accountData.rateLimitDuration !== undefined ? parseInt(accountData.rateLimitDuration) : 60,
+
     // OAuth 相关字段（加密存储）
     geminiOauth: geminiOauth ? encrypt(geminiOauth) : '',
     accessToken: accessToken ? encrypt(accessToken) : '',
@@ -506,6 +510,12 @@ async function updateAccount(accountId, updates) {
   // 处理 schedulable 字段，确保正确转换为字符串存储
   if (updates.schedulable !== undefined) {
     updates.schedulable = updates.schedulable.toString()
+  }
+
+  // 处理 rateLimitDuration 字段
+  if (updates.rateLimitDuration !== undefined) {
+    const duration = parseInt(updates.rateLimitDuration)
+    updates.rateLimitDuration = isNaN(duration) ? 60 : duration
   }
 
   // 加密敏感字段
@@ -847,7 +857,11 @@ function isRateLimited(account) {
   if (account.rateLimitStatus === 'limited' && account.rateLimitedAt) {
     const limitedAt = new Date(account.rateLimitedAt).getTime()
     const now = Date.now()
-    const limitDuration = 60 * 60 * 1000 // 1小时
+
+    // 读取配置的限流时长，默认为60分钟
+    const durationMinutes =
+      account.rateLimitDuration !== undefined ? parseInt(account.rateLimitDuration) : 60
+    const limitDuration = durationMinutes * 60 * 1000
 
     return now < limitedAt + limitDuration
   }
@@ -1009,9 +1023,14 @@ async function getAccountRateLimitInfo(accountId) {
       const now = new Date()
       const minutesSinceRateLimit = Math.floor((now - rateLimitedAt) / (1000 * 60))
 
-      // Gemini 限流持续时间为 1 小时
-      const minutesRemaining = Math.max(0, 60 - minutesSinceRateLimit)
-      const rateLimitEndAt = new Date(rateLimitedAt.getTime() + 60 * 60 * 1000).toISOString()
+      // 读取配置的限流时长，默认为60分钟
+      const durationMinutes =
+        account.rateLimitDuration !== undefined ? parseInt(account.rateLimitDuration) : 60
+
+      const minutesRemaining = Math.max(0, durationMinutes - minutesSinceRateLimit)
+      const rateLimitEndAt = new Date(
+        rateLimitedAt.getTime() + durationMinutes * 60 * 1000
+      ).toISOString()
 
       return {
         isRateLimited: minutesRemaining > 0,
