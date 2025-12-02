@@ -33,22 +33,26 @@ jobs:
           # 等待 Docker 启动
           while ! docker info > /dev/null 2>&1; do echo "Waiting for Docker to start..."; sleep 1; done
 
+      # Debug: 检查仓库连通性
+      - name: Check Registry Connectivity
+        run: |
+          echo "Checking HTTP..."
+          curl -v http://154.12.35.169:5000/v2/ || true
+          echo "Checking HTTPS (insecure)..."
+          curl -v -k https://154.12.35.169:5000/v2/ || true
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
-          # 这里依然保留 BuildKit 的配置，确保构建阶段也信任
           driver-opts: |
             network=host
           config-inline: |
             [registry."154.12.35.169:5000"]
               insecure = true
 
-      - name: Log in to Private Registry
-        uses: docker/login-action@v3
-        with:
-          registry: 154.12.35.169:5000
-          username: ${{ secrets.PRIVATE_REGISTRY_USERNAME }}
-          password: ${{ secrets.PRIVATE_REGISTRY_PASSWORD }}
+      - name: Log in to Private Registry (Manual)
+        run: |
+          echo "${{ secrets.PRIVATE_REGISTRY_PASSWORD }}" | docker login 154.12.35.169:5000 -u "${{ secrets.PRIVATE_REGISTRY_USERNAME }}" --password-stdin
 
       - name: Extract metadata (tags, labels)
         id: meta
