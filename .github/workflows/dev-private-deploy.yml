@@ -41,7 +41,6 @@ jobs:
             network=host
           config-inline: |
             [registry."154.12.35.169:5000"]
-              http = true
               insecure = true
 
       - name: Log in to Private Registry
