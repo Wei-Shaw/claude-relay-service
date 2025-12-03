@@ -59,6 +59,10 @@ jobs:
           REGISTRY_USER: ${{ secrets.PRIVATE_REGISTRY_USERNAME }}
           REGISTRY_PWD: ${{ secrets.PRIVATE_REGISTRY_PASSWORD }}
         run: |
+          # Debug: 打印变量长度 (不打印内容) 以检查是否有隐藏空格
+          echo "User length: ${#REGISTRY_USER}"
+          echo "Pass length: ${#REGISTRY_PWD}"
+
           echo "$REGISTRY_PWD" | docker login 154.12.35.169:5000 -u "$REGISTRY_USER" --password-stdin
 
       - name: Extract metadata (tags, labels)
