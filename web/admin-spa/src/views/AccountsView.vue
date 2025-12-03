@@ -19,12 +19,12 @@
                 class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-indigo-500 to-blue-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
               ></div>
               <CustomDropdown
-                v-model="accountSortBy"
-                icon="fa-sort-amount-down"
+                v-model="accountsSortBy"
+                :icon="accountsSortOrder === 'asc' ? 'fa-sort-amount-up' : 'fa-sort-amount-down'"
                 icon-color="text-indigo-500"
                 :options="sortOptions"
                 placeholder="选择排序"
-                @change="sortAccounts()"
+                @change="handleDropdownSort"
               />
             </div>
 
@@ -1873,8 +1873,7 @@ const { showConfirmModal, confirmOptions, showConfirm, handleConfirm, handleCanc
 // 数据状态
 const accounts = ref([])
 const accountsLoading = ref(false)
-const accountSortBy = ref('name')
-const accountsSortBy = ref('')
+const accountsSortBy = ref('name')
 const accountsSortOrder = ref('asc')
 const apiKeys = ref([]) // 保留用于其他功能（如删除账户时显示绑定信息）
 const bindingCounts = ref({}) // 轻量级绑定计数，用于显示"绑定: X 个API Key"
@@ -2735,7 +2734,10 @@ const loadClaudeUsage = async () => {
   }
 }
 
-// 排序账户
+// 记录上一次的排序字段，用于判断下拉选择是否是同一字段被再次选择
+let lastDropdownSortField = 'name'
+
+// 排序账户（表头点击使用）
 const sortAccounts = (field) => {
   if (field) {
     if (accountsSortBy.value === field) {
@@ -2744,7 +2746,21 @@ const sortAccounts = (field) => {
       accountsSortBy.value = field
       accountsSortOrder.value = 'asc'
     }
+    // 同步下拉选择器的状态记录
+    lastDropdownSortField = field
   }
+}
+
+// 下拉选择器排序处理（支持再次选择同一选项时切换排序方向）
+const handleDropdownSort = (field) => {
+  if (field === lastDropdownSortField) {
+    // 选择同一字段，切换排序方向
+    accountsSortOrder.value = accountsSortOrder.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    // 选择不同字段，重置为升序
+    accountsSortOrder.value = 'asc'
+  }
+  lastDropdownSortField = field
 }
 
 // 格式化数字（与原版保持一致）
@@ -3993,20 +4009,20 @@ watch(
   }
 )
 
-// 监听排序选择变化
-watch(accountSortBy, (newVal) => {
-  const fieldMap = {
-    name: 'name',
-    dailyTokens: 'dailyTokens',
-    dailyRequests: 'dailyRequests',
-    totalTokens: 'totalTokens',
-    lastUsed: 'lastUsed'
-  }
-
-  if (fieldMap[newVal]) {
-    sortAccounts(fieldMap[newVal])
-  }
-})
+// 监听排序选择变化 - 已重构为 handleDropdownSort，此处注释保留原逻辑参考
+// watch(accountSortBy, (newVal) => {
+//   const fieldMap = {
+//     name: 'name',
+//     dailyTokens: 'dailyTokens',
+//     dailyRequests: 'dailyRequests',
+//     totalTokens: 'totalTokens',
+//     lastUsed: 'lastUsed'
+//   }
+//
+//   if (fieldMap[newVal]) {
+//     sortAccounts(fieldMap[newVal])
+//   }
+// })
 
 watch(currentPage, () => {
   updateSelectAllState()
