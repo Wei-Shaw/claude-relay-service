@@ -55,8 +55,11 @@ jobs:
               insecure = true
 
       - name: Log in to Private Registry (Manual)
+        env:
+          REGISTRY_USER: ${{ secrets.PRIVATE_REGISTRY_USERNAME }}
+          REGISTRY_PWD: ${{ secrets.PRIVATE_REGISTRY_PASSWORD }}
         run: |
-          echo "${{ secrets.PRIVATE_REGISTRY_PASSWORD }}" | docker login 154.12.35.169:5000 -u "${{ secrets.PRIVATE_REGISTRY_USERNAME }}" --password-stdin
+          echo "$REGISTRY_PWD" | docker login 154.12.35.169:5000 -u "$REGISTRY_USER" --password-stdin
 
       - name: Extract metadata (tags, labels)
         id: meta
