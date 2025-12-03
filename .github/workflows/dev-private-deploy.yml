@@ -95,18 +95,8 @@ jobs:
           echo "Sanitized: $SANITIZED_BRANCH"
           echo "tag=$SANITIZED_BRANCH" >> $GITHUB_OUTPUT
 
-      # 1. 上传最新的 docker-compose.yml 到服务器
-      - name: Upload docker-compose.yml
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          password: ${{ secrets.DEPLOY_PASSWORD }}
-          port: ${{ secrets.DEPLOY_PORT || 22 }}
-          source: "docker-compose.yml"
-          target: "/root/docker"
-
-      # 2. 远程执行部署命令
+      # 远程执行部署命令
+      # 注意：不再上传 docker-compose.yml，避免覆盖服务器的 JWT_SECRET/ENCRYPTION_KEY 配置
       - name: SSH Remote Deploy
         uses: appleboy/ssh-action@master
         env:
