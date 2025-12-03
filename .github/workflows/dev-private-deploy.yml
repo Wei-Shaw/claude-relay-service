@@ -37,13 +37,6 @@ jobs:
           sudo systemctl restart docker
           while ! docker info > /dev/null 2>&1; do echo "Waiting for Docker to start..."; sleep 1; done
 
-      - name: Check Registry Connectivity
-        run: |
-          echo "Checking HTTP..."
-          curl -v http://154.12.35.169:5000/v2/ || true
-          echo "Checking HTTPS (insecure)..."
-          curl -v -k https://154.12.35.169:5000/v2/ || true
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
@@ -59,10 +52,6 @@ jobs:
           REGISTRY_USER: ${{ secrets.PRIVATE_REGISTRY_USERNAME }}
           REGISTRY_PWD: ${{ secrets.PRIVATE_REGISTRY_PASSWORD }}
         run: |
-          # Debug: 打印变量长度 (不打印内容) 以检查是否有隐藏空格
-          echo "User length: ${#REGISTRY_USER}"
-          echo "Pass length: ${#REGISTRY_PWD}"
-
           echo "$REGISTRY_PWD" | docker login 154.12.35.169:5000 -u "$REGISTRY_USER" --password-stdin
 
       - name: Extract metadata (tags, labels)
