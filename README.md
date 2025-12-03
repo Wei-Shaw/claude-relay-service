@@ -178,6 +178,70 @@ Redis 密码 (默认: 无密码):
 
 ---
 
+## 🚀 自动化部署 (GitHub Actions)
+
+本项目支持通过 GitHub Actions 进行全自动化的构建和部署。
+
+### 1. 功能特性
+- **多环境支持**: 推送任意分支均可触发构建
+- **私有仓库**: 自动构建并推送镜像到配置的私有 Docker Registry
+- **自动更新**: 自动 SSH 登录服务器并更新服务
+- **动态版本**: 镜像 Tag 自动匹配 Git 分支名
+
+### 2. 配置步骤
+
+在 GitHub 仓库的 `Settings -> Secrets and variables -> Actions` 中配置以下 Secrets：
+
+| Secret 名�� | 说明 | 示例 |
+|------------|------|------|
+| `PRIVATE_REGISTRY_USERNAME` | 私有 Docker 仓库用户名 | `admin` |
+| `PRIVATE_REGISTRY_PASSWORD` | 私有 Docker 仓库密码 | `password123` |
+| `DEPLOY_HOST` | 部署服务器 IP 地址 | `1.2.3.4` |
+| `DEPLOY_USER` | 服务器登录用户名 | `root` |
+| `DEPLOY_KEY` | (推荐) 服务器 SSH 私钥 | `-----BEGIN OPENSSH PRIVATE KEY...` |
+| `DEPLOY_PASSWORD` | (可选) 服务器登录密码 | `server_password` |
+| `DEPLOY_PORT` | (可选) SSH 端口 | `22` |
+
+### 3. 服务器端准备
+
+为了保证密钥安全且不被每次部署覆盖，请在服务器上**手动创建** `.env` 文件：
+
+```bash
+mkdir -p /root/docker
+cd /root/docker
+
+# 1. 生成安全密钥 (只执行一次)
+JWT_SECRET=$(openssl rand -base64 48 | tr -d '=+/\n ' | cut -c1-32)
+ENCRYPTION_KEY=$(openssl rand -base64 48 | tr -d '=+/\n ' | cut -c1-32)
+
+# 2. 创建 .env 文件
+cat > .env <<EOF
+JWT_SECRET=${JWT_SECRET}
+ENCRYPTION_KEY=${ENCRYPTION_KEY}
+EOF
+
+# 3. 确保 docker-compose.yml 支持环境变量 (如果使用旧版配置)
+# 确保 image 行类似这样:
+# image: \${DOCKER_IMAGE_NAME:-weishaw/claude-relay-service:latest}
+```
+
+### 4. 触发部署
+
+只需将代码推送到 GitHub 仓库：
+
+```bash
+git add .
+git commit -m "fix: update some feature"
+git push
+```
+
+GitHub Actions 会自动：
+1. 构建镜像并推送到私有仓库 (Tag: `fix-update-some-feature`)
+2. SSH 登录服务器
+3. 拉取新镜像并重启服务
+
+---
+
 ## 📦 手动部署
 
 ### 第一步：环境准备
