@@ -83,6 +83,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 新增步骤：处理分支名，将 / 替换为 - 以适配 Docker Tag 规范
+      - name: Sanitize Branch Name
+        id: branch_name
+        run: |
+          # 获取原始分支名
+          RAW_BRANCH="${{ github.ref_name }}"
+          # 将 / 替��为 -
+          SANITIZED_BRANCH="${RAW_BRANCH//\//-}"
+          echo "Original: $RAW_BRANCH"
+          echo "Sanitized: $SANITIZED_BRANCH"
+          echo "tag=$SANITIZED_BRANCH" >> $GITHUB_OUTPUT
+
       # 1. 上传最新的 docker-compose.yml 到服务器
       - name: Upload docker-compose.yml
         uses: appleboy/scp-action@master
@@ -100,8 +112,8 @@ jobs:
         env:
           PRIVATE_REGISTRY_USERNAME: ${{ secrets.PRIVATE_REGISTRY_USERNAME }}
           PRIVATE_REGISTRY_PASSWORD: ${{ secrets.PRIVATE_REGISTRY_PASSWORD }}
-          # 使用当前分支名作为 tag
-          IMAGE_TAG: ${{ github.ref_name }}
+          # 使用处理后的 Tag
+          IMAGE_TAG: ${{ steps.branch_name.outputs.tag }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
