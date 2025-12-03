@@ -53,6 +53,10 @@ const config = {
         // 验证配置值：限制在0-1440分钟(24小时)内
         return Math.max(0, Math.min(minutes, 1440))
       })()
+    },
+    // 401/403错误处理：是否需要手动重置账户
+    authErrorHandling: {
+      requireManualReset: process.env.CLAUDE_AUTH_ERROR_REQUIRE_MANUAL_RESET !== 'false'
     }
   },
 

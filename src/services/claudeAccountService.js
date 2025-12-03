@@ -2318,7 +2318,11 @@ class ClaudeAccountService {
       // 更新账户状态
       const updatedAccountData = { ...accountData }
       updatedAccountData.status = errorConfig.status
-      updatedAccountData.schedulable = 'false' // 设置为不可调度
+      // 根据配置决定是否停止调度
+      const requireManualReset = config.claude?.authErrorHandling?.requireManualReset !== false
+      if (requireManualReset) {
+        updatedAccountData.schedulable = 'false'
+      }
       updatedAccountData.errorMessage = errorConfig.errorMessage
       updatedAccountData[errorConfig.timestampField] = new Date().toISOString()
 
@@ -2331,8 +2335,9 @@ class ClaudeAccountService {
         logger.info(`🗑️ Deleted sticky session mapping for hash: ${sessionHash}`)
       }
 
+      const schedulingStatus = requireManualReset ? 'disabled for scheduling' : 'still schedulable (auto-recovery mode)'
       logger.warn(
-        `⚠️ Account ${accountData.name} (${accountId}) marked as ${errorConfig.logMessage} and disabled for scheduling`
+        `⚠️ Account ${accountData.name} (${accountId}) marked as ${errorConfig.logMessage}, ${schedulingStatus}`
       )
 
       // 发送Webhook通知
