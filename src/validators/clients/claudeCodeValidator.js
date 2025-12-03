@@ -67,15 +67,21 @@ class ClaudeCodeValidator {
 
   // 版本号比较
   static compareVersions(v1, v2) {
-    if (!v1 || !v2) return 0
+    if (!v1 || !v2) {
+      return 0
+    }
     const parts1 = v1.split('.').map((n) => parseInt(n, 10) || 0)
     const parts2 = v2.split('.').map((n) => parseInt(n, 10) || 0)
     const len = Math.max(parts1.length, parts2.length)
     for (let i = 0; i < len; i++) {
       const a = parts1[i] || 0
       const b = parts2[i] || 0
-      if (a > b) return 1
-      if (a < b) return -1
+      if (a > b) {
+        return 1
+      }
+      if (a < b) {
+        return -1
+      }
     }
     return 0
   }
