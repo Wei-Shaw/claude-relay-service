@@ -269,20 +269,38 @@ jobs:
       id: image_names
       if: steps.check.outputs.needs_bump == 'true'
       run: |
-        GHCR_IMAGE=$(echo "ghcr.io/${{ github.repository_owner }}/claude-relay-service" | tr '[:upper:]' '[:lower:]')
-
         DOCKER_USERNAME="${{ secrets.DOCKERHUB_USERNAME }}"
-        if [ -n "$DOCKER_USERNAME" ]; then
+        DOCKER_TOKEN="${{ secrets.DOCKERHUB_TOKEN }}"
+
+        # 检查 Docker Hub 凭据是否配置
+        if [ -n "$DOCKER_USERNAME" ] && [ -n "$DOCKER_TOKEN" ]; then
+          echo "dockerhub_enabled=true" >> "$GITHUB_OUTPUT"
           DOCKER_IMAGE=$(echo "${DOCKER_USERNAME}/claude-relay-service" | tr '[:upper:]' '[:lower:]')
+          echo "docker_image=${DOCKER_IMAGE}" >> "$GITHUB_OUTPUT"
         else
-          # 未配置 Docker Hub 时，docker_image 也指向 GHCR（避免推送失败）
-          DOCKER_IMAGE="${GHCR_IMAGE}"
+          echo "dockerhub_enabled=false" >> "$GITHUB_OUTPUT"
+          echo "⚠️ Docker Hub credentials not configured, skipping Docker Hub push"
         fi
 
-        {
-          echo "docker_image=${DOCKER_IMAGE}"
-          echo "ghcr_image=${GHCR_IMAGE}"
-        } >> "$GITHUB_OUTPUT"
+        GHCR_IMAGE=$(echo "ghcr.io/${{ github.repository_owner }}/claude-relay-service" | tr '[:upper:]' '[:lower:]')
+        echo "ghcr_image=${GHCR_IMAGE}" >> "$GITHUB_OUTPUT"
+
+    - name: Prepare release body
+      id: release_body
+      if: steps.check.outputs.needs_bump == 'true'
+      run: |
+        # 构建 Docker 镜像拉取命令
+        DOCKER_COMMANDS="docker pull ${{ steps.image_names.outputs.ghcr_image }}:${{ steps.next_version.outputs.new_tag }}"
+        DOCKER_COMMANDS="${DOCKER_COMMANDS}"$'\n'"docker pull ${{ steps.image_names.outputs.ghcr_image }}:latest"
+
+        if [ "${{ steps.image_names.outputs.dockerhub_enabled }}" = "true" ]; then
+          DOCKER_COMMANDS="${DOCKER_COMMANDS}"$'\n'"docker pull ${{ steps.image_names.outputs.docker_image }}:${{ steps.next_version.outputs.new_tag }}"
+          DOCKER_COMMANDS="${DOCKER_COMMANDS}"$'\n'"docker pull ${{ steps.image_names.outputs.docker_image }}:latest"
+        fi
+
+        echo "docker_commands<<EOF" >> "$GITHUB_OUTPUT"
+        echo "$DOCKER_COMMANDS" >> "$GITHUB_OUTPUT"
+        echo "EOF" >> "$GITHUB_OUTPUT"
 
     - name: Create GitHub Release
       if: steps.check.outputs.needs_bump == 'true'
@@ -292,20 +310,17 @@ jobs:
         name: Release ${{ steps.next_version.outputs.new_version }}
         body: |
           ## 🐳 Docker 镜像
-          
+
           ```bash
-          docker pull ${{ steps.image_names.outputs.docker_image }}:${{ steps.next_version.outputs.new_tag }}
-          docker pull ${{ steps.image_names.outputs.docker_image }}:latest
-          docker pull ${{ steps.image_names.outputs.ghcr_image }}:${{ steps.next_version.outputs.new_tag }}
-          docker pull ${{ steps.image_names.outputs.ghcr_image }}:latest
+          ${{ steps.release_body.outputs.docker_commands }}
           ```
-          
+
           ## 📦 主要更新
-          
+
           ${{ steps.changelog.outputs.content }}
-          
+
           ## 📋 完整更新日志
-          
+
           查看 [所有版本](https://github.com/${{ github.repository }}/releases)
         draft: false
         prerelease: false
@@ -421,7 +436,7 @@ jobs:
       uses: docker/setup-buildx-action@v3
 
     - name: Log in to Docker Hub
-      if: steps.check.outputs.needs_bump == 'true' && secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != ''
+      if: steps.check.outputs.needs_bump == 'true' && steps.image_names.outputs.dockerhub_enabled == 'true'
       uses: docker/login-action@v3
       with:
         registry: docker.io
@@ -436,6 +451,23 @@ jobs:
         username: ${{ github.repository_owner }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Prepare Docker tags
+      id: docker_tags
+      if: steps.check.outputs.needs_bump == 'true'
+      run: |
+        TAGS="${{ steps.image_names.outputs.ghcr_image }}:${{ steps.next_version.outputs.new_tag }}"
+        TAGS="${TAGS},${{ steps.image_names.outputs.ghcr_image }}:latest"
+        TAGS="${TAGS},${{ steps.image_names.outputs.ghcr_image }}:${{ steps.next_version.outputs.new_version }}"
+
+        # 如果配置了 Docker Hub，添加对应的 tags
+        if [ "${{ steps.image_names.outputs.dockerhub_enabled }}" = "true" ]; then
+          TAGS="${TAGS},${{ steps.image_names.outputs.docker_image }}:${{ steps.next_version.outputs.new_tag }}"
+          TAGS="${TAGS},${{ steps.image_names.outputs.docker_image }}:latest"
+          TAGS="${TAGS},${{ steps.image_names.outputs.docker_image }}:${{ steps.next_version.outputs.new_version }}"
+        fi
+
+        echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+
     - name: Build and push Docker image
       if: steps.check.outputs.needs_bump == 'true'
       uses: docker/build-push-action@v6
@@ -443,13 +475,7 @@ jobs:
         context: .
         platforms: linux/amd64,linux/arm64
         push: true
-        tags: |
-          ${{ steps.image_names.outputs.docker_image }}:${{ steps.next_version.outputs.new_tag }}
-          ${{ steps.image_names.outputs.docker_image }}:latest
-          ${{ steps.image_names.outputs.docker_image }}:${{ steps.next_version.outputs.new_version }}
-          ${{ steps.image_names.outputs.ghcr_image }}:${{ steps.next_version.outputs.new_tag }}
-          ${{ steps.image_names.outputs.ghcr_image }}:latest
-          ${{ steps.image_names.outputs.ghcr_image }}:${{ steps.next_version.outputs.new_version }}
+        tags: ${{ steps.docker_tags.outputs.tags }}
         labels: |
           org.opencontainers.image.version=${{ steps.next_version.outputs.new_version }}
           org.opencontainers.image.revision=${{ github.sha }}
@@ -464,19 +490,38 @@ jobs:
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         DOCKER_IMAGE: ${{ steps.image_names.outputs.docker_image }}
         GHCR_IMAGE: ${{ steps.image_names.outputs.ghcr_image }}
+        DOCKERHUB_ENABLED: ${{ steps.image_names.outputs.dockerhub_enabled }}
       continue-on-error: true
       run: |
         VERSION="${{ steps.next_version.outputs.new_version }}"
         TAG="${{ steps.next_version.outputs.new_tag }}"
         REPO="${{ github.repository }}"
-        
+
         # 获取更新内容并限制长度
         CHANGELOG="${{ steps.changelog.outputs.content }}"
         CHANGELOG_TRUNCATED=$(echo "$CHANGELOG" | head -c 1000)
         if [ ${#CHANGELOG} -gt 1000 ]; then
           CHANGELOG_TRUNCATED="${CHANGELOG_TRUNCATED}..."
         fi
-        
+
+        # 构建 Docker 部署命令
+        DOCKER_CMDS="docker pull ${GHCR_IMAGE}:${TAG}"$'\n'
+        DOCKER_CMDS+="docker pull ${GHCR_IMAGE}:latest"
+        if [ "$DOCKERHUB_ENABLED" = "true" ]; then
+          DOCKER_CMDS=$'\n'"docker pull ${DOCKER_IMAGE}:${TAG}"$'\n'
+          DOCKER_CMDS+="docker pull ${DOCKER_IMAGE}:latest"$'\n'
+          DOCKER_CMDS+="docker pull ${GHCR_IMAGE}:${TAG}"$'\n'
+          DOCKER_CMDS+="docker pull ${GHCR_IMAGE}:latest"
+        fi
+
+        # 构建链接部分
+        LINKS="• [GitHub Release](https://github.com/${REPO}/releases/tag/${TAG})"$'\n'
+        LINKS+="• [完整更新日志](https://github.com/${REPO}/releases)"$'\n'
+        if [ "$DOCKERHUB_ENABLED" = "true" ]; then
+          LINKS+="• [Docker Hub](https://hub.docker.com/r/${DOCKER_IMAGE%/*}/claude-relay-service)"$'\n'
+        fi
+        LINKS+="• [GHCR](https://ghcr.io/${GHCR_IMAGE#ghcr.io/})"
+
         # 构建消息内容
         MESSAGE="🚀 *Claude Relay Service 新版本发布！*"$'\n'$'\n'
         MESSAGE+="📦 版本号: \`${VERSION}\`"$'\n'$'\n'
@@ -484,18 +529,12 @@ jobs:
         MESSAGE+="${CHANGELOG_TRUNCATED}"$'\n'$'\n'
         MESSAGE+="🐳 *Docker 部署:*"$'\n'
         MESSAGE+="\`\`\`bash"$'\n'
-        MESSAGE+="docker pull ${DOCKER_IMAGE}:${TAG}"$'\n'
-        MESSAGE+="docker pull ${DOCKER_IMAGE}:latest"$'\n'
-        MESSAGE+="docker pull ${GHCR_IMAGE}:${TAG}"$'\n'
-        MESSAGE+="docker pull ${GHCR_IMAGE}:latest"$'\n'
+        MESSAGE+="${DOCKER_CMDS}"$'\n'
         MESSAGE+="\`\`\`"$'\n'$'\n'
         MESSAGE+="🔗 *相关链接:*"$'\n'
-        MESSAGE+="• [GitHub Release](https://github.com/${REPO}/releases/tag/${TAG})"$'\n'
-        MESSAGE+="• [完整更新日志](https://github.com/${REPO}/releases)"$'\n'
-        MESSAGE+="• [Docker Hub](https://hub.docker.com/r/${DOCKER_IMAGE%/*}/claude-relay-service)"$'\n'
-        MESSAGE+="• [GHCR](https://ghcr.io/${GHCR_IMAGE#ghcr.io/})"$'\n'$'\n'
+        MESSAGE+="${LINKS}"$'\n'$'\n'
         MESSAGE+="#ClaudeRelay #Update #v${VERSION//./_}"
-        
+
         # 使用 jq 构建 JSON 并发送
         jq -n \
           --arg chat_id "${TELEGRAM_CHAT_ID}" \
