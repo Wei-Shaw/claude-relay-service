@@ -75,3 +75,59 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 1. 上传最新的 docker-compose.yml 到服务器
+      - name: Upload docker-compose.yml
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          password: ${{ secrets.DEPLOY_PASSWORD }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          source: "docker-compose.yml"
+          target: "/root/docker"
+
+      # 2. 远程执行部署命令
+      - name: SSH Remote Deploy
+        uses: appleboy/ssh-action@master
+        env:
+          PRIVATE_REGISTRY_USERNAME: ${{ secrets.PRIVATE_REGISTRY_USERNAME }}
+          PRIVATE_REGISTRY_PASSWORD: ${{ secrets.PRIVATE_REGISTRY_PASSWORD }}
+          # 使用当前分支名作为 tag
+          IMAGE_TAG: ${{ github.ref_name }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          password: ${{ secrets.DEPLOY_PASSWORD }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          envs: PRIVATE_REGISTRY_USERNAME,PRIVATE_REGISTRY_PASSWORD,IMAGE_TAG
+          script: |
+            # 1. 登录私有仓库 (确保服务器也能访问)
+            # 注意：如果服务器未配置证书信任，这里可能需要 --tls-verify=false 或者复用 CI 的证书逻辑
+            # 为简单起见，这里假设服务器已经配置了 daemon.json 的 insecure-registries 或者信任了证书
+            echo "$PRIVATE_REGISTRY_PASSWORD" | docker login 154.12.35.169:5000 -u "$PRIVATE_REGISTRY_USERNAME" --password-stdin
+
+            # 2. 进入目录
+            cd /root/docker
+
+            # 3. 设���镜像名环境变量
+            export DOCKER_IMAGE_NAME="154.12.35.169:5000/claude-relay-service:${IMAGE_TAG}"
+            echo "Deploying image: $DOCKER_IMAGE_NAME"
+
+            # 4. 拉取并重启
+            # -E 保持环境变量传给 sudo (如果 docker 需要 sudo)
+            # 如果是 root 用户直接运行，不需要 sudo
+            docker-compose pull
+            docker-compose up -d
+
+            # 5. 清理旧镜像 (可选，释放空间)
+            docker image prune -f

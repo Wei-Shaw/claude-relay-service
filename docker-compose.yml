@@ -7,7 +7,8 @@ services:
   # 🚀 Claude Relay Service
   claude-relay:
     build: .
-    image: weishaw/claude-relay-service:latest
+    # 支持通过环境变量自定义镜像名，默认为 weishaw/claude-relay-service:latest
+    image: ${DOCKER_IMAGE_NAME:-weishaw/claude-relay-service:latest}
     restart: unless-stopped
     ports:
       # 绑定地址：生产环境建议使用反向代理，设置 BIND_HOST=127.0.0.1
