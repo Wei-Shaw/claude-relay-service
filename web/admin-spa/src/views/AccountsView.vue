@@ -58,6 +58,20 @@
               />
             </div>
 
+            <!-- 状态筛选器 -->
+            <div class="group relative min-w-[120px]">
+              <div
+                class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-green-500 to-emerald-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+              ></div>
+              <CustomDropdown
+                v-model="statusFilter"
+                icon="fa-check-circle"
+                icon-color="text-green-500"
+                :options="statusOptions"
+                placeholder="选择状态"
+              />
+            </div>
+
             <!-- 搜索框 -->
             <div class="group relative min-w-[200px]">
               <div
@@ -83,6 +97,22 @@
           </div>
 
           <div class="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
+            <!-- 账户统计按钮 -->
+            <div class="relative">
+              <el-tooltip content="查看账户统计汇总" effect="dark" placement="bottom">
+                <button
+                  class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 sm:w-auto"
+                  @click="showAccountStatsModal = true"
+                >
+                  <div
+                    class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-violet-500 to-purple-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+                  ></div>
+                  <i class="fas fa-chart-bar relative text-violet-500" />
+                  <span class="relative">统计</span>
+                </button>
+              </el-tooltip>
+            </div>
+
             <!-- 刷新按钮 -->
             <div class="relative">
               <el-tooltip
@@ -359,7 +389,7 @@
                   最后使用
                 </th>
                 <th
-                  class="min-w-[80px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                  class="hidden min-w-[80px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                   @click="sortAccounts('priority')"
                 >
                   优先级
@@ -428,7 +458,7 @@
                       <i class="fas fa-user-circle text-xs text-white" />
                     </div>
                     <div class="min-w-0">
-                      <div class="flex items-center gap-2">
+                      <div class="flex flex-wrap items-center gap-2">
                         <div
                           class="truncate text-sm font-semibold text-gray-900 dark:text-gray-100"
                           :title="account.name"
@@ -453,23 +483,28 @@
                         >
                           <i class="fas fa-share-alt mr-1" />共享
                         </span>
-                      </div>
-                      <!-- 显示所有分组 - 换行显示 -->
-                      <div
-                        v-if="account.groupInfos && account.groupInfos.length > 0"
-                        class="my-2 flex flex-wrap items-center gap-2"
-                      >
+                        <!-- 显示所有分组 - 内联显示 -->
+                        <template v-if="account.groupInfos && account.groupInfos.length > 0">
+                          <span
+                            v-for="group in account.groupInfos"
+                            :key="group.id"
+                            class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+                            :title="`所属分组: ${group.name}`"
+                          >
+                            <i class="fas fa-folder mr-1" />{{ group.name }}
+                          </span>
+                        </template>
+                        <!-- 优先级标签 -->
                         <span
-                          v-for="group in account.groupInfos"
-                          :key="group.id"
-                          class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-400"
-                          :title="`所属分组: ${group.name}`"
+                          class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                          :title="`调用优先级 ${account.priority ?? 50}`"
                         >
-                          <i class="fas fa-folder mr-1" />{{ group.name }}
+                          <i class="fas fa-bolt text-[10px] text-amber-500" />
+                          {{ account.priority ?? 50 }}
                         </span>
                       </div>
                       <div
-                        class="truncate text-xs text-gray-500 dark:text-gray-400"
+                        class="mt-1 truncate text-xs text-gray-500 dark:text-gray-400"
                         :title="account.id"
                       >
                         {{ account.id }}
@@ -1071,7 +1106,7 @@
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 dark:text-gray-300">
                   {{ formatLastUsed(account.lastUsedAt) }}
                 </td>
-                <td class="whitespace-nowrap px-3 py-4">
+                <td class="hidden whitespace-nowrap px-3 py-4">
                   <div
                     v-if="
                       account.platform === 'claude' ||
@@ -1850,6 +1885,68 @@
       :show="showAccountTestModal"
       @close="closeAccountTestModal"
     />
+
+    <!-- 账户统计弹窗 -->
+    <Teleport to="body">
+      <div
+        v-if="showAccountStatsModal"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        @click.self="showAccountStatsModal = false"
+      >
+        <div
+          class="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl dark:bg-gray-800"
+        >
+          <div class="mb-4 flex items-center justify-between">
+            <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">
+              <i class="fas fa-chart-bar mr-2 text-violet-500" />账户统计
+            </h3>
+            <button
+              class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+              @click="showAccountStatsModal = false"
+            >
+              <i class="fas fa-times" />
+            </button>
+          </div>
+          <div class="space-y-4">
+            <div
+              v-for="(stats, platform) in accountStats"
+              :key="platform"
+              class="rounded-lg border border-gray-200 p-4 dark:border-gray-700"
+            >
+              <div class="mb-2 flex items-center gap-2">
+                <i :class="getPlatformIcon(platform)" class="text-blue-500" />
+                <span class="font-semibold text-gray-900 dark:text-gray-100">
+                  {{ getPlatformLabel(platform) }}
+                </span>
+                <span class="ml-auto text-sm text-gray-500 dark:text-gray-400">
+                  共 {{ stats.total }} 个
+                </span>
+              </div>
+              <div class="grid grid-cols-3 gap-2 text-sm">
+                <div class="text-center">
+                  <div class="font-medium text-green-600 dark:text-green-400">
+                    {{ stats.active }}
+                  </div>
+                  <div class="text-xs text-gray-500 dark:text-gray-400">正常</div>
+                </div>
+                <div class="text-center">
+                  <div class="font-medium text-red-600 dark:text-red-400">
+                    {{ stats.error }}
+                  </div>
+                  <div class="text-xs text-gray-500 dark:text-gray-400">异常</div>
+                </div>
+                <div class="text-center">
+                  <div class="font-medium text-amber-600 dark:text-amber-400">
+                    {{ stats.rateLimited }}
+                  </div>
+                  <div class="text-xs text-gray-500 dark:text-gray-400">限流</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -1880,7 +1977,9 @@ const bindingCounts = ref({}) // 轻量级绑定计数，用于显示"绑定: X 
 const accountGroups = ref([])
 const groupFilter = ref('all')
 const platformFilter = ref('all')
+const statusFilter = ref('normal')
 const searchKeyword = ref('')
+const showAccountStatsModal = ref(false)
 const PAGE_SIZE_STORAGE_KEY = 'accountsPageSize'
 const getInitialPageSize = () => {
   const saved = localStorage.getItem(PAGE_SIZE_STORAGE_KEY)
@@ -1963,6 +2062,12 @@ const platformOptions = ref([
   { value: 'droid', label: 'Droid', icon: 'fa-robot' }
 ])
 
+const statusOptions = ref([
+  { value: 'all', label: '全部状态', icon: 'fa-list' },
+  { value: 'normal', label: '正常', icon: 'fa-check-circle' },
+  { value: 'abnormal', label: '异常', icon: 'fa-exclamation-circle' }
+])
+
 const groupOptions = computed(() => {
   const options = [
     { value: 'all', label: '所有账户', icon: 'fa-globe' },
@@ -1984,6 +2089,66 @@ const groupOptions = computed(() => {
   })
   return options
 })
+
+// 账户统计数据
+const accountStats = computed(() => {
+  const stats = {}
+  const abnormalStatuses = ['error', 'rate_limited', 'quota_exceeded', 'temp_error', 'blocked']
+
+  accounts.value.forEach((account) => {
+    const platform = account.platform
+    if (!stats[platform]) {
+      stats[platform] = { total: 0, active: 0, error: 0, rateLimited: 0 }
+    }
+    stats[platform].total++
+
+    if (abnormalStatuses.includes(account.status) || account.isActive === false) {
+      if (account.status === 'rate_limited') {
+        stats[platform].rateLimited++
+      } else {
+        stats[platform].error++
+      }
+    } else {
+      stats[platform].active++
+    }
+  })
+
+  return stats
+})
+
+// 获取平台图标
+const getPlatformIcon = (platform) => {
+  const iconMap = {
+    claude: 'fas fa-brain',
+    'claude-console': 'fas fa-terminal',
+    gemini: 'fab fa-google',
+    'gemini-api': 'fas fa-key',
+    openai: 'fas fa-robot',
+    'azure_openai': 'fab fa-microsoft',
+    bedrock: 'fab fa-aws',
+    'openai-responses': 'fas fa-server',
+    ccr: 'fas fa-code-branch',
+    droid: 'fas fa-robot'
+  }
+  return iconMap[platform] || 'fas fa-server'
+}
+
+// 获取平台名称
+const getPlatformLabel = (platform) => {
+  const labelMap = {
+    claude: 'Claude',
+    'claude-console': 'Claude Console',
+    gemini: 'Gemini',
+    'gemini-api': 'Gemini API',
+    openai: 'OpenAI',
+    'azure_openai': 'Azure OpenAI',
+    bedrock: 'Bedrock',
+    'openai-responses': 'OpenAI Responses',
+    ccr: 'CCR',
+    droid: 'Droid'
+  }
+  return labelMap[platform] || platform
+}
 
 const shouldShowCheckboxes = computed(() => showCheckboxes.value)
 
@@ -2683,6 +2848,20 @@ const loadAccounts = async (forceReload = false) => {
           }
           // 检查账户是否属于选中的分组
           return account.groupInfos.some((group) => group.id === groupFilter.value)
+        })
+      }
+    }
+
+    // 根据状态筛选器过滤账户
+    if (statusFilter.value !== 'all') {
+      const abnormalStatuses = ['error', 'rate_limited', 'quota_exceeded', 'temp_error', 'blocked']
+      if (statusFilter.value === 'normal') {
+        filteredAccounts = filteredAccounts.filter((account) => {
+          return !abnormalStatuses.includes(account.status) && account.isActive !== false
+        })
+      } else if (statusFilter.value === 'abnormal') {
+        filteredAccounts = filteredAccounts.filter((account) => {
+          return abnormalStatuses.includes(account.status) || account.isActive === false
         })
       }
     }
