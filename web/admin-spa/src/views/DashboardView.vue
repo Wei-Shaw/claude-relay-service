@@ -673,6 +673,158 @@
         </div>
       </div>
     </div>
+
+    <!-- 最近使用记录 -->
+    <div class="mb-4 sm:mb-6 md:mb-8">
+      <div class="card p-4 sm:p-6">
+        <div class="mb-4 flex items-center justify-between">
+          <h4 class="text-base font-semibold text-gray-800 dark:text-gray-200 sm:text-lg">
+            最近使用记录
+          </h4>
+          <button
+            class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+            :disabled="usageRecordsLoading"
+            @click="loadUsageRecords"
+          >
+            <i :class="['fas', usageRecordsLoading ? 'fa-spinner fa-spin' : 'fa-sync-alt']"></i>
+            <span class="ml-1">刷新</span>
+          </button>
+        </div>
+
+        <div v-if="usageRecordsLoading" class="py-12 text-center">
+          <div class="loading-spinner mx-auto mb-4"></div>
+          <p class="text-gray-500 dark:text-gray-400">正在加载使用记录...</p>
+        </div>
+
+        <div v-else-if="usageRecords.length === 0" class="py-12 text-center">
+          <p class="text-gray-500 dark:text-gray-400">暂无使用记录</p>
+        </div>
+
+        <div v-else class="overflow-x-auto">
+          <table class="w-full min-w-[800px] text-sm">
+            <thead class="bg-gray-50 dark:bg-gray-700/50">
+              <tr>
+                <th
+                  class="border-b border-gray-200 px-3 py-2 text-left font-medium text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                >
+                  时间
+                </th>
+                <th
+                  class="border-b border-gray-200 px-3 py-2 text-left font-medium text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                >
+                  API Key
+                </th>
+                <th
+                  class="border-b border-gray-200 px-3 py-2 text-left font-medium text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                >
+                  账户
+                </th>
+                <th
+                  class="border-b border-gray-200 px-3 py-2 text-left font-medium text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                >
+                  模型
+                </th>
+                <th
+                  class="border-b border-gray-200 px-3 py-2 text-right font-medium text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                >
+                  输入
+                </th>
+                <th
+                  class="border-b border-gray-200 px-3 py-2 text-right font-medium text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                >
+                  输出
+                </th>
+                <th
+                  class="border-b border-gray-200 px-3 py-2 text-right font-medium text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                >
+                  缓存创建
+                </th>
+                <th
+                  class="border-b border-gray-200 px-3 py-2 text-right font-medium text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                >
+                  缓存读取
+                </th>
+                <th
+                  class="border-b border-gray-200 px-3 py-2 text-right font-medium text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                >
+                  成本
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(record, index) in usageRecords"
+                :key="index"
+                class="hover:bg-gray-50 dark:hover:bg-gray-700/30"
+              >
+                <td
+                  class="border-b border-gray-100 px-3 py-2 text-gray-700 dark:border-gray-700 dark:text-gray-300"
+                >
+                  {{ formatRecordTime(record.timestamp) }}
+                </td>
+                <td
+                  class="border-b border-gray-100 px-3 py-2 text-gray-700 dark:border-gray-700 dark:text-gray-300"
+                >
+                  <div class="max-w-[120px] truncate" :title="record.apiKeyName">
+                    {{ record.apiKeyName }}
+                  </div>
+                </td>
+                <td
+                  class="border-b border-gray-100 px-3 py-2 text-gray-700 dark:border-gray-700 dark:text-gray-300"
+                >
+                  <div class="max-w-[120px] truncate" :title="record.accountName">
+                    {{ record.accountName }}
+                  </div>
+                </td>
+                <td
+                  class="border-b border-gray-100 px-3 py-2 text-gray-700 dark:border-gray-700 dark:text-gray-300"
+                >
+                  <div class="max-w-[150px] truncate" :title="record.model">
+                    {{ record.model }}
+                  </div>
+                </td>
+                <td
+                  class="border-b border-gray-100 px-3 py-2 text-right text-gray-700 dark:border-gray-700 dark:text-gray-300"
+                >
+                  {{ formatNumber(record.inputTokens) }}
+                </td>
+                <td
+                  class="border-b border-gray-100 px-3 py-2 text-right text-gray-700 dark:border-gray-700 dark:text-gray-300"
+                >
+                  {{ formatNumber(record.outputTokens) }}
+                </td>
+                <td
+                  class="border-b border-gray-100 px-3 py-2 text-right text-gray-700 dark:border-gray-700 dark:text-gray-300"
+                >
+                  {{ formatNumber(record.cacheCreateTokens) }}
+                </td>
+                <td
+                  class="border-b border-gray-100 px-3 py-2 text-right text-gray-700 dark:border-gray-700 dark:text-gray-300"
+                >
+                  {{ formatNumber(record.cacheReadTokens) }}
+                </td>
+                <td
+                  class="border-b border-gray-100 px-3 py-2 text-right font-medium text-gray-700 dark:border-gray-700 dark:text-gray-300"
+                >
+                  ${{ formatCost(record.cost) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- 分页 -->
+          <div v-if="usageRecordsTotal > usageRecords.length" class="mt-4 flex justify-center">
+            <button
+              class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+              :disabled="usageRecordsLoading"
+              @click="loadMoreUsageRecords"
+            >
+              加载更多 (剩余 {{ usageRecordsTotal - usageRecords.length }} 条)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -681,11 +833,20 @@ import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useDashboardStore } from '@/stores/dashboard'
 import { useThemeStore } from '@/stores/theme'
+import { apiClient } from '@/config/api'
+import { showToast } from '@/utils/toast'
 import Chart from 'chart.js/auto'
 
 const dashboardStore = useDashboardStore()
 const themeStore = useThemeStore()
 const { isDarkMode } = storeToRefs(themeStore)
+
+// 使用记录相关
+const usageRecords = ref([])
+const usageRecordsLoading = ref(false)
+const usageRecordsTotal = ref(0)
+const usageRecordsOffset = ref(0)
+const usageRecordsLimit = ref(50)
 
 const {
   dashboardData,
@@ -1477,13 +1638,95 @@ watch(accountUsageTrendData, () => {
   nextTick(() => createAccountUsageTrendChart())
 })
 
+// 加载使用记录
+async function loadUsageRecords(reset = true) {
+  if (usageRecordsLoading.value) return
+
+  try {
+    usageRecordsLoading.value = true
+    if (reset) {
+      usageRecordsOffset.value = 0
+      usageRecords.value = []
+    }
+
+    const response = await apiClient.get('/admin/dashboard/usage-records', {
+      params: {
+        limit: usageRecordsLimit.value,
+        offset: usageRecordsOffset.value
+      }
+    })
+
+    if (response.success && response.data) {
+      if (reset) {
+        usageRecords.value = response.data.records || []
+      } else {
+        usageRecords.value = [...usageRecords.value, ...(response.data.records || [])]
+      }
+      usageRecordsTotal.value = response.data.total || 0
+    }
+  } catch (error) {
+    console.error('Failed to load usage records:', error)
+    showToast('加载使用记录失败', 'error')
+  } finally {
+    usageRecordsLoading.value = false
+  }
+}
+
+// 加载更多使用记录
+async function loadMoreUsageRecords() {
+  usageRecordsOffset.value += usageRecordsLimit.value
+  await loadUsageRecords(false)
+}
+
+// 格式化记录时间
+function formatRecordTime(timestamp) {
+  if (!timestamp) return '-'
+  const date = new Date(timestamp)
+  const now = new Date()
+  const diff = now - date
+
+  // 如果是今天
+  if (diff < 86400000 && date.getDate() === now.getDate()) {
+    return date.toLocaleTimeString('zh-CN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+  }
+
+  // 如果是昨天
+  if (diff < 172800000 && date.getDate() === now.getDate() - 1) {
+    return '昨天 ' + date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  }
+
+  // 其他日期
+  return date.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+// 格式化数字（添加千分位）
+function formatNumber(num) {
+  if (!num || num === 0) return '0'
+  return num.toLocaleString('en-US')
+}
+
+// 格式化成本
+function formatCost(cost) {
+  if (!cost || cost === 0) return '0.000000'
+  return cost.toFixed(6)
+}
+
 // 刷新所有数据
 async function refreshAllData() {
   if (isRefreshing.value) return
 
   isRefreshing.value = true
   try {
-    await Promise.all([loadDashboardData(), refreshChartsData()])
+    await Promise.all([loadDashboardData(), refreshChartsData(), loadUsageRecords()])
   } finally {
     isRefreshing.value = false
   }
