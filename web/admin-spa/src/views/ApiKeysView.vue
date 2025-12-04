@@ -2084,6 +2084,13 @@
       @close="closeExpiryEdit"
       @save="handleSaveExpiry"
     />
+
+    <UsageDetailModal
+      :api-key="selectedApiKeyForDetail || {}"
+      :show="showUsageDetailModal"
+      @close="showUsageDetailModal = false"
+      @open-timeline="openTimeline"
+    />
   </div>
 </template>
 
@@ -2102,6 +2109,7 @@ import NewApiKeyModal from '@/components/apikeys/NewApiKeyModal.vue'
 import BatchApiKeyModal from '@/components/apikeys/BatchApiKeyModal.vue'
 import BatchEditApiKeyModal from '@/components/apikeys/BatchEditApiKeyModal.vue'
 import ExpiryEditModal from '@/components/apikeys/ExpiryEditModal.vue'
+import UsageDetailModal from '@/components/apikeys/UsageDetailModal.vue'
 import LimitProgressBar from '@/components/apikeys/LimitProgressBar.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 import ActionDropdown from '@/components/common/ActionDropdown.vue'
@@ -2205,6 +2213,8 @@ const accountsLoading = ref(false)
 const accountsLoaded = ref(false)
 const editingExpiryKey = ref(null)
 const expiryEditModalRef = ref(null)
+const showUsageDetailModal = ref(false)
+const selectedApiKeyForDetail = ref(null)
 
 // 标签相关
 const selectedTagFilter = ref('')
@@ -4185,7 +4195,40 @@ const formatWindowTime = (seconds) => {
 
 // 显示使用详情
 const showUsageDetails = (apiKey) => {
-  router.push(`/api-keys/${apiKey.id}/usage-records`)
+  const cachedStats = getCachedStats(apiKey.id)
+
+  const enrichedApiKey = {
+    ...apiKey,
+    dailyCost: cachedStats?.dailyCost ?? apiKey.dailyCost ?? 0,
+    currentWindowCost: cachedStats?.currentWindowCost ?? apiKey.currentWindowCost ?? 0,
+    windowRemainingSeconds: cachedStats?.windowRemainingSeconds ?? apiKey.windowRemainingSeconds,
+    windowStartTime: cachedStats?.windowStartTime ?? apiKey.windowStartTime ?? null,
+    windowEndTime: cachedStats?.windowEndTime ?? apiKey.windowEndTime ?? null,
+    usage: {
+      ...apiKey.usage,
+      total: {
+        ...apiKey.usage?.total,
+        requests: cachedStats?.requests ?? apiKey.usage?.total?.requests ?? 0,
+        tokens: cachedStats?.tokens ?? apiKey.usage?.total?.tokens ?? 0,
+        cost: cachedStats?.allTimeCost ?? apiKey.usage?.total?.cost ?? 0,
+        inputTokens: cachedStats?.inputTokens ?? apiKey.usage?.total?.inputTokens ?? 0,
+        outputTokens: cachedStats?.outputTokens ?? apiKey.usage?.total?.outputTokens ?? 0,
+        cacheCreateTokens:
+          cachedStats?.cacheCreateTokens ?? apiKey.usage?.total?.cacheCreateTokens ?? 0,
+        cacheReadTokens: cachedStats?.cacheReadTokens ?? apiKey.usage?.total?.cacheReadTokens ?? 0
+      }
+    }
+  }
+
+  selectedApiKeyForDetail.value = enrichedApiKey
+  showUsageDetailModal.value = true
+}
+
+const openTimeline = (keyId) => {
+  const id = keyId || selectedApiKeyForDetail.value?.id
+  if (!id) return
+  showUsageDetailModal.value = false
+  router.push(`/api-keys/${id}/usage-records`)
 }
 
 // 格式化时间（秒转换为可读格式） - 已移到 WindowLimitBar 组件中
