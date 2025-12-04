@@ -1893,9 +1893,7 @@
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
         @click.self="showAccountStatsModal = false"
       >
-        <div
-          class="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl dark:bg-gray-800"
-        >
+        <div class="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl dark:bg-gray-800">
           <div class="mb-4 flex items-center justify-between">
             <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">
               <i class="fas fa-chart-bar mr-2 text-violet-500" />账户统计
@@ -1914,7 +1912,7 @@
               class="rounded-lg border border-gray-200 p-4 dark:border-gray-700"
             >
               <div class="mb-2 flex items-center gap-2">
-                <i :class="getPlatformIcon(platform)" class="text-blue-500" />
+                <i class="text-blue-500" :class="getPlatformIcon(platform)" />
                 <span class="font-semibold text-gray-900 dark:text-gray-100">
                   {{ getPlatformLabel(platform) }}
                 </span>
@@ -2124,7 +2122,7 @@ const getPlatformIcon = (platform) => {
     gemini: 'fab fa-google',
     'gemini-api': 'fas fa-key',
     openai: 'fas fa-robot',
-    'azure_openai': 'fab fa-microsoft',
+    azure_openai: 'fab fa-microsoft',
     bedrock: 'fab fa-aws',
     'openai-responses': 'fas fa-server',
     ccr: 'fas fa-code-branch',
@@ -2141,7 +2139,7 @@ const getPlatformLabel = (platform) => {
     gemini: 'Gemini',
     'gemini-api': 'Gemini API',
     openai: 'OpenAI',
-    'azure_openai': 'Azure OpenAI',
+    azure_openai: 'Azure OpenAI',
     bedrock: 'Bedrock',
     'openai-responses': 'OpenAI Responses',
     ccr: 'CCR',
