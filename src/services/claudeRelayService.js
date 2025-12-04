@@ -3,6 +3,7 @@ const zlib = require('zlib')
 const fs = require('fs')
 const path = require('path')
 const ProxyHelper = require('../utils/proxyHelper')
+const { filterForClaude } = require('../utils/headerFilter')
 const claudeAccountService = require('./claudeAccountService')
 const unifiedClaudeScheduler = require('./unifiedClaudeScheduler')
 const sessionHelper = require('../utils/sessionHelper')
@@ -877,62 +878,9 @@ class ClaudeRelayService {
 
   // 🔧 过滤客户端请求头
   _filterClientHeaders(clientHeaders) {
-    // 需要移除的敏感 headers
-    const sensitiveHeaders = [
-      'content-type',
-      'user-agent',
-      'x-api-key',
-      'authorization',
-      'x-authorization',
-      'host',
-      'content-length',
-      'connection',
-      'proxy-authorization',
-      'content-encoding',
-      'transfer-encoding'
-    ]
-
-    // 🆕 需要移除的浏览器相关 headers（避免CORS问题）
-    const browserHeaders = [
-      'origin',
-      'referer',
-      'sec-fetch-mode',
-      'sec-fetch-site',
-      'sec-fetch-dest',
-      'sec-ch-ua',
-      'sec-ch-ua-mobile',
-      'sec-ch-ua-platform',
-      'accept-language',
-      'accept-encoding',
-      'accept',
-      'cache-control',
-      'pragma',
-      'anthropic-dangerous-direct-browser-access' // 这个头可能触发CORS检查
-    ]
-
-    // 应该保留的 headers（用于会话一致性和追踪）
-    const allowedHeaders = [
-      'x-request-id',
-      'anthropic-version', // 保留API版本
-      'anthropic-beta' // 保留beta功能
-    ]
-
-    const filteredHeaders = {}
-
-    // 转发客户端的非敏感 headers
-    Object.keys(clientHeaders || {}).forEach((key) => {
-      const lowerKey = key.toLowerCase()
-      // 如果在允许列表中，直接保留
-      if (allowedHeaders.includes(lowerKey)) {
-        filteredHeaders[key] = clientHeaders[key]
-      }
-      // 如果不在敏感列表和浏览器列表中，也保留
-      else if (!sensitiveHeaders.includes(lowerKey) && !browserHeaders.includes(lowerKey)) {
-        filteredHeaders[key] = clientHeaders[key]
-      }
-    })
-
-    return filteredHeaders
+    // 使用统一的 headerFilter 工具类 - 移除 CDN、浏览器和代理相关 headers
+    // 同时伪装成正常的直接客户端请求，避免触发上游 API 的安全检查
+    return filterForClaude(clientHeaders)
   }
 
   _applyRequestIdentityTransform(body, headers, context = {}) {
