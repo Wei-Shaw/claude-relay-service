@@ -37,6 +37,8 @@ class ClaudeConsoleRelayService {
         throw new Error('Claude Console Claude account not found')
       }
 
+      const autoProtectionDisabled = account.disableAutoProtection === true
+
       logger.info(
         `📤 Processing Claude Console API request for key: ${apiKeyData.name || apiKeyData.id}, account: ${account.name} (${accountId}), request: ${requestId}`
       )
@@ -248,27 +250,41 @@ class ClaudeConsoleRelayService {
 
       // 检查错误状态并相应处理
       if (response.status === 401) {
-        logger.warn(`🚫 Unauthorized error detected for Claude Console account ${accountId}`)
-        await claudeConsoleAccountService.markAccountUnauthorized(accountId)
+        logger.warn(
+          `🚫 Unauthorized error detected for Claude Console account ${accountId}${autoProtectionDisabled ? ' (auto-protection disabled, skipping status change)' : ''}`
+        )
+        if (!autoProtectionDisabled) {
+          await claudeConsoleAccountService.markAccountUnauthorized(accountId)
+        }
       } else if (accountDisabledError) {
         logger.error(
-          `🚫 Account disabled error (400) detected for Claude Console account ${accountId}, marking as blocked`
+          `🚫 Account disabled error (400) detected for Claude Console account ${accountId}${autoProtectionDisabled ? ' (auto-protection disabled, skipping status change)' : ''}`
         )
         // 传入完整的错误详情到 webhook
         const errorDetails =
           typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
-        await claudeConsoleAccountService.markConsoleAccountBlocked(accountId, errorDetails)
+        if (!autoProtectionDisabled) {
+          await claudeConsoleAccountService.markConsoleAccountBlocked(accountId, errorDetails)
+        }
       } else if (response.status === 429) {
-        logger.warn(`🚫 Rate limit detected for Claude Console account ${accountId}`)
+        logger.warn(
+          `🚫 Rate limit detected for Claude Console account ${accountId}${autoProtectionDisabled ? ' (auto-protection disabled, skipping status change)' : ''}`
+        )
         // 收到429先检查是否因为超过了手动配置的每日额度
         await claudeConsoleAccountService.checkQuotaUsage(accountId).catch((err) => {
           logger.error('❌ Failed to check quota after 429 error:', err)
         })
 
-        await claudeConsoleAccountService.markAccountRateLimited(accountId)
+        if (!autoProtectionDisabled) {
+          await claudeConsoleAccountService.markAccountRateLimited(accountId)
+        }
       } else if (response.status === 529) {
-        logger.warn(`🚫 Overload error detected for Claude Console account ${accountId}`)
-        await claudeConsoleAccountService.markAccountOverloaded(accountId)
+        logger.warn(
+          `🚫 Overload error detected for Claude Console account ${accountId}${autoProtectionDisabled ? ' (auto-protection disabled, skipping status change)' : ''}`
+        )
+        if (!autoProtectionDisabled) {
+          await claudeConsoleAccountService.markAccountOverloaded(accountId)
+        }
       } else if (response.status === 200 || response.status === 201) {
         // 如果请求成功，检查并移除错误状态
         const isRateLimited = await claudeConsoleAccountService.isAccountRateLimited(accountId)
@@ -597,6 +613,7 @@ class ClaudeConsoleRelayService {
             })
 
             response.data.on('end', async () => {
+              const autoProtectionDisabled = account.disableAutoProtection === true
               // 记录原始错误消息到日志（方便调试，包含供应商信息）
               logger.error(
                 `📝 [Stream] Upstream error response from ${account?.name || accountId}: ${errorDataForCheck.substring(0, 500)}`
@@ -609,24 +626,41 @@ class ClaudeConsoleRelayService {
               )
 
               if (response.status === 401) {
-                await claudeConsoleAccountService.markAccountUnauthorized(accountId)
+                logger.warn(
+                  `🚫 [Stream] Unauthorized error detected for Claude Console account ${accountId}${autoProtectionDisabled ? ' (auto-protection disabled, skipping status change)' : ''}`
+                )
+                if (!autoProtectionDisabled) {
+                  await claudeConsoleAccountService.markAccountUnauthorized(accountId)
+                }
               } else if (accountDisabledError) {
                 logger.error(
-                  `🚫 [Stream] Account disabled error (400) detected for Claude Console account ${accountId}, marking as blocked`
+                  `🚫 [Stream] Account disabled error (400) detected for Claude Console account ${accountId}${autoProtectionDisabled ? ' (auto-protection disabled, skipping status change)' : ''}`
                 )
                 // 传入完整的错误详情到 webhook
-                await claudeConsoleAccountService.markConsoleAccountBlocked(
-                  accountId,
-                  errorDataForCheck
-                )
+                if (!autoProtectionDisabled) {
+                  await claudeConsoleAccountService.markConsoleAccountBlocked(
+                    accountId,
+                    errorDataForCheck
+                  )
+                }
               } else if (response.status === 429) {
-                await claudeConsoleAccountService.markAccountRateLimited(accountId)
+                logger.warn(
+                  `🚫 [Stream] Rate limit detected for Claude Console account ${accountId}${autoProtectionDisabled ? ' (auto-protection disabled, skipping status change)' : ''}`
+                )
                 // 检查是否因为超过每日额度
                 claudeConsoleAccountService.checkQuotaUsage(accountId).catch((err) => {
                   logger.error('❌ Failed to check quota after 429 error:', err)
                 })
+                if (!autoProtectionDisabled) {
+                  await claudeConsoleAccountService.markAccountRateLimited(accountId)
+                }
               } else if (response.status === 529) {
-                await claudeConsoleAccountService.markAccountOverloaded(accountId)
+                logger.warn(
+                  `🚫 [Stream] Overload error detected for Claude Console account ${accountId}${autoProtectionDisabled ? ' (auto-protection disabled, skipping status change)' : ''}`
+                )
+                if (!autoProtectionDisabled) {
+                  await claudeConsoleAccountService.markAccountOverloaded(accountId)
+                }
               }
 
               // 设置响应头

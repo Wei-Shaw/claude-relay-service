@@ -131,7 +131,8 @@ router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
       groupId,
       dailyQuota,
       quotaResetTime,
-      maxConcurrentTasks
+      maxConcurrentTasks,
+      disableAutoProtection
     } = req.body
 
     if (!name || !apiUrl || !apiKey) {
@@ -150,6 +151,10 @@ router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
         return res.status(400).json({ error: 'maxConcurrentTasks must be a non-negative integer' })
       }
     }
+
+    // 校验上游错误自动防护开关
+    const normalizedDisableAutoProtection =
+      disableAutoProtection === true || disableAutoProtection === 'true'
 
     // 验证accountType的有效性
     if (accountType && !['shared', 'dedicated', 'group'].includes(accountType)) {
@@ -180,7 +185,8 @@ router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
       maxConcurrentTasks:
         maxConcurrentTasks !== undefined && maxConcurrentTasks !== null
           ? Number(maxConcurrentTasks)
-          : 0
+          : 0,
+      disableAutoProtection: normalizedDisableAutoProtection
     })
 
     // 如果是分组类型，将账户添加到分组（CCR 归属 Claude 平台分组）
@@ -248,6 +254,13 @@ router.put('/claude-console-accounts/:accountId', authenticateAdmin, async (req,
     const currentAccount = await claudeConsoleAccountService.getAccount(accountId)
     if (!currentAccount) {
       return res.status(404).json({ error: 'Account not found' })
+    }
+
+    // 规范化上游错误自动防护开关
+    if (mappedUpdates.disableAutoProtection !== undefined) {
+      mappedUpdates.disableAutoProtection =
+        mappedUpdates.disableAutoProtection === true ||
+        mappedUpdates.disableAutoProtection === 'true'
     }
 
     // 处理分组的变更
