@@ -58,6 +58,34 @@
               />
             </div>
 
+            <!-- 状态筛选器 -->
+            <div class="group relative min-w-[120px]">
+              <div
+                class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-green-500 to-emerald-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+              ></div>
+              <CustomDropdown
+                v-model="statusFilter"
+                icon="fa-check-circle"
+                icon-color="text-green-500"
+                :options="statusOptions"
+                placeholder="选择状态"
+              />
+            </div>
+
+            <!-- 限流时间筛选器 -->
+            <div class="group relative min-w-[140px]">
+              <div
+                class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+              ></div>
+              <CustomDropdown
+                v-model="rateLimitFilter"
+                icon="fa-clock"
+                icon-color="text-orange-500"
+                :options="rateLimitOptions"
+                placeholder="限流时间"
+              />
+            </div>
+
             <!-- 搜索框 -->
             <div class="group relative min-w-[200px]">
               <div
@@ -83,6 +111,22 @@
           </div>
 
           <div class="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
+            <!-- 账户统计按钮 -->
+            <div class="relative">
+              <el-tooltip content="查看账户统计汇总" effect="dark" placement="bottom">
+                <button
+                  class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 sm:w-auto"
+                  @click="showAccountStatsModal = true"
+                >
+                  <div
+                    class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-violet-500 to-purple-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+                  ></div>
+                  <i class="fas fa-chart-bar relative text-violet-500" />
+                  <span class="relative">统计</span>
+                </button>
+              </el-tooltip>
+            </div>
+
             <!-- 刷新按钮 -->
             <div class="relative">
               <el-tooltip
@@ -1850,6 +1894,120 @@
       :show="showAccountTestModal"
       @close="closeAccountTestModal"
     />
+
+    <!-- 账户统计弹窗 -->
+    <el-dialog
+      v-model="showAccountStatsModal"
+      title="账户统计汇总"
+      width="90%"
+      :style="{ maxWidth: '1200px' }"
+    >
+      <div class="space-y-4">
+        <div class="overflow-x-auto">
+          <table class="w-full border-collapse text-sm" style="min-width: 800px">
+            <thead class="bg-gray-100 dark:bg-gray-700">
+              <tr>
+                <th class="border border-gray-300 px-4 py-2 text-left dark:border-gray-600">
+                  平台类型
+                </th>
+                <th class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  正常
+                </th>
+                <th class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  限流≤1h
+                </th>
+                <th class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  限流≤5h
+                </th>
+                <th class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  限流≤12h
+                </th>
+                <th class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  限流≤1d
+                </th>
+                <th class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  异常
+                </th>
+                <th
+                  class="border border-gray-300 bg-blue-50 px-4 py-2 text-center font-bold dark:border-gray-600 dark:bg-blue-900/30"
+                >
+                  合计
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="stat in accountStats" :key="stat.platform">
+                <td class="border border-gray-300 px-4 py-2 font-medium dark:border-gray-600">
+                  {{ stat.platformLabel }}
+                </td>
+                <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  <span class="text-green-600 dark:text-green-400">{{ stat.normal }}</span>
+                </td>
+                <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  <span class="text-orange-600 dark:text-orange-400">{{ stat.rateLimit1h }}</span>
+                </td>
+                <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  <span class="text-orange-600 dark:text-orange-400">{{ stat.rateLimit5h }}</span>
+                </td>
+                <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  <span class="text-orange-600 dark:text-orange-400">{{ stat.rateLimit12h }}</span>
+                </td>
+                <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  <span class="text-orange-600 dark:text-orange-400">{{ stat.rateLimit1d }}</span>
+                </td>
+                <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  <span class="text-red-600 dark:text-red-400">{{ stat.abnormal }}</span>
+                </td>
+                <td
+                  class="border border-gray-300 bg-blue-50 px-4 py-2 text-center font-bold dark:border-gray-600 dark:bg-blue-900/30"
+                >
+                  {{ stat.total }}
+                </td>
+              </tr>
+              <tr class="bg-blue-50 font-bold dark:bg-blue-900/30">
+                <td class="border border-gray-300 px-4 py-2 dark:border-gray-600">合计</td>
+                <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  <span class="text-green-600 dark:text-green-400">{{
+                    accountStatsTotal.normal
+                  }}</span>
+                </td>
+                <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  <span class="text-orange-600 dark:text-orange-400">{{
+                    accountStatsTotal.rateLimit1h
+                  }}</span>
+                </td>
+                <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  <span class="text-orange-600 dark:text-orange-400">{{
+                    accountStatsTotal.rateLimit5h
+                  }}</span>
+                </td>
+                <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  <span class="text-orange-600 dark:text-orange-400">{{
+                    accountStatsTotal.rateLimit12h
+                  }}</span>
+                </td>
+                <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  <span class="text-orange-600 dark:text-orange-400">{{
+                    accountStatsTotal.rateLimit1d
+                  }}</span>
+                </td>
+                <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  <span class="text-red-600 dark:text-red-400">{{
+                    accountStatsTotal.abnormal
+                  }}</span>
+                </td>
+                <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  {{ accountStatsTotal.total }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-sm text-gray-500 dark:text-gray-400">
+          注：限流时间列表示剩余限流时间在指定范围内的账户数量
+        </p>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -1880,6 +2038,8 @@ const bindingCounts = ref({}) // 轻量级绑定计数，用于显示"绑定: X 
 const accountGroups = ref([])
 const groupFilter = ref('all')
 const platformFilter = ref('all')
+const statusFilter = ref('normal') // 新增：状态过滤 (normal/abnormal/all)
+const rateLimitFilter = ref('all') // 新增：限流时间过滤 (all/1h/5h/12h/1d)
 const searchKeyword = ref('')
 const PAGE_SIZE_STORAGE_KEY = 'accountsPageSize'
 const getInitialPageSize = () => {
@@ -1929,6 +2089,9 @@ const expiryEditModalRef = ref(null)
 const showAccountTestModal = ref(false)
 const testingAccount = ref(null)
 
+// 账户统计弹窗状态
+const showAccountStatsModal = ref(false)
+
 // 表格横向滚动检测
 const tableContainerRef = ref(null)
 const needsHorizontalScroll = ref(false)
@@ -1961,6 +2124,20 @@ const platformOptions = ref([
   { value: 'openai-responses', label: 'OpenAI-Responses', icon: 'fa-server' },
   { value: 'ccr', label: 'CCR', icon: 'fa-code-branch' },
   { value: 'droid', label: 'Droid', icon: 'fa-robot' }
+])
+
+const statusOptions = ref([
+  { value: 'normal', label: '正常', icon: 'fa-check-circle' },
+  { value: 'abnormal', label: '异常', icon: 'fa-exclamation-triangle' },
+  { value: 'all', label: '全部状态', icon: 'fa-list' }
+])
+
+const rateLimitOptions = ref([
+  { value: 'all', label: '全部限流', icon: 'fa-infinity' },
+  { value: '1h', label: '限流≤1小时', icon: 'fa-hourglass-start' },
+  { value: '5h', label: '限流≤5小时', icon: 'fa-hourglass-half' },
+  { value: '12h', label: '限流≤12小时', icon: 'fa-hourglass-end' },
+  { value: '1d', label: '限流≤1天', icon: 'fa-calendar-day' }
 ])
 
 const groupOptions = computed(() => {
@@ -2199,6 +2376,47 @@ const sortedAccounts = computed(() => {
     )
   }
 
+  // 状态过滤 (normal/abnormal/all)
+  if (statusFilter.value !== 'all') {
+    sourceAccounts = sourceAccounts.filter((account) => {
+      const isNormal =
+        account.isActive &&
+        account.status !== 'blocked' &&
+        account.status !== 'unauthorized' &&
+        account.schedulable !== false &&
+        !isAccountRateLimited(account)
+
+      if (statusFilter.value === 'normal') {
+        return isNormal
+      } else if (statusFilter.value === 'abnormal') {
+        return !isNormal
+      }
+      return true
+    })
+  }
+
+  // 限流时间过滤 (all/1h/5h/12h/1d)
+  if (rateLimitFilter.value !== 'all') {
+    sourceAccounts = sourceAccounts.filter((account) => {
+      const rateLimitMinutes = getRateLimitRemainingMinutes(account)
+      if (!rateLimitMinutes || rateLimitMinutes <= 0) return false
+
+      const minutes = Math.floor(rateLimitMinutes)
+      switch (rateLimitFilter.value) {
+        case '1h':
+          return minutes <= 60
+        case '5h':
+          return minutes <= 300
+        case '12h':
+          return minutes <= 720
+        case '1d':
+          return minutes <= 1440
+        default:
+          return true
+      }
+    })
+  }
+
   if (!accountsSortBy.value) return sourceAccounts
 
   const sorted = [...sourceAccounts].sort((a, b) => {
@@ -2240,6 +2458,101 @@ const sortedAccounts = computed(() => {
 const totalPages = computed(() => {
   const total = sortedAccounts.value.length
   return Math.ceil(total / pageSize.value) || 0
+})
+
+// 账户统计数据（按平台和状态分类）
+const accountStats = computed(() => {
+  const platforms = [
+    { value: 'claude', label: 'Claude' },
+    { value: 'claude-console', label: 'Claude Console' },
+    { value: 'gemini', label: 'Gemini' },
+    { value: 'gemini-api', label: 'Gemini API' },
+    { value: 'openai', label: 'OpenAI' },
+    { value: 'azure_openai', label: 'Azure OpenAI' },
+    { value: 'bedrock', label: 'Bedrock' },
+    { value: 'openai-responses', label: 'OpenAI-Responses' },
+    { value: 'ccr', label: 'CCR' },
+    { value: 'droid', label: 'Droid' }
+  ]
+
+  return platforms
+    .map((p) => {
+      const platformAccounts = accounts.value.filter((acc) => acc.platform === p.value)
+
+      const normal = platformAccounts.filter((acc) => {
+        return (
+          acc.isActive &&
+          acc.status !== 'blocked' &&
+          acc.status !== 'unauthorized' &&
+          acc.schedulable !== false &&
+          !isAccountRateLimited(acc)
+        )
+      }).length
+
+      const abnormal = platformAccounts.filter((acc) => {
+        return !acc.isActive || acc.status === 'blocked' || acc.status === 'unauthorized'
+      }).length
+
+      const rateLimitedAccounts = platformAccounts.filter((acc) => isAccountRateLimited(acc))
+
+      const rateLimit1h = rateLimitedAccounts.filter((acc) => {
+        const minutes = getRateLimitRemainingMinutes(acc)
+        return minutes > 0 && minutes <= 60
+      }).length
+
+      const rateLimit5h = rateLimitedAccounts.filter((acc) => {
+        const minutes = getRateLimitRemainingMinutes(acc)
+        return minutes > 0 && minutes <= 300
+      }).length
+
+      const rateLimit12h = rateLimitedAccounts.filter((acc) => {
+        const minutes = getRateLimitRemainingMinutes(acc)
+        return minutes > 0 && minutes <= 720
+      }).length
+
+      const rateLimit1d = rateLimitedAccounts.filter((acc) => {
+        const minutes = getRateLimitRemainingMinutes(acc)
+        return minutes > 0 && minutes <= 1440
+      }).length
+
+      return {
+        platform: p.value,
+        platformLabel: p.label,
+        normal,
+        rateLimit1h,
+        rateLimit5h,
+        rateLimit12h,
+        rateLimit1d,
+        abnormal,
+        total: platformAccounts.length
+      }
+    })
+    .filter((stat) => stat.total > 0) // 只显示有账户的平台
+})
+
+// 账户统计合计
+const accountStatsTotal = computed(() => {
+  return accountStats.value.reduce(
+    (total, stat) => {
+      total.normal += stat.normal
+      total.rateLimit1h += stat.rateLimit1h
+      total.rateLimit5h += stat.rateLimit5h
+      total.rateLimit12h += stat.rateLimit12h
+      total.rateLimit1d += stat.rateLimit1d
+      total.abnormal += stat.abnormal
+      total.total += stat.total
+      return total
+    },
+    {
+      normal: 0,
+      rateLimit1h: 0,
+      rateLimit5h: 0,
+      rateLimit12h: 0,
+      rateLimit1d: 0,
+      abnormal: 0,
+      total: 0
+    }
+  )
 })
 
 const pageNumbers = computed(() => {
@@ -3012,6 +3325,45 @@ const formatRateLimitTime = (minutes) => {
     // 不到1小时，只显示分钟
     return `${mins}分钟`
   }
+}
+
+// 检查账户是否被限流
+const isAccountRateLimited = (account) => {
+  if (!account) return false
+
+  // 检查 rateLimitStatus
+  if (account.rateLimitStatus) {
+    if (typeof account.rateLimitStatus === 'string' && account.rateLimitStatus === 'limited') {
+      return true
+    }
+    if (
+      typeof account.rateLimitStatus === 'object' &&
+      account.rateLimitStatus.isRateLimited === true
+    ) {
+      return true
+    }
+  }
+
+  return false
+}
+
+// 获取限流剩余时间（分钟）
+const getRateLimitRemainingMinutes = (account) => {
+  if (!account || !account.rateLimitStatus) return 0
+
+  if (typeof account.rateLimitStatus === 'object' && account.rateLimitStatus.remainingMinutes) {
+    return account.rateLimitStatus.remainingMinutes
+  }
+
+  // 如果有 rateLimitUntil 字段，计算剩余时间
+  if (account.rateLimitUntil) {
+    const now = new Date().getTime()
+    const untilTime = new Date(account.rateLimitUntil).getTime()
+    const diff = untilTime - now
+    return diff > 0 ? Math.ceil(diff / 60000) : 0
+  }
+
+  return 0
 }
 
 // 打开创建账户模态框
