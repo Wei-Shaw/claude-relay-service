@@ -80,7 +80,7 @@ const officialModels = [
   { name: 'claude-3-opus-20240229', desc: 'Opus 3 (已弃用)', expectPro: false },
   { name: 'claude-opus-4-20250514', desc: 'Opus 4.0', expectPro: false },
   { name: 'claude-opus-4-1-20250805', desc: 'Opus 4.1', expectPro: false },
-  { name: 'claude-opus-4-5-20251101', desc: 'Opus 4.5', expectPro: true },
+  { name: 'claude-opus-4-5-20251101', desc: 'Opus 4.5', expectPro: true }
 ]
 
 // 非 Opus 模型
@@ -90,7 +90,7 @@ const nonOpusModels = [
   { name: 'claude-haiku-4-5-20251001', desc: 'Haiku 4.5' },
   { name: 'claude-3-5-haiku-20241022', desc: 'Haiku 3.5' },
   { name: 'claude-3-haiku-20240307', desc: 'Haiku 3' },
-  { name: 'claude-3-7-sonnet-20250219', desc: 'Sonnet 3.7 (已弃用)' },
+  { name: 'claude-3-7-sonnet-20250219', desc: 'Sonnet 3.7 (已弃用)' }
 ]
 
 // 其他格式测试
@@ -111,7 +111,7 @@ const otherFormats = [
   { name: 'opus-4-4', expected: false, desc: 'Opus 4-4' },
   { name: 'opus', expected: false, desc: '仅 opus' },
   { name: null, expected: false, desc: 'null' },
-  { name: '', expected: false, desc: '空字符串' },
+  { name: '', expected: false, desc: '空字符串' }
 ]
 
 console.log('='.repeat(90))
@@ -137,7 +137,9 @@ console.log()
 console.log('📌 非 Opus 模型 (不受此函数影响):')
 for (const m of nonOpusModels) {
   const result = isOpus45OrNewer(m.name)
-  console.log(`  ➖      | ${m.name.padEnd(32)} | ${m.desc.padEnd(18)} | ${result ? '⚠️ 异常' : '正确跳过'}`)
+  console.log(
+    `  ➖      | ${m.name.padEnd(32)} | ${m.desc.padEnd(18)} | ${result ? '⚠️ 异常' : '正确跳过'}`
+  )
   if (result) failed++ // 非 Opus 模型不应返回 true
 }
 
@@ -149,7 +151,9 @@ for (const m of otherFormats) {
   if (result === m.expected) passed++
   else failed++
   const display = m.name === null ? 'null' : m.name === '' ? '""' : m.name
-  console.log(`  ${status} | ${display.padEnd(25)} | ${m.desc.padEnd(18)} | ${result ? 'Pro 可用' : 'Pro 不可用'}`)
+  console.log(
+    `  ${status} | ${display.padEnd(25)} | ${m.desc.padEnd(18)} | ${result ? 'Pro 可用' : 'Pro 不可用'}`
+  )
 }
 
 console.log()
