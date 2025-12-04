@@ -1182,7 +1182,9 @@ class UnifiedClaudeScheduler {
       const client = redis.getClientSafe()
       const key = `temp_unavailable:${accountType}:${accountId}`
       await client.setex(key, ttlSeconds, '1')
-      if (sessionHash) await this._deleteSessionMapping(sessionHash)
+      if (sessionHash) {
+        await this._deleteSessionMapping(sessionHash)
+      }
       logger.warn(
         `⏱️ Account ${accountId} (${accountType}) marked temporarily unavailable for ${ttlSeconds}s`
       )
