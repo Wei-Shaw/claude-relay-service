@@ -306,26 +306,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
         url += `granularity=hour`
 
         if (dateFilter.value.customRange && dateFilter.value.customRange.length === 2) {
-          // 使用自定义时间范围 - 需要将系统时区时间转换为UTC
-          const convertToUTC = (systemTzTimeStr) => {
-            // 固定使用UTC+8，因为后端系统时区是UTC+8
-            const systemTz = 8
-            // 解析系统时区时间字符串
-            const [datePart, timePart] = systemTzTimeStr.split(' ')
-            const [year, month, day] = datePart.split('-').map(Number)
-            const [hours, minutes, seconds] = timePart.split(':').map(Number)
-
-            // 创建UTC时间，使其在系统时区显示为用户选择的时间
-            // 例如：用户选择 UTC+8 的 2025-07-25 00:00:00
-            // 对应的UTC时间是 2025-07-24 16:00:00
-            const utcDate = new Date(
-              Date.UTC(year, month - 1, day, hours - systemTz, minutes, seconds)
-            )
-            return utcDate.toISOString()
-          }
-
-          url += `&startDate=${encodeURIComponent(convertToUTC(dateFilter.value.customRange[0]))}`
-          url += `&endDate=${encodeURIComponent(convertToUTC(dateFilter.value.customRange[1]))}`
+          // 使用自定义时间范围 - 直接按系统时区字符串传递，避免额外时区偏移导致窗口错位
+          url += `&startDate=${encodeURIComponent(dateFilter.value.customRange[0])}`
+          url += `&endDate=${encodeURIComponent(dateFilter.value.customRange[1])}`
         } else {
           // 使用预设计算时间范围，与loadApiKeysTrend保持一致
           const now = new Date()
@@ -397,21 +380,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
       // 如果是自定义时间范围或小时粒度，传递具体的时间参数
       if (dateFilter.value.type === 'custom' || currentGranularity === 'hour') {
         if (dateFilter.value.customRange && dateFilter.value.customRange.length === 2) {
-          // 将系统时区时间转换为UTC
-          const convertToUTC = (systemTzTimeStr) => {
-            const systemTz = 8
-            const [datePart, timePart] = systemTzTimeStr.split(' ')
-            const [year, month, day] = datePart.split('-').map(Number)
-            const [hours, minutes, seconds] = timePart.split(':').map(Number)
-
-            const utcDate = new Date(
-              Date.UTC(year, month - 1, day, hours - systemTz, minutes, seconds)
-            )
-            return utcDate.toISOString()
-          }
-
-          url += `&startDate=${encodeURIComponent(convertToUTC(dateFilter.value.customRange[0]))}`
-          url += `&endDate=${encodeURIComponent(convertToUTC(dateFilter.value.customRange[1]))}`
+          // 按系统时区字符串直传，避免额外时区转换
+          url += `&startDate=${encodeURIComponent(dateFilter.value.customRange[0])}`
+          url += `&endDate=${encodeURIComponent(dateFilter.value.customRange[1])}`
         } else if (currentGranularity === 'hour' && dateFilter.value.type === 'preset') {
           // 小时粒度的预设时间范围
           const now = new Date()
@@ -497,26 +468,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
         url += `granularity=hour`
 
         if (dateFilter.value.customRange && dateFilter.value.customRange.length === 2) {
-          // 使用自定义时间范围 - 需要将系统时区时间转换为UTC
-          const convertToUTC = (systemTzTimeStr) => {
-            // 固定使用UTC+8，因为后端系统时区是UTC+8
-            const systemTz = 8
-            // 解析系统时区时间字符串
-            const [datePart, timePart] = systemTzTimeStr.split(' ')
-            const [year, month, day] = datePart.split('-').map(Number)
-            const [hours, minutes, seconds] = timePart.split(':').map(Number)
-
-            // 创建UTC时间，使其在系统时区显示为用户选择的时间
-            // 例如：用户选择 UTC+8 的 2025-07-25 00:00:00
-            // 对应的UTC时间是 2025-07-24 16:00:00
-            const utcDate = new Date(
-              Date.UTC(year, month - 1, day, hours - systemTz, minutes, seconds)
-            )
-            return utcDate.toISOString()
-          }
-
-          url += `&startDate=${encodeURIComponent(convertToUTC(dateFilter.value.customRange[0]))}`
-          url += `&endDate=${encodeURIComponent(convertToUTC(dateFilter.value.customRange[1]))}`
+          // 使用自定义时间范围 - 按系统时区字符串直传
+          url += `&startDate=${encodeURIComponent(dateFilter.value.customRange[0])}`
+          url += `&endDate=${encodeURIComponent(dateFilter.value.customRange[1])}`
         } else {
           // 使用预设计算时间范围，与setDateFilterPreset保持一致
           const now = new Date()
@@ -604,20 +558,8 @@ export const useDashboardStore = defineStore('dashboard', () => {
         url += `granularity=hour`
 
         if (dateFilter.value.customRange && dateFilter.value.customRange.length === 2) {
-          const convertToUTC = (systemTzTimeStr) => {
-            const systemTz = 8
-            const [datePart, timePart] = systemTzTimeStr.split(' ')
-            const [year, month, day] = datePart.split('-').map(Number)
-            const [hours, minutes, seconds] = timePart.split(':').map(Number)
-
-            const utcDate = new Date(
-              Date.UTC(year, month - 1, day, hours - systemTz, minutes, seconds)
-            )
-            return utcDate.toISOString()
-          }
-
-          url += `&startDate=${encodeURIComponent(convertToUTC(dateFilter.value.customRange[0]))}`
-          url += `&endDate=${encodeURIComponent(convertToUTC(dateFilter.value.customRange[1]))}`
+          url += `&startDate=${encodeURIComponent(dateFilter.value.customRange[0])}`
+          url += `&endDate=${encodeURIComponent(dateFilter.value.customRange[1])}`
         } else {
           const now = new Date()
           let startTime
@@ -750,17 +692,14 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
 
     const formatDateForDisplay = (date) => {
-      // 固定使用UTC+8来显示时间
-      const systemTz = 8
-      const tzOffset = systemTz * 60 * 60 * 1000
-      const localTime = new Date(date.getTime() + tzOffset)
-
-      const year = localTime.getUTCFullYear()
-      const month = String(localTime.getUTCMonth() + 1).padStart(2, '0')
-      const day = String(localTime.getUTCDate()).padStart(2, '0')
-      const hours = String(localTime.getUTCHours()).padStart(2, '0')
-      const minutes = String(localTime.getUTCMinutes()).padStart(2, '0')
-      const seconds = String(localTime.getUTCSeconds()).padStart(2, '0')
+      // 使用本地时间直接格式化，避免多余的时区偏移导致日期错位
+      const localTime = new Date(date)
+      const year = localTime.getFullYear()
+      const month = String(localTime.getMonth() + 1).padStart(2, '0')
+      const day = String(localTime.getDate()).padStart(2, '0')
+      const hours = String(localTime.getHours()).padStart(2, '0')
+      const minutes = String(localTime.getMinutes()).padStart(2, '0')
+      const seconds = String(localTime.getSeconds()).padStart(2, '0')
       return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
     }
 
