@@ -705,7 +705,7 @@ router.post('/cleanup', authenticateAdmin, async (req, res) => {
 })
 
 // 📊 获取最近的使用记录
-router.get('/usage-records', authenticateAdmin, async (req, res) => {
+router.get('/dashboard/usage-records', authenticateAdmin, async (req, res) => {
   try {
     const { limit = 100, offset = 0 } = req.query
     const limitNum = Math.min(parseInt(limit) || 100, 500) // 最多500条
@@ -774,8 +774,44 @@ router.get('/usage-records', authenticateAdmin, async (req, res) => {
             return
           }
 
-          // 其他平台账户...
-          accountNameMap[accountId] = accountId // 降级显示ID
+          const bedrockAcc = await redis.getBedrockAccount(accountId)
+          if (bedrockAcc && bedrockAcc.name) {
+            accountNameMap[accountId] = bedrockAcc.name
+            return
+          }
+
+          const azureAcc = await redis.getAzureOpenaiAccount(accountId)
+          if (azureAcc && azureAcc.name) {
+            accountNameMap[accountId] = azureAcc.name
+            return
+          }
+
+          const openaiResponsesAcc = await redis.getOpenaiResponsesAccount(accountId)
+          if (openaiResponsesAcc && openaiResponsesAcc.name) {
+            accountNameMap[accountId] = openaiResponsesAcc.name
+            return
+          }
+
+          const droidAcc = await redis.getDroidAccount(accountId)
+          if (droidAcc && droidAcc.name) {
+            accountNameMap[accountId] = droidAcc.name
+            return
+          }
+
+          const ccrAcc = await redis.getCcrAccount(accountId)
+          if (ccrAcc && ccrAcc.name) {
+            accountNameMap[accountId] = ccrAcc.name
+            return
+          }
+
+          const openaiAcc = await redis.getOpenaiAccount(accountId)
+          if (openaiAcc && openaiAcc.name) {
+            accountNameMap[accountId] = openaiAcc.name
+            return
+          }
+
+          // 降级显示ID
+          accountNameMap[accountId] = accountId
         } catch (error) {
           accountNameMap[accountId] = accountId
         }
