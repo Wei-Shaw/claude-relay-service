@@ -371,7 +371,9 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
         logger.info(`  endDate (raw): ${endDate}`)
         logger.info(`  startTime (parsed): ${startTime.toISOString()}`)
         logger.info(`  endTime (parsed): ${endTime.toISOString()}`)
-        logger.info(`  System timezone offset: ${require('../../../config/config').system.timezoneOffset || 8}`)
+        logger.info(
+          `  System timezone offset: ${require('../../../config/config').system.timezoneOffset || 8}`
+        )
       } else {
         // 默认最近24小时
         endTime = new Date()
@@ -1841,7 +1843,10 @@ router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res)
     const startTime = startDate ? new Date(startDate) : null
     const endTime = endDate ? new Date(endDate) : null
 
-    if ((startDate && Number.isNaN(startTime?.getTime())) || (endDate && Number.isNaN(endTime?.getTime()))) {
+    if (
+      (startDate && Number.isNaN(startTime?.getTime())) ||
+      (endDate && Number.isNaN(endTime?.getTime()))
+    ) {
       return res.status(400).json({ success: false, error: 'Invalid date range' })
     }
 
@@ -2071,14 +2076,13 @@ router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res)
           record.costFormatted ||
           costData?.formatted?.total ||
           CostCalculator.formatCost(computedCost),
-        costBreakdown:
-          record.costBreakdown || {
-            input: costData?.costs?.input || 0,
-            output: costData?.costs?.output || 0,
-            cacheCreate: costData?.costs?.cacheWrite || 0,
-            cacheRead: costData?.costs?.cacheRead || 0,
-            total: costData?.costs?.total || computedCost
-          },
+        costBreakdown: record.costBreakdown || {
+          input: costData?.costs?.input || 0,
+          output: costData?.costs?.output || 0,
+          cacheCreate: costData?.costs?.cacheWrite || 0,
+          cacheRead: costData?.costs?.cacheRead || 0,
+          total: costData?.costs?.total || computedCost
+        },
         responseTime: record.responseTime || null
       })
     }
