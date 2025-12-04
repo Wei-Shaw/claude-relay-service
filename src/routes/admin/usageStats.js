@@ -150,7 +150,6 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
           accountData = await geminiAccountService.getAccount(accountId)
           break
         case 'gemini-api': {
-          const geminiApiAccountService = require('../../services/geminiApiAccountService')
           accountData = await geminiApiAccountService.getAccount(accountId)
           break
         }
@@ -894,7 +893,6 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
         })
       ]
     } else if (group === 'gemini') {
-      const geminiApiAccountService = require('../../services/geminiApiAccountService')
       const [geminiAccounts, geminiApiAccounts] = await Promise.all([
         geminiAccountService.getAllAccounts(),
         geminiApiAccountService.getAllAccounts(true)
