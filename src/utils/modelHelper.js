@@ -81,10 +81,14 @@ function getVendorType(modelStr) {
  * @returns {boolean} - 是否为 Opus 4.5+
  */
 function isOpus45OrNewer(modelName) {
-  if (!modelName) return false
+  if (!modelName) {
+    return false
+  }
 
   const lowerModel = modelName.toLowerCase()
-  if (!lowerModel.includes('opus')) return false
+  if (!lowerModel.includes('opus')) {
+    return false
+  }
 
   // 处理 latest 特殊情况
   if (lowerModel.includes('opus-latest') || lowerModel.includes('opus_latest')) {
@@ -93,14 +97,18 @@ function isOpus45OrNewer(modelName) {
 
   // 旧格式: claude-{version}-opus (版本在 opus 前面)
   // 例如: claude-3-opus-20240229, claude-3.5-opus
-  const oldFormatMatch = lowerModel.match(/claude[- ](\d+)(?:[\.-](\d+))?[- ]opus/)
+  const oldFormatMatch = lowerModel.match(/claude[- ](\d+)(?:[.-](\d+))?[- ]opus/)
   if (oldFormatMatch) {
     const majorVersion = parseInt(oldFormatMatch[1], 10)
     const minorVersion = oldFormatMatch[2] ? parseInt(oldFormatMatch[2], 10) : 0
 
     // 旧格式的版本号指的是 Claude 大版本
-    if (majorVersion > 4) return true
-    if (majorVersion === 4 && minorVersion >= 5) return true
+    if (majorVersion > 4) {
+      return true
+    }
+    if (majorVersion === 4 && minorVersion >= 5) {
+      return true
+    }
     return false
   }
 
@@ -111,8 +119,12 @@ function isOpus45OrNewer(modelName) {
     const majorVersion = parseInt(dotFormatMatch[1], 10)
     const minorVersion = parseInt(dotFormatMatch[2], 10)
 
-    if (majorVersion > 4) return true
-    if (majorVersion === 4 && minorVersion >= 5) return true
+    if (majorVersion > 4) {
+      return true
+    }
+    if (majorVersion === 4 && minorVersion >= 5) {
+      return true
+    }
     return false
   }
 
@@ -133,8 +145,12 @@ function isOpus45OrNewer(modelName) {
     const majorVersion = parseInt(versionMatch[1], 10)
     const minorVersion = versionMatch[2] ? parseInt(versionMatch[2], 10) : 0
 
-    if (majorVersion > 4) return true
-    if (majorVersion === 4 && minorVersion >= 5) return true
+    if (majorVersion > 4) {
+      return true
+    }
+    if (majorVersion === 4 && minorVersion >= 5) {
+      return true
+    }
     return false
   }
 

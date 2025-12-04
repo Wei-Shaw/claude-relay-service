@@ -14,10 +14,14 @@
  * @returns {boolean} - 是否为 Opus 4.5+
  */
 function isOpus45OrNewer(modelName) {
-  if (!modelName) return false
+  if (!modelName) {
+    return false
+  }
 
   const lowerModel = modelName.toLowerCase()
-  if (!lowerModel.includes('opus')) return false
+  if (!lowerModel.includes('opus')) {
+    return false
+  }
 
   // 处理 latest 特殊情况
   if (lowerModel.includes('opus-latest') || lowerModel.includes('opus_latest')) {
@@ -26,14 +30,18 @@ function isOpus45OrNewer(modelName) {
 
   // 旧格式: claude-{version}-opus (版本在 opus 前面)
   // 例如: claude-3-opus-20240229, claude-3.5-opus
-  const oldFormatMatch = lowerModel.match(/claude[- ](\d+)(?:[\.-](\d+))?[- ]opus/)
+  const oldFormatMatch = lowerModel.match(/claude[- ](\d+)(?:[.-](\d+))?[- ]opus/)
   if (oldFormatMatch) {
     const majorVersion = parseInt(oldFormatMatch[1], 10)
     const minorVersion = oldFormatMatch[2] ? parseInt(oldFormatMatch[2], 10) : 0
 
     // 旧格式的版本号指的是 Claude 大版本
-    if (majorVersion > 4) return true
-    if (majorVersion === 4 && minorVersion >= 5) return true
+    if (majorVersion > 4) {
+      return true
+    }
+    if (majorVersion === 4 && minorVersion >= 5) {
+      return true
+    }
     return false
   }
 
@@ -44,8 +52,12 @@ function isOpus45OrNewer(modelName) {
     const majorVersion = parseInt(dotFormatMatch[1], 10)
     const minorVersion = parseInt(dotFormatMatch[2], 10)
 
-    if (majorVersion > 4) return true
-    if (majorVersion === 4 && minorVersion >= 5) return true
+    if (majorVersion > 4) {
+      return true
+    }
+    if (majorVersion === 4 && minorVersion >= 5) {
+      return true
+    }
     return false
   }
 
@@ -66,8 +78,12 @@ function isOpus45OrNewer(modelName) {
     const majorVersion = parseInt(versionMatch[1], 10)
     const minorVersion = versionMatch[2] ? parseInt(versionMatch[2], 10) : 0
 
-    if (majorVersion > 4) return true
-    if (majorVersion === 4 && minorVersion >= 5) return true
+    if (majorVersion > 4) {
+      return true
+    }
+    if (majorVersion === 4 && minorVersion >= 5) {
+      return true
+    }
     return false
   }
 
@@ -127,8 +143,11 @@ console.log('📌 官方 Opus 模型:')
 for (const m of officialModels) {
   const result = isOpus45OrNewer(m.name)
   const status = result === m.expectPro ? '✅ PASS' : '❌ FAIL'
-  if (result === m.expectPro) passed++
-  else failed++
+  if (result === m.expectPro) {
+    passed++
+  } else {
+    failed++
+  }
   const proSupport = result ? 'Pro 可用 ✅' : 'Pro 不可用 ❌'
   console.log(`  ${status} | ${m.name.padEnd(32)} | ${m.desc.padEnd(18)} | ${proSupport}`)
 }
@@ -140,7 +159,9 @@ for (const m of nonOpusModels) {
   console.log(
     `  ➖      | ${m.name.padEnd(32)} | ${m.desc.padEnd(18)} | ${result ? '⚠️ 异常' : '正确跳过'}`
   )
-  if (result) failed++ // 非 Opus 模型不应返回 true
+  if (result) {
+    failed++ // 非 Opus 模型不应返回 true
+  }
 }
 
 console.log()
@@ -148,8 +169,11 @@ console.log('📌 其他格式测试:')
 for (const m of otherFormats) {
   const result = isOpus45OrNewer(m.name)
   const status = result === m.expected ? '✅ PASS' : '❌ FAIL'
-  if (result === m.expected) passed++
-  else failed++
+  if (result === m.expected) {
+    passed++
+  } else {
+    failed++
+  }
   const display = m.name === null ? 'null' : m.name === '' ? '""' : m.name
   console.log(
     `  ${status} | ${display.padEnd(25)} | ${m.desc.padEnd(18)} | ${result ? 'Pro 可用' : 'Pro 不可用'}`
