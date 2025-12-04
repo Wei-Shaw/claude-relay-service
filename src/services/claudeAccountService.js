@@ -16,6 +16,7 @@ const {
 const tokenRefreshService = require('./tokenRefreshService')
 const LRUCache = require('../utils/lruCache')
 const { formatDateWithTimezone, getISOStringWithTimezone } = require('../utils/dateHelper')
+const { isOpus45OrNewer } = require('../utils/modelHelper')
 
 class ClaudeAccountService {
   constructor() {
@@ -852,22 +853,32 @@ class ClaudeAccountService {
           !this.isSubscriptionExpired(account)
       )
 
-      // 如果请求的是 Opus 模型，过滤掉 Pro 和 Free 账号
+      // 如果请求的是 Opus 模型，根据账号类型和模型版本过滤
       if (modelName && modelName.toLowerCase().includes('opus')) {
+        const isNewOpus = isOpus45OrNewer(modelName)
+
         activeAccounts = activeAccounts.filter((account) => {
-          // 检查账号的订阅信息
           if (account.subscriptionInfo) {
             try {
               const info = JSON.parse(account.subscriptionInfo)
-              // Pro 和 Free 账号不支持 Opus
+
+              // Free 账号不支持任何 Opus 模型
+              if (info.accountType === 'claude_free' || info.accountType === 'free') {
+                return false
+              }
+
+              // Pro 账号：仅支持 Opus 4.5+
               if (info.hasClaudePro === true && info.hasClaudeMax !== true) {
-                return false // Claude Pro 不支持 Opus
+                return isNewOpus // 仅新版 Opus 支持
               }
-              if (info.accountType === 'claude_pro' || info.accountType === 'claude_free') {
-                return false // 明确标记为 Pro 或 Free 的账号不支持
+              if (info.accountType === 'claude_pro') {
+                return isNewOpus // 仅新版 Opus 支持
               }
+
+              // Max 账号支持所有 Opus 版本
+              return true
             } catch (e) {
-              // 解析失败，假设为旧数据，默认支持（兼容旧数据为 Max）
+              // 解析失败，假设为旧数据（Max），默认支持
               return true
             }
           }
@@ -876,7 +887,8 @@ class ClaudeAccountService {
         })
 
         if (activeAccounts.length === 0) {
-          throw new Error('No Claude accounts available that support Opus model')
+          const modelDesc = isNewOpus ? 'Opus 4.5+' : 'legacy Opus (requires Max subscription)'
+          throw new Error(`No Claude accounts available that support ${modelDesc} model`)
         }
       }
 
@@ -970,22 +982,32 @@ class ClaudeAccountService {
           !this.isSubscriptionExpired(account)
       )
 
-      // 如果请求的是 Opus 模型，过滤掉 Pro 和 Free 账号
+      // 如果请求的是 Opus 模型，根据账号类型和模型版本过滤
       if (modelName && modelName.toLowerCase().includes('opus')) {
+        const isNewOpus = isOpus45OrNewer(modelName)
+
         sharedAccounts = sharedAccounts.filter((account) => {
-          // 检查账号的订阅信息
           if (account.subscriptionInfo) {
             try {
               const info = JSON.parse(account.subscriptionInfo)
-              // Pro 和 Free 账号不支持 Opus
+
+              // Free 账号不支持任何 Opus 模型
+              if (info.accountType === 'claude_free' || info.accountType === 'free') {
+                return false
+              }
+
+              // Pro 账号：仅支持 Opus 4.5+
               if (info.hasClaudePro === true && info.hasClaudeMax !== true) {
-                return false // Claude Pro 不支持 Opus
+                return isNewOpus // 仅新版 Opus 支持
               }
-              if (info.accountType === 'claude_pro' || info.accountType === 'claude_free') {
-                return false // 明确标记为 Pro 或 Free 的账号不支持
+              if (info.accountType === 'claude_pro') {
+                return isNewOpus // 仅新版 Opus 支持
               }
+
+              // Max 账号支持所有 Opus 版本
+              return true
             } catch (e) {
-              // 解析失败，假设为旧数据，默认支持（兼容旧数据为 Max）
+              // 解析失败，假设为旧数据（Max），默认支持
               return true
             }
           }
@@ -994,7 +1016,8 @@ class ClaudeAccountService {
         })
 
         if (sharedAccounts.length === 0) {
-          throw new Error('No shared Claude accounts available that support Opus model')
+          const modelDesc = isNewOpus ? 'Opus 4.5+' : 'legacy Opus (requires Max subscription)'
+          throw new Error(`No shared Claude accounts available that support ${modelDesc} model`)
         }
       }
 

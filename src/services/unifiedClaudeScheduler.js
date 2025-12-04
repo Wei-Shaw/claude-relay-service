@@ -5,7 +5,7 @@ const ccrAccountService = require('./ccrAccountService')
 const accountGroupService = require('./accountGroupService')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
-const { parseVendorPrefixedModel } = require('../utils/modelHelper')
+const { parseVendorPrefixedModel, isOpus45OrNewer } = require('../utils/modelHelper')
 
 class UnifiedClaudeScheduler {
   constructor() {
@@ -48,6 +48,8 @@ class UnifiedClaudeScheduler {
 
       // 2. Opus 模型的订阅级别检查
       if (requestedModel.toLowerCase().includes('opus')) {
+        const isNewOpus = isOpus45OrNewer(requestedModel)
+
         if (account.subscriptionInfo) {
           try {
             const info =
@@ -55,21 +57,39 @@ class UnifiedClaudeScheduler {
                 ? JSON.parse(account.subscriptionInfo)
                 : account.subscriptionInfo
 
-            // Pro 和 Free 账号不支持 Opus
+            // Free 账号不支持任何 Opus 模型
+            if (info.accountType === 'claude_free' || info.accountType === 'free') {
+              logger.info(
+                `🚫 Claude account ${account.name} (Free) does not support Opus model${context ? ` ${context}` : ''}`
+              )
+              return false
+            }
+
+            // Pro 账号：仅支持 Opus 4.5+
             if (info.hasClaudePro === true && info.hasClaudeMax !== true) {
-              logger.info(
-                `🚫 Claude account ${account.name} (Pro) does not support Opus model${context ? ` ${context}` : ''}`
-              )
-              return false
+              if (!isNewOpus) {
+                logger.info(
+                  `🚫 Claude account ${account.name} (Pro) does not support legacy Opus model${context ? ` ${context}` : ''}`
+                )
+                return false
+              }
+              // Opus 4.5+ 支持
+              return true
             }
-            if (info.accountType === 'claude_pro' || info.accountType === 'claude_free') {
-              logger.info(
-                `🚫 Claude account ${account.name} (${info.accountType}) does not support Opus model${context ? ` ${context}` : ''}`
-              )
-              return false
+            if (info.accountType === 'claude_pro') {
+              if (!isNewOpus) {
+                logger.info(
+                  `🚫 Claude account ${account.name} (Pro) does not support legacy Opus model${context ? ` ${context}` : ''}`
+                )
+                return false
+              }
+              // Opus 4.5+ 支持
+              return true
             }
+
+            // Max 账号支持所有 Opus 版本
           } catch (e) {
-            // 解析失败，假设为旧数据，默认支持（兼容旧数据为 Max）
+            // 解析失败，假设为旧数据（Max），默认支持
             logger.debug(
               `Account ${account.name} has invalid subscriptionInfo${context ? ` ${context}` : ''}, assuming Max`
             )
