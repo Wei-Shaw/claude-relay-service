@@ -676,21 +676,19 @@
 
     <!-- 最近使用记录 -->
     <div class="mb-4 sm:mb-6 md:mb-8">
-      <div class="card p-4 sm:p-6">
-        <div class="mb-4 flex items-center justify-between">
-          <h4 class="text-base font-semibold text-gray-800 dark:text-gray-200 sm:text-lg">
-            最近使用记录
-          </h4>
-          <button
-            class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-            :disabled="usageRecordsLoading"
-            @click="loadUsageRecords"
-          >
-            <i :class="['fas', usageRecordsLoading ? 'fa-spinner fa-spin' : 'fa-sync-alt']"></i>
-            <span class="ml-1">刷新</span>
-          </button>
-        </div>
+      <div class="mb-4 flex items-center justify-between sm:mb-6">
+        <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">最近使用记录</h3>
+        <button
+          class="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-blue-600 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-700 sm:gap-2"
+          :disabled="usageRecordsLoading"
+          @click="loadUsageRecords"
+        >
+          <i :class="['fas fa-sync-alt text-xs', { 'animate-spin': usageRecordsLoading }]"></i>
+          <span class="hidden sm:inline">{{ usageRecordsLoading ? '刷新中' : '刷新' }}</span>
+        </button>
+      </div>
 
+      <div class="card p-4 sm:p-6">
         <div v-if="usageRecordsLoading" class="py-12 text-center">
           <div class="loading-spinner mx-auto mb-4"></div>
           <p class="text-gray-500 dark:text-gray-400">正在加载使用记录...</p>
@@ -701,110 +699,94 @@
         </div>
 
         <div v-else class="overflow-x-auto">
-          <table class="w-full min-w-[800px] text-sm">
+          <table class="w-full" style="min-width: 1100px">
             <thead class="bg-gray-50 dark:bg-gray-700/50">
               <tr>
                 <th
-                  class="border-b border-gray-200 px-3 py-2 text-left font-medium text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                  class="min-w-[140px] border-b border-gray-200 px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:border-gray-600 dark:text-gray-300"
                 >
                   时间
                 </th>
                 <th
-                  class="border-b border-gray-200 px-3 py-2 text-left font-medium text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                  class="min-w-[140px] border-b border-gray-200 px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:border-gray-600 dark:text-gray-300"
                 >
                   API Key
                 </th>
                 <th
-                  class="border-b border-gray-200 px-3 py-2 text-left font-medium text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                  class="min-w-[140px] border-b border-gray-200 px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:border-gray-600 dark:text-gray-300"
                 >
                   账户
                 </th>
                 <th
-                  class="border-b border-gray-200 px-3 py-2 text-left font-medium text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                  class="min-w-[180px] border-b border-gray-200 px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:border-gray-600 dark:text-gray-300"
                 >
                   模型
                 </th>
                 <th
-                  class="border-b border-gray-200 px-3 py-2 text-right font-medium text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                  class="min-w-[90px] border-b border-gray-200 px-3 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:border-gray-600 dark:text-gray-300"
                 >
                   输入
                 </th>
                 <th
-                  class="border-b border-gray-200 px-3 py-2 text-right font-medium text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                  class="min-w-[90px] border-b border-gray-200 px-3 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:border-gray-600 dark:text-gray-300"
                 >
                   输出
                 </th>
                 <th
-                  class="border-b border-gray-200 px-3 py-2 text-right font-medium text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                  class="min-w-[90px] border-b border-gray-200 px-3 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:border-gray-600 dark:text-gray-300"
                 >
                   缓存创建
                 </th>
                 <th
-                  class="border-b border-gray-200 px-3 py-2 text-right font-medium text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                  class="min-w-[90px] border-b border-gray-200 px-3 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:border-gray-600 dark:text-gray-300"
                 >
                   缓存读取
                 </th>
                 <th
-                  class="border-b border-gray-200 px-3 py-2 text-right font-medium text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                  class="min-w-[100px] border-b border-gray-200 px-3 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:border-gray-600 dark:text-gray-300"
                 >
                   成本
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody class="divide-y divide-gray-200/50 dark:divide-gray-600/50">
               <tr
                 v-for="(record, index) in usageRecords"
                 :key="index"
                 class="hover:bg-gray-50 dark:hover:bg-gray-700/30"
               >
-                <td
-                  class="border-b border-gray-100 px-3 py-2 text-gray-700 dark:border-gray-700 dark:text-gray-300"
-                >
+                <td class="px-3 py-3 text-sm text-gray-700 dark:text-gray-300">
                   {{ formatRecordTime(record.timestamp) }}
                 </td>
-                <td
-                  class="border-b border-gray-100 px-3 py-2 text-gray-700 dark:border-gray-700 dark:text-gray-300"
-                >
-                  <div class="max-w-[120px] truncate" :title="record.apiKeyName">
+                <td class="px-3 py-3 text-sm text-gray-700 dark:text-gray-300">
+                  <div class="truncate" :title="record.apiKeyName">
                     {{ record.apiKeyName }}
                   </div>
                 </td>
-                <td
-                  class="border-b border-gray-100 px-3 py-2 text-gray-700 dark:border-gray-700 dark:text-gray-300"
-                >
-                  <div class="max-w-[120px] truncate" :title="record.accountName">
+                <td class="px-3 py-3 text-sm text-gray-700 dark:text-gray-300">
+                  <div class="truncate" :title="record.accountName">
                     {{ record.accountName }}
                   </div>
                 </td>
-                <td
-                  class="border-b border-gray-100 px-3 py-2 text-gray-700 dark:border-gray-700 dark:text-gray-300"
-                >
-                  <div class="max-w-[150px] truncate" :title="record.model">
+                <td class="px-3 py-3 text-sm text-gray-700 dark:text-gray-300">
+                  <div class="truncate" :title="record.model">
                     {{ record.model }}
                   </div>
                 </td>
-                <td
-                  class="border-b border-gray-100 px-3 py-2 text-right text-gray-700 dark:border-gray-700 dark:text-gray-300"
-                >
+                <td class="px-3 py-3 text-right text-sm text-gray-700 dark:text-gray-300">
                   {{ formatNumber(record.inputTokens) }}
                 </td>
-                <td
-                  class="border-b border-gray-100 px-3 py-2 text-right text-gray-700 dark:border-gray-700 dark:text-gray-300"
-                >
+                <td class="px-3 py-3 text-right text-sm text-gray-700 dark:text-gray-300">
                   {{ formatNumber(record.outputTokens) }}
                 </td>
-                <td
-                  class="border-b border-gray-100 px-3 py-2 text-right text-gray-700 dark:border-gray-700 dark:text-gray-300"
-                >
+                <td class="px-3 py-3 text-right text-sm text-gray-700 dark:text-gray-300">
                   {{ formatNumber(record.cacheCreateTokens) }}
                 </td>
-                <td
-                  class="border-b border-gray-100 px-3 py-2 text-right text-gray-700 dark:border-gray-700 dark:text-gray-300"
-                >
+                <td class="px-3 py-3 text-right text-sm text-gray-700 dark:text-gray-300">
                   {{ formatNumber(record.cacheReadTokens) }}
                 </td>
                 <td
-                  class="border-b border-gray-100 px-3 py-2 text-right font-medium text-gray-700 dark:border-gray-700 dark:text-gray-300"
+                  class="px-3 py-3 text-right text-sm font-medium text-gray-900 dark:text-gray-100"
                 >
                   ${{ formatCost(record.cost) }}
                 </td>
@@ -813,14 +795,120 @@
           </table>
 
           <!-- 分页 -->
-          <div v-if="usageRecordsTotal > usageRecords.length" class="mt-4 flex justify-center">
-            <button
-              class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-              :disabled="usageRecordsLoading"
-              @click="loadMoreUsageRecords"
-            >
-              加载更多 (剩余 {{ usageRecordsTotal - usageRecords.length }} 条)
-            </button>
+          <div v-if="usageRecordsTotal > 0" class="mt-4 space-y-3">
+            <!-- 分页信息和每页数量选择 -->
+            <div class="flex flex-wrap items-center justify-between gap-3 text-sm">
+              <div class="text-gray-600 dark:text-gray-400">
+                显示 {{ (usageRecordsCurrentPage - 1) * usageRecordsPageSize + 1 }} -
+                {{ Math.min(usageRecordsCurrentPage * usageRecordsPageSize, usageRecordsTotal) }}
+                条，共 {{ usageRecordsTotal }} 条
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-gray-600 dark:text-gray-400">每页显示：</span>
+                <select
+                  v-model.number="usageRecordsPageSize"
+                  class="rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                  @change="handleUsageRecordsPageSizeChange(usageRecordsPageSize)"
+                >
+                  <option v-for="size in usageRecordsPageSizeOptions" :key="size" :value="size">
+                    {{ size }} 条
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            <!-- 分页按钮 -->
+            <div class="flex justify-center gap-2">
+              <!-- 上一页 -->
+              <button
+                class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                :disabled="usageRecordsCurrentPage === 1 || usageRecordsLoading"
+                @click="handleUsageRecordsPageChange(usageRecordsCurrentPage - 1)"
+              >
+                <i class="fas fa-chevron-left" />
+              </button>
+
+              <!-- 页码 -->
+              <template v-if="usageRecordsTotalPages <= 7">
+                <button
+                  v-for="page in usageRecordsTotalPages"
+                  :key="page"
+                  class="min-w-[36px] rounded-lg border px-3 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  :class="
+                    page === usageRecordsCurrentPage
+                      ? 'border-blue-500 bg-blue-500 text-white'
+                      : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                  "
+                  :disabled="usageRecordsLoading"
+                  @click="handleUsageRecordsPageChange(page)"
+                >
+                  {{ page }}
+                </button>
+              </template>
+              <template v-else>
+                <!-- 第一页 -->
+                <button
+                  class="min-w-[36px] rounded-lg border px-3 py-1.5 text-sm transition-colors"
+                  :class="
+                    1 === usageRecordsCurrentPage
+                      ? 'border-blue-500 bg-blue-500 text-white'
+                      : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                  "
+                  @click="handleUsageRecordsPageChange(1)"
+                >
+                  1
+                </button>
+                <!-- 省略号 -->
+                <span v-if="usageRecordsCurrentPage > 3" class="px-2 text-gray-500">...</span>
+                <!-- 当前页附近的页码 -->
+                <button
+                  v-for="page in [
+                    usageRecordsCurrentPage - 1,
+                    usageRecordsCurrentPage,
+                    usageRecordsCurrentPage + 1
+                  ].filter((p) => p > 1 && p < usageRecordsTotalPages)"
+                  :key="page"
+                  class="min-w-[36px] rounded-lg border px-3 py-1.5 text-sm transition-colors"
+                  :class="
+                    page === usageRecordsCurrentPage
+                      ? 'border-blue-500 bg-blue-500 text-white'
+                      : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                  "
+                  @click="handleUsageRecordsPageChange(page)"
+                >
+                  {{ page }}
+                </button>
+                <!-- 省略号 -->
+                <span
+                  v-if="usageRecordsCurrentPage < usageRecordsTotalPages - 2"
+                  class="px-2 text-gray-500"
+                  >...</span
+                >
+                <!-- 最后一页 -->
+                <button
+                  class="min-w-[36px] rounded-lg border px-3 py-1.5 text-sm transition-colors"
+                  :class="
+                    usageRecordsTotalPages === usageRecordsCurrentPage
+                      ? 'border-blue-500 bg-blue-500 text-white'
+                      : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                  "
+                  @click="handleUsageRecordsPageChange(usageRecordsTotalPages)"
+                >
+                  {{ usageRecordsTotalPages }}
+                </button>
+              </template>
+
+              <!-- 下一页 -->
+              <button
+                class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                :disabled="
+                  usageRecordsCurrentPage === usageRecordsTotalPages || usageRecordsLoading
+                "
+                @click="handleUsageRecordsPageChange(usageRecordsCurrentPage + 1)"
+              >
+                <i class="fas fa-chevron-right" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -845,8 +933,9 @@ const { isDarkMode } = storeToRefs(themeStore)
 const usageRecords = ref([])
 const usageRecordsLoading = ref(false)
 const usageRecordsTotal = ref(0)
-const usageRecordsOffset = ref(0)
-const usageRecordsLimit = ref(50)
+const usageRecordsCurrentPage = ref(1)
+const usageRecordsPageSize = ref(20)
+const usageRecordsPageSizeOptions = [10, 20, 50, 100]
 
 const {
   dashboardData,
@@ -1639,29 +1728,22 @@ watch(accountUsageTrendData, () => {
 })
 
 // 加载使用记录
-async function loadUsageRecords(reset = true) {
+async function loadUsageRecords() {
   if (usageRecordsLoading.value) return
 
   try {
     usageRecordsLoading.value = true
-    if (reset) {
-      usageRecordsOffset.value = 0
-      usageRecords.value = []
-    }
+    const offset = (usageRecordsCurrentPage.value - 1) * usageRecordsPageSize.value
 
     const response = await apiClient.get('/admin/dashboard/usage-records', {
       params: {
-        limit: usageRecordsLimit.value,
-        offset: usageRecordsOffset.value
+        limit: usageRecordsPageSize.value,
+        offset: offset
       }
     })
 
     if (response.success && response.data) {
-      if (reset) {
-        usageRecords.value = response.data.records || []
-      } else {
-        usageRecords.value = [...usageRecords.value, ...(response.data.records || [])]
-      }
+      usageRecords.value = response.data.records || []
       usageRecordsTotal.value = response.data.total || 0
     }
   } catch (error) {
@@ -1672,11 +1754,23 @@ async function loadUsageRecords(reset = true) {
   }
 }
 
-// 加载更多使用记录
-async function loadMoreUsageRecords() {
-  usageRecordsOffset.value += usageRecordsLimit.value
-  await loadUsageRecords(false)
+// 切换页码
+function handleUsageRecordsPageChange(page) {
+  usageRecordsCurrentPage.value = page
+  loadUsageRecords()
 }
+
+// 切换每页数量
+function handleUsageRecordsPageSizeChange(size) {
+  usageRecordsPageSize.value = size
+  usageRecordsCurrentPage.value = 1 // 重置到第一页
+  loadUsageRecords()
+}
+
+// 计算总页数
+const usageRecordsTotalPages = computed(() => {
+  return Math.ceil(usageRecordsTotal.value / usageRecordsPageSize.value) || 1
+})
 
 // 格式化记录时间
 function formatRecordTime(timestamp) {
@@ -1706,12 +1800,6 @@ function formatRecordTime(timestamp) {
     hour: '2-digit',
     minute: '2-digit'
   })
-}
-
-// 格式化数字（添加千分位）
-function formatNumber(num) {
-  if (!num || num === 0) return '0'
-  return num.toLocaleString('en-US')
 }
 
 // 格式化成本

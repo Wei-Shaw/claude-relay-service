@@ -72,20 +72,6 @@
               />
             </div>
 
-            <!-- 限流时间筛选器 -->
-            <div class="group relative min-w-[140px]">
-              <div
-                class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
-              ></div>
-              <CustomDropdown
-                v-model="rateLimitFilter"
-                icon="fa-clock"
-                icon-color="text-orange-500"
-                :options="rateLimitOptions"
-                placeholder="限流时间"
-              />
-            </div>
-
             <!-- 搜索框 -->
             <div class="group relative min-w-[200px]">
               <div
@@ -1898,13 +1884,13 @@
     <!-- 账户统计弹窗 -->
     <el-dialog
       v-model="showAccountStatsModal"
+      :style="{ maxWidth: '1200px' }"
       title="账户统计汇总"
       width="90%"
-      :style="{ maxWidth: '1200px' }"
     >
       <div class="space-y-4">
         <div class="overflow-x-auto">
-          <table class="w-full border-collapse text-sm" style="min-width: 800px">
+          <table class="w-full border-collapse text-sm" style="min-width: 1000px">
             <thead class="bg-gray-100 dark:bg-gray-700">
               <tr>
                 <th class="border border-gray-300 px-4 py-2 text-left dark:border-gray-600">
@@ -1914,19 +1900,25 @@
                   正常
                 </th>
                 <th class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
-                  限流≤1h
+                  不可调度
                 </th>
                 <th class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
-                  限流≤5h
+                  限流0-1h
                 </th>
                 <th class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
-                  限流≤12h
+                  限流1-5h
                 </th>
                 <th class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
-                  限流≤1d
+                  限流5-12h
                 </th>
                 <th class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
-                  异常
+                  限流12-24h
+                </th>
+                <th class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  限流>24h
+                </th>
+                <th class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  其他
                 </th>
                 <th
                   class="border border-gray-300 bg-blue-50 px-4 py-2 text-center font-bold dark:border-gray-600 dark:bg-blue-900/30"
@@ -1944,19 +1936,31 @@
                   <span class="text-green-600 dark:text-green-400">{{ stat.normal }}</span>
                 </td>
                 <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
-                  <span class="text-orange-600 dark:text-orange-400">{{ stat.rateLimit1h }}</span>
+                  <span class="text-yellow-600 dark:text-yellow-400">{{ stat.unschedulable }}</span>
                 </td>
                 <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
-                  <span class="text-orange-600 dark:text-orange-400">{{ stat.rateLimit5h }}</span>
+                  <span class="text-orange-600 dark:text-orange-400">{{ stat.rateLimit0_1h }}</span>
                 </td>
                 <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
-                  <span class="text-orange-600 dark:text-orange-400">{{ stat.rateLimit12h }}</span>
+                  <span class="text-orange-600 dark:text-orange-400">{{ stat.rateLimit1_5h }}</span>
                 </td>
                 <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
-                  <span class="text-orange-600 dark:text-orange-400">{{ stat.rateLimit1d }}</span>
+                  <span class="text-orange-600 dark:text-orange-400">{{
+                    stat.rateLimit5_12h
+                  }}</span>
                 </td>
                 <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
-                  <span class="text-red-600 dark:text-red-400">{{ stat.abnormal }}</span>
+                  <span class="text-orange-600 dark:text-orange-400">{{
+                    stat.rateLimit12_24h
+                  }}</span>
+                </td>
+                <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  <span class="text-orange-600 dark:text-orange-400">{{
+                    stat.rateLimitOver24h
+                  }}</span>
+                </td>
+                <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  <span class="text-red-600 dark:text-red-400">{{ stat.other }}</span>
                 </td>
                 <td
                   class="border border-gray-300 bg-blue-50 px-4 py-2 text-center font-bold dark:border-gray-600 dark:bg-blue-900/30"
@@ -1972,29 +1976,37 @@
                   }}</span>
                 </td>
                 <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
-                  <span class="text-orange-600 dark:text-orange-400">{{
-                    accountStatsTotal.rateLimit1h
+                  <span class="text-yellow-600 dark:text-yellow-400">{{
+                    accountStatsTotal.unschedulable
                   }}</span>
                 </td>
                 <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
                   <span class="text-orange-600 dark:text-orange-400">{{
-                    accountStatsTotal.rateLimit5h
+                    accountStatsTotal.rateLimit0_1h
                   }}</span>
                 </td>
                 <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
                   <span class="text-orange-600 dark:text-orange-400">{{
-                    accountStatsTotal.rateLimit12h
+                    accountStatsTotal.rateLimit1_5h
                   }}</span>
                 </td>
                 <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
                   <span class="text-orange-600 dark:text-orange-400">{{
-                    accountStatsTotal.rateLimit1d
+                    accountStatsTotal.rateLimit5_12h
                   }}</span>
                 </td>
                 <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
-                  <span class="text-red-600 dark:text-red-400">{{
-                    accountStatsTotal.abnormal
+                  <span class="text-orange-600 dark:text-orange-400">{{
+                    accountStatsTotal.rateLimit12_24h
                   }}</span>
+                </td>
+                <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  <span class="text-orange-600 dark:text-orange-400">{{
+                    accountStatsTotal.rateLimitOver24h
+                  }}</span>
+                </td>
+                <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
+                  <span class="text-red-600 dark:text-red-400">{{ accountStatsTotal.other }}</span>
                 </td>
                 <td class="border border-gray-300 px-4 py-2 text-center dark:border-gray-600">
                   {{ accountStatsTotal.total }}
@@ -2038,8 +2050,7 @@ const bindingCounts = ref({}) // 轻量级绑定计数，用于显示"绑定: X 
 const accountGroups = ref([])
 const groupFilter = ref('all')
 const platformFilter = ref('all')
-const statusFilter = ref('normal') // 新增：状态过滤 (normal/abnormal/all)
-const rateLimitFilter = ref('all') // 新增：限流时间过滤 (all/1h/5h/12h/1d)
+const statusFilter = ref('normal') // 状态过滤 (normal/rateLimited/other/all)
 const searchKeyword = ref('')
 const PAGE_SIZE_STORAGE_KEY = 'accountsPageSize'
 const getInitialPageSize = () => {
@@ -2109,7 +2120,8 @@ const sortOptions = ref([
   { value: 'dailyTokens', label: '按今日Token排序', icon: 'fa-coins' },
   { value: 'dailyRequests', label: '按今日请求数排序', icon: 'fa-chart-line' },
   { value: 'totalTokens', label: '按总Token排序', icon: 'fa-database' },
-  { value: 'lastUsed', label: '按最后使用排序', icon: 'fa-clock' }
+  { value: 'lastUsed', label: '按最后使用排序', icon: 'fa-clock' },
+  { value: 'rateLimitTime', label: '按限流时间排序', icon: 'fa-hourglass' }
 ])
 
 const platformOptions = ref([
@@ -2128,16 +2140,10 @@ const platformOptions = ref([
 
 const statusOptions = ref([
   { value: 'normal', label: '正常', icon: 'fa-check-circle' },
-  { value: 'abnormal', label: '异常', icon: 'fa-exclamation-triangle' },
+  { value: 'unschedulable', label: '不可调度', icon: 'fa-ban' },
+  { value: 'rateLimited', label: '限流', icon: 'fa-hourglass-half' },
+  { value: 'other', label: '其他', icon: 'fa-exclamation-triangle' },
   { value: 'all', label: '全部状态', icon: 'fa-list' }
-])
-
-const rateLimitOptions = ref([
-  { value: 'all', label: '全部限流', icon: 'fa-infinity' },
-  { value: '1h', label: '限流≤1小时', icon: 'fa-hourglass-start' },
-  { value: '5h', label: '限流≤5小时', icon: 'fa-hourglass-half' },
-  { value: '12h', label: '限流≤12小时', icon: 'fa-hourglass-end' },
-  { value: '1d', label: '限流≤1天', icon: 'fa-calendar-day' }
 ])
 
 const groupOptions = computed(() => {
@@ -2376,44 +2382,30 @@ const sortedAccounts = computed(() => {
     )
   }
 
-  // 状态过滤 (normal/abnormal/all)
+  // 状态过滤 (normal/unschedulable/rateLimited/other/all)
+  // 限流: isActive && rate-limited (最高优先级)
+  // 正常: isActive && !rate-limited && !blocked && schedulable
+  // 不可调度: isActive && !rate-limited && !blocked && schedulable === false
+  // 其他: 非限流的（未激活 || 被阻止）
   if (statusFilter.value !== 'all') {
     sourceAccounts = sourceAccounts.filter((account) => {
-      const isNormal =
-        account.isActive &&
-        account.status !== 'blocked' &&
-        account.status !== 'unauthorized' &&
-        account.schedulable !== false &&
-        !isAccountRateLimited(account)
+      const isRateLimited = isAccountRateLimited(account)
+      const isBlocked = account.status === 'blocked' || account.status === 'unauthorized'
 
-      if (statusFilter.value === 'normal') {
-        return isNormal
-      } else if (statusFilter.value === 'abnormal') {
-        return !isNormal
+      if (statusFilter.value === 'rateLimited') {
+        // 限流: 激活且限流中（优先判断）
+        return account.isActive && isRateLimited
+      } else if (statusFilter.value === 'normal') {
+        // 正常: 激活且非限流且非阻止且可调度
+        return account.isActive && !isRateLimited && !isBlocked && account.schedulable !== false
+      } else if (statusFilter.value === 'unschedulable') {
+        // 不可调度: 激活且非限流且非阻止但不可调度
+        return account.isActive && !isRateLimited && !isBlocked && account.schedulable === false
+      } else if (statusFilter.value === 'other') {
+        // 其他: 非限流的异常账户（未激活或被阻止）
+        return !isRateLimited && (!account.isActive || isBlocked)
       }
       return true
-    })
-  }
-
-  // 限流时间过滤 (all/1h/5h/12h/1d)
-  if (rateLimitFilter.value !== 'all') {
-    sourceAccounts = sourceAccounts.filter((account) => {
-      const rateLimitMinutes = getRateLimitRemainingMinutes(account)
-      if (!rateLimitMinutes || rateLimitMinutes <= 0) return false
-
-      const minutes = Math.floor(rateLimitMinutes)
-      switch (rateLimitFilter.value) {
-        case '1h':
-          return minutes <= 60
-        case '5h':
-          return minutes <= 300
-        case '12h':
-          return minutes <= 720
-        case '1d':
-          return minutes <= 1440
-        default:
-          return true
-      }
     })
   }
 
@@ -2445,6 +2437,23 @@ const sortedAccounts = computed(() => {
     if (accountsSortBy.value === 'status') {
       aVal = a.isActive ? 1 : 0
       bVal = b.isActive ? 1 : 0
+    }
+
+    // 处理限流时间排序: 未限流优先，然后按剩余时间从小到大
+    if (accountsSortBy.value === 'rateLimitTime') {
+      const aIsRateLimited = isAccountRateLimited(a)
+      const bIsRateLimited = isAccountRateLimited(b)
+      const aMinutes = aIsRateLimited ? getRateLimitRemainingMinutes(a) : 0
+      const bMinutes = bIsRateLimited ? getRateLimitRemainingMinutes(b) : 0
+
+      // 未限流的排在前面
+      if (!aIsRateLimited && bIsRateLimited) return -1
+      if (aIsRateLimited && !bIsRateLimited) return 1
+
+      // 都未限流或都限流时，按剩余时间升序
+      if (aMinutes < bMinutes) return -1
+      if (aMinutes > bMinutes) return 1
+      return 0
     }
 
     if (aVal < bVal) return accountsSortOrder.value === 'asc' ? -1 : 1
@@ -2479,51 +2488,66 @@ const accountStats = computed(() => {
     .map((p) => {
       const platformAccounts = accounts.value.filter((acc) => acc.platform === p.value)
 
-      const normal = platformAccounts.filter((acc) => {
-        return (
-          acc.isActive &&
-          acc.status !== 'blocked' &&
-          acc.status !== 'unauthorized' &&
-          acc.schedulable !== false &&
-          !isAccountRateLimited(acc)
-        )
-      }).length
-
-      const abnormal = platformAccounts.filter((acc) => {
-        return !acc.isActive || acc.status === 'blocked' || acc.status === 'unauthorized'
-      }).length
-
+      // 先筛选限流账户（优先级最高）
       const rateLimitedAccounts = platformAccounts.filter((acc) => isAccountRateLimited(acc))
 
-      const rateLimit1h = rateLimitedAccounts.filter((acc) => {
+      // 正常: 非限流 && 激活 && 非阻止 && 可调度
+      const normal = platformAccounts.filter((acc) => {
+        const isRateLimited = isAccountRateLimited(acc)
+        const isBlocked = acc.status === 'blocked' || acc.status === 'unauthorized'
+        return !isRateLimited && acc.isActive && !isBlocked && acc.schedulable !== false
+      }).length
+
+      // 不可调度: 非限流 && 激活 && 非阻止 && 不可调度
+      const unschedulable = platformAccounts.filter((acc) => {
+        const isRateLimited = isAccountRateLimited(acc)
+        const isBlocked = acc.status === 'blocked' || acc.status === 'unauthorized'
+        return !isRateLimited && acc.isActive && !isBlocked && acc.schedulable === false
+      }).length
+
+      // 其他: 非限流的异常账户（未激活或被阻止）
+      const other = platformAccounts.filter((acc) => {
+        const isRateLimited = isAccountRateLimited(acc)
+        const isBlocked = acc.status === 'blocked' || acc.status === 'unauthorized'
+        return !isRateLimited && (!acc.isActive || isBlocked)
+      }).length
+
+      const rateLimit0_1h = rateLimitedAccounts.filter((acc) => {
         const minutes = getRateLimitRemainingMinutes(acc)
         return minutes > 0 && minutes <= 60
       }).length
 
-      const rateLimit5h = rateLimitedAccounts.filter((acc) => {
+      const rateLimit1_5h = rateLimitedAccounts.filter((acc) => {
         const minutes = getRateLimitRemainingMinutes(acc)
-        return minutes > 0 && minutes <= 300
+        return minutes > 60 && minutes <= 300
       }).length
 
-      const rateLimit12h = rateLimitedAccounts.filter((acc) => {
+      const rateLimit5_12h = rateLimitedAccounts.filter((acc) => {
         const minutes = getRateLimitRemainingMinutes(acc)
-        return minutes > 0 && minutes <= 720
+        return minutes > 300 && minutes <= 720
       }).length
 
-      const rateLimit1d = rateLimitedAccounts.filter((acc) => {
+      const rateLimit12_24h = rateLimitedAccounts.filter((acc) => {
         const minutes = getRateLimitRemainingMinutes(acc)
-        return minutes > 0 && minutes <= 1440
+        return minutes > 720 && minutes <= 1440
+      }).length
+
+      const rateLimitOver24h = rateLimitedAccounts.filter((acc) => {
+        const minutes = getRateLimitRemainingMinutes(acc)
+        return minutes > 1440
       }).length
 
       return {
         platform: p.value,
         platformLabel: p.label,
         normal,
-        rateLimit1h,
-        rateLimit5h,
-        rateLimit12h,
-        rateLimit1d,
-        abnormal,
+        unschedulable,
+        rateLimit0_1h,
+        rateLimit1_5h,
+        rateLimit5_12h,
+        rateLimit12_24h,
+        rateLimitOver24h,
+        other,
         total: platformAccounts.length
       }
     })
@@ -2535,21 +2559,25 @@ const accountStatsTotal = computed(() => {
   return accountStats.value.reduce(
     (total, stat) => {
       total.normal += stat.normal
-      total.rateLimit1h += stat.rateLimit1h
-      total.rateLimit5h += stat.rateLimit5h
-      total.rateLimit12h += stat.rateLimit12h
-      total.rateLimit1d += stat.rateLimit1d
-      total.abnormal += stat.abnormal
+      total.unschedulable += stat.unschedulable
+      total.rateLimit0_1h += stat.rateLimit0_1h
+      total.rateLimit1_5h += stat.rateLimit1_5h
+      total.rateLimit5_12h += stat.rateLimit5_12h
+      total.rateLimit12_24h += stat.rateLimit12_24h
+      total.rateLimitOver24h += stat.rateLimitOver24h
+      total.other += stat.other
       total.total += stat.total
       return total
     },
     {
       normal: 0,
-      rateLimit1h: 0,
-      rateLimit5h: 0,
-      rateLimit12h: 0,
-      rateLimit1d: 0,
-      abnormal: 0,
+      unschedulable: 0,
+      rateLimit0_1h: 0,
+      rateLimit1_5h: 0,
+      rateLimit5_12h: 0,
+      rateLimit12_24h: 0,
+      rateLimitOver24h: 0,
+      other: 0,
       total: 0
     }
   )
@@ -3351,8 +3379,21 @@ const isAccountRateLimited = (account) => {
 const getRateLimitRemainingMinutes = (account) => {
   if (!account || !account.rateLimitStatus) return 0
 
-  if (typeof account.rateLimitStatus === 'object' && account.rateLimitStatus.remainingMinutes) {
-    return account.rateLimitStatus.remainingMinutes
+  if (typeof account.rateLimitStatus === 'object') {
+    const status = account.rateLimitStatus
+    if (Number.isFinite(status.minutesRemaining)) {
+      return Math.max(0, Math.ceil(status.minutesRemaining))
+    }
+    if (Number.isFinite(status.remainingMinutes)) {
+      return Math.max(0, Math.ceil(status.remainingMinutes))
+    }
+    if (Number.isFinite(status.remainingSeconds)) {
+      return Math.max(0, Math.ceil(status.remainingSeconds / 60))
+    }
+    if (status.rateLimitResetAt) {
+      const diffMs = new Date(status.rateLimitResetAt).getTime() - Date.now()
+      return diffMs > 0 ? Math.ceil(diffMs / 60000) : 0
+    }
   }
 
   // 如果有 rateLimitUntil 字段，计算剩余时间
