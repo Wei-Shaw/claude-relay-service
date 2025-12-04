@@ -1,9 +1,12 @@
 <template>
   <el-dialog
+    :append-to-body="true"
     class="record-detail-modal"
     :close-on-click-modal="false"
+    :destroy-on-close="true"
     :model-value="show"
     :show-close="false"
+    top="10vh"
     width="720px"
     @close="emitClose"
   >
