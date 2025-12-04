@@ -1,8 +1,10 @@
 const express = require('express')
 const apiKeyService = require('../../services/apiKeyService')
+const ccrAccountService = require('../../services/ccrAccountService')
 const claudeAccountService = require('../../services/claudeAccountService')
 const claudeConsoleAccountService = require('../../services/claudeConsoleAccountService')
 const geminiAccountService = require('../../services/geminiAccountService')
+const geminiApiAccountService = require('../../services/geminiApiAccountService')
 const openaiAccountService = require('../../services/openaiAccountService')
 const openaiResponsesAccountService = require('../../services/openaiResponsesAccountService')
 const droidAccountService = require('../../services/droidAccountService')
@@ -1815,6 +1817,330 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
     return res
       .status(500)
       .json({ error: 'Failed to calculate usage costs', message: error.message })
+  }
+})
+
+// 获取 API Key 的请求记录时间线
+router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyId } = req.params
+    const {
+      page = 1,
+      pageSize = 50,
+      startDate,
+      endDate,
+      model,
+      accountId,
+      sortOrder = 'desc'
+    } = req.query
+
+    const pageNumber = Math.max(parseInt(page, 10) || 1, 1)
+    const pageSizeNumber = Math.min(Math.max(parseInt(pageSize, 10) || 50, 1), 200)
+    const normalizedSortOrder = sortOrder === 'asc' ? 'asc' : 'desc'
+
+    const startTime = startDate ? new Date(startDate) : null
+    const endTime = endDate ? new Date(endDate) : null
+
+    if ((startDate && Number.isNaN(startTime?.getTime())) || (endDate && Number.isNaN(endTime?.getTime()))) {
+      return res.status(400).json({ success: false, error: 'Invalid date range' })
+    }
+
+    if (startTime && endTime && startTime > endTime) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Start date must be before or equal to end date' })
+    }
+
+    const apiKeyInfo = await redis.getApiKey(keyId)
+    if (!apiKeyInfo || Object.keys(apiKeyInfo).length === 0) {
+      return res.status(404).json({ success: false, error: 'API key not found' })
+    }
+
+    const rawRecords = await redis.getUsageRecords(keyId, 5000)
+
+    const accountTypeNames = {
+      claude: 'Claude官方',
+      'claude-console': 'Claude Console',
+      ccr: 'Claude Console Relay',
+      openai: 'OpenAI',
+      'openai-responses': 'OpenAI Responses',
+      gemini: 'Gemini',
+      'gemini-api': 'Gemini API',
+      droid: 'Droid',
+      unknown: '未知渠道'
+    }
+
+    const accountServices = [
+      { type: 'claude', getter: (id) => claudeAccountService.getAccount(id) },
+      { type: 'claude-console', getter: (id) => claudeConsoleAccountService.getAccount(id) },
+      { type: 'ccr', getter: (id) => ccrAccountService.getAccount(id) },
+      { type: 'openai', getter: (id) => openaiAccountService.getAccount(id) },
+      { type: 'openai-responses', getter: (id) => openaiResponsesAccountService.getAccount(id) },
+      { type: 'gemini', getter: (id) => geminiAccountService.getAccount(id) },
+      { type: 'gemini-api', getter: (id) => geminiApiAccountService.getAccount(id) },
+      { type: 'droid', getter: (id) => droidAccountService.getAccount(id) }
+    ]
+
+    const accountCache = new Map()
+    const resolveAccountInfo = async (id, type) => {
+      if (!id) {
+        return null
+      }
+
+      const cacheKey = `${type || 'any'}:${id}`
+      if (accountCache.has(cacheKey)) {
+        return accountCache.get(cacheKey)
+      }
+
+      const servicesToTry = type
+        ? accountServices.filter((svc) => svc.type === type)
+        : accountServices
+
+      for (const service of servicesToTry) {
+        try {
+          const account = await service.getter(id)
+          if (account) {
+            const info = {
+              id,
+              name: account.name || account.email || id,
+              type: service.type,
+              status: account.status || account.isActive
+            }
+            accountCache.set(cacheKey, info)
+            return info
+          }
+        } catch (error) {
+          logger.debug(`⚠️ Failed to resolve account ${id} via ${service.type}: ${error.message}`)
+        }
+      }
+
+      accountCache.set(cacheKey, null)
+      return null
+    }
+
+    const toUsageObject = (record) => ({
+      input_tokens: record.inputTokens || 0,
+      output_tokens: record.outputTokens || 0,
+      cache_creation_input_tokens: record.cacheCreateTokens || 0,
+      cache_read_input_tokens: record.cacheReadTokens || 0,
+      cache_creation: record.cacheCreation || record.cache_creation || null
+    })
+
+    const withinRange = (record) => {
+      if (!record.timestamp) {
+        return false
+      }
+      const ts = new Date(record.timestamp)
+      if (Number.isNaN(ts.getTime())) {
+        return false
+      }
+      if (startTime && ts < startTime) {
+        return false
+      }
+      if (endTime && ts > endTime) {
+        return false
+      }
+      return true
+    }
+
+    const filteredRecords = rawRecords.filter((record) => {
+      if (!withinRange(record)) {
+        return false
+      }
+      if (model && record.model !== model) {
+        return false
+      }
+      if (accountId && record.accountId !== accountId) {
+        return false
+      }
+      return true
+    })
+
+    filteredRecords.sort((a, b) => {
+      const aTime = new Date(a.timestamp).getTime()
+      const bTime = new Date(b.timestamp).getTime()
+      if (Number.isNaN(aTime) || Number.isNaN(bTime)) {
+        return 0
+      }
+      return normalizedSortOrder === 'asc' ? aTime - bTime : bTime - aTime
+    })
+
+    const summary = {
+      totalRequests: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheCreateTokens: 0,
+      cacheReadTokens: 0,
+      totalTokens: 0,
+      totalCost: 0
+    }
+
+    const modelSet = new Set()
+    const accountOptionMap = new Map()
+    let earliestTimestamp = null
+    let latestTimestamp = null
+
+    for (const record of filteredRecords) {
+      const usage = toUsageObject(record)
+      const costData = CostCalculator.calculateCost(usage, record.model || 'unknown')
+      const computedCost =
+        typeof record.cost === 'number' ? record.cost : costData?.costs?.total || 0
+      const totalTokens =
+        record.totalTokens ||
+        usage.input_tokens +
+          usage.output_tokens +
+          usage.cache_creation_input_tokens +
+          usage.cache_read_input_tokens
+
+      summary.totalRequests += 1
+      summary.inputTokens += usage.input_tokens
+      summary.outputTokens += usage.output_tokens
+      summary.cacheCreateTokens += usage.cache_creation_input_tokens
+      summary.cacheReadTokens += usage.cache_read_input_tokens
+      summary.totalTokens += totalTokens
+      summary.totalCost += computedCost
+
+      if (record.model) {
+        modelSet.add(record.model)
+      }
+
+      if (record.accountId) {
+        const key = `${record.accountId}:${record.accountType || 'unknown'}`
+        if (!accountOptionMap.has(key)) {
+          accountOptionMap.set(key, {
+            id: record.accountId,
+            accountType: record.accountType || 'unknown'
+          })
+        }
+      }
+
+      if (record.timestamp) {
+        const ts = new Date(record.timestamp)
+        if (!Number.isNaN(ts.getTime())) {
+          if (!earliestTimestamp || ts < earliestTimestamp) {
+            earliestTimestamp = ts
+          }
+          if (!latestTimestamp || ts > latestTimestamp) {
+            latestTimestamp = ts
+          }
+        }
+      }
+    }
+
+    const totalRecords = filteredRecords.length
+    const totalPages = totalRecords > 0 ? Math.ceil(totalRecords / pageSizeNumber) : 0
+    const safePage = totalPages > 0 ? Math.min(pageNumber, totalPages) : 1
+    const startIndex = (safePage - 1) * pageSizeNumber
+    const pageRecords =
+      totalRecords === 0 ? [] : filteredRecords.slice(startIndex, startIndex + pageSizeNumber)
+
+    const enrichedRecords = []
+    for (const record of pageRecords) {
+      const usage = toUsageObject(record)
+      const costData = CostCalculator.calculateCost(usage, record.model || 'unknown')
+      const computedCost =
+        typeof record.cost === 'number' ? record.cost : costData?.costs?.total || 0
+      const totalTokens =
+        record.totalTokens ||
+        usage.input_tokens +
+          usage.output_tokens +
+          usage.cache_creation_input_tokens +
+          usage.cache_read_input_tokens
+
+      const accountInfo = await resolveAccountInfo(record.accountId, record.accountType)
+      const resolvedAccountType = accountInfo?.type || record.accountType || 'unknown'
+
+      enrichedRecords.push({
+        timestamp: record.timestamp,
+        model: record.model || 'unknown',
+        accountId: record.accountId || null,
+        accountName: accountInfo?.name || null,
+        accountStatus: accountInfo?.status ?? null,
+        accountType: resolvedAccountType,
+        accountTypeName: accountTypeNames[resolvedAccountType] || '未知渠道',
+        inputTokens: usage.input_tokens,
+        outputTokens: usage.output_tokens,
+        cacheCreateTokens: usage.cache_creation_input_tokens,
+        cacheReadTokens: usage.cache_read_input_tokens,
+        ephemeral5mTokens: record.ephemeral5mTokens || 0,
+        ephemeral1hTokens: record.ephemeral1hTokens || 0,
+        totalTokens,
+        isLongContextRequest: record.isLongContext || record.isLongContextRequest || false,
+        cost: Number(computedCost.toFixed(6)),
+        costFormatted:
+          record.costFormatted ||
+          costData?.formatted?.total ||
+          CostCalculator.formatCost(computedCost),
+        costBreakdown:
+          record.costBreakdown || {
+            input: costData?.costs?.input || 0,
+            output: costData?.costs?.output || 0,
+            cacheCreate: costData?.costs?.cacheWrite || 0,
+            cacheRead: costData?.costs?.cacheRead || 0,
+            total: costData?.costs?.total || computedCost
+          },
+        responseTime: record.responseTime || null
+      })
+    }
+
+    const accountOptions = []
+    for (const option of accountOptionMap.values()) {
+      const info = await resolveAccountInfo(option.id, option.accountType)
+      const resolvedType = info?.type || option.accountType || 'unknown'
+      accountOptions.push({
+        id: option.id,
+        name: info?.name || option.id,
+        accountType: resolvedType,
+        accountTypeName: accountTypeNames[resolvedType] || '未知渠道'
+      })
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        records: enrichedRecords,
+        pagination: {
+          currentPage: safePage,
+          pageSize: pageSizeNumber,
+          totalRecords,
+          totalPages,
+          hasNextPage: totalPages > 0 && safePage < totalPages,
+          hasPreviousPage: totalPages > 0 && safePage > 1
+        },
+        filters: {
+          startDate: startTime ? startTime.toISOString() : null,
+          endDate: endTime ? endTime.toISOString() : null,
+          model: model || null,
+          accountId: accountId || null,
+          sortOrder: normalizedSortOrder
+        },
+        apiKeyInfo: {
+          id: keyId,
+          name: apiKeyInfo.name || apiKeyInfo.label || keyId
+        },
+        summary: {
+          ...summary,
+          totalCost: Number(summary.totalCost.toFixed(6)),
+          avgCost:
+            summary.totalRequests > 0
+              ? Number((summary.totalCost / summary.totalRequests).toFixed(6))
+              : 0
+        },
+        availableFilters: {
+          models: Array.from(modelSet),
+          accounts: accountOptions,
+          dateRange: {
+            earliest: earliestTimestamp ? earliestTimestamp.toISOString() : null,
+            latest: latestTimestamp ? latestTimestamp.toISOString() : null
+          }
+        }
+      }
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get API key usage records:', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to get API key usage records', message: error.message })
   }
 })
 

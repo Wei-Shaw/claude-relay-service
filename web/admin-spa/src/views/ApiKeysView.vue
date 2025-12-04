@@ -2084,18 +2084,12 @@
       @close="closeExpiryEdit"
       @save="handleSaveExpiry"
     />
-
-    <!-- 使用详情弹窗 -->
-    <UsageDetailModal
-      :api-key="selectedApiKeyForDetail || {}"
-      :show="showUsageDetailModal"
-      @close="showUsageDetailModal = false"
-    />
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
 import { useClientsStore } from '@/stores/clients'
@@ -2108,12 +2102,12 @@ import NewApiKeyModal from '@/components/apikeys/NewApiKeyModal.vue'
 import BatchApiKeyModal from '@/components/apikeys/BatchApiKeyModal.vue'
 import BatchEditApiKeyModal from '@/components/apikeys/BatchEditApiKeyModal.vue'
 import ExpiryEditModal from '@/components/apikeys/ExpiryEditModal.vue'
-import UsageDetailModal from '@/components/apikeys/UsageDetailModal.vue'
 import LimitProgressBar from '@/components/apikeys/LimitProgressBar.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 import ActionDropdown from '@/components/common/ActionDropdown.vue'
 
 // 响应式数据
+const router = useRouter()
 const clientsStore = useClientsStore()
 const authStore = useAuthStore()
 const apiKeys = ref([])
@@ -2211,8 +2205,6 @@ const accountsLoading = ref(false)
 const accountsLoaded = ref(false)
 const editingExpiryKey = ref(null)
 const expiryEditModalRef = ref(null)
-const showUsageDetailModal = ref(false)
-const selectedApiKeyForDetail = ref(null)
 
 // 标签相关
 const selectedTagFilter = ref('')
@@ -4193,37 +4185,7 @@ const formatWindowTime = (seconds) => {
 
 // 显示使用详情
 const showUsageDetails = (apiKey) => {
-  // 获取异步加载的统计数据
-  const cachedStats = getCachedStats(apiKey.id)
-
-  // 合并异步统计数据到 apiKey 对象
-  const enrichedApiKey = {
-    ...apiKey,
-    // 合并实时限制数据
-    dailyCost: cachedStats?.dailyCost ?? apiKey.dailyCost ?? 0,
-    currentWindowCost: cachedStats?.currentWindowCost ?? apiKey.currentWindowCost ?? 0,
-    windowRemainingSeconds: cachedStats?.windowRemainingSeconds ?? apiKey.windowRemainingSeconds,
-    windowStartTime: cachedStats?.windowStartTime ?? apiKey.windowStartTime ?? null,
-    windowEndTime: cachedStats?.windowEndTime ?? apiKey.windowEndTime ?? null,
-    // 合并 usage 数据（用于详情弹窗中的统计卡片）
-    usage: {
-      ...apiKey.usage,
-      total: {
-        ...apiKey.usage?.total,
-        requests: cachedStats?.requests ?? apiKey.usage?.total?.requests ?? 0,
-        tokens: cachedStats?.tokens ?? apiKey.usage?.total?.tokens ?? 0,
-        cost: cachedStats?.allTimeCost ?? apiKey.usage?.total?.cost ?? 0,
-        inputTokens: cachedStats?.inputTokens ?? apiKey.usage?.total?.inputTokens ?? 0,
-        outputTokens: cachedStats?.outputTokens ?? apiKey.usage?.total?.outputTokens ?? 0,
-        cacheCreateTokens:
-          cachedStats?.cacheCreateTokens ?? apiKey.usage?.total?.cacheCreateTokens ?? 0,
-        cacheReadTokens: cachedStats?.cacheReadTokens ?? apiKey.usage?.total?.cacheReadTokens ?? 0
-      }
-    }
-  }
-
-  selectedApiKeyForDetail.value = enrichedApiKey
-  showUsageDetailModal.value = true
+  router.push(`/api-keys/${apiKey.id}/usage-records`)
 }
 
 // 格式化时间（秒转换为可读格式） - 已移到 WindowLimitBar 组件中
