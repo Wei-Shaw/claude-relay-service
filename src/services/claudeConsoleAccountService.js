@@ -67,7 +67,8 @@ class ClaudeConsoleAccountService {
       schedulable = true, // 是否可被调度
       dailyQuota = 0, // 每日额度限制（美元），0表示不限制
       quotaResetTime = '00:00', // 额度重置时间（HH:mm格式）
-      maxConcurrentTasks = 0 // 最大并发任务数，0表示无限制
+      maxConcurrentTasks = 0, // 最大并发任务数，0表示无限制
+      disableAutoProtection = false // 是否关闭自动防护（429/401/400/529 不自动禁用）
     } = options
 
     // 验证必填字段
@@ -115,7 +116,8 @@ class ClaudeConsoleAccountService {
       lastResetDate: redis.getDateStringInTimezone(), // 最后重置日期（按配置时区）
       quotaResetTime, // 额度重置时间
       quotaStoppedAt: '', // 因额度停用的时间
-      maxConcurrentTasks: maxConcurrentTasks.toString() // 最大并发任务数，0表示无限制
+      maxConcurrentTasks: maxConcurrentTasks.toString(), // 最大并发任务数，0表示无限制
+      disableAutoProtection: disableAutoProtection.toString() // 关闭自动防护
     }
 
     const client = redis.getClientSafe()
@@ -153,6 +155,7 @@ class ClaudeConsoleAccountService {
       quotaResetTime,
       quotaStoppedAt: null,
       maxConcurrentTasks, // 新增：返回并发限制配置
+      disableAutoProtection, // 新增：返回自动防护开关
       activeTaskCount: 0 // 新增：新建账户当前并发数为0
     }
   }
@@ -213,7 +216,8 @@ class ClaudeConsoleAccountService {
 
             // 并发控制相关
             maxConcurrentTasks: parseInt(accountData.maxConcurrentTasks) || 0,
-            activeTaskCount
+            activeTaskCount,
+            disableAutoProtection: accountData.disableAutoProtection === 'true'
           })
         }
       }
@@ -259,6 +263,7 @@ class ClaudeConsoleAccountService {
     }
     accountData.isActive = accountData.isActive === 'true'
     accountData.schedulable = accountData.schedulable !== 'false' // 默认为true
+    accountData.disableAutoProtection = accountData.disableAutoProtection === 'true'
 
     if (accountData.proxy) {
       accountData.proxy = JSON.parse(accountData.proxy)
@@ -366,6 +371,9 @@ class ClaudeConsoleAccountService {
       // 并发控制相关字段
       if (updates.maxConcurrentTasks !== undefined) {
         updatedData.maxConcurrentTasks = updates.maxConcurrentTasks.toString()
+      }
+      if (updates.disableAutoProtection !== undefined) {
+        updatedData.disableAutoProtection = updates.disableAutoProtection.toString()
       }
 
       // ✅ 直接保存 subscriptionExpiresAt（如果提供）
