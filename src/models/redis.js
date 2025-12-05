@@ -284,7 +284,8 @@ class RedisClient {
       isActive = '',
       sortBy = 'createdAt',
       sortOrder = 'desc',
-      excludeDeleted = true // 默认排除已删除的 API Keys
+      excludeDeleted = true, // 默认排除已删除的 API Keys
+      modelFilter = []
     } = options
 
     // 1. 使用 SCAN 获取所有 apikey:* 的 ID 列表（避免阻塞）
@@ -330,6 +331,15 @@ class RedisClient {
         const accountNameCacheService = require('../services/accountNameCacheService')
         filteredKeys = accountNameCacheService.searchByBindingAccount(filteredKeys, lowerSearch)
       }
+    }
+
+    // 模型筛选
+    if (modelFilter.length > 0) {
+      const keyIdsWithModels = await this.getKeyIdsWithModels(
+        filteredKeys.map((k) => k.id),
+        modelFilter
+      )
+      filteredKeys = filteredKeys.filter((k) => keyIdsWithModels.has(k.id))
     }
 
     // 4. 排序
@@ -779,6 +789,56 @@ class RedisClient {
     }
 
     await Promise.all(operations)
+  }
+
+  /**
+   * 获取使用了指定模型的 Key IDs（OR 逻辑）
+   */
+  async getKeyIdsWithModels(keyIds, models) {
+    if (!keyIds.length || !models.length) return new Set()
+
+    const client = this.getClientSafe()
+    const result = new Set()
+
+    // 批量检查每个 keyId 是否使用过任意一个指定模型
+    for (const keyId of keyIds) {
+      for (const model of models) {
+        // 检查是否有该模型的使用记录（daily 或 monthly）
+        const pattern = `usage:${keyId}:model:*:${model}:*`
+        const keys = await client.keys(pattern)
+        if (keys.length > 0) {
+          result.add(keyId)
+          break // 找到一个就够了（OR 逻辑）
+        }
+      }
+    }
+
+    return result
+  }
+
+  /**
+   * 获取所有被使用过的模型列表
+   */
+  async getAllUsedModels() {
+    const client = this.getClientSafe()
+    const models = new Set()
+
+    // 扫描所有模型使用记录
+    const pattern = 'usage:*:model:daily:*'
+    let cursor = '0'
+    do {
+      const [nextCursor, keys] = await client.scan(cursor, 'MATCH', pattern, 'COUNT', 1000)
+      cursor = nextCursor
+      for (const key of keys) {
+        // 从 key 中提取模型名: usage:{keyId}:model:daily:{model}:{date}
+        const match = key.match(/usage:[^:]+:model:daily:([^:]+):/)
+        if (match) {
+          models.add(match[1])
+        }
+      }
+    } while (cursor !== '0')
+
+    return [...models].sort()
   }
 
   async getUsageStats(keyId) {

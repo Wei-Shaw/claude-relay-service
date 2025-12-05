@@ -103,6 +103,17 @@ router.get('/api-keys/:keyId/cost-debug', authenticateAdmin, async (req, res) =>
   }
 })
 
+// 获取所有被使用过的模型列表
+router.get('/api-keys/used-models', authenticateAdmin, async (req, res) => {
+  try {
+    const models = await redis.getAllUsedModels()
+    return res.json({ success: true, data: models })
+  } catch (error) {
+    logger.error('❌ Failed to get used models:', error)
+    return res.status(500).json({ error: 'Failed to get used models', message: error.message })
+  }
+})
+
 // 获取所有API Keys
 router.get('/api-keys', authenticateAdmin, async (req, res) => {
   try {
@@ -116,6 +127,7 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
       // 筛选参数
       tag = '',
       isActive = '',
+      models = '', // 模型筛选（逗号分隔）
       // 排序参数
       sortBy = 'createdAt',
       sortOrder = 'desc',
@@ -126,6 +138,9 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
       // 兼容旧参数（不再用于费用计算，仅标记）
       timeRange = 'all'
     } = req.query
+
+    // 解析模型筛选参数
+    const modelFilter = models ? models.split(',').filter((m) => m.trim()) : []
 
     // 验证分页参数
     const pageNum = Math.max(1, parseInt(page) || 1)
@@ -217,7 +232,8 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
           search,
           searchMode,
           tag,
-          isActive
+          isActive,
+          modelFilter
         })
 
         costSortStatus = {
@@ -250,7 +266,8 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
           search,
           searchMode,
           tag,
-          isActive
+          isActive,
+          modelFilter
         })
 
         costSortStatus.isRealTimeCalculation = false
@@ -265,7 +282,8 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
         tag,
         isActive,
         sortBy: validSortBy,
-        sortOrder: validSortOrder
+        sortOrder: validSortOrder,
+        modelFilter
       })
     }
 
@@ -322,7 +340,17 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
  * 使用预计算索引进行费用排序的分页查询
  */
 async function getApiKeysSortedByCostPrecomputed(options) {
-  const { page, pageSize, sortOrder, costTimeRange, search, searchMode, tag, isActive } = options
+  const {
+    page,
+    pageSize,
+    sortOrder,
+    costTimeRange,
+    search,
+    searchMode,
+    tag,
+    isActive,
+    modelFilter = []
+  } = options
   const costRankService = require('../../services/costRankService')
 
   // 1. 获取排序后的全量 keyId 列表
@@ -369,6 +397,15 @@ async function getApiKeysSortedByCostPrecomputed(options) {
     }
   }
 
+  // 模型筛选
+  if (modelFilter.length > 0) {
+    const keyIdsWithModels = await redis.getKeyIdsWithModels(
+      orderedKeys.map((k) => k.id),
+      modelFilter
+    )
+    orderedKeys = orderedKeys.filter((k) => keyIdsWithModels.has(k.id))
+  }
+
   // 5. 收集所有可用标签
   const allTags = new Set()
   for (const key of allKeys) {
@@ -411,8 +448,18 @@ async function getApiKeysSortedByCostPrecomputed(options) {
  * 使用实时计算进行 custom 时间范围的费用排序
  */
 async function getApiKeysSortedByCostCustom(options) {
-  const { page, pageSize, sortOrder, startDate, endDate, search, searchMode, tag, isActive } =
-    options
+  const {
+    page,
+    pageSize,
+    sortOrder,
+    startDate,
+    endDate,
+    search,
+    searchMode,
+    tag,
+    isActive,
+    modelFilter = []
+  } = options
   const costRankService = require('../../services/costRankService')
 
   // 1. 实时计算所有 Keys 的费用
@@ -463,6 +510,15 @@ async function getApiKeysSortedByCostCustom(options) {
       const accountNameCacheService = require('../../services/accountNameCacheService')
       orderedKeys = accountNameCacheService.searchByBindingAccount(orderedKeys, lowerSearch)
     }
+  }
+
+  // 模型筛选
+  if (modelFilter.length > 0) {
+    const keyIdsWithModels = await redis.getKeyIdsWithModels(
+      orderedKeys.map((k) => k.id),
+      modelFilter
+    )
+    orderedKeys = orderedKeys.filter((k) => keyIdsWithModels.has(k.id))
   }
 
   // 6. 收集所有可用标签
