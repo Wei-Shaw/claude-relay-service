@@ -868,7 +868,7 @@ class ClaudeAccountService {
           !this.isSubscriptionExpired(account)
       )
 
-      // 如果请求的是 Opus 模型，根据账号类型和模型版本过滤
+      // Filter Opus models based on account type and model version
       if (modelName && modelName.toLowerCase().includes('opus')) {
         const isNewOpus = isOpus45OrNewer(modelName)
 
@@ -877,24 +877,24 @@ class ClaudeAccountService {
             try {
               const info = JSON.parse(account.subscriptionInfo)
 
-              // Free 账号不支持任何 Opus 模型
+              // Free account: does not support any Opus model
               if (info.accountType === 'free') {
                 return false
               }
 
-              // Pro 账号：仅支持 Opus 4.5+
+              // Pro account: only supports Opus 4.5+
               if (isProAccount(info)) {
                 return isNewOpus
               }
 
-              // Max 账号支持所有 Opus 版本
+              // Max account: supports all Opus versions
               return true
             } catch (e) {
-              // 解析失败，假设为旧数据（Max），默认支持
+              // Parse failed, assume legacy data (Max), default support
               return true
             }
           }
-          // 没有订阅信息的账号，默认当作支持（兼容旧数据）
+          // Account without subscription info, default to supported (legacy data compatibility)
           return true
         })
 
@@ -994,7 +994,7 @@ class ClaudeAccountService {
           !this.isSubscriptionExpired(account)
       )
 
-      // 如果请求的是 Opus 模型，根据账号类型和模型版本过滤
+      // Filter Opus models based on account type and model version
       if (modelName && modelName.toLowerCase().includes('opus')) {
         const isNewOpus = isOpus45OrNewer(modelName)
 
@@ -1003,24 +1003,24 @@ class ClaudeAccountService {
             try {
               const info = JSON.parse(account.subscriptionInfo)
 
-              // Free 账号不支持任何 Opus 模型
+              // Free account: does not support any Opus model
               if (info.accountType === 'free') {
                 return false
               }
 
-              // Pro 账号：仅支持 Opus 4.5+
+              // Pro account: only supports Opus 4.5+
               if (isProAccount(info)) {
                 return isNewOpus
               }
 
-              // Max 账号支持所有 Opus 版本
+              // Max account: supports all Opus versions
               return true
             } catch (e) {
-              // 解析失败，假设为旧数据（Max），默认支持
+              // Parse failed, assume legacy data (Max), default support
               return true
             }
           }
-          // 没有订阅信息的账号，默认当作支持（兼容旧数据）
+          // Account without subscription info, default to supported (legacy data compatibility)
           return true
         })
 
