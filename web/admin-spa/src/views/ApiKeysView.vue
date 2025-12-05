@@ -126,9 +126,9 @@
                     v-model="selectedModels"
                     icon="fa-cube"
                     icon-color="text-orange-500"
+                    :multiple="true"
                     :options="modelOptions"
                     placeholder="所有模型"
-                    :multiple="true"
                   />
                   <span
                     v-if="selectedModels.length > 0"
