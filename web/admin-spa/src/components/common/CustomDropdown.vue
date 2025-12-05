@@ -41,19 +41,25 @@
             <div
               v-for="option in options"
               :key="option.value"
-              class="flex cursor-pointer items-center gap-2 whitespace-nowrap px-3 py-2 text-sm transition-colors duration-150"
+              class="flex cursor-pointer items-center gap-2 whitespace-nowrap py-2 text-sm transition-colors duration-150"
               :class="[
                 option.value === modelValue
                   ? 'bg-blue-50 font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                  : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
+                  : option.isGroup
+                    ? 'bg-gray-50 font-semibold text-gray-800 dark:bg-gray-700/50 dark:text-gray-200'
+                    : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
               ]"
+              :style="{
+                paddingLeft: option.indent ? `${12 + option.indent * 16}px` : '12px',
+                paddingRight: '12px'
+              }"
               @click="selectOption(option)"
             >
               <i v-if="option.icon" :class="['fas', option.icon, 'text-xs']"></i>
               <span>{{ option.label }}</span>
               <i
                 v-if="option.value === modelValue"
-                class="fas fa-check ml-auto pl-3 text-xs text-blue-600"
+                class="fas fa-check ml-auto pl-3 text-xs text-blue-600 dark:text-blue-400"
               ></i>
             </div>
           </div>
