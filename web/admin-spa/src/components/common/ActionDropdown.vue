@@ -116,7 +116,8 @@ const updateDropdownPosition = () => {
 
   const trigger = triggerRef.value.getBoundingClientRect()
   const dropdownHeight = 200 // 预估高度
-  const dropdownWidth = 160 // 预估宽度
+  const dropdownWidth = 180 // 预估宽度，略大以减少遮挡
+  const gap = 8
   const spaceBelow = window.innerHeight - trigger.bottom
   const spaceAbove = trigger.top
   const spaceRight = window.innerWidth - trigger.right
@@ -126,16 +127,16 @@ const updateDropdownPosition = () => {
 
   // 计算垂直位置
   if (spaceBelow >= dropdownHeight || spaceBelow >= spaceAbove) {
-    top = trigger.bottom + 4
+    top = trigger.bottom + gap
   } else {
-    top = trigger.top - dropdownHeight - 4
+    top = trigger.top - dropdownHeight - gap
   }
 
-  // 计算水平位置 - 优先显示在左侧（因为按钮在右侧固定列）
-  if (spaceLeft >= dropdownWidth) {
-    left = trigger.left - dropdownWidth + trigger.width
-  } else if (spaceRight >= dropdownWidth) {
-    left = trigger.left
+  // 计算水平位置 - 优先向右展开，避免遮挡左侧内容
+  if (spaceRight >= dropdownWidth + gap) {
+    left = trigger.right + gap
+  } else if (spaceLeft >= dropdownWidth + gap) {
+    left = trigger.left - dropdownWidth - gap + trigger.width
   } else {
     left = window.innerWidth - dropdownWidth - 10
   }
