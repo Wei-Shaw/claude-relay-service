@@ -2159,9 +2159,7 @@ router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res)
       const chosenTypeName = accountTypeNames[chosenType] || '未知渠道'
 
       if (!resolvedInfo) {
-        logger.warn(
-          `⚠️ 保留无法解析的账户筛选项: ${option.id}, types=${types.join(',') || 'none'}`
-        )
+        logger.warn(`⚠️ 保留无法解析的账户筛选项: ${option.id}, types=${types.join(',') || 'none'}`)
       }
 
       accountOptions.push({
