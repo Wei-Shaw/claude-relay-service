@@ -18,6 +18,21 @@ const LRUCache = require('../utils/lruCache')
 const { formatDateWithTimezone, getISOStringWithTimezone } = require('../utils/dateHelper')
 const { isOpus45OrNewer } = require('../utils/modelHelper')
 
+/**
+ * 判断账号是否为 Pro 账号（非 Max）
+ * 兼容两种数据来源：API 实时返回的 hasClaudePro 和本地配置的 accountType
+ * @param {Object} info - 订阅信息对象
+ * @returns {boolean}
+ */
+function isProAccount(info) {
+  // API 返回的实时状态优先
+  if (info.hasClaudePro === true && info.hasClaudeMax !== true) {
+    return true
+  }
+  // 本地配置的账户类型
+  return info.accountType === 'claude_pro'
+}
+
 class ClaudeAccountService {
   constructor() {
     this.claudeApiUrl = 'https://console.anthropic.com/v1/oauth/token'
@@ -868,11 +883,8 @@ class ClaudeAccountService {
               }
 
               // Pro 账号：仅支持 Opus 4.5+
-              if (info.hasClaudePro === true && info.hasClaudeMax !== true) {
-                return isNewOpus // 仅新版 Opus 支持
-              }
-              if (info.accountType === 'claude_pro') {
-                return isNewOpus // 仅新版 Opus 支持
+              if (isProAccount(info)) {
+                return isNewOpus
               }
 
               // Max 账号支持所有 Opus 版本
@@ -997,11 +1009,8 @@ class ClaudeAccountService {
               }
 
               // Pro 账号：仅支持 Opus 4.5+
-              if (info.hasClaudePro === true && info.hasClaudeMax !== true) {
-                return isNewOpus // 仅新版 Opus 支持
-              }
-              if (info.accountType === 'claude_pro') {
-                return isNewOpus // 仅新版 Opus 支持
+              if (isProAccount(info)) {
+                return isNewOpus
               }
 
               // Max 账号支持所有 Opus 版本
