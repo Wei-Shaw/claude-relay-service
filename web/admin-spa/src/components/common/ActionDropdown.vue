@@ -77,7 +77,21 @@ const getActionClass = (action) => {
   return colorMap[action.color] || colorMap.gray
 }
 
+const instanceId = Symbol('action-dropdown')
+const handleGlobalOpen = (event) => {
+  if (event?.detail?.id !== instanceId) {
+    closeDropdown()
+  }
+}
+
 const toggleDropdown = async () => {
+  if (!isOpen.value) {
+    window.dispatchEvent(
+      new CustomEvent('action-dropdown-open', {
+        detail: { id: instanceId }
+      })
+    )
+  }
   isOpen.value = !isOpen.value
   if (isOpen.value) {
     await nextTick()
@@ -164,11 +178,13 @@ onMounted(() => {
   window.addEventListener('scroll', handleScroll, true)
   window.addEventListener('resize', handleResize)
   document.addEventListener('click', handleClickOutside)
+  window.addEventListener('action-dropdown-open', handleGlobalOpen)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('scroll', handleScroll, true)
   window.removeEventListener('resize', handleResize)
   document.removeEventListener('click', handleClickOutside)
+  window.removeEventListener('action-dropdown-open', handleGlobalOpen)
 })
 </script>

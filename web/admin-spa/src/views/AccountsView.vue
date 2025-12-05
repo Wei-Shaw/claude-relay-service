@@ -1200,15 +1200,6 @@
                       <span class="ml-1">详情</span>
                     </button>
                     <button
-                      v-if="canViewUsage(account)"
-                      class="rounded bg-purple-100 px-2.5 py-1 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-200"
-                      title="请求时间线"
-                      @click="viewAccountTimeline(account)"
-                    >
-                      <i class="fas fa-clock" />
-                      <span class="ml-1">时间线</span>
-                    </button>
-                    <button
                       v-if="canTestAccount(account)"
                       class="rounded bg-cyan-100 px-2.5 py-1 text-xs font-medium text-cyan-700 transition-colors hover:bg-cyan-200 dark:bg-cyan-900/40 dark:text-cyan-300 dark:hover:bg-cyan-800/50"
                       title="测试账户连通性"
@@ -1678,15 +1669,6 @@
               详情
             </button>
             <button
-              v-if="canViewUsage(account)"
-              class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-purple-50 px-3 py-2 text-xs text-purple-600 transition-colors hover:bg-purple-100"
-              @click="viewAccountTimeline(account)"
-            >
-              <i class="fas fa-clock" />
-              时间线
-            </button>
-
-            <button
               v-if="canTestAccount(account)"
               class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-cyan-50 px-3 py-2 text-xs text-cyan-600 transition-colors hover:bg-cyan-100 dark:bg-cyan-900/40 dark:text-cyan-300 dark:hover:bg-cyan-800/50"
               @click="openAccountTestModal(account)"
@@ -1872,7 +1854,6 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
 import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
 import { useConfirm } from '@/composables/useConfirm'
@@ -1887,7 +1868,6 @@ import ActionDropdown from '@/components/common/ActionDropdown.vue'
 
 // 使用确认弹窗
 const { showConfirmModal, confirmOptions, showConfirm, handleConfirm, handleCancel } = useConfirm()
-const router = useRouter()
 
 // 数据状态
 const accounts = ref([])
@@ -2119,13 +2099,6 @@ const getAccountActions = (account) => {
       color: 'indigo',
       handler: () => openAccountUsageModal(account)
     })
-    actions.push({
-      key: 'timeline',
-      label: '请求时间线',
-      icon: 'fa-clock',
-      color: 'purple',
-      handler: () => viewAccountTimeline(account)
-    })
   }
 
   // 测试账户
@@ -2184,13 +2157,6 @@ const openAccountUsageModal = async (account) => {
   } finally {
     accountUsageLoading.value = false
   }
-}
-
-const viewAccountTimeline = (account) => {
-  router.push({
-    path: `/accounts/${account.id}/usage-records`,
-    query: { platform: account.platform || account.accountType }
-  })
 }
 
 const closeAccountUsageModal = () => {

@@ -2133,9 +2133,14 @@ router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res)
     }
 
     const accountOptions = []
+    const accountIdAdded = new Set()
     for (const option of accountOptionMap.values()) {
       const info = await resolveAccountInfo(option.id, option.accountType)
       if (info && info.name) {
+        if (accountIdAdded.has(option.id)) {
+          continue
+        }
+        accountIdAdded.add(option.id)
         accountOptions.push({
           id: option.id,
           name: info.name,
