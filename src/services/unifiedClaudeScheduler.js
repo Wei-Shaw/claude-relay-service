@@ -7,6 +7,32 @@ const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const { parseVendorPrefixedModel, isOpus45OrNewer } = require('../utils/modelHelper')
 
+/**
+ * Check if account is Pro (not Max)
+ *
+ * ACCOUNT TYPE判断逻辑 (2025-12-05):
+ * Pro accounts can be identified by either:
+ *   1. API real-time data: hasClaudePro=true && hasClaudeMax=false
+ *   2. Local config data: accountType='claude_pro'
+ *
+ * Account type restrictions for Opus models:
+ *   - Free account: No Opus access at all
+ *   - Pro account: Only Opus 4.5+ (new versions)
+ *   - Max account: All Opus versions (legacy 3.x, 4.0, 4.1 and new 4.5+)
+ *
+ * Compatible with both API real-time data (hasClaudePro) and local config (accountType)
+ * @param {Object} info - Subscription info object
+ * @returns {boolean} - true if Pro account (not Free, not Max)
+ */
+function isProAccount(info) {
+  // API real-time status takes priority
+  if (info.hasClaudePro === true && info.hasClaudeMax !== true) {
+    return true
+  }
+  // Local configured account type
+  return info.accountType === 'claude_pro'
+}
+
 class UnifiedClaudeScheduler {
   constructor() {
     this.SESSION_MAPPING_PREFIX = 'unified_claude_session_mapping:'
@@ -46,7 +72,11 @@ class UnifiedClaudeScheduler {
         return false
       }
 
-      // 2. Opus 模型的订阅级别检查
+      // 2. Opus model subscription level check
+      // VERSION RESTRICTION LOGIC:
+      // - Free: No Opus models
+      // - Pro: Only Opus 4.5+ (isOpus45OrNewer = true)
+      // - Max: All Opus versions
       if (requestedModel.toLowerCase().includes('opus')) {
         const isNewOpus = isOpus45OrNewer(requestedModel)
 
@@ -57,7 +87,7 @@ class UnifiedClaudeScheduler {
                 ? JSON.parse(account.subscriptionInfo)
                 : account.subscriptionInfo
 
-            // Free 账号不支持任何 Opus 模型
+            // Free account: does not support any Opus model
             if (info.accountType === 'free') {
               logger.info(
                 `🚫 Claude account ${account.name} (Free) does not support Opus model${context ? ` ${context}` : ''}`
@@ -65,37 +95,28 @@ class UnifiedClaudeScheduler {
               return false
             }
 
-            // Pro 账号：仅支持 Opus 4.5+
-            if (info.hasClaudePro === true && info.hasClaudeMax !== true) {
+            // Pro account: only supports Opus 4.5+
+            // Reject legacy Opus (3.x, 4.0-4.4) but allow new Opus (4.5+)
+            if (isProAccount(info)) {
               if (!isNewOpus) {
                 logger.info(
                   `🚫 Claude account ${account.name} (Pro) does not support legacy Opus model${context ? ` ${context}` : ''}`
                 )
                 return false
               }
-              // Opus 4.5+ 支持
-              return true
-            }
-            if (info.accountType === 'claude_pro') {
-              if (!isNewOpus) {
-                logger.info(
-                  `🚫 Claude account ${account.name} (Pro) does not support legacy Opus model${context ? ` ${context}` : ''}`
-                )
-                return false
-              }
-              // Opus 4.5+ 支持
+              // Opus 4.5+ supported
               return true
             }
 
-            // Max 账号支持所有 Opus 版本
+            // Max account: supports all Opus versions (no restriction)
           } catch (e) {
-            // 解析失败，假设为旧数据（Max），默认支持
+            // Parse failed, assume legacy data (Max), default support
             logger.debug(
               `Account ${account.name} has invalid subscriptionInfo${context ? ` ${context}` : ''}, assuming Max`
             )
           }
         }
-        // 没有订阅信息的账号，默认当作支持（兼容旧数据）
+        // Account without subscription info, default to supported (legacy data compatibility)
       }
     }
 

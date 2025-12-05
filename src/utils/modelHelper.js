@@ -71,14 +71,20 @@ function getVendorType(modelStr) {
 }
 
 /**
- * 检查模型是否为 Opus 4.5 或更新版本
- * 支持格式:
- *   - 新格式: claude-opus-{major}[-{minor}][-date] 如 claude-opus-4-5-20251101
- *   - 新格式: claude-opus-{major}.{minor} 如 claude-opus-4.5
- *   - 旧格式: claude-{version}-opus[-date] 如 claude-3-opus-20240229
+ * Check if the model is Opus 4.5 or newer.
  *
- * @param {string} modelName - 模型名称
- * @returns {boolean} - 是否为 Opus 4.5+
+ * VERSION判断逻辑 (2025-12-05):
+ * - Opus 4.5+ (包括 5.0, 6.0 等) → 返回 true (Pro 账号可用)
+ * - Opus 4.4 及以下 (包括 3.x, 4.0, 4.1) → 返回 false (仅 Max 账号可用)
+ *
+ * 支持的命名格式:
+ *   - New format: claude-opus-{major}[-{minor}][-date], e.g., claude-opus-4-5-20251101
+ *   - New format: claude-opus-{major}.{minor}, e.g., claude-opus-4.5
+ *   - Old format: claude-{version}-opus[-date], e.g., claude-3-opus-20240229
+ *   - Special: opus-latest, claude-opus-latest → always returns true
+ *
+ * @param {string} modelName - Model name
+ * @returns {boolean} - Whether the model is Opus 4.5 or newer
  */
 function isOpus45OrNewer(modelName) {
   if (!modelName) {
@@ -90,19 +96,22 @@ function isOpus45OrNewer(modelName) {
     return false
   }
 
-  // 处理 latest 特殊情况
+  // Handle 'latest' special case
   if (lowerModel.includes('opus-latest') || lowerModel.includes('opus_latest')) {
     return true
   }
 
-  // 旧格式: claude-{version}-opus (版本在 opus 前面)
-  // 例如: claude-3-opus-20240229, claude-3.5-opus
+  // Old format: claude-{version}-opus (version before opus)
+  // e.g., claude-3-opus-20240229, claude-3.5-opus
   const oldFormatMatch = lowerModel.match(/claude[- ](\d+)(?:[.-](\d+))?[- ]opus/)
   if (oldFormatMatch) {
     const majorVersion = parseInt(oldFormatMatch[1], 10)
     const minorVersion = oldFormatMatch[2] ? parseInt(oldFormatMatch[2], 10) : 0
 
-    // 旧格式的版本号指的是 Claude 大版本
+    // Old format version refers to Claude major version
+    // majorVersion > 4: 5.x, 6.x, ... → true
+    // majorVersion === 4 && minorVersion >= 5: 4.5, 4.6, ... → true
+    // Others (3.x, 4.0-4.4): → false
     if (majorVersion > 4) {
       return true
     }
@@ -112,13 +121,17 @@ function isOpus45OrNewer(modelName) {
     return false
   }
 
-  // 新格式 1: opus-{major}.{minor} (点分隔)
-  // 例如: claude-opus-4.5, opus-4.5
+  // New format 1: opus-{major}.{minor} (dot-separated)
+  // e.g., claude-opus-4.5, opus-4.5
   const dotFormatMatch = lowerModel.match(/opus[- ]?(\d+)\.(\d+)/)
   if (dotFormatMatch) {
     const majorVersion = parseInt(dotFormatMatch[1], 10)
     const minorVersion = parseInt(dotFormatMatch[2], 10)
 
+    // Same version logic as old format
+    // opus-5.0, opus-6.0 → true
+    // opus-4.5, opus-4.6 → true
+    // opus-4.0, opus-4.4 → false
     if (majorVersion > 4) {
       return true
     }
@@ -128,23 +141,31 @@ function isOpus45OrNewer(modelName) {
     return false
   }
 
-  // 新格式 2: opus-{major}[-{minor}][-date] (横线分隔)
-  // 例如: claude-opus-4-5-20251101, claude-opus-4-20250514, claude-opus-4-1-20250805
-  // 关键：小版本号必须是 1 位数字，且后面紧跟 8 位日期或结束
-  // 如果 opus-{major} 后面直接是 8 位日期，则没有小版本号
+  // New format 2: opus-{major}[-{minor}][-date] (hyphen-separated)
+  // e.g., claude-opus-4-5-20251101, claude-opus-4-20250514, claude-opus-4-1-20250805
+  // If opus-{major} is followed by 8-digit date, there's no minor version
 
-  // 提取 opus 后面的部分
+  // Extract content after 'opus'
   const opusIndex = lowerModel.indexOf('opus')
-  const afterOpus = lowerModel.substring(opusIndex + 4) // 'opus' 后面的内容
+  const afterOpus = lowerModel.substring(opusIndex + 4)
 
-  // 尝试匹配: -{major}-{minor}-{date} 或 -{major}-{date} 或 -{major}
-  // 小版本号只能是 1 位数字 (如 1, 5)，不会是 2 位以上
-  const versionMatch = afterOpus.match(/^[- ](\d+)(?:[- ](\d)(?=[- ]\d{8}|$))?/)
+  // Match: -{major}-{minor}-{date} or -{major}-{date} or -{major}
+  // IMPORTANT: Minor version regex is (\d{1,2}) not (\d+)
+  // This prevents matching 8-digit dates as minor version
+  // Example: opus-4-20250514 → major=4, minor=undefined (not 20250514)
+  // Example: opus-4-5-20251101 → major=4, minor=5
+  // Future-proof: Supports up to 2-digit minor versions (0-99)
+  const versionMatch = afterOpus.match(/^[- ](\d+)(?:[- ](\d{1,2})(?=[- ]\d{8}|$))?/)
 
   if (versionMatch) {
     const majorVersion = parseInt(versionMatch[1], 10)
     const minorVersion = versionMatch[2] ? parseInt(versionMatch[2], 10) : 0
 
+    // Same version logic: >= 4.5 returns true
+    // opus-5-0-date, opus-6-date → true
+    // opus-4-5-date, opus-4-10-date → true (supports 2-digit minor)
+    // opus-4-date (no minor, treated as 4.0) → false
+    // opus-4-1-date, opus-4-4-date → false
     if (majorVersion > 4) {
       return true
     }
@@ -154,7 +175,7 @@ function isOpus45OrNewer(modelName) {
     return false
   }
 
-  // 其他包含 opus 但无法解析版本的情况，默认认为是旧版本
+  // Other cases containing 'opus' but cannot parse version, assume legacy
   return false
 }
 
