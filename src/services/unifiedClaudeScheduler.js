@@ -10,7 +10,7 @@ const { parseVendorPrefixedModel, isOpus45OrNewer } = require('../utils/modelHel
 /**
  * Check if account is Pro (not Max)
  *
- * ACCOUNT TYPE判断逻辑 (2025-12-05):
+ * ACCOUNT TYPE LOGIC (as of 2025-12-05):
  * Pro accounts can be identified by either:
  *   1. API real-time data: hasClaudePro=true && hasClaudeMax=false
  *   2. Local config data: accountType='claude_pro'

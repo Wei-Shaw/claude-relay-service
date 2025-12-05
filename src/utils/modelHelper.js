@@ -73,11 +73,11 @@ function getVendorType(modelStr) {
 /**
  * Check if the model is Opus 4.5 or newer.
  *
- * VERSION判断逻辑 (2025-12-05):
- * - Opus 4.5+ (包括 5.0, 6.0 等) → 返回 true (Pro 账号可用)
- * - Opus 4.4 及以下 (包括 3.x, 4.0, 4.1) → 返回 false (仅 Max 账号可用)
+ * VERSION LOGIC (as of 2025-12-05):
+ * - Opus 4.5+ (including 5.0, 6.0, etc.) → returns true (Pro account eligible)
+ * - Opus 4.4 and below (including 3.x, 4.0, 4.1) → returns false (Max account only)
  *
- * 支持的命名格式:
+ * Supported naming formats:
  *   - New format: claude-opus-{major}[-{minor}][-date], e.g., claude-opus-4-5-20251101
  *   - New format: claude-opus-{major}.{minor}, e.g., claude-opus-4.5
  *   - Old format: claude-{version}-opus[-date], e.g., claude-3-opus-20240229
