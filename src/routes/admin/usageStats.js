@@ -1942,9 +1942,14 @@ router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res)
         return accountCache.get(cacheKey)
       }
 
-      const servicesToTry = type
+      let servicesToTry = type
         ? accountServices.filter((svc) => svc.type === type)
         : accountServices
+
+      // 若渠道改名或传入未知类型，回退尝试全量服务，避免漏解析历史账号
+      if (!servicesToTry.length) {
+        servicesToTry = accountServices
+      }
 
       for (const service of servicesToTry) {
         try {
@@ -2055,12 +2060,14 @@ router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res)
       }
 
       if (record.accountId) {
-        const key = `${record.accountId}:${record.accountType || 'unknown'}`
-        if (!accountOptionMap.has(key)) {
-          accountOptionMap.set(key, {
+        const normalizedType = record.accountType || 'unknown'
+        if (!accountOptionMap.has(record.accountId)) {
+          accountOptionMap.set(record.accountId, {
             id: record.accountId,
-            accountType: record.accountType || 'unknown'
+            accountTypes: new Set([normalizedType])
           })
+        } else {
+          accountOptionMap.get(record.accountId).accountTypes.add(normalizedType)
         }
       }
 
@@ -2133,23 +2140,37 @@ router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res)
     }
 
     const accountOptions = []
-    const accountIdAdded = new Set()
     for (const option of accountOptionMap.values()) {
-      const info = await resolveAccountInfo(option.id, option.accountType)
-      if (info && info.name) {
-        if (accountIdAdded.has(option.id)) {
-          continue
+      const types = Array.from(option.accountTypes || [])
+
+      // 优先按历史出现的 accountType 解析，若失败则回退全量解析
+      let resolvedInfo = null
+      for (const type of types) {
+        resolvedInfo = await resolveAccountInfo(option.id, type)
+        if (resolvedInfo && resolvedInfo.name) {
+          break
         }
-        accountIdAdded.add(option.id)
-        accountOptions.push({
-          id: option.id,
-          name: info.name,
-          accountType: info.type,
-          accountTypeName: accountTypeNames[info.type] || '未知渠道'
-        })
-      } else {
-        logger.warn(`⚠️ Skipping deleted/invalid account in filter options: ${option.id}`)
       }
+      if (!resolvedInfo) {
+        resolvedInfo = await resolveAccountInfo(option.id)
+      }
+
+      const chosenType = resolvedInfo?.type || types[0] || 'unknown'
+      const chosenTypeName = accountTypeNames[chosenType] || '未知渠道'
+
+      if (!resolvedInfo) {
+        logger.warn(
+          `⚠️ 保留无法解析的账户筛选项: ${option.id}, types=${types.join(',') || 'none'}`
+        )
+      }
+
+      accountOptions.push({
+        id: option.id,
+        name: resolvedInfo?.name || option.id,
+        accountType: chosenType,
+        accountTypeName: chosenTypeName,
+        rawTypes: types
+      })
     }
 
     return res.json({
