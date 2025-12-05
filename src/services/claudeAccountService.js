@@ -19,17 +19,17 @@ const { formatDateWithTimezone, getISOStringWithTimezone } = require('../utils/d
 const { isOpus45OrNewer } = require('../utils/modelHelper')
 
 /**
- * 判断账号是否为 Pro 账号（非 Max）
- * 兼容两种数据来源：API 实时返回的 hasClaudePro 和本地配置的 accountType
- * @param {Object} info - 订阅信息对象
+ * Check if account is Pro (not Max)
+ * Compatible with both API real-time data (hasClaudePro) and local config (accountType)
+ * @param {Object} info - Subscription info object
  * @returns {boolean}
  */
 function isProAccount(info) {
-  // API 返回的实时状态优先
+  // API real-time status takes priority
   if (info.hasClaudePro === true && info.hasClaudeMax !== true) {
     return true
   }
-  // 本地配置的账户类型
+  // Local configured account type
   return info.accountType === 'claude_pro'
 }
 
