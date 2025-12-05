@@ -2085,17 +2085,18 @@
       @save="handleSaveExpiry"
     />
 
-    <!-- 使用详情弹窗 -->
     <UsageDetailModal
       :api-key="selectedApiKeyForDetail || {}"
       :show="showUsageDetailModal"
       @close="showUsageDetailModal = false"
+      @open-timeline="openTimeline"
     />
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
 import { useClientsStore } from '@/stores/clients'
@@ -2114,6 +2115,7 @@ import CustomDropdown from '@/components/common/CustomDropdown.vue'
 import ActionDropdown from '@/components/common/ActionDropdown.vue'
 
 // 响应式数据
+const router = useRouter()
 const clientsStore = useClientsStore()
 const authStore = useAuthStore()
 const apiKeys = ref([])
@@ -4193,19 +4195,15 @@ const formatWindowTime = (seconds) => {
 
 // 显示使用详情
 const showUsageDetails = (apiKey) => {
-  // 获取异步加载的统计数据
   const cachedStats = getCachedStats(apiKey.id)
 
-  // 合并异步统计数据到 apiKey 对象
   const enrichedApiKey = {
     ...apiKey,
-    // 合并实时限制数据
     dailyCost: cachedStats?.dailyCost ?? apiKey.dailyCost ?? 0,
     currentWindowCost: cachedStats?.currentWindowCost ?? apiKey.currentWindowCost ?? 0,
     windowRemainingSeconds: cachedStats?.windowRemainingSeconds ?? apiKey.windowRemainingSeconds,
     windowStartTime: cachedStats?.windowStartTime ?? apiKey.windowStartTime ?? null,
     windowEndTime: cachedStats?.windowEndTime ?? apiKey.windowEndTime ?? null,
-    // 合并 usage 数据（用于详情弹窗中的统计卡片）
     usage: {
       ...apiKey.usage,
       total: {
@@ -4224,6 +4222,13 @@ const showUsageDetails = (apiKey) => {
 
   selectedApiKeyForDetail.value = enrichedApiKey
   showUsageDetailModal.value = true
+}
+
+const openTimeline = (keyId) => {
+  const id = keyId || selectedApiKeyForDetail.value?.id
+  if (!id) return
+  showUsageDetailModal.value = false
+  router.push(`/api-keys/${id}/usage-records`)
 }
 
 // 格式化时间（秒转换为可读格式） - 已移到 WindowLimitBar 组件中
