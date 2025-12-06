@@ -26,6 +26,7 @@ redis_data/
 
 # Logs directory
 logs/
+logs1/
 *.log
 startup.log
 app.log
