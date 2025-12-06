@@ -1668,7 +1668,6 @@
               <i class="fas fa-chart-line" />
               详情
             </button>
-
             <button
               v-if="canTestAccount(account)"
               class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-cyan-50 px-3 py-2 text-xs text-cyan-600 transition-colors hover:bg-cyan-100 dark:bg-cyan-900/40 dark:text-cyan-300 dark:hover:bg-cyan-800/50"
