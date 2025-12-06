@@ -90,6 +90,7 @@ class ClaudeAccountService {
       useUnifiedUserAgent = false, // 是否使用统一Claude Code版本的User-Agent
       useUnifiedClientId = false, // 是否使用统一的客户端标识
       unifiedClientId = '', // 统一的客户端标识
+      limitUnifiedDefaultModels = false, // 限制为统一 Claude Code 版本的默认模型
       expiresAt = null, // 账户订阅到期时间
       extInfo = null // 额外扩展信息
     } = options
@@ -127,6 +128,7 @@ class ClaudeAccountService {
         useUnifiedUserAgent: useUnifiedUserAgent.toString(), // 是否使用统一Claude Code版本的User-Agent
         useUnifiedClientId: useUnifiedClientId.toString(), // 是否使用统一的客户端标识
         unifiedClientId: unifiedClientId || '', // 统一的客户端标识
+        limitUnifiedDefaultModels: limitUnifiedDefaultModels.toString(), // 限制模型到统一版本默认列表
         // 优先使用手动设置的订阅信息，否则使用OAuth数据中的，否则默认为空
         subscriptionInfo: subscriptionInfo
           ? JSON.stringify(subscriptionInfo)
@@ -165,6 +167,7 @@ class ClaudeAccountService {
         useUnifiedUserAgent: useUnifiedUserAgent.toString(), // 是否使用统一Claude Code版本的User-Agent
         // 手动设置的订阅信息
         subscriptionInfo: subscriptionInfo ? JSON.stringify(subscriptionInfo) : '',
+        limitUnifiedDefaultModels: limitUnifiedDefaultModels.toString(), // 限制模型到统一版本默认列表
         // 账户订阅到期时间
         subscriptionExpiresAt: expiresAt || '',
         // 扩展信息
@@ -216,6 +219,7 @@ class ClaudeAccountService {
       useUnifiedUserAgent,
       useUnifiedClientId,
       unifiedClientId,
+      limitUnifiedDefaultModels,
       extInfo: normalizedExtInfo
     }
   }
@@ -571,6 +575,8 @@ class ClaudeAccountService {
             // 添加统一客户端标识设置
             useUnifiedClientId: account.useUnifiedClientId === 'true', // 默认为false
             unifiedClientId: account.unifiedClientId || '', // 统一的客户端标识
+            // 限制到统一版本默认模型
+            limitUnifiedDefaultModels: account.limitUnifiedDefaultModels === 'true',
             // 添加停止原因
             stoppedReason: account.stoppedReason || null,
             // 扩展信息
@@ -665,6 +671,7 @@ class ClaudeAccountService {
         'useUnifiedUserAgent',
         'useUnifiedClientId',
         'unifiedClientId',
+        'limitUnifiedDefaultModels',
         'subscriptionExpiresAt',
         'extInfo'
       ]

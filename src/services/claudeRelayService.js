@@ -14,6 +14,8 @@ const redis = require('../models/redis')
 const ClaudeCodeValidator = require('../validators/clients/claudeCodeValidator')
 const { formatDateWithTimezone } = require('../utils/dateHelper')
 const requestIdentityService = require('./requestIdentityService')
+const claudeCodeHeaderService = require('./claudeCodeHeadersService')
+const { getEffectiveModel } = require('../utils/modelHelper')
 const { createClaudeTestPayload } = require('../utils/testPayloadHelper')
 
 class ClaudeRelayService {
@@ -23,6 +25,7 @@ class ClaudeRelayService {
     this.betaHeader = config.claude.betaHeader
     this.systemPrompt = config.claude.systemPrompt
     this.claudeCodeSystemPrompt = "You are Claude Code, Anthropic's official CLI for Claude."
+    this.defaultClaudeCodeUserAgent = 'claude-cli/1.0.119 (external, cli)'
   }
 
   // 🔧 根据模型ID和客户端传递的 anthropic-beta 获取最终的 header
@@ -913,6 +916,56 @@ class ClaudeRelayService {
     }
   }
 
+  async _checkUnifiedDefaultModelRestriction(account, modelId, userAgent) {
+    if (
+      !account ||
+      account.useUnifiedUserAgent !== 'true' ||
+      account.limitUnifiedDefaultModels !== 'true'
+    ) {
+      return null
+    }
+
+    if (!modelId || typeof modelId !== 'string') {
+      return null
+    }
+
+    const effectiveModel = getEffectiveModel(modelId).trim()
+    const version = claudeCodeHeaderService.extractVersionFromUserAgent(userAgent)
+    const { isDefault, defaultModels } = ClaudeCodeValidator.validateModelForVersion(
+      effectiveModel,
+      version
+    )
+
+    if (!isDefault) {
+      if (!defaultModels || defaultModels.length === 0) {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            error: 'invalid_model',
+            message:
+              'Unable to retrieve the Claude Code default model list. Please contact the CRS developers to update it, or try again later.'
+          })
+        }
+      }
+
+      logger.warn(
+        `🚫 Blocked model ${effectiveModel} for account ${account.id} due to Claude Code ${version} default model restriction`
+      )
+      return {
+        statusCode: 400,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          error: 'invalid_model',
+          message: `Model ${effectiveModel} is not in the Claude Code ${version} default model list. Please install Claude Code ${version} or use one of the following models: ${defaultModels.join(', ')}`,
+          defaultModels
+        })
+      }
+    }
+
+    return null
+  }
+
   // 🔗 发送请求到Claude API
   async _makeClaudeRequest(
     body,
@@ -969,6 +1022,22 @@ class ClaudeRelayService {
     requestPayload = extensionResult.body
     finalHeaders = extensionResult.headers
 
+    const resolvedUserAgent =
+      unifiedUA ||
+      finalHeaders['user-agent'] ||
+      finalHeaders['User-Agent'] ||
+      this.defaultClaudeCodeUserAgent
+
+    const restrictionResponse = await this._checkUnifiedDefaultModelRestriction(
+      account,
+      requestPayload?.model || body?.model,
+      resolvedUserAgent
+    )
+
+    if (restrictionResponse) {
+      return restrictionResponse
+    }
+
     return new Promise((resolve, reject) => {
       // 支持自定义路径（如 count_tokens）
       let requestPath = url.pathname
@@ -994,10 +1063,7 @@ class ClaudeRelayService {
       }
 
       // 使用统一 User-Agent 或客户端提供的，最后使用默认值
-      if (!options.headers['user-agent'] || unifiedUA !== null) {
-        const userAgent = unifiedUA || 'claude-cli/1.0.119 (external, cli)'
-        options.headers['user-agent'] = userAgent
-      }
+      options.headers['user-agent'] = resolvedUserAgent
 
       logger.info(`🔗 指纹是这个: ${options.headers['user-agent']}`)
 
@@ -1291,6 +1357,32 @@ class ClaudeRelayService {
     requestPayload = extensionResult.body
     finalHeaders = extensionResult.headers
 
+    const resolvedUserAgent =
+      unifiedUA ||
+      finalHeaders['user-agent'] ||
+      finalHeaders['User-Agent'] ||
+      this.defaultClaudeCodeUserAgent
+
+    const restrictionResponse = await this._checkUnifiedDefaultModelRestriction(
+      account,
+      requestPayload?.model || body?.model,
+      resolvedUserAgent
+    )
+
+    if (restrictionResponse) {
+      if (!responseStream.headersSent) {
+        responseStream.status(restrictionResponse.statusCode || 400)
+        Object.entries(restrictionResponse.headers || {}).forEach(([key, value]) => {
+          responseStream.setHeader(key, value)
+        })
+      }
+      if (restrictionResponse.body) {
+        responseStream.write(restrictionResponse.body)
+      }
+      responseStream.end()
+      return
+    }
+
     return new Promise((resolve, reject) => {
       const url = new URL(this.claudeApiUrl)
 
@@ -1310,10 +1402,7 @@ class ClaudeRelayService {
       }
 
       // 使用统一 User-Agent 或客户端提供的，最后使用默认值
-      if (!options.headers['user-agent'] || unifiedUA !== null) {
-        const userAgent = unifiedUA || 'claude-cli/1.0.119 (external, cli)'
-        options.headers['user-agent'] = userAgent
-      }
+      options.headers['user-agent'] = resolvedUserAgent
 
       logger.info(`🔗 指纹是这个: ${options.headers['user-agent']}`)
       // 根据模型和客户端传递的 anthropic-beta 动态设置 header

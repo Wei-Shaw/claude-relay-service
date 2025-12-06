@@ -582,6 +582,7 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       useUnifiedUserAgent,
       useUnifiedClientId,
       unifiedClientId,
+      limitUnifiedDefaultModels,
       expiresAt,
       extInfo
     } = req.body
@@ -627,6 +628,7 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       useUnifiedUserAgent: useUnifiedUserAgent === true, // 默认为false
       useUnifiedClientId: useUnifiedClientId === true, // 默认为false
       unifiedClientId: unifiedClientId || '', // 统一的客户端标识
+      limitUnifiedDefaultModels: limitUnifiedDefaultModels === true, // 限定默认模型
       expiresAt: expiresAt || null, // 账户订阅到期时间
       extInfo: extInfo || null
     })
