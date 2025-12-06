@@ -795,7 +795,9 @@ class RedisClient {
    * 获取使用了指定模型的 Key IDs（OR 逻辑）
    */
   async getKeyIdsWithModels(keyIds, models) {
-    if (!keyIds.length || !models.length) return new Set()
+    if (!keyIds.length || !models.length) {
+      return new Set()
+    }
 
     const client = this.getClientSafe()
     const result = new Set()

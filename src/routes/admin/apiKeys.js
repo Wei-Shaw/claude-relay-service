@@ -474,9 +474,9 @@ async function getApiKeysSortedByCostCustom(options) {
   }
 
   // 2. 转换为数组并排序
-  const sortedEntries = [...costs.entries()].sort((a, b) => {
-    return sortOrder === 'desc' ? b[1] - a[1] : a[1] - b[1]
-  })
+  const sortedEntries = [...costs.entries()].sort((a, b) =>
+    sortOrder === 'desc' ? b[1] - a[1] : a[1] - b[1]
+  )
   const rankedKeyIds = sortedEntries.map(([keyId]) => keyId)
 
   // 3. 批量获取 API Key 基础数据
