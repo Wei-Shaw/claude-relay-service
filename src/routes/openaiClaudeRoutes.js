@@ -15,6 +15,7 @@ const claudeCodeHeadersService = require('../services/claudeCodeHeadersService')
 const sessionHelper = require('../utils/sessionHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const pricingService = require('../services/pricingService')
+const { getEffectiveModel } = require('../utils/modelHelper')
 
 // 🔧 辅助函数：检查 API Key 权限
 function checkPermissions(apiKeyData, requiredPermission = 'claude') {
@@ -75,9 +76,9 @@ router.get('/v1/models', authenticateApiKey, async (req, res) => {
       }
     ]
 
-    // 如果启用了模型限制，过滤模型列表
+    // 如果启用了模型限制，视为黑名单：过滤掉受限模型
     if (apiKeyData.enableModelRestriction && apiKeyData.restrictedModels?.length > 0) {
-      models = models.filter((model) => apiKeyData.restrictedModels.includes(model.id))
+      models = models.filter((model) => !apiKeyData.restrictedModels.includes(model.id))
     }
 
     res.json({
@@ -114,9 +115,9 @@ router.get('/v1/models/:model', authenticateApiKey, async (req, res) => {
       })
     }
 
-    // 检查模型限制
+    // 模型限制（黑名单）：命中则直接拒绝
     if (apiKeyData.enableModelRestriction && apiKeyData.restrictedModels?.length > 0) {
-      if (!apiKeyData.restrictedModels.includes(modelId)) {
+      if (apiKeyData.restrictedModels.includes(modelId)) {
         return res.status(404).json({
           error: {
             message: `Model '${modelId}' not found`,
@@ -199,9 +200,10 @@ async function handleChatCompletion(req, res, apiKeyData) {
     // 转换 OpenAI 请求为 Claude 格式
     const claudeRequest = openaiToClaude.convertRequest(req.body)
 
-    // 检查模型限制
+    // 模型限制（黑名单）：命中受限模型则拒绝
     if (apiKeyData.enableModelRestriction && apiKeyData.restrictedModels?.length > 0) {
-      if (!apiKeyData.restrictedModels.includes(claudeRequest.model)) {
+      const effectiveModel = getEffectiveModel(claudeRequest.model || '')
+      if (apiKeyData.restrictedModels.includes(effectiveModel)) {
         return res.status(403).json({
           error: {
             message: `Model ${req.body.model} is not allowed for this API key`,
