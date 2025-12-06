@@ -824,7 +824,8 @@ router.get('/v1/models', authenticateApiKey, async (req, res) => {
     // 可选：根据 API Key 的模型限制过滤
     let filteredModels = models
     if (req.apiKey.enableModelRestriction && req.apiKey.restrictedModels?.length > 0) {
-      filteredModels = models.filter((model) => req.apiKey.restrictedModels.includes(model.id))
+      // 将 restrictedModels 视为黑名单：过滤掉受限模型
+      filteredModels = models.filter((model) => !req.apiKey.restrictedModels.includes(model.id))
     }
 
     res.json({
