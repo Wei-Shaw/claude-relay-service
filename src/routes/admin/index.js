@@ -22,6 +22,7 @@ const droidAccountsRoutes = require('./droidAccounts')
 const dashboardRoutes = require('./dashboard')
 const usageStatsRoutes = require('./usageStats')
 const systemRoutes = require('./system')
+const concurrencyRoutes = require('./concurrency')
 
 // 挂载所有子路由
 // 使用完整路径的模块（直接挂载到根路径）
@@ -35,6 +36,7 @@ router.use('/', droidAccountsRoutes)
 router.use('/', dashboardRoutes)
 router.use('/', usageStatsRoutes)
 router.use('/', systemRoutes)
+router.use('/', concurrencyRoutes)
 
 // 使用相对路径的模块（需要指定基础路径前缀）
 router.use('/account-groups', accountGroupsRoutes)

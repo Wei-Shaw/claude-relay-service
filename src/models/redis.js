@@ -2096,6 +2096,246 @@ class RedisClient {
     return await this.getConcurrency(compositeKey)
   }
 
+  // 🔧 并发管理方法（用于管理员手动清理）
+
+  /**
+   * 获取所有并发状态
+   * @returns {Promise<Array>} 并发状态列表
+   */
+  async getAllConcurrencyStatus() {
+    try {
+      const client = this.getClientSafe()
+      const keys = await client.keys('concurrency:*')
+      const now = Date.now()
+      const results = []
+
+      for (const key of keys) {
+        // 提取 apiKeyId（去掉 concurrency: 前缀）
+        const apiKeyId = key.replace('concurrency:', '')
+
+        // 获取所有成员和分数（过期时间）
+        const members = await client.zrangebyscore(key, now, '+inf', 'WITHSCORES')
+
+        // 解析成员和过期时间
+        const activeRequests = []
+        for (let i = 0; i < members.length; i += 2) {
+          const requestId = members[i]
+          const expireAt = parseInt(members[i + 1])
+          const remainingSeconds = Math.max(0, Math.round((expireAt - now) / 1000))
+          activeRequests.push({
+            requestId,
+            expireAt: new Date(expireAt).toISOString(),
+            remainingSeconds
+          })
+        }
+
+        // 获取过期的成员数量
+        const expiredCount = await client.zcount(key, '-inf', now)
+
+        results.push({
+          apiKeyId,
+          key,
+          activeCount: activeRequests.length,
+          expiredCount,
+          activeRequests
+        })
+      }
+
+      return results
+    } catch (error) {
+      logger.error('❌ Failed to get all concurrency status:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 获取特定 API Key 的并发状态详情
+   * @param {string} apiKeyId - API Key ID
+   * @returns {Promise<Object>} 并发状态详情
+   */
+  async getConcurrencyStatus(apiKeyId) {
+    try {
+      const client = this.getClientSafe()
+      const key = `concurrency:${apiKeyId}`
+      const now = Date.now()
+
+      // 检查 key 是否存在
+      const exists = await client.exists(key)
+      if (!exists) {
+        return {
+          apiKeyId,
+          key,
+          activeCount: 0,
+          expiredCount: 0,
+          activeRequests: [],
+          exists: false
+        }
+      }
+
+      // 获取所有成员和分数
+      const allMembers = await client.zrange(key, 0, -1, 'WITHSCORES')
+
+      const activeRequests = []
+      const expiredRequests = []
+
+      for (let i = 0; i < allMembers.length; i += 2) {
+        const requestId = allMembers[i]
+        const expireAt = parseInt(allMembers[i + 1])
+        const remainingSeconds = Math.round((expireAt - now) / 1000)
+
+        const requestInfo = {
+          requestId,
+          expireAt: new Date(expireAt).toISOString(),
+          remainingSeconds
+        }
+
+        if (expireAt > now) {
+          activeRequests.push(requestInfo)
+        } else {
+          expiredRequests.push(requestInfo)
+        }
+      }
+
+      return {
+        apiKeyId,
+        key,
+        activeCount: activeRequests.length,
+        expiredCount: expiredRequests.length,
+        activeRequests,
+        expiredRequests,
+        exists: true
+      }
+    } catch (error) {
+      logger.error(`❌ Failed to get concurrency status for ${apiKeyId}:`, error)
+      throw error
+    }
+  }
+
+  /**
+   * 强制清理特定 API Key 的并发计数（忽略租约）
+   * @param {string} apiKeyId - API Key ID
+   * @returns {Promise<Object>} 清理结果
+   */
+  async forceClearConcurrency(apiKeyId) {
+    try {
+      const client = this.getClientSafe()
+      const key = `concurrency:${apiKeyId}`
+
+      // 获取清理前的状态
+      const beforeCount = await client.zcard(key)
+
+      // 删除整个 key
+      await client.del(key)
+
+      logger.warn(
+        `🧹 Force cleared concurrency for key ${apiKeyId}, removed ${beforeCount} entries`
+      )
+
+      return {
+        apiKeyId,
+        key,
+        clearedCount: beforeCount,
+        success: true
+      }
+    } catch (error) {
+      logger.error(`❌ Failed to force clear concurrency for ${apiKeyId}:`, error)
+      throw error
+    }
+  }
+
+  /**
+   * 强制清理所有并发计数
+   * @returns {Promise<Object>} 清理结果
+   */
+  async forceClearAllConcurrency() {
+    try {
+      const client = this.getClientSafe()
+      const keys = await client.keys('concurrency:*')
+
+      let totalCleared = 0
+      const clearedKeys = []
+
+      for (const key of keys) {
+        const count = await client.zcard(key)
+        await client.del(key)
+        totalCleared += count
+        clearedKeys.push({
+          key,
+          clearedCount: count
+        })
+      }
+
+      logger.warn(
+        `🧹 Force cleared all concurrency: ${keys.length} keys, ${totalCleared} total entries`
+      )
+
+      return {
+        keysCleared: keys.length,
+        totalEntriesCleared: totalCleared,
+        clearedKeys,
+        success: true
+      }
+    } catch (error) {
+      logger.error('❌ Failed to force clear all concurrency:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 清理过期的并发条目（不影响活跃请求）
+   * @param {string} apiKeyId - API Key ID（可选，不传则清理所有）
+   * @returns {Promise<Object>} 清理结果
+   */
+  async cleanupExpiredConcurrency(apiKeyId = null) {
+    try {
+      const client = this.getClientSafe()
+      const now = Date.now()
+      let keys
+
+      if (apiKeyId) {
+        keys = [`concurrency:${apiKeyId}`]
+      } else {
+        keys = await client.keys('concurrency:*')
+      }
+
+      let totalCleaned = 0
+      const cleanedKeys = []
+
+      for (const key of keys) {
+        // 只清理过期的条目
+        const cleaned = await client.zremrangebyscore(key, '-inf', now)
+        if (cleaned > 0) {
+          totalCleaned += cleaned
+          cleanedKeys.push({
+            key,
+            cleanedCount: cleaned
+          })
+        }
+
+        // 如果 key 为空，删除它
+        const remaining = await client.zcard(key)
+        if (remaining === 0) {
+          await client.del(key)
+        }
+      }
+
+      logger.info(
+        `🧹 Cleaned up expired concurrency: ${totalCleaned} entries from ${cleanedKeys.length} keys`
+      )
+
+      return {
+        keysProcessed: keys.length,
+        keysCleaned: cleanedKeys.length,
+        totalEntriesCleaned: totalCleaned,
+        cleanedKeys,
+        success: true
+      }
+    } catch (error) {
+      logger.error('❌ Failed to cleanup expired concurrency:', error)
+      throw error
+    }
+  }
+
   // 🔧 Basic Redis operations wrapper methods for convenience
   async get(key) {
     const client = this.getClientSafe()
