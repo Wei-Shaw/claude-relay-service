@@ -16,6 +16,8 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateApiKey } = require('../middleware/auth')
+const { executeWithFailover } = require('../utils/failoverWrapper')
+const unifiedGeminiScheduler = require('../services/unifiedGeminiScheduler')
 
 // 从 handlers/geminiHandlers.js 导入所有处理函数
 const {
@@ -34,6 +36,47 @@ const {
   handleStandardStreamGenerateContent,
   ensureGeminiPermissionMiddleware
 } = require('../handlers/geminiHandlers')
+
+/**
+ * Execute Gemini request with failover support
+ * @param {Object} params
+ * @param {Object} params.req - Express request
+ * @param {Object} params.res - Express response
+ * @param {Object} params.apiKeyData - API key data
+ * @param {string} params.sessionHash - Session hash
+ * @param {string} params.requestedModel - Requested model
+ * @param {Function} params.executeWithAccount - Async function(selection) => void
+ */
+async function executeGeminiWithFailover({
+  req,
+  res,
+  apiKeyData,
+  sessionHash,
+  requestedModel,
+  executeWithAccount
+}) {
+  await executeWithFailover({
+    req,
+    res,
+    selectAccount: async (excludeAccountIds) =>
+      await unifiedGeminiScheduler.selectAccountForApiKey(apiKeyData, sessionHash, requestedModel, {
+        excludeAccounts: excludeAccountIds
+      }),
+    executeRequest: async (selection) => {
+      await executeWithAccount(selection)
+    },
+    markUnavailable: async (accountId, accountType, sessionHashValue, ttl) => {
+      await unifiedGeminiScheduler.markAccountTemporarilyUnavailable(
+        accountId,
+        accountType,
+        sessionHashValue,
+        ttl
+      )
+    },
+    sessionHash,
+    platform: 'gemini'
+  })
+}
 
 // ============================================================================
 // OpenAI 兼容格式路由
@@ -106,3 +149,4 @@ module.exports.handleStreamGenerateContent = handleStreamGenerateContent
 module.exports.handleStandardGenerateContent = handleStandardGenerateContent
 module.exports.handleStandardStreamGenerateContent = handleStandardStreamGenerateContent
 module.exports.ensureGeminiPermissionMiddleware = ensureGeminiPermissionMiddleware
+module.exports.executeGeminiWithFailover = executeGeminiWithFailover

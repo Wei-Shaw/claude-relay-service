@@ -347,11 +347,27 @@ class ClaudeRelayService {
           } else {
             logger.info(`🚫 529 error handling is disabled, skipping account overload marking`)
           }
+          const overloadErrorMessage =
+            this._extractErrorMessage(response.body) ||
+            `Claude upstream error: ${response.statusCode}`
+          const overloadError = new Error(overloadErrorMessage)
+          overloadError.statusCode = response.statusCode
+          overloadError.isUpstream = true
+          overloadError.accountId = accountId
+          throw overloadError
         }
         // 检查是否为5xx状态码
         else if (response.statusCode >= 500 && response.statusCode < 600) {
           logger.warn(`🔥 Server error (${response.statusCode}) detected for account ${accountId}`)
           await this._handleServerError(accountId, response.statusCode, sessionHash)
+          const upstreamErrorMessage =
+            this._extractErrorMessage(response.body) ||
+            `Claude upstream error: ${response.statusCode}`
+          const upstreamError = new Error(upstreamErrorMessage)
+          upstreamError.statusCode = response.statusCode
+          upstreamError.isUpstream = true
+          upstreamError.accountId = accountId
+          throw upstreamError
         }
         // 检查是否为429状态码
         else if (response.statusCode === 429) {
@@ -1070,19 +1086,28 @@ class ClaudeRelayService {
 
         // 根据错误类型提供更具体的错误信息
         let errorMessage = 'Upstream request failed'
+        let statusCode = 502
         if (error.code === 'ECONNRESET') {
           errorMessage = 'Connection reset by Claude API server'
+          statusCode = 502
         } else if (error.code === 'ENOTFOUND') {
           errorMessage = 'Unable to resolve Claude API hostname'
+          statusCode = 502
         } else if (error.code === 'ECONNREFUSED') {
           errorMessage = 'Connection refused by Claude API server'
+          statusCode = 502
         } else if (error.code === 'ETIMEDOUT') {
           errorMessage = 'Connection timed out to Claude API server'
+          statusCode = 504
 
           await this._handleServerError(accountId, 504, null, 'Network')
         }
 
-        reject(new Error(errorMessage))
+        const upstreamError = new Error(errorMessage)
+        upstreamError.statusCode = statusCode
+        upstreamError.isUpstream = true
+        upstreamError.accountId = accountId
+        reject(upstreamError)
       })
 
       req.on('timeout', async () => {
@@ -1091,7 +1116,11 @@ class ClaudeRelayService {
 
         await this._handleServerError(accountId, 504, null, 'Request')
 
-        reject(new Error('Request timeout'))
+        const timeoutError = new Error('Request timeout')
+        timeoutError.statusCode = 504
+        timeoutError.isUpstream = true
+        timeoutError.accountId = accountId
+        reject(timeoutError)
       })
 
       // 写入请求体
@@ -1489,9 +1518,9 @@ class ClaudeRelayService {
                 }
               })()
             }
+            let errorMessage = `Claude API error: ${res.statusCode}`
             if (!responseStream.destroyed) {
               // 解析 Claude API 返回的错误详情
-              let errorMessage = `Claude API error: ${res.statusCode}`
               try {
                 const parsedError = JSON.parse(errorData)
                 if (parsedError.error?.message) {
@@ -1522,7 +1551,11 @@ class ClaudeRelayService {
               }
               responseStream.end()
             }
-            reject(new Error(`Claude API error: ${res.statusCode}`))
+            const upstreamError = new Error(errorMessage)
+            upstreamError.statusCode = res.statusCode
+            upstreamError.isUpstream = true
+            upstreamError.accountId = accountId
+            reject(upstreamError)
           })
           return
         }
@@ -1904,7 +1937,12 @@ class ClaudeRelayService {
           )
           responseStream.end()
         }
-        reject(error)
+        const upstreamError = new Error(errorMessage)
+        upstreamError.statusCode = statusCode
+        upstreamError.isUpstream = true
+        upstreamError.accountId = accountId
+        upstreamError.code = error.code
+        reject(upstreamError)
       })
 
       req.on('timeout', async () => {
@@ -1930,7 +1968,11 @@ class ClaudeRelayService {
           )
           responseStream.end()
         }
-        reject(new Error('Request timeout'))
+        const timeoutError = new Error('Request timeout')
+        timeoutError.statusCode = 504
+        timeoutError.isUpstream = true
+        timeoutError.accountId = accountId
+        reject(timeoutError)
       })
 
       // 处理客户端断开连接

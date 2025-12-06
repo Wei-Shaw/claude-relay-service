@@ -1,6 +1,7 @@
 const axios = require('axios')
 const { v4: uuidv4 } = require('uuid')
 const claudeConsoleAccountService = require('./claudeConsoleAccountService')
+const unifiedClaudeScheduler = require('./unifiedClaudeScheduler')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
@@ -293,7 +294,7 @@ class ClaudeConsoleRelayService {
           await unifiedClaudeScheduler.markAccountTemporarilyUnavailable(
             accountId,
             'claude-console',
-            sessionHash,
+            null,
             300
           )
         }
@@ -337,6 +338,16 @@ class ClaudeConsoleRelayService {
 
       logger.debug(`[DEBUG] Final response body to return: ${responseBody.substring(0, 200)}...`)
 
+      if (response.status >= 500) {
+        const upstreamError = new Error(
+          responseBody || `Claude Console upstream error: ${response.status}`
+        )
+        upstreamError.statusCode = response.status
+        upstreamError.isUpstream = true
+        upstreamError.accountId = accountId
+        throw upstreamError
+      }
+
       return {
         statusCode: response.status,
         headers: response.headers,
@@ -361,6 +372,15 @@ class ClaudeConsoleRelayService {
       )
 
       // 不再因为模型不支持而block账号
+
+      if (
+        (error.response && error.response.status >= 500) ||
+        ['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND'].includes(error.code)
+      ) {
+        error.statusCode = error.response?.status || (error.code === 'ETIMEDOUT' ? 504 : 502)
+        error.isUpstream = true
+        error.accountId = accountId
+      }
 
       throw error
     } finally {
@@ -681,7 +701,7 @@ class ClaudeConsoleRelayService {
                   await unifiedClaudeScheduler.markAccountTemporarilyUnavailable(
                     accountId,
                     'claude-console',
-                    sessionHash,
+                    null,
                     300
                   )
                 }
@@ -719,7 +739,13 @@ class ClaudeConsoleRelayService {
                   responseStream.end()
                 }
               }
-              resolve() // 不抛出异常，正常完成流处理
+              const upstreamError = new Error(
+                `Claude Console upstream stream error: ${response.status}`
+              )
+              upstreamError.statusCode = response.status
+              upstreamError.isUpstream = true
+              upstreamError.accountId = accountId
+              reject(upstreamError)
             })
 
             return
@@ -996,7 +1022,12 @@ class ClaudeConsoleRelayService {
               }
               responseStream.end()
             }
-            reject(error)
+            const upstreamError = new Error(error.message || 'Stream error')
+            upstreamError.statusCode = error.response?.status || 502
+            upstreamError.isUpstream = true
+            upstreamError.accountId = accountId
+            upstreamError.code = error.code
+            reject(upstreamError)
           })
         })
         .catch((error) => {
@@ -1062,7 +1093,13 @@ class ClaudeConsoleRelayService {
             responseStream.end()
           }
 
-          reject(error)
+          const upstreamError = new Error(error.message || 'Claude Console stream request failed')
+          upstreamError.statusCode =
+            error.response?.status || (error.code === 'ETIMEDOUT' ? 504 : 502)
+          upstreamError.isUpstream = true
+          upstreamError.accountId = accountId
+          upstreamError.code = error.code
+          reject(upstreamError)
         })
 
       // 处理客户端断开连接

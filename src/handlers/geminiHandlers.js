@@ -17,6 +17,7 @@ const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const { parseSSELine } = require('../utils/sseParser')
 const axios = require('axios')
 const ProxyHelper = require('../utils/proxyHelper')
+const { executeWithFailover } = require('../utils/failoverWrapper')
 
 // ============================================================================
 // 工具函数
@@ -339,61 +340,7 @@ async function handleMessages(req, res) {
 
     // 生成会话哈希用于粘性会话
     sessionHash = generateSessionHash(req)
-
-    // 使用统一调度选择可用的 Gemini 账户（传递请求的模型）
-    try {
-      const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
-        apiKeyData,
-        sessionHash,
-        model, // 传递请求的模型进行过滤
-        { allowApiAccounts: true } // 允许调度 API 账户
-      )
-      ;({ accountId, accountType } = schedulerResult)
-    } catch (error) {
-      logger.error('Failed to select Gemini account:', error)
-      return res.status(503).json({
-        error: {
-          message: error.message || 'No available Gemini accounts',
-          type: 'service_unavailable'
-        }
-      })
-    }
-
-    // 判断账户类型：根据 accountType 判断，而非 accountId 前缀
-    const isApiAccount = accountType === 'gemini-api'
-
-    // 获取账户详情
-    let account
-    if (isApiAccount) {
-      account = await geminiApiAccountService.getAccount(accountId)
-      if (!account) {
-        return res.status(503).json({
-          error: {
-            message: 'Gemini API account not found',
-            type: 'service_unavailable'
-          }
-        })
-      }
-      logger.info(`Using Gemini API account: ${account.id} for API key: ${apiKeyData.id}`)
-      // 标记 API 账户被使用
-      await geminiApiAccountService.markAccountUsed(account.id)
-    } else {
-      account = await geminiAccountService.getAccount(accountId)
-      if (!account) {
-        return res.status(503).json({
-          error: {
-            message: 'Gemini OAuth account not found',
-            type: 'service_unavailable'
-          }
-        })
-      }
-      logger.info(`Using Gemini OAuth account: ${account.id} for API key: ${apiKeyData.id}`)
-      // 标记 OAuth 账户被使用
-      await geminiAccountService.markAccountUsed(account.id)
-    }
-
-    // 创建中止控制器
-    abortController = new AbortController()
+    const requestedModel = model
 
     // 处理客户端断开连接
     req.on('close', () => {
@@ -403,222 +350,277 @@ async function handleMessages(req, res) {
       }
     })
 
-    let geminiResponse
+    await executeWithFailover({
+      req,
+      res,
+      selectAccount: async (excludeAccountIds) =>
+        await unifiedGeminiScheduler.selectAccountForApiKey(
+          apiKeyData,
+          sessionHash,
+          requestedModel,
+          { excludeAccounts: excludeAccountIds, allowApiAccounts: true }
+        ),
+      executeRequest: async (selection) => {
+        ;({ accountId, accountType } = selection)
 
-    if (isApiAccount) {
-      // API 账户：直接调用 Google Gemini API
-      // 转换 OpenAI 格式的 messages 为 Gemini 格式的 contents
-      const contents = messages.map((msg) => ({
-        role: msg.role === 'assistant' ? 'model' : msg.role,
-        parts: [{ text: msg.content }]
-      }))
+        const isApiAccount = accountType === 'gemini-api'
 
-      const requestBody = {
-        contents,
-        generationConfig: {
-          temperature,
-          maxOutputTokens: max_tokens,
-          topP: 0.95,
-          topK: 40
-        }
-      }
-
-      // 解析代理配置
-      const proxyConfig = parseProxyConfig(account)
-
-      const apiUrl = buildGeminiApiUrl(
-        account.baseUrl,
-        model,
-        stream ? 'streamGenerateContent' : 'generateContent',
-        account.apiKey,
-        { stream }
-      )
-
-      const axiosConfig = {
-        method: 'POST',
-        url: apiUrl,
-        data: requestBody,
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': account.apiKey,
-          'x-goog-api-key': account.apiKey
-        },
-        responseType: stream ? 'stream' : 'json',
-        signal: abortController.signal
-      }
-
-      // 添加代理配置
-      if (proxyConfig) {
-        axiosConfig.httpsAgent = ProxyHelper.createProxyAgent(proxyConfig)
-        axiosConfig.httpAgent = ProxyHelper.createProxyAgent(proxyConfig)
-      }
-
-      try {
-        const apiResponse = await axios(axiosConfig)
-        if (stream) {
-          geminiResponse = apiResponse.data
+        // 获取账户详情
+        let account
+        if (isApiAccount) {
+          account = await geminiApiAccountService.getAccount(accountId)
+          if (!account) {
+            const error = new Error('Gemini API account not found')
+            error.status = 503
+            throw error
+          }
+          logger.info(`Using Gemini API account: ${account.id} for API key: ${apiKeyData.id}`)
+          await geminiApiAccountService.markAccountUsed(account.id)
         } else {
-          // 转换为 OpenAI 兼容格式
-          const geminiData = apiResponse.data
-          geminiResponse = {
-            id: crypto.randomUUID(),
-            object: 'chat.completion',
-            created: Math.floor(Date.now() / 1000),
-            model,
-            choices: [
-              {
-                index: 0,
-                message: {
-                  role: 'assistant',
-                  content:
-                    geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated'
-                },
-                finish_reason: 'stop'
-              }
-            ],
-            usage: {
-              prompt_tokens: geminiData.usageMetadata?.promptTokenCount || 0,
-              completion_tokens: geminiData.usageMetadata?.candidatesTokenCount || 0,
-              total_tokens: geminiData.usageMetadata?.totalTokenCount || 0
+          account = await geminiAccountService.getAccount(accountId)
+          if (!account) {
+            const error = new Error('Gemini OAuth account not found')
+            error.status = 503
+            throw error
+          }
+          logger.info(`Using Gemini OAuth account: ${account.id} for API key: ${apiKeyData.id}`)
+          await geminiAccountService.markAccountUsed(account.id)
+        }
+
+        if (abortController && !abortController.signal.aborted) {
+          abortController.abort()
+        }
+        abortController = new AbortController()
+
+        let geminiResponse
+
+        if (isApiAccount) {
+          // API 账户：直接调用 Google Gemini API
+          // 转换 OpenAI 格式的 messages 为 Gemini 格式的 contents
+          const contents = messages.map((msg) => ({
+            role: msg.role === 'assistant' ? 'model' : msg.role,
+            parts: [{ text: msg.content }]
+          }))
+
+          const requestBody = {
+            contents,
+            generationConfig: {
+              temperature,
+              maxOutputTokens: max_tokens,
+              topP: 0.95,
+              topK: 40
             }
           }
 
-          // 记录使用统计
-          if (geminiData.usageMetadata) {
-            await apiKeyService.recordUsage(
-              apiKeyData.id,
-              geminiData.usageMetadata.promptTokenCount || 0,
-              geminiData.usageMetadata.candidatesTokenCount || 0,
-              0,
-              0,
-              model,
-              accountId
-            )
+          // 解析代理配置
+          const proxyConfig = parseProxyConfig(account)
+
+          const apiUrl = buildGeminiApiUrl(
+            account.baseUrl,
+            model,
+            stream ? 'streamGenerateContent' : 'generateContent',
+            account.apiKey,
+            { stream }
+          )
+
+          const axiosConfig = {
+            method: 'POST',
+            url: apiUrl,
+            data: requestBody,
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': account.apiKey,
+              'x-goog-api-key': account.apiKey
+            },
+            responseType: stream ? 'stream' : 'json',
+            signal: abortController.signal
           }
-        }
-      } catch (error) {
-        logger.error('Gemini API request failed:', {
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          data: error.response?.data
-        })
-        throw error
-      }
-    } else {
-      // OAuth 账户：使用现有的 sendGeminiRequest
-      // 智能处理项目ID：优先使用配置的 projectId，降级到临时 tempProjectId
-      const effectiveProjectId = account.projectId || account.tempProjectId || null
 
-      geminiResponse = await sendGeminiRequest({
-        messages,
-        model,
-        temperature,
-        maxTokens: max_tokens,
-        stream,
-        accessToken: account.accessToken,
-        proxy: account.proxy,
-        apiKeyId: apiKeyData.id,
-        signal: abortController.signal,
-        projectId: effectiveProjectId,
-        accountId: account.id
-      })
-    }
+          // 添加代理配置
+          if (proxyConfig) {
+            axiosConfig.httpsAgent = ProxyHelper.createProxyAgent(proxyConfig)
+            axiosConfig.httpAgent = ProxyHelper.createProxyAgent(proxyConfig)
+          }
 
-    if (stream) {
-      // 设置流式响应头
-      res.setHeader('Content-Type', 'text/event-stream')
-      res.setHeader('Cache-Control', 'no-cache')
-      res.setHeader('Connection', 'keep-alive')
-      res.setHeader('X-Accel-Buffering', 'no')
-
-      if (isApiAccount) {
-        // API 账户：处理 SSE 流并记录使用统计
-        let totalUsage = {
-          promptTokenCount: 0,
-          candidatesTokenCount: 0,
-          totalTokenCount: 0
-        }
-
-        geminiResponse.on('data', (chunk) => {
           try {
-            const chunkStr = chunk.toString()
-            res.write(chunkStr)
-
-            // 尝试从 SSE 流中提取 usage 数据
-            const lines = chunkStr.split('\n')
-            for (const line of lines) {
-              if (line.startsWith('data:')) {
-                const data = line.substring(5).trim()
-                if (data && data !== '[DONE]') {
-                  try {
-                    const parsed = JSON.parse(data)
-                    if (parsed.usageMetadata || parsed.response?.usageMetadata) {
-                      totalUsage = parsed.usageMetadata || parsed.response.usageMetadata
-                    }
-                  } catch (e) {
-                    // 解析失败，忽略
+            const apiResponse = await axios(axiosConfig)
+            if (stream) {
+              geminiResponse = apiResponse.data
+            } else {
+              // 转换为 OpenAI 兼容格式
+              const geminiData = apiResponse.data
+              geminiResponse = {
+                id: crypto.randomUUID(),
+                object: 'chat.completion',
+                created: Math.floor(Date.now() / 1000),
+                model,
+                choices: [
+                  {
+                    index: 0,
+                    message: {
+                      role: 'assistant',
+                      content:
+                        geminiData.candidates?.[0]?.content?.parts?.[0]?.text ||
+                        'No response generated'
+                    },
+                    finish_reason: 'stop'
                   }
+                ],
+                usage: {
+                  prompt_tokens: geminiData.usageMetadata?.promptTokenCount || 0,
+                  completion_tokens: geminiData.usageMetadata?.candidatesTokenCount || 0,
+                  total_tokens: geminiData.usageMetadata?.totalTokenCount || 0
                 }
+              }
+
+              // 记录使用统计
+              if (geminiData.usageMetadata) {
+                await apiKeyService.recordUsage(
+                  apiKeyData.id,
+                  geminiData.usageMetadata.promptTokenCount || 0,
+                  geminiData.usageMetadata.candidatesTokenCount || 0,
+                  0,
+                  0,
+                  model,
+                  accountId
+                )
               }
             }
           } catch (error) {
-            logger.error('Error processing stream chunk:', error)
+            logger.error('Gemini API request failed:', {
+              status: error.response?.status,
+              statusText: error.response?.statusText,
+              data: error.response?.data
+            })
+            throw error
           }
-        })
+        } else {
+          // OAuth 账户：使用现有的 sendGeminiRequest
+          // 智能处理项目ID：优先使用配置的 projectId，降级到临时 tempProjectId
+          const effectiveProjectId = account.projectId || account.tempProjectId || null
 
-        geminiResponse.on('end', () => {
-          res.end()
+          geminiResponse = await sendGeminiRequest({
+            messages,
+            model,
+            temperature,
+            maxTokens: max_tokens,
+            stream,
+            accessToken: account.accessToken,
+            proxy: account.proxy,
+            apiKeyId: apiKeyData.id,
+            signal: abortController.signal,
+            projectId: effectiveProjectId,
+            accountId: account.id
+          })
+        }
 
-          // 异步记录使用统计
-          if (totalUsage.totalTokenCount > 0) {
-            apiKeyService
-              .recordUsage(
-                apiKeyData.id,
-                totalUsage.promptTokenCount || 0,
-                totalUsage.candidatesTokenCount || 0,
-                0,
-                0,
-                model,
-                accountId
-              )
-              .then(() => {
-                logger.info(
-                  `📊 Recorded Gemini API stream usage - Input: ${totalUsage.promptTokenCount}, Output: ${totalUsage.candidatesTokenCount}`
-                )
-              })
-              .catch((error) => {
-                logger.error('Failed to record Gemini API usage:', error)
-              })
-          }
-        })
+        if (stream) {
+          // 设置流式响应头
+          res.setHeader('Content-Type', 'text/event-stream')
+          res.setHeader('Cache-Control', 'no-cache')
+          res.setHeader('Connection', 'keep-alive')
+          res.setHeader('X-Accel-Buffering', 'no')
 
-        geminiResponse.on('error', (error) => {
-          logger.error('Stream error:', error)
-          if (!res.headersSent) {
-            res.status(500).json({
-              error: {
-                message: error.message || 'Stream error',
-                type: 'api_error'
+          if (isApiAccount) {
+            // API 账户：处理 SSE 流并记录使用统计
+            let totalUsage = {
+              promptTokenCount: 0,
+              candidatesTokenCount: 0,
+              totalTokenCount: 0
+            }
+
+            geminiResponse.on('data', (chunk) => {
+              try {
+                const chunkStr = chunk.toString()
+                res.write(chunkStr)
+
+                // 尝试从 SSE 流中提取 usage 数据
+                const lines = chunkStr.split('\n')
+                for (const line of lines) {
+                  if (line.startsWith('data:')) {
+                    const data = line.substring(5).trim()
+                    if (data && data !== '[DONE]') {
+                      try {
+                        const parsed = JSON.parse(data)
+                        if (parsed.usageMetadata || parsed.response?.usageMetadata) {
+                          totalUsage = parsed.usageMetadata || parsed.response.usageMetadata
+                        }
+                      } catch (e) {
+                        // 解析失败，忽略
+                      }
+                    }
+                  }
+                }
+              } catch (error) {
+                logger.error('Error processing stream chunk:', error)
+              }
+            })
+
+            geminiResponse.on('end', () => {
+              res.end()
+
+              // 异步记录使用统计
+              if (totalUsage.totalTokenCount > 0) {
+                apiKeyService
+                  .recordUsage(
+                    apiKeyData.id,
+                    totalUsage.promptTokenCount || 0,
+                    totalUsage.candidatesTokenCount || 0,
+                    0,
+                    0,
+                    model,
+                    accountId
+                  )
+                  .then(() => {
+                    logger.info(
+                      `📊 Recorded Gemini API stream usage - Input: ${totalUsage.promptTokenCount}, Output: ${totalUsage.candidatesTokenCount}`
+                    )
+                  })
+                  .catch((error) => {
+                    logger.error('Failed to record Gemini API usage:', error)
+                  })
+              }
+            })
+
+            geminiResponse.on('error', (error) => {
+              logger.error('Stream error:', error)
+              if (!res.headersSent) {
+                res.status(500).json({
+                  error: {
+                    message: error.message || 'Stream error',
+                    type: 'api_error'
+                  }
+                })
+              } else {
+                res.end()
               }
             })
           } else {
+            // OAuth 账户：使用原有的流式传输逻辑
+            for await (const chunk of geminiResponse) {
+              if (abortController.signal.aborted) {
+                break
+              }
+              res.write(chunk)
+            }
             res.end()
           }
-        })
-      } else {
-        // OAuth 账户：使用原有的流式传输逻辑
-        for await (const chunk of geminiResponse) {
-          if (abortController.signal.aborted) {
-            break
-          }
-          res.write(chunk)
+        } else {
+          // 非流式响应
+          res.json(geminiResponse)
         }
-        res.end()
-      }
-    } else {
-      // 非流式响应
-      res.json(geminiResponse)
-    }
+      },
+      markUnavailable: async (accountIdValue, accountTypeValue, sessionHashValue, ttl) => {
+        await unifiedGeminiScheduler.markAccountTemporarilyUnavailable(
+          accountIdValue,
+          accountTypeValue,
+          sessionHashValue,
+          ttl
+        )
+      },
+      sessionHash,
+      platform: 'gemini'
+    })
 
     const duration = Date.now() - startTime
     logger.info(`Gemini request completed in ${duration}ms`)
@@ -1489,6 +1491,7 @@ async function handleStreamGenerateContent(req, res) {
     // 从路径参数或请求体中获取模型名
     const model = req.body.model || req.params.modelName || 'gemini-2.5-flash'
     const sessionHash = sessionHelper.generateSessionHash(req.body)
+    const requestedModel = model
 
     // 处理不同格式的请求
     let actualRequestData = requestData
@@ -1523,50 +1526,6 @@ async function handleStreamGenerateContent(req, res) {
       })
     }
 
-    // 使用统一调度选择账号（v1internal 不允许 API 账户）
-    const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
-      req.apiKey,
-      sessionHash,
-      model
-    )
-    const { accountId, accountType } = schedulerResult
-
-    // v1internal 路由只支持 OAuth 账户，不支持 API Key 账户
-    if (accountType === 'gemini-api') {
-      logger.error(`❌ v1internal routes do not support Gemini API accounts. Account: ${accountId}`)
-      return res.status(400).json({
-        error: {
-          message:
-            'This endpoint only supports Gemini OAuth accounts. Gemini API Key accounts are not compatible with v1internal format.',
-          type: 'invalid_account_type'
-        }
-      })
-    }
-
-    const account = await geminiAccountService.getAccount(accountId)
-    if (!account) {
-      logger.error(`❌ Gemini account not found: ${accountId}`)
-      return res.status(404).json({
-        error: {
-          message: 'Gemini account not found',
-          type: 'account_not_found'
-        }
-      })
-    }
-
-    const { accessToken, refreshToken } = account
-
-    const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
-    logger.info(`StreamGenerateContent request (${version})`, {
-      model,
-      userPromptId: user_prompt_id,
-      projectId: project || account.projectId,
-      apiKeyId: req.apiKey?.id || 'unknown'
-    })
-
-    // 创建中止控制器
-    abortController = new AbortController()
-
     // 处理客户端断开连接
     req.on('close', () => {
       if (abortController && !abortController.signal.aborted) {
@@ -1575,218 +1534,292 @@ async function handleStreamGenerateContent(req, res) {
       }
     })
 
-    // 解析账户的代理配置
-    const proxyConfig = parseProxyConfig(account)
-
-    const client = await geminiAccountService.getOauthClient(accessToken, refreshToken, proxyConfig)
-
-    // 智能处理项目ID：优先使用配置的 projectId，降级到临时 tempProjectId
-    let effectiveProjectId = account.projectId || account.tempProjectId || null
-
-    // 如果没有任何项目ID，尝试调用 loadCodeAssist 获取
-    if (!effectiveProjectId) {
-      try {
-        logger.info('📋 No projectId available, attempting to fetch from loadCodeAssist...')
-        const loadResponse = await geminiAccountService.loadCodeAssist(client, null, proxyConfig)
-
-        if (loadResponse.cloudaicompanionProject) {
-          effectiveProjectId = loadResponse.cloudaicompanionProject
-          // 保存临时项目ID
-          await geminiAccountService.updateTempProjectId(accountId, effectiveProjectId)
-          logger.info(`📋 Fetched and cached temporary projectId: ${effectiveProjectId}`)
-        }
-      } catch (loadError) {
-        logger.warn('Failed to fetch projectId from loadCodeAssist:', loadError.message)
-      }
-    }
-
-    // 如果还是没有项目ID，返回错误
-    if (!effectiveProjectId) {
-      return res.status(403).json({
-        error: {
-          message:
-            'This account requires a project ID to be configured. Please configure a project ID in the account settings.',
-          type: 'configuration_required'
-        }
-      })
-    }
-
-    logger.info('📋 流式请求项目ID处理逻辑', {
-      accountProjectId: account.projectId,
-      accountTempProjectId: account.tempProjectId,
-      effectiveProjectId,
-      decision: account.projectId
-        ? '使用账户配置'
-        : account.tempProjectId
-          ? '使用临时项目ID'
-          : '从loadCodeAssist获取'
-    })
-
-    const streamResponse = await geminiAccountService.generateContentStream(
-      client,
-      { model, request: actualRequestData },
-      user_prompt_id,
-      effectiveProjectId,
-      req.apiKey?.id,
-      abortController.signal,
-      proxyConfig
-    )
-
-    // 设置 SSE 响应头
-    res.setHeader('Content-Type', 'text/event-stream')
-    res.setHeader('Cache-Control', 'no-cache')
-    res.setHeader('Connection', 'keep-alive')
-    res.setHeader('X-Accel-Buffering', 'no')
-
-    // 处理流式响应并捕获usage数据
-    let streamBuffer = ''
-    let totalUsage = {
-      promptTokenCount: 0,
-      candidatesTokenCount: 0,
-      totalTokenCount: 0
-    }
-    let usageReported = false
-
-    // SSE 心跳机制
-    let heartbeatTimer = null
-    let lastDataTime = Date.now()
-    const HEARTBEAT_INTERVAL = 15000
-
-    const sendHeartbeat = () => {
-      const timeSinceLastData = Date.now() - lastDataTime
-      if (timeSinceLastData >= HEARTBEAT_INTERVAL && !res.destroyed) {
-        res.write('\n')
-        logger.info(`💓 Sent SSE keepalive (gap: ${(timeSinceLastData / 1000).toFixed(1)}s)`)
-      }
-    }
-
-    heartbeatTimer = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL)
-
-    streamResponse.on('data', (chunk) => {
-      try {
-        lastDataTime = Date.now()
-
-        // 立即转发原始数据
-        if (!res.destroyed) {
-          res.write(chunk)
-        }
-
-        // 异步提取 usage 数据
-        setImmediate(() => {
-          try {
-            const chunkStr = chunk.toString()
-            if (!chunkStr.trim() || !chunkStr.includes('usageMetadata')) {
-              return
-            }
-
-            streamBuffer += chunkStr
-            const lines = streamBuffer.split('\n')
-            streamBuffer = lines.pop() || ''
-
-            for (const line of lines) {
-              if (!line.trim() || !line.includes('usageMetadata')) {
-                continue
-              }
-
-              try {
-                const parsed = parseSSELine(line)
-                if (parsed.type === 'data' && parsed.data.response?.usageMetadata) {
-                  totalUsage = parsed.data.response.usageMetadata
-                  logger.debug('📊 Captured Gemini usage data:', totalUsage)
-                }
-              } catch (parseError) {
-                logger.warn('⚠️ Failed to parse usage line:', parseError.message)
-              }
-            }
-          } catch (error) {
-            logger.warn('⚠️ Error extracting usage data:', error.message)
+    await executeWithFailover({
+      req,
+      res,
+      selectAccount: async (excludeAccountIds) =>
+        await unifiedGeminiScheduler.selectAccountForApiKey(
+          req.apiKey,
+          sessionHash,
+          requestedModel,
+          {
+            excludeAccounts: excludeAccountIds
           }
-        })
-      } catch (error) {
-        logger.error('Error processing stream chunk:', error)
-      }
-    })
+        ),
+      executeRequest: async (selection) => {
+        const { accountId, accountType } = selection
 
-    streamResponse.on('end', () => {
-      logger.info('Stream completed successfully')
-
-      if (heartbeatTimer) {
-        clearInterval(heartbeatTimer)
-        heartbeatTimer = null
-      }
-
-      res.end()
-
-      // 异步记录使用统计
-      if (!usageReported && totalUsage.totalTokenCount > 0) {
-        Promise.all([
-          apiKeyService.recordUsage(
-            req.apiKey.id,
-            totalUsage.promptTokenCount || 0,
-            totalUsage.candidatesTokenCount || 0,
-            0,
-            0,
-            model,
-            account.id
-          ),
-          applyRateLimitTracking(
-            req,
-            {
-              inputTokens: totalUsage.promptTokenCount || 0,
-              outputTokens: totalUsage.candidatesTokenCount || 0,
-              cacheCreateTokens: 0,
-              cacheReadTokens: 0
-            },
-            model,
-            'gemini-stream'
+        // v1internal 路由只支持 OAuth 账户，不支持 API Key 账户
+        if (accountType === 'gemini-api') {
+          logger.error(
+            `❌ v1internal routes do not support Gemini API accounts. Account: ${accountId}`
           )
-        ])
-          .then(() => {
-            logger.info(
-              `📊 Recorded Gemini stream usage - Input: ${totalUsage.promptTokenCount}, Output: ${totalUsage.candidatesTokenCount}, Total: ${totalUsage.totalTokenCount}`
-            )
-            usageReported = true
+          res.status(400).json({
+            error: {
+              message:
+                'This endpoint only supports Gemini OAuth accounts. Gemini API Key accounts are not compatible with v1internal format.',
+              type: 'invalid_account_type'
+            }
           })
-          .catch((error) => {
-            logger.error('Failed to record Gemini usage:', error)
-          })
-      }
-    })
+          return
+        }
 
-    streamResponse.on('error', (error) => {
-      logger.error('Stream error:', error)
+        const account = await geminiAccountService.getAccount(accountId)
+        if (!account) {
+          const error = new Error('Gemini account not found')
+          error.status = 503
+          logger.error(`❌ Gemini account not found: ${accountId}`)
+          throw error
+        }
 
-      if (heartbeatTimer) {
-        clearInterval(heartbeatTimer)
-        heartbeatTimer = null
-      }
+        const { accessToken, refreshToken } = account
 
-      if (!res.headersSent) {
-        res.status(500).json({
-          error: {
-            message: error.message || 'Stream error',
-            type: 'api_error'
-          }
+        const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
+        logger.info(`StreamGenerateContent request (${version})`, {
+          model,
+          userPromptId: user_prompt_id,
+          projectId: project || account.projectId,
+          apiKeyId: req.apiKey?.id || 'unknown'
         })
-      } else {
-        if (!res.destroyed) {
+
+        if (abortController && !abortController.signal.aborted) {
+          abortController.abort()
+        }
+        abortController = new AbortController()
+
+        // 解析账户的代理配置
+        const proxyConfig = parseProxyConfig(account)
+
+        const client = await geminiAccountService.getOauthClient(
+          accessToken,
+          refreshToken,
+          proxyConfig
+        )
+
+        // 智能处理项目ID：优先使用配置的 projectId，降级到临时 tempProjectId
+        let effectiveProjectId = account.projectId || account.tempProjectId || null
+
+        // 如果没有任何项目ID，尝试调用 loadCodeAssist 获取
+        if (!effectiveProjectId) {
           try {
-            res.write(
-              `data: ${JSON.stringify({
-                error: {
-                  message: error.message || 'Stream error',
-                  type: 'stream_error',
-                  code: error.code
-                }
-              })}\n\n`
+            logger.info('📋 No projectId available, attempting to fetch from loadCodeAssist...')
+            const loadResponse = await geminiAccountService.loadCodeAssist(
+              client,
+              null,
+              proxyConfig
             )
-            res.write('data: [DONE]\n\n')
-          } catch (writeError) {
-            logger.error('Error sending error event:', writeError)
+
+            if (loadResponse.cloudaicompanionProject) {
+              effectiveProjectId = loadResponse.cloudaicompanionProject
+              // 保存临时项目ID
+              await geminiAccountService.updateTempProjectId(accountId, effectiveProjectId)
+              logger.info(`📋 Fetched and cached temporary projectId: ${effectiveProjectId}`)
+            }
+          } catch (loadError) {
+            logger.warn('Failed to fetch projectId from loadCodeAssist:', loadError.message)
           }
         }
-        res.end()
-      }
+
+        // 如果还是没有项目ID，返回错误
+        if (!effectiveProjectId) {
+          res.status(403).json({
+            error: {
+              message:
+                'This account requires a project ID to be configured. Please configure a project ID in the account settings.',
+              type: 'configuration_required'
+            }
+          })
+          return
+        }
+
+        logger.info('📋 流式请求项目ID处理逻辑', {
+          accountProjectId: account.projectId,
+          accountTempProjectId: account.tempProjectId,
+          effectiveProjectId,
+          decision: account.projectId
+            ? '使用账户配置'
+            : account.tempProjectId
+              ? '使用临时项目ID'
+              : '从loadCodeAssist获取'
+        })
+
+        const streamResponse = await geminiAccountService.generateContentStream(
+          client,
+          { model, request: actualRequestData },
+          user_prompt_id,
+          effectiveProjectId,
+          req.apiKey?.id,
+          abortController.signal,
+          proxyConfig
+        )
+
+        // 设置 SSE 响应头
+        res.setHeader('Content-Type', 'text/event-stream')
+        res.setHeader('Cache-Control', 'no-cache')
+        res.setHeader('Connection', 'keep-alive')
+        res.setHeader('X-Accel-Buffering', 'no')
+
+        // 处理流式响应并捕获usage数据
+        let streamBuffer = ''
+        let totalUsage = {
+          promptTokenCount: 0,
+          candidatesTokenCount: 0,
+          totalTokenCount: 0
+        }
+        let usageReported = false
+
+        // SSE 心跳机制
+        let heartbeatTimer = null
+        let lastDataTime = Date.now()
+        const HEARTBEAT_INTERVAL = 15000
+
+        const sendHeartbeat = () => {
+          const timeSinceLastData = Date.now() - lastDataTime
+          if (timeSinceLastData >= HEARTBEAT_INTERVAL && !res.destroyed) {
+            res.write('\n')
+            logger.info(`💓 Sent SSE keepalive (gap: ${(timeSinceLastData / 1000).toFixed(1)}s)`)
+          }
+        }
+
+        heartbeatTimer = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL)
+
+        streamResponse.on('data', (chunk) => {
+          try {
+            lastDataTime = Date.now()
+
+            // 立即转发原始数据
+            if (!res.destroyed) {
+              res.write(chunk)
+            }
+
+            // 异步提取 usage 数据
+            setImmediate(() => {
+              try {
+                const chunkStr = chunk.toString()
+                if (!chunkStr.trim() || !chunkStr.includes('usageMetadata')) {
+                  return
+                }
+
+                streamBuffer += chunkStr
+                const lines = streamBuffer.split('\n')
+                streamBuffer = lines.pop() || ''
+
+                for (const line of lines) {
+                  if (!line.trim() || !line.includes('usageMetadata')) {
+                    continue
+                  }
+
+                  try {
+                    const parsed = parseSSELine(line)
+                    if (parsed.type === 'data' && parsed.data.response?.usageMetadata) {
+                      totalUsage = parsed.data.response.usageMetadata
+                      logger.debug('📊 Captured Gemini usage data:', totalUsage)
+                    }
+                  } catch (parseError) {
+                    logger.warn('⚠️ Failed to parse usage line:', parseError.message)
+                  }
+                }
+              } catch (error) {
+                logger.warn('⚠️ Error extracting usage data:', error.message)
+              }
+            })
+          } catch (error) {
+            logger.error('Error processing stream chunk:', error)
+          }
+        })
+
+        streamResponse.on('end', () => {
+          logger.info('Stream completed successfully')
+
+          if (heartbeatTimer) {
+            clearInterval(heartbeatTimer)
+            heartbeatTimer = null
+          }
+
+          res.end()
+
+          // 异步记录使用统计
+          if (!usageReported && totalUsage.totalTokenCount > 0) {
+            Promise.all([
+              apiKeyService.recordUsage(
+                req.apiKey.id,
+                totalUsage.promptTokenCount || 0,
+                totalUsage.candidatesTokenCount || 0,
+                0,
+                0,
+                model,
+                account.id
+              ),
+              applyRateLimitTracking(
+                req,
+                {
+                  inputTokens: totalUsage.promptTokenCount || 0,
+                  outputTokens: totalUsage.candidatesTokenCount || 0,
+                  cacheCreateTokens: 0,
+                  cacheReadTokens: 0
+                },
+                model,
+                'gemini-stream'
+              )
+            ])
+              .then(() => {
+                logger.info(
+                  `📊 Recorded Gemini stream usage - Input: ${totalUsage.promptTokenCount}, Output: ${totalUsage.candidatesTokenCount}, Total: ${totalUsage.totalTokenCount}`
+                )
+                usageReported = true
+              })
+              .catch((error) => {
+                logger.error('Failed to record Gemini usage:', error)
+              })
+          }
+        })
+
+        streamResponse.on('error', (error) => {
+          logger.error('Stream error:', error)
+
+          if (heartbeatTimer) {
+            clearInterval(heartbeatTimer)
+            heartbeatTimer = null
+          }
+
+          if (!res.headersSent) {
+            res.status(500).json({
+              error: {
+                message: error.message || 'Stream error',
+                type: 'api_error'
+              }
+            })
+          } else {
+            if (!res.destroyed) {
+              try {
+                res.write(
+                  `data: ${JSON.stringify({
+                    error: {
+                      message: error.message || 'Stream error',
+                      type: 'stream_error',
+                      code: error.code
+                    }
+                  })}\n\n`
+                )
+                res.write('data: [DONE]\n\n')
+              } catch (writeError) {
+                logger.error('Error sending error event:', writeError)
+              }
+            }
+            res.end()
+          }
+        })
+      },
+      markUnavailable: async (accountIdValue, accountTypeValue, sessionHashValue, ttl) => {
+        await unifiedGeminiScheduler.markAccountTemporarilyUnavailable(
+          accountIdValue,
+          accountTypeValue,
+          sessionHashValue,
+          ttl
+        )
+      },
+      sessionHash,
+      platform: 'gemini'
     })
   } catch (error) {
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
@@ -1828,6 +1861,7 @@ async function handleStandardGenerateContent(req, res) {
   let sessionHash = null
   let accountId = null
   let isApiAccount = false
+  let accountType = null
 
   try {
     if (!ensureGeminiPermission(req, res)) {
@@ -1897,165 +1931,196 @@ async function handleStandardGenerateContent(req, res) {
       }
     }
 
-    // 使用统一调度选择账号
-    const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
-      req.apiKey,
+    await executeWithFailover({
+      req,
+      res,
+      selectAccount: async (excludeAccountIds) =>
+        await unifiedGeminiScheduler.selectAccountForApiKey(req.apiKey, sessionHash, model, {
+          allowApiAccounts: true,
+          excludeAccounts: excludeAccountIds
+        }),
+      executeRequest: async (selection) => {
+        ;({ accountId, accountType } = selection)
+
+        isApiAccount = accountType === 'gemini-api'
+        const actualAccountId = accountId
+
+        const version = req.path.includes('v1beta') ? 'v1beta' : 'v1'
+
+        if (isApiAccount) {
+          account = await geminiApiAccountService.getAccount(actualAccountId)
+          if (!account) {
+            const error = new Error('Gemini API account not found')
+            error.status = 503
+            throw error
+          }
+
+          // API Key 账户：清理 functionResponse 中标准 Gemini API 不支持的字段（如 id）
+          actualRequestData.contents = sanitizeFunctionResponsesForApiKey(
+            actualRequestData.contents
+          )
+
+          logger.info(
+            `Standard Gemini API generateContent request (${version}) - API Key Account`,
+            {
+              model,
+              accountId: actualAccountId,
+              apiKeyId: req.apiKey?.id || 'unknown'
+            }
+          )
+        } else {
+          account = await geminiAccountService.getAccount(actualAccountId)
+
+          if (!account) {
+            const error = new Error('Gemini OAuth account not found')
+            error.status = 503
+            throw error
+          }
+
+          logger.info(`Standard Gemini API generateContent request (${version}) - OAuth Account`, {
+            model,
+            projectId: account.projectId,
+            apiKeyId: req.apiKey?.id || 'unknown'
+          })
+        }
+
+        // 解析账户的代理配置
+        const proxyConfig = parseProxyConfig(account)
+
+        let response
+
+        if (isApiAccount) {
+          // Gemini API 账户：直接使用 API Key 请求
+          const apiUrl = buildGeminiApiUrl(
+            account.baseUrl,
+            model,
+            'generateContent',
+            account.apiKey
+          )
+
+          const axiosConfig = {
+            method: 'POST',
+            url: apiUrl,
+            data: actualRequestData,
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
+
+          if (proxyConfig) {
+            axiosConfig.httpsAgent = ProxyHelper.createProxyAgent(proxyConfig)
+            axiosConfig.httpAgent = ProxyHelper.createProxyAgent(proxyConfig)
+          }
+
+          try {
+            const apiResponse = await axios(axiosConfig)
+            response = { response: apiResponse.data }
+          } catch (error) {
+            logger.error('Gemini API request failed:', {
+              status: error.response?.status,
+              statusText: error.response?.statusText,
+              data: error.response?.data
+            })
+            throw error
+          }
+        } else {
+          // OAuth 账户
+          const { accessToken, refreshToken } = account
+          const client = await geminiAccountService.getOauthClient(
+            accessToken,
+            refreshToken,
+            proxyConfig
+          )
+
+          let effectiveProjectId = account.projectId || account.tempProjectId || null
+
+          if (!effectiveProjectId) {
+            try {
+              logger.info('📋 No projectId available, attempting to fetch from loadCodeAssist...')
+              const loadResponse = await geminiAccountService.loadCodeAssist(
+                client,
+                null,
+                proxyConfig
+              )
+
+              if (loadResponse.cloudaicompanionProject) {
+                effectiveProjectId = loadResponse.cloudaicompanionProject
+                await geminiAccountService.updateTempProjectId(actualAccountId, effectiveProjectId)
+                logger.info(`📋 Fetched and cached temporary projectId: ${effectiveProjectId}`)
+              }
+            } catch (loadError) {
+              logger.warn('Failed to fetch projectId from loadCodeAssist:', loadError.message)
+            }
+          }
+
+          if (!effectiveProjectId) {
+            res.status(403).json({
+              error: {
+                message:
+                  'This account requires a project ID to be configured. Please configure a project ID in the account settings.',
+                type: 'configuration_required'
+              }
+            })
+            return
+          }
+
+          logger.info('📋 Standard API 项目ID处理逻辑', {
+            accountProjectId: account.projectId,
+            tempProjectId: account.tempProjectId,
+            effectiveProjectId,
+            decision: account.projectId
+              ? '使用账户配置'
+              : account.tempProjectId
+                ? '使用临时项目ID'
+                : '从loadCodeAssist获取'
+          })
+
+          const userPromptId = `${crypto.randomUUID()}########0`
+
+          response = await geminiAccountService.generateContent(
+            client,
+            { model, request: actualRequestData },
+            userPromptId,
+            effectiveProjectId,
+            req.apiKey?.id,
+            proxyConfig
+          )
+        }
+
+        // 记录使用统计
+        if (response?.response?.usageMetadata) {
+          try {
+            const usage = response.response.usageMetadata
+            await apiKeyService.recordUsage(
+              req.apiKey.id,
+              usage.promptTokenCount || 0,
+              usage.candidatesTokenCount || 0,
+              0,
+              0,
+              model,
+              accountId
+            )
+            logger.info(
+              `📊 Recorded Gemini usage - Input: ${usage.promptTokenCount}, Output: ${usage.candidatesTokenCount}, Total: ${usage.totalTokenCount}`
+            )
+          } catch (error) {
+            logger.error('Failed to record Gemini usage:', error)
+          }
+        }
+
+        res.json(response.response || response)
+      },
+      markUnavailable: async (accountIdValue, accountTypeValue, sessionHashValue, ttl) => {
+        await unifiedGeminiScheduler.markAccountTemporarilyUnavailable(
+          accountIdValue,
+          accountTypeValue,
+          sessionHashValue,
+          ttl
+        )
+      },
       sessionHash,
-      model,
-      { allowApiAccounts: true }
-    )
-    ;({ accountId } = schedulerResult)
-    const { accountType } = schedulerResult
-
-    isApiAccount = accountType === 'gemini-api'
-    const actualAccountId = accountId
-
-    const version = req.path.includes('v1beta') ? 'v1beta' : 'v1'
-
-    if (isApiAccount) {
-      account = await geminiApiAccountService.getAccount(actualAccountId)
-      if (!account) {
-        return res.status(404).json({
-          error: {
-            message: 'Gemini API account not found',
-            type: 'account_not_found'
-          }
-        })
-      }
-
-      // API Key 账户：清理 functionResponse 中标准 Gemini API 不支持的字段（如 id）
-      actualRequestData.contents = sanitizeFunctionResponsesForApiKey(actualRequestData.contents)
-
-      logger.info(`Standard Gemini API generateContent request (${version}) - API Key Account`, {
-        model,
-        accountId: actualAccountId,
-        apiKeyId: req.apiKey?.id || 'unknown'
-      })
-    } else {
-      account = await geminiAccountService.getAccount(actualAccountId)
-
-      logger.info(`Standard Gemini API generateContent request (${version}) - OAuth Account`, {
-        model,
-        projectId: account.projectId,
-        apiKeyId: req.apiKey?.id || 'unknown'
-      })
-    }
-
-    // 解析账户的代理配置
-    const proxyConfig = parseProxyConfig(account)
-
-    let response
-
-    if (isApiAccount) {
-      // Gemini API 账户：直接使用 API Key 请求
-      const apiUrl = buildGeminiApiUrl(account.baseUrl, model, 'generateContent', account.apiKey)
-
-      const axiosConfig = {
-        method: 'POST',
-        url: apiUrl,
-        data: actualRequestData,
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-
-      if (proxyConfig) {
-        axiosConfig.httpsAgent = ProxyHelper.createProxyAgent(proxyConfig)
-        axiosConfig.httpAgent = ProxyHelper.createProxyAgent(proxyConfig)
-      }
-
-      try {
-        const apiResponse = await axios(axiosConfig)
-        response = { response: apiResponse.data }
-      } catch (error) {
-        logger.error('Gemini API request failed:', {
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          data: error.response?.data
-        })
-        throw error
-      }
-    } else {
-      // OAuth 账户
-      const { accessToken, refreshToken } = account
-      const client = await geminiAccountService.getOauthClient(
-        accessToken,
-        refreshToken,
-        proxyConfig
-      )
-
-      let effectiveProjectId = account.projectId || account.tempProjectId || null
-
-      if (!effectiveProjectId) {
-        try {
-          logger.info('📋 No projectId available, attempting to fetch from loadCodeAssist...')
-          const loadResponse = await geminiAccountService.loadCodeAssist(client, null, proxyConfig)
-
-          if (loadResponse.cloudaicompanionProject) {
-            effectiveProjectId = loadResponse.cloudaicompanionProject
-            await geminiAccountService.updateTempProjectId(actualAccountId, effectiveProjectId)
-            logger.info(`📋 Fetched and cached temporary projectId: ${effectiveProjectId}`)
-          }
-        } catch (loadError) {
-          logger.warn('Failed to fetch projectId from loadCodeAssist:', loadError.message)
-        }
-      }
-
-      if (!effectiveProjectId) {
-        return res.status(403).json({
-          error: {
-            message:
-              'This account requires a project ID to be configured. Please configure a project ID in the account settings.',
-            type: 'configuration_required'
-          }
-        })
-      }
-
-      logger.info('📋 Standard API 项目ID处理逻辑', {
-        accountProjectId: account.projectId,
-        tempProjectId: account.tempProjectId,
-        effectiveProjectId,
-        decision: account.projectId
-          ? '使用账户配置'
-          : account.tempProjectId
-            ? '使用临时项目ID'
-            : '从loadCodeAssist获取'
-      })
-
-      const userPromptId = `${crypto.randomUUID()}########0`
-
-      response = await geminiAccountService.generateContent(
-        client,
-        { model, request: actualRequestData },
-        userPromptId,
-        effectiveProjectId,
-        req.apiKey?.id,
-        proxyConfig
-      )
-    }
-
-    // 记录使用统计
-    if (response?.response?.usageMetadata) {
-      try {
-        const usage = response.response.usageMetadata
-        await apiKeyService.recordUsage(
-          req.apiKey.id,
-          usage.promptTokenCount || 0,
-          usage.candidatesTokenCount || 0,
-          0,
-          0,
-          model,
-          accountId
-        )
-        logger.info(
-          `📊 Recorded Gemini usage - Input: ${usage.promptTokenCount}, Output: ${usage.candidatesTokenCount}, Total: ${usage.totalTokenCount}`
-        )
-      } catch (error) {
-        logger.error('Failed to record Gemini usage:', error)
-      }
-    }
-
-    res.json(response.response || response)
+      platform: 'gemini'
+    })
   } catch (error) {
     logger.error(`Error in standard generateContent endpoint`, {
       message: error.message,
@@ -2083,6 +2148,7 @@ async function handleStandardStreamGenerateContent(req, res) {
   let sessionHash = null
   let accountId = null
   let isApiAccount = false
+  let accountType = null
 
   try {
     if (!ensureGeminiPermission(req, res)) {
@@ -2092,6 +2158,7 @@ async function handleStandardStreamGenerateContent(req, res) {
     // 从路径参数中获取模型名
     const model = req.params.modelName || 'gemini-2.0-flash-exp'
     sessionHash = sessionHelper.generateSessionHash(req.body)
+    const requestedModel = model
 
     // 标准 Gemini API 请求体直接包含 contents 等字段
     const { contents, generationConfig, safetySettings, systemInstruction, tools, toolConfig } =
@@ -2150,59 +2217,6 @@ async function handleStandardStreamGenerateContent(req, res) {
       }
     }
 
-    // 使用统一调度选择账号
-    const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
-      req.apiKey,
-      sessionHash,
-      model,
-      { allowApiAccounts: true }
-    )
-    ;({ accountId } = schedulerResult)
-    const { accountType } = schedulerResult
-
-    isApiAccount = accountType === 'gemini-api'
-    const actualAccountId = accountId
-
-    const version = req.path.includes('v1beta') ? 'v1beta' : 'v1'
-
-    if (isApiAccount) {
-      account = await geminiApiAccountService.getAccount(actualAccountId)
-      if (!account) {
-        return res.status(404).json({
-          error: {
-            message: 'Gemini API account not found',
-            type: 'account_not_found'
-          }
-        })
-      }
-
-      // API Key 账户：清理 functionResponse 中标准 Gemini API 不支持的字段（如 id）
-      actualRequestData.contents = sanitizeFunctionResponsesForApiKey(actualRequestData.contents)
-
-      logger.info(
-        `Standard Gemini API streamGenerateContent request (${version}) - API Key Account`,
-        {
-          model,
-          accountId: actualAccountId,
-          apiKeyId: req.apiKey?.id || 'unknown'
-        }
-      )
-    } else {
-      account = await geminiAccountService.getAccount(actualAccountId)
-
-      logger.info(
-        `Standard Gemini API streamGenerateContent request (${version}) - OAuth Account`,
-        {
-          model,
-          projectId: account.projectId,
-          apiKeyId: req.apiKey?.id || 'unknown'
-        }
-      )
-    }
-
-    // 创建中止控制器
-    abortController = new AbortController()
-
     // 处理客户端断开连接
     req.on('close', () => {
       if (abortController && !abortController.signal.aborted) {
@@ -2211,300 +2225,386 @@ async function handleStandardStreamGenerateContent(req, res) {
       }
     })
 
-    // 解析账户的代理配置
-    const proxyConfig = parseProxyConfig(account)
-
-    let streamResponse
-
-    if (isApiAccount) {
-      // Gemini API 账户：直接使用 API Key 请求流式接口
-      const apiUrl = buildGeminiApiUrl(
-        account.baseUrl,
-        model,
-        'streamGenerateContent',
-        account.apiKey,
-        {
-          stream: true
-        }
-      )
-
-      const axiosConfig = {
-        method: 'POST',
-        url: apiUrl,
-        data: actualRequestData,
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': account.apiKey,
-          'x-goog-api-key': account.apiKey
-        },
-        responseType: 'stream',
-        signal: abortController.signal
-      }
-
-      if (proxyConfig) {
-        axiosConfig.httpsAgent = ProxyHelper.createProxyAgent(proxyConfig)
-        axiosConfig.httpAgent = ProxyHelper.createProxyAgent(proxyConfig)
-      }
-
-      try {
-        const apiResponse = await axios(axiosConfig)
-        streamResponse = apiResponse.data
-      } catch (error) {
-        logger.error('Gemini API stream request failed:', {
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          data: error.response?.data
-        })
-        throw error
-      }
-    } else {
-      // OAuth 账户
-      const { accessToken, refreshToken } = account
-      const client = await geminiAccountService.getOauthClient(
-        accessToken,
-        refreshToken,
-        proxyConfig
-      )
-
-      let effectiveProjectId = account.projectId || account.tempProjectId || null
-
-      if (!effectiveProjectId) {
-        try {
-          logger.info('📋 No projectId available, attempting to fetch from loadCodeAssist...')
-          const loadResponse = await geminiAccountService.loadCodeAssist(client, null, proxyConfig)
-
-          if (loadResponse.cloudaicompanionProject) {
-            effectiveProjectId = loadResponse.cloudaicompanionProject
-            await geminiAccountService.updateTempProjectId(actualAccountId, effectiveProjectId)
-            logger.info(`📋 Fetched and cached temporary projectId: ${effectiveProjectId}`)
+    await executeWithFailover({
+      req,
+      res,
+      selectAccount: async (excludeAccountIds) =>
+        await unifiedGeminiScheduler.selectAccountForApiKey(
+          req.apiKey,
+          sessionHash,
+          requestedModel,
+          {
+            allowApiAccounts: true,
+            excludeAccounts: excludeAccountIds
           }
-        } catch (loadError) {
-          logger.warn('Failed to fetch projectId from loadCodeAssist:', loadError.message)
-        }
-      }
+        ),
+      executeRequest: async (selection) => {
+        ;({ accountId, accountType } = selection)
 
-      if (!effectiveProjectId) {
-        return res.status(403).json({
-          error: {
-            message:
-              'This account requires a project ID to be configured. Please configure a project ID in the account settings.',
-            type: 'configuration_required'
-          }
-        })
-      }
+        isApiAccount = accountType === 'gemini-api'
+        const actualAccountId = accountId
 
-      logger.info('📋 Standard API 流式项目ID处理逻辑', {
-        accountProjectId: account.projectId,
-        tempProjectId: account.tempProjectId,
-        effectiveProjectId,
-        decision: account.projectId
-          ? '使用账户配置'
-          : account.tempProjectId
-            ? '使用临时项目ID'
-            : '从loadCodeAssist获取'
-      })
+        const version = req.path.includes('v1beta') ? 'v1beta' : 'v1'
 
-      const userPromptId = `${crypto.randomUUID()}########0`
-
-      streamResponse = await geminiAccountService.generateContentStream(
-        client,
-        { model, request: actualRequestData },
-        userPromptId,
-        effectiveProjectId,
-        req.apiKey?.id,
-        abortController.signal,
-        proxyConfig
-      )
-    }
-
-    // 设置 SSE 响应头
-    res.setHeader('Content-Type', 'text/event-stream')
-    res.setHeader('Cache-Control', 'no-cache')
-    res.setHeader('Connection', 'keep-alive')
-    res.setHeader('X-Accel-Buffering', 'no')
-
-    // 处理流式响应
-    let totalUsage = {
-      promptTokenCount: 0,
-      candidatesTokenCount: 0,
-      totalTokenCount: 0
-    }
-
-    let heartbeatTimer = null
-    let lastDataTime = Date.now()
-    const HEARTBEAT_INTERVAL = 15000
-
-    const sendHeartbeat = () => {
-      const timeSinceLastData = Date.now() - lastDataTime
-      if (timeSinceLastData >= HEARTBEAT_INTERVAL && !res.destroyed) {
-        res.write('\n')
-        logger.info(`💓 Sent SSE keepalive (gap: ${(timeSinceLastData / 1000).toFixed(1)}s)`)
-      }
-    }
-
-    heartbeatTimer = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL)
-
-    let sseBuffer = ''
-
-    const handleEventBlock = (evt) => {
-      if (!evt.trim()) {
-        return
-      }
-
-      const dataLines = evt.split(/\r?\n/).filter((line) => line.startsWith('data:'))
-      if (dataLines.length === 0) {
-        if (!res.destroyed) {
-          res.write(`${evt}\n\n`)
-        }
-        return
-      }
-
-      const dataPayload = dataLines.map((line) => line.replace(/^data:\s?/, '')).join('\n')
-
-      let processedPayload = null
-      let parsed = null
-
-      if (dataPayload === '[DONE]') {
-        processedPayload = '[DONE]'
-      } else {
-        try {
-          parsed = JSON.parse(dataPayload)
-
-          if (parsed.usageMetadata) {
-            totalUsage = parsed.usageMetadata
-          } else if (parsed.response?.usageMetadata) {
-            totalUsage = parsed.response.usageMetadata
+        if (isApiAccount) {
+          account = await geminiApiAccountService.getAccount(actualAccountId)
+          if (!account) {
+            const error = new Error('Gemini API account not found')
+            error.status = 503
+            throw error
           }
 
-          processedPayload = JSON.stringify(parsed.response || parsed)
-        } catch (e) {
-          // 解析失败，直接转发原始 data
+          // API Key 账户：清理 functionResponse 中标准 Gemini API 不支持的字段（如 id）
+          actualRequestData.contents = sanitizeFunctionResponsesForApiKey(
+            actualRequestData.contents
+          )
+
+          logger.info(
+            `Standard Gemini API streamGenerateContent request (${version}) - API Key Account`,
+            {
+              model,
+              accountId: actualAccountId,
+              apiKeyId: req.apiKey?.id || 'unknown'
+            }
+          )
+        } else {
+          account = await geminiAccountService.getAccount(actualAccountId)
+
+          if (!account) {
+            const error = new Error('Gemini OAuth account not found')
+            error.status = 503
+            throw error
+          }
+
+          logger.info(
+            `Standard Gemini API streamGenerateContent request (${version}) - OAuth Account`,
+            {
+              model,
+              projectId: account.projectId,
+              apiKeyId: req.apiKey?.id || 'unknown'
+            }
+          )
         }
-      }
 
-      const outputChunk = processedPayload === null ? `${evt}\n\n` : `data: ${processedPayload}\n\n`
+        // 创建中止控制器
+        if (abortController && !abortController.signal.aborted) {
+          abortController.abort()
+        }
+        abortController = new AbortController()
 
-      if (!res.destroyed) {
-        res.write(outputChunk)
-      }
+        // 解析账户的代理配置
+        const proxyConfig = parseProxyConfig(account)
 
-      setImmediate(() => {
-        try {
-          const usageSource =
-            processedPayload && processedPayload !== '[DONE]' ? processedPayload : dataPayload
+        let streamResponse
 
-          if (!usageSource || !usageSource.includes('usageMetadata')) {
+        if (isApiAccount) {
+          // Gemini API 账户：直接使用 API Key 请求流式接口
+          const apiUrl = buildGeminiApiUrl(
+            account.baseUrl,
+            model,
+            'streamGenerateContent',
+            account.apiKey,
+            {
+              stream: true
+            }
+          )
+
+          const axiosConfig = {
+            method: 'POST',
+            url: apiUrl,
+            data: actualRequestData,
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': account.apiKey,
+              'x-goog-api-key': account.apiKey
+            },
+            responseType: 'stream',
+            signal: abortController.signal
+          }
+
+          if (proxyConfig) {
+            axiosConfig.httpsAgent = ProxyHelper.createProxyAgent(proxyConfig)
+            axiosConfig.httpAgent = ProxyHelper.createProxyAgent(proxyConfig)
+          }
+
+          try {
+            const apiResponse = await axios(axiosConfig)
+            streamResponse = apiResponse.data
+          } catch (error) {
+            logger.error('Gemini API stream request failed:', {
+              status: error.response?.status,
+              statusText: error.response?.statusText,
+              data: error.response?.data
+            })
+            throw error
+          }
+        } else {
+          // OAuth 账户
+          const { accessToken, refreshToken } = account
+          const client = await geminiAccountService.getOauthClient(
+            accessToken,
+            refreshToken,
+            proxyConfig
+          )
+
+          let effectiveProjectId = account.projectId || account.tempProjectId || null
+
+          if (!effectiveProjectId) {
+            try {
+              logger.info('📋 No projectId available, attempting to fetch from loadCodeAssist...')
+              const loadResponse = await geminiAccountService.loadCodeAssist(
+                client,
+                null,
+                proxyConfig
+              )
+
+              if (loadResponse.cloudaicompanionProject) {
+                effectiveProjectId = loadResponse.cloudaicompanionProject
+                await geminiAccountService.updateTempProjectId(actualAccountId, effectiveProjectId)
+                logger.info(`📋 Fetched and cached temporary projectId: ${effectiveProjectId}`)
+              }
+            } catch (loadError) {
+              logger.warn('Failed to fetch projectId from loadCodeAssist:', loadError.message)
+            }
+          }
+
+          if (!effectiveProjectId) {
+            res.status(403).json({
+              error: {
+                message:
+                  'This account requires a project ID to be configured. Please configure a project ID in the account settings.',
+                type: 'configuration_required'
+              }
+            })
             return
           }
 
-          const usageObj = JSON.parse(usageSource)
-          const usage = usageObj.usageMetadata || usageObj.response?.usageMetadata || usageObj.usage
+          logger.info('📋 Standard API 流式项目ID处理逻辑', {
+            accountProjectId: account.projectId,
+            tempProjectId: account.tempProjectId,
+            effectiveProjectId,
+            decision: account.projectId
+              ? '使用账户配置'
+              : account.tempProjectId
+                ? '使用临时项目ID'
+                : '从loadCodeAssist获取'
+          })
 
-          if (usage && typeof usage === 'object') {
-            totalUsage = usage
-            logger.debug('📊 Captured Gemini usage data (async):', totalUsage)
-          }
-        } catch (error) {
-          // 提取用量失败时忽略
-        }
-      })
-    }
+          const userPromptId = `${crypto.randomUUID()}########0`
 
-    streamResponse.on('data', (chunk) => {
-      try {
-        lastDataTime = Date.now()
-
-        sseBuffer += chunk.toString()
-        const events = sseBuffer.split(/\r?\n\r?\n/)
-        sseBuffer = events.pop() || ''
-
-        for (const evt of events) {
-          handleEventBlock(evt)
-        }
-      } catch (error) {
-        logger.error('Error processing stream chunk:', error)
-      }
-    })
-
-    streamResponse.on('end', () => {
-      logger.info('Stream completed successfully')
-
-      if (sseBuffer.trim()) {
-        try {
-          handleEventBlock(sseBuffer)
-        } catch (flushError) {
-          // 忽略 flush 期间的异常
-        }
-        sseBuffer = ''
-      }
-
-      if (heartbeatTimer) {
-        clearInterval(heartbeatTimer)
-        heartbeatTimer = null
-      }
-
-      res.end()
-
-      if (totalUsage.totalTokenCount > 0) {
-        apiKeyService
-          .recordUsage(
-            req.apiKey.id,
-            totalUsage.promptTokenCount || 0,
-            totalUsage.candidatesTokenCount || 0,
-            0,
-            0,
-            model,
-            accountId
+          streamResponse = await geminiAccountService.generateContentStream(
+            client,
+            { model, request: actualRequestData },
+            userPromptId,
+            effectiveProjectId,
+            req.apiKey?.id,
+            abortController.signal,
+            proxyConfig
           )
-          .then(() => {
-            logger.info(
-              `📊 Recorded Gemini stream usage - Input: ${totalUsage.promptTokenCount}, Output: ${totalUsage.candidatesTokenCount}, Total: ${totalUsage.totalTokenCount}`
-            )
+        }
+
+        // 设置 SSE 响应头
+        res.setHeader('Content-Type', 'text/event-stream')
+        res.setHeader('Cache-Control', 'no-cache')
+        res.setHeader('Connection', 'keep-alive')
+        res.setHeader('X-Accel-Buffering', 'no')
+
+        // 处理流式响应
+        let totalUsage = {
+          promptTokenCount: 0,
+          candidatesTokenCount: 0,
+          totalTokenCount: 0
+        }
+
+        let heartbeatTimer = null
+        let lastDataTime = Date.now()
+        const HEARTBEAT_INTERVAL = 15000
+
+        const sendHeartbeat = () => {
+          const timeSinceLastData = Date.now() - lastDataTime
+          if (timeSinceLastData >= HEARTBEAT_INTERVAL && !res.destroyed) {
+            res.write('\n')
+            logger.info(`💓 Sent SSE keepalive (gap: ${(timeSinceLastData / 1000).toFixed(1)}s)`)
+          }
+        }
+
+        heartbeatTimer = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL)
+
+        let sseBuffer = ''
+
+        const handleEventBlock = (evt) => {
+          if (!evt.trim()) {
+            return
+          }
+
+          const dataLines = evt.split(/\r?\n/).filter((line) => line.startsWith('data:'))
+          if (dataLines.length === 0) {
+            if (!res.destroyed) {
+              res.write(`${evt}\n\n`)
+            }
+            return
+          }
+
+          const dataPayload = dataLines.map((line) => line.replace(/^data:\s?/, '')).join('\n')
+
+          let processedPayload = null
+          let parsed = null
+
+          if (dataPayload === '[DONE]') {
+            processedPayload = '[DONE]'
+          } else {
+            try {
+              parsed = JSON.parse(dataPayload)
+
+              if (parsed.usageMetadata) {
+                totalUsage = parsed.usageMetadata
+              } else if (parsed.response?.usageMetadata) {
+                totalUsage = parsed.response.usageMetadata
+              }
+
+              processedPayload = JSON.stringify(parsed.response || parsed)
+            } catch (e) {
+              // 解析失败，直接转发原始 data
+            }
+          }
+
+          const outputChunk =
+            processedPayload === null ? `${evt}\n\n` : `data: ${processedPayload}\n\n`
+
+          if (!res.destroyed) {
+            res.write(outputChunk)
+          }
+
+          setImmediate(() => {
+            try {
+              const usageSource =
+                processedPayload && processedPayload !== '[DONE]' ? processedPayload : dataPayload
+
+              if (!usageSource || !usageSource.includes('usageMetadata')) {
+                return
+              }
+
+              const usageObj = JSON.parse(usageSource)
+              const usage =
+                usageObj.usageMetadata || usageObj.response?.usageMetadata || usageObj.usage
+
+              if (usage && typeof usage === 'object') {
+                totalUsage = usage
+                logger.debug('📊 Captured Gemini usage data (async):', totalUsage)
+              }
+            } catch (error) {
+              // 提取用量失败时忽略
+            }
           })
-          .catch((error) => {
-            logger.error('Failed to record Gemini usage:', error)
-          })
-      } else {
-        logger.warn(
-          `⚠️ Stream completed without usage data - totalTokenCount: ${totalUsage.totalTokenCount}`
-        )
-      }
-    })
+        }
 
-    streamResponse.on('error', (error) => {
-      logger.error('Stream error:', error)
+        streamResponse.on('data', (chunk) => {
+          try {
+            lastDataTime = Date.now()
 
-      if (heartbeatTimer) {
-        clearInterval(heartbeatTimer)
-        heartbeatTimer = null
-      }
+            sseBuffer += chunk.toString()
+            const events = sseBuffer.split(/\r?\n\r?\n/)
+            sseBuffer = events.pop() || ''
 
-      if (!res.headersSent) {
-        res.status(500).json({
-          error: {
-            message: error.message || 'Stream error',
-            type: 'api_error'
+            for (const evt of events) {
+              handleEventBlock(evt)
+            }
+          } catch (error) {
+            logger.error('Error processing stream chunk:', error)
           }
         })
-      } else {
-        if (!res.destroyed) {
-          try {
-            res.write(
-              `data: ${JSON.stringify({
-                error: {
-                  message: error.message || 'Stream error',
-                  type: 'stream_error',
-                  code: error.code
-                }
-              })}\n\n`
-            )
-            res.write('data: [DONE]\n\n')
-          } catch (writeError) {
-            logger.error('Error sending error event:', writeError)
+
+        streamResponse.on('end', () => {
+          logger.info('Stream completed successfully')
+
+          if (sseBuffer.trim()) {
+            try {
+              handleEventBlock(sseBuffer)
+            } catch (flushError) {
+              // 忽略 flush 期间的异常
+            }
+            sseBuffer = ''
           }
-        }
-        res.end()
-      }
+
+          if (heartbeatTimer) {
+            clearInterval(heartbeatTimer)
+            heartbeatTimer = null
+          }
+
+          res.end()
+
+          if (totalUsage.totalTokenCount > 0) {
+            apiKeyService
+              .recordUsage(
+                req.apiKey.id,
+                totalUsage.promptTokenCount || 0,
+                totalUsage.candidatesTokenCount || 0,
+                0,
+                0,
+                model,
+                accountId
+              )
+              .then(() => {
+                logger.info(
+                  `📊 Recorded Gemini stream usage - Input: ${totalUsage.promptTokenCount}, Output: ${totalUsage.candidatesTokenCount}, Total: ${totalUsage.totalTokenCount}`
+                )
+              })
+              .catch((error) => {
+                logger.error('Failed to record Gemini usage:', error)
+              })
+          } else {
+            logger.warn(
+              `⚠️ Stream completed without usage data - totalTokenCount: ${totalUsage.totalTokenCount}`
+            )
+          }
+        })
+
+        streamResponse.on('error', (error) => {
+          logger.error('Stream error:', error)
+
+          if (heartbeatTimer) {
+            clearInterval(heartbeatTimer)
+            heartbeatTimer = null
+          }
+
+          if (!res.headersSent) {
+            res.status(500).json({
+              error: {
+                message: error.message || 'Stream error',
+                type: 'api_error'
+              }
+            })
+          } else {
+            if (!res.destroyed) {
+              try {
+                res.write(
+                  `data: ${JSON.stringify({
+                    error: {
+                      message: error.message || 'Stream error',
+                      type: 'stream_error',
+                      code: error.code
+                    }
+                  })}\n\n`
+                )
+                res.write('data: [DONE]\n\n')
+              } catch (writeError) {
+                logger.error('Error sending error event:', writeError)
+              }
+            }
+            res.end()
+          }
+        })
+      },
+      markUnavailable: async (accountIdValue, accountTypeValue, sessionHashValue, ttl) => {
+        await unifiedGeminiScheduler.markAccountTemporarilyUnavailable(
+          accountIdValue,
+          accountTypeValue,
+          sessionHashValue,
+          ttl
+        )
+      },
+      sessionHash,
+      platform: 'gemini'
     })
   } catch (error) {
     const normalizedError = await normalizeAxiosStreamError(error)

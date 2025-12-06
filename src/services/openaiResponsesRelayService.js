@@ -266,6 +266,20 @@ class OpenAIResponsesRelayService {
           return res.status(401).json(unauthorizedResponse)
         }
 
+        if (response.status >= 500) {
+          const upstreamMessage =
+            (typeof errorData === 'string' && errorData) ||
+            errorData?.error?.message ||
+            `OpenAI Responses upstream error: ${response.status}`
+          req.removeListener('close', handleClientDisconnect)
+          res.removeListener('close', handleClientDisconnect)
+          const upstreamError = new Error(upstreamMessage)
+          upstreamError.statusCode = response.status
+          upstreamError.isUpstream = true
+          upstreamError.accountId = account.id
+          throw upstreamError
+        }
+
         // 清理监听器
         req.removeListener('close', handleClientDisconnect)
         res.removeListener('close', handleClientDisconnect)
@@ -307,6 +321,24 @@ class OpenAIResponsesRelayService {
         statusText: error.response?.statusText
       }
       logger.error('OpenAI-Responses relay error:', errorInfo)
+
+      const upstreamStatusCode =
+        error.statusCode ||
+        (error.response && error.response.status >= 500 ? error.response.status : null)
+      const isUpstreamNetworkError = [
+        'ECONNRESET',
+        'ECONNREFUSED',
+        'ETIMEDOUT',
+        'ENOTFOUND'
+      ].includes(error.code)
+
+      if (error.isUpstream || upstreamStatusCode || isUpstreamNetworkError) {
+        const statusCode = upstreamStatusCode || (error.code === 'ETIMEDOUT' ? 504 : 502)
+        error.statusCode = statusCode
+        error.isUpstream = true
+        error.accountId = account?.id
+        throw error
+      }
 
       // 检查是否是网络错误
       if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {

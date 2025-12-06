@@ -347,6 +347,9 @@ async function sendGeminiRequest({
       const geminiError = error.response.data?.error
       const err = new Error(geminiError?.message || 'Gemini API request failed')
       err.status = error.response.status
+      err.statusCode = error.response.status
+      err.isUpstream = true
+      err.accountId = accountId
       err.error = {
         message: geminiError?.message || 'Gemini API request failed',
         type: geminiError?.code || 'api_error',
@@ -357,6 +360,9 @@ async function sendGeminiRequest({
 
     const err = new Error(error.message)
     err.status = 500
+    err.statusCode = 500
+    err.isUpstream = true
+    err.accountId = accountId
     err.error = {
       message: error.message,
       type: 'network_error'
@@ -537,6 +543,9 @@ async function countTokens({
           `Gemini countTokens API request failed (Status: ${error.response.status})`
       )
       errorObj.status = error.response.status
+      errorObj.statusCode = error.response.status
+      errorObj.isUpstream = true
+      errorObj.accountId = null
       errorObj.error = {
         message:
           geminiError?.message ||
@@ -549,6 +558,9 @@ async function countTokens({
 
     const errorObj = new Error(error.message)
     errorObj.status = 500
+    errorObj.statusCode = 500
+    errorObj.isUpstream = true
+    errorObj.accountId = null
     errorObj.error = {
       message: error.message,
       type: 'network_error'

@@ -180,7 +180,14 @@ class UnifiedClaudeScheduler {
   }
 
   // 🎯 统一调度Claude账号（官方和Console）
-  async selectAccountForApiKey(apiKeyData, sessionHash = null, requestedModel = null) {
+  // options.excludeAccounts: 要排除的账户ID数组（用于 failover 重试时排除已失败的账户）
+  async selectAccountForApiKey(
+    apiKeyData,
+    sessionHash = null,
+    requestedModel = null,
+    options = {}
+  ) {
+    const { excludeAccounts = [] } = options
     try {
       // 解析供应商前缀
       const { vendor, baseModel } = parseVendorPrefixedModel(requestedModel)
@@ -201,6 +208,7 @@ class UnifiedClaudeScheduler {
       }
       // 如果API Key绑定了专属账户或分组，优先使用
       if (apiKeyData.claudeAccountId) {
+        const dedicatedAccountId = apiKeyData.claudeAccountId
         // 检查是否是分组
         if (apiKeyData.claudeAccountId.startsWith('group:')) {
           const groupId = apiKeyData.claudeAccountId.replace('group:', '')
@@ -211,125 +219,145 @@ class UnifiedClaudeScheduler {
             groupId,
             sessionHash,
             effectiveModel,
-            vendor === 'ccr'
+            vendor === 'ccr',
+            excludeAccounts
           )
         }
 
         // 普通专属账户
-        const boundAccount = await redis.getClaudeAccount(apiKeyData.claudeAccountId)
-        if (boundAccount && boundAccount.isActive === 'true' && boundAccount.status !== 'error') {
-          // 检查是否临时不可用
-          const isTempUnavailable = await this.isAccountTemporarilyUnavailable(
-            boundAccount.id,
-            'claude-official'
+        if (excludeAccounts.includes(dedicatedAccountId)) {
+          logger.warn(
+            `⚠️ Dedicated Claude account ${dedicatedAccountId} is excluded by failover, falling back to pool`
           )
-          if (isTempUnavailable) {
-            logger.warn(
-              `⏱️ Bound Claude OAuth account ${boundAccount.id} is temporarily unavailable, falling back to pool`
+        } else {
+          const boundAccount = await redis.getClaudeAccount(dedicatedAccountId)
+          if (boundAccount && boundAccount.isActive === 'true' && boundAccount.status !== 'error') {
+            // 检查是否临时不可用
+            const isTempUnavailable = await this.isAccountTemporarilyUnavailable(
+              boundAccount.id,
+              'claude-official'
             )
-          } else {
-            const isRateLimited = await claudeAccountService.isAccountRateLimited(boundAccount.id)
-            if (isRateLimited) {
-              const rateInfo = await claudeAccountService.getAccountRateLimitInfo(boundAccount.id)
-              const error = new Error('Dedicated Claude account is rate limited')
-              error.code = 'CLAUDE_DEDICATED_RATE_LIMITED'
-              error.accountId = boundAccount.id
-              error.rateLimitEndAt = rateInfo?.rateLimitEndAt || boundAccount.rateLimitEndAt || null
-              throw error
-            }
-
-            if (!this._isSchedulable(boundAccount.schedulable)) {
+            if (isTempUnavailable) {
               logger.warn(
-                `⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not schedulable (schedulable: ${boundAccount?.schedulable}), falling back to pool`
+                `⏱️ Bound Claude OAuth account ${boundAccount.id} is temporarily unavailable, falling back to pool`
               )
             } else {
-              if (isOpusRequest) {
-                await claudeAccountService.clearExpiredOpusRateLimit(boundAccount.id)
+              const isRateLimited = await claudeAccountService.isAccountRateLimited(boundAccount.id)
+              if (isRateLimited) {
+                const rateInfo = await claudeAccountService.getAccountRateLimitInfo(boundAccount.id)
+                const error = new Error('Dedicated Claude account is rate limited')
+                error.code = 'CLAUDE_DEDICATED_RATE_LIMITED'
+                error.accountId = boundAccount.id
+                error.rateLimitEndAt =
+                  rateInfo?.rateLimitEndAt || boundAccount.rateLimitEndAt || null
+                throw error
               }
-              logger.info(
-                `🎯 Using bound dedicated Claude OAuth account: ${boundAccount.name} (${apiKeyData.claudeAccountId}) for API key ${apiKeyData.name}`
-              )
-              return {
-                accountId: apiKeyData.claudeAccountId,
-                accountType: 'claude-official'
+
+              if (!this._isSchedulable(boundAccount.schedulable)) {
+                logger.warn(
+                  `⚠️ Bound Claude OAuth account ${dedicatedAccountId} is not schedulable (schedulable: ${boundAccount?.schedulable}), falling back to pool`
+                )
+              } else {
+                if (isOpusRequest) {
+                  await claudeAccountService.clearExpiredOpusRateLimit(boundAccount.id)
+                }
+                logger.info(
+                  `🎯 Using bound dedicated Claude OAuth account: ${boundAccount.name} (${dedicatedAccountId}) for API key ${apiKeyData.name}`
+                )
+                return {
+                  accountId: dedicatedAccountId,
+                  accountType: 'claude-official'
+                }
               }
             }
+          } else {
+            logger.warn(
+              `⚠️ Bound Claude OAuth account ${dedicatedAccountId} is not available (isActive: ${boundAccount?.isActive}, status: ${boundAccount?.status}), falling back to pool`
+            )
           }
-        } else {
-          logger.warn(
-            `⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not available (isActive: ${boundAccount?.isActive}, status: ${boundAccount?.status}), falling back to pool`
-          )
         }
       }
 
       // 2. 检查Claude Console账户绑定
       if (apiKeyData.claudeConsoleAccountId) {
-        const boundConsoleAccount = await claudeConsoleAccountService.getAccount(
-          apiKeyData.claudeConsoleAccountId
-        )
-        if (
-          boundConsoleAccount &&
-          boundConsoleAccount.isActive === true &&
-          boundConsoleAccount.status === 'active' &&
-          this._isSchedulable(boundConsoleAccount.schedulable)
-        ) {
-          // 检查是否临时不可用
-          const isTempUnavailable = await this.isAccountTemporarilyUnavailable(
-            boundConsoleAccount.id,
-            'claude-console'
-          )
-          if (isTempUnavailable) {
-            logger.warn(
-              `⏱️ Bound Claude Console account ${boundConsoleAccount.id} is temporarily unavailable, falling back to pool`
-            )
-          } else {
-            logger.info(
-              `🎯 Using bound dedicated Claude Console account: ${boundConsoleAccount.name} (${apiKeyData.claudeConsoleAccountId}) for API key ${apiKeyData.name}`
-            )
-            return {
-              accountId: apiKeyData.claudeConsoleAccountId,
-              accountType: 'claude-console'
-            }
-          }
-        } else {
+        const dedicatedConsoleAccountId = apiKeyData.claudeConsoleAccountId
+        if (excludeAccounts.includes(dedicatedConsoleAccountId)) {
           logger.warn(
-            `⚠️ Bound Claude Console account ${apiKeyData.claudeConsoleAccountId} is not available (isActive: ${boundConsoleAccount?.isActive}, status: ${boundConsoleAccount?.status}, schedulable: ${boundConsoleAccount?.schedulable}), falling back to pool`
+            `⚠️ Dedicated Claude Console account ${dedicatedConsoleAccountId} is excluded by failover, falling back to pool`
           )
+        } else {
+          const boundConsoleAccount =
+            await claudeConsoleAccountService.getAccount(dedicatedConsoleAccountId)
+          if (
+            boundConsoleAccount &&
+            boundConsoleAccount.isActive === true &&
+            boundConsoleAccount.status === 'active' &&
+            this._isSchedulable(boundConsoleAccount.schedulable)
+          ) {
+            // 检查是否临时不可用
+            const isTempUnavailable = await this.isAccountTemporarilyUnavailable(
+              boundConsoleAccount.id,
+              'claude-console'
+            )
+            if (isTempUnavailable) {
+              logger.warn(
+                `⏱️ Bound Claude Console account ${boundConsoleAccount.id} is temporarily unavailable, falling back to pool`
+              )
+            } else {
+              logger.info(
+                `🎯 Using bound dedicated Claude Console account: ${boundConsoleAccount.name} (${dedicatedConsoleAccountId}) for API key ${apiKeyData.name}`
+              )
+              return {
+                accountId: dedicatedConsoleAccountId,
+                accountType: 'claude-console'
+              }
+            }
+          } else {
+            logger.warn(
+              `⚠️ Bound Claude Console account ${dedicatedConsoleAccountId} is not available (isActive: ${boundConsoleAccount?.isActive}, status: ${boundConsoleAccount?.status}, schedulable: ${boundConsoleAccount?.schedulable}), falling back to pool`
+            )
+          }
         }
       }
 
       // 3. 检查Bedrock账户绑定
       if (apiKeyData.bedrockAccountId) {
-        const boundBedrockAccountResult = await bedrockAccountService.getAccount(
-          apiKeyData.bedrockAccountId
-        )
-        if (
-          boundBedrockAccountResult.success &&
-          boundBedrockAccountResult.data.isActive === true &&
-          this._isSchedulable(boundBedrockAccountResult.data.schedulable)
-        ) {
-          // 检查是否临时不可用
-          const isTempUnavailable = await this.isAccountTemporarilyUnavailable(
-            apiKeyData.bedrockAccountId,
-            'bedrock'
-          )
-          if (isTempUnavailable) {
-            logger.warn(
-              `⏱️ Bound Bedrock account ${apiKeyData.bedrockAccountId} is temporarily unavailable, falling back to pool`
-            )
-          } else {
-            logger.info(
-              `🎯 Using bound dedicated Bedrock account: ${boundBedrockAccountResult.data.name} (${apiKeyData.bedrockAccountId}) for API key ${apiKeyData.name}`
-            )
-            return {
-              accountId: apiKeyData.bedrockAccountId,
-              accountType: 'bedrock'
-            }
-          }
-        } else {
+        const dedicatedBedrockAccountId = apiKeyData.bedrockAccountId
+        if (excludeAccounts.includes(dedicatedBedrockAccountId)) {
           logger.warn(
-            `⚠️ Bound Bedrock account ${apiKeyData.bedrockAccountId} is not available (isActive: ${boundBedrockAccountResult?.data?.isActive}, schedulable: ${boundBedrockAccountResult?.data?.schedulable}), falling back to pool`
+            `⚠️ Dedicated Bedrock account ${dedicatedBedrockAccountId} is excluded by failover, falling back to pool`
           )
+        } else {
+          const boundBedrockAccountResult =
+            await bedrockAccountService.getAccount(dedicatedBedrockAccountId)
+          if (
+            boundBedrockAccountResult.success &&
+            boundBedrockAccountResult.data.isActive === true &&
+            this._isSchedulable(boundBedrockAccountResult.data.schedulable)
+          ) {
+            // 检查是否临时不可用
+            const isTempUnavailable = await this.isAccountTemporarilyUnavailable(
+              dedicatedBedrockAccountId,
+              'bedrock'
+            )
+            if (isTempUnavailable) {
+              logger.warn(
+                `⏱️ Bound Bedrock account ${dedicatedBedrockAccountId} is temporarily unavailable, falling back to pool`
+              )
+            } else {
+              logger.info(
+                `🎯 Using bound dedicated Bedrock account: ${boundBedrockAccountResult.data.name} (${dedicatedBedrockAccountId}) for API key ${apiKeyData.name}`
+              )
+              return {
+                accountId: dedicatedBedrockAccountId,
+                accountType: 'bedrock'
+              }
+            }
+          } else {
+            logger.warn(
+              `⚠️ Bound Bedrock account ${dedicatedBedrockAccountId} is not available (isActive: ${boundBedrockAccountResult?.data?.isActive}, schedulable: ${boundBedrockAccountResult?.data?.schedulable}), falling back to pool`
+            )
+          }
         }
       }
 
@@ -373,7 +401,8 @@ class UnifiedClaudeScheduler {
       const availableAccounts = await this._getAllAvailableAccounts(
         apiKeyData,
         effectiveModel,
-        false // 仅前缀才走 CCR：默认池不包含 CCR 账户
+        false, // 仅前缀才走 CCR：默认池不包含 CCR 账户
+        excludeAccounts
       )
 
       if (availableAccounts.length === 0) {
@@ -420,141 +449,175 @@ class UnifiedClaudeScheduler {
   }
 
   // 📋 获取所有可用账户（合并官方和Console）
-  async _getAllAvailableAccounts(apiKeyData, requestedModel = null, includeCcr = false) {
+  // excludeAccounts: 要排除的账户ID数组（用于 failover 重试时排除已失败的账户）
+  async _getAllAvailableAccounts(
+    apiKeyData,
+    requestedModel = null,
+    includeCcr = false,
+    excludeAccounts = []
+  ) {
     const availableAccounts = []
     const isOpusRequest =
       requestedModel && typeof requestedModel === 'string'
         ? requestedModel.toLowerCase().includes('opus')
         : false
 
+    // 将 excludeAccounts 转为 Set 以提高查找效率
+    const excludeSet = new Set(excludeAccounts)
+
     // 如果API Key绑定了专属账户，优先返回
     // 1. 检查Claude OAuth账户绑定
     if (apiKeyData.claudeAccountId) {
-      const boundAccount = await redis.getClaudeAccount(apiKeyData.claudeAccountId)
-      if (
-        boundAccount &&
-        boundAccount.isActive === 'true' &&
-        boundAccount.status !== 'error' &&
-        boundAccount.status !== 'blocked' &&
-        boundAccount.status !== 'temp_error'
-      ) {
-        const isRateLimited = await claudeAccountService.isAccountRateLimited(boundAccount.id)
-        if (isRateLimited) {
-          const rateInfo = await claudeAccountService.getAccountRateLimitInfo(boundAccount.id)
-          const error = new Error('Dedicated Claude account is rate limited')
-          error.code = 'CLAUDE_DEDICATED_RATE_LIMITED'
-          error.accountId = boundAccount.id
-          error.rateLimitEndAt = rateInfo?.rateLimitEndAt || boundAccount.rateLimitEndAt || null
-          throw error
-        }
-
-        if (!this._isSchedulable(boundAccount.schedulable)) {
-          logger.warn(
-            `⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not schedulable (schedulable: ${boundAccount?.schedulable})`
-          )
-        } else {
-          logger.info(
-            `🎯 Using bound dedicated Claude OAuth account: ${boundAccount.name} (${apiKeyData.claudeAccountId})`
-          )
-          return [
-            {
-              ...boundAccount,
-              accountId: boundAccount.id,
-              accountType: 'claude-official',
-              priority: parseInt(boundAccount.priority) || 50,
-              lastUsedAt: boundAccount.lastUsedAt || '0'
-            }
-          ]
-        }
-      } else {
+      const dedicatedAccountId = apiKeyData.claudeAccountId
+      if (excludeSet.has(dedicatedAccountId)) {
         logger.warn(
-          `⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not available (isActive: ${boundAccount?.isActive}, status: ${boundAccount?.status})`
+          `⚠️ Dedicated Claude account ${dedicatedAccountId} is excluded by failover, falling back to pool`
         )
+      } else {
+        const boundAccount = await redis.getClaudeAccount(dedicatedAccountId)
+        if (
+          boundAccount &&
+          boundAccount.isActive === 'true' &&
+          boundAccount.status !== 'error' &&
+          boundAccount.status !== 'blocked' &&
+          boundAccount.status !== 'temp_error'
+        ) {
+          const isRateLimited = await claudeAccountService.isAccountRateLimited(boundAccount.id)
+          if (isRateLimited) {
+            const rateInfo = await claudeAccountService.getAccountRateLimitInfo(boundAccount.id)
+            const error = new Error('Dedicated Claude account is rate limited')
+            error.code = 'CLAUDE_DEDICATED_RATE_LIMITED'
+            error.accountId = boundAccount.id
+            error.rateLimitEndAt = rateInfo?.rateLimitEndAt || boundAccount.rateLimitEndAt || null
+            throw error
+          }
+
+          if (!this._isSchedulable(boundAccount.schedulable)) {
+            logger.warn(
+              `⚠️ Bound Claude OAuth account ${dedicatedAccountId} is not schedulable (schedulable: ${boundAccount?.schedulable})`
+            )
+          } else {
+            logger.info(
+              `🎯 Using bound dedicated Claude OAuth account: ${boundAccount.name} (${dedicatedAccountId})`
+            )
+            return [
+              {
+                ...boundAccount,
+                accountId: boundAccount.id,
+                accountType: 'claude-official',
+                priority: parseInt(boundAccount.priority) || 50,
+                lastUsedAt: boundAccount.lastUsedAt || '0'
+              }
+            ]
+          }
+        } else {
+          logger.warn(
+            `⚠️ Bound Claude OAuth account ${dedicatedAccountId} is not available (isActive: ${boundAccount?.isActive}, status: ${boundAccount?.status})`
+          )
+        }
       }
     }
 
     // 2. 检查Claude Console账户绑定
     if (apiKeyData.claudeConsoleAccountId) {
-      const boundConsoleAccount = await claudeConsoleAccountService.getAccount(
-        apiKeyData.claudeConsoleAccountId
-      )
-      if (
-        boundConsoleAccount &&
-        boundConsoleAccount.isActive === true &&
-        boundConsoleAccount.status === 'active' &&
-        this._isSchedulable(boundConsoleAccount.schedulable)
-      ) {
-        // 主动触发一次额度检查
-        try {
-          await claudeConsoleAccountService.checkQuotaUsage(boundConsoleAccount.id)
-        } catch (e) {
-          logger.warn(
-            `Failed to check quota for bound Claude Console account ${boundConsoleAccount.name}: ${e.message}`
-          )
-          // 继续使用该账号
-        }
-
-        // 检查限流状态和额度状态
-        const isRateLimited = await claudeConsoleAccountService.isAccountRateLimited(
-          boundConsoleAccount.id
-        )
-        const isQuotaExceeded = await claudeConsoleAccountService.isAccountQuotaExceeded(
-          boundConsoleAccount.id
-        )
-
-        if (!isRateLimited && !isQuotaExceeded) {
-          logger.info(
-            `🎯 Using bound dedicated Claude Console account: ${boundConsoleAccount.name} (${apiKeyData.claudeConsoleAccountId})`
-          )
-          return [
-            {
-              ...boundConsoleAccount,
-              accountId: boundConsoleAccount.id,
-              accountType: 'claude-console',
-              priority: parseInt(boundConsoleAccount.priority) || 50,
-              lastUsedAt: boundConsoleAccount.lastUsedAt || '0'
-            }
-          ]
-        }
-      } else {
+      const dedicatedConsoleAccountId = apiKeyData.claudeConsoleAccountId
+      if (excludeSet.has(dedicatedConsoleAccountId)) {
         logger.warn(
-          `⚠️ Bound Claude Console account ${apiKeyData.claudeConsoleAccountId} is not available (isActive: ${boundConsoleAccount?.isActive}, status: ${boundConsoleAccount?.status}, schedulable: ${boundConsoleAccount?.schedulable})`
+          `⚠️ Dedicated Claude Console account ${dedicatedConsoleAccountId} is excluded by failover, falling back to pool`
         )
+      } else {
+        const boundConsoleAccount =
+          await claudeConsoleAccountService.getAccount(dedicatedConsoleAccountId)
+        if (
+          boundConsoleAccount &&
+          boundConsoleAccount.isActive === true &&
+          boundConsoleAccount.status === 'active' &&
+          this._isSchedulable(boundConsoleAccount.schedulable)
+        ) {
+          // 主动触发一次额度检查
+          try {
+            await claudeConsoleAccountService.checkQuotaUsage(boundConsoleAccount.id)
+          } catch (e) {
+            logger.warn(
+              `Failed to check quota for bound Claude Console account ${boundConsoleAccount.name}: ${e.message}`
+            )
+            // 继续使用该账号
+          }
+
+          // 检查限流状态和额度状态
+          const isRateLimited = await claudeConsoleAccountService.isAccountRateLimited(
+            boundConsoleAccount.id
+          )
+          const isQuotaExceeded = await claudeConsoleAccountService.isAccountQuotaExceeded(
+            boundConsoleAccount.id
+          )
+
+          if (!isRateLimited && !isQuotaExceeded) {
+            logger.info(
+              `🎯 Using bound dedicated Claude Console account: ${boundConsoleAccount.name} (${dedicatedConsoleAccountId})`
+            )
+            return [
+              {
+                ...boundConsoleAccount,
+                accountId: boundConsoleAccount.id,
+                accountType: 'claude-console',
+                priority: parseInt(boundConsoleAccount.priority) || 50,
+                lastUsedAt: boundConsoleAccount.lastUsedAt || '0'
+              }
+            ]
+          }
+        } else {
+          logger.warn(
+            `⚠️ Bound Claude Console account ${dedicatedConsoleAccountId} is not available (isActive: ${boundConsoleAccount?.isActive}, status: ${boundConsoleAccount?.status}, schedulable: ${boundConsoleAccount?.schedulable})`
+          )
+        }
       }
     }
 
     // 3. 检查Bedrock账户绑定
     if (apiKeyData.bedrockAccountId) {
-      const boundBedrockAccountResult = await bedrockAccountService.getAccount(
-        apiKeyData.bedrockAccountId
-      )
-      if (
-        boundBedrockAccountResult.success &&
-        boundBedrockAccountResult.data.isActive === true &&
-        this._isSchedulable(boundBedrockAccountResult.data.schedulable)
-      ) {
-        logger.info(
-          `🎯 Using bound dedicated Bedrock account: ${boundBedrockAccountResult.data.name} (${apiKeyData.bedrockAccountId})`
-        )
-        return [
-          {
-            ...boundBedrockAccountResult.data,
-            accountId: boundBedrockAccountResult.data.id,
-            accountType: 'bedrock',
-            priority: parseInt(boundBedrockAccountResult.data.priority) || 50,
-            lastUsedAt: boundBedrockAccountResult.data.lastUsedAt || '0'
-          }
-        ]
-      } else {
+      const dedicatedBedrockAccountId = apiKeyData.bedrockAccountId
+      if (excludeSet.has(dedicatedBedrockAccountId)) {
         logger.warn(
-          `⚠️ Bound Bedrock account ${apiKeyData.bedrockAccountId} is not available (isActive: ${boundBedrockAccountResult?.data?.isActive}, schedulable: ${boundBedrockAccountResult?.data?.schedulable})`
+          `⚠️ Dedicated Bedrock account ${dedicatedBedrockAccountId} is excluded by failover, falling back to pool`
         )
+      } else {
+        const boundBedrockAccountResult =
+          await bedrockAccountService.getAccount(dedicatedBedrockAccountId)
+        if (
+          boundBedrockAccountResult.success &&
+          boundBedrockAccountResult.data.isActive === true &&
+          this._isSchedulable(boundBedrockAccountResult.data.schedulable)
+        ) {
+          logger.info(
+            `🎯 Using bound dedicated Bedrock account: ${boundBedrockAccountResult.data.name} (${dedicatedBedrockAccountId})`
+          )
+          return [
+            {
+              ...boundBedrockAccountResult.data,
+              accountId: boundBedrockAccountResult.data.id,
+              accountType: 'bedrock',
+              priority: parseInt(boundBedrockAccountResult.data.priority) || 50,
+              lastUsedAt: boundBedrockAccountResult.data.lastUsedAt || '0'
+            }
+          ]
+        } else {
+          logger.warn(
+            `⚠️ Bound Bedrock account ${dedicatedBedrockAccountId} is not available (isActive: ${boundBedrockAccountResult?.data?.isActive}, schedulable: ${boundBedrockAccountResult?.data?.schedulable})`
+          )
+        }
       }
     }
 
     // 获取官方Claude账户（共享池）
     const claudeAccounts = await redis.getAllClaudeAccounts()
     for (const account of claudeAccounts) {
+      // 🔄 Failover: 检查是否在排除列表中
+      if (excludeSet.has(account.id)) {
+        logger.debug(`⏭️ Skipping Claude Official account ${account.name} - excluded for failover`)
+        continue
+      }
+
       if (
         account.isActive === 'true' &&
         account.status !== 'error' &&
@@ -620,6 +683,12 @@ class UnifiedClaudeScheduler {
     const accountsNeedingConcurrencyCheck = []
 
     for (const account of consoleAccounts) {
+      // 🔄 Failover: 检查是否在排除列表中
+      if (excludeSet.has(account.id)) {
+        logger.debug(`⏭️ Skipping Claude Console account ${account.name} - excluded for failover`)
+        continue
+      }
+
       // 主动检查封禁状态并尝试恢复（在过滤之前执行，确保可以恢复被封禁的账户）
       const wasBlocked = await claudeConsoleAccountService.isAccountBlocked(account.id)
 
@@ -771,6 +840,12 @@ class UnifiedClaudeScheduler {
       logger.info(`📋 Found ${bedrockAccounts.length} total Bedrock accounts`)
 
       for (const account of bedrockAccounts) {
+        // 🔄 Failover: 检查是否在排除列表中
+        if (excludeSet.has(account.id)) {
+          logger.debug(`⏭️ Skipping Bedrock account ${account.name} - excluded for failover`)
+          continue
+        }
+
         logger.info(
           `🔍 Checking Bedrock account: ${account.name} - isActive: ${account.isActive}, accountType: ${account.accountType}, schedulable: ${account.schedulable}`
         )
@@ -814,6 +889,12 @@ class UnifiedClaudeScheduler {
       logger.info(`📋 Found ${ccrAccounts.length} total CCR accounts`)
 
       for (const account of ccrAccounts) {
+        // 🔄 Failover: 检查是否在排除列表中
+        if (excludeSet.has(account.id)) {
+          logger.debug(`⏭️ Skipping CCR account ${account.name} - excluded for failover`)
+          continue
+        }
+
         logger.info(
           `🔍 Checking CCR account: ${account.name} - isActive: ${account.isActive}, status: ${account.status}, accountType: ${account.accountType}, schedulable: ${account.schedulable}`
         )
@@ -1392,7 +1473,8 @@ class UnifiedClaudeScheduler {
     groupId,
     sessionHash = null,
     requestedModel = null,
-    allowCcr = false
+    allowCcr = false,
+    excludeAccounts = []
   ) {
     try {
       // 获取分组信息
@@ -1402,6 +1484,7 @@ class UnifiedClaudeScheduler {
       }
 
       logger.info(`👥 Selecting account from group: ${group.name} (${group.platform})`)
+      const excludeSet = new Set(excludeAccounts)
 
       // 如果有会话哈希，检查是否有已映射的账户
       if (sessionHash) {
@@ -1480,6 +1563,11 @@ class UnifiedClaudeScheduler {
 
         if (!account) {
           logger.warn(`⚠️ Account ${memberId} not found in group ${group.name}`)
+          continue
+        }
+
+        if (excludeSet.has(account.id)) {
+          logger.debug(`⏭️ Skipping group member account ${account.name} - excluded by failover`)
           continue
         }
 
