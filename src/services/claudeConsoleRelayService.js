@@ -285,6 +285,18 @@ class ClaudeConsoleRelayService {
         if (!autoProtectionDisabled) {
           await claudeConsoleAccountService.markAccountOverloaded(accountId)
         }
+      } else if (response.status === 502 || response.status === 504) {
+        logger.warn(
+          `⚠️ Upstream error (${response.status}) detected for Claude Console account ${accountId}${autoProtectionDisabled ? ' (auto-protection disabled, skipping status change)' : ''}`
+        )
+        if (!autoProtectionDisabled) {
+          await unifiedClaudeScheduler.markAccountTemporarilyUnavailable(
+            accountId,
+            'claude-console',
+            sessionHash,
+            300
+          )
+        }
       } else if (response.status === 200 || response.status === 201) {
         // 如果请求成功，检查并移除错误状态
         const isRateLimited = await claudeConsoleAccountService.isAccountRateLimited(accountId)
@@ -661,6 +673,18 @@ class ClaudeConsoleRelayService {
                 if (!autoProtectionDisabled) {
                   await claudeConsoleAccountService.markAccountOverloaded(accountId)
                 }
+              } else if (response.status === 502 || response.status === 504) {
+                logger.warn(
+                  `⚠️ [Stream] Upstream error (${response.status}) detected for Claude Console account ${accountId}${autoProtectionDisabled ? ' (auto-protection disabled, skipping status change)' : ''}`
+                )
+                if (!autoProtectionDisabled) {
+                  await unifiedClaudeScheduler.markAccountTemporarilyUnavailable(
+                    accountId,
+                    'claude-console',
+                    sessionHash,
+                    300
+                  )
+                }
               }
 
               // 设置响应头
@@ -997,6 +1021,16 @@ class ClaudeConsoleRelayService {
               })
             } else if (error.response.status === 529) {
               claudeConsoleAccountService.markAccountOverloaded(accountId)
+            } else if (error.response.status === 502 || error.response.status === 504) {
+              logger.warn(
+                `⚠️ Upstream error (${error.response.status}) in catch block for account ${accountId}`
+              )
+              unifiedClaudeScheduler.markAccountTemporarilyUnavailable(
+                accountId,
+                'claude-console',
+                null,
+                300
+              )
             }
           }
 

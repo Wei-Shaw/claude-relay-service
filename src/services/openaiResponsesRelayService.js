@@ -197,7 +197,21 @@ class OpenAIResponsesRelayService {
           errorData
         })
 
-        if (response.status === 401) {
+        if (response.status === 502 || response.status === 504) {
+          logger.warn(
+            `⚠️ Upstream error (${response.status}) detected for OpenAI-Responses account ${account.id}`
+          )
+          try {
+            await unifiedOpenAIScheduler.markAccountTemporarilyUnavailable(
+              account.id,
+              'openai-responses',
+              sessionHash,
+              300
+            )
+          } catch (markError) {
+            logger.error('❌ Failed to mark account temporarily unavailable:', markError)
+          }
+        } else if (response.status === 401) {
           let reason = 'OpenAI Responses账号认证失败（401错误）'
           if (errorData) {
             if (typeof errorData === 'string' && errorData.trim()) {
