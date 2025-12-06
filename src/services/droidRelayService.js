@@ -737,6 +737,14 @@ class DroidRelayService {
                 currentUsageData.output_tokens = 0
               }
 
+              // Capture cache tokens from OpenAI format
+              currentUsageData.cache_read_input_tokens =
+                data.usage.input_tokens_details?.cached_tokens || 0
+              currentUsageData.cache_creation_input_tokens =
+                data.usage.input_tokens_details?.cache_creation_input_tokens ||
+                data.usage.cache_creation_input_tokens ||
+                0
+
               logger.debug('📊 Droid OpenAI usage:', currentUsageData)
             }
 
@@ -757,6 +765,14 @@ class DroidRelayService {
               } else {
                 currentUsageData.output_tokens = 0
               }
+
+              // Capture cache tokens from OpenAI Response API format
+              currentUsageData.cache_read_input_tokens =
+                usage.input_tokens_details?.cached_tokens || 0
+              currentUsageData.cache_creation_input_tokens =
+                usage.input_tokens_details?.cache_creation_input_tokens ||
+                usage.cache_creation_input_tokens ||
+                0
 
               logger.debug('📊 Droid OpenAI response usage:', currentUsageData)
             }
