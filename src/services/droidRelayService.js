@@ -407,6 +407,45 @@ class DroidRelayService {
 
         logger.info(`✅ Factory.ai response status: ${response.status}`)
 
+        if ((response.status === 200 || response.status === 201) && account?.id) {
+          try {
+            if (typeof droidAccountService.isAccountRateLimited === 'function') {
+              const isRateLimited = await droidAccountService.isAccountRateLimited(account.id)
+              if (
+                isRateLimited &&
+                typeof droidAccountService.removeAccountRateLimit === 'function'
+              ) {
+                await droidAccountService.removeAccountRateLimit(account.id)
+                logger.debug(`✅ Cleared rate limit for Droid account ${account.id}`)
+              }
+            }
+
+            if (typeof droidAccountService.isAccountUnauthorized === 'function') {
+              const isUnauthorized = await droidAccountService.isAccountUnauthorized(account.id)
+              if (
+                isUnauthorized &&
+                typeof droidAccountService.clearAccountUnauthorized === 'function'
+              ) {
+                await droidAccountService.clearAccountUnauthorized(account.id)
+                logger.debug(`✅ Cleared unauthorized for Droid account ${account.id}`)
+              }
+            }
+
+            if (typeof droidAccountService.isAccountOverloaded === 'function') {
+              const isOverloaded = await droidAccountService.isAccountOverloaded(account.id)
+              if (
+                isOverloaded &&
+                typeof droidAccountService.removeAccountOverload === 'function'
+              ) {
+                await droidAccountService.removeAccountOverload(account.id)
+                logger.debug(`✅ Cleared overload for Droid account ${account.id}`)
+              }
+            }
+          } catch (cleanupError) {
+            logger.error(`❌ Failed to cleanup Droid account status:`, cleanupError)
+          }
+        }
+
         // 处理非流式响应
         return this._handleNonStreamResponse(
           response,
@@ -436,36 +475,96 @@ class DroidRelayService {
         }
       }
 
-      if (error.response) {
-        // HTTP 错误响应
-        return {
-          statusCode: error.response.status,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(
-            error.response.data || {
-              error: 'upstream_error',
-              message: error.message
+      const mappedStatus =
+        error.response?.status || error.statusCode || this._mapNetworkErrorStatus(error)
+
+      try {
+        if (account?.id) {
+          if (mappedStatus === 401 || mappedStatus === 402) {
+            if (typeof droidAccountService.markAccountUnauthorized === 'function') {
+              await droidAccountService.markAccountUnauthorized(account.id)
+              logger.warn(`🚫 Marked Droid account ${account.id} as unauthorized (${mappedStatus})`)
             }
-          )
+          } else if (mappedStatus === 403) {
+            if (typeof droidAccountService.markAccountBlocked === 'function') {
+              await droidAccountService.markAccountBlocked(account.id)
+              logger.warn(`🚫 Marked Droid account ${account.id} as blocked (403)`)
+            }
+          } else if (mappedStatus === 429) {
+            if (typeof droidAccountService.markAccountRateLimited === 'function') {
+              await droidAccountService.markAccountRateLimited(account.id)
+              logger.warn(`🚫 Marked Droid account ${account.id} as rate limited (429)`)
+            }
+          } else if (mappedStatus === 529) {
+            if (typeof droidAccountService.markAccountOverloaded === 'function') {
+              await droidAccountService.markAccountOverloaded(account.id)
+              logger.warn(`🚫 Marked Droid account ${account.id} as overloaded (529)`)
+            }
+          } else if (mappedStatus >= 500) {
+            if (typeof droidAccountService.markAccountTemporarilyUnavailable === 'function') {
+              await droidAccountService.markAccountTemporarilyUnavailable(account.id)
+              logger.warn(
+                `🚫 Marked Droid account ${account.id} as temporarily unavailable (${mappedStatus})`
+              )
+            }
+          }
         }
+      } catch (markError) {
+        logger.error(`❌ Failed to mark Droid account status:`, markError)
       }
 
-      const mappedStatus = error.statusCode || this._mapNetworkErrorStatus(error)
+      // ✅ noFailover 检查 - 如果启用则直接返回错误，不触发 failover
+      if (account?.noFailover === true) {
+        logger.info(`Account ${account.name} has noFailover=true, returning error directly`)
 
-      if (error.errorData) {
+        if (error.response) {
+          return {
+            statusCode: error.response.status,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(
+              error.response.data || {
+                error: 'upstream_error',
+                message: error.message
+              }
+            ),
+            accountId: account.id
+          }
+        }
+
+        if (error.errorData) {
+          return {
+            statusCode: mappedStatus,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(error.errorData),
+            accountId: account.id
+          }
+        }
+
         return {
           statusCode: mappedStatus,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(error.errorData)
+          body: JSON.stringify(this._buildNetworkErrorBody(error)),
+          accountId: account.id
         }
       }
 
-      // 网络错误或其他错误（统一返回 4xx）
-      return {
-        statusCode: mappedStatus,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(this._buildNetworkErrorBody(error))
+      // ✅ 必须 throw error 以触发 failover（这是修复的关键！）
+      const failoverError = new Error(error.message || 'Droid request failed')
+      failoverError.statusCode = mappedStatus
+      failoverError.accountId = account?.id
+
+      if (error.response) {
+        failoverError.errorData = error.response.data || {
+          error: 'upstream_error',
+          message: error.message
+        }
+      } else if (error.errorData) {
+        failoverError.errorData = error.errorData
+      } else {
+        failoverError.errorData = this._buildNetworkErrorBody(error)
       }
+
+      throw failoverError
     }
   }
 
@@ -701,6 +800,26 @@ class DroidRelayService {
             logger.success(
               `✅ Droid stream completed - Account: ${account.name}, usage recording skipped`
             )
+          }
+
+          if (account?.id) {
+            try {
+              if (typeof droidAccountService.isAccountOverloaded === 'function') {
+                const isOverloaded = await droidAccountService.isAccountOverloaded(account.id)
+                if (
+                  isOverloaded &&
+                  typeof droidAccountService.removeAccountOverload === 'function'
+                ) {
+                  await droidAccountService.removeAccountOverload(account.id)
+                  logger.debug(`✅ Cleared overload for Droid account ${account.id}`)
+                }
+              }
+            } catch (overloadCleanupError) {
+              logger.error(
+                '❌ Failed to cleanup Droid overload status after stream success:',
+                overloadCleanupError
+              )
+            }
           }
           resolveOnce({ statusCode: 200, streaming: true })
         })

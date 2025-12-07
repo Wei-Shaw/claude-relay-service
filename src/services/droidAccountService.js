@@ -25,6 +25,9 @@ class DroidAccountService {
     // Token 刷新策略
     this.refreshIntervalHours = 6 // 每6小时刷新一次
     this.tokenValidHours = 8 // Token 有效期8小时
+    this.DEFAULT_RATE_LIMIT_DURATION_MINUTES = 10
+    this.DEFAULT_TEMP_UNAVAILABLE_DURATION_MINUTES = 10
+    this.DEFAULT_OVERLOAD_DURATION_MINUTES = 10
 
     // 加密相关常量
     this.ENCRYPTION_ALGORITHM = 'aes-256-cbc'
@@ -865,6 +868,8 @@ class DroidAccountService {
       return null
     }
 
+    await this._restoreTransientStatuses(accountId, account)
+
     // 解密敏感数据
     const apiKeyEntries = this._parseApiKeyEntries(account.apiKeys)
 
@@ -885,6 +890,10 @@ class DroidAccountService {
    */
   async getAllAccounts() {
     const accounts = await redis.getAllDroidAccounts()
+    for (const account of accounts) {
+      await this._restoreTransientStatuses(account.id, account)
+    }
+
     return accounts.map((account) => ({
       ...account,
       endpointType: this._sanitizeEndpointType(account.endpointType),
@@ -1563,6 +1572,10 @@ class DroidAccountService {
     return baseUrls[normalizedType] || baseUrls.openai
   }
 
+  _getAccountRedisKey(accountId) {
+    return `droid:account:${accountId}`
+  }
+
   async touchLastUsedAt(accountId) {
     if (!accountId) {
       return
@@ -1570,9 +1583,411 @@ class DroidAccountService {
 
     try {
       const client = redis.getClientSafe()
-      await client.hset(`droid:account:${accountId}`, 'lastUsedAt', new Date().toISOString())
+      await client.hset(this._getAccountRedisKey(accountId), 'lastUsedAt', new Date().toISOString())
     } catch (error) {
       logger.warn(`⚠️ Failed to update lastUsedAt for Droid account ${accountId}:`, error)
+    }
+  }
+
+  async markAccountUnauthorized(accountId) {
+    if (!accountId) {
+      return { success: false, error: 'invalid_account' }
+    }
+
+    try {
+      const account = await this.getAccount(accountId)
+      if (!account) {
+        return { success: false, error: 'not_found' }
+      }
+
+      const now = new Date().toISOString()
+      await redis.setDroidAccount(accountId, {
+        status: 'unauthorized',
+        schedulable: 'false',
+        unauthorizedAt: now,
+        errorMessage: 'Droid account unauthorized'
+      })
+
+      logger.warn(`🚫 Marked Droid account as unauthorized: ${account.name} (${accountId})`)
+      return { success: true, unauthorizedAt: now }
+    } catch (error) {
+      logger.error(`❌ Failed to mark Droid account as unauthorized: ${accountId}`, error)
+      throw error
+    }
+  }
+
+  async clearAccountUnauthorized(accountId) {
+    if (!accountId) {
+      return { success: false, error: 'invalid_account' }
+    }
+
+    try {
+      const accountKey = this._getAccountRedisKey(accountId)
+      const client = redis.getClientSafe()
+      await client.hdel(accountKey, 'unauthorizedAt')
+      await client.hset(accountKey, {
+        status: 'active',
+        schedulable: 'true',
+        errorMessage: ''
+      })
+
+      logger.info(`✅ Cleared unauthorized status for Droid account: ${accountId}`)
+      return { success: true }
+    } catch (error) {
+      logger.error(`❌ Failed to clear unauthorized status for Droid account ${accountId}`, error)
+      throw error
+    }
+  }
+
+  async isAccountUnauthorized(accountId) {
+    if (!accountId) {
+      return false
+    }
+
+    try {
+      const client = redis.getClientSafe()
+      const [status, unauthorizedAt] = await client.hmget(
+        this._getAccountRedisKey(accountId),
+        'status',
+        'unauthorizedAt'
+      )
+
+      return status === 'unauthorized' || Boolean(unauthorizedAt)
+    } catch (error) {
+      logger.error(`❌ Failed to check unauthorized status for Droid account ${accountId}`, error)
+      return false
+    }
+  }
+
+  async markAccountBlocked(accountId) {
+    if (!accountId) {
+      return { success: false, error: 'invalid_account' }
+    }
+
+    try {
+      const account = await this.getAccount(accountId)
+      if (!account) {
+        return { success: false, error: 'not_found' }
+      }
+
+      const now = new Date().toISOString()
+      await redis.setDroidAccount(accountId, {
+        status: 'blocked',
+        schedulable: 'false',
+        blockedAt: now,
+        errorMessage: 'Droid account blocked by upstream'
+      })
+
+      logger.warn(`🚫 Marked Droid account as blocked: ${account.name} (${accountId})`)
+      return { success: true, blockedAt: now }
+    } catch (error) {
+      logger.error(`❌ Failed to mark Droid account as blocked: ${accountId}`, error)
+      throw error
+    }
+  }
+
+  async markAccountRateLimited(accountId) {
+    if (!accountId) {
+      return { success: false, error: 'invalid_account' }
+    }
+
+    try {
+      const account = await this.getAccount(accountId)
+      if (!account) {
+        return { success: false, error: 'not_found' }
+      }
+
+      const now = new Date()
+      const parsedDuration = parseInt(account.rateLimitDuration, 10)
+      const durationMinutes = Number.isFinite(parsedDuration)
+        ? parsedDuration
+        : this.DEFAULT_RATE_LIMIT_DURATION_MINUTES
+      const resetAt = new Date(now.getTime() + durationMinutes * 60 * 1000).toISOString()
+
+      await redis.setDroidAccount(accountId, {
+        status: 'rate_limited',
+        schedulable: 'false',
+        rateLimitStatus: 'limited',
+        rateLimitedAt: now.toISOString(),
+        rateLimitResetAt: resetAt,
+        errorMessage: 'Droid account rate limited by upstream'
+      })
+
+      logger.warn(
+        `⏱️ Marked Droid account as rate limited until ${resetAt}: ${account.name} (${accountId})`
+      )
+      return { success: true, resetAt }
+    } catch (error) {
+      logger.error(`❌ Failed to mark Droid account as rate limited: ${accountId}`, error)
+      throw error
+    }
+  }
+
+  async removeAccountRateLimit(accountId) {
+    if (!accountId) {
+      return { success: false, error: 'invalid_account' }
+    }
+
+    try {
+      const client = redis.getClientSafe()
+      const accountKey = this._getAccountRedisKey(accountId)
+      await client.hdel(accountKey, 'rateLimitResetAt', 'rateLimitedAt', 'rateLimitStatus')
+      await client.hset(accountKey, {
+        status: 'active',
+        schedulable: 'true',
+        errorMessage: ''
+      })
+
+      logger.info(`✅ Removed rate limit for Droid account: ${accountId}`)
+      return { success: true }
+    } catch (error) {
+      logger.error(`❌ Failed to remove rate limit for Droid account ${accountId}`, error)
+      throw error
+    }
+  }
+
+  async isAccountRateLimited(accountId) {
+    if (!accountId) {
+      return false
+    }
+
+    try {
+      const client = redis.getClientSafe()
+      const accountKey = this._getAccountRedisKey(accountId)
+      const [status, resetAt, limitedAt, durationRaw] = await client.hmget(
+        accountKey,
+        'status',
+        'rateLimitResetAt',
+        'rateLimitedAt',
+        'rateLimitDuration'
+      )
+
+      const isLimitedStatus = status === 'rate_limited'
+
+      if (!isLimitedStatus) {
+        return false
+      }
+
+      const now = new Date()
+      if (resetAt) {
+        const resetTime = new Date(resetAt)
+        if (!Number.isNaN(resetTime.getTime()) && resetTime <= now) {
+          await this.removeAccountRateLimit(accountId)
+          return false
+        }
+      } else if (limitedAt && durationRaw) {
+        const parsedDuration = parseInt(durationRaw, 10)
+        if (Number.isFinite(parsedDuration)) {
+          const limitedTime = new Date(limitedAt)
+          const expiryTime = new Date(limitedTime.getTime() + parsedDuration * 60 * 1000)
+          if (expiryTime <= now) {
+            await this.removeAccountRateLimit(accountId)
+            return false
+          }
+        }
+      }
+
+      return true
+    } catch (error) {
+      logger.error(`❌ Failed to check rate limit status for Droid account ${accountId}`, error)
+      return false
+    }
+  }
+
+  async markAccountOverloaded(accountId) {
+    if (!accountId) {
+      return { success: false, error: 'invalid_account' }
+    }
+
+    try {
+      const account = await this.getAccount(accountId)
+      if (!account) {
+        return { success: false, error: 'not_found' }
+      }
+
+      const now = new Date()
+      const resetAt = new Date(
+        now.getTime() + this.DEFAULT_OVERLOAD_DURATION_MINUTES * 60 * 1000
+      ).toISOString()
+      await redis.setDroidAccount(accountId, {
+        status: 'overloaded',
+        schedulable: 'false',
+        overloadedAt: now.toISOString(),
+        overloadedResetAt: resetAt,
+        errorMessage: 'Droid account overloaded by upstream'
+      })
+
+      logger.warn(`🚫 Marked Droid account as overloaded: ${account.name} (${accountId})`)
+      return { success: true, overloadedAt: now.toISOString(), resetAt }
+    } catch (error) {
+      logger.error(`❌ Failed to mark Droid account as overloaded: ${accountId}`, error)
+      throw error
+    }
+  }
+
+  async markAccountTemporarilyUnavailable(accountId) {
+    if (!accountId) {
+      return { success: false, error: 'invalid_account' }
+    }
+
+    try {
+      const account = await this.getAccount(accountId)
+      if (!account) {
+        return { success: false, error: 'not_found' }
+      }
+
+      const now = new Date()
+      const resetAt = new Date(
+        now.getTime() + this.DEFAULT_TEMP_UNAVAILABLE_DURATION_MINUTES * 60 * 1000
+      ).toISOString()
+
+      await redis.setDroidAccount(accountId, {
+        status: 'temporarily_unavailable',
+        schedulable: 'false',
+        unavailableAt: now.toISOString(),
+        unavailableResetAt: resetAt,
+        errorMessage: 'Droid account temporarily unavailable'
+      })
+
+      logger.warn(
+        `🚫 Marked Droid account as temporarily unavailable until ${resetAt}: ${account.name} (${accountId})`
+      )
+      return { success: true, resetAt }
+    } catch (error) {
+      logger.error(
+        `❌ Failed to mark Droid account as temporarily unavailable: ${accountId}`,
+        error
+      )
+      throw error
+    }
+  }
+
+  async removeAccountOverload(accountId) {
+    try {
+      const accountKey = this._getAccountRedisKey(accountId)
+      const client = redis.getClientSafe()
+      await client.hdel(accountKey, 'overloadedAt', 'overloadedResetAt')
+      await client.hset(accountKey, {
+        status: 'active',
+        schedulable: 'true',
+        errorMessage: ''
+      })
+      logger.info(`✅ Cleared overload status for Droid account ${accountId}`)
+      return { success: true }
+    } catch (error) {
+      logger.error(`❌ Failed to clear overload status for Droid account ${accountId}`, error)
+      throw error
+    }
+  }
+
+  async isAccountOverloaded(accountId) {
+    if (!accountId) {
+      return false
+    }
+
+    try {
+      const client = redis.getClientSafe()
+      const accountKey = this._getAccountRedisKey(accountId)
+      const [status, resetAtRaw] = await client.hmget(accountKey, 'status', 'overloadedResetAt')
+
+      if (status !== 'overloaded') {
+        return false
+      }
+
+      if (resetAtRaw) {
+        const resetAt = new Date(resetAtRaw)
+        if (!Number.isNaN(resetAt.getTime()) && resetAt <= new Date()) {
+          await this.removeAccountOverload(accountId)
+          return false
+        }
+      }
+
+      return true
+    } catch (error) {
+      logger.error(`❌ Failed to check overload status for Droid account ${accountId}`, error)
+      return false
+    }
+  }
+
+  async isAccountTemporarilyUnavailable(accountId) {
+    if (!accountId) {
+      return false
+    }
+
+    try {
+      const client = redis.getClientSafe()
+      const accountKey = this._getAccountRedisKey(accountId)
+      const [status, resetAtRaw] = await client.hmget(accountKey, 'status', 'unavailableResetAt')
+
+      if (status !== 'temporarily_unavailable') {
+        return false
+      }
+
+      if (resetAtRaw) {
+        const resetAt = new Date(resetAtRaw)
+        if (!Number.isNaN(resetAt.getTime()) && resetAt <= new Date()) {
+          await this._restoreTransientStatuses(accountId, await redis.getDroidAccount(accountId))
+          return false
+        }
+      }
+
+      return true
+    } catch (error) {
+      logger.error(
+        `❌ Failed to check temporary unavailable status for Droid account ${accountId}`,
+        error
+      )
+      return false
+    }
+  }
+
+  async _restoreTransientStatuses(accountId, accountData) {
+    if (!accountData || !accountId) {
+      return
+    }
+
+    let changed = false
+
+    // 自动恢复临时不可用
+    if (accountData.status === 'temporarily_unavailable') {
+      const resetAtRaw = accountData.unavailableResetAt
+      const resetAt = resetAtRaw ? new Date(resetAtRaw) : null
+      if (!resetAt || resetAt <= new Date()) {
+        accountData.status = 'active'
+        accountData.schedulable = 'true'
+        accountData.unavailableAt = ''
+        accountData.unavailableResetAt = ''
+        accountData.errorMessage = ''
+        changed = true
+      }
+    }
+
+    // 自动恢复过载状态
+    if (accountData.status === 'overloaded') {
+      const resetAtRaw = accountData.overloadedResetAt
+      const resetAt = resetAtRaw ? new Date(resetAtRaw) : null
+      if (!resetAt || resetAt <= new Date()) {
+        accountData.status = 'active'
+        accountData.schedulable = 'true'
+        accountData.overloadedAt = ''
+        accountData.overloadedResetAt = ''
+        accountData.errorMessage = ''
+        changed = true
+      }
+    }
+
+    if (changed) {
+      const client = redis.getClientSafe()
+      await client.hset(this._getAccountRedisKey(accountId), {
+        status: accountData.status,
+        schedulable: accountData.schedulable,
+        unavailableAt: accountData.unavailableAt || '',
+        unavailableResetAt: accountData.unavailableResetAt || '',
+        overloadedAt: accountData.overloadedAt || '',
+        overloadedResetAt: accountData.overloadedResetAt || '',
+        errorMessage: accountData.errorMessage || ''
+      })
+      logger.info(`✅ Restored transient status for Droid account ${accountId}`)
     }
   }
 }

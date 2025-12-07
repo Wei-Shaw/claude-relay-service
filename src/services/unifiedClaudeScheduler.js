@@ -345,12 +345,31 @@ class UnifiedClaudeScheduler {
                 `⏱️ Bound Bedrock account ${dedicatedBedrockAccountId} is temporarily unavailable, falling back to pool`
               )
             } else {
-              logger.info(
-                `🎯 Using bound dedicated Bedrock account: ${boundBedrockAccountResult.data.name} (${dedicatedBedrockAccountId}) for API key ${apiKeyData.name}`
-              )
-              return {
-                accountId: dedicatedBedrockAccountId,
-                accountType: 'bedrock'
+              const [isRateLimited, isUnauthorized] = await Promise.all([
+                bedrockAccountService.isAccountRateLimited(dedicatedBedrockAccountId),
+                bedrockAccountService.isAccountUnauthorized(dedicatedBedrockAccountId)
+              ])
+
+              if (boundBedrockAccountResult.data.status === 'blocked') {
+                logger.warn(
+                  `⛔ Bound Bedrock account ${dedicatedBedrockAccountId} is blocked, falling back to pool`
+                )
+              } else if (isRateLimited) {
+                logger.warn(
+                  `⏱️ Bound Bedrock account ${dedicatedBedrockAccountId} is rate limited, falling back to pool`
+                )
+              } else if (isUnauthorized || boundBedrockAccountResult.data.status === 'unauthorized') {
+                logger.warn(
+                  `🚫 Bound Bedrock account ${dedicatedBedrockAccountId} is unauthorized, falling back to pool`
+                )
+              } else {
+                logger.info(
+                  `🎯 Using bound dedicated Bedrock account: ${boundBedrockAccountResult.data.name} (${dedicatedBedrockAccountId}) for API key ${apiKeyData.name}`
+                )
+                return {
+                  accountId: dedicatedBedrockAccountId,
+                  accountType: 'bedrock'
+                }
               }
             }
           } else {
@@ -865,6 +884,32 @@ class UnifiedClaudeScheduler {
             continue
           }
 
+          if (account.status === 'blocked') {
+            logger.debug(`⏭️ Skipping Bedrock account ${account.name} - blocked`)
+            continue
+          }
+
+          const [isRateLimited, isUnauthorized, accountTempUnavailable] = await Promise.all([
+            bedrockAccountService.isAccountRateLimited(account.id),
+            bedrockAccountService.isAccountUnauthorized(account.id),
+            bedrockAccountService.isAccountTemporarilyUnavailable(account.id)
+          ])
+
+          if (accountTempUnavailable) {
+            logger.debug(`⏭️ Skipping Bedrock account ${account.name} - temp unavailable (account state)`)
+            continue
+          }
+
+          if (isRateLimited) {
+            logger.warn(`⏭️ Skipping Bedrock account ${account.name} - rate limited`)
+            continue
+          }
+
+          if (isUnauthorized || account.status === 'unauthorized') {
+            logger.warn(`⏭️ Skipping Bedrock account ${account.name} - unauthorized`)
+            continue
+          }
+
           availableAccounts.push({
             ...account,
             accountId: account.id,
@@ -1130,7 +1175,32 @@ class UnifiedClaudeScheduler {
           logger.info(`🚫 Bedrock account ${accountId} is not schedulable`)
           return false
         }
-        // Bedrock账户暂不需要限流检查，因为AWS管理限流
+        if (accountResult.data.status === 'blocked') {
+          logger.info(`🚫 Bedrock account ${accountId} is blocked`)
+          return false
+        }
+
+        const [isRateLimited, isUnauthorized, isTempUnavailable] = await Promise.all([
+          bedrockAccountService.isAccountRateLimited(accountId),
+          bedrockAccountService.isAccountUnauthorized(accountId),
+          bedrockAccountService.isAccountTemporarilyUnavailable(accountId)
+        ])
+
+        if (isTempUnavailable) {
+          logger.info(`⏭️ Bedrock account ${accountId} is temporarily unavailable`)
+          return false
+        }
+
+        if (isRateLimited) {
+          logger.info(`⏭️ Bedrock account ${accountId} is rate limited`)
+          return false
+        }
+
+        if (isUnauthorized || accountResult.data.status === 'unauthorized') {
+          logger.info(`⏭️ Bedrock account ${accountId} is unauthorized`)
+          return false
+        }
+
         return true
       } else if (accountType === 'ccr') {
         const account = await ccrAccountService.getAccount(accountId)

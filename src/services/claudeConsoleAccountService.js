@@ -739,6 +739,54 @@ class ClaudeConsoleAccountService {
     }
   }
 
+  // 🚫 标记账号为需要付款状态（402错误）
+  async markAccountPaymentRequired(accountId) {
+    try {
+      const client = redis.getClientSafe()
+      const account = await this.getAccount(accountId)
+
+      if (!account) {
+        throw new Error('Account not found')
+      }
+
+      const updates = {
+        status: 'payment_required',
+        errorMessage: 'Payment required（402错误）',
+        schedulable: 'false',
+        isActive: 'false',
+        paymentRequiredAt: new Date().toISOString()
+      }
+
+      await client.hset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, updates)
+
+      try {
+        const webhookNotifier = require('../utils/webhookNotifier')
+        await webhookNotifier.sendAccountAnomalyNotification({
+          accountId,
+          accountName: account.name || 'Claude Console Account',
+          platform: 'claude-console',
+          status: 'error',
+          errorCode: 'CLAUDE_CONSOLE_PAYMENT_REQUIRED',
+          reason: 'Account requires payment (402 error) and has been disabled',
+          timestamp: new Date().toISOString()
+        })
+      } catch (webhookError) {
+        logger.error('Failed to send payment required webhook notification:', webhookError)
+      }
+
+      logger.warn(
+        `🚫 Claude Console account marked as payment required: ${account.name} (${accountId})`
+      )
+      return { success: true }
+    } catch (error) {
+      logger.error(
+        `❌ Failed to mark Claude Console account as payment required: ${accountId}`,
+        error
+      )
+      throw error
+    }
+  }
+
   // 🚫 标记账号为临时封禁状态（400错误 - 账户临时禁用）
   async markConsoleAccountBlocked(accountId, errorDetails = '') {
     try {
@@ -1480,7 +1528,8 @@ class ClaudeConsoleAccountService {
         'overloadedAt',
         'overloadStatus',
         'blockedAt',
-        'quotaStoppedAt'
+        'quotaStoppedAt',
+        'paymentRequiredAt'
       ]
 
       // 执行更新

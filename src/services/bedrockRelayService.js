@@ -6,6 +6,7 @@ const {
 const { fromEnv } = require('@aws-sdk/credential-providers')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
+const bedrockAccountService = require('./bedrockAccountService')
 
 class BedrockRelayService {
   constructor() {
@@ -108,6 +109,8 @@ class BedrockRelayService {
 
       logger.info(`✅ Bedrock请求完成 - 模型: ${modelId}, 耗时: ${duration}ms`)
 
+      await this._clearAccountErrorState(bedrockAccount)
+
       return {
         success: true,
         data: claudeResponse,
@@ -117,6 +120,7 @@ class BedrockRelayService {
       }
     } catch (error) {
       logger.error('❌ Bedrock非流式请求失败:', error)
+      const statusInfo = await this._handleAccountStatusForError(error, bedrockAccount)
       const handledError = this._handleBedrockError(error)
       if (bedrockAccount?.id) {
         handledError.accountId = bedrockAccount.id
@@ -129,7 +133,8 @@ class BedrockRelayService {
         return {
           success: false,
           error: handledError.message,
-          errorData: handledError.errorData
+          errorData: handledError.errorData,
+          statusCode: statusInfo.statusCode || handledError.statusCode || handledError.errorData?.error?.statusCode
         }
       }
 
@@ -139,6 +144,10 @@ class BedrockRelayService {
 
   // 处理流式请求
   async handleStreamRequest(requestBody, bedrockAccount = null, res) {
+    let streamStarted = false
+    let lastStatusInfo = null
+    let connectionStatusInfo = null
+
     try {
       const modelId = this._selectModel(requestBody, bedrockAccount)
       const region = this._selectRegion(modelId, bedrockAccount)
@@ -157,8 +166,15 @@ class BedrockRelayService {
       logger.debug(`🌊 Bedrock流式请求 - 模型: ${modelId}, 区域: ${region}`)
 
       const startTime = Date.now()
-      const response = await client.send(command)
+      let response
+      try {
+        response = await client.send(command)
+      } catch (error) {
+        connectionStatusInfo = await this._handleAccountStatusForError(error, bedrockAccount)
+        throw error
+      }
 
+      streamStarted = true
       // 设置SSE响应头
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -172,24 +188,29 @@ class BedrockRelayService {
       let isFirstChunk = true
 
       // 处理流式响应
-      for await (const chunk of response.body) {
-        if (chunk.chunk) {
-          const chunkData = JSON.parse(new TextDecoder().decode(chunk.chunk.bytes))
-          const claudeEvent = this._convertBedrockStreamToClaudeFormat(chunkData, isFirstChunk)
+      try {
+        for await (const chunk of response.body) {
+          if (chunk.chunk) {
+            const chunkData = JSON.parse(new TextDecoder().decode(chunk.chunk.bytes))
+            const claudeEvent = this._convertBedrockStreamToClaudeFormat(chunkData, isFirstChunk)
 
-          if (claudeEvent) {
-            // 发送SSE事件
-            res.write(`event: ${claudeEvent.type}\n`)
-            res.write(`data: ${JSON.stringify(claudeEvent.data)}\n\n`)
+            if (claudeEvent) {
+              // 发送SSE事件
+              res.write(`event: ${claudeEvent.type}\n`)
+              res.write(`data: ${JSON.stringify(claudeEvent.data)}\n\n`)
 
-            // 提取使用统计
-            if (claudeEvent.type === 'message_stop' && claudeEvent.data.usage) {
-              totalUsage = claudeEvent.data.usage
+              // 提取使用统计
+              if (claudeEvent.type === 'message_stop' && claudeEvent.data.usage) {
+                totalUsage = claudeEvent.data.usage
+              }
+
+              isFirstChunk = false
             }
-
-            isFirstChunk = false
           }
         }
+      } catch (streamError) {
+        lastStatusInfo = await this._handleAccountStatusForError(streamError, bedrockAccount)
+        throw streamError
       }
 
       const duration = Date.now() - startTime
@@ -200,6 +221,8 @@ class BedrockRelayService {
       res.write('data: [DONE]\n\n')
       res.end()
 
+      await this._clearAccountErrorState(bedrockAccount)
+
       return {
         success: true,
         usage: totalUsage,
@@ -208,9 +231,33 @@ class BedrockRelayService {
       }
     } catch (error) {
       logger.error('❌ Bedrock流式请求失败:', error)
+      const statusInfo =
+        lastStatusInfo ||
+        connectionStatusInfo ||
+        (bedrockAccount?.id
+          ? await this._handleAccountStatusForError(error, bedrockAccount)
+          : null)
       const handledError = this._handleBedrockError(error)
       if (bedrockAccount?.id) {
         handledError.accountId = bedrockAccount.id
+      }
+
+      if (!streamStarted) {
+        if (bedrockAccount?.noFailover === true) {
+          logger.info(
+            `Account ${bedrockAccount.name || bedrockAccount.id} has noFailover=true, returning error directly`
+          )
+          return {
+            success: false,
+            error: handledError.message,
+            errorData: handledError.errorData,
+            statusCode:
+              statusInfo?.statusCode ||
+              handledError.statusCode ||
+              handledError.errorData?.error?.statusCode
+          }
+        }
+        throw handledError
       }
 
       // 发送错误事件
@@ -232,7 +279,11 @@ class BedrockRelayService {
         return {
           success: false,
           error: handledError.message,
-          errorData: handledError.errorData
+          errorData: handledError.errorData,
+          statusCode:
+            statusInfo?.statusCode ||
+            handledError.statusCode ||
+            handledError.errorData?.error?.statusCode
         }
       }
 
@@ -450,6 +501,125 @@ class BedrockRelayService {
     return null
   }
 
+  _extractStatusCode(error) {
+    const candidates = [
+      error?.statusCode,
+      error?.$metadata?.httpStatusCode,
+      error?.status,
+      error?.$response?.statusCode,
+      error?.$response?.status,
+      error?.response?.statusCode,
+      error?.response?.status,
+      error?.cause?.statusCode,
+      error?.cause?.$metadata?.httpStatusCode,
+      error?.cause?.$response?.statusCode
+    ]
+
+    for (const candidate of candidates) {
+      if (candidate === undefined || candidate === null) {
+        continue
+      }
+      const parsed = typeof candidate === 'string' ? parseInt(candidate, 10) : candidate
+      if (Number.isFinite(parsed)) {
+        return parsed
+      }
+    }
+
+    return undefined
+  }
+
+  async _handleAccountStatusForError(error, bedrockAccount) {
+    const statusCode = this._extractStatusCode(error)
+    if (!bedrockAccount?.id) {
+      return { handled: false, statusCode }
+    }
+
+    const accountId = bedrockAccount.id
+    const accountLabel = bedrockAccount.name || accountId
+
+    try {
+      if (error?.name === 'ThrottlingException' || statusCode === 429) {
+        await bedrockAccountService.markAccountRateLimited(accountId)
+        return { handled: true, statusCode: 429, type: 'rate_limit' }
+      }
+
+      if (error?.name === 'AccessDeniedException' || statusCode === 403) {
+        await bedrockAccountService.markAccountBlocked(accountId)
+        return { handled: true, statusCode: 403, type: 'access_denied' }
+      }
+
+      if (statusCode === 401) {
+        await bedrockAccountService.markAccountUnauthorized(accountId)
+        return { handled: true, statusCode: 401, type: 'unauthorized' }
+      }
+
+      if (statusCode === 529) {
+        if (typeof bedrockAccountService.markAccountOverloaded === 'function') {
+          await bedrockAccountService.markAccountOverloaded(accountId)
+          logger.warn(`🚫 Marked Bedrock account ${accountLabel} as overloaded (529)`)
+        } else {
+          logger.warn(
+            `🚫 Bedrock account ${accountLabel} received overload status (529) but overload handler is unavailable`
+          )
+        }
+        return { handled: true, statusCode: 529, type: 'overloaded' }
+      }
+
+      if (Number.isFinite(statusCode) && statusCode >= 500) {
+        await bedrockAccountService.markAccountTemporarilyUnavailable(accountId)
+        logger.warn(
+          `🚫 Marked Bedrock account ${accountLabel} as temporarily unavailable (${statusCode})`
+        )
+        return { handled: true, statusCode, type: 'temporarily_unavailable' }
+      }
+    } catch (statusError) {
+      logger.error('❌ Failed to mark Bedrock account status:', statusError)
+    }
+
+    return { handled: false, statusCode }
+  }
+
+  async _clearAccountErrorState(bedrockAccount) {
+    if (!bedrockAccount?.id) {
+      return
+    }
+
+    try {
+      const overloadCheck =
+        typeof bedrockAccountService.isAccountOverloaded === 'function'
+          ? bedrockAccountService.isAccountOverloaded(bedrockAccount.id)
+          : Promise.resolve(false)
+      const [isRateLimited, isUnauthorized, isOverloaded] = await Promise.all([
+        bedrockAccountService.isAccountRateLimited(bedrockAccount.id),
+        bedrockAccountService.isAccountUnauthorized(bedrockAccount.id),
+        overloadCheck
+      ])
+
+      if (isRateLimited) {
+        await bedrockAccountService.removeAccountRateLimit(bedrockAccount.id)
+      }
+
+      if (isUnauthorized) {
+        await bedrockAccountService.clearAccountUnauthorized(bedrockAccount.id)
+      }
+
+      if (
+        isOverloaded &&
+        typeof bedrockAccountService.removeAccountOverload === 'function'
+      ) {
+        await bedrockAccountService.removeAccountOverload(bedrockAccount.id)
+        logger.debug(
+          `✅ Cleared overload for Bedrock account ${bedrockAccount.name || bedrockAccount.id}`
+        )
+      }
+    } catch (error) {
+      logger.warn(
+        `⚠️ Failed to clear Bedrock account error status for ${bedrockAccount?.name || bedrockAccount?.id}:`,
+        error
+      )
+    }
+  }
+
   // 处理Bedrock错误
   _handleBedrockError(error) {
     if (error?.isBedrockHandled) {
@@ -457,7 +627,7 @@ class BedrockRelayService {
     }
 
     const errorMessage = error?.message || 'Unknown Bedrock error'
-    const statusCode = error?.$metadata?.httpStatusCode || error?.statusCode || error?.status
+    const statusCode = this._extractStatusCode(error)
     const requestId = error?.requestId || error?.$metadata?.requestId
 
     const baseErrorData = {
@@ -522,6 +692,10 @@ class BedrockRelayService {
 
     if (error?.name === 'ModelNotReadyException') {
       return buildError('Bedrock模型未就绪，请稍后重试', statusCode || 503, 'model_not_ready')
+    }
+
+    if (statusCode === 529) {
+      return buildError('Bedrock服务过载，请稍后重试', 529, 'overloaded')
     }
 
     return buildError(`Bedrock服务错误: ${errorMessage}`, statusCode || 500, 'bedrock_error')

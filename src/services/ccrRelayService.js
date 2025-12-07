@@ -3,6 +3,7 @@ const ccrAccountService = require('./ccrAccountService')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
 const { parseVendorPrefixedModel } = require('../utils/modelHelper')
+const { sanitizeUpstreamError } = require('../utils/errorSanitizer')
 
 class CcrRelayService {
   constructor() {
@@ -185,10 +186,59 @@ class CcrRelayService {
         `[DEBUG] Response data preview: ${typeof response.data === 'string' ? response.data.substring(0, 200) : JSON.stringify(response.data).substring(0, 200)}`
       )
 
+      const parsedErrorData = this._parseErrorData(response.data)
+      const sanitizedErrorData = sanitizeUpstreamError(parsedErrorData)
+      const responseHeaders = response.headers || { 'Content-Type': 'application/json' }
+
       // 检查错误状态并相应处理
       if (response.status === 401) {
         logger.warn(`🚫 Unauthorized error detected for CCR account ${accountId}`)
         await ccrAccountService.markAccountUnauthorized(accountId)
+
+        if (account?.noFailover === true) {
+          logger.info(
+            `Account ${account.name} has noFailover=true, returning 401 error directly`
+          )
+          return this._buildErrorResponse(401, sanitizedErrorData || parsedErrorData, accountId, responseHeaders)
+        }
+
+        const unauthorizedError = new Error('CCR Unauthorized')
+        unauthorizedError.statusCode = 401
+        unauthorizedError.accountId = accountId
+        unauthorizedError.errorData = sanitizedErrorData || parsedErrorData
+        throw unauthorizedError
+      } else if (response.status === 402) {
+        logger.warn(`💰 Payment required error detected for CCR account ${accountId}`)
+        await ccrAccountService.markAccountPaymentRequired(accountId)
+
+        if (account?.noFailover === true) {
+          logger.info(
+            `Account ${account.name} has noFailover=true, returning 402 error directly`
+          )
+          return this._buildErrorResponse(402, sanitizedErrorData || parsedErrorData, accountId, responseHeaders)
+        }
+
+        const paymentRequiredError = new Error('CCR Payment Required')
+        paymentRequiredError.statusCode = 402
+        paymentRequiredError.accountId = accountId
+        paymentRequiredError.errorData = sanitizedErrorData || parsedErrorData
+        throw paymentRequiredError
+      } else if (response.status === 403) {
+        logger.warn(`🚫 Forbidden error detected for CCR account ${accountId}`)
+        await ccrAccountService.markAccountBlocked(accountId)
+
+        if (account?.noFailover === true) {
+          logger.info(
+            `Account ${account.name} has noFailover=true, returning 403 error directly`
+          )
+          return this._buildErrorResponse(403, sanitizedErrorData || parsedErrorData, accountId, responseHeaders)
+        }
+
+        const forbiddenError = new Error('CCR Forbidden')
+        forbiddenError.statusCode = 403
+        forbiddenError.accountId = accountId
+        forbiddenError.errorData = sanitizedErrorData || parsedErrorData
+        throw forbiddenError
       } else if (response.status === 429) {
         logger.warn(`🚫 Rate limit detected for CCR account ${accountId}`)
         // 收到429先检查是否因为超过了手动配置的每日额度
@@ -197,9 +247,51 @@ class CcrRelayService {
         })
 
         await ccrAccountService.markAccountRateLimited(accountId)
+
+        if (account?.noFailover === true) {
+          logger.info(
+            `Account ${account.name} has noFailover=true, returning 429 error directly`
+          )
+          return this._buildErrorResponse(429, sanitizedErrorData || parsedErrorData, accountId, responseHeaders)
+        }
+
+        const rateLimitError = new Error('CCR Rate Limited')
+        rateLimitError.statusCode = 429
+        rateLimitError.accountId = accountId
+        rateLimitError.errorData = sanitizedErrorData || parsedErrorData
+        throw rateLimitError
       } else if (response.status === 529) {
         logger.warn(`🚫 Overload error detected for CCR account ${accountId}`)
         await ccrAccountService.markAccountOverloaded(accountId)
+
+        if (account?.noFailover === true) {
+          logger.info(
+            `Account ${account.name} has noFailover=true, returning 529 error directly`
+          )
+          return this._buildErrorResponse(529, sanitizedErrorData || parsedErrorData, accountId, responseHeaders)
+        }
+
+        const overloadError = new Error('CCR Overloaded')
+        overloadError.statusCode = 529
+        overloadError.accountId = accountId
+        overloadError.errorData = sanitizedErrorData || parsedErrorData
+        throw overloadError
+      } else if (response.status >= 500) {
+        logger.warn(`🔥 Server error (${response.status}) detected for CCR account ${accountId}`)
+        await ccrAccountService.markAccountTemporarilyUnavailable(accountId)
+
+        if (account?.noFailover === true) {
+          logger.info(
+            `Account ${account.name} has noFailover=true, returning ${response.status} error directly`
+          )
+          return this._buildErrorResponse(response.status, sanitizedErrorData || parsedErrorData, accountId, responseHeaders)
+        }
+
+        const upstreamError = new Error(`CCR upstream error: ${response.status}`)
+        upstreamError.statusCode = response.status
+        upstreamError.accountId = accountId
+        upstreamError.errorData = sanitizedErrorData || parsedErrorData
+        throw upstreamError
       } else if (response.status === 200 || response.status === 201) {
         // 如果请求成功，检查并移除错误状态
         const isRateLimited = await ccrAccountService.isAccountRateLimited(accountId)
@@ -209,6 +301,16 @@ class CcrRelayService {
         const isOverloaded = await ccrAccountService.isAccountOverloaded(accountId)
         if (isOverloaded) {
           await ccrAccountService.removeAccountOverload(accountId)
+        }
+        if (typeof ccrAccountService.isAccountUnauthorized === 'function') {
+          const isUnauthorized = await ccrAccountService.isAccountUnauthorized(account.id)
+          if (
+            isUnauthorized &&
+            typeof ccrAccountService.clearAccountUnauthorized === 'function'
+          ) {
+            await ccrAccountService.clearAccountUnauthorized(account.id)
+            logger.debug(`✅ Cleared unauthorized for CCR account ${account.id}`)
+          }
         }
       }
 
@@ -449,7 +551,7 @@ class CcrRelayService {
       const request = axios(requestConfig)
 
       request
-        .then((response) => {
+        .then(async (response) => {
           logger.debug(`🌊 CCR stream response status: ${response.status}`)
 
           // 错误响应处理
@@ -459,42 +561,89 @@ class CcrRelayService {
             )
 
             if (response.status === 401) {
-              ccrAccountService.markAccountUnauthorized(accountId)
+              await ccrAccountService.markAccountUnauthorized(accountId)
+            } else if (response.status === 402) {
+              await ccrAccountService.markAccountPaymentRequired(accountId)
+            } else if (response.status === 403) {
+              await ccrAccountService.markAccountBlocked(accountId)
             } else if (response.status === 429) {
-              ccrAccountService.markAccountRateLimited(accountId)
+              await ccrAccountService.markAccountRateLimited(accountId)
               // 检查是否因为超过每日额度
-              ccrAccountService.checkQuotaUsage(accountId).catch((err) => {
+              await ccrAccountService.checkQuotaUsage(accountId).catch((err) => {
                 logger.error('❌ Failed to check quota after 429 error:', err)
               })
             } else if (response.status === 529) {
-              ccrAccountService.markAccountOverloaded(accountId)
+              await ccrAccountService.markAccountOverloaded(accountId)
+            } else if (response.status >= 500) {
+              await ccrAccountService.markAccountTemporarilyUnavailable(accountId)
             }
 
-            // 设置错误响应的状态码和响应头
-            if (!responseStream.headersSent) {
-              const errorHeaders = {
-                'Content-Type': response.headers['content-type'] || 'application/json',
-                'Cache-Control': 'no-cache',
-                Connection: 'keep-alive'
-              }
-              // 避免 Transfer-Encoding 冲突，让 Express 自动处理
-              delete errorHeaders['Transfer-Encoding']
-              delete errorHeaders['Content-Length']
+            const bypassFailover = account?.noFailover === true
+            const errorHeaders = {
+              'Content-Type': response.headers['content-type'] || 'application/json',
+              'Cache-Control': 'no-cache',
+              Connection: 'keep-alive'
+            }
+            delete errorHeaders['Transfer-Encoding']
+            delete errorHeaders['Content-Length']
+
+            let errorBody = ''
+
+            if (bypassFailover && !responseStream.headersSent) {
               responseStream.writeHead(response.status, errorHeaders)
             }
 
-            // 直接透传错误数据，不进行包装
+            // 直接透传错误数据（仅在 noFailover 时）
             response.data.on('data', (chunk) => {
-              if (!responseStream.destroyed) {
+              errorBody += chunk.toString()
+              if (bypassFailover && !responseStream.destroyed) {
                 responseStream.write(chunk)
               }
             })
 
             response.data.on('end', () => {
-              if (!responseStream.destroyed) {
-                responseStream.end()
+              if (bypassFailover) {
+                if (!responseStream.destroyed) {
+                  responseStream.end()
+                }
+                resolve({
+                  statusCode: response.status,
+                  headers: response.headers,
+                  accountId
+                })
+                return
               }
-              resolve() // 不抛出异常，正常完成流处理
+
+              const parsedErrorData = this._parseErrorData(errorBody)
+              const sanitizedErrorData = sanitizeUpstreamError(parsedErrorData)
+              const upstreamError = new Error(`CCR upstream error: ${response.status}`)
+              upstreamError.statusCode = response.status
+              upstreamError.accountId = accountId
+              upstreamError.errorData = sanitizedErrorData || parsedErrorData
+              reject(upstreamError)
+            })
+
+            response.data.on('error', (err) => {
+              const parsedErrorData = this._extractErrorDataFromError(err)
+              const sanitizedErrorData = sanitizeUpstreamError(parsedErrorData)
+              const streamError = new Error('CCR stream error')
+              streamError.statusCode = response.status
+              streamError.accountId = accountId
+              streamError.errorData = sanitizedErrorData || parsedErrorData
+
+              if (bypassFailover) {
+                if (!responseStream.destroyed) {
+                  responseStream.end()
+                }
+                resolve({
+                  statusCode: response.status,
+                  headers: response.headers,
+                  accountId
+                })
+                return
+              }
+
+              reject(streamError)
             })
             return
           }
@@ -510,6 +659,16 @@ class CcrRelayService {
               ccrAccountService.removeAccountOverload(accountId)
             }
           })
+          if (typeof ccrAccountService.isAccountUnauthorized === 'function') {
+            const isUnauthorized = await ccrAccountService.isAccountUnauthorized(account.id)
+            if (
+              isUnauthorized &&
+              typeof ccrAccountService.clearAccountUnauthorized === 'function'
+            ) {
+              await ccrAccountService.clearAccountUnauthorized(account.id)
+              logger.debug(`✅ Cleared unauthorized for CCR account ${account.id}`)
+            }
+          }
 
           // 设置响应头
           if (!responseStream.headersSent) {

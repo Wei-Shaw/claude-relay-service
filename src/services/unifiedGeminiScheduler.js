@@ -25,6 +25,20 @@ class UnifiedGeminiScheduler {
     return isActive === true || isActive === 'true'
   }
 
+  // 🔧 辅助方法：过滤异常状态
+  _isHealthyStatus(status) {
+    const unhealthyStatuses = new Set([
+      'error',
+      'unauthorized',
+      'blocked',
+      'rate_limited',
+      'overloaded',
+      'temporarily_unavailable',
+      'disabled'
+    ])
+    return !unhealthyStatuses.has(status)
+  }
+
   // 🎯 统一调度Gemini账号
   // options.excludeAccounts: 要排除的账户ID数组（用于 failover 重试时排除已失败的账户）
   async selectAccountForApiKey(
@@ -50,7 +64,7 @@ class UnifiedGeminiScheduler {
             if (
               boundAccount &&
               this._isActive(boundAccount.isActive) &&
-              boundAccount.status !== 'error'
+              this._isHealthyStatus(boundAccount.status)
             ) {
               logger.info(
                 `🎯 Using bound Gemini-API account: ${boundAccount.name} (${accountId}) for API key ${apiKeyData.name}`
@@ -98,7 +112,7 @@ class UnifiedGeminiScheduler {
             if (
               boundAccount &&
               this._isActive(boundAccount.isActive) &&
-              boundAccount.status !== 'error'
+              this._isHealthyStatus(boundAccount.status)
             ) {
               logger.info(
                 `🎯 Using bound dedicated Gemini account: ${boundAccount.name} (${apiKeyData.geminiAccountId}) for API key ${apiKeyData.name}`
@@ -231,7 +245,7 @@ class UnifiedGeminiScheduler {
           if (
             boundAccount &&
             this._isActive(boundAccount.isActive) &&
-            boundAccount.status !== 'error'
+            this._isHealthyStatus(boundAccount.status)
           ) {
             const isRateLimited = await this.isAccountRateLimited(accountId)
             if (!isRateLimited) {
@@ -289,9 +303,20 @@ class UnifiedGeminiScheduler {
           if (
             boundAccount &&
             this._isActive(boundAccount.isActive) &&
-            boundAccount.status !== 'error'
+            this._isHealthyStatus(boundAccount.status)
           ) {
-            const isRateLimited = await this.isAccountRateLimited(boundAccount.id)
+            const isTempUnavailable = await this.isAccountTemporarilyUnavailable(
+              boundAccount.id,
+              'gemini'
+            )
+            if (isTempUnavailable) {
+              logger.warn(
+                `⚠️ Bound Gemini account ${boundAccount.name} is temporarily unavailable, falling back to pool`
+              )
+              return availableAccounts
+            }
+
+            const isRateLimited = await this.isAccountRateLimited(boundAccount.id, 'gemini')
             if (!isRateLimited) {
               // 检查模型支持
               if (
@@ -342,7 +367,7 @@ class UnifiedGeminiScheduler {
 
       if (
         this._isActive(account.isActive) &&
-        account.status !== 'error' &&
+        this._isHealthyStatus(account.status) &&
         (account.accountType === 'shared' || !account.accountType) && // 兼容旧数据
         this._isSchedulable(account.schedulable)
       ) {
@@ -403,7 +428,7 @@ class UnifiedGeminiScheduler {
 
         if (
           this._isActive(account.isActive) &&
-          account.status !== 'error' &&
+          this._isHealthyStatus(account.status) &&
           (account.accountType === 'shared' || !account.accountType) &&
           this._isSchedulable(account.schedulable)
         ) {
@@ -471,7 +496,11 @@ class UnifiedGeminiScheduler {
     try {
       if (accountType === 'gemini') {
         const account = await geminiAccountService.getAccount(accountId)
-        if (!account || !this._isActive(account.isActive) || account.status === 'error') {
+        if (
+          !account ||
+          !this._isActive(account.isActive) ||
+          !this._isHealthyStatus(account.status)
+        ) {
           return false
         }
         // 检查是否可调度
@@ -479,10 +508,19 @@ class UnifiedGeminiScheduler {
           logger.info(`🚫 Gemini account ${accountId} is not schedulable`)
           return false
         }
-        return !(await this.isAccountRateLimited(accountId))
+        const isTempUnavailable = await this.isAccountTemporarilyUnavailable(accountId, 'gemini')
+        if (isTempUnavailable) {
+          logger.info(`🚫 Gemini account ${accountId} is temporarily unavailable`)
+          return false
+        }
+        return !(await this.isAccountRateLimited(accountId, 'gemini'))
       } else if (accountType === 'gemini-api') {
         const account = await geminiApiAccountService.getAccount(accountId)
-        if (!account || !this._isActive(account.isActive) || account.status === 'error') {
+        if (
+          !account ||
+          !this._isActive(account.isActive) ||
+          !this._isHealthyStatus(account.status)
+        ) {
           return false
         }
         // 检查是否可调度
@@ -490,7 +528,15 @@ class UnifiedGeminiScheduler {
           logger.info(`🚫 Gemini-API account ${accountId} is not schedulable`)
           return false
         }
-        return !(await this.isAccountRateLimited(accountId))
+        const isTempUnavailable = await this.isAccountTemporarilyUnavailable(
+          accountId,
+          'gemini-api'
+        )
+        if (isTempUnavailable) {
+          logger.info(`🚫 Gemini-API account ${accountId} is temporarily unavailable`)
+          return false
+        }
+        return !(await this.isAccountRateLimited(accountId, 'gemini-api'))
       }
       return false
     } catch (error) {
@@ -623,16 +669,19 @@ class UnifiedGeminiScheduler {
       let account = null
 
       // 如果指定了账户类型，直接使用对应服务
+      if (accountType === 'gemini') {
+        return await geminiAccountService.isAccountRateLimited(accountId)
+      }
+
       if (accountType === 'gemini-api') {
         account = await geminiApiAccountService.getAccount(accountId)
-      } else if (accountType === 'gemini') {
-        account = await geminiAccountService.getAccount(accountId)
       } else {
         // 未指定类型，先尝试 gemini，再尝试 gemini-api
-        account = await geminiAccountService.getAccount(accountId)
-        if (!account) {
-          account = await geminiApiAccountService.getAccount(accountId)
+        const isGeminiLimited = await geminiAccountService.isAccountRateLimited(accountId)
+        if (isGeminiLimited) {
+          return true
         }
+        account = await geminiApiAccountService.getAccount(accountId)
       }
 
       if (!account) {
@@ -742,7 +791,7 @@ class UnifiedGeminiScheduler {
         // 检查账户是否可用
         if (
           this._isActive(account.isActive) &&
-          account.status !== 'error' &&
+          this._isHealthyStatus(account.status) &&
           this._isSchedulable(account.schedulable)
         ) {
           // 对于 Gemini OAuth 账户，检查 token 是否过期

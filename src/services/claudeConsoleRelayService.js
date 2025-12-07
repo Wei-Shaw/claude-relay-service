@@ -273,6 +273,37 @@ class ClaudeConsoleRelayService {
       // 检查是否为账户禁用/不可用的 400 错误
       const accountDisabledError = isAccountDisabledError(response.status, response.data)
 
+      // 预构建清理后的错误负载，避免重复解析
+      let sanitizedErrorPayload = null
+      const getSanitizedErrorPayload = () => {
+        if (sanitizedErrorPayload) {
+          return sanitizedErrorPayload
+        }
+
+        try {
+          const responseData =
+            typeof response.data === 'string' ? JSON.parse(response.data) : response.data
+          const sanitizedData = sanitizeUpstreamError(responseData)
+          sanitizedErrorPayload = {
+            data: sanitizedData,
+            body: JSON.stringify(sanitizedData)
+          }
+        } catch (parseError) {
+          const rawText =
+            typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
+          const sanitizedText = sanitizeErrorMessage(rawText)
+          sanitizedErrorPayload = {
+            data: sanitizedText,
+            body: sanitizedText
+          }
+        }
+
+        return sanitizedErrorPayload
+      }
+
+      // 更新最后使用时间
+      await this._updateLastUsedTime(accountId)
+
       // 检查错误状态并相应处理
       if (response.status === 401) {
         logger.warn(
@@ -281,6 +312,52 @@ class ClaudeConsoleRelayService {
         if (!autoProtectionDisabled) {
           await claudeConsoleAccountService.markAccountUnauthorized(accountId)
         }
+        const { data: sanitizedErrorData, body: sanitizedErrorBody } = getSanitizedErrorPayload()
+
+        if (account.noFailover === true) {
+          logger.info(
+            `Account ${account.name} has noFailover=true, returning 401 error directly`
+          )
+          return {
+            statusCode: 401,
+            headers: response.headers,
+            body: sanitizedErrorBody,
+            accountId
+          }
+        }
+
+        const error = new Error('Unauthorized')
+        error.statusCode = 401
+        error.accountId = accountId
+        error.errorData = sanitizedErrorData
+        throw error
+      } else if (response.status === 402) {
+        logger.warn(
+          `🚫 Payment required detected for Claude Console account ${accountId}${autoProtectionDisabled ? ' (auto-protection disabled, skipping status change)' : ''}`
+        )
+        if (!autoProtectionDisabled) {
+          await claudeConsoleAccountService.markAccountPaymentRequired(accountId)
+        }
+
+        const { data: sanitizedErrorData, body: sanitizedErrorBody } = getSanitizedErrorPayload()
+
+        if (account.noFailover === true) {
+          logger.info(
+            `Account ${account.name} has noFailover=true, returning 402 error directly`
+          )
+          return {
+            statusCode: 402,
+            headers: response.headers,
+            body: sanitizedErrorBody,
+            accountId
+          }
+        }
+
+        const error = new Error('Payment Required')
+        error.statusCode = 402
+        error.accountId = accountId
+        error.errorData = sanitizedErrorData
+        throw error
       } else if (accountDisabledError) {
         logger.error(
           `🚫 Account disabled error (400) detected for Claude Console account ${accountId}${autoProtectionDisabled ? ' (auto-protection disabled, skipping status change)' : ''}`
@@ -291,6 +368,33 @@ class ClaudeConsoleRelayService {
         if (!autoProtectionDisabled) {
           await claudeConsoleAccountService.markConsoleAccountBlocked(accountId, errorDetails)
         }
+      } else if (response.status === 403) {
+        logger.warn(
+          `🚫 Forbidden error detected for Claude Console account ${accountId}${autoProtectionDisabled ? ' (auto-protection disabled, skipping status change)' : ''}`
+        )
+        if (!autoProtectionDisabled) {
+          await claudeConsoleAccountService.markConsoleAccountBlocked(accountId, '403 Forbidden')
+        }
+
+        const { data: sanitizedErrorData, body: sanitizedErrorBody } = getSanitizedErrorPayload()
+
+        if (account.noFailover === true) {
+          logger.info(
+            `Account ${account.name} has noFailover=true, returning 403 error directly`
+          )
+          return {
+            statusCode: 403,
+            headers: response.headers,
+            body: sanitizedErrorBody,
+            accountId
+          }
+        }
+
+        const error = new Error('Forbidden')
+        error.statusCode = 403
+        error.accountId = accountId
+        error.errorData = sanitizedErrorData
+        throw error
       } else if (response.status === 429) {
         logger.warn(
           `🚫 Rate limit detected for Claude Console account ${accountId}${autoProtectionDisabled ? ' (auto-protection disabled, skipping status change)' : ''}`
@@ -303,6 +407,26 @@ class ClaudeConsoleRelayService {
         if (!autoProtectionDisabled) {
           await claudeConsoleAccountService.markAccountRateLimited(accountId)
         }
+
+        const { data: sanitizedErrorData, body: sanitizedErrorBody } = getSanitizedErrorPayload()
+
+        if (account.noFailover === true) {
+          logger.info(
+            `Account ${account.name} has noFailover=true, returning 429 error directly`
+          )
+          return {
+            statusCode: 429,
+            headers: response.headers,
+            body: sanitizedErrorBody,
+            accountId
+          }
+        }
+
+        const error = new Error('Rate limited')
+        error.statusCode = 429
+        error.accountId = accountId
+        error.errorData = sanitizedErrorData
+        throw error
       } else if (response.status === 529) {
         logger.warn(
           `🚫 Overload error detected for Claude Console account ${accountId}${autoProtectionDisabled ? ' (auto-protection disabled, skipping status change)' : ''}`
@@ -310,6 +434,26 @@ class ClaudeConsoleRelayService {
         if (!autoProtectionDisabled) {
           await claudeConsoleAccountService.markAccountOverloaded(accountId)
         }
+
+        const { data: sanitizedErrorData, body: sanitizedErrorBody } = getSanitizedErrorPayload()
+
+        if (account.noFailover === true) {
+          logger.info(
+            `Account ${account.name} has noFailover=true, returning 529 error directly`
+          )
+          return {
+            statusCode: 529,
+            headers: response.headers,
+            body: sanitizedErrorBody,
+            accountId
+          }
+        }
+
+        const error = new Error('Overloaded')
+        error.statusCode = 529
+        error.accountId = accountId
+        error.errorData = sanitizedErrorData
+        throw error
       } else if (response.status === 502 || response.status === 504) {
         logger.warn(
           `⚠️ Upstream error (${response.status}) detected for Claude Console account ${accountId}${autoProtectionDisabled ? ' (auto-protection disabled, skipping status change)' : ''}`
@@ -332,28 +476,25 @@ class ClaudeConsoleRelayService {
         if (isOverloaded) {
           await claudeConsoleAccountService.removeAccountOverload(accountId)
         }
+        if (typeof claudeConsoleAccountService.isAccountUnauthorized === 'function') {
+          const isUnauthorized = await claudeConsoleAccountService.isAccountUnauthorized(account.id)
+          if (
+            isUnauthorized &&
+            typeof claudeConsoleAccountService.clearAccountUnauthorized === 'function'
+          ) {
+            await claudeConsoleAccountService.clearAccountUnauthorized(account.id)
+            logger.debug(`✅ Cleared unauthorized for Claude Console account ${account.id}`)
+          }
+        }
       }
-
-      // 更新最后使用时间
-      await this._updateLastUsedTime(accountId)
 
       // 准备响应体并清理错误信息（如果是错误响应）
       let responseBody
       if (response.status < 200 || response.status >= 300) {
-        // 错误响应，清理供应商信息
-        try {
-          const responseData =
-            typeof response.data === 'string' ? JSON.parse(response.data) : response.data
-          const sanitizedData = sanitizeUpstreamError(responseData)
-          responseBody = JSON.stringify(sanitizedData)
-          logger.debug(`🧹 Sanitized error response`)
-        } catch (parseError) {
-          // 如果无法解析为JSON，尝试清理文本
-          const rawText =
-            typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
-          responseBody = sanitizeErrorMessage(rawText)
-          logger.debug(`🧹 Sanitized error text`)
-        }
+        // 错误响应，使用预先清理的数据
+        const { body } = getSanitizedErrorPayload()
+        responseBody = body
+        logger.debug(`🧹 Sanitized error response`)
       } else {
         // 成功响应，不需要清理
         responseBody =

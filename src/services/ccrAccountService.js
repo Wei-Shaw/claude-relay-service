@@ -31,6 +31,9 @@ class CcrAccountService {
       },
       10 * 60 * 1000
     )
+
+    // 临时不可用状态的默认TTL（秒）
+    this.TEMP_UNAVAILABLE_TTL_SECONDS = 300
   }
 
   // 🏢 创建CCR账户
@@ -148,6 +151,8 @@ class CcrAccountService {
       for (const key of keys) {
         const accountData = await client.hgetall(key)
         if (accountData && Object.keys(accountData).length > 0) {
+          await this._restoreTempUnavailableIfExpired(accountData.id, accountData)
+
           // 获取限流状态信息
           const rateLimitInfo = this._getRateLimitInfo(accountData)
 
@@ -203,6 +208,8 @@ class CcrAccountService {
       logger.debug(`[DEBUG] No CCR account data found for ID: ${accountId}`)
       return null
     }
+
+    await this._restoreTempUnavailableIfExpired(accountId, accountData)
 
     logger.debug(`[DEBUG] Raw CCR account data keys: ${Object.keys(accountData).join(', ')}`)
     logger.debug(`[DEBUG] Raw supportedModels value: ${accountData.supportedModels}`)
@@ -534,6 +541,135 @@ class CcrAccountService {
     } catch (error) {
       logger.error(`❌ Failed to mark CCR account as unauthorized: ${accountId}`, error)
       throw error
+    }
+  }
+
+  // 💰 标记账户为需要付款状态
+  async markAccountPaymentRequired(accountId) {
+    try {
+      const client = redis.getClientSafe()
+      const account = await this.getAccount(accountId)
+      if (!account) {
+        throw new Error('CCR Account not found')
+      }
+
+      await client.hmset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, {
+        status: 'payment_required',
+        errorMessage: 'Payment required',
+        paymentRequiredAt: new Date().toISOString(),
+        schedulable: 'false',
+        isActive: 'false'
+      })
+
+      logger.warn(`🚫 Marked CCR account as payment required: ${account.name} (${accountId})`)
+      return { success: true }
+    } catch (error) {
+      logger.error(`❌ Failed to mark CCR account as payment required: ${accountId}`, error)
+      throw error
+    }
+  }
+
+  // 🚫 标记账户为被封禁状态
+  async markAccountBlocked(accountId) {
+    try {
+      const client = redis.getClientSafe()
+      const account = await this.getAccount(accountId)
+      if (!account) {
+        throw new Error('CCR Account not found')
+      }
+
+      const blockedAt = new Date().toISOString()
+      await client.hmset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, {
+        status: 'blocked',
+        blockedAt,
+        errorMessage: 'Account blocked',
+        schedulable: 'false',
+        isActive: 'false'
+      })
+
+      logger.warn(`🚫 Marked CCR account as blocked: ${account.name} (${accountId})`)
+      return { success: true, blockedAt }
+    } catch (error) {
+      logger.error(`❌ Failed to mark CCR account as blocked: ${accountId}`, error)
+      throw error
+    }
+  }
+
+  // ⏳ 标记账户为临时不可用状态
+  async markAccountTemporarilyUnavailable(accountId, ttlSeconds = this.TEMP_UNAVAILABLE_TTL_SECONDS) {
+    try {
+      const client = redis.getClientSafe()
+      const account = await this.getAccount(accountId)
+      if (!account) {
+        throw new Error('CCR Account not found')
+      }
+
+      const now = new Date()
+      const until = new Date(now.getTime() + ttlSeconds * 1000).toISOString()
+
+      await client.hmset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, {
+        status: 'temporarily_unavailable',
+        tempUnavailableAt: now.toISOString(),
+        tempUnavailableUntil: until,
+        errorMessage: 'CCR account temporarily unavailable',
+        schedulable: 'false',
+        isActive: 'false'
+      })
+
+      await client.setex(`temp_unavailable:ccr:${accountId}`, ttlSeconds, '1')
+
+      logger.warn(
+        `⏱️ Marked CCR account temporarily unavailable until ${until}: ${account.name} (${accountId})`
+      )
+      return { success: true, tempUnavailableUntil: until }
+    } catch (error) {
+      logger.error(
+        `❌ Failed to mark CCR account as temporarily unavailable: ${accountId}`,
+        error
+      )
+      throw error
+    }
+  }
+
+  async _restoreTempUnavailableIfExpired(accountId, accountData) {
+    try {
+      if (!accountData) {
+        return
+      }
+
+      if (accountData.status !== 'temporarily_unavailable') {
+        return
+      }
+
+      const now = new Date()
+      const untilRaw = accountData.tempUnavailableUntil
+      const until = untilRaw ? new Date(untilRaw) : null
+
+      if (until && until > now) {
+        return
+      }
+
+      const accountKey = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+      const client = redis.getClientSafe()
+      await client.hmset(accountKey, {
+        status: 'active',
+        schedulable: 'true',
+        isActive: 'true',
+        errorMessage: '',
+        tempUnavailableAt: '',
+        tempUnavailableUntil: ''
+      })
+
+      accountData.status = 'active'
+      accountData.schedulable = 'true'
+      accountData.isActive = 'true'
+      accountData.errorMessage = ''
+      accountData.tempUnavailableAt = ''
+      accountData.tempUnavailableUntil = ''
+
+      logger.info(`✅ Restored CCR account from temporary unavailable: ${accountId}`)
+    } catch (error) {
+      logger.error(`❌ Failed to restore CCR account temp unavailable status: ${accountId}`, error)
     }
   }
 
@@ -915,7 +1051,10 @@ class CcrAccountService {
         'overloadedAt',
         'overloadStatus',
         'blockedAt',
-        'quotaStoppedAt'
+        'quotaStoppedAt',
+        'paymentRequiredAt',
+        'tempUnavailableAt',
+        'tempUnavailableUntil'
       ]
 
       await client.hset(accountKey, updates)

@@ -230,6 +230,45 @@ class OpenAIResponsesRelayService {
           } catch (markError) {
             logger.error('❌ Failed to mark account temporarily unavailable:', markError)
           }
+        } else if (response.status >= 500 && response.status !== 529) {
+          try {
+            await unifiedOpenAIScheduler.markAccountTemporarilyUnavailable(
+              account.id,
+              'openai-responses',
+              null,
+              300
+            )
+          } catch (markError) {
+            logger.error(
+              '❌ Failed to mark OpenAI-Responses account temporarily unavailable after 5xx:',
+              markError
+            )
+          }
+
+          // 5xx 错误 - 上游服务错误，抛出以触发 failover
+          const upstreamMessage =
+            (typeof errorData === 'string' && errorData) ||
+            errorData?.error?.message ||
+            `OpenAI Responses upstream error: ${response.status}`
+          req.removeListener('close', handleClientDisconnect)
+          res.removeListener('close', handleClientDisconnect)
+
+          // 检查是否配置了不触发 failover
+          if (account.noFailover === true) {
+            logger.info(
+              `Account ${account.name} has noFailover=true, returning ${response.status} error directly`
+            )
+            return res
+              .status(response.status)
+              .json(errorData || { error: { message: upstreamMessage } })
+          }
+
+          const upstreamError = new Error(upstreamMessage)
+          upstreamError.statusCode = response.status
+          upstreamError.isUpstream = true
+          upstreamError.accountId = account.id
+          upstreamError.errorData = errorData
+          throw upstreamError
         } else if (response.status === 401 || response.status === 402) {
           // 401/402 认证/支付错误 - 永久标记账户失效
           let reason = `OpenAI Responses账号认证失败（${response.status}错误）`
@@ -299,33 +338,114 @@ class OpenAIResponsesRelayService {
           authError.accountId = account.id
           authError.errorData = unauthorizedResponse
           throw authError
-        }
-
-        if (response.status >= 500) {
-          // 5xx 错误 - 上游服务错误，抛出以触发 failover
-          const upstreamMessage =
+        } else if (response.status === 403) {
+          const forbiddenReason =
             (typeof errorData === 'string' && errorData) ||
             errorData?.error?.message ||
-            `OpenAI Responses upstream error: ${response.status}`
+            'OpenAI Responses account forbidden'
+
+          try {
+            if (typeof unifiedOpenAIScheduler.markAccountBlocked === 'function') {
+              await unifiedOpenAIScheduler.markAccountBlocked(
+                account.id,
+                'openai-responses',
+                sessionHash
+              )
+            } else {
+              await openaiResponsesAccountService.updateAccount(account.id, {
+                status: 'blocked',
+                schedulable: 'false',
+                errorMessage: forbiddenReason,
+                blockedAt: new Date().toISOString()
+              })
+            }
+          } catch (markError) {
+            logger.error(
+              `❌ Failed to mark OpenAI-Responses account blocked after ${response.status}:`,
+              markError
+            )
+          }
+
           req.removeListener('close', handleClientDisconnect)
           res.removeListener('close', handleClientDisconnect)
 
-          // 检查是否配置了不触发 failover
+          if (account.noFailover === true) {
+            logger.info(
+              `Account ${account.name} has noFailover=true, returning ${response.status} error directly`
+            )
+            return res.status(response.status).json(
+              errorData || {
+                error: {
+                  message: forbiddenReason,
+                  type: 'forbidden'
+                }
+              }
+            )
+          }
+
+          const forbiddenError = new Error(forbiddenReason)
+          forbiddenError.statusCode = response.status
+          forbiddenError.isForbidden = true
+          forbiddenError.accountId = account.id
+          forbiddenError.errorData = errorData
+          throw forbiddenError
+        }
+
+        if (response.status === 529) {
+          const overloadMessage =
+            (typeof errorData === 'string' && errorData) ||
+            errorData?.error?.message ||
+            'OpenAI Responses overloaded'
+          try {
+            if (typeof openaiResponsesAccountService.markAccountOverloaded === 'function') {
+              await openaiResponsesAccountService.markAccountOverloaded(account.id)
+            } else {
+              await openaiResponsesAccountService.updateAccount(account.id, {
+                status: 'overloaded',
+                schedulable: 'false',
+                errorMessage: overloadMessage,
+                overloadedAt: new Date().toISOString()
+              })
+            }
+          } catch (markError) {
+            logger.error(
+              `❌ Failed to mark OpenAI-Responses account overloaded after ${response.status}:`,
+              markError
+            )
+          }
+
+          try {
+            await unifiedOpenAIScheduler.markAccountTemporarilyUnavailable(
+              account.id,
+              'openai-responses',
+              null,
+              300
+            )
+          } catch (tempMarkError) {
+            logger.error(
+              '❌ Failed to mark OpenAI-Responses account temporarily unavailable after 529:',
+              tempMarkError
+            )
+          }
+
+          req.removeListener('close', handleClientDisconnect)
+          res.removeListener('close', handleClientDisconnect)
+
           if (account.noFailover === true) {
             logger.info(
               `Account ${account.name} has noFailover=true, returning ${response.status} error directly`
             )
             return res
               .status(response.status)
-              .json(errorData || { error: { message: upstreamMessage } })
+              .json(errorData || { error: { message: overloadMessage } })
           }
 
-          const upstreamError = new Error(upstreamMessage)
-          upstreamError.statusCode = response.status
-          upstreamError.isUpstream = true
-          upstreamError.accountId = account.id
-          upstreamError.errorData = errorData
-          throw upstreamError
+          const overloadError = new Error(overloadMessage)
+          overloadError.statusCode = response.status
+          overloadError.isOverloaded = true
+          overloadError.accountId = account.id
+          overloadError.errorData = errorData
+          throw overloadError
         }
 
         // 其他 4xx 错误（400, 403, 404等）- 客户端请求错误，直接返回不触发 failover
@@ -334,6 +454,85 @@ class OpenAIResponsesRelayService {
         res.removeListener('close', handleClientDisconnect)
 
         return res.status(response.status).json(errorData)
+      }
+
+      // 成功响应后清理异常状态
+      if (response.status === 200 || response.status === 201) {
+        try {
+          const isRateLimited = await unifiedOpenAIScheduler.isAccountRateLimited(
+            account.id,
+            'openai-responses'
+          )
+          if (isRateLimited) {
+            await unifiedOpenAIScheduler.removeAccountRateLimit(account.id, 'openai-responses')
+          }
+        } catch (clearRateLimitError) {
+          logger.error(
+            `❌ Failed to clear rate limit status for OpenAI-Responses account ${account.id} after success:`,
+            clearRateLimitError
+          )
+        }
+
+        try {
+          let isUnauthorized = false
+          if (typeof openaiResponsesAccountService.isAccountUnauthorized === 'function') {
+            isUnauthorized = await openaiResponsesAccountService.isAccountUnauthorized(account.id)
+          } else {
+            const latestAccount = await openaiResponsesAccountService.getAccount(account.id)
+            isUnauthorized = latestAccount?.status === 'unauthorized'
+          }
+
+          if (isUnauthorized) {
+            if (typeof openaiResponsesAccountService.clearAccountUnauthorized === 'function') {
+              await openaiResponsesAccountService.clearAccountUnauthorized(account.id)
+            } else {
+              await openaiResponsesAccountService.updateAccount(account.id, {
+                status: 'active',
+                schedulable: 'true',
+                errorMessage: '',
+                unauthorizedAt: '',
+                unauthorizedCount: '0'
+              })
+            }
+          }
+        } catch (clearUnauthorizedError) {
+          logger.error(
+            `❌ Failed to clear unauthorized status for OpenAI-Responses account ${account.id} after success:`,
+            clearUnauthorizedError
+          )
+        }
+
+        try {
+          if (typeof openaiResponsesAccountService.isAccountOverloaded === 'function') {
+            const isOverloaded = await openaiResponsesAccountService.isAccountOverloaded(
+              account.id
+            )
+            if (
+              isOverloaded &&
+              typeof openaiResponsesAccountService.removeAccountOverload === 'function'
+            ) {
+              await openaiResponsesAccountService.removeAccountOverload(account.id)
+              logger.debug(`✅ Cleared overload for OpenAI-Responses account ${account.id}`)
+            }
+          } else if (typeof unifiedOpenAIScheduler.isAccountOverloaded === 'function') {
+            const isOverloaded = await unifiedOpenAIScheduler.isAccountOverloaded(
+              account.id,
+              'openai-responses'
+            )
+            if (
+              isOverloaded &&
+              typeof unifiedOpenAIScheduler.removeAccountOverload === 'function'
+            ) {
+              await unifiedOpenAIScheduler.removeAccountOverload(account.id, 'openai-responses')
+              logger.debug(`✅ Cleared overload for OpenAI-Responses account ${account.id}`)
+            }
+          }
+        } catch (clearOverloadError) {
+          logger.error(
+            `❌ Failed to clear overload status for OpenAI-Responses account ${account.id} after success:`,
+            clearOverloadError
+          )
+        }
       }
 
       // 更新最后使用时间
@@ -370,6 +569,7 @@ class OpenAIResponsesRelayService {
         statusText: error.response?.statusText
       }
       logger.error('OpenAI-Responses relay error:', errorInfo)
+      const accountId = account?.id
 
       const upstreamStatusCode =
         error.statusCode ||
@@ -385,7 +585,15 @@ class OpenAIResponsesRelayService {
         const statusCode = upstreamStatusCode || (error.code === 'ETIMEDOUT' ? 504 : 502)
         error.statusCode = statusCode
         error.isUpstream = true
-        error.accountId = account?.id
+        error.accountId = accountId
+        if (account?.noFailover === true) {
+          return {
+            statusCode: error.statusCode || 500,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(error.errorData || { error: error.message }),
+            accountId
+          }
+        }
         throw error
       }
 
@@ -487,6 +695,53 @@ class OpenAIResponsesRelayService {
           throw authError
         }
 
+        if (status === 403) {
+          const forbiddenReason =
+            (typeof errorData === 'string' && errorData) ||
+            errorData?.error?.message ||
+            'OpenAI Responses account forbidden'
+
+          try {
+            if (typeof unifiedOpenAIScheduler.markAccountBlocked === 'function') {
+              await unifiedOpenAIScheduler.markAccountBlocked(
+                account.id,
+                'openai-responses',
+                sessionHash
+              )
+            } else {
+              await openaiResponsesAccountService.updateAccount(account.id, {
+                status: 'blocked',
+                schedulable: 'false',
+                errorMessage: forbiddenReason,
+                blockedAt: new Date().toISOString()
+              })
+            }
+          } catch (markError) {
+            logger.error(
+              `❌ Failed to mark OpenAI-Responses account blocked in catch handler (${status}):`,
+              markError
+            )
+          }
+
+          if (account?.noFailover === true) {
+            return res.status(status).json(
+              errorData || {
+                error: {
+                  message: forbiddenReason,
+                  type: 'forbidden'
+                }
+              }
+            )
+          }
+
+          const forbiddenError = new Error(forbiddenReason)
+          forbiddenError.statusCode = status
+          forbiddenError.isForbidden = true
+          forbiddenError.accountId = account.id
+          forbiddenError.errorData = errorData
+          throw forbiddenError
+        }
+
         if (status === 429) {
           // 429 限流错误 - 抛出以触发 failover
           const rateLimitError = new Error('Rate limit exceeded')
@@ -497,8 +752,89 @@ class OpenAIResponsesRelayService {
           throw rateLimitError
         }
 
+        if (status === 529) {
+          const overloadMessage =
+            (typeof errorData === 'string' && errorData) ||
+            errorData?.error?.message ||
+            'OpenAI Responses overloaded'
+          try {
+            if (typeof openaiResponsesAccountService.markAccountOverloaded === 'function') {
+              await openaiResponsesAccountService.markAccountOverloaded(account.id)
+            } else {
+              await openaiResponsesAccountService.updateAccount(account.id, {
+                status: 'overloaded',
+                schedulable: 'false',
+                errorMessage: overloadMessage,
+                overloadedAt: new Date().toISOString()
+              })
+            }
+          } catch (markError) {
+            logger.error(
+              `❌ Failed to mark OpenAI-Responses account overloaded in catch handler (${status}):`,
+              markError
+            )
+          }
+
+          try {
+            await unifiedOpenAIScheduler.markAccountTemporarilyUnavailable(
+              account.id,
+              'openai-responses',
+              null,
+              300
+            )
+          } catch (tempMarkError) {
+            logger.error(
+              '❌ Failed to mark OpenAI-Responses account temporarily unavailable in catch handler (529):',
+              tempMarkError
+            )
+          }
+
+          if (account?.noFailover === true) {
+            return res.status(status).json(
+              errorData || {
+                error: {
+                  message: overloadMessage,
+                  type: 'overloaded'
+                }
+              }
+            )
+          }
+
+          const overloadError = new Error(overloadMessage)
+          overloadError.statusCode = status
+          overloadError.isOverloaded = true
+          overloadError.accountId = account.id
+          overloadError.errorData = errorData
+          throw overloadError
+        }
+
         if (status >= 500) {
-          // 5xx 错误 - 上游服务错误，抛出以触发 failover
+          try {
+            await unifiedOpenAIScheduler.markAccountTemporarilyUnavailable(
+              account.id,
+              'openai-responses',
+              null,
+              300
+            )
+          } catch (markError) {
+            logger.error(
+              '❌ Failed to mark OpenAI-Responses account temporarily unavailable in catch handler (5xx):',
+              markError
+            )
+          }
+
+          const headers = error.response?.headers || { 'Content-Type': 'application/json' }
+          const body =
+            typeof errorData === 'string'
+              ? errorData
+              : JSON.stringify(
+                  errorData || { error: `OpenAI Responses upstream error: ${status}` }
+                )
+
+          if (account?.noFailover === true) {
+            return { statusCode: status, headers, body, accountId: account.id }
+          }
+
           const upstreamError = new Error(`OpenAI Responses upstream error: ${status}`)
           upstreamError.statusCode = status
           upstreamError.isUpstream = true
@@ -538,224 +874,300 @@ class OpenAIResponsesRelayService {
     res.setHeader('Connection', 'keep-alive')
     res.setHeader('X-Accel-Buffering', 'no')
 
-    let usageData = null
-    let actualModel = null
-    let buffer = ''
-    let rateLimitDetected = false
-    let rateLimitResetsInSeconds = null
-    let streamEnded = false
+    return new Promise((resolve, reject) => {
+      let usageData = null
+      let actualModel = null
+      let buffer = ''
+      let rateLimitDetected = false
+      let rateLimitResetsInSeconds = null
+      let streamEnded = false
+      let streamStarted = false
+      let settled = false
 
-    // 解析 SSE 事件以捕获 usage 数据和 model
-    const parseSSEForUsage = (data) => {
-      const lines = data.split('\n')
+      const safeResolve = (value) => {
+        if (settled) {
+          return
+        }
+        settled = true
+        resolve(value)
+      }
 
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const jsonStr = line.slice(6)
-            if (jsonStr === '[DONE]') {
-              continue
-            }
+      const safeReject = (error) => {
+        if (settled) {
+          return
+        }
+        settled = true
+        reject(error)
+      }
 
-            const eventData = JSON.parse(jsonStr)
+      const cleanup = () => {
+        streamEnded = true
+        try {
+          response.data?.unpipe?.(res)
+          response.data?.destroy?.()
+        } catch (_) {
+          // 忽略清理错误
+        }
+      }
 
-            // 检查是否是 response.completed 事件（OpenAI-Responses 格式）
-            if (eventData.type === 'response.completed' && eventData.response) {
-              // 从响应中获取真实的 model
-              if (eventData.response.model) {
-                actualModel = eventData.response.model
-                logger.debug(`📊 Captured actual model from response.completed: ${actualModel}`)
+      const detachClientListeners = () => {
+        req.removeListener('close', cleanup)
+        req.removeListener('aborted', cleanup)
+        req.removeListener('close', handleClientDisconnect)
+        res.removeListener('close', handleClientDisconnect)
+      }
+
+      // 解析 SSE 事件以捕获 usage 数据和 model
+      const parseSSEForUsage = (data) => {
+        const lines = data.split('\n')
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const jsonStr = line.slice(6)
+              if (jsonStr === '[DONE]') {
+                continue
               }
 
-              // 获取 usage 数据 - OpenAI-Responses 格式在 response.usage 下
-              if (eventData.response.usage) {
-                usageData = eventData.response.usage
-                logger.info('📊 Successfully captured usage data from OpenAI-Responses:', {
-                  input_tokens: usageData.input_tokens,
-                  output_tokens: usageData.output_tokens,
-                  total_tokens: usageData.total_tokens
-                })
-              }
-            }
+              const eventData = JSON.parse(jsonStr)
 
-            // 检查是否有限流错误
-            if (eventData.error) {
-              // 检查多种可能的限流错误类型
-              if (
-                eventData.error.type === 'rate_limit_error' ||
-                eventData.error.type === 'usage_limit_reached' ||
-                eventData.error.type === 'rate_limit_exceeded'
-              ) {
-                rateLimitDetected = true
-                if (eventData.error.resets_in_seconds) {
-                  rateLimitResetsInSeconds = eventData.error.resets_in_seconds
-                  logger.warn(
-                    `🚫 Rate limit detected in stream, resets in ${rateLimitResetsInSeconds} seconds (${Math.ceil(rateLimitResetsInSeconds / 60)} minutes)`
-                  )
+              // 检查是否是 response.completed 事件（OpenAI-Responses 格式）
+              if (eventData.type === 'response.completed' && eventData.response) {
+                // 从响应中获取真实的 model
+                if (eventData.response.model) {
+                  actualModel = eventData.response.model
+                  logger.debug(`📊 Captured actual model from response.completed: ${actualModel}`)
+                }
+
+                // 获取 usage 数据 - OpenAI-Responses 格式在 response.usage 下
+                if (eventData.response.usage) {
+                  usageData = eventData.response.usage
+                  logger.info('📊 Successfully captured usage data from OpenAI-Responses:', {
+                    input_tokens: usageData.input_tokens,
+                    output_tokens: usageData.output_tokens,
+                    total_tokens: usageData.total_tokens
+                  })
                 }
               }
-            }
-          } catch (e) {
-            // 忽略解析错误
-          }
-        }
-      }
-    }
 
-    // 监听数据流
-    response.data.on('data', (chunk) => {
-      try {
-        const chunkStr = chunk.toString()
-
-        // 转发数据给客户端
-        if (!res.destroyed && !streamEnded) {
-          res.write(chunk)
-        }
-
-        // 同时解析数据以捕获 usage 信息
-        buffer += chunkStr
-
-        // 处理完整的 SSE 事件
-        if (buffer.includes('\n\n')) {
-          const events = buffer.split('\n\n')
-          buffer = events.pop() || ''
-
-          for (const event of events) {
-            if (event.trim()) {
-              parseSSEForUsage(event)
+              // 检查是否有限流错误
+              if (eventData.error) {
+                // 检查多种可能的限流错误类型
+                if (
+                  eventData.error.type === 'rate_limit_error' ||
+                  eventData.error.type === 'usage_limit_reached' ||
+                  eventData.error.type === 'rate_limit_exceeded'
+                ) {
+                  rateLimitDetected = true
+                  if (eventData.error.resets_in_seconds) {
+                    rateLimitResetsInSeconds = eventData.error.resets_in_seconds
+                    logger.warn(
+                      `🚫 Rate limit detected in stream, resets in ${rateLimitResetsInSeconds} seconds (${Math.ceil(rateLimitResetsInSeconds / 60)} minutes)`
+                    )
+                  }
+                }
+              }
+            } catch (e) {
+              // 忽略解析错误
             }
           }
         }
-      } catch (error) {
-        logger.error('Error processing stream chunk:', error)
-      }
-    })
-
-    response.data.on('end', async () => {
-      streamEnded = true
-
-      // 处理剩余的 buffer
-      if (buffer.trim()) {
-        parseSSEForUsage(buffer)
       }
 
-      // 记录使用统计
-      if (usageData) {
+      // 监听数据流
+      response.data.on('data', (chunk) => {
         try {
-          // OpenAI-Responses 使用 input_tokens/output_tokens，标准 OpenAI 使用 prompt_tokens/completion_tokens
-          const totalInputTokens = usageData.input_tokens || usageData.prompt_tokens || 0
-          const outputTokens = usageData.output_tokens || usageData.completion_tokens || 0
+          const chunkStr = chunk.toString()
 
-          // 提取缓存相关的 tokens（如果存在）
-          const cacheReadTokens = usageData.input_tokens_details?.cached_tokens || 0
-          const cacheCreateTokens = extractCacheCreationTokens(usageData)
-          // 计算实际输入token（总输入减去缓存部分）
-          const actualInputTokens = Math.max(0, totalInputTokens - cacheReadTokens)
+          // 转发数据给客户端
+          if (!res.destroyed && !streamEnded) {
+            streamStarted = true
+            res.write(chunk)
+          }
 
-          const totalTokens =
-            usageData.total_tokens || totalInputTokens + outputTokens + cacheCreateTokens
-          const modelToRecord = actualModel || requestedModel || 'gpt-4'
+          // 同时解析数据以捕获 usage 信息
+          buffer += chunkStr
 
-          await apiKeyService.recordUsage(
-            apiKeyData.id,
-            actualInputTokens, // 传递实际输入（不含缓存）
-            outputTokens,
-            cacheCreateTokens,
-            cacheReadTokens,
-            modelToRecord,
-            account.id
-          )
+          // 处理完整的 SSE 事件
+          if (buffer.includes('\n\n')) {
+            const events = buffer.split('\n\n')
+            buffer = events.pop() || ''
 
-          logger.info(
-            `📊 Recorded usage - Input: ${totalInputTokens}(actual:${actualInputTokens}+cached:${cacheReadTokens}), CacheCreate: ${cacheCreateTokens}, Output: ${outputTokens}, Total: ${totalTokens}, Model: ${modelToRecord}`
-          )
-
-          // 更新账户的 token 使用统计
-          await openaiResponsesAccountService.updateAccountUsage(account.id, totalTokens)
-
-          // 更新账户使用额度（如果设置了额度限制）
-          if (parseFloat(account.dailyQuota) > 0) {
-            // 使用CostCalculator正确计算费用（考虑缓存token的不同价格）
-            const CostCalculator = require('../utils/costCalculator')
-            const costInfo = CostCalculator.calculateCost(
-              {
-                input_tokens: actualInputTokens, // 实际输入（不含缓存）
-                output_tokens: outputTokens,
-                cache_creation_input_tokens: cacheCreateTokens,
-                cache_read_input_tokens: cacheReadTokens
-              },
-              modelToRecord
-            )
-            await openaiResponsesAccountService.updateUsageQuota(account.id, costInfo.costs.total)
+            for (const event of events) {
+              if (event.trim()) {
+                parseSSEForUsage(event)
+              }
+            }
           }
         } catch (error) {
-          logger.error('Failed to record usage:', error)
+          logger.error('Error processing stream chunk:', error)
         }
-      }
+      })
 
-      // 如果在流式响应中检测到限流
-      if (rateLimitDetected) {
-        // 使用统一调度器处理限流（与非流式响应保持一致）
-        const sessionId = req.headers['session_id'] || req.body?.session_id
-        const sessionHash = sessionId
-          ? crypto.createHash('sha256').update(sessionId).digest('hex')
-          : null
+      response.data.on('end', async () => {
+        streamEnded = true
 
-        await unifiedOpenAIScheduler.markAccountRateLimited(
-          account.id,
-          'openai-responses',
-          sessionHash,
-          rateLimitResetsInSeconds
-        )
+        // 处理剩余的 buffer
+        if (buffer.trim()) {
+          parseSSEForUsage(buffer)
+        }
 
-        logger.warn(
-          `🚫 Processing rate limit for OpenAI-Responses account ${account.id} from stream`
-        )
-      }
+        // 记录使用统计
+        if (usageData) {
+          try {
+            // OpenAI-Responses 使用 input_tokens/output_tokens，标准 OpenAI 使用 prompt_tokens/completion_tokens
+            const totalInputTokens = usageData.input_tokens || usageData.prompt_tokens || 0
+            const outputTokens = usageData.output_tokens || usageData.completion_tokens || 0
 
-      // 清理监听器
-      req.removeListener('close', handleClientDisconnect)
-      res.removeListener('close', handleClientDisconnect)
+            // 提取缓存相关的 tokens（如果存在）
+            const cacheReadTokens = usageData.input_tokens_details?.cached_tokens || 0
+            const cacheCreateTokens = extractCacheCreationTokens(usageData)
+            // 计算实际输入token（总输入减去缓存部分）
+            const actualInputTokens = Math.max(0, totalInputTokens - cacheReadTokens)
 
-      if (!res.destroyed) {
-        res.end()
-      }
+            const totalTokens =
+              usageData.total_tokens || totalInputTokens + outputTokens + cacheCreateTokens
+            const modelToRecord = actualModel || requestedModel || 'gpt-4'
 
-      logger.info('Stream response completed', {
-        accountId: account.id,
-        hasUsage: !!usageData,
-        actualModel: actualModel || 'unknown'
+            await apiKeyService.recordUsage(
+              apiKeyData.id,
+              actualInputTokens, // 传递实际输入（不含缓存）
+              outputTokens,
+              cacheCreateTokens,
+              cacheReadTokens,
+              modelToRecord,
+              account.id
+            )
+
+            logger.info(
+              `📊 Recorded usage - Input: ${totalInputTokens}(actual:${actualInputTokens}+cached:${cacheReadTokens}), CacheCreate: ${cacheCreateTokens}, Output: ${outputTokens}, Total: ${totalTokens}, Model: ${modelToRecord}`
+            )
+
+            // 更新账户的 token 使用统计
+            await openaiResponsesAccountService.updateAccountUsage(account.id, totalTokens)
+
+            // 更新账户使用额度（如果设置了额度限制）
+            if (parseFloat(account.dailyQuota) > 0) {
+              // 使用CostCalculator正确计算费用（考虑缓存token的不同价格）
+              const CostCalculator = require('../utils/costCalculator')
+              const costInfo = CostCalculator.calculateCost(
+                {
+                  input_tokens: actualInputTokens, // 实际输入（不含缓存）
+                  output_tokens: outputTokens,
+                  cache_creation_input_tokens: cacheCreateTokens,
+                  cache_read_input_tokens: cacheReadTokens
+                },
+                modelToRecord
+              )
+              await openaiResponsesAccountService.updateUsageQuota(account.id, costInfo.costs.total)
+            }
+          } catch (error) {
+            logger.error('Failed to record usage:', error)
+          }
+        }
+
+        // 如果在流式响应中检测到限流
+        if (rateLimitDetected || response.status === 429) {
+          // 使用统一调度器处理限流（与非流式响应保持一致）
+          const sessionId = req.headers['session_id'] || req.body?.session_id
+          const sessionHash = sessionId
+            ? crypto.createHash('sha256').update(sessionId).digest('hex')
+            : null
+
+          await unifiedOpenAIScheduler.markAccountRateLimited(
+            account.id,
+            'openai-responses',
+            sessionHash,
+            rateLimitResetsInSeconds
+          )
+
+          logger.warn(
+            `🚫 Processing rate limit for OpenAI-Responses account ${account.id} from stream`
+          )
+
+          detachClientListeners()
+
+          if (account?.noFailover === true) {
+            if (!res.destroyed && !res.writableEnded) {
+              res.write(`event: error\ndata: ${JSON.stringify({ error: 'Rate Limited' })}\n\n`)
+              res.end()
+            }
+            safeResolve({ statusCode: 429, accountId: account.id })
+            return
+          }
+
+          const rateLimitError = new Error('OpenAI Responses Rate Limited')
+          rateLimitError.statusCode = 429
+          rateLimitError.isRateLimitError = true
+          rateLimitError.accountId = account.id
+          safeReject(rateLimitError)
+          return
+        }
+
+        detachClientListeners()
+
+        if (!res.destroyed && !res.writableEnded) {
+          res.end()
+        }
+
+        logger.info('Stream response completed', {
+          accountId: account.id,
+          hasUsage: !!usageData,
+          actualModel: actualModel || 'unknown'
+        })
+
+        safeResolve({ statusCode: response.status || 200, accountId: account.id })
+      })
+
+      response.data.on('error', (error) => {
+        streamEnded = true
+        logger.error('Stream error:', error)
+
+        cleanup()
+        detachClientListeners()
+
+        const headersSent = res.headersSent || streamStarted
+
+        if (account?.noFailover === true || headersSent) {
+          if (!res.headersSent && !res.destroyed) {
+            res.status(502).json({ error: { message: 'Upstream stream error' } })
+          } else if (!res.destroyed && !res.writableEnded) {
+            res.write(
+              `event: error\ndata: ${JSON.stringify({ error: 'Upstream error' })}\n\n`
+            )
+            res.end()
+          }
+        }
+
+        if (account?.noFailover === true) {
+          safeResolve({ statusCode: 502, accountId: account.id })
+          return
+        }
+
+        const upstreamError = new Error('OpenAI Responses upstream error')
+        upstreamError.statusCode = res?.statusCode || 502
+        upstreamError.isUpstream = true
+        upstreamError.accountId = account.id
+        upstreamError.innerError = error
+        safeReject(upstreamError)
+      })
+
+      req.on('close', () => {
+        cleanup()
+        detachClientListeners()
+        if (!settled) {
+          safeResolve({ statusCode: 499, accountId: account.id })
+        }
+      })
+
+      req.on('aborted', () => {
+        cleanup()
+        detachClientListeners()
+        if (!settled) {
+          safeResolve({ statusCode: 499, accountId: account.id })
+        }
       })
     })
-
-    response.data.on('error', (error) => {
-      streamEnded = true
-      logger.error('Stream error:', error)
-
-      // 清理监听器
-      req.removeListener('close', handleClientDisconnect)
-      res.removeListener('close', handleClientDisconnect)
-
-      if (!res.headersSent) {
-        res.status(502).json({ error: { message: 'Upstream stream error' } })
-      } else if (!res.destroyed) {
-        res.end()
-      }
-    })
-
-    // 处理客户端断开连接
-    const cleanup = () => {
-      streamEnded = true
-      try {
-        response.data?.unpipe?.(res)
-        response.data?.destroy?.()
-      } catch (_) {
-        // 忽略清理错误
-      }
-    }
-
-    req.on('close', cleanup)
-    req.on('aborted', cleanup)
   }
 
   // 处理非流式响应

@@ -34,6 +34,10 @@ const keepAliveAgent = new https.Agent({
 
 logger.info('🌐 Gemini HTTPS Agent initialized with TCP Keep-Alive support')
 
+const DEFAULT_RATE_LIMIT_DURATION_MINUTES = 60
+const TEMP_UNAVAILABLE_TTL_SECONDS = 300
+const OVERLOAD_TTL_SECONDS = 300
+
 // 加密相关常量
 const ALGORITHM = 'aes-256-cbc'
 const ENCRYPTION_SALT = 'gemini-account-salt'
@@ -989,41 +993,390 @@ async function markAccountUsed(accountId) {
   })
 }
 
+async function markAccountUnauthorized(
+  accountId,
+  reason = 'Gemini账号认证失败（401错误）'
+) {
+  try {
+    const account = await getAccount(accountId)
+    if (!account) {
+      return
+    }
+
+    const now = new Date().toISOString()
+    const currentCount = parseInt(account.unauthorizedCount || '0', 10)
+    const unauthorizedCount = Number.isFinite(currentCount) ? currentCount + 1 : 1
+
+    await updateAccount(accountId, {
+      status: 'unauthorized',
+      schedulable: 'false',
+      unauthorizedAt: now,
+      unauthorizedCount: unauthorizedCount.toString(),
+      errorMessage: reason
+    })
+
+    logger.warn(
+      `🚫 Gemini account ${account.name || accountId} marked as unauthorized due to 401/400`
+    )
+  } catch (error) {
+    logger.error(`❌ Failed to mark Gemini account unauthorized: ${accountId}`, error)
+  }
+}
+
+async function clearAccountUnauthorized(accountId) {
+  try {
+    const account = await getAccount(accountId)
+    if (!account) {
+      return { success: false, message: 'Account not found' }
+    }
+
+    const updates = {
+      unauthorizedAt: '',
+      errorMessage: account.status === 'unauthorized' ? '' : account.errorMessage
+    }
+
+    if (account.status === 'unauthorized') {
+      updates.status = 'active'
+      updates.schedulable = 'true'
+    }
+
+    await updateAccount(accountId, updates)
+    logger.info(`✅ Cleared unauthorized status for Gemini account: ${account.name || accountId}`)
+    return { success: true }
+  } catch (error) {
+    logger.error(`❌ Failed to clear unauthorized status for Gemini account ${accountId}`, error)
+    return { success: false, error: error.message }
+  }
+}
+
+async function isAccountUnauthorized(accountId) {
+  try {
+    const client = redisClient.getClientSafe()
+    const [status, unauthorizedAt] = await client.hmget(
+      `${GEMINI_ACCOUNT_KEY_PREFIX}${accountId}`,
+      'status',
+      'unauthorizedAt'
+    )
+    return status === 'unauthorized' || !!unauthorizedAt
+  } catch (error) {
+    logger.error(`❌ Failed to check unauthorized status for Gemini account ${accountId}`, error)
+    return false
+  }
+}
+
+async function markAccountBlocked(
+  accountId,
+  reason = 'Gemini账号被禁止访问（403错误）'
+) {
+  try {
+    const account = await getAccount(accountId)
+    if (!account) {
+      return
+    }
+
+    await updateAccount(accountId, {
+      status: 'blocked',
+      schedulable: 'false',
+      blockedAt: new Date().toISOString(),
+      errorMessage: reason,
+      rateLimitStatus: '',
+      rateLimitedAt: '',
+      rateLimitResetAt: ''
+    })
+
+    logger.warn(`⛔ Gemini account ${account.name || accountId} marked as blocked (403)`)
+  } catch (error) {
+    logger.error(`❌ Failed to mark Gemini account blocked: ${accountId}`, error)
+  }
+}
+
 // 设置账户限流状态
-async function setAccountRateLimited(accountId, isLimited = true) {
+async function setAccountRateLimited(
+  accountId,
+  isLimited = true,
+  durationMinutes = DEFAULT_RATE_LIMIT_DURATION_MINUTES
+) {
+  const account = await getAccount(accountId)
+  if (!account) {
+    return
+  }
+
   const updates = isLimited
     ? {
+        status: 'rate_limited',
+        schedulable: 'false',
         rateLimitStatus: 'limited',
-        rateLimitedAt: new Date().toISOString()
+        rateLimitedAt: new Date().toISOString(),
+        rateLimitDuration: durationMinutes.toString(),
+        rateLimitResetAt: new Date(Date.now() + durationMinutes * 60 * 1000).toISOString(),
+        errorMessage: 'Gemini account rate limited'
       }
     : {
         rateLimitStatus: '',
-        rateLimitedAt: ''
+        rateLimitedAt: '',
+        rateLimitDuration: '',
+        rateLimitResetAt: ''
       }
 
+  // 解除限流时，仅在状态仍为 rate_limited 时恢复调度
+  if (!isLimited && account.status === 'rate_limited') {
+    updates.status = 'active'
+    updates.schedulable = 'true'
+    updates.errorMessage = ''
+  }
+
   await updateAccount(accountId, updates)
+  return updates
+}
+
+async function markAccountRateLimited(
+  accountId,
+  durationMinutes = DEFAULT_RATE_LIMIT_DURATION_MINUTES
+) {
+  try {
+    const updates = await setAccountRateLimited(accountId, true, durationMinutes)
+    if (updates) {
+      logger.warn(
+        `⏳ Gemini account ${accountId} marked as rate limited until ${updates.rateLimitResetAt}`
+      )
+      return { success: true, resetAt: updates.rateLimitResetAt }
+    }
+    return { success: false }
+  } catch (error) {
+    logger.error(`❌ Failed to mark Gemini account rate limited: ${accountId}`, error)
+    return { success: false, error: error.message }
+  }
+}
+
+async function removeAccountRateLimit(accountId) {
+  try {
+    const account = await getAccount(accountId)
+    if (!account) {
+      return { success: false, message: 'Account not found' }
+    }
+
+    const updates = {
+      rateLimitStatus: '',
+      rateLimitedAt: '',
+      rateLimitDuration: '',
+      rateLimitResetAt: ''
+    }
+
+    if (account.status === 'rate_limited') {
+      updates.status = 'active'
+      updates.schedulable = 'true'
+      updates.errorMessage = ''
+    }
+
+    await updateAccount(accountId, updates)
+    logger.info(`✅ Removed rate limit status for Gemini account: ${account.name || accountId}`)
+    return { success: true }
+  } catch (error) {
+    logger.error(`❌ Failed to remove rate limit status for Gemini account ${accountId}`, error)
+    return { success: false, error: error.message }
+  }
+}
+
+async function isAccountRateLimited(accountId) {
+  try {
+    const client = redisClient.getClientSafe()
+    const [status, resetAt, limitedAt, durationRaw] = await client.hmget(
+      `${GEMINI_ACCOUNT_KEY_PREFIX}${accountId}`,
+      'rateLimitStatus',
+      'rateLimitResetAt',
+      'rateLimitedAt',
+      'rateLimitDuration'
+    )
+
+    if (status !== 'limited') {
+      return false
+    }
+
+    const durationMinutes = Number.isNaN(parseInt(durationRaw, 10))
+      ? DEFAULT_RATE_LIMIT_DURATION_MINUTES
+      : parseInt(durationRaw, 10)
+    const now = new Date()
+
+    if (resetAt) {
+      const resetTime = new Date(resetAt)
+      if (resetTime > now) {
+        return true
+      }
+    }
+
+    if (limitedAt) {
+      const limitTime = new Date(limitedAt)
+      const expireTime = new Date(limitTime.getTime() + durationMinutes * 60 * 1000)
+      if (expireTime > now) {
+        return true
+      }
+    }
+
+    await removeAccountRateLimit(accountId)
+    return false
+  } catch (error) {
+    logger.error(`❌ Failed to check rate limit status for Gemini account: ${accountId}`, error)
+    return false
+  }
+}
+
+async function markAccountTemporarilyUnavailable(
+  accountId,
+  ttlSeconds = TEMP_UNAVAILABLE_TTL_SECONDS
+) {
+  try {
+    const client = redisClient.getClientSafe()
+    const account = await getAccount(accountId)
+    if (!account) {
+      return { success: false, message: 'Account not found' }
+    }
+
+    const now = new Date()
+    const until = new Date(now.getTime() + ttlSeconds * 1000).toISOString()
+
+    await client.hset(`${GEMINI_ACCOUNT_KEY_PREFIX}${accountId}`, {
+      status: 'temporarily_unavailable',
+      tempUnavailableAt: now.toISOString(),
+      tempUnavailableUntil: until,
+      errorMessage: 'Gemini account temporarily unavailable'
+    })
+
+    await client.setex(`temp_unavailable:gemini:${accountId}`, ttlSeconds, '1')
+
+    logger.warn(
+      `⏱️ Gemini account ${account.name || accountId} marked temporarily unavailable until ${until}`
+    )
+    return { success: true, until }
+  } catch (error) {
+    logger.error(
+      `❌ Failed to mark Gemini account temporarily unavailable: ${accountId}`,
+      error
+    )
+    return { success: false, error: error.message }
+  }
+}
+
+async function markAccountOverloaded(accountId, ttlSeconds = OVERLOAD_TTL_SECONDS) {
+  try {
+    const client = redisClient.getClientSafe()
+    const account = await getAccount(accountId)
+    if (!account) {
+      return { success: false, message: 'Account not found' }
+    }
+
+    const now = new Date()
+    const until = new Date(now.getTime() + ttlSeconds * 1000).toISOString()
+
+    await client.hset(`${GEMINI_ACCOUNT_KEY_PREFIX}${accountId}`, {
+      status: 'overloaded',
+      overloadedAt: now.toISOString(),
+      overloadedUntil: until,
+      schedulable: 'false',
+      errorMessage: 'Gemini account overloaded'
+    })
+
+    await client.setex(`overloaded:gemini:${accountId}`, ttlSeconds, '1')
+
+    logger.warn(
+      `🚫 Gemini account ${account.name || accountId} marked overloaded until ${until}`
+    )
+    return { success: true, until }
+  } catch (error) {
+    logger.error(`❌ Failed to mark Gemini account overloaded: ${accountId}`, error)
+    return { success: false, error: error.message }
+  }
+}
+
+async function removeAccountOverload(accountId) {
+  try {
+    const client = redisClient.getClientSafe()
+    const account = await getAccount(accountId)
+    if (!account) {
+      return { success: false, message: 'Account not found' }
+    }
+
+    await client.hset(`${GEMINI_ACCOUNT_KEY_PREFIX}${accountId}`, {
+      status: 'active',
+      schedulable: 'true',
+      errorMessage: '',
+      overloadedAt: '',
+      overloadedUntil: ''
+    })
+    await client.del(`overloaded:gemini:${accountId}`)
+
+    logger.info(`✅ Cleared overload status for Gemini account: ${account.name || accountId}`)
+    return { success: true }
+  } catch (error) {
+    logger.error(`❌ Failed to clear overload status for Gemini account ${accountId}`, error)
+    return { success: false, error: error.message }
+  }
+}
+
+async function isAccountOverloaded(accountId) {
+  try {
+    const client = redisClient.getClientSafe()
+    const exists = await client.exists(`overloaded:gemini:${accountId}`)
+    if (exists === 1) {
+      return true
+    }
+
+    const [status, until] = await client.hmget(
+      `${GEMINI_ACCOUNT_KEY_PREFIX}${accountId}`,
+      'status',
+      'overloadedUntil'
+    )
+
+    if (status !== 'overloaded') {
+      return false
+    }
+
+    if (until && new Date(until) > new Date()) {
+      return true
+    }
+
+    await removeAccountOverload(accountId)
+    return false
+  } catch (error) {
+    logger.error(`❌ Failed to check overload status for Gemini account ${accountId}`, error)
+    return false
+  }
 }
 
 // 获取账户的限流信息（参考 claudeAccountService 的实现）
 async function getAccountRateLimitInfo(accountId) {
   try {
-    const account = await getAccount(accountId)
-    if (!account) {
+    const client = redisClient.getClientSafe()
+    const [status, limitedAt, durationRaw, resetAt] = await client.hmget(
+      `${GEMINI_ACCOUNT_KEY_PREFIX}${accountId}`,
+      'rateLimitStatus',
+      'rateLimitedAt',
+      'rateLimitDuration',
+      'rateLimitResetAt'
+    )
+
+    if (status !== 'limited') {
       return null
     }
 
-    if (account.rateLimitStatus === 'limited' && account.rateLimitedAt) {
-      const rateLimitedAt = new Date(account.rateLimitedAt)
+    if (limitedAt) {
+      const rateLimitedAt = new Date(limitedAt)
       const now = new Date()
+      const durationMinutes = Number.isNaN(parseInt(durationRaw, 10))
+        ? DEFAULT_RATE_LIMIT_DURATION_MINUTES
+        : parseInt(durationRaw, 10)
       const minutesSinceRateLimit = Math.floor((now - rateLimitedAt) / (1000 * 60))
 
-      // Gemini 限流持续时间为 1 小时
-      const minutesRemaining = Math.max(0, 60 - minutesSinceRateLimit)
-      const rateLimitEndAt = new Date(rateLimitedAt.getTime() + 60 * 60 * 1000).toISOString()
+      const rateLimitEndAt =
+        resetAt ||
+        new Date(rateLimitedAt.getTime() + durationMinutes * 60 * 1000).toISOString()
+      const minutesRemaining = Math.max(
+        0,
+        Math.ceil((new Date(rateLimitEndAt).getTime() - now.getTime()) / (1000 * 60))
+      )
 
       return {
         isRateLimited: minutesRemaining > 0,
-        rateLimitedAt: account.rateLimitedAt,
+        rateLimitedAt: limitedAt,
         minutesSinceRateLimit,
         minutesRemaining,
         rateLimitEndAt
@@ -1639,7 +1992,13 @@ async function resetAccountStatus(accountId) {
     // 清除错误相关字段
     errorMessage: '',
     rateLimitedAt: '',
-    rateLimitStatus: ''
+    rateLimitStatus: '',
+    rateLimitResetAt: '',
+    rateLimitDuration: '',
+    unauthorizedAt: '',
+    blockedAt: '',
+    tempUnavailableAt: '',
+    tempUnavailableUntil: ''
   }
 
   await updateAccount(accountId, updates)
@@ -1681,6 +2040,17 @@ module.exports = {
   selectAvailableAccount,
   refreshAccountToken,
   markAccountUsed,
+  markAccountUnauthorized,
+  clearAccountUnauthorized,
+  isAccountUnauthorized,
+  markAccountBlocked,
+  markAccountRateLimited,
+  removeAccountRateLimit,
+  isAccountRateLimited,
+  markAccountTemporarilyUnavailable,
+  markAccountOverloaded,
+  removeAccountOverload,
+  isAccountOverloaded,
   setAccountRateLimited,
   getAccountRateLimitInfo,
   isTokenExpired,

@@ -3,7 +3,6 @@ const crypto = require('crypto')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
-const bedrockRelayService = require('./bedrockRelayService')
 const LRUCache = require('../utils/lruCache')
 
 class BedrockAccountService {
@@ -14,6 +13,9 @@ class BedrockAccountService {
 
     // 🚀 性能优化：缓存派生的加密密钥，避免每次重复计算
     this._encryptionKeyCache = null
+
+    this.RATE_LIMIT_TTL_SECONDS = 300
+    this.TEMP_UNAVAILABLE_TTL_SECONDS = 300
 
     // 🔄 解密结果缓存，提高解密性能
     this._decryptCache = new LRUCache(500)
@@ -62,6 +64,12 @@ class BedrockAccountService {
       // ✅ 新增：账户订阅到期时间（业务字段，手动管理）
       // 注意：Bedrock 使用 AWS 凭证，没有 OAuth token，因此没有 expiresAt
       subscriptionExpiresAt: options.subscriptionExpiresAt || null,
+      status: 'active',
+      errorMessage: '',
+      rateLimitUntil: null,
+      tempUnavailableUntil: null,
+      unauthorizedAt: null,
+      blockedAt: null,
 
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -107,6 +115,7 @@ class BedrockAccountService {
       }
 
       const account = JSON.parse(accountData)
+      this._normalizeAccountStatus(account)
 
       // 解密AWS凭证用于内部使用
       if (account.awsCredentials) {
@@ -138,6 +147,7 @@ class BedrockAccountService {
         const accountData = await client.get(key)
         if (accountData) {
           const account = JSON.parse(accountData)
+          this._normalizeAccountStatus(account)
 
           // 返回给前端时，不包含敏感信息，只显示掩码
           accounts.push({
@@ -154,6 +164,11 @@ class BedrockAccountService {
 
             // ✅ 前端显示订阅过期时间（业务字段）
             expiresAt: account.subscriptionExpiresAt || null,
+            status: account.status || 'active',
+            rateLimitUntil: account.rateLimitUntil || null,
+            tempUnavailableUntil: account.tempUnavailableUntil || null,
+            unauthorizedAt: account.unauthorizedAt || null,
+            blockedAt: account.blockedAt || null,
 
             createdAt: account.createdAt,
             updatedAt: account.updatedAt,
@@ -314,6 +329,19 @@ class BedrockAccountService {
           return false
         }
 
+        // 跳过受限或不可用的账号
+        if (account.status === 'blocked' || account.status === 'unauthorized') {
+          return false
+        }
+
+        const now = new Date()
+        if (account.tempUnavailableUntil && new Date(account.tempUnavailableUntil) > now) {
+          return false
+        }
+        if (account.rateLimitUntil && new Date(account.rateLimitUntil) > now) {
+          return false
+        }
+
         return account.isActive && account.schedulable
       })
 
@@ -351,6 +379,7 @@ class BedrockAccountService {
       }
 
       const account = accountResult.data
+      const bedrockRelayService = require('./bedrockRelayService')
 
       logger.info(`🧪 测试Bedrock账户连接 - ID: ${accountId}, 名称: ${account.name}`)
 
@@ -394,6 +423,196 @@ class BedrockAccountService {
     }
     const expiryDate = new Date(account.subscriptionExpiresAt)
     return expiryDate <= new Date()
+  }
+
+  _getAccountKey(accountId) {
+    return `bedrock_account:${accountId}`
+  }
+
+  _normalizeAccountStatus(account) {
+    if (!account.status) {
+      account.status = 'active'
+    }
+    return account
+  }
+
+  async _getAccountData(accountId) {
+    const client = redis.getClientSafe()
+    const raw = await client.get(this._getAccountKey(accountId))
+    if (!raw) {
+      throw new Error('Bedrock account not found')
+    }
+    const parsed = JSON.parse(raw)
+    return this._normalizeAccountStatus(parsed)
+  }
+
+  async _saveAccountData(account) {
+    const client = redis.getClientSafe()
+    await client.set(this._getAccountKey(account.id), JSON.stringify(account))
+  }
+
+  async markAccountUnauthorized(accountId) {
+    try {
+      const account = await this._getAccountData(accountId)
+      account.status = 'unauthorized'
+      account.unauthorizedAt = new Date().toISOString()
+      delete account.rateLimitUntil
+      delete account.rateLimitedAt
+      await this._saveAccountData(account)
+      logger.warn(`🚫 Marked Bedrock account as unauthorized: ${account.name || accountId}`)
+      return { success: true }
+    } catch (error) {
+      logger.error(`❌ Failed to mark Bedrock account unauthorized: ${accountId}`, error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  async clearAccountUnauthorized(accountId) {
+    try {
+      const account = await this._getAccountData(accountId)
+      delete account.unauthorizedAt
+      if (account.status === 'unauthorized') {
+        account.status = 'active'
+      }
+      await this._saveAccountData(account)
+      logger.info(`✅ Cleared unauthorized status for Bedrock account: ${account.name || accountId}`)
+      return { success: true }
+    } catch (error) {
+      logger.error(`❌ Failed to clear unauthorized status for Bedrock account: ${accountId}`, error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  async isAccountUnauthorized(accountId) {
+    try {
+      const account = await this._getAccountData(accountId)
+      return account.status === 'unauthorized'
+    } catch (error) {
+      logger.error(`❌ Failed to check unauthorized status for Bedrock account: ${accountId}`, error)
+      return false
+    }
+  }
+
+  async markAccountBlocked(accountId) {
+    try {
+      const account = await this._getAccountData(accountId)
+      account.status = 'blocked'
+      account.blockedAt = new Date().toISOString()
+      delete account.rateLimitUntil
+      delete account.rateLimitedAt
+      await this._saveAccountData(account)
+      logger.warn(`⛔ Marked Bedrock account as blocked: ${account.name || accountId}`)
+      return { success: true }
+    } catch (error) {
+      logger.error(`❌ Failed to mark Bedrock account blocked: ${accountId}`, error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  async markAccountRateLimited(accountId) {
+    try {
+      const account = await this._getAccountData(accountId)
+      const now = new Date()
+      const until = new Date(now.getTime() + this.RATE_LIMIT_TTL_SECONDS * 1000)
+      if (account.status !== 'blocked' && account.status !== 'unauthorized') {
+        account.status = 'rate_limited'
+      }
+      account.rateLimitedAt = now.toISOString()
+      account.rateLimitUntil = until.toISOString()
+      await this._saveAccountData(account)
+      logger.warn(
+        `⏱️ Marked Bedrock account as rate limited until ${until.toISOString()}: ${account.name || accountId}`
+      )
+      return { success: true, rateLimitUntil: until.toISOString() }
+    } catch (error) {
+      logger.error(`❌ Failed to mark Bedrock account rate limited: ${accountId}`, error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  async removeAccountRateLimit(accountId) {
+    try {
+      const account = await this._getAccountData(accountId)
+      delete account.rateLimitedAt
+      delete account.rateLimitUntil
+      if (account.status === 'rate_limited') {
+        account.status = 'active'
+      }
+      await this._saveAccountData(account)
+      logger.info(`✅ Removed rate limit for Bedrock account: ${account.name || accountId}`)
+      return { success: true }
+    } catch (error) {
+      logger.error(`❌ Failed to remove Bedrock account rate limit: ${accountId}`, error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  async isAccountRateLimited(accountId) {
+    try {
+      const account = await this._getAccountData(accountId)
+      if (account.rateLimitUntil) {
+        const now = new Date()
+        const until = new Date(account.rateLimitUntil)
+        if (until > now) {
+          return true
+        }
+        await this.removeAccountRateLimit(accountId)
+      }
+      return account.status === 'rate_limited'
+    } catch (error) {
+      logger.error(`❌ Failed to check Bedrock account rate limit: ${accountId}`, error)
+      return false
+    }
+  }
+
+  async markAccountTemporarilyUnavailable(accountId, ttlSeconds = this.TEMP_UNAVAILABLE_TTL_SECONDS) {
+    try {
+      const client = redis.getClientSafe()
+      const account = await this._getAccountData(accountId)
+      const now = new Date()
+      const until = new Date(now.getTime() + ttlSeconds * 1000)
+      if (account.status !== 'blocked' && account.status !== 'unauthorized') {
+        account.status = 'temporarily_unavailable'
+      }
+      account.tempUnavailableUntil = until.toISOString()
+      await this._saveAccountData(account)
+      await client.setex(`temp_unavailable:bedrock:${accountId}`, ttlSeconds, '1')
+      logger.warn(
+        `⏱️ Marked Bedrock account temporarily unavailable until ${until.toISOString()}: ${account.name || accountId}`
+      )
+      return { success: true, tempUnavailableUntil: until.toISOString() }
+    } catch (error) {
+      logger.error(
+        `❌ Failed to mark Bedrock account temporarily unavailable: ${accountId}`,
+        error
+      )
+      return { success: false, error: error.message }
+    }
+  }
+
+  async isAccountTemporarilyUnavailable(accountId) {
+    try {
+      const account = await this._getAccountData(accountId)
+      if (account.tempUnavailableUntil) {
+        const now = new Date()
+        const until = new Date(account.tempUnavailableUntil)
+        if (until > now) {
+          return true
+        }
+        delete account.tempUnavailableUntil
+        if (account.status === 'temporarily_unavailable') {
+          account.status = 'active'
+        }
+        await this._saveAccountData(account)
+      }
+      return account.status === 'temporarily_unavailable'
+    } catch (error) {
+      logger.error(
+        `❌ Failed to check Bedrock account temporary unavailable status: ${accountId}`,
+        error
+      )
+      return false
+    }
   }
 
   // 🔑 生成加密密钥（缓存优化）

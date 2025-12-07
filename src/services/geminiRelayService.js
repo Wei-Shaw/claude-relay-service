@@ -3,6 +3,7 @@ const ProxyHelper = require('../utils/proxyHelper')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
 const apiKeyService = require('./apiKeyService')
+const geminiAccountService = require('./geminiAccountService')
 
 // Gemini API 配置
 const GEMINI_API_BASE = 'https://cloudcode.googleapis.com/v1'
@@ -352,6 +353,35 @@ async function sendGeminiRequest({
     logger.debug('Sending request to Gemini API')
     const response = await axios(axiosConfig)
 
+    if (response.status === 200 && accountId) {
+      try {
+        const isRateLimited = await geminiAccountService.isAccountRateLimited(accountId)
+        if (isRateLimited) {
+          await geminiAccountService.removeAccountRateLimit(accountId)
+          logger.debug(`✅ Cleared rate limit status for Gemini account ${accountId}`)
+        }
+
+        const isUnauthorized = await geminiAccountService.isAccountUnauthorized(accountId)
+        if (isUnauthorized) {
+          await geminiAccountService.clearAccountUnauthorized(accountId)
+          logger.debug(`✅ Cleared unauthorized status for Gemini account ${accountId}`)
+        }
+
+        if (typeof geminiAccountService.isAccountOverloaded === 'function') {
+          const isOverloaded = await geminiAccountService.isAccountOverloaded(accountId)
+          if (
+            isOverloaded &&
+            typeof geminiAccountService.removeAccountOverload === 'function'
+          ) {
+            await geminiAccountService.removeAccountOverload(accountId)
+            logger.debug(`✅ Cleared overload for Gemini account ${accountId}`)
+          }
+        }
+      } catch (cleanupError) {
+        logger.error('❌ Failed to cleanup Gemini account status after success:', cleanupError)
+      }
+    }
+
     if (stream) {
       return handleStreamResponse(response, model, apiKeyId, accountId)
     } else {
@@ -379,6 +409,32 @@ async function sendGeminiRequest({
     }
   } catch (error) {
     let err
+    const status = error.response?.status
+
+    if (accountId) {
+      try {
+        if (status === 400 || status === 401) {
+          await geminiAccountService.markAccountUnauthorized(accountId)
+        } else if (status === 429) {
+          await geminiAccountService.markAccountRateLimited(accountId)
+        } else if (status === 403) {
+          await geminiAccountService.markAccountBlocked(accountId)
+        } else if (status === 529) {
+          await geminiAccountService.markAccountOverloaded(accountId)
+          logger.warn(`🚫 Marked Gemini account ${accountId} as overloaded (529)`)
+        } else if (status >= 500) {
+          await geminiAccountService.markAccountTemporarilyUnavailable(accountId)
+          logger.warn(
+            `🚫 Marked Gemini account ${accountId} as temporarily unavailable (${status})`
+          )
+        }
+      } catch (markError) {
+        logger.error(
+          `❌ Failed to update Gemini account status for ${accountId} after error:`,
+          markError
+        )
+      }
+    }
 
     // 检查是否是请求被中止
     if (error.name === 'CanceledError' || error.code === 'ECONNABORTED') {
@@ -386,50 +442,69 @@ async function sendGeminiRequest({
       err = new Error('Request canceled by client')
       err.status = 499
       err.statusCode = 499
+      err.accountId = accountId
       err.error = {
         message: 'Request canceled by client',
         type: 'canceled',
         code: 'request_canceled'
       }
       err.errorData = { error: err.error }
-    } else {
+    } else if (error.response) {
       logger.error('Gemini API request failed:', error.response?.data || error.message)
 
-      if (error.response) {
-        const geminiError = error.response.data?.error
-        const errorData = (error.response.data &&
+      const geminiError = error.response.data?.error
+      const baseMessage =
+        status === 400 || status === 401
+          ? 'Gemini API key invalid'
+          : geminiError?.message || 'Gemini API request failed'
+      const errorData =
+        (error.response.data &&
           typeof error.response.data === 'object' &&
           error.response.data) || {
           error: {
-            message: geminiError?.message || 'Gemini API request failed',
+            message: baseMessage,
             type: geminiError?.code || 'api_error',
             code: geminiError?.code
           }
         }
 
-        err = new Error(geminiError?.message || 'Gemini API request failed')
-        err.status = error.response.status
-        err.statusCode = error.response.status
-        err.isUpstream = true
-        err.accountId = accountId
-        err.error = errorData.error || {
-          message: geminiError?.message || 'Gemini API request failed',
-          type: geminiError?.code || 'api_error',
-          code: geminiError?.code
-        }
-        err.errorData = errorData
-      } else {
-        err = new Error(error.message)
-        err.status = error.status || error.statusCode || 500
-        err.statusCode = error.status || error.statusCode || 500
-        err.isUpstream = true
-        err.accountId = accountId
-        err.error = {
-          message: error.message,
-          type: 'network_error'
-        }
-        err.errorData = error.errorData || { error: err.error }
+      err = new Error(baseMessage)
+      err.status = error.response.status
+      err.statusCode = error.response.status
+      err.isUpstream = true
+      err.accountId = accountId
+      err.error = errorData.error || {
+        message: baseMessage,
+        type: geminiError?.code || (status === 429 ? 'rate_limit_error' : 'api_error'),
+        code: geminiError?.code
       }
+      err.errorData = errorData
+
+      if ((status === 529 || status >= 500) && account?.noFailover === true) {
+        const noFailoverHandled = handleNoFailoverError(
+          account,
+          res,
+          err.status || err.statusCode,
+          err.errorData || err.error
+        )
+        if (noFailoverHandled) {
+          err.noFailover = true
+          return noFailoverHandled
+        }
+      }
+    } else {
+      logger.error('Gemini API request failed:', error.message)
+
+      err = new Error(error.message)
+      err.status = error.status || error.statusCode || 500
+      err.statusCode = error.status || error.statusCode || 500
+      err.isUpstream = true
+      err.accountId = accountId
+      err.error = {
+        message: error.message,
+        type: 'network_error'
+      }
+      err.errorData = error.errorData || { error: err.error }
     }
 
     const noFailoverHandled = handleNoFailoverError(

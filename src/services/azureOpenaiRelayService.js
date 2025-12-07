@@ -2,6 +2,7 @@ const axios = require('axios')
 const ProxyHelper = require('../utils/proxyHelper')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
+const azureOpenaiAccountService = require('./azureOpenaiAccountService')
 
 // 转换模型名称（去掉 azure/ 前缀）
 function normalizeModelName(model) {
@@ -147,6 +148,44 @@ async function handleAzureOpenAIRequest({
       contentType: response.headers?.['content-type'] || 'unknown'
     })
 
+    // 成功响应后清理异常状态
+    if (account?.id && (response.status === 200 || response.status === 201)) {
+      try {
+        const isRateLimited = await azureOpenaiAccountService.isAccountRateLimited(account.id)
+        if (isRateLimited) {
+          await azureOpenaiAccountService.removeAccountRateLimit(account.id)
+          logger.debug(`✅ Cleared rate limit status for Azure OpenAI account ${account.id}`)
+        }
+
+        const isUnauthorized = await azureOpenaiAccountService.isAccountUnauthorized(account.id)
+        if (isUnauthorized) {
+          await azureOpenaiAccountService.clearAccountUnauthorized(account.id)
+          logger.debug(`✅ Cleared unauthorized status for Azure OpenAI account ${account.id}`)
+        }
+
+        const isBlocked = await azureOpenaiAccountService.isAccountBlocked(account.id)
+        if (isBlocked) {
+          await azureOpenaiAccountService.clearAccountBlocked(account.id)
+          logger.debug(`✅ Cleared blocked status for Azure OpenAI account ${account.id}`)
+        }
+
+        if (typeof azureOpenaiAccountService.isAccountOverloaded === 'function') {
+          const isOverloaded = await azureOpenaiAccountService.isAccountOverloaded(account.id)
+          if (
+            isOverloaded &&
+            typeof azureOpenaiAccountService.removeAccountOverload === 'function'
+          ) {
+            await azureOpenaiAccountService.removeAccountOverload(account.id)
+            logger.debug(`✅ Cleared overload for Azure OpenAI account ${account.id}`)
+          }
+        }
+      } catch (cleanupError) {
+        logger.warn(
+          `⚠️ Failed to cleanup account status after successful Azure OpenAI response: ${cleanupError.message}`
+        )
+      }
+    }
+
     return response
   } catch (error) {
     const errorDetails = {
@@ -195,6 +234,9 @@ async function handleAzureOpenAIRequest({
     error.errorData = error.errorData || errorData
     error.statusCode = error.statusCode || inferredStatus
     error.accountId = error.accountId || account?.id || null
+    const status = error.response?.status
+    const statusForReturn = status || inferredStatus
+    const accountId = account?.id || error.accountId || null
 
     // 特殊错误类型的详细日志
     if (error.code === 'ENOTFOUND') {
@@ -241,6 +283,106 @@ async function handleAzureOpenAIRequest({
       })
     } else {
       logger.error('Azure OpenAI Request Failed', errorDetails)
+    }
+
+    // 错误类型处理与账户状态标记
+    if (status === 401 || status === 402) {
+      if (account?.id) {
+        try {
+          await azureOpenaiAccountService.markAccountUnauthorized(account.id)
+        } catch (markError) {
+          logger.warn(
+            `Failed to mark Azure OpenAI account ${account.id} as unauthorized: ${markError.message}`
+          )
+        }
+      }
+
+      if (account?.noFailover === true) {
+        return {
+          status: statusForReturn,
+          statusText: error.response?.statusText || error.message,
+          headers: error.response?.headers || {},
+          data: errorData,
+          errorData,
+          isErrorResponse: true
+        }
+      }
+
+      const authError = new Error('Azure OpenAI Unauthorized')
+      authError.statusCode = statusForReturn
+      authError.accountId = account?.id || null
+      authError.errorData = errorData
+      throw authError
+    } else if (status === 403) {
+      if (accountId) {
+        try {
+          await azureOpenaiAccountService.markAccountBlocked(accountId)
+        } catch (markError) {
+          logger.warn(
+            `Failed to mark Azure OpenAI account ${accountId} as blocked: ${markError.message}`
+          )
+        }
+      }
+
+      if (account?.noFailover === true) {
+        return {
+          status: statusForReturn,
+          statusText: error.response?.statusText || error.message,
+          headers: error.response?.headers || {},
+          data: errorData,
+          errorData,
+          isErrorResponse: true,
+          accountId
+        }
+      }
+
+      throw error
+    } else if (status === 429) {
+      if (account?.id) {
+        try {
+          await azureOpenaiAccountService.markAccountRateLimited(account.id)
+        } catch (markError) {
+          logger.warn(
+            `Failed to mark Azure OpenAI account ${account.id} as rate limited: ${markError.message}`
+          )
+        }
+      }
+
+      if (account?.noFailover === true) {
+        return {
+          status: statusForReturn,
+          statusText: error.response?.statusText || error.message,
+          headers: error.response?.headers || {},
+          data: errorData,
+          errorData,
+          isErrorResponse: true
+        }
+      }
+
+      throw error
+    } else if (status >= 500) {
+      if (account?.id) {
+        try {
+          await azureOpenaiAccountService.markAccountTemporarilyUnavailable(account.id)
+        } catch (markError) {
+          logger.warn(
+            `Failed to mark Azure OpenAI account ${account.id} as temporarily unavailable: ${markError.message}`
+          )
+        }
+      }
+
+      if (account?.noFailover === true) {
+        return {
+          status: statusForReturn,
+          statusText: error.response?.statusText || error.message,
+          headers: error.response?.headers || {},
+          data: errorData,
+          errorData,
+          isErrorResponse: true
+        }
+      }
+
+      throw error
     }
 
     if (account?.noFailover === true) {
