@@ -3,7 +3,6 @@ const axios = require('axios')
 const router = express.Router()
 const logger = require('../utils/logger')
 const { executeWithFailover } = require('../utils/failoverWrapper')
-const failoverHelper = require('../utils/failoverHelper')
 const config = require('../../config/config')
 const { authenticateApiKey } = require('../middleware/auth')
 const unifiedOpenAIScheduler = require('../services/unifiedOpenAIScheduler')
@@ -478,9 +477,7 @@ const handleResponses = async (req, res) => {
           }
 
           // 抛出错误以触发 failover，同时避免重复标记临时不可用
-          const rateLimitError = new Error(
-            `Rate limit exceeded for OpenAI account ${accountId}`
-          )
+          const rateLimitError = new Error(`Rate limit exceeded for OpenAI account ${accountId}`)
           rateLimitError.status = 429
           rateLimitError.statusCode = 429
           rateLimitError.accountId = accountId
