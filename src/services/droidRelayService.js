@@ -26,7 +26,7 @@ class DroidRelayService {
       comm: '/o/v1/chat/completions'
     }
 
-    this.userAgent = 'factory-cli/0.19.12'
+    this.userAgent = 'factory-cli/0.32.1'
     this.systemPrompt = SYSTEM_PROMPT
     this.API_KEY_STICKY_PREFIX = 'droid_api_key'
   }
@@ -241,7 +241,8 @@ class DroidRelayService {
         accessToken,
         normalizedRequestBody,
         normalizedEndpoint,
-        clientHeaders
+        clientHeaders,
+        account
       )
 
       if (selectedApiKey) {
@@ -982,11 +983,13 @@ class DroidRelayService {
   /**
    * 构建请求头
    */
-  _buildHeaders(accessToken, requestBody, endpointType, clientHeaders = {}) {
+  _buildHeaders(accessToken, requestBody, endpointType, clientHeaders = {}, account = null) {
+    // 使用账户配置的 userAgent 或默认值
+    const userAgent = account?.userAgent || this.userAgent
     const headers = {
       'content-type': 'application/json',
       authorization: `Bearer ${accessToken}`,
-      'user-agent': this.userAgent,
+      'user-agent': userAgent,
       'x-factory-client': 'cli',
       connection: 'keep-alive'
     }
@@ -1003,9 +1006,15 @@ class DroidRelayService {
       }
     }
 
-    // OpenAI 特定头
+    // OpenAI 特定头 - 根据模型动态选择 provider
     if (endpointType === 'openai') {
-      headers['x-api-provider'] = 'azure_openai'
+      const model = (requestBody?.model || '').toLowerCase()
+      // -max 模型使用 openai provider，其他使用 azure_openai
+      if (model.includes('-max')) {
+        headers['x-api-provider'] = 'openai'
+      } else {
+        headers['x-api-provider'] = 'azure_openai'
+      }
     }
 
     // Comm 端点根据模型动态设置 provider
