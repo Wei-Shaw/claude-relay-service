@@ -1771,6 +1771,25 @@
               </p>
             </div>
 
+            <!-- 不触发 Failover 配置 -->
+            <div v-if="showNoFailoverOption" class="mt-1">
+              <label class="flex items-start">
+                <input
+                  v-model="form.noFailover"
+                  class="mt-1 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  type="checkbox"
+                />
+                <div class="ml-3">
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    不触发 Failover（调试用）
+                  </span>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    启用后，该账户遇到错误时将直接返回给客户端，不会尝试其他账户
+                  </p>
+                </div>
+              </label>
+            </div>
+
             <!-- 手动输入 Token 字段 -->
             <div
               v-if="
@@ -2720,6 +2739,25 @@
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
               数字越小优先级越高，建议范围：1-100
             </p>
+          </div>
+
+          <!-- 不触发 Failover 配置（编辑模式） -->
+          <div v-if="showNoFailoverOption" class="mt-1">
+            <label class="flex items-start">
+              <input
+                v-model="form.noFailover"
+                class="mt-1 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                type="checkbox"
+              />
+              <div class="ml-3">
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  不触发 Failover（调试用）
+                </span>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  启用后，该账户遇到错误时将直接返回给客户端，不会尝试其他账户
+                </p>
+              </div>
+            </label>
           </div>
 
           <!-- Claude Console 和 CCR 特定字段（编辑模式）-->
@@ -3919,6 +3957,7 @@ const form = ref({
   useUnifiedUserAgent: props.account?.useUnifiedUserAgent || false, // 使用统一Claude Code版本
   useUnifiedClientId: props.account?.useUnifiedClientId || false, // 使用统一的客户端标识
   unifiedClientId: props.account?.unifiedClientId || '', // 统一的客户端标识
+  noFailover: props.account?.noFailover === true, // 遇错时不触发 Failover
   groupId: '',
   groupIds: [],
   projectId: props.account?.projectId || '',
@@ -3988,6 +4027,12 @@ const form = ref({
   })(),
   expiresAt: props.account?.expiresAt || null
 })
+
+const showNoFailoverOption = computed(() =>
+  ['claude', 'gemini', 'openai-responses', 'bedrock', 'azure_openai', 'droid'].includes(
+    form.value.platform
+  )
+)
 
 // 模型限制配置
 const modelRestrictionMode = ref('whitelist') // 'whitelist' 或 'mapping'
@@ -4645,6 +4690,7 @@ const handleOAuthSuccess = async (tokenInfoOrList) => {
       data.useUnifiedUserAgent = form.value.useUnifiedUserAgent || false
       data.useUnifiedClientId = form.value.useUnifiedClientId || false
       data.unifiedClientId = form.value.unifiedClientId || ''
+      data.noFailover = form.value.noFailover === true
       // 添加订阅类型信息
       data.subscriptionInfo = {
         accountType: form.value.subscriptionType || 'claude_max',
@@ -4660,6 +4706,7 @@ const handleOAuthSuccess = async (tokenInfoOrList) => {
       }
       // 添加 Gemini 优先级
       data.priority = form.value.priority || 50
+      data.noFailover = form.value.noFailover === true
     } else if (currentPlatform === 'openai') {
       data.openaiOauth = tokenInfo.tokens || tokenInfo
       data.accountInfo = tokenInfo.accountInfo
@@ -4695,6 +4742,7 @@ const handleOAuthSuccess = async (tokenInfoOrList) => {
       data.platform = 'droid'
       data.tokenType = normalizedTokens.tokenType
       data.authenticationMethod = normalizedTokens.authenticationMethod
+      data.noFailover = form.value.noFailover === true
 
       if (normalizedTokens.organizationId) {
         data.organizationId = normalizedTokens.organizationId
@@ -4968,6 +5016,7 @@ const createAccount = async () => {
       data.useUnifiedUserAgent = form.value.useUnifiedUserAgent || false
       data.useUnifiedClientId = form.value.useUnifiedClientId || false
       data.unifiedClientId = form.value.unifiedClientId || ''
+      data.noFailover = form.value.noFailover === true
       // 添加订阅类型信息
       data.subscriptionInfo = {
         accountType: form.value.subscriptionType || 'claude_max',
@@ -4995,6 +5044,7 @@ const createAccount = async () => {
 
       // 添加 Gemini 优先级
       data.priority = form.value.priority || 50
+      data.noFailover = form.value.noFailover === true
     } else if (form.value.platform === 'openai') {
       // OpenAI手动模式需要构建openaiOauth对象
       const expiresInMs = form.value.refreshToken
@@ -5028,6 +5078,7 @@ const createAccount = async () => {
       data.priority = form.value.priority || 50
       data.endpointType = form.value.endpointType || 'anthropic'
       data.platform = 'droid'
+      data.noFailover = form.value.noFailover === true
 
       if (form.value.addType === 'apikey') {
         const apiKeys = parseApiKeysInput(form.value.apiKeysInput)
@@ -5074,6 +5125,7 @@ const createAccount = async () => {
       data.rateLimitDuration = 60 // 默认值60，不从用户输入获取
       data.dailyQuota = form.value.dailyQuota || 0
       data.quotaResetTime = form.value.quotaResetTime || '00:00'
+      data.noFailover = form.value.noFailover === true
     } else if (form.value.platform === 'gemini-api') {
       // Gemini API 账户特定数据
       data.baseUrl = form.value.baseUrl || 'https://generativelanguage.googleapis.com'
@@ -5095,6 +5147,7 @@ const createAccount = async () => {
       data.priority = form.value.priority || 50
       // 如果不启用限流，传递 0 表示不限流
       data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
+      data.noFailover = form.value.noFailover === true
     } else if (form.value.platform === 'azure_openai') {
       // Azure OpenAI 账户特定数据
       data.azureEndpoint = form.value.azureEndpoint
@@ -5107,6 +5160,7 @@ const createAccount = async () => {
       data.priority = form.value.priority || 50
       data.isActive = form.value.isActive !== false
       data.schedulable = form.value.schedulable !== false
+      data.noFailover = form.value.noFailover === true
     }
 
     let result
@@ -5344,6 +5398,7 @@ const updateAccount = async () => {
     if (props.account.platform === 'droid') {
       data.priority = form.value.priority || 50
       data.endpointType = form.value.endpointType || 'anthropic'
+      data.noFailover = form.value.noFailover === true
     }
 
     // Claude 官方账号优先级和订阅类型更新
@@ -5358,6 +5413,7 @@ const updateAccount = async () => {
       data.useUnifiedUserAgent = form.value.useUnifiedUserAgent || false
       data.useUnifiedClientId = form.value.useUnifiedClientId || false
       data.unifiedClientId = form.value.unifiedClientId || ''
+      data.noFailover = form.value.noFailover === true
       // 更新订阅类型信息
       data.subscriptionInfo = {
         accountType: form.value.subscriptionType || 'claude_max',
@@ -5375,6 +5431,7 @@ const updateAccount = async () => {
     // Gemini 账号优先级更新
     if (props.account.platform === 'gemini') {
       data.priority = form.value.priority || 50
+      data.noFailover = form.value.noFailover === true
     }
 
     // Claude Console 特定更新
@@ -5405,6 +5462,7 @@ const updateAccount = async () => {
       }
       data.userAgent = form.value.userAgent || ''
       data.priority = form.value.priority || 50
+      data.noFailover = form.value.noFailover === true
       // 编辑时不上传 rateLimitDuration，保持原值
       data.dailyQuota = form.value.dailyQuota || 0
       data.quotaResetTime = form.value.quotaResetTime || '00:00'
@@ -5434,6 +5492,7 @@ const updateAccount = async () => {
       data.priority = form.value.priority || 50
       // 如果不启用限流，传递 0 表示不限流
       data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
+      data.noFailover = form.value.noFailover === true
     }
 
     // Azure OpenAI 特定更新
@@ -5445,6 +5504,7 @@ const updateAccount = async () => {
         ? form.value.supportedModels
         : []
       data.priority = form.value.priority || 50
+      data.noFailover = form.value.noFailover === true
       // 只有当有新的 API Key 时才更新
       if (form.value.apiKey && form.value.apiKey.trim()) {
         data.apiKey = form.value.apiKey

@@ -47,6 +47,7 @@ class OpenAIResponsesAccountService {
       isActive = true,
       accountType = 'shared', // 'dedicated' or 'shared'
       schedulable = true, // 是否可被调度
+      noFailover = false, // 是否禁用 failover（默认false，即允许failover）
       dailyQuota = 0, // 每日额度限制（美元），0表示不限制
       quotaResetTime = '00:00', // 额度重置时间（HH:mm格式）
       rateLimitDuration = 60 // 限流时间（分钟）
@@ -75,6 +76,7 @@ class OpenAIResponsesAccountService {
       isActive: isActive.toString(),
       accountType,
       schedulable: schedulable.toString(),
+      noFailover: noFailover.toString(), // 转为字符串存储，读取时转换回布尔值
 
       // ✅ 新增：账户订阅到期时间（业务字段，手动管理）
       // 注意：OpenAI-Responses 使用 API Key 认证，没有 OAuth token，因此没有 expiresAt
@@ -120,6 +122,9 @@ class OpenAIResponsesAccountService {
     // 解密敏感数据
     accountData.apiKey = this._decryptSensitiveData(accountData.apiKey)
 
+    // 转换布尔值字段
+    accountData.noFailover = accountData.noFailover === 'true' || accountData.noFailover === true
+
     // 解析 JSON 字段
     if (accountData.proxy) {
       try {
@@ -147,6 +152,11 @@ class OpenAIResponsesAccountService {
     // 处理 JSON 字段
     if (updates.proxy !== undefined) {
       updates.proxy = updates.proxy ? JSON.stringify(updates.proxy) : ''
+    }
+
+    // 处理布尔值字段
+    if (updates.noFailover !== undefined) {
+      updates.noFailover = updates.noFailover.toString()
     }
 
     // 规范化 baseApi

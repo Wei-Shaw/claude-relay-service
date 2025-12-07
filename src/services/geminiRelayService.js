@@ -68,7 +68,17 @@ function convertGeminiResponse(geminiResponse, model, stream = false) {
     // 非流式响应
     const candidate = geminiResponse.candidates?.[0]
     if (!candidate) {
-      throw new Error('No response from Gemini')
+      const error = new Error('No response from Gemini')
+      error.status = 502
+      error.statusCode = 502
+      error.errorData = {
+        error: {
+          message: 'No response from Gemini',
+          type: 'api_error',
+          code: 'no_response'
+        }
+      }
+      throw error
     }
 
     const content = candidate.content?.parts?.[0]?.text || ''
@@ -102,6 +112,45 @@ function convertGeminiResponse(geminiResponse, model, stream = false) {
         total_tokens: usage.totalTokenCount
       }
     }
+  }
+}
+
+// noFailover 辅助：在需要时直接向客户端返回错误
+function handleNoFailoverError(account, res, status, errorData) {
+  if (!account || account.noFailover !== true) {
+    return null
+  }
+
+  const responseStatus = status || 500
+  let responseData = errorData
+
+  // 规范化错误数据结构
+  if (!responseData || typeof responseData !== 'object') {
+    responseData = {
+      error: {
+        message: typeof errorData === 'string' ? errorData : 'Gemini API request failed',
+        type: 'api_error'
+      }
+    }
+  } else if (!responseData.error) {
+    responseData = { error: responseData }
+  }
+
+  let responseSent = false
+  if (res && !res.headersSent) {
+    res.status(responseStatus).json(responseData)
+    responseSent = true
+  }
+
+  logger.info(
+    `Account ${account.name || account.id} has noFailover=true, returning ${responseStatus} error directly`
+  )
+
+  return {
+    noFailoverHandled: true,
+    responseSent,
+    status: responseStatus,
+    errorData: responseData
   }
 }
 
@@ -229,7 +278,9 @@ async function sendGeminiRequest({
   signal,
   projectId,
   location = 'us-central1',
-  accountId = null
+  accountId = null,
+  account = null,
+  res = null
 }) {
   // 确保模型名称格式正确
   if (!model.startsWith('models/')) {
@@ -327,46 +378,72 @@ async function sendGeminiRequest({
       return openaiResponse
     }
   } catch (error) {
+    let err
+
     // 检查是否是请求被中止
     if (error.name === 'CanceledError' || error.code === 'ECONNABORTED') {
       logger.info('Gemini request was aborted by client')
-      const err = new Error('Request canceled by client')
+      err = new Error('Request canceled by client')
       err.status = 499
+      err.statusCode = 499
       err.error = {
         message: 'Request canceled by client',
         type: 'canceled',
         code: 'request_canceled'
       }
-      throw err
-    }
+      err.errorData = { error: err.error }
+    } else {
+      logger.error('Gemini API request failed:', error.response?.data || error.message)
 
-    logger.error('Gemini API request failed:', error.response?.data || error.message)
+      if (error.response) {
+        const geminiError = error.response.data?.error
+        const errorData = (error.response.data &&
+          typeof error.response.data === 'object' &&
+          error.response.data) || {
+          error: {
+            message: geminiError?.message || 'Gemini API request failed',
+            type: geminiError?.code || 'api_error',
+            code: geminiError?.code
+          }
+        }
 
-    // 转换错误格式
-    if (error.response) {
-      const geminiError = error.response.data?.error
-      const err = new Error(geminiError?.message || 'Gemini API request failed')
-      err.status = error.response.status
-      err.statusCode = error.response.status
-      err.isUpstream = true
-      err.accountId = accountId
-      err.error = {
-        message: geminiError?.message || 'Gemini API request failed',
-        type: geminiError?.code || 'api_error',
-        code: geminiError?.code
+        err = new Error(geminiError?.message || 'Gemini API request failed')
+        err.status = error.response.status
+        err.statusCode = error.response.status
+        err.isUpstream = true
+        err.accountId = accountId
+        err.error = errorData.error || {
+          message: geminiError?.message || 'Gemini API request failed',
+          type: geminiError?.code || 'api_error',
+          code: geminiError?.code
+        }
+        err.errorData = errorData
+      } else {
+        err = new Error(error.message)
+        err.status = error.status || error.statusCode || 500
+        err.statusCode = error.status || error.statusCode || 500
+        err.isUpstream = true
+        err.accountId = accountId
+        err.error = {
+          message: error.message,
+          type: 'network_error'
+        }
+        err.errorData = error.errorData || { error: err.error }
       }
-      throw err
     }
 
-    const err = new Error(error.message)
-    err.status = 500
-    err.statusCode = 500
-    err.isUpstream = true
-    err.accountId = accountId
-    err.error = {
-      message: error.message,
-      type: 'network_error'
+    const noFailoverHandled = handleNoFailoverError(
+      account,
+      res,
+      err.status || err.statusCode,
+      err.errorData || err.error
+    )
+    if (noFailoverHandled) {
+      err.noFailover = true
+      return noFailoverHandled
     }
+
+    err.noFailover = account?.noFailover === true
     throw err
   }
 }
@@ -439,7 +516,9 @@ async function countTokens({
   accessToken,
   proxy,
   projectId,
-  location = 'us-central1'
+  location = 'us-central1',
+  account = null,
+  res = null
 }) {
   // 确保模型名称格式正确
   if (!model.startsWith('models/')) {
@@ -553,6 +632,22 @@ async function countTokens({
         type: geminiError?.code || 'api_error',
         code: geminiError?.code
       }
+      errorObj.errorData = (error.response.data &&
+        typeof error.response.data === 'object' &&
+        error.response.data) || { error: errorObj.error }
+
+      const noFailoverHandled = handleNoFailoverError(
+        account,
+        res,
+        errorObj.status || errorObj.statusCode,
+        errorObj.errorData
+      )
+      if (noFailoverHandled) {
+        errorObj.noFailover = true
+        return noFailoverHandled
+      }
+
+      errorObj.noFailover = account?.noFailover === true
       throw errorObj
     }
 
@@ -565,6 +660,20 @@ async function countTokens({
       message: error.message,
       type: 'network_error'
     }
+    errorObj.errorData = { error: errorObj.error }
+
+    const noFailoverHandled = handleNoFailoverError(
+      account,
+      res,
+      errorObj.status || errorObj.statusCode,
+      errorObj.errorData
+    )
+    if (noFailoverHandled) {
+      errorObj.noFailover = true
+      return noFailoverHandled
+    }
+
+    errorObj.noFailover = account?.noFailover === true
     throw errorObj
   }
 }

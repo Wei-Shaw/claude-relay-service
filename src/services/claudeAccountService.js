@@ -85,6 +85,7 @@ class ClaudeAccountService {
       platform = 'claude',
       priority = 50, // 调度优先级 (1-100，数字越小优先级越高)
       schedulable = true, // 是否可被调度
+      noFailover = false, // 是否禁用 failover（默认false，即允许failover）
       subscriptionInfo = null, // 手动设置的订阅信息
       autoStopOnWarning = false, // 5小时使用量接近限制时自动停止调度
       useUnifiedUserAgent = false, // 是否使用统一Claude Code版本的User-Agent
@@ -123,6 +124,7 @@ class ClaudeAccountService {
         status: 'active', // 有OAuth数据的账户直接设为active
         errorMessage: '',
         schedulable: schedulable.toString(), // 是否可被调度
+        noFailover: noFailover.toString(), // 是否禁用 failover
         autoStopOnWarning: autoStopOnWarning.toString(), // 5小时使用量接近限制时自动停止调度
         useUnifiedUserAgent: useUnifiedUserAgent.toString(), // 是否使用统一Claude Code版本的User-Agent
         useUnifiedClientId: useUnifiedClientId.toString(), // 是否使用统一的客户端标识
@@ -161,6 +163,7 @@ class ClaudeAccountService {
         status: 'created', // created, active, expired, error
         errorMessage: '',
         schedulable: schedulable.toString(), // 是否可被调度
+        noFailover: noFailover.toString(), // 是否禁用 failover
         autoStopOnWarning: autoStopOnWarning.toString(), // 5小时使用量接近限制时自动停止调度
         useUnifiedUserAgent: useUnifiedUserAgent.toString(), // 是否使用统一Claude Code版本的User-Agent
         // 手动设置的订阅信息
@@ -424,6 +427,8 @@ class ClaudeAccountService {
         return null
       }
 
+      accountData.noFailover = accountData.noFailover === 'true' || accountData.noFailover === true
+
       return accountData
     } catch (error) {
       logger.error('❌ Failed to get Claude account:', error)
@@ -660,6 +665,7 @@ class ClaudeAccountService {
         'accountType',
         'priority',
         'schedulable',
+        'noFailover',
         'subscriptionInfo',
         'autoStopOnWarning',
         'useUnifiedUserAgent',
@@ -683,6 +689,8 @@ class ClaudeAccountService {
             updatedData[field] = value ? JSON.stringify(value) : ''
           } else if (field === 'priority') {
             updatedData[field] = value.toString()
+          } else if (field === 'noFailover') {
+            updatedData[field] = value !== null && value !== undefined ? value.toString() : ''
           } else if (field === 'subscriptionInfo') {
             // 处理订阅信息更新
             updatedData[field] = typeof value === 'string' ? value : JSON.stringify(value)

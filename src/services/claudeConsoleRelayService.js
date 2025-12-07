@@ -35,7 +35,11 @@ class ClaudeConsoleRelayService {
       // 获取账户信息
       account = await claudeConsoleAccountService.getAccount(accountId)
       if (!account) {
-        throw new Error('Claude Console Claude account not found')
+        const notFoundError = new Error('Claude Console Claude account not found')
+        notFoundError.statusCode = 404
+        notFoundError.accountId = accountId
+        notFoundError.errorData = { error: { message: 'Claude Console Claude account not found' } }
+        throw notFoundError
       }
 
       const autoProtectionDisabled = account.disableAutoProtection === true
@@ -65,6 +69,26 @@ class ClaudeConsoleRelayService {
           const error = new Error('Console account concurrency limit reached')
           error.code = 'CONSOLE_ACCOUNT_CONCURRENCY_FULL'
           error.accountId = accountId
+          error.statusCode = 503
+          error.errorData = {
+            error: {
+              message: 'Console account concurrency limit reached',
+              code: 'CONSOLE_ACCOUNT_CONCURRENCY_FULL'
+            }
+          }
+
+          if (account.noFailover === true) {
+            logger.info(
+              `Account ${account.name} has noFailover=true, returning concurrency error directly`
+            )
+            return {
+              statusCode: error.statusCode,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(error.errorData),
+              accountId
+            }
+          }
+
           throw error
         }
 
@@ -339,12 +363,36 @@ class ClaudeConsoleRelayService {
       logger.debug(`[DEBUG] Final response body to return: ${responseBody.substring(0, 200)}...`)
 
       if (response.status >= 500) {
+        let upstreamErrorData = null
+        try {
+          upstreamErrorData =
+            typeof responseBody === 'string' && responseBody.trim()
+              ? JSON.parse(responseBody)
+              : responseBody
+        } catch (parseErr) {
+          upstreamErrorData = responseBody
+        }
+
         const upstreamError = new Error(
           responseBody || `Claude Console upstream error: ${response.status}`
         )
         upstreamError.statusCode = response.status
         upstreamError.isUpstream = true
         upstreamError.accountId = accountId
+        upstreamError.errorData = upstreamErrorData
+
+        if (account.noFailover === true) {
+          logger.info(
+            `Account ${account.name} has noFailover=true, returning ${response.status} error directly`
+          )
+          return {
+            statusCode: response.status,
+            headers: response.headers,
+            body: responseBody,
+            accountId
+          }
+        }
+
         throw upstreamError
       }
 
@@ -363,7 +411,24 @@ class ClaudeConsoleRelayService {
         error.code === 'ERR_CANCELED'
       ) {
         logger.info('Request aborted due to client disconnect')
-        throw new Error('Client disconnected')
+        const clientDisconnectError = new Error('Client disconnected')
+        clientDisconnectError.statusCode = 499
+        clientDisconnectError.accountId = accountId
+        clientDisconnectError.errorData = { error: { message: 'Client disconnected' } }
+
+        if (account?.noFailover === true) {
+          logger.info(
+            `Account ${account.name} has noFailover=true, returning client disconnect error directly`
+          )
+          return {
+            statusCode: clientDisconnectError.statusCode,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(clientDisconnectError.errorData),
+            accountId
+          }
+        }
+
+        throw clientDisconnectError
       }
 
       logger.error(
@@ -380,6 +445,45 @@ class ClaudeConsoleRelayService {
         error.statusCode = error.response?.status || (error.code === 'ETIMEDOUT' ? 504 : 502)
         error.isUpstream = true
         error.accountId = accountId
+      }
+
+      if (error.errorData === undefined) {
+        if (error.response?.data !== undefined) {
+          try {
+            const upstreamData =
+              typeof error.response.data === 'string'
+                ? JSON.parse(error.response.data)
+                : error.response.data
+            error.errorData = sanitizeUpstreamError(upstreamData)
+          } catch (parseErr) {
+            const rawText =
+              typeof error.response?.data === 'string'
+                ? error.response.data
+                : JSON.stringify(error.response?.data || '')
+            error.errorData = {
+              error: sanitizeErrorMessage(rawText) || error.message || 'Unknown error'
+            }
+          }
+        } else {
+          error.errorData = { error: error.message || 'Unknown error' }
+        }
+      }
+
+      if (account?.noFailover === true) {
+        logger.info(
+          `Account ${account.name} has noFailover=true, returning ${error.statusCode || error.response?.status || 500} error directly`
+        )
+        const statusCode = error.statusCode || error.response?.status || 500
+        const body =
+          typeof error.errorData === 'string'
+            ? error.errorData
+            : JSON.stringify(error.errorData || { error: error.message || 'Unknown error' })
+        return {
+          statusCode,
+          headers: { 'Content-Type': 'application/json' },
+          body,
+          accountId
+        }
       }
 
       throw error
@@ -421,7 +525,11 @@ class ClaudeConsoleRelayService {
       // 获取账户信息
       account = await claudeConsoleAccountService.getAccount(accountId)
       if (!account) {
-        throw new Error('Claude Console Claude account not found')
+        const notFoundError = new Error('Claude Console Claude account not found')
+        notFoundError.statusCode = 404
+        notFoundError.accountId = accountId
+        notFoundError.errorData = { error: { message: 'Claude Console Claude account not found' } }
+        throw notFoundError
       }
 
       logger.info(
@@ -449,6 +557,31 @@ class ClaudeConsoleRelayService {
           const error = new Error('Console account concurrency limit reached')
           error.code = 'CONSOLE_ACCOUNT_CONCURRENCY_FULL'
           error.accountId = accountId
+          error.statusCode = 503
+          error.errorData = {
+            error: {
+              message: 'Console account concurrency limit reached',
+              code: 'CONSOLE_ACCOUNT_CONCURRENCY_FULL'
+            }
+          }
+
+          if (account.noFailover === true) {
+            logger.info(
+              `Account ${account.name} has noFailover=true, returning concurrency error directly`
+            )
+            if (!responseStream.headersSent) {
+              responseStream.writeHead(error.statusCode, {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache'
+              })
+            }
+            if (!responseStream.destroyed) {
+              responseStream.write(JSON.stringify(error.errorData))
+              responseStream.end()
+            }
+            return
+          }
+
           throw error
         }
 
@@ -525,6 +658,27 @@ class ClaudeConsoleRelayService {
         `❌ Claude Console stream relay failed (Account: ${account?.name || accountId}):`,
         error
       )
+      if (error.errorData === undefined) {
+        error.errorData = { error: error.message || 'Unknown error' }
+      }
+
+      if (account?.noFailover === true) {
+        logger.info(`Account ${account.name} has noFailover=true, returning stream error directly`)
+        if (!responseStream.headersSent) {
+          responseStream.writeHead(error.statusCode || error.response?.status || 500, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache'
+          })
+        }
+        if (!responseStream.destroyed) {
+          const errorBody =
+            typeof error.errorData === 'string' ? error.errorData : JSON.stringify(error.errorData)
+          responseStream.write(errorBody)
+          responseStream.end()
+        }
+        return
+      }
+
       throw error
     } finally {
       // 🛑 清理租约刷新定时器
@@ -638,6 +792,7 @@ class ClaudeConsoleRelayService {
             // 收集错误数据用于检测
             let errorDataForCheck = ''
             const errorChunks = []
+            let sanitizedErrorData = null
 
             response.data.on('data', (chunk) => {
               errorChunks.push(chunk)
@@ -720,6 +875,7 @@ class ClaudeConsoleRelayService {
                 const fullErrorData = Buffer.concat(errorChunks).toString()
                 const errorJson = JSON.parse(fullErrorData)
                 const sanitizedError = sanitizeUpstreamError(errorJson)
+                sanitizedErrorData = sanitizedError
 
                 // 记录清理后的错误消息（发送给客户端的，完整记录）
                 logger.error(
@@ -733,6 +889,7 @@ class ClaudeConsoleRelayService {
               } catch (parseError) {
                 const sanitizedText = sanitizeErrorMessage(errorDataForCheck)
                 logger.error(`🧹 [Stream] [SANITIZED] Error response to client: ${sanitizedText}`)
+                sanitizedErrorData = sanitizedText
 
                 if (!responseStream.destroyed) {
                   responseStream.write(sanitizedText)
@@ -745,6 +902,14 @@ class ClaudeConsoleRelayService {
               upstreamError.statusCode = response.status
               upstreamError.isUpstream = true
               upstreamError.accountId = accountId
+              upstreamError.errorData = sanitizedErrorData
+              if (account.noFailover === true) {
+                logger.info(
+                  `Account ${account.name} has noFailover=true, returning ${response.status} stream error directly`
+                )
+                resolve()
+                return
+              }
               reject(upstreamError)
             })
 
@@ -995,6 +1160,16 @@ class ClaudeConsoleRelayService {
               resolve()
             } catch (error) {
               logger.error('❌ Error processing stream end:', error)
+              if (error && error.errorData === undefined) {
+                error.errorData = { error: error.message || 'Stream end processing error' }
+              }
+              if (account.noFailover === true) {
+                logger.info(
+                  `Account ${account.name} has noFailover=true, suppressing failover after stream end error`
+                )
+                resolve()
+                return
+              }
               reject(error)
             }
           })
@@ -1027,6 +1202,17 @@ class ClaudeConsoleRelayService {
             upstreamError.isUpstream = true
             upstreamError.accountId = accountId
             upstreamError.code = error.code
+            upstreamError.errorData = {
+              error: error.message || 'Stream error',
+              code: error.code
+            }
+            if (account.noFailover === true) {
+              logger.info(
+                `Account ${account.name} has noFailover=true, returning stream transport error directly`
+              )
+              resolve()
+              return
+            }
             reject(upstreamError)
           })
         })
@@ -1099,6 +1285,34 @@ class ClaudeConsoleRelayService {
           upstreamError.isUpstream = true
           upstreamError.accountId = accountId
           upstreamError.code = error.code
+          try {
+            const upstreamData =
+              typeof error.response?.data === 'string'
+                ? JSON.parse(error.response.data)
+                : error.response?.data
+            upstreamError.errorData =
+              upstreamData !== undefined
+                ? sanitizeUpstreamError(upstreamData)
+                : { error: error.message || 'Claude Console stream request failed' }
+          } catch (parseError) {
+            const rawText =
+              typeof error.response?.data === 'string'
+                ? error.response.data
+                : JSON.stringify(error.response?.data || '')
+            upstreamError.errorData = {
+              error:
+                sanitizeErrorMessage(rawText) ||
+                error.message ||
+                'Claude Console stream request failed'
+            }
+          }
+          if (account.noFailover === true) {
+            logger.info(
+              `Account ${account.name} has noFailover=true, returning ${upstreamError.statusCode} stream error directly`
+            )
+            resolve()
+            return
+          }
           reject(upstreamError)
         })
 
@@ -1225,7 +1439,11 @@ class ClaudeConsoleRelayService {
     try {
       const account = await claudeConsoleAccountService.getAccount(accountId)
       if (!account) {
-        throw new Error('Account not found')
+        const notFoundError = new Error('Account not found')
+        notFoundError.statusCode = 404
+        notFoundError.accountId = accountId
+        notFoundError.errorData = { error: { message: 'Account not found' } }
+        throw notFoundError
       }
 
       logger.info(`🧪 Testing Claude Console account connection: ${account.name} (${accountId})`)

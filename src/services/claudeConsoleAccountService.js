@@ -68,6 +68,7 @@ class ClaudeConsoleAccountService {
       dailyQuota = 0, // 每日额度限制（美元），0表示不限制
       quotaResetTime = '00:00', // 额度重置时间（HH:mm格式）
       maxConcurrentTasks = 0, // 最大并发任务数，0表示无限制
+      noFailover = false, // 是否禁用 failover（默认false，即允许failover）
       disableAutoProtection = false // 是否关闭自动防护（429/401/400/529 不自动禁用）
     } = options
 
@@ -117,6 +118,7 @@ class ClaudeConsoleAccountService {
       quotaResetTime, // 额度重置时间
       quotaStoppedAt: '', // 因额度停用的时间
       maxConcurrentTasks: maxConcurrentTasks.toString(), // 最大并发任务数，0表示无限制
+      noFailover: noFailover.toString(), // 是否禁用 failover
       disableAutoProtection: disableAutoProtection.toString() // 关闭自动防护
     }
 
@@ -263,6 +265,7 @@ class ClaudeConsoleAccountService {
     }
     accountData.isActive = accountData.isActive === 'true'
     accountData.schedulable = accountData.schedulable !== 'false' // 默认为true
+    accountData.noFailover = accountData.noFailover === 'true' || accountData.noFailover === true
     accountData.disableAutoProtection = accountData.disableAutoProtection === 'true'
 
     if (accountData.proxy) {
@@ -374,6 +377,9 @@ class ClaudeConsoleAccountService {
       }
       if (updates.disableAutoProtection !== undefined) {
         updatedData.disableAutoProtection = updates.disableAutoProtection.toString()
+      }
+      if (updates.noFailover !== undefined) {
+        updatedData.noFailover = updates.noFailover.toString()
       }
 
       // ✅ 直接保存 subscriptionExpiresAt（如果提供）

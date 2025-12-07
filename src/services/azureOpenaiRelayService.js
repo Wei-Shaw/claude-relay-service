@@ -165,6 +165,37 @@ async function handleAzureOpenAIRequest({
       stack: error.stack
     }
 
+    const inferredStatus =
+      error.response?.status ||
+      error.statusCode ||
+      (error.code === 'ECONNABORTED' ? 504 : error.code ? 502 : 500)
+    const fallbackMessage =
+      error.response?.data?.error?.message ||
+      error.response?.statusText ||
+      error.message ||
+      'Azure OpenAI request failed'
+
+    let errorData = error.response?.data
+    if (
+      !errorData ||
+      typeof errorData !== 'object' ||
+      Buffer.isBuffer(errorData) ||
+      typeof errorData.pipe === 'function'
+    ) {
+      errorData = {
+        error: {
+          message: fallbackMessage,
+          type: 'azure_openai_error',
+          code: error.code || 'unknown_error',
+          status: inferredStatus
+        }
+      }
+    }
+
+    error.errorData = error.errorData || errorData
+    error.statusCode = error.statusCode || inferredStatus
+    error.accountId = error.accountId || account?.id || null
+
     // 特殊错误类型的详细日志
     if (error.code === 'ENOTFOUND') {
       logger.error('DNS Resolution Failed for Azure OpenAI', {
@@ -210,6 +241,21 @@ async function handleAzureOpenAIRequest({
       })
     } else {
       logger.error('Azure OpenAI Request Failed', errorDetails)
+    }
+
+    if (account?.noFailover === true) {
+      logger.info(
+        `Account ${account.name} has noFailover=true, returning ${inferredStatus} error directly`
+      )
+
+      return {
+        status: inferredStatus,
+        statusText: error.response?.statusText || error.message,
+        headers: error.response?.headers || {},
+        data: errorData,
+        errorData,
+        isErrorResponse: true
+      }
     }
 
     throw error
@@ -720,7 +766,7 @@ function extractUsageDataRobust(responseData, context = 'unknown') {
 }
 
 // 处理非流式响应
-function handleNonStreamResponse(upstreamResponse, clientResponse) {
+function handleNonStreamResponse(upstreamResponse, clientResponse, account = null) {
   try {
     // 设置状态码
     clientResponse.status(upstreamResponse.status)
@@ -751,6 +797,32 @@ function handleNonStreamResponse(upstreamResponse, clientResponse) {
     return { usageData, actualModel, responseData }
   } catch (error) {
     logger.error('Error handling Azure OpenAI non-stream response:', error)
+
+    const fallbackStatus = error.statusCode || 500
+    const errorData = error.errorData ||
+      upstreamResponse?.data || {
+        error: {
+          message: error.message || 'Failed to handle Azure OpenAI response',
+          type: 'azure_openai_error'
+        }
+      }
+    error.errorData = errorData
+    error.statusCode = fallbackStatus
+
+    if (account?.noFailover === true) {
+      logger.info(
+        `Account ${account.name} has noFailover=true, returning ${fallbackStatus} error directly`
+      )
+
+      if (!clientResponse.headersSent) {
+        clientResponse.status(fallbackStatus).json(errorData)
+      } else if (!clientResponse.destroyed) {
+        clientResponse.end()
+      }
+
+      return { usageData: null, actualModel: null, responseData: errorData }
+    }
+
     throw error
   }
 }

@@ -12,7 +12,13 @@ class FailoverHelper {
       enabled: true,
       maxRetries: 3,
       tempUnavailableTTL: 300,
-      retryableStatusCodes: [500, 502, 503, 504, 529],
+      // 上游账户问题导致的错误，应该触发 failover 尝试其他账户
+      // 401: 上游账户认证失败
+      // 402: 上游账户欠费/支付问题
+      // 403: 上游账户权限不足/被封禁
+      // 429: 上游账户限流
+      // 5xx: 上游服务错误 (500, 502, 503, 504, 529)
+      retryableStatusCodes: [401, 402, 403, 429, 500, 502, 503, 504, 529],
       retryableErrorCodes: [
         'ECONNABORTED',
         'ECONNRESET',
@@ -107,6 +113,12 @@ class FailoverHelper {
   shouldRetry(context) {
     // 未启用故障转移
     if (!this.isEnabled()) {
+      return false
+    }
+
+    // 检查显式的 noRetry 标志
+    if (context.error?.noRetry || context.error?.noFailover) {
+      logger.debug('🔄 Failover: Error marked as noRetry, skipping failover')
       return false
     }
 

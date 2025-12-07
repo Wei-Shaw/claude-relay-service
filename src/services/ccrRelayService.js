@@ -26,7 +26,12 @@ class CcrRelayService {
       // 获取账户信息
       account = await ccrAccountService.getAccount(accountId)
       if (!account) {
-        throw new Error('CCR account not found')
+        const errorData = { error: { message: 'CCR account not found' } }
+        const notFoundError = new Error('CCR account not found')
+        notFoundError.statusCode = 404
+        notFoundError.errorData = errorData
+        notFoundError.accountId = accountId
+        throw notFoundError
       }
 
       logger.info(
@@ -221,16 +226,50 @@ class CcrRelayService {
         accountId
       }
     } catch (error) {
+      const parsedErrorData = this._extractErrorDataFromError(error)
+
       // 处理特定错误
       if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {
         logger.info('Request aborted due to client disconnect')
-        throw new Error('Client disconnected')
+        const clientDisconnectError = new Error('Client disconnected')
+        clientDisconnectError.statusCode = 499
+        clientDisconnectError.code = error.code || clientDisconnectError.code
+        clientDisconnectError.accountId = accountId
+        clientDisconnectError.errorData = parsedErrorData || {
+          error: { message: 'Client disconnected' }
+        }
+
+        if (account?.noFailover === true) {
+          logger.info(
+            `Account ${account.name} has noFailover=true, returning client disconnect error directly`
+          )
+          return this._buildErrorResponse(499, clientDisconnectError.errorData, accountId, {
+            'Content-Type': 'application/json'
+          })
+        }
+
+        throw clientDisconnectError
       }
 
       logger.error(
         `❌ CCR relay request failed (Account: ${account?.name || accountId}):`,
         error.message
       )
+
+      if (error.errorData === undefined) {
+        error.errorData = parsedErrorData || {
+          error: { message: error.message || 'CCR relay request failed' }
+        }
+      }
+
+      if (account?.noFailover === true) {
+        const statusCode = error.statusCode || error.response?.status || 500
+        const headers = error.response?.headers || { 'Content-Type': 'application/json' }
+        logger.info(
+          `Account ${account.name} has noFailover=true, returning ${statusCode} error directly`
+        )
+        return this._buildErrorResponse(statusCode, error.errorData, accountId, headers)
+      }
 
       throw error
     }
@@ -252,7 +291,12 @@ class CcrRelayService {
       // 获取账户信息
       account = await ccrAccountService.getAccount(accountId)
       if (!account) {
-        throw new Error('CCR account not found')
+        const errorData = { error: { message: 'CCR account not found' } }
+        const notFoundError = new Error('CCR account not found')
+        notFoundError.statusCode = 404
+        notFoundError.errorData = errorData
+        notFoundError.accountId = accountId
+        throw notFoundError
       }
 
       logger.info(
@@ -302,6 +346,30 @@ class CcrRelayService {
       // 更新最后使用时间
       await this._updateLastUsedTime(accountId)
     } catch (error) {
+      const parsedErrorData = this._extractErrorDataFromError(error)
+      if (error.errorData === undefined) {
+        error.errorData = parsedErrorData || {
+          error: { message: error.message || 'CCR stream relay failed' }
+        }
+      }
+
+      if (account?.noFailover === true) {
+        logger.info(`Account ${account.name} has noFailover=true, returning stream error directly`)
+        if (!responseStream.headersSent) {
+          responseStream.writeHead(error.statusCode || error.response?.status || 500, {
+            'Content-Type': 'application/json'
+          })
+        }
+        if (!responseStream.destroyed && !responseStream.writableEnded) {
+          const errorPayload = error.errorData
+          const payloadString =
+            typeof errorPayload === 'string' ? errorPayload : JSON.stringify(errorPayload)
+          responseStream.write(`data: ${payloadString}\n\n`)
+          responseStream.end()
+        }
+        return
+      }
+
       logger.error(`❌ CCR stream relay failed (Account: ${account?.name || accountId}):`, error)
       throw error
     }
@@ -563,6 +631,62 @@ class CcrRelayService {
           reject(error)
         })
     })
+  }
+
+  _buildErrorResponse(statusCode, errorData, accountId, headers = {}) {
+    const normalizedErrorData =
+      errorData === undefined || errorData === null
+        ? { error: { message: 'CCR relay request failed' } }
+        : errorData
+    const body =
+      typeof normalizedErrorData === 'string'
+        ? normalizedErrorData
+        : JSON.stringify(normalizedErrorData)
+    const safeHeaders =
+      headers && Object.keys(headers).length > 0 ? headers : { 'Content-Type': 'application/json' }
+
+    return {
+      statusCode,
+      headers: safeHeaders,
+      body,
+      accountId
+    }
+  }
+
+  _extractErrorDataFromError(error) {
+    if (!error) {
+      return null
+    }
+
+    if (error.response && error.response.data !== undefined) {
+      return this._parseErrorData(error.response.data)
+    }
+
+    if (error.data !== undefined) {
+      return this._parseErrorData(error.data)
+    }
+
+    if (typeof error.message === 'string' && error.message) {
+      return { error: { message: error.message } }
+    }
+
+    return null
+  }
+
+  _parseErrorData(rawData) {
+    if (rawData === undefined || rawData === null) {
+      return null
+    }
+
+    if (typeof rawData === 'string') {
+      try {
+        return JSON.parse(rawData)
+      } catch (error) {
+        return rawData
+      }
+    }
+
+    return rawData
   }
 
   // 📊 解析SSE行以提取使用统计信息

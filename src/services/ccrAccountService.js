@@ -48,6 +48,7 @@ class CcrAccountService {
       isActive = true,
       accountType = 'shared', // 'dedicated' or 'shared'
       schedulable = true, // 是否可被调度
+      noFailover = false, // 是否禁用 failover（默认false，即允许failover）
       dailyQuota = 0, // 每日额度限制（美元），0表示不限制
       quotaResetTime = '00:00' // 额度重置时间（HH:mm格式）
     } = options
@@ -90,6 +91,7 @@ class CcrAccountService {
       rateLimitStatus: '',
       // 调度控制
       schedulable: schedulable.toString(),
+      noFailover: noFailover.toString(),
       // 额度管理相关
       dailyQuota: dailyQuota.toString(), // 每日额度限制（美元）
       dailyUsage: '0', // 当日使用金额（美元）
@@ -225,6 +227,7 @@ class CcrAccountService {
     }
     accountData.isActive = accountData.isActive === 'true'
     accountData.schedulable = accountData.schedulable !== 'false' // 默认为true
+    accountData.noFailover = accountData.noFailover === 'true' || accountData.noFailover === true
 
     if (accountData.proxy) {
       accountData.proxy = JSON.parse(accountData.proxy)
@@ -289,6 +292,9 @@ class CcrAccountService {
       }
       if (updates.schedulable !== undefined) {
         updatedData.schedulable = updates.schedulable.toString()
+      }
+      if (updates.noFailover !== undefined) {
+        updatedData.noFailover = updates.noFailover.toString()
       }
       if (updates.dailyQuota !== undefined) {
         updatedData.dailyQuota = updates.dailyQuota.toString()

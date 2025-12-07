@@ -69,7 +69,8 @@ async function executeWithFailover(options) {
         retryCount: failoverContext.retryCount,
         statusCode,
         errorCode,
-        isStreamStarted: res.headersSent
+        isStreamStarted: res.headersSent,
+        error // 传递完整 error 对象，支持 noRetry/noFailover 标志
       }
 
       // If headers already sent, we cannot retry - just mark account unavailable

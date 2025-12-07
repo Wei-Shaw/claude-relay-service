@@ -336,7 +336,7 @@ async function refreshAccessToken(refreshToken, proxyConfig = null) {
 }
 
 // 创建 Gemini 账户
-async function createAccount(accountData) {
+async function createAccount(accountData, noFailover = false) {
   const id = uuidv4()
   const now = new Date().toISOString()
 
@@ -380,6 +380,9 @@ async function createAccount(accountData) {
     }
   }
 
+  const resolvedNoFailover =
+    accountData.noFailover !== undefined ? accountData.noFailover : noFailover
+
   const account = {
     id,
     platform: 'gemini', // 标识为 Gemini 账户
@@ -392,6 +395,7 @@ async function createAccount(accountData) {
     // 调度相关
     schedulable: accountData.schedulable !== undefined ? String(accountData.schedulable) : 'true',
     priority: accountData.priority || 50, // 调度优先级 (1-100，数字越小优先级越高)
+    noFailover: resolvedNoFailover.toString(),
 
     // OAuth 相关字段（加密存储）
     geminiOauth: geminiOauth ? encrypt(geminiOauth) : '',
@@ -479,6 +483,7 @@ async function getAccount(accountId) {
 
   // 转换 schedulable 字符串为布尔值（与 claudeConsoleAccountService 保持一致）
   accountData.schedulable = accountData.schedulable !== 'false' // 默认为true，只有明确设置为'false'才为false
+  accountData.noFailover = accountData.noFailover === 'true' || accountData.noFailover === true
 
   return accountData
 }
@@ -506,6 +511,9 @@ async function updateAccount(accountId, updates) {
   // 处理 schedulable 字段，确保正确转换为字符串存储
   if (updates.schedulable !== undefined) {
     updates.schedulable = updates.schedulable.toString()
+  }
+  if (updates.noFailover !== undefined) {
+    updates.noFailover = updates.noFailover.toString()
   }
 
   // 加密敏感字段

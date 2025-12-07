@@ -52,9 +52,21 @@ class BedrockRelayService {
       if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
         clientConfig.credentials = fromEnv()
       } else {
-        throw new Error(
+        const credentialError = new Error(
           'AWS凭证未配置。请在Bedrock账户中配置AWS访问密钥，或设置环境变量AWS_ACCESS_KEY_ID和AWS_SECRET_ACCESS_KEY'
         )
+        credentialError.statusCode = 500
+        credentialError.errorData = {
+          error: {
+            message: credentialError.message,
+            type: 'missing_credentials',
+            statusCode: 500
+          }
+        }
+        if (bedrockAccount?.noFailover === true) {
+          credentialError.noFailover = true
+        }
+        throw credentialError
       }
     }
 
@@ -105,7 +117,23 @@ class BedrockRelayService {
       }
     } catch (error) {
       logger.error('❌ Bedrock非流式请求失败:', error)
-      throw this._handleBedrockError(error)
+      const handledError = this._handleBedrockError(error)
+      if (bedrockAccount?.id) {
+        handledError.accountId = bedrockAccount.id
+      }
+
+      if (bedrockAccount?.noFailover === true) {
+        logger.info(
+          `Account ${bedrockAccount.name || bedrockAccount.id} has noFailover=true, returning error directly`
+        )
+        return {
+          success: false,
+          error: handledError.message,
+          errorData: handledError.errorData
+        }
+      }
+
+      throw handledError
     }
   }
 
@@ -180,17 +208,35 @@ class BedrockRelayService {
       }
     } catch (error) {
       logger.error('❌ Bedrock流式请求失败:', error)
+      const handledError = this._handleBedrockError(error)
+      if (bedrockAccount?.id) {
+        handledError.accountId = bedrockAccount.id
+      }
 
       // 发送错误事件
       if (!res.headersSent) {
         res.writeHead(500, { 'Content-Type': 'application/json' })
       }
 
+      const errorPayload = handledError.errorData || {
+        error: { message: handledError.message, statusCode: 500 }
+      }
       res.write('event: error\n')
-      res.write(`data: ${JSON.stringify({ error: this._handleBedrockError(error).message })}\n\n`)
+      res.write(`data: ${JSON.stringify(errorPayload)}\n\n`)
       res.end()
 
-      throw this._handleBedrockError(error)
+      if (bedrockAccount?.noFailover === true) {
+        logger.info(
+          `Account ${bedrockAccount.name || bedrockAccount.id} has noFailover=true, returning error directly`
+        )
+        return {
+          success: false,
+          error: handledError.message,
+          errorData: handledError.errorData
+        }
+      }
+
+      throw handledError
     }
   }
 
@@ -406,25 +452,79 @@ class BedrockRelayService {
 
   // 处理Bedrock错误
   _handleBedrockError(error) {
-    const errorMessage = error.message || 'Unknown Bedrock error'
-
-    if (error.name === 'ValidationException') {
-      return new Error(`Bedrock参数验证失败: ${errorMessage}`)
+    if (error?.isBedrockHandled) {
+      return error
     }
 
-    if (error.name === 'ThrottlingException') {
-      return new Error('Bedrock请求限流，请稍后重试')
+    const errorMessage = error?.message || 'Unknown Bedrock error'
+    const statusCode = error?.$metadata?.httpStatusCode || error?.statusCode || error?.status
+    const requestId = error?.requestId || error?.$metadata?.requestId
+
+    const baseErrorData = {
+      ...(typeof error?.errorData === 'object' && error.errorData ? error.errorData : {}),
+      error: {
+        ...(error?.errorData?.error || {}),
+        message: (error?.errorData && error.errorData.error?.message) || errorMessage,
+        type: (error?.errorData && error.errorData.error?.type) || error?.name || 'bedrock_error',
+        code: (error?.errorData && error.errorData.error?.code) || error?.code || error?.name,
+        statusCode: (error?.errorData && error.errorData.error?.statusCode) || statusCode
+      }
     }
 
-    if (error.name === 'AccessDeniedException') {
-      return new Error('Bedrock访问被拒绝，请检查IAM权限')
+    if (requestId && !baseErrorData.error.requestId) {
+      baseErrorData.error.requestId = requestId
     }
 
-    if (error.name === 'ModelNotReadyException') {
-      return new Error('Bedrock模型未就绪，请稍后重试')
+    if (error?.$metadata && !baseErrorData.error.metadata) {
+      baseErrorData.error.metadata = error.$metadata
     }
 
-    return new Error(`Bedrock服务错误: ${errorMessage}`)
+    const buildError = (message, status, type) => {
+      const err = new Error(message)
+      err.statusCode = status || statusCode || 500
+      err.errorData = {
+        ...baseErrorData,
+        error: {
+          ...(baseErrorData.error || {}),
+          message,
+          type: type || baseErrorData.error?.type || 'bedrock_error',
+          statusCode: status || statusCode || 500
+        }
+      }
+      if (requestId && !err.errorData.error.requestId) {
+        err.errorData.error.requestId = requestId
+      }
+      if (error?.accountId) {
+        err.accountId = error.accountId
+      }
+      if (error?.noFailover) {
+        err.noFailover = error.noFailover
+      }
+      err.isBedrockHandled = true
+      return err
+    }
+
+    if (error?.name === 'ValidationException') {
+      return buildError(
+        `Bedrock参数验证失败: ${errorMessage}`,
+        statusCode || 400,
+        'validation_error'
+      )
+    }
+
+    if (error?.name === 'ThrottlingException') {
+      return buildError('Bedrock请求限流，请稍后重试', statusCode || 429, 'rate_limit')
+    }
+
+    if (error?.name === 'AccessDeniedException') {
+      return buildError('Bedrock访问被拒绝，请检查IAM权限', statusCode || 403, 'access_denied')
+    }
+
+    if (error?.name === 'ModelNotReadyException') {
+      return buildError('Bedrock模型未就绪，请稍后重试', statusCode || 503, 'model_not_ready')
+    }
+
+    return buildError(`Bedrock服务错误: ${errorMessage}`, statusCode || 500, 'bedrock_error')
   }
 
   // 获取可用模型列表

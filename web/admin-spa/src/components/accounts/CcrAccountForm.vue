@@ -113,6 +113,26 @@
             </div>
           </div>
 
+          <div
+            class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/60"
+          >
+            <label class="flex items-start">
+              <input
+                v-model="form.noFailover"
+                class="mt-1 text-emerald-600 focus:ring-emerald-500 dark:border-gray-600 dark:bg-gray-700"
+                type="checkbox"
+              />
+              <div class="ml-3">
+                <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                  不触发 Failover（调试用）
+                </span>
+                <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                  启用后，该账户遇到错误时将直接返回给客户端，不会尝试其他账户
+                </p>
+              </div>
+            </label>
+          </div>
+
           <!-- 限流设置 -->
           <div>
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -287,7 +307,8 @@ const form = ref({
   dailyQuota: 0,
   quotaResetTime: '00:00',
   proxy: null,
-  supportedModels: {}
+  supportedModels: {},
+  noFailover: false
 })
 
 const enableRateLimit = ref(true)
@@ -339,7 +360,8 @@ const submit = async () => {
         dailyQuota: Number(form.value.dailyQuota || 0),
         quotaResetTime: form.value.quotaResetTime || '00:00',
         proxy: form.value.proxy || null,
-        supportedModels: buildSupportedModels()
+        supportedModels: buildSupportedModels(),
+        noFailover: form.value.noFailover === true
       }
       if (form.value.apiKey && form.value.apiKey.trim().length > 0) {
         updates.apiKey = form.value.apiKey
@@ -365,7 +387,8 @@ const submit = async () => {
         proxy: form.value.proxy,
         accountType: 'shared',
         dailyQuota: Number(form.value.dailyQuota || 0),
-        quotaResetTime: form.value.quotaResetTime || '00:00'
+        quotaResetTime: form.value.quotaResetTime || '00:00',
+        noFailover: form.value.noFailover === true
       }
       const res = await apiClient.post('/admin/ccr-accounts', payload)
       if (res.success) {
@@ -394,6 +417,7 @@ const populateFromAccount = () => {
   form.value.dailyQuota = Number(a.dailyQuota || 0)
   form.value.quotaResetTime = a.quotaResetTime || '00:00'
   form.value.proxy = a.proxy || null
+  form.value.noFailover = a.noFailover === true
   enableRateLimit.value = form.value.rateLimitDuration > 0
 
   // supportedModels 对象转为数组

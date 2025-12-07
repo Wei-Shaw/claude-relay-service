@@ -40,7 +40,8 @@ class BedrockAccountService {
       accountType = 'shared', // 'dedicated' or 'shared'
       priority = 50, // 调度优先级 (1-100，数字越小优先级越高)
       schedulable = true, // 是否可被调度
-      credentialType = 'default' // 'default', 'access_key', 'bearer_token'
+      credentialType = 'default', // 'default', 'access_key', 'bearer_token'
+      noFailover = false // 是否禁用 failover（默认false，即允许failover）
     } = options
 
     const accountId = uuidv4()
@@ -56,6 +57,7 @@ class BedrockAccountService {
       priority,
       schedulable,
       credentialType,
+      noFailover: noFailover.toString(),
 
       // ✅ 新增：账户订阅到期时间（业务字段，手动管理）
       // 注意：Bedrock 使用 AWS 凭证，没有 OAuth token，因此没有 expiresAt
@@ -110,6 +112,8 @@ class BedrockAccountService {
       if (account.awsCredentials) {
         account.awsCredentials = this._decryptAwsCredentials(account.awsCredentials)
       }
+
+      account.noFailover = account.noFailover === 'true' || account.noFailover === true
 
       logger.debug(`🔍 获取Bedrock账户 - ID: ${accountId}, 名称: ${account.name}`)
 
@@ -219,6 +223,9 @@ class BedrockAccountService {
       }
       if (updates.credentialType !== undefined) {
         account.credentialType = updates.credentialType
+      }
+      if (updates.noFailover !== undefined) {
+        account.noFailover = updates.noFailover.toString()
       }
 
       // 更新AWS凭证

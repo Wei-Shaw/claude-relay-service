@@ -109,9 +109,11 @@ function decrypt(text) {
 }
 
 // 创建账户
-async function createAccount(accountData) {
+async function createAccount(accountData, noFailover = false) {
   const accountId = uuidv4()
   const now = new Date().toISOString()
+
+  const normalizedNoFailover = accountData.noFailover ?? noFailover
 
   const account = {
     id: accountId,
@@ -138,6 +140,7 @@ async function createAccount(accountData) {
     isActive: accountData.isActive !== false ? 'true' : 'false',
     status: 'active',
     schedulable: accountData.schedulable !== false ? 'true' : 'false',
+    noFailover: normalizedNoFailover.toString(),
     createdAt: now,
     updatedAt: now
   }
@@ -192,6 +195,9 @@ async function getAccount(accountId) {
     }
   }
 
+  // 处理 noFailover 布尔值
+  accountData.noFailover = accountData.noFailover === 'true' || accountData.noFailover === true
+
   return accountData
 }
 
@@ -221,6 +227,10 @@ async function updateAccount(accountId, updates) {
       typeof updates.supportedModels === 'string'
         ? updates.supportedModels
         : JSON.stringify(updates.supportedModels)
+  }
+
+  if (updates.noFailover !== undefined) {
+    updates.noFailover = updates.noFailover.toString()
   }
 
   // ✅ 直接保存 subscriptionExpiresAt（如果提供）

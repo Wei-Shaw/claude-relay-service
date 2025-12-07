@@ -858,40 +858,10 @@ const handleResponses = async (req, res) => {
     // 优先使用主动设置的 statusCode，然后是上游响应的状态码，最后默认 500
     const status = error.statusCode || error.response?.status || 500
 
-    if ((status === 401 || status === 402) && accountId) {
-      const statusLabel = status === 401 ? '401错误' : '402错误'
-      const extraHint = status === 402 ? '，可能欠费' : ''
-      let reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）`
-      const errorData = error.response?.data
-      if (errorData) {
-        if (typeof errorData === 'string' && errorData.trim()) {
-          reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）：${errorData.trim()}`
-        } else if (
-          errorData.error &&
-          typeof errorData.error.message === 'string' &&
-          errorData.error.message.trim()
-        ) {
-          reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）：${errorData.error.message.trim()}`
-        } else if (typeof errorData.message === 'string' && errorData.message.trim()) {
-          reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）：${errorData.message.trim()}`
-        }
-      } else if (error.message) {
-        reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）：${error.message}`
-      }
+    // 优先使用 error.errorData（从 relay service 抛出的错误携带的数据）
+    // 然后尝试 error.response?.data，最后使用 error.message
+    let responsePayload = error.errorData || error.response?.data
 
-      try {
-        await unifiedOpenAIScheduler.markAccountUnauthorized(
-          accountId,
-          accountType || 'openai',
-          sessionHash,
-          reason
-        )
-      } catch (markError) {
-        logger.error('❌ Failed to mark OpenAI account unauthorized in catch handler:', markError)
-      }
-    }
-
-    let responsePayload = error.response?.data
     if (!responsePayload) {
       responsePayload = { error: { message: error.message || 'Internal server error' } }
     } else if (typeof responsePayload === 'string') {

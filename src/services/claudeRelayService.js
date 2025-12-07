@@ -121,6 +121,22 @@ class ClaudeRelayService {
     return ''
   }
 
+  _parseErrorData(rawBody) {
+    if (rawBody === undefined || rawBody === null) {
+      return null
+    }
+
+    if (typeof rawBody === 'string') {
+      try {
+        return JSON.parse(rawBody)
+      } catch (error) {
+        return rawBody
+      }
+    }
+
+    return rawBody
+  }
+
   // 🚫 检查是否为组织被禁用错误
   _isOrganizationDisabledError(statusCode, body) {
     if (statusCode !== 400) {
@@ -287,14 +303,17 @@ class ClaudeRelayService {
         let isRateLimited = false
         let rateLimitResetTimestamp = null
         let dedicatedRateLimitMessage = null
+        const errorData = this._parseErrorData(response.body)
         const organizationDisabledError = this._isOrganizationDisabledError(
           response.statusCode,
           response.body
         )
 
         // 检查是否为401状态码（未授权）
-        if (response.statusCode === 401) {
-          logger.warn(`🔐 Unauthorized error (401) detected for account ${accountId}`)
+        if (response.statusCode === 401 || response.statusCode === 402) {
+          logger.warn(
+            `🔐 Unauthorized error (${response.statusCode}) detected for account ${accountId}`
+          )
 
           // 记录401错误
           await this.recordUnauthorizedError(accountId)
@@ -307,7 +326,7 @@ class ClaudeRelayService {
 
           if (errorCount >= 1) {
             logger.error(
-              `❌ Account ${accountId} encountered 401 error (${errorCount} errors), marking as unauthorized`
+              `❌ Account ${accountId} encountered ${response.statusCode} error (${errorCount} errors), marking as unauthorized`
             )
             await unifiedClaudeScheduler.markAccountUnauthorized(
               accountId,
@@ -315,6 +334,22 @@ class ClaudeRelayService {
               sessionHash
             )
           }
+
+          const unauthorizedMessage =
+            this._extractErrorMessage(errorData) || `Claude upstream error: ${response.statusCode}`
+          if (account.noFailover === true) {
+            logger.info(
+              `Account ${account.name} has noFailover=true, returning ${response.statusCode} error directly`
+            )
+            return response
+          }
+
+          const authError = new Error(unauthorizedMessage)
+          authError.statusCode = response.statusCode
+          authError.isUnauthorized = true
+          authError.accountId = accountId
+          authError.errorData = errorData
+          throw authError
         }
         // 检查是否为403状态码（禁止访问）
         else if (response.statusCode === 403) {
@@ -322,6 +357,22 @@ class ClaudeRelayService {
             `🚫 Forbidden error (403) detected for account ${accountId}, marking as blocked`
           )
           await unifiedClaudeScheduler.markAccountBlocked(accountId, accountType, sessionHash)
+
+          const forbiddenMessage =
+            this._extractErrorMessage(errorData) || `Claude upstream error: ${response.statusCode}`
+          if (account.noFailover === true) {
+            logger.info(
+              `Account ${account.name} has noFailover=true, returning ${response.statusCode} error directly`
+            )
+            return response
+          }
+
+          const forbiddenError = new Error(forbiddenMessage)
+          forbiddenError.statusCode = response.statusCode
+          forbiddenError.isForbidden = true
+          forbiddenError.accountId = accountId
+          forbiddenError.errorData = errorData
+          throw forbiddenError
         }
         // 检查是否返回组织被禁用错误（400状态码）
         else if (organizationDisabledError) {
@@ -348,12 +399,18 @@ class ClaudeRelayService {
             logger.info(`🚫 529 error handling is disabled, skipping account overload marking`)
           }
           const overloadErrorMessage =
-            this._extractErrorMessage(response.body) ||
-            `Claude upstream error: ${response.statusCode}`
+            this._extractErrorMessage(errorData) || `Claude upstream error: ${response.statusCode}`
+          if (account.noFailover === true) {
+            logger.info(
+              `Account ${account.name} has noFailover=true, returning ${response.statusCode} error directly`
+            )
+            return response
+          }
           const overloadError = new Error(overloadErrorMessage)
           overloadError.statusCode = response.statusCode
           overloadError.isUpstream = true
           overloadError.accountId = accountId
+          overloadError.errorData = errorData
           throw overloadError
         }
         // 检查是否为5xx状态码
@@ -361,12 +418,18 @@ class ClaudeRelayService {
           logger.warn(`🔥 Server error (${response.statusCode}) detected for account ${accountId}`)
           await this._handleServerError(accountId, response.statusCode, sessionHash)
           const upstreamErrorMessage =
-            this._extractErrorMessage(response.body) ||
-            `Claude upstream error: ${response.statusCode}`
+            this._extractErrorMessage(errorData) || `Claude upstream error: ${response.statusCode}`
+          if (account.noFailover === true) {
+            logger.info(
+              `Account ${account.name} has noFailover=true, returning ${response.statusCode} error directly`
+            )
+            return response
+          }
           const upstreamError = new Error(upstreamErrorMessage)
           upstreamError.statusCode = response.statusCode
           upstreamError.isUpstream = true
           upstreamError.accountId = accountId
+          upstreamError.errorData = errorData
           throw upstreamError
         }
         // 检查是否为429状态码
@@ -460,6 +523,22 @@ class ClaudeRelayService {
               accountId
             }
           }
+
+          const rateLimitMessage =
+            this._extractErrorMessage(errorData) || `Claude upstream error: ${response.statusCode}`
+          if (account.noFailover === true) {
+            logger.info(
+              `Account ${account.name} has noFailover=true, returning ${response.statusCode} error directly`
+            )
+            return response
+          }
+
+          const rateLimitError = new Error(rateLimitMessage)
+          rateLimitError.statusCode = response.statusCode
+          rateLimitError.isRateLimitError = true
+          rateLimitError.accountId = accountId
+          rateLimitError.errorData = errorData
+          throw rateLimitError
         }
       } else if (response.statusCode === 200 || response.statusCode === 201) {
         // 提取5小时会话窗口状态
@@ -1107,6 +1186,7 @@ class ClaudeRelayService {
         upstreamError.statusCode = statusCode
         upstreamError.isUpstream = true
         upstreamError.accountId = accountId
+        upstreamError.errorData = null
         reject(upstreamError)
       })
 
@@ -1120,6 +1200,7 @@ class ClaudeRelayService {
         timeoutError.statusCode = 504
         timeoutError.isUpstream = true
         timeoutError.accountId = accountId
+        timeoutError.errorData = null
         reject(timeoutError)
       })
 
@@ -1518,20 +1599,10 @@ class ClaudeRelayService {
                 }
               })()
             }
-            let errorMessage = `Claude API error: ${res.statusCode}`
+            const parsedErrorData = this._parseErrorData(errorData)
+            const errorMessage =
+              this._extractErrorMessage(parsedErrorData) || `Claude API error: ${res.statusCode}`
             if (!responseStream.destroyed) {
-              // 解析 Claude API 返回的错误详情
-              try {
-                const parsedError = JSON.parse(errorData)
-                if (parsedError.error?.message) {
-                  errorMessage = parsedError.error.message
-                } else if (parsedError.message) {
-                  errorMessage = parsedError.message
-                }
-              } catch {
-                // 使用默认错误消息
-              }
-
               // 如果有 streamTransformer（如测试请求），使用前端期望的格式
               if (streamTransformer) {
                 responseStream.write(
@@ -1555,6 +1626,16 @@ class ClaudeRelayService {
             upstreamError.statusCode = res.statusCode
             upstreamError.isUpstream = true
             upstreamError.accountId = accountId
+            upstreamError.errorData = parsedErrorData
+
+            if (account.noFailover === true) {
+              logger.info(
+                `Account ${account.name} has noFailover=true, returning ${res.statusCode} error directly`
+              )
+              resolve()
+              return
+            }
+
             reject(upstreamError)
           })
           return
@@ -1942,6 +2023,7 @@ class ClaudeRelayService {
         upstreamError.isUpstream = true
         upstreamError.accountId = accountId
         upstreamError.code = error.code
+        upstreamError.errorData = null
         reject(upstreamError)
       })
 
@@ -1972,6 +2054,7 @@ class ClaudeRelayService {
         timeoutError.statusCode = 504
         timeoutError.isUpstream = true
         timeoutError.accountId = accountId
+        timeoutError.errorData = null
         reject(timeoutError)
       })
 

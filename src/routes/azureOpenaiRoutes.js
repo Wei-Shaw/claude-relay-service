@@ -181,6 +181,11 @@ router.post('/chat/completions', authenticateApiKey, async (req, res) => {
       endpoint: 'chat/completions'
     })
 
+    if (response?.isErrorResponse) {
+      azureOpenaiRelayService.handleNonStreamResponse(response, res, account)
+      return
+    }
+
     // 处理流式响应
     if (req.body.stream) {
       await azureOpenaiRelayService.handleStreamResponse(response, res, {
@@ -204,7 +209,8 @@ router.post('/chat/completions', authenticateApiKey, async (req, res) => {
       // 处理非流式响应
       const { usageData, actualModel } = azureOpenaiRelayService.handleNonStreamResponse(
         response,
-        res
+        res,
+        account
       )
 
       if (usageData) {
@@ -274,6 +280,11 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
       endpoint: 'responses'
     })
 
+    if (response?.isErrorResponse) {
+      azureOpenaiRelayService.handleNonStreamResponse(response, res, account)
+      return
+    }
+
     // 处理流式响应
     if (req.body.stream) {
       await azureOpenaiRelayService.handleStreamResponse(response, res, {
@@ -297,7 +308,8 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
       // 处理非流式响应
       const { usageData, actualModel } = azureOpenaiRelayService.handleNonStreamResponse(
         response,
-        res
+        res,
+        account
       )
 
       if (usageData) {
@@ -366,10 +378,16 @@ router.post('/embeddings', authenticateApiKey, async (req, res) => {
       endpoint: 'embeddings'
     })
 
+    if (response?.isErrorResponse) {
+      azureOpenaiRelayService.handleNonStreamResponse(response, res, account)
+      return
+    }
+
     // 处理响应
     const { usageData, actualModel } = azureOpenaiRelayService.handleNonStreamResponse(
       response,
-      res
+      res,
+      account
     )
 
     if (usageData) {

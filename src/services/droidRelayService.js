@@ -122,16 +122,65 @@ class DroidRelayService {
     return `${this.API_KEY_STICKY_PREFIX}:${accountId}:${normalizedEndpoint}:${sessionHash}`
   }
 
+  _buildNoFailoverResponse(account, statusCode, errorData) {
+    if (!account || account.noFailover !== true) {
+      return null
+    }
+
+    const accountLabel = account.name || account.id || 'unknown'
+    logger.info(
+      `Droid account ${accountLabel} has noFailover=true, returning ${statusCode} error directly`
+    )
+
+    return {
+      statusCode,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(errorData),
+      errorData,
+      noFailover: true
+    }
+  }
+
   async _selectApiKey(account, endpointType, sessionHash) {
     const entries = await droidAccountService.getDecryptedApiKeyEntries(account.id)
     if (!entries || entries.length === 0) {
-      throw new Error(`Droid account ${account.id} 未配置任何 API Key`)
+      const message = `Droid account ${account.id} 未配置任何 API Key`
+      const errorData = {
+        error: 'api_key_missing',
+        message,
+        accountId: account.id
+      }
+      const noFailoverResponse = this._buildNoFailoverResponse(account, 503, errorData)
+      if (noFailoverResponse) {
+        return noFailoverResponse
+      }
+
+      const error = new Error(message)
+      error.statusCode = 503
+      error.errorData = errorData
+      error.accountId = account.id
+      throw error
     }
 
     // 过滤掉异常状态的API Key
     const activeEntries = entries.filter((entry) => entry.status !== 'error')
     if (!activeEntries || activeEntries.length === 0) {
-      throw new Error(`Droid account ${account.id} 没有可用的 API Key（所有API Key均已异常）`)
+      const message = `Droid account ${account.id} 没有可用的 API Key（所有API Key均已异常）`
+      const errorData = {
+        error: 'api_key_unavailable',
+        message,
+        accountId: account.id
+      }
+      const noFailoverResponse = this._buildNoFailoverResponse(account, 503, errorData)
+      if (noFailoverResponse) {
+        return noFailoverResponse
+      }
+
+      const error = new Error(message)
+      error.statusCode = 503
+      error.errorData = errorData
+      error.accountId = account.id
+      throw error
     }
 
     const stickyKey = this._composeApiKeyStickyKey(account.id, endpointType, sessionHash)
@@ -153,7 +202,22 @@ class DroidRelayService {
 
     const selectedEntry = activeEntries[Math.floor(Math.random() * activeEntries.length)]
     if (!selectedEntry) {
-      throw new Error(`Droid account ${account.id} 没有可用的 API Key`)
+      const message = `Droid account ${account.id} 没有可用的 API Key`
+      const errorData = {
+        error: 'api_key_selection_failed',
+        message,
+        accountId: account.id
+      }
+      const noFailoverResponse = this._buildNoFailoverResponse(account, 503, errorData)
+      if (noFailoverResponse) {
+        return noFailoverResponse
+      }
+
+      const error = new Error(message)
+      error.statusCode = 503
+      error.errorData = errorData
+      error.accountId = account.id
+      throw error
     }
 
     if (stickyKey) {
@@ -203,7 +267,22 @@ class DroidRelayService {
       account = await droidScheduler.selectAccount(keyInfo, normalizedEndpoint, sessionHash)
 
       if (!account) {
-        throw new Error(`No available Droid account for endpoint type: ${normalizedEndpoint}`)
+        const message = `No available Droid account for endpoint type: ${normalizedEndpoint}`
+        const errorData = {
+          error: 'no_available_account',
+          message,
+          endpointType: normalizedEndpoint
+        }
+
+        const noFailoverResponse = this._buildNoFailoverResponse(account, 503, errorData)
+        if (noFailoverResponse) {
+          return noFailoverResponse
+        }
+
+        const error = new Error(message)
+        error.statusCode = 503
+        error.errorData = errorData
+        throw error
       }
 
       // 获取认证凭据：支持 Access Token 和 API Key 两种模式
@@ -211,7 +290,12 @@ class DroidRelayService {
         typeof account.authenticationMethod === 'string' &&
         account.authenticationMethod.toLowerCase().trim() === 'api_key'
       ) {
-        selectedApiKey = await this._selectApiKey(account, normalizedEndpoint, sessionHash)
+        const apiKeySelection = await this._selectApiKey(account, normalizedEndpoint, sessionHash)
+        if (apiKeySelection?.noFailover === true) {
+          return apiKeySelection
+        }
+
+        selectedApiKey = apiKeySelection
         accessToken = selectedApiKey.key
       } else {
         accessToken = await droidAccountService.getValidAccessToken(account.id)
@@ -366,8 +450,17 @@ class DroidRelayService {
         }
       }
 
+      const mappedStatus = error.statusCode || this._mapNetworkErrorStatus(error)
+
+      if (error.errorData) {
+        return {
+          statusCode: mappedStatus,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(error.errorData)
+        }
+      }
+
       // 网络错误或其他错误（统一返回 4xx）
-      const mappedStatus = this._mapNetworkErrorStatus(error)
       return {
         statusCode: mappedStatus,
         headers: { 'Content-Type': 'application/json' },

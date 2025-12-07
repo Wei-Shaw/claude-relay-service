@@ -510,8 +510,24 @@ async function handleMessages(req, res) {
             apiKeyId: apiKeyData.id,
             signal: abortController.signal,
             projectId: effectiveProjectId,
-            accountId: account.id
+            accountId: account.id,
+            account,
+            res
           })
+
+          if (geminiResponse?.noFailoverHandled) {
+            if (!geminiResponse.responseSent && !res.headersSent) {
+              res.status(geminiResponse.status || 500).json(
+                geminiResponse.errorData || {
+                  error: {
+                    message: 'Gemini API request failed',
+                    type: 'api_error'
+                  }
+                }
+              )
+            }
+            return
+          }
         }
 
         if (stream) {

@@ -548,6 +548,7 @@ class DroidAccountService {
       platform = 'droid',
       priority = 50, // 调度优先级 (1-100)
       schedulable = true, // 是否可被调度
+      noFailover = false, // 是否禁用 failover（默认false，即允许failover）
       endpointType = 'anthropic', // 默认端点类型: 'anthropic', 'openai' 或 'comm'
       organizationId = '',
       ownerEmail = '',
@@ -816,6 +817,7 @@ class DroidAccountService {
       status, // created, active, expired, error
       errorMessage: '',
       schedulable: schedulable.toString(),
+      noFailover: noFailover.toString(),
       endpointType: normalizedEndpointType, // anthropic, openai 或 comm
       organizationId: normalizedOrganizationId || '',
       owner: normalizedOwnerName || normalizedOwnerEmail || '',
@@ -872,6 +874,7 @@ class DroidAccountService {
       endpointType: this._sanitizeEndpointType(account.endpointType),
       refreshToken: this._decryptSensitiveData(account.refreshToken),
       accessToken: this._decryptSensitiveData(account.accessToken),
+      noFailover: account.noFailover === 'true' || account.noFailover === true,
       apiKeys: this._maskApiKeyEntries(apiKeyEntries),
       apiKeyCount: apiKeyEntries.length
     }
@@ -929,6 +932,10 @@ class DroidAccountService {
 
     if (sanitizedUpdates.endpointType) {
       sanitizedUpdates.endpointType = this._sanitizeEndpointType(sanitizedUpdates.endpointType)
+    }
+
+    if (sanitizedUpdates.noFailover !== undefined) {
+      sanitizedUpdates.noFailover = sanitizedUpdates.noFailover.toString()
     }
 
     const parseProxyConfig = (value) => {

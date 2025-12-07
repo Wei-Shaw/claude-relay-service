@@ -140,8 +140,27 @@ class OpenAIResponsesRelayService {
           sessionHash
         )
 
-        // 返回错误响应（使用处理后的数据，避免循环引用）
-        const errorResponse = errorData || {
+        // 检查是否配置了不触发 failover
+        if (account.noFailover === true) {
+          logger.info(`Account ${account.name} has noFailover=true, returning 429 error directly`)
+          return res.status(429).json(
+            errorData || {
+              error: {
+                message: 'Rate limit exceeded',
+                type: 'rate_limit_error',
+                code: 'rate_limit_exceeded',
+                resets_in_seconds: resetsInSeconds
+              }
+            }
+          )
+        }
+
+        // 抛出错误以触发 failover，尝试其他账户
+        const rateLimitError = new Error('Rate limit exceeded')
+        rateLimitError.statusCode = 429
+        rateLimitError.isRateLimitError = true
+        rateLimitError.accountId = account.id
+        rateLimitError.errorData = errorData || {
           error: {
             message: 'Rate limit exceeded',
             type: 'rate_limit_error',
@@ -149,7 +168,7 @@ class OpenAIResponsesRelayService {
             resets_in_seconds: resetsInSeconds
           }
         }
-        return res.status(429).json(errorResponse)
+        throw rateLimitError
       }
 
       // 处理其他错误状态码
@@ -211,19 +230,20 @@ class OpenAIResponsesRelayService {
           } catch (markError) {
             logger.error('❌ Failed to mark account temporarily unavailable:', markError)
           }
-        } else if (response.status === 401) {
-          let reason = 'OpenAI Responses账号认证失败（401错误）'
+        } else if (response.status === 401 || response.status === 402) {
+          // 401/402 认证/支付错误 - 永久标记账户失效
+          let reason = `OpenAI Responses账号认证失败（${response.status}错误）`
           if (errorData) {
             if (typeof errorData === 'string' && errorData.trim()) {
-              reason = `OpenAI Responses账号认证失败（401错误）：${errorData.trim()}`
+              reason = `OpenAI Responses账号认证失败（${response.status}错误）：${errorData.trim()}`
             } else if (
               errorData.error &&
               typeof errorData.error.message === 'string' &&
               errorData.error.message.trim()
             ) {
-              reason = `OpenAI Responses账号认证失败（401错误）：${errorData.error.message.trim()}`
+              reason = `OpenAI Responses账号认证失败（${response.status}错误）：${errorData.error.message.trim()}`
             } else if (typeof errorData.message === 'string' && errorData.message.trim()) {
-              reason = `OpenAI Responses账号认证失败（401错误）：${errorData.message.trim()}`
+              reason = `OpenAI Responses账号认证失败（${response.status}错误）：${errorData.message.trim()}`
             }
           }
 
@@ -236,11 +256,12 @@ class OpenAIResponsesRelayService {
             )
           } catch (markError) {
             logger.error(
-              '❌ Failed to mark OpenAI-Responses account unauthorized after 401:',
+              `❌ Failed to mark OpenAI-Responses account unauthorized after ${response.status}:`,
               markError
             )
           }
 
+          // 构造错误响应数据
           let unauthorizedResponse = errorData
           if (
             !unauthorizedResponse ||
@@ -263,23 +284,51 @@ class OpenAIResponsesRelayService {
           req.removeListener('close', handleClientDisconnect)
           res.removeListener('close', handleClientDisconnect)
 
-          return res.status(401).json(unauthorizedResponse)
+          // 检查是否配置了不触发 failover
+          if (account.noFailover === true) {
+            logger.info(
+              `Account ${account.name} has noFailover=true, returning ${response.status} error directly`
+            )
+            return res.status(response.status).json(unauthorizedResponse)
+          }
+
+          // 抛出错误以触发 failover，尝试其他账户
+          const authError = new Error(reason)
+          authError.statusCode = response.status
+          authError.isUnauthorized = true
+          authError.accountId = account.id
+          authError.errorData = unauthorizedResponse
+          throw authError
         }
 
         if (response.status >= 500) {
+          // 5xx 错误 - 上游服务错误，抛出以触发 failover
           const upstreamMessage =
             (typeof errorData === 'string' && errorData) ||
             errorData?.error?.message ||
             `OpenAI Responses upstream error: ${response.status}`
           req.removeListener('close', handleClientDisconnect)
           res.removeListener('close', handleClientDisconnect)
+
+          // 检查是否配置了不触发 failover
+          if (account.noFailover === true) {
+            logger.info(
+              `Account ${account.name} has noFailover=true, returning ${response.status} error directly`
+            )
+            return res
+              .status(response.status)
+              .json(errorData || { error: { message: upstreamMessage } })
+          }
+
           const upstreamError = new Error(upstreamMessage)
           upstreamError.statusCode = response.status
           upstreamError.isUpstream = true
           upstreamError.accountId = account.id
+          upstreamError.errorData = errorData
           throw upstreamError
         }
 
+        // 其他 4xx 错误（400, 403, 404等）- 客户端请求错误，直接返回不触发 failover
         // 清理监听器
         req.removeListener('close', handleClientDisconnect)
         res.removeListener('close', handleClientDisconnect)
@@ -379,19 +428,20 @@ class OpenAIResponsesRelayService {
           }
         }
 
-        if (status === 401) {
-          let reason = 'OpenAI Responses账号认证失败（401错误）'
+        if (status === 401 || status === 402) {
+          // 401/402 认证/支付错误 - 永久标记账户失效
+          let reason = `OpenAI Responses账号认证失败（${status}错误）`
           if (errorData) {
             if (typeof errorData === 'string' && errorData.trim()) {
-              reason = `OpenAI Responses账号认证失败（401错误）：${errorData.trim()}`
+              reason = `OpenAI Responses账号认证失败（${status}错误）：${errorData.trim()}`
             } else if (
               errorData.error &&
               typeof errorData.error.message === 'string' &&
               errorData.error.message.trim()
             ) {
-              reason = `OpenAI Responses账号认证失败（401错误）：${errorData.error.message.trim()}`
+              reason = `OpenAI Responses账号认证失败（${status}错误）：${errorData.error.message.trim()}`
             } else if (typeof errorData.message === 'string' && errorData.message.trim()) {
-              reason = `OpenAI Responses账号认证失败（401错误）：${errorData.message.trim()}`
+              reason = `OpenAI Responses账号认证失败（${status}错误）：${errorData.message.trim()}`
             }
           }
 
@@ -404,11 +454,12 @@ class OpenAIResponsesRelayService {
             )
           } catch (markError) {
             logger.error(
-              '❌ Failed to mark OpenAI-Responses account unauthorized in catch handler:',
+              `❌ Failed to mark OpenAI-Responses account unauthorized in catch handler (${status}):`,
               markError
             )
           }
 
+          // 构造错误响应数据
           let unauthorizedResponse = errorData
           if (
             !unauthorizedResponse ||
@@ -427,9 +478,36 @@ class OpenAIResponsesRelayService {
             }
           }
 
-          return res.status(401).json(unauthorizedResponse)
+          // 抛出错误以触发 failover，尝试其他账户
+          const authError = new Error(reason)
+          authError.statusCode = status
+          authError.isUnauthorized = true
+          authError.accountId = account.id
+          authError.errorData = unauthorizedResponse
+          throw authError
         }
 
+        if (status === 429) {
+          // 429 限流错误 - 抛出以触发 failover
+          const rateLimitError = new Error('Rate limit exceeded')
+          rateLimitError.statusCode = 429
+          rateLimitError.isRateLimitError = true
+          rateLimitError.accountId = account.id
+          rateLimitError.errorData = errorData
+          throw rateLimitError
+        }
+
+        if (status >= 500) {
+          // 5xx 错误 - 上游服务错误，抛出以触发 failover
+          const upstreamError = new Error(`OpenAI Responses upstream error: ${status}`)
+          upstreamError.statusCode = status
+          upstreamError.isUpstream = true
+          upstreamError.accountId = account.id
+          upstreamError.errorData = errorData
+          throw upstreamError
+        }
+
+        // 其他 4xx 错误（400, 403, 404等）- 客户端请求错误，直接返回
         return res.status(status).json(errorData)
       }
 
