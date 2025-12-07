@@ -557,7 +557,7 @@ class DroidAccountService {
       authenticationMethod = '',
       expiresIn = null,
       apiKeys = [],
-      userAgent = ''  // 自定义 User-Agent
+      userAgent = '' // 自定义 User-Agent
     } = options
 
     const accountId = uuidv4()
@@ -834,7 +834,7 @@ class DroidAccountService {
       apiKeys: hasApiKeys ? JSON.stringify(apiKeyEntries) : '',
       apiKeyCount: hasApiKeys ? String(apiKeyEntries.length) : '0',
       apiKeyStrategy: hasApiKeys ? 'random_sticky' : '',
-      userAgent: userAgent || ''  // 自定义 User-Agent
+      userAgent: userAgent || '' // 自定义 User-Agent
     }
 
     await redis.setDroidAccount(accountId, accountData)
