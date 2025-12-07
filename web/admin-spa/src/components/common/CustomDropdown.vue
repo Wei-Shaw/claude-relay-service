@@ -41,19 +41,25 @@
             <div
               v-for="option in options"
               :key="option.value"
-              class="flex cursor-pointer items-center gap-2 whitespace-nowrap px-3 py-2 text-sm transition-colors duration-150"
+              class="flex cursor-pointer items-center gap-2 whitespace-nowrap py-2 text-sm transition-colors duration-150"
               :class="[
-                option.value === modelValue
+                isSelected(option.value)
                   ? 'bg-blue-50 font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                  : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
+                  : option.isGroup
+                    ? 'bg-gray-50 font-semibold text-gray-800 dark:bg-gray-700/50 dark:text-gray-200'
+                    : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
               ]"
+              :style="{
+                paddingLeft: option.indent ? `${12 + option.indent * 16}px` : '12px',
+                paddingRight: '12px'
+              }"
               @click="selectOption(option)"
             >
               <i v-if="option.icon" :class="['fas', option.icon, 'text-xs']"></i>
               <span>{{ option.label }}</span>
               <i
-                v-if="option.value === modelValue"
-                class="fas fa-check ml-auto pl-3 text-xs text-blue-600"
+                v-if="isSelected(option.value)"
+                class="fas fa-check ml-auto pl-3 text-xs text-blue-600 dark:text-blue-400"
               ></i>
             </div>
           </div>
@@ -68,7 +74,7 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 
 const props = defineProps({
   modelValue: {
-    type: [String, Number],
+    type: [String, Number, Array],
     default: ''
   },
   options: {
@@ -86,6 +92,10 @@ const props = defineProps({
   iconColor: {
     type: String,
     default: 'text-gray-500'
+  },
+  multiple: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -96,7 +106,18 @@ const triggerRef = ref(null)
 const dropdownRef = ref(null)
 const dropdownStyle = ref({})
 
+const isSelected = (value) => {
+  if (props.multiple) {
+    return Array.isArray(props.modelValue) && props.modelValue.includes(value)
+  }
+  return props.modelValue === value
+}
+
 const selectedLabel = computed(() => {
+  if (props.multiple) {
+    const count = Array.isArray(props.modelValue) ? props.modelValue.length : 0
+    return count > 0 ? `已选 ${count} 个` : ''
+  }
   const selected = props.options.find((opt) => opt.value === props.modelValue)
   return selected ? selected.label : ''
 })
@@ -114,9 +135,21 @@ const closeDropdown = () => {
 }
 
 const selectOption = (option) => {
-  emit('update:modelValue', option.value)
-  emit('change', option.value)
-  closeDropdown()
+  if (props.multiple) {
+    const current = Array.isArray(props.modelValue) ? [...props.modelValue] : []
+    const idx = current.indexOf(option.value)
+    if (idx >= 0) {
+      current.splice(idx, 1)
+    } else {
+      current.push(option.value)
+    }
+    emit('update:modelValue', current)
+    emit('change', current)
+  } else {
+    emit('update:modelValue', option.value)
+    emit('change', option.value)
+    closeDropdown()
+  }
 }
 
 const updateDropdownPosition = () => {

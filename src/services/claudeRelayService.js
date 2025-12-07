@@ -1948,7 +1948,13 @@ class ClaudeRelayService {
   }
 
   // 🛠️ 统一的错误处理方法
-  async _handleServerError(accountId, statusCode, _sessionHash = null, context = '') {
+  async _handleServerError(
+    accountId,
+    statusCode,
+    sessionHash = null,
+    context = '',
+    accountType = 'claude-official'
+  ) {
     try {
       await claudeAccountService.recordServerError(accountId, statusCode)
       const errorCount = await claudeAccountService.getServerErrorCount(accountId)
@@ -1961,6 +1967,18 @@ class ClaudeRelayService {
       logger.warn(
         `⏱️ ${prefix}${isTimeout ? 'Timeout' : 'Server'} error for account ${accountId}, error count: ${errorCount}/${threshold}`
       )
+
+      // 标记账户为临时不可用（5分钟）
+      try {
+        await unifiedClaudeScheduler.markAccountTemporarilyUnavailable(
+          accountId,
+          accountType,
+          sessionHash,
+          300
+        )
+      } catch (markError) {
+        logger.error(`❌ Failed to mark account temporarily unavailable: ${accountId}`, markError)
+      }
 
       if (errorCount > threshold) {
         const errorTypeLabel = isTimeout ? 'timeout' : '5xx'
