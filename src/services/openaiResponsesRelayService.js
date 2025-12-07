@@ -168,6 +168,7 @@ class OpenAIResponsesRelayService {
             resets_in_seconds: resetsInSeconds
           }
         }
+        rateLimitError.skipMarkUnavailable = true
         throw rateLimitError
       }
 
@@ -175,6 +176,7 @@ class OpenAIResponsesRelayService {
       if (response.status >= 400) {
         // 处理流式错误响应
         let errorData = response.data
+        let parseFailed = false
         if (response.data && typeof response.data.pipe === 'function') {
           // 流式响应需要先读取内容
           const chunks = []
@@ -206,6 +208,7 @@ class OpenAIResponsesRelayService {
             }
           } catch (e) {
             logger.error('Failed to parse error response:', e)
+            parseFailed = true
             errorData = { error: { message: fullResponse || 'Unknown error' } }
           }
         }
@@ -215,6 +218,15 @@ class OpenAIResponsesRelayService {
           statusText: response.statusText,
           errorData
         })
+
+        // 非 JSON 错误响应直接返回，不触发 failover
+        if (parseFailed) {
+          req.removeListener('close', handleClientDisconnect)
+          res.removeListener('close', handleClientDisconnect)
+          return res
+            .status(response.status || 502)
+            .json(errorData || { error: { message: 'Upstream returned non-JSON error' } })
+        }
 
         if (response.status === 502 || response.status === 504) {
           logger.warn(
@@ -337,6 +349,7 @@ class OpenAIResponsesRelayService {
           authError.isUnauthorized = true
           authError.accountId = account.id
           authError.errorData = unauthorizedResponse
+          authError.skipMarkUnavailable = true
           throw authError
         } else if (response.status === 403) {
           const forbiddenReason =
@@ -388,6 +401,7 @@ class OpenAIResponsesRelayService {
           forbiddenError.isForbidden = true
           forbiddenError.accountId = account.id
           forbiddenError.errorData = errorData
+          forbiddenError.skipMarkUnavailable = true
           throw forbiddenError
         }
 
@@ -692,6 +706,7 @@ class OpenAIResponsesRelayService {
           authError.isUnauthorized = true
           authError.accountId = account.id
           authError.errorData = unauthorizedResponse
+          authError.skipMarkUnavailable = true
           throw authError
         }
 
@@ -739,6 +754,7 @@ class OpenAIResponsesRelayService {
           forbiddenError.isForbidden = true
           forbiddenError.accountId = account.id
           forbiddenError.errorData = errorData
+          forbiddenError.skipMarkUnavailable = true
           throw forbiddenError
         }
 
@@ -749,6 +765,7 @@ class OpenAIResponsesRelayService {
           rateLimitError.isRateLimitError = true
           rateLimitError.accountId = account.id
           rateLimitError.errorData = errorData
+          rateLimitError.skipMarkUnavailable = true
           throw rateLimitError
         }
 

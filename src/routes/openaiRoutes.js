@@ -399,20 +399,6 @@ const handleResponses = async (req, res) => {
           }
         }
 
-        if (failoverHelper.isRetryableStatusCode(upstream.status)) {
-          if (upstream?.data && typeof upstream.data.destroy === 'function') {
-            upstream.data.destroy()
-          }
-
-          const retryableError = new Error(
-            `Retryable upstream status ${upstream.status} for OpenAI account ${accountId}`
-          )
-          retryableError.status = upstream.status
-          retryableError.statusCode = upstream.status
-          retryableError.response = upstream
-          throw retryableError
-        }
-
         // 处理 429 限流错误
         if (upstream.status === 429) {
           logger.warn(`🚫 Rate limit detected for OpenAI account ${accountId} (Codex API)`)
@@ -469,7 +455,6 @@ const handleResponses = async (req, res) => {
             resetsInSeconds
           )
 
-          // 返回错误响应给客户端
           const errorResponse = errorData || {
             error: {
               type: 'usage_limit_reached',
@@ -478,19 +463,30 @@ const handleResponses = async (req, res) => {
             }
           }
 
-          if (isStream) {
-            // 流式响应也需要设置正确的状态码
-            res.status(429)
-            res.setHeader('Content-Type', 'text/event-stream')
-            res.setHeader('Cache-Control', 'no-cache')
-            res.setHeader('Connection', 'keep-alive')
-            res.write(`data: ${JSON.stringify(errorResponse)}\n\n`)
-            res.end()
-          } else {
-            res.status(429).json(errorResponse)
+          // 如果禁用了 failover，则直接返回错误
+          if (account?.noFailover === true) {
+            if (isStream) {
+              res.status(429)
+              res.setHeader('Content-Type', 'text/event-stream')
+              res.setHeader('Cache-Control', 'no-cache')
+              res.setHeader('Connection', 'keep-alive')
+              res.write(`data: ${JSON.stringify(errorResponse)}\n\n`)
+              res.end()
+              return
+            }
+            return res.status(429).json(errorResponse)
           }
 
-          return
+          // 抛出错误以触发 failover，同时避免重复标记临时不可用
+          const rateLimitError = new Error(
+            `Rate limit exceeded for OpenAI account ${accountId}`
+          )
+          rateLimitError.status = 429
+          rateLimitError.statusCode = 429
+          rateLimitError.accountId = accountId
+          rateLimitError.errorData = errorResponse
+          rateLimitError.skipMarkUnavailable = true
+          throw rateLimitError
         } else if (upstream.status === 401 || upstream.status === 402) {
           const unauthorizedStatus = upstream.status
           const statusDescription = unauthorizedStatus === 401 ? 'Unauthorized' : 'Payment required'
@@ -573,8 +569,31 @@ const handleResponses = async (req, res) => {
             }
           }
 
-          res.status(unauthorizedStatus).json(errorResponse)
-          return
+          if (account?.noFailover === true) {
+            res.status(unauthorizedStatus).json(errorResponse)
+            return
+          }
+
+          const authError = new Error(reason)
+          authError.status = unauthorizedStatus
+          authError.statusCode = unauthorizedStatus
+          authError.accountId = accountId
+          authError.errorData = errorResponse
+          authError.skipMarkUnavailable = true
+          throw authError
+        } else if ([500, 502, 503, 504, 529].includes(upstream.status)) {
+          if (upstream?.data && typeof upstream.data.destroy === 'function') {
+            upstream.data.destroy()
+          }
+
+          const retryableError = new Error(
+            `Retryable upstream status ${upstream.status} for OpenAI account ${accountId}`
+          )
+          retryableError.status = upstream.status
+          retryableError.statusCode = upstream.status
+          retryableError.response = upstream
+          retryableError.tempUnavailableTTL = 300
+          throw retryableError
         } else if (upstream.status === 200 || upstream.status === 201) {
           // 请求成功，检查并移除限流状态
           const isRateLimited = await unifiedOpenAIScheduler.isAccountRateLimited(accountId)

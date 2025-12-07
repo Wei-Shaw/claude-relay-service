@@ -86,8 +86,17 @@ async function executeWithFailover(options) {
 
       // Check if we should retry
       if (account && failoverHelper.shouldRetry(retryContext)) {
-        // Mark the failed account as temporarily unavailable
-        await markUnavailable(account.accountId, account.accountType, sessionHash, ttl)
+        // Allow callers to opt-out of temp-unavailable marking (e.g., already marked as rate-limited/unauthorized)
+        const shouldMarkUnavailable = !retryContext.error?.skipMarkUnavailable
+        const ttlOverride = retryContext.error?.tempUnavailableTTL
+        if (shouldMarkUnavailable) {
+          await markUnavailable(
+            account.accountId,
+            account.accountType,
+            sessionHash,
+            ttlOverride || ttl
+          )
+        }
 
         // Update failover context
         failoverContext.retryCount += 1
