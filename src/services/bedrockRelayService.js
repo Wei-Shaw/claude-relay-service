@@ -134,7 +134,10 @@ class BedrockRelayService {
           success: false,
           error: handledError.message,
           errorData: handledError.errorData,
-          statusCode: statusInfo.statusCode || handledError.statusCode || handledError.errorData?.error?.statusCode
+          statusCode:
+            statusInfo.statusCode ||
+            handledError.statusCode ||
+            handledError.errorData?.error?.statusCode
         }
       }
 
@@ -234,9 +237,7 @@ class BedrockRelayService {
       const statusInfo =
         lastStatusInfo ||
         connectionStatusInfo ||
-        (bedrockAccount?.id
-          ? await this._handleAccountStatusForError(error, bedrockAccount)
-          : null)
+        (bedrockAccount?.id ? await this._handleAccountStatusForError(error, bedrockAccount) : null)
       const handledError = this._handleBedrockError(error)
       if (bedrockAccount?.id) {
         handledError.accountId = bedrockAccount.id
@@ -603,10 +604,7 @@ class BedrockRelayService {
         await bedrockAccountService.clearAccountUnauthorized(bedrockAccount.id)
       }
 
-      if (
-        isOverloaded &&
-        typeof bedrockAccountService.removeAccountOverload === 'function'
-      ) {
+      if (isOverloaded && typeof bedrockAccountService.removeAccountOverload === 'function') {
         await bedrockAccountService.removeAccountOverload(bedrockAccount.id)
         logger.debug(
           `✅ Cleared overload for Bedrock account ${bedrockAccount.name || bedrockAccount.id}`

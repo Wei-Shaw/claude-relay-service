@@ -369,10 +369,7 @@ async function sendGeminiRequest({
 
         if (typeof geminiAccountService.isAccountOverloaded === 'function') {
           const isOverloaded = await geminiAccountService.isAccountOverloaded(accountId)
-          if (
-            isOverloaded &&
-            typeof geminiAccountService.removeAccountOverload === 'function'
-          ) {
+          if (isOverloaded && typeof geminiAccountService.removeAccountOverload === 'function') {
             await geminiAccountService.removeAccountOverload(accountId)
             logger.debug(`✅ Cleared overload for Gemini account ${accountId}`)
           }
@@ -457,16 +454,15 @@ async function sendGeminiRequest({
         status === 400 || status === 401
           ? 'Gemini API key invalid'
           : geminiError?.message || 'Gemini API request failed'
-      const errorData =
-        (error.response.data &&
-          typeof error.response.data === 'object' &&
-          error.response.data) || {
-          error: {
-            message: baseMessage,
-            type: geminiError?.code || 'api_error',
-            code: geminiError?.code
-          }
+      const errorData = (error.response.data &&
+        typeof error.response.data === 'object' &&
+        error.response.data) || {
+        error: {
+          message: baseMessage,
+          type: geminiError?.code || 'api_error',
+          code: geminiError?.code
         }
+      }
 
       err = new Error(baseMessage)
       err.status = error.response.status

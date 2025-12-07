@@ -596,7 +596,10 @@ class CcrAccountService {
   }
 
   // ⏳ 标记账户为临时不可用状态
-  async markAccountTemporarilyUnavailable(accountId, ttlSeconds = this.TEMP_UNAVAILABLE_TTL_SECONDS) {
+  async markAccountTemporarilyUnavailable(
+    accountId,
+    ttlSeconds = this.TEMP_UNAVAILABLE_TTL_SECONDS
+  ) {
     try {
       const client = redis.getClientSafe()
       const account = await this.getAccount(accountId)
@@ -623,10 +626,7 @@ class CcrAccountService {
       )
       return { success: true, tempUnavailableUntil: until }
     } catch (error) {
-      logger.error(
-        `❌ Failed to mark CCR account as temporarily unavailable: ${accountId}`,
-        error
-      )
+      logger.error(`❌ Failed to mark CCR account as temporarily unavailable: ${accountId}`, error)
       throw error
     }
   }

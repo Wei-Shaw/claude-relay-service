@@ -518,9 +518,7 @@ class OpenAIResponsesRelayService {
 
         try {
           if (typeof openaiResponsesAccountService.isAccountOverloaded === 'function') {
-            const isOverloaded = await openaiResponsesAccountService.isAccountOverloaded(
-              account.id
-            )
+            const isOverloaded = await openaiResponsesAccountService.isAccountOverloaded(account.id)
             if (
               isOverloaded &&
               typeof openaiResponsesAccountService.removeAccountOverload === 'function'
@@ -844,9 +842,7 @@ class OpenAIResponsesRelayService {
           const body =
             typeof errorData === 'string'
               ? errorData
-              : JSON.stringify(
-                  errorData || { error: `OpenAI Responses upstream error: ${status}` }
-                )
+              : JSON.stringify(errorData || { error: `OpenAI Responses upstream error: ${status}` })
 
           if (account?.noFailover === true) {
             return { statusCode: status, headers, body, accountId: account.id }
@@ -1149,9 +1145,7 @@ class OpenAIResponsesRelayService {
           if (!res.headersSent && !res.destroyed) {
             res.status(502).json({ error: { message: 'Upstream stream error' } })
           } else if (!res.destroyed && !res.writableEnded) {
-            res.write(
-              `event: error\ndata: ${JSON.stringify({ error: 'Upstream error' })}\n\n`
-            )
+            res.write(`event: error\ndata: ${JSON.stringify({ error: 'Upstream error' })}\n\n`)
             res.end()
           }
         }

@@ -315,9 +315,7 @@ class ClaudeConsoleRelayService {
         const { data: sanitizedErrorData, body: sanitizedErrorBody } = getSanitizedErrorPayload()
 
         if (account.noFailover === true) {
-          logger.info(
-            `Account ${account.name} has noFailover=true, returning 401 error directly`
-          )
+          logger.info(`Account ${account.name} has noFailover=true, returning 401 error directly`)
           return {
             statusCode: 401,
             headers: response.headers,
@@ -342,9 +340,7 @@ class ClaudeConsoleRelayService {
         const { data: sanitizedErrorData, body: sanitizedErrorBody } = getSanitizedErrorPayload()
 
         if (account.noFailover === true) {
-          logger.info(
-            `Account ${account.name} has noFailover=true, returning 402 error directly`
-          )
+          logger.info(`Account ${account.name} has noFailover=true, returning 402 error directly`)
           return {
             statusCode: 402,
             headers: response.headers,
@@ -379,9 +375,7 @@ class ClaudeConsoleRelayService {
         const { data: sanitizedErrorData, body: sanitizedErrorBody } = getSanitizedErrorPayload()
 
         if (account.noFailover === true) {
-          logger.info(
-            `Account ${account.name} has noFailover=true, returning 403 error directly`
-          )
+          logger.info(`Account ${account.name} has noFailover=true, returning 403 error directly`)
           return {
             statusCode: 403,
             headers: response.headers,
@@ -411,9 +405,7 @@ class ClaudeConsoleRelayService {
         const { data: sanitizedErrorData, body: sanitizedErrorBody } = getSanitizedErrorPayload()
 
         if (account.noFailover === true) {
-          logger.info(
-            `Account ${account.name} has noFailover=true, returning 429 error directly`
-          )
+          logger.info(`Account ${account.name} has noFailover=true, returning 429 error directly`)
           return {
             statusCode: 429,
             headers: response.headers,
@@ -438,9 +430,7 @@ class ClaudeConsoleRelayService {
         const { data: sanitizedErrorData, body: sanitizedErrorBody } = getSanitizedErrorPayload()
 
         if (account.noFailover === true) {
-          logger.info(
-            `Account ${account.name} has noFailover=true, returning 529 error directly`
-          )
+          logger.info(`Account ${account.name} has noFailover=true, returning 529 error directly`)
           return {
             statusCode: 529,
             headers: response.headers,

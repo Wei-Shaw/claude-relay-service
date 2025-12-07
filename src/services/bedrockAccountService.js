@@ -475,10 +475,15 @@ class BedrockAccountService {
         account.status = 'active'
       }
       await this._saveAccountData(account)
-      logger.info(`✅ Cleared unauthorized status for Bedrock account: ${account.name || accountId}`)
+      logger.info(
+        `✅ Cleared unauthorized status for Bedrock account: ${account.name || accountId}`
+      )
       return { success: true }
     } catch (error) {
-      logger.error(`❌ Failed to clear unauthorized status for Bedrock account: ${accountId}`, error)
+      logger.error(
+        `❌ Failed to clear unauthorized status for Bedrock account: ${accountId}`,
+        error
+      )
       return { success: false, error: error.message }
     }
   }
@@ -488,7 +493,10 @@ class BedrockAccountService {
       const account = await this._getAccountData(accountId)
       return account.status === 'unauthorized'
     } catch (error) {
-      logger.error(`❌ Failed to check unauthorized status for Bedrock account: ${accountId}`, error)
+      logger.error(
+        `❌ Failed to check unauthorized status for Bedrock account: ${accountId}`,
+        error
+      )
       return false
     }
   }
@@ -565,7 +573,10 @@ class BedrockAccountService {
     }
   }
 
-  async markAccountTemporarilyUnavailable(accountId, ttlSeconds = this.TEMP_UNAVAILABLE_TTL_SECONDS) {
+  async markAccountTemporarilyUnavailable(
+    accountId,
+    ttlSeconds = this.TEMP_UNAVAILABLE_TTL_SECONDS
+  ) {
     try {
       const client = redis.getClientSafe()
       const account = await this._getAccountData(accountId)
@@ -582,10 +593,7 @@ class BedrockAccountService {
       )
       return { success: true, tempUnavailableUntil: until.toISOString() }
     } catch (error) {
-      logger.error(
-        `❌ Failed to mark Bedrock account temporarily unavailable: ${accountId}`,
-        error
-      )
+      logger.error(`❌ Failed to mark Bedrock account temporarily unavailable: ${accountId}`, error)
       return { success: false, error: error.message }
     }
   }

@@ -993,10 +993,7 @@ async function markAccountUsed(accountId) {
   })
 }
 
-async function markAccountUnauthorized(
-  accountId,
-  reason = 'Gemini账号认证失败（401错误）'
-) {
+async function markAccountUnauthorized(accountId, reason = 'Gemini账号认证失败（401错误）') {
   try {
     const account = await getAccount(accountId)
     if (!account) {
@@ -1064,10 +1061,7 @@ async function isAccountUnauthorized(accountId) {
   }
 }
 
-async function markAccountBlocked(
-  accountId,
-  reason = 'Gemini账号被禁止访问（403错误）'
-) {
+async function markAccountBlocked(accountId, reason = 'Gemini账号被禁止访问（403错误）') {
   try {
     const account = await getAccount(accountId)
     if (!account) {
@@ -1248,10 +1242,7 @@ async function markAccountTemporarilyUnavailable(
     )
     return { success: true, until }
   } catch (error) {
-    logger.error(
-      `❌ Failed to mark Gemini account temporarily unavailable: ${accountId}`,
-      error
-    )
+    logger.error(`❌ Failed to mark Gemini account temporarily unavailable: ${accountId}`, error)
     return { success: false, error: error.message }
   }
 }
@@ -1277,9 +1268,7 @@ async function markAccountOverloaded(accountId, ttlSeconds = OVERLOAD_TTL_SECOND
 
     await client.setex(`overloaded:gemini:${accountId}`, ttlSeconds, '1')
 
-    logger.warn(
-      `🚫 Gemini account ${account.name || accountId} marked overloaded until ${until}`
-    )
+    logger.warn(`🚫 Gemini account ${account.name || accountId} marked overloaded until ${until}`)
     return { success: true, until }
   } catch (error) {
     logger.error(`❌ Failed to mark Gemini account overloaded: ${accountId}`, error)
@@ -1367,8 +1356,7 @@ async function getAccountRateLimitInfo(accountId) {
       const minutesSinceRateLimit = Math.floor((now - rateLimitedAt) / (1000 * 60))
 
       const rateLimitEndAt =
-        resetAt ||
-        new Date(rateLimitedAt.getTime() + durationMinutes * 60 * 1000).toISOString()
+        resetAt || new Date(rateLimitedAt.getTime() + durationMinutes * 60 * 1000).toISOString()
       const minutesRemaining = Math.max(
         0,
         Math.ceil((new Date(rateLimitEndAt).getTime() - now.getTime()) / (1000 * 60))

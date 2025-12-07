@@ -433,10 +433,7 @@ class DroidRelayService {
 
             if (typeof droidAccountService.isAccountOverloaded === 'function') {
               const isOverloaded = await droidAccountService.isAccountOverloaded(account.id)
-              if (
-                isOverloaded &&
-                typeof droidAccountService.removeAccountOverload === 'function'
-              ) {
+              if (isOverloaded && typeof droidAccountService.removeAccountOverload === 'function') {
                 await droidAccountService.removeAccountOverload(account.id)
                 logger.debug(`✅ Cleared overload for Droid account ${account.id}`)
               }

@@ -196,10 +196,13 @@ class CcrRelayService {
         await ccrAccountService.markAccountUnauthorized(accountId)
 
         if (account?.noFailover === true) {
-          logger.info(
-            `Account ${account.name} has noFailover=true, returning 401 error directly`
+          logger.info(`Account ${account.name} has noFailover=true, returning 401 error directly`)
+          return this._buildErrorResponse(
+            401,
+            sanitizedErrorData || parsedErrorData,
+            accountId,
+            responseHeaders
           )
-          return this._buildErrorResponse(401, sanitizedErrorData || parsedErrorData, accountId, responseHeaders)
         }
 
         const unauthorizedError = new Error('CCR Unauthorized')
@@ -212,10 +215,13 @@ class CcrRelayService {
         await ccrAccountService.markAccountPaymentRequired(accountId)
 
         if (account?.noFailover === true) {
-          logger.info(
-            `Account ${account.name} has noFailover=true, returning 402 error directly`
+          logger.info(`Account ${account.name} has noFailover=true, returning 402 error directly`)
+          return this._buildErrorResponse(
+            402,
+            sanitizedErrorData || parsedErrorData,
+            accountId,
+            responseHeaders
           )
-          return this._buildErrorResponse(402, sanitizedErrorData || parsedErrorData, accountId, responseHeaders)
         }
 
         const paymentRequiredError = new Error('CCR Payment Required')
@@ -228,10 +234,13 @@ class CcrRelayService {
         await ccrAccountService.markAccountBlocked(accountId)
 
         if (account?.noFailover === true) {
-          logger.info(
-            `Account ${account.name} has noFailover=true, returning 403 error directly`
+          logger.info(`Account ${account.name} has noFailover=true, returning 403 error directly`)
+          return this._buildErrorResponse(
+            403,
+            sanitizedErrorData || parsedErrorData,
+            accountId,
+            responseHeaders
           )
-          return this._buildErrorResponse(403, sanitizedErrorData || parsedErrorData, accountId, responseHeaders)
         }
 
         const forbiddenError = new Error('CCR Forbidden')
@@ -249,10 +258,13 @@ class CcrRelayService {
         await ccrAccountService.markAccountRateLimited(accountId)
 
         if (account?.noFailover === true) {
-          logger.info(
-            `Account ${account.name} has noFailover=true, returning 429 error directly`
+          logger.info(`Account ${account.name} has noFailover=true, returning 429 error directly`)
+          return this._buildErrorResponse(
+            429,
+            sanitizedErrorData || parsedErrorData,
+            accountId,
+            responseHeaders
           )
-          return this._buildErrorResponse(429, sanitizedErrorData || parsedErrorData, accountId, responseHeaders)
         }
 
         const rateLimitError = new Error('CCR Rate Limited')
@@ -265,10 +277,13 @@ class CcrRelayService {
         await ccrAccountService.markAccountOverloaded(accountId)
 
         if (account?.noFailover === true) {
-          logger.info(
-            `Account ${account.name} has noFailover=true, returning 529 error directly`
+          logger.info(`Account ${account.name} has noFailover=true, returning 529 error directly`)
+          return this._buildErrorResponse(
+            529,
+            sanitizedErrorData || parsedErrorData,
+            accountId,
+            responseHeaders
           )
-          return this._buildErrorResponse(529, sanitizedErrorData || parsedErrorData, accountId, responseHeaders)
         }
 
         const overloadError = new Error('CCR Overloaded')
@@ -284,7 +299,12 @@ class CcrRelayService {
           logger.info(
             `Account ${account.name} has noFailover=true, returning ${response.status} error directly`
           )
-          return this._buildErrorResponse(response.status, sanitizedErrorData || parsedErrorData, accountId, responseHeaders)
+          return this._buildErrorResponse(
+            response.status,
+            sanitizedErrorData || parsedErrorData,
+            accountId,
+            responseHeaders
+          )
         }
 
         const upstreamError = new Error(`CCR upstream error: ${response.status}`)
@@ -304,10 +324,7 @@ class CcrRelayService {
         }
         if (typeof ccrAccountService.isAccountUnauthorized === 'function') {
           const isUnauthorized = await ccrAccountService.isAccountUnauthorized(account.id)
-          if (
-            isUnauthorized &&
-            typeof ccrAccountService.clearAccountUnauthorized === 'function'
-          ) {
+          if (isUnauthorized && typeof ccrAccountService.clearAccountUnauthorized === 'function') {
             await ccrAccountService.clearAccountUnauthorized(account.id)
             logger.debug(`✅ Cleared unauthorized for CCR account ${account.id}`)
           }

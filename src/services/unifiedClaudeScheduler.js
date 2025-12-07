@@ -358,7 +358,10 @@ class UnifiedClaudeScheduler {
                 logger.warn(
                   `⏱️ Bound Bedrock account ${dedicatedBedrockAccountId} is rate limited, falling back to pool`
                 )
-              } else if (isUnauthorized || boundBedrockAccountResult.data.status === 'unauthorized') {
+              } else if (
+                isUnauthorized ||
+                boundBedrockAccountResult.data.status === 'unauthorized'
+              ) {
                 logger.warn(
                   `🚫 Bound Bedrock account ${dedicatedBedrockAccountId} is unauthorized, falling back to pool`
                 )
@@ -896,7 +899,9 @@ class UnifiedClaudeScheduler {
           ])
 
           if (accountTempUnavailable) {
-            logger.debug(`⏭️ Skipping Bedrock account ${account.name} - temp unavailable (account state)`)
+            logger.debug(
+              `⏭️ Skipping Bedrock account ${account.name} - temp unavailable (account state)`
+            )
             continue
           }
 
