@@ -6,6 +6,8 @@ const logger = require('../utils/logger')
 const redis = require('../models/redis')
 // const { RateLimiterRedis } = require('rate-limiter-flexible') // 暂时未使用
 const ClientValidator = require('../validators/clientValidator')
+const ClaudeCodeValidator = require('../validators/clients/claudeCodeValidator')
+const claudeRelayConfigService = require('../services/claudeRelayConfigService')
 
 const FALLBACK_CONCURRENCY_CONFIG = {
   leaseSeconds: 300,
@@ -199,6 +201,53 @@ const authenticateApiKey = async (req, res, next) => {
       logger.api(
         `✅ Client validated: ${validationResult.clientName} (${validationResult.matchedClient}) for key: ${validation.keyData.id} (${validation.keyData.name})`
       )
+    }
+
+    // 🔒 检查全局 Claude Code 限制（与 API Key 级别是 OR 逻辑）
+    // 仅对 Claude 服务端点生效 (/api/v1/messages 和 /claude/v1/messages)
+    if (!skipKeyRestrictions) {
+      const normalizedPath = (req.originalUrl || req.path || '').toLowerCase()
+      const isClaudeMessagesEndpoint =
+        normalizedPath.includes('/v1/messages') &&
+        (normalizedPath.startsWith('/api') || normalizedPath.startsWith('/claude'))
+
+      if (isClaudeMessagesEndpoint) {
+        try {
+          const globalClaudeCodeOnly = await claudeRelayConfigService.isClaudeCodeOnlyEnabled()
+
+          // API Key 级别的 Claude Code 限制
+          const keyClaudeCodeOnly =
+            validation.keyData.enableClientRestriction &&
+            Array.isArray(validation.keyData.allowedClients) &&
+            validation.keyData.allowedClients.length === 1 &&
+            validation.keyData.allowedClients.includes('claude_code')
+
+          // OR 逻辑：全局开启 或 API Key 级别限制为仅 claude_code
+          if (globalClaudeCodeOnly || keyClaudeCodeOnly) {
+            const isClaudeCode = ClaudeCodeValidator.validate(req)
+
+            if (!isClaudeCode) {
+              const clientIP = req.ip || req.connection?.remoteAddress || 'unknown'
+              logger.api(
+                `❌ Claude Code client validation failed (global: ${globalClaudeCodeOnly}, key: ${keyClaudeCodeOnly}) from ${clientIP}`
+              )
+              return res.status(403).json({
+                error: {
+                  type: 'client_validation_error',
+                  message: 'This endpoint only accepts requests from Claude Code CLI'
+                }
+              })
+            }
+
+            logger.api(
+              `✅ Claude Code client validated (global: ${globalClaudeCodeOnly}, key: ${keyClaudeCodeOnly})`
+            )
+          }
+        } catch (error) {
+          logger.error('❌ Error checking Claude Code restriction:', error)
+          // 配置服务出错时不阻断请求
+        }
+      }
     }
 
     // 检查并发限制

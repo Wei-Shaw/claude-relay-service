@@ -11,6 +11,7 @@ const logger = require('../utils/logger')
 const { getEffectiveModel, parseVendorPrefixedModel } = require('../utils/modelHelper')
 const sessionHelper = require('../utils/sessionHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
+const claudeRelayConfigService = require('../services/claudeRelayConfigService')
 const { sanitizeUpstreamError } = require('../utils/errorSanitizer')
 const router = express.Router()
 
@@ -141,6 +142,56 @@ async function handleMessagesRequest(req, res) {
       // 生成会话哈希用于sticky会话
       const sessionHash = sessionHelper.generateSessionHash(req.body)
 
+      // 🔒 全局会话绑定验证
+      let forcedAccount = null
+      let needSessionBinding = false
+      let originalSessionIdForBinding = null
+
+      try {
+        const globalBindingEnabled = await claudeRelayConfigService.isGlobalSessionBindingEnabled()
+
+        if (globalBindingEnabled) {
+          const originalSessionId = claudeRelayConfigService.extractOriginalSessionId(req.body)
+
+          if (originalSessionId) {
+            const validation = await claudeRelayConfigService.validateNewSession(
+              req.body,
+              originalSessionId
+            )
+
+            if (!validation.valid) {
+              logger.api(
+                `❌ Session binding validation failed: ${validation.code} for session ${originalSessionId}`
+              )
+              return res.status(403).json({
+                error: {
+                  type: 'session_binding_error',
+                  message: validation.error
+                }
+              })
+            }
+
+            // 如果已有绑定，使用绑定的账户
+            if (validation.binding) {
+              forcedAccount = validation.binding
+              logger.api(
+                `🔗 Using bound account for session ${originalSessionId}: ${forcedAccount.accountId}`
+              )
+            }
+
+            // 标记需要在调度成功后建立绑定
+            if (validation.isNewSession) {
+              needSessionBinding = true
+              originalSessionIdForBinding = originalSessionId
+              logger.api(`📝 New session detected, will create binding: ${originalSessionId}`)
+            }
+          }
+        }
+      } catch (error) {
+        logger.error('❌ Error in global session binding check:', error)
+        // 配置服务出错时不阻断请求
+      }
+
       // 使用统一调度选择账号（传递请求的模型）
       const requestedModel = req.body.model
       let accountId
@@ -149,10 +200,21 @@ async function handleMessagesRequest(req, res) {
         const selection = await unifiedClaudeScheduler.selectAccountForApiKey(
           req.apiKey,
           sessionHash,
-          requestedModel
+          requestedModel,
+          forcedAccount
         )
         ;({ accountId, accountType } = selection)
       } catch (error) {
+        // 处理会话绑定账户不可用的错误
+        if (error.code === 'SESSION_BINDING_ACCOUNT_UNAVAILABLE') {
+          const errorMessage = await claudeRelayConfigService.getSessionBindingErrorMessage()
+          return res.status(403).json({
+            error: {
+              type: 'session_binding_error',
+              message: errorMessage
+            }
+          })
+        }
         if (error.code === 'CLAUDE_DEDICATED_RATE_LIMITED') {
           const limitMessage = claudeRelayService._buildStandardRateLimitMessage(
             error.rateLimitEndAt
@@ -168,6 +230,41 @@ async function handleMessagesRequest(req, res) {
           return
         }
         throw error
+      }
+
+      // 🔗 在成功调度后建立会话绑定（仅 claude-official 类型）
+      // claude-official 只接受：1) 新会话(messages.length=1) 2) 已绑定的会话
+      if (
+        needSessionBinding &&
+        originalSessionIdForBinding &&
+        accountId &&
+        accountType === 'claude-official'
+      ) {
+        // 🚫 新会话必须 messages.length === 1
+        const messages = req.body?.messages
+        if (messages && messages.length > 1) {
+          const cfg = await claudeRelayConfigService.getConfig()
+          logger.warn(
+            `🚫 New session with messages.length > 1 rejected: sessionId=${originalSessionIdForBinding}, messages.length=${messages.length}`
+          )
+          return res.status(400).json({
+            error: {
+              type: 'session_binding_error',
+              message: cfg.sessionBindingErrorMessage || '你的本地session已污染，请清理后使用。'
+            }
+          })
+        }
+
+        // 创建绑定
+        try {
+          await claudeRelayConfigService.setOriginalSessionBinding(
+            originalSessionIdForBinding,
+            accountId,
+            accountType
+          )
+        } catch (bindingError) {
+          logger.warn(`⚠️ Failed to create session binding:`, bindingError)
+        }
       }
 
       // 根据账号类型选择对应的转发服务并调用
@@ -503,6 +600,55 @@ async function handleMessagesRequest(req, res) {
       // 生成会话哈希用于sticky会话
       const sessionHash = sessionHelper.generateSessionHash(req.body)
 
+      // 🔒 全局会话绑定验证（非流式）
+      let forcedAccountNonStream = null
+      let needSessionBindingNonStream = false
+      let originalSessionIdForBindingNonStream = null
+
+      try {
+        const globalBindingEnabled = await claudeRelayConfigService.isGlobalSessionBindingEnabled()
+
+        if (globalBindingEnabled) {
+          const originalSessionId = claudeRelayConfigService.extractOriginalSessionId(req.body)
+
+          if (originalSessionId) {
+            const validation = await claudeRelayConfigService.validateNewSession(
+              req.body,
+              originalSessionId
+            )
+
+            if (!validation.valid) {
+              logger.api(
+                `❌ Session binding validation failed (non-stream): ${validation.code} for session ${originalSessionId}`
+              )
+              return res.status(403).json({
+                error: {
+                  type: 'session_binding_error',
+                  message: validation.error
+                }
+              })
+            }
+
+            if (validation.binding) {
+              forcedAccountNonStream = validation.binding
+              logger.api(
+                `🔗 Using bound account for session (non-stream) ${originalSessionId}: ${forcedAccountNonStream.accountId}`
+              )
+            }
+
+            if (validation.isNewSession) {
+              needSessionBindingNonStream = true
+              originalSessionIdForBindingNonStream = originalSessionId
+              logger.api(
+                `📝 New session detected (non-stream), will create binding: ${originalSessionId}`
+              )
+            }
+          }
+        }
+      } catch (error) {
+        logger.error('❌ Error in global session binding check (non-stream):', error)
+      }
+
       // 使用统一调度选择账号（传递请求的模型）
       const requestedModel = req.body.model
       let accountId
@@ -511,10 +657,20 @@ async function handleMessagesRequest(req, res) {
         const selection = await unifiedClaudeScheduler.selectAccountForApiKey(
           req.apiKey,
           sessionHash,
-          requestedModel
+          requestedModel,
+          forcedAccountNonStream
         )
         ;({ accountId, accountType } = selection)
       } catch (error) {
+        if (error.code === 'SESSION_BINDING_ACCOUNT_UNAVAILABLE') {
+          const errorMessage = await claudeRelayConfigService.getSessionBindingErrorMessage()
+          return res.status(403).json({
+            error: {
+              type: 'session_binding_error',
+              message: errorMessage
+            }
+          })
+        }
         if (error.code === 'CLAUDE_DEDICATED_RATE_LIMITED') {
           const limitMessage = claudeRelayService._buildStandardRateLimitMessage(
             error.rateLimitEndAt
@@ -525,6 +681,41 @@ async function handleMessagesRequest(req, res) {
           })
         }
         throw error
+      }
+
+      // 🔗 在成功调度后建立会话绑定（非流式，仅 claude-official 类型）
+      // claude-official 只接受：1) 新会话(messages.length=1) 2) 已绑定的会话
+      if (
+        needSessionBindingNonStream &&
+        originalSessionIdForBindingNonStream &&
+        accountId &&
+        accountType === 'claude-official'
+      ) {
+        // 🚫 新会话必须 messages.length === 1
+        const messages = req.body?.messages
+        if (messages && messages.length > 1) {
+          const cfg = await claudeRelayConfigService.getConfig()
+          logger.warn(
+            `🚫 New session with messages.length > 1 rejected (non-stream): sessionId=${originalSessionIdForBindingNonStream}, messages.length=${messages.length}`
+          )
+          return res.status(400).json({
+            error: {
+              type: 'session_binding_error',
+              message: cfg.sessionBindingErrorMessage || '你的本地session已污染，请清理后使用。'
+            }
+          })
+        }
+
+        // 创建绑定
+        try {
+          await claudeRelayConfigService.setOriginalSessionBinding(
+            originalSessionIdForBindingNonStream,
+            accountId,
+            accountType
+          )
+        } catch (bindingError) {
+          logger.warn(`⚠️ Failed to create session binding (non-stream):`, bindingError)
+        }
       }
 
       // 根据账号类型选择对应的转发服务

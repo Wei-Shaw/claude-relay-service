@@ -180,8 +180,56 @@ class UnifiedClaudeScheduler {
   }
 
   // 🎯 统一调度Claude账号（官方和Console）
-  async selectAccountForApiKey(apiKeyData, sessionHash = null, requestedModel = null) {
+  async selectAccountForApiKey(
+    apiKeyData,
+    sessionHash = null,
+    requestedModel = null,
+    forcedAccount = null
+  ) {
     try {
+      // 🔒 如果有强制绑定的账户（全局会话绑定），仅 claude-official 类型受影响
+      if (forcedAccount && forcedAccount.accountId && forcedAccount.accountType) {
+        // ⚠️ 只有 claude-official 类型账户受全局会话绑定限制
+        // 其他类型（bedrock, ccr, claude-console等）忽略绑定，走正常调度
+        if (forcedAccount.accountType !== 'claude-official') {
+          logger.info(
+            `🔗 Session binding ignored for non-official account type: ${forcedAccount.accountType}, proceeding with normal scheduling`
+          )
+          // 不使用 forcedAccount，继续走下面的正常调度逻辑
+        } else {
+          // claude-official 类型需要检查可用性并强制使用
+          logger.info(
+            `🔗 Forced session binding detected: ${forcedAccount.accountId} (${forcedAccount.accountType})`
+          )
+
+          const isAvailable = await this._isAccountAvailableForSessionBinding(
+            forcedAccount.accountId,
+            forcedAccount.accountType,
+            requestedModel
+          )
+
+          if (isAvailable) {
+            logger.info(
+              `✅ Using forced session binding account: ${forcedAccount.accountId} (${forcedAccount.accountType})`
+            )
+            return {
+              accountId: forcedAccount.accountId,
+              accountType: forcedAccount.accountType
+            }
+          } else {
+            // 绑定账户不可用，抛出特定错误（不 fallback）
+            logger.warn(
+              `❌ Forced session binding account unavailable: ${forcedAccount.accountId} (${forcedAccount.accountType})`
+            )
+            const error = new Error('Session binding account unavailable')
+            error.code = 'SESSION_BINDING_ACCOUNT_UNAVAILABLE'
+            error.accountId = forcedAccount.accountId
+            error.accountType = forcedAccount.accountType
+            throw error
+          }
+        }
+      }
+
       // 解析供应商前缀
       const { vendor, baseModel } = parseVendorPrefixedModel(requestedModel)
       const effectiveModel = vendor === 'ccr' ? baseModel : requestedModel
@@ -1709,6 +1757,67 @@ class UnifiedClaudeScheduler {
     } catch (error) {
       logger.error('❌ Failed to get available CCR accounts:', error)
       return []
+    }
+  }
+
+  /**
+   * 🔒 检查 claude-official 账户是否可用于会话绑定
+   * 注意：此方法仅用于 claude-official 类型账户，其他类型不受会话绑定限制
+   * @param {string} accountId - 账户ID
+   * @param {string} accountType - 账户类型（应为 'claude-official'）
+   * @param {string} _requestedModel - 请求的模型（保留参数，当前未使用）
+   * @returns {Promise<boolean>}
+   */
+  async _isAccountAvailableForSessionBinding(accountId, accountType, _requestedModel = null) {
+    try {
+      // 此方法仅处理 claude-official 类型
+      if (accountType !== 'claude-official') {
+        logger.warn(
+          `Session binding: _isAccountAvailableForSessionBinding called for non-official type: ${accountType}`
+        )
+        return true // 非 claude-official 类型不受限制
+      }
+
+      const account = await redis.getClaudeAccount(accountId)
+      if (!account) {
+        logger.warn(`Session binding: Claude OAuth account ${accountId} not found`)
+        return false
+      }
+
+      const isActive = account.isActive === 'true' || account.isActive === true
+      const { status } = account
+
+      if (!isActive) {
+        logger.warn(`Session binding: Claude OAuth account ${accountId} is not active`)
+        return false
+      }
+
+      if (status === 'error' || status === 'temp_error') {
+        logger.warn(
+          `Session binding: Claude OAuth account ${accountId} has error status: ${status}`
+        )
+        return false
+      }
+
+      // 检查是否被限流
+      if (await claudeAccountService.isAccountRateLimited(accountId)) {
+        logger.warn(`Session binding: Claude OAuth account ${accountId} is rate limited`)
+        return false
+      }
+
+      // 检查临时不可用
+      if (await this.isAccountTemporarilyUnavailable(accountId, accountType)) {
+        logger.warn(`Session binding: Claude OAuth account ${accountId} is temporarily unavailable`)
+        return false
+      }
+
+      return true
+    } catch (error) {
+      logger.error(
+        `❌ Error checking account availability for session binding: ${accountId} (${accountType})`,
+        error
+      )
+      return false
     }
   }
 }
