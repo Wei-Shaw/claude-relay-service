@@ -84,6 +84,11 @@ const PROMPT_DEFINITIONS = {
     title: 'Claude Code Compact System Prompt',
     text: 'You are a helpful AI assistant tasked with summarizing conversations.'
   },
+  exploreAgentSystemPrompt: {
+    category: 'system',
+    title: 'Claude Code Explore Agent System Prompt',
+    text: "You are a file search specialist for Claude Code, Anthropic's official CLI for Claude."
+  },
   outputStyleInsightsPrompt: {
     category: 'output_style',
     title: 'Output Style Insights Addendum',
