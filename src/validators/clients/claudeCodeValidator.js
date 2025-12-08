@@ -2,6 +2,36 @@ const logger = require('../../utils/logger')
 const { CLIENT_DEFINITIONS } = require('../clientDefinitions')
 const { bestSimilarityByTemplates, SYSTEM_PROMPT_THRESHOLD } = require('../../utils/contents')
 
+// Claude Code 版本 -> 默认模型增量映射
+// 只配置“变更点”，其余型号按版本从低到高继承，基线为 0.0.0。
+// 更新方式：
+// 1) 官方默认模型有调整时，新增对应版本键（如 2.0.xx），仅填写有变化的类型（opus/sonnet/haiku）。
+// 2) 保持配置最小化，版本排序自动完成。
+// 3) 需要覆盖旧值时，写新的版本键即可覆盖继承结果。
+const CLAUDE_CODE_MODEL_VERSION_MAP = {
+  '2.0.51': {
+    opus: 'claude-opus-4-5-20251101'
+  },
+  '2.0.17': {
+    haiku: 'claude-haiku-4-5-20251001'
+  },
+  '2.0.0': {
+    sonnet: 'claude-sonnet-4-5-20250929'
+  },
+  '1.0.69': {
+    opus: 'claude-opus-4-1-20250805'
+  },
+  '0.0.0': {
+    opus: 'claude-opus-4-20250514',
+    sonnet: 'claude-sonnet-4-20250514',
+    haiku: 'claude-3-5-haiku-20241022'
+  }
+}
+
+const CLAUDE_CODE_MODEL_VERSION_CACHE = new Map()
+
+let CLAUDE_CODE_VERSION_KEYS
+
 /**
  * Claude Code CLI 验证器
  * 验证请求是否来自 Claude Code CLI
@@ -33,6 +63,69 @@ class ClaudeCodeValidator {
    */
   static getIcon() {
     return CLIENT_DEFINITIONS.CLAUDE_CODE.icon || '🤖'
+  }
+
+  // 版本号比较
+  static compareVersions(v1, v2) {
+    if (!v1 || !v2) {
+      return 0
+    }
+    const parts1 = v1.split('.').map((n) => parseInt(n, 10) || 0)
+    const parts2 = v2.split('.').map((n) => parseInt(n, 10) || 0)
+    const len = Math.max(parts1.length, parts2.length)
+    for (let i = 0; i < len; i++) {
+      const a = parts1[i] || 0
+      const b = parts2[i] || 0
+      if (a > b) {
+        return 1
+      }
+      if (a < b) {
+        return -1
+      }
+    }
+    return 0
+  }
+
+  // 构造当前版本的默认模型列表
+  static resolveVersionDefaultModels(version) {
+    const targetVersion = version || '0.0.0'
+    if (CLAUDE_CODE_MODEL_VERSION_CACHE.has(targetVersion)) {
+      return CLAUDE_CODE_MODEL_VERSION_CACHE.get(targetVersion)
+    }
+
+    if (!CLAUDE_CODE_VERSION_KEYS) {
+      CLAUDE_CODE_VERSION_KEYS = Object.keys(CLAUDE_CODE_MODEL_VERSION_MAP).sort((a, b) =>
+        this.compareVersions(a, b)
+      )
+    }
+
+    const result = { ...CLAUDE_CODE_MODEL_VERSION_MAP['0.0.0'] }
+    for (const key of CLAUDE_CODE_VERSION_KEYS) {
+      if (this.compareVersions(targetVersion, key) >= 0) {
+        Object.assign(result, CLAUDE_CODE_MODEL_VERSION_MAP[key])
+      }
+    }
+
+    CLAUDE_CODE_MODEL_VERSION_CACHE.set(
+      targetVersion,
+      [result.opus, result.sonnet, result.haiku].filter(Boolean)
+    )
+
+    return CLAUDE_CODE_MODEL_VERSION_CACHE.get(targetVersion)
+  }
+
+  static validateModelForVersion(modelId, version) {
+    if (!modelId || typeof modelId !== 'string') {
+      return { isDefault: true, defaultModels: [] }
+    }
+
+    const defaults = this.resolveVersionDefaultModels(version)
+
+    if (defaults.length === 0) {
+      return { isDefault: false, defaultModels: [] }
+    }
+
+    return { isDefault: defaults.includes(modelId), defaultModels: defaults }
   }
 
   /**
