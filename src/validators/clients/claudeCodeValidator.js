@@ -64,9 +64,8 @@ class ClaudeCodeValidator {
       const rawText = typeof entry?.text === 'string' ? entry.text : ''
       const { bestScore } = bestSimilarityByTemplates(rawText)
       if (bestScore < threshold) {
-        logger.error(
-          `Claude system prompt similarity below threshold: score=${bestScore.toFixed(4)}, threshold=${threshold}, prompt=${rawText}`
-        )
+        logger.error(`Claude system prompt similarity below threshold: score=${bestScore.toFixed(4)}, threshold=${threshold}`)
+        logger.warn(`Claude system prompt detail: ${rawText}`)
         return false
       }
     }
