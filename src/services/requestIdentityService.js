@@ -22,6 +22,18 @@ const STAINLESS_HEADER_KEYS = [
   'x-stainless-runtime',
   'x-stainless-runtime-version'
 ]
+
+// 小写 key 到正确大小写格式的映射（用于返回给上游时）
+const STAINLESS_HEADER_CASE_MAP = {
+  'x-stainless-retry-count': 'X-Stainless-Retry-Count',
+  'x-stainless-timeout': 'X-Stainless-Timeout',
+  'x-stainless-lang': 'X-Stainless-Lang',
+  'x-stainless-package-version': 'X-Stainless-Package-Version',
+  'x-stainless-os': 'X-Stainless-OS',
+  'x-stainless-arch': 'X-Stainless-Arch',
+  'x-stainless-runtime': 'X-Stainless-Runtime',
+  'x-stainless-runtime-version': 'X-Stainless-Runtime-Version'
+}
 const MIN_FINGERPRINT_FIELDS = 4
 const REDIS_KEY_PREFIX = 'fmt_claude_req:stainless_headers:'
 
@@ -135,7 +147,9 @@ function applyFingerprintToHeaders(headers, fingerprint) {
       return
     }
     removeHeaderCaseInsensitive(nextHeaders, key)
-    nextHeaders[key] = fingerprint[key]
+    // 使用正确的大小写格式返回给上游
+    const properCaseKey = STAINLESS_HEADER_CASE_MAP[key] || key
+    nextHeaders[properCaseKey] = fingerprint[key]
   })
 
   return nextHeaders

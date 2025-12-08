@@ -18,7 +18,7 @@ const { createClaudeTestPayload } = require('../utils/testPayloadHelper')
 
 class ClaudeRelayService {
   constructor() {
-    this.claudeApiUrl = config.claude.apiUrl
+    this.claudeApiUrl = 'https://api.anthropic.com/v1/messages?beta=true'
     this.apiVersion = config.claude.apiVersion
     this.betaHeader = config.claude.betaHeader
     this.systemPrompt = config.claude.systemPrompt
@@ -878,9 +878,100 @@ class ClaudeRelayService {
 
   // 🔧 过滤客户端请求头
   _filterClientHeaders(clientHeaders) {
-    // 使用统一的 headerFilter 工具类 - 移除 CDN、浏览器和代理相关 headers
+    // 使用统一的 headerFilter 工具类
     // 同时伪装成正常的直接客户端请求，避免触发上游 API 的安全检查
     return filterForClaude(clientHeaders)
+  }
+
+  // 🔧 准备请求头和 payload（抽离公共逻辑）
+  async _prepareRequestHeadersAndPayload(
+    body,
+    clientHeaders,
+    accountId,
+    accessToken,
+    options = {}
+  ) {
+    const { account, accountType, sessionHash, requestOptions = {}, isStream = false } = options
+
+    // 获取统一的 User-Agent
+    const unifiedUA = await this.captureAndGetUnifiedUserAgent(clientHeaders, account)
+
+    // 获取过滤后的客户端 headers
+    const filteredHeaders = this._filterClientHeaders(clientHeaders)
+
+    // 判断是否是真实的 Claude Code 请求
+    const isRealClaudeCode = this.isRealClaudeCodeRequest(body)
+
+    // 如果不是真实的 Claude Code 请求，需要使用从账户获取的 Claude Code headers
+    let finalHeaders = { ...filteredHeaders }
+    let requestPayload = body
+
+    if (!isRealClaudeCode) {
+      // 获取该账号存储的 Claude Code headers
+      const claudeCodeHeaders = await claudeCodeHeadersService.getAccountHeaders(accountId)
+
+      // 只添加客户端没有提供的 headers
+      Object.keys(claudeCodeHeaders).forEach((key) => {
+        const lowerKey = key.toLowerCase()
+        if (!finalHeaders[key] && !finalHeaders[lowerKey]) {
+          finalHeaders[key] = claudeCodeHeaders[key]
+        }
+      })
+    }
+
+    // 应用请求身份转换
+    const extensionResult = this._applyRequestIdentityTransform(requestPayload, finalHeaders, {
+      account,
+      accountId,
+      accountType,
+      sessionHash,
+      clientHeaders,
+      requestOptions,
+      isStream
+    })
+
+    if (extensionResult.abortResponse) {
+      return { abortResponse: extensionResult.abortResponse }
+    }
+
+    requestPayload = extensionResult.body
+    finalHeaders = extensionResult.headers
+
+    // 序列化请求体，计算 content-length
+    const bodyString = JSON.stringify(requestPayload)
+    const contentLength = Buffer.byteLength(bodyString, 'utf8')
+
+    // 构建最终请求头（包含认证、版本、User-Agent、Beta 等）
+    const headers = {
+      host: 'api.anthropic.com',
+      connection: 'keep-alive',
+      'content-type': 'application/json',
+      'content-length': String(contentLength),
+      authorization: `Bearer ${accessToken}`,
+      'anthropic-version': this.apiVersion,
+      ...finalHeaders
+    }
+
+    // 使用统一 User-Agent 或客户端提供的，最后使用默认值
+    const userAgent = unifiedUA || headers['user-agent'] || 'claude-cli/1.0.119 (external, cli)'
+    const acceptHeader = headers['accept'] || 'application/json'
+    delete headers['user-agent']
+    delete headers['accept']
+    headers['User-Agent'] = userAgent
+    headers['Accept'] = acceptHeader
+
+    logger.info(`🔗 指纹是这个: ${headers['User-Agent']}`)
+
+    // 根据模型和客户端传递的 anthropic-beta 动态设置 header
+    const modelId = requestPayload?.model || body?.model
+    const clientBetaHeader = clientHeaders?.['anthropic-beta']
+    headers['anthropic-beta'] = this._getBetaHeader(modelId, clientBetaHeader)
+    return {
+      requestPayload,
+      bodyString,
+      headers,
+      isRealClaudeCode
+    }
   }
 
   _applyRequestIdentityTransform(body, headers, context = {}) {
@@ -928,46 +1019,24 @@ class ClaudeRelayService {
     // 获取账户信息用于统一 User-Agent
     const account = await claudeAccountService.getAccount(accountId)
 
-    // 获取统一的 User-Agent
-    const unifiedUA = await this.captureAndGetUnifiedUserAgent(clientHeaders, account)
-
-    // 获取过滤后的客户端 headers
-    const filteredHeaders = this._filterClientHeaders(clientHeaders)
-
-    // 判断是否是真实的 Claude Code 请求
-    const isRealClaudeCode = this.isRealClaudeCodeRequest(body)
-
-    // 如果不是真实的 Claude Code 请求，需要使用从账户获取的 Claude Code headers
-    let finalHeaders = { ...filteredHeaders }
-    let requestPayload = body
-
-    if (!isRealClaudeCode) {
-      // 获取该账号存储的 Claude Code headers
-      const claudeCodeHeaders = await claudeCodeHeadersService.getAccountHeaders(accountId)
-
-      // 只添加客户端没有提供的 headers
-      Object.keys(claudeCodeHeaders).forEach((key) => {
-        const lowerKey = key.toLowerCase()
-        if (!finalHeaders[key] && !finalHeaders[lowerKey]) {
-          finalHeaders[key] = claudeCodeHeaders[key]
-        }
-      })
-    }
-
-    const extensionResult = this._applyRequestIdentityTransform(requestPayload, finalHeaders, {
-      account,
-      accountId,
+    // 使用公共方法准备请求头和 payload
+    const prepared = await this._prepareRequestHeadersAndPayload(
+      body,
       clientHeaders,
-      requestOptions,
-      isStream: false
-    })
+      accountId,
+      accessToken,
+      {
+        account,
+        requestOptions,
+        isStream: false
+      }
+    )
 
-    if (extensionResult.abortResponse) {
-      return extensionResult.abortResponse
+    if (prepared.abortResponse) {
+      return prepared.abortResponse
     }
 
-    requestPayload = extensionResult.body
-    finalHeaders = extensionResult.headers
+    const { bodyString, headers } = prepared
 
     return new Promise((resolve, reject) => {
       // 支持自定义路径（如 count_tokens）
@@ -981,30 +1050,14 @@ class ClaudeRelayService {
       const options = {
         hostname: url.hostname,
         port: url.port || 443,
-        path: requestPath,
+        path: requestPath + (url.search || ''),
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-          'anthropic-version': this.apiVersion,
-          ...finalHeaders
-        },
+        headers,
         agent: proxyAgent,
         timeout: config.requestTimeout || 600000
       }
 
-      // 使用统一 User-Agent 或客户端提供的，最后使用默认值
-      if (!options.headers['user-agent'] || unifiedUA !== null) {
-        const userAgent = unifiedUA || 'claude-cli/1.0.119 (external, cli)'
-        options.headers['user-agent'] = userAgent
-      }
-
-      logger.info(`🔗 指纹是这个: ${options.headers['user-agent']}`)
-
-      // 根据模型和客户端传递的 anthropic-beta 动态设置 header
-      const modelId = requestPayload?.model || body?.model
-      const clientBetaHeader = clientHeaders?.['anthropic-beta']
-      options.headers['anthropic-beta'] = this._getBetaHeader(modelId, clientBetaHeader)
+      console.log(options.path)
 
       const req = https.request(options, (res) => {
         let responseData = Buffer.alloc(0)
@@ -1015,32 +1068,32 @@ class ClaudeRelayService {
 
         res.on('end', () => {
           try {
-            let bodyString = ''
+            let responseBody = ''
 
             // 根据Content-Encoding处理响应数据
             const contentEncoding = res.headers['content-encoding']
             if (contentEncoding === 'gzip') {
               try {
-                bodyString = zlib.gunzipSync(responseData).toString('utf8')
+                responseBody = zlib.gunzipSync(responseData).toString('utf8')
               } catch (unzipError) {
                 logger.error('❌ Failed to decompress gzip response:', unzipError)
-                bodyString = responseData.toString('utf8')
+                responseBody = responseData.toString('utf8')
               }
             } else if (contentEncoding === 'deflate') {
               try {
-                bodyString = zlib.inflateSync(responseData).toString('utf8')
+                responseBody = zlib.inflateSync(responseData).toString('utf8')
               } catch (unzipError) {
                 logger.error('❌ Failed to decompress deflate response:', unzipError)
-                bodyString = responseData.toString('utf8')
+                responseBody = responseData.toString('utf8')
               }
             } else {
-              bodyString = responseData.toString('utf8')
+              responseBody = responseData.toString('utf8')
             }
 
             const response = {
               statusCode: res.statusCode,
               headers: res.headers,
-              body: bodyString
+              body: responseBody
             }
 
             logger.debug(`🔗 Claude API response: ${res.statusCode}`)
@@ -1095,7 +1148,7 @@ class ClaudeRelayService {
       })
 
       // 写入请求体
-      req.write(JSON.stringify(requestPayload))
+      req.write(bodyString)
       req.end()
     })
   }
@@ -1248,78 +1301,38 @@ class ClaudeRelayService {
     const isOpusModelRequest =
       typeof body?.model === 'string' && body.model.toLowerCase().includes('opus')
 
-    // 获取统一的 User-Agent
-    const unifiedUA = await this.captureAndGetUnifiedUserAgent(clientHeaders, account)
-
-    // 获取过滤后的客户端 headers
-    const filteredHeaders = this._filterClientHeaders(clientHeaders)
-
-    // 判断是否是真实的 Claude Code 请求
-    const isRealClaudeCode = this.isRealClaudeCodeRequest(body)
-
-    // 如果不是真实的 Claude Code 请求，需要使用从账户获取的 Claude Code headers
-    let finalHeaders = { ...filteredHeaders }
-    let requestPayload = body
-
-    if (!isRealClaudeCode) {
-      // 获取该账号存储的 Claude Code headers
-      const claudeCodeHeaders = await claudeCodeHeadersService.getAccountHeaders(accountId)
-
-      // 只添加客户端没有提供的 headers
-      Object.keys(claudeCodeHeaders).forEach((key) => {
-        const lowerKey = key.toLowerCase()
-        if (!finalHeaders[key] && !finalHeaders[lowerKey]) {
-          finalHeaders[key] = claudeCodeHeaders[key]
-        }
-      })
-    }
-
-    const extensionResult = this._applyRequestIdentityTransform(requestPayload, finalHeaders, {
-      account,
-      accountId,
-      accountType,
-      sessionHash,
+    // 使用公共方法准备请求头和 payload
+    const prepared = await this._prepareRequestHeadersAndPayload(
+      body,
       clientHeaders,
-      requestOptions,
-      isStream: true
-    })
+      accountId,
+      accessToken,
+      {
+        account,
+        accountType,
+        sessionHash,
+        requestOptions,
+        isStream: true
+      }
+    )
 
-    if (extensionResult.abortResponse) {
-      return extensionResult.abortResponse
+    if (prepared.abortResponse) {
+      return prepared.abortResponse
     }
 
-    requestPayload = extensionResult.body
-    finalHeaders = extensionResult.headers
+    const { bodyString, headers } = prepared
 
     return new Promise((resolve, reject) => {
       const url = new URL(this.claudeApiUrl)
-
       const options = {
         hostname: url.hostname,
         port: url.port || 443,
-        path: url.pathname,
+        path: url.pathname + (url.search || ''),
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-          'anthropic-version': this.apiVersion,
-          ...finalHeaders
-        },
+        headers,
         agent: proxyAgent,
         timeout: config.requestTimeout || 600000
       }
-
-      // 使用统一 User-Agent 或客户端提供的，最后使用默认值
-      if (!options.headers['user-agent'] || unifiedUA !== null) {
-        const userAgent = unifiedUA || 'claude-cli/1.0.119 (external, cli)'
-        options.headers['user-agent'] = userAgent
-      }
-
-      logger.info(`🔗 指纹是这个: ${options.headers['user-agent']}`)
-      // 根据模型和客户端传递的 anthropic-beta 动态设置 header
-      const modelId = body?.model
-      const clientBetaHeader = clientHeaders?.['anthropic-beta']
-      options.headers['anthropic-beta'] = this._getBetaHeader(modelId, clientBetaHeader)
 
       const req = https.request(options, async (res) => {
         logger.debug(`🌊 Claude stream response status: ${res.statusCode}`)
@@ -1766,15 +1779,15 @@ class ClaudeRelayService {
 
           // 提取5小时会话窗口状态
           // 使用大小写不敏感的方式获取响应头
-          const get5hStatus = (headers) => {
-            if (!headers) {
+          const get5hStatus = (resHeaders) => {
+            if (!resHeaders) {
               return null
             }
             // HTTP头部名称不区分大小写，需要处理不同情况
             return (
-              headers['anthropic-ratelimit-unified-5h-status'] ||
-              headers['Anthropic-Ratelimit-Unified-5h-Status'] ||
-              headers['ANTHROPIC-RATELIMIT-UNIFIED-5H-STATUS']
+              resHeaders['anthropic-ratelimit-unified-5h-status'] ||
+              resHeaders['Anthropic-Ratelimit-Unified-5h-Status'] ||
+              resHeaders['ANTHROPIC-RATELIMIT-UNIFIED-5H-STATUS']
             )
           }
 
@@ -1942,7 +1955,7 @@ class ClaudeRelayService {
       })
 
       // 写入请求体
-      req.write(JSON.stringify(requestPayload))
+      req.write(bodyString)
       req.end()
     })
   }
