@@ -52,49 +52,37 @@ function filterForOpenAI(headers) {
 
 /**
  * 为 Claude/Anthropic API 过滤 headers
- * 在原有逻辑基础上添加 CDN headers 到敏感列表
+ * 使用白名单模式，只允许指定的 headers 通过
  */
 function filterForClaude(headers) {
-  const sensitiveHeaders = [
-    'content-type',
-    'user-agent',
-    'x-api-key',
-    'authorization',
-    'x-authorization',
-    'host',
-    'content-length',
-    'connection',
-    'proxy-authorization',
-    'content-encoding',
-    'transfer-encoding',
-    ...cdnHeaders // 添加 CDN headers
-  ]
-
-  const browserHeaders = [
-    'origin',
-    'referer',
-    'sec-fetch-mode',
-    'sec-fetch-site',
-    'sec-fetch-dest',
-    'sec-ch-ua',
-    'sec-ch-ua-mobile',
-    'sec-ch-ua-platform',
-    'accept-language',
-    'accept-encoding',
+  // 白名单模式：只允许以下 headers
+  const allowedHeaders = [
     'accept',
-    'cache-control',
-    'pragma',
-    'anthropic-dangerous-direct-browser-access'
+    'x-stainless-retry-count',
+    'x-stainless-timeout',
+    'x-stainless-lang',
+    'x-stainless-package-version',
+    'x-stainless-os',
+    'x-stainless-arch',
+    'x-stainless-runtime',
+    'x-stainless-runtime-version',
+    'x-stainless-helper-method',
+    'anthropic-dangerous-direct-browser-access',
+    'anthropic-version',
+    'x-app',
+    'anthropic-beta',
+    'accept-language',
+    'sec-fetch-mode',
+    'accept-encoding',
+    'user-agent',
+    'content-type',
+    'connection'
   ]
-
-  const allowedHeaders = ['x-request-id', 'anthropic-version', 'anthropic-beta']
 
   const filtered = {}
   Object.keys(headers || {}).forEach((key) => {
     const lowerKey = key.toLowerCase()
     if (allowedHeaders.includes(lowerKey)) {
-      filtered[key] = headers[key]
-    } else if (!sensitiveHeaders.includes(lowerKey) && !browserHeaders.includes(lowerKey)) {
       filtered[key] = headers[key]
     }
   })
