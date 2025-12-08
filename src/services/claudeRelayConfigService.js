@@ -283,12 +283,13 @@ class ClaudeRelayConfigService {
 
       const account = await accountService.getAccount(accountId)
 
-      if (!account || !account.success || !account.data) {
+      // getAccount() 直接返回账户数据对象或 null，不是 { success, data } 格式
+      if (!account) {
         logger.warn(`Session binding account not found: ${accountId} (${accountType})`)
         return false
       }
 
-      const accountData = account.data
+      const accountData = account
 
       // 检查账户是否激活
       if (accountData.isActive === false || accountData.isActive === 'false') {

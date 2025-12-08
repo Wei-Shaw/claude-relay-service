@@ -720,7 +720,7 @@
                     </div>
                     <div>
                       <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                        全局会话绑定
+                        强制会话绑定
                       </h2>
                       <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
                         启用后，系统会将原始会话 ID 绑定到首次使用的账户，确保上下文的一致性
@@ -777,7 +777,7 @@
                     @change="saveClaudeConfig"
                   ></textarea>
                   <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    当绑定的账户不可用（状态异常、过载等）时，返回给客户端的错误消息
+                    当检测到为旧的sessionId且未在系统中有调度记录时提示，返回给客户端的错误消息
                   </p>
                 </div>
               </div>
@@ -794,7 +794,7 @@
                       的请求将自动路由到同一账户。
                     </p>
                     <p class="mt-2 text-sm text-purple-700 dark:text-purple-300">
-                      <strong>新会话识别：</strong>如果是已存在的绑定会话但请求中
+                      <strong>新会话识别：</strong>如果绑定会话历史中没有该sessionId但请求中
                       <code class="rounded bg-purple-100 px-1 dark:bg-purple-800"
                         >messages.length > 1</code
                       >， 系统会认为这是一个污染的会话并拒绝请求。

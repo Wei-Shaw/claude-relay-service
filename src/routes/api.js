@@ -38,6 +38,73 @@ function queueRateLimitUpdate(rateLimitInfo, usageSummary, model, context = '') 
     })
 }
 
+/**
+ * 判断是否为旧会话（污染的会话）
+ * Claude Code 发送的请求特点：
+ * - messages 数组通常只有 1 个元素
+ * - 历史对话记录嵌套在单个 message 的 content 数组中
+ * - content 数组中包含 <system-reminder> 开头的系统注入内容
+ *
+ * 污染会话的特征：
+ * 1. messages.length > 1
+ * 2. messages.length === 1 但 content 中有多个用户输入
+ * 3. "warmup" 请求：单条简单消息 + 无 tools（真正新会话会带 tools）
+ *
+ * @param {Object} body - 请求体
+ * @returns {boolean} 是否为旧会话
+ */
+function isOldSession(body) {
+  const messages = body?.messages
+  const tools = body?.tools
+
+  if (!messages || messages.length === 0) {
+    return false
+  }
+
+  // 1. 多条消息 = 旧会话
+  if (messages.length > 1) {
+    return true
+  }
+
+  // 2. 单条消息，分析 content
+  const firstMessage = messages[0]
+  const content = firstMessage?.content
+
+  if (!content) {
+    return false
+  }
+
+  // 如果 content 是字符串，只有一条输入，需要检查 tools
+  if (typeof content === 'string') {
+    // 有 tools = 正常新会话，无 tools = 可疑
+    return !tools || tools.length === 0
+  }
+
+  // 如果 content 是数组，统计非 system-reminder 的元素
+  if (Array.isArray(content)) {
+    const userInputs = content.filter((item) => {
+      if (item.type !== 'text') {
+        return false
+      }
+      const text = item.text || ''
+      // 剔除以 <system-reminder> 开头的
+      return !text.trimStart().startsWith('<system-reminder>')
+    })
+
+    // 多个用户输入 = 旧会话
+    if (userInputs.length > 1) {
+      return true
+    }
+
+    // Warmup 检测：单个消息 + 无 tools = 旧会话
+    if (userInputs.length === 1 && (!tools || tools.length === 0)) {
+      return true
+    }
+  }
+
+  return false
+}
+
 // 🔧 共享的消息处理函数
 async function handleMessagesRequest(req, res) {
   try {
@@ -233,19 +300,18 @@ async function handleMessagesRequest(req, res) {
       }
 
       // 🔗 在成功调度后建立会话绑定（仅 claude-official 类型）
-      // claude-official 只接受：1) 新会话(messages.length=1) 2) 已绑定的会话
+      // claude-official 只接受：1) 新会话 2) 已绑定的会话
       if (
         needSessionBinding &&
         originalSessionIdForBinding &&
         accountId &&
         accountType === 'claude-official'
       ) {
-        // 🚫 新会话必须 messages.length === 1
-        const messages = req.body?.messages
-        if (messages && messages.length > 1) {
+        // 🚫 检测旧会话（污染的会话）
+        if (isOldSession(req.body)) {
           const cfg = await claudeRelayConfigService.getConfig()
           logger.warn(
-            `🚫 New session with messages.length > 1 rejected: sessionId=${originalSessionIdForBinding}, messages.length=${messages.length}`
+            `🚫 Old session rejected: sessionId=${originalSessionIdForBinding}, messages.length=${req.body?.messages?.length}, tools.length=${req.body?.tools?.length || 0}, isOldSession=true`
           )
           return res.status(400).json({
             error: {
@@ -684,19 +750,18 @@ async function handleMessagesRequest(req, res) {
       }
 
       // 🔗 在成功调度后建立会话绑定（非流式，仅 claude-official 类型）
-      // claude-official 只接受：1) 新会话(messages.length=1) 2) 已绑定的会话
+      // claude-official 只接受：1) 新会话 2) 已绑定的会话
       if (
         needSessionBindingNonStream &&
         originalSessionIdForBindingNonStream &&
         accountId &&
         accountType === 'claude-official'
       ) {
-        // 🚫 新会话必须 messages.length === 1
-        const messages = req.body?.messages
-        if (messages && messages.length > 1) {
+        // 🚫 检测旧会话（污染的会话）
+        if (isOldSession(req.body)) {
           const cfg = await claudeRelayConfigService.getConfig()
           logger.warn(
-            `🚫 New session with messages.length > 1 rejected (non-stream): sessionId=${originalSessionIdForBindingNonStream}, messages.length=${messages.length}`
+            `🚫 Old session rejected (non-stream): sessionId=${originalSessionIdForBindingNonStream}, messages.length=${req.body?.messages?.length}, tools.length=${req.body?.tools?.length || 0}, isOldSession=true`
           )
           return res.status(400).json({
             error: {
@@ -1155,6 +1220,41 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
         message: 'This API key does not have permission to access Claude'
       }
     })
+  }
+
+  // 🔗 会话绑定验证（与 messages 端点保持一致）
+  const originalSessionId = claudeRelayConfigService.extractOriginalSessionId(req.body)
+  const sessionValidation = await claudeRelayConfigService.validateNewSession(
+    req.body,
+    originalSessionId
+  )
+
+  if (!sessionValidation.valid) {
+    logger.warn(
+      `🚫 Session binding validation failed (count_tokens): ${sessionValidation.code} for session ${originalSessionId}`
+    )
+    return res.status(400).json({
+      error: {
+        type: 'session_binding_error',
+        message: sessionValidation.error
+      }
+    })
+  }
+
+  // 🔗 检测旧会话（污染的会话）- 仅对需要绑定的新会话检查
+  if (sessionValidation.isNewSession && originalSessionId) {
+    if (isOldSession(req.body)) {
+      const cfg = await claudeRelayConfigService.getConfig()
+      logger.warn(
+        `🚫 Old session rejected (count_tokens): sessionId=${originalSessionId}, messages.length=${req.body?.messages?.length}, tools.length=${req.body?.tools?.length || 0}, isOldSession=true`
+      )
+      return res.status(400).json({
+        error: {
+          type: 'session_binding_error',
+          message: cfg.sessionBindingErrorMessage || '你的本地session已污染，请清理后使用。'
+        }
+      })
+    }
   }
 
   logger.info(`🔢 Processing token count request for key: ${req.apiKey.name}`)
