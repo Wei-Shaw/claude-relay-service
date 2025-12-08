@@ -2491,6 +2491,11 @@ class ClaudeAccountService {
       const serverErrorKey = `claude_account:${accountId}:5xx_errors`
       await redis.client.del(serverErrorKey)
 
+      // 清除overload状态（529错误临时不可用）
+      const overloadKey = `account:overload:${accountId}`
+      await redis.client.del(overloadKey)
+      delete updatedAccountData.lastOverloadAt
+
       logger.info(
         `✅ Successfully reset all error states for account ${accountData.name} (${accountId})`
       )

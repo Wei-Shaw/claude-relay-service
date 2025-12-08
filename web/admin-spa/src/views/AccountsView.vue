@@ -650,43 +650,59 @@
                   <div class="flex flex-col gap-1">
                     <span
                       :class="[
-                        'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold',
-                        account.status === 'blocked'
-                          ? 'bg-orange-100 text-orange-800'
-                          : account.status === 'unauthorized'
-                            ? 'bg-red-100 text-red-800'
-                            : account.status === 'temp_error'
-                              ? 'bg-orange-100 text-orange-800'
-                              : account.isActive
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
+                        'inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold',
+                        account.overloadStatus === 'overloaded'
+                          ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
+                          : account.status === 'blocked'
+                            ? 'bg-orange-100 text-orange-800'
+                            : account.status === 'unauthorized'
+                              ? 'bg-red-100 text-red-800'
+                              : account.status === 'temp_error'
+                                ? 'bg-orange-100 text-orange-800'
+                                : account.isActive
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-red-100 text-red-800'
                       ]"
                     >
                       <div
                         :class="[
-                          'mr-2 h-2 w-2 rounded-full',
-                          account.status === 'blocked'
-                            ? 'bg-orange-500'
-                            : account.status === 'unauthorized'
-                              ? 'bg-red-500'
-                              : account.status === 'temp_error'
-                                ? 'bg-orange-500'
-                                : account.isActive
-                                  ? 'bg-green-500'
-                                  : 'bg-red-500'
+                          'h-2 w-2 flex-shrink-0 rounded-full',
+                          account.overloadStatus === 'overloaded'
+                            ? 'bg-purple-500'
+                            : account.status === 'blocked'
+                              ? 'bg-orange-500'
+                              : account.status === 'unauthorized'
+                                ? 'bg-red-500'
+                                : account.status === 'temp_error'
+                                  ? 'bg-orange-500'
+                                  : account.isActive
+                                    ? 'bg-green-500'
+                                    : 'bg-red-500'
                         ]"
                       />
-                      {{
-                        account.status === 'blocked'
-                          ? '已封锁'
-                          : account.status === 'unauthorized'
-                            ? '异常'
-                            : account.status === 'temp_error'
-                              ? '临时异常'
-                              : account.isActive
-                                ? '正常'
-                                : '异常'
-                      }}
+                      <span class="flex-1">
+                        {{
+                          account.overloadStatus === 'overloaded'
+                            ? '临时不可用'
+                            : account.status === 'blocked'
+                              ? '已封锁'
+                              : account.status === 'unauthorized'
+                                ? '异常'
+                                : account.status === 'temp_error'
+                                  ? '临时异常'
+                                  : account.isActive
+                                    ? '正常'
+                                    : '异常'
+                        }}
+                      </span>
+                      <button
+                        v-if="account.overloadStatus === 'overloaded'"
+                        class="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full hover:bg-purple-200 dark:hover:bg-purple-800"
+                        title="清除临时不可用状态"
+                        @click.stop="clearOverloadStatus(account)"
+                      >
+                        <i class="fas fa-times text-[10px]" />
+                      </button>
                     </span>
                     <span
                       v-if="
@@ -2324,6 +2340,7 @@ const showResetButton = (account) => {
     supportedPlatforms.includes(account.platform) &&
     (account.status === 'unauthorized' ||
       account.status !== 'active' ||
+      account.overloadStatus === 'overloaded' ||
       account.rateLimitStatus?.isRateLimited ||
       account.rateLimitStatus === 'limited' ||
       !account.isActive)
@@ -3518,6 +3535,41 @@ const batchDeleteAccounts = async () => {
 }
 
 // 重置账户状态
+// 清除overload临时不可用状态（快捷操作）
+const clearOverloadStatus = async (account) => {
+  if (account.isResetting) return
+
+  try {
+    account.isResetting = true
+
+    // 根据账户平台选择不同的 API 端点
+    let endpoint = ''
+    if (account.platform === 'claude') {
+      endpoint = `/admin/claude-accounts/${account.id}/reset-status`
+    } else if (account.platform === 'claude-console') {
+      endpoint = `/admin/claude-console-accounts/${account.id}/reset-status`
+    } else {
+      showToast('不支持的账户类型', 'error')
+      account.isResetting = false
+      return
+    }
+
+    const data = await apiClient.post(endpoint)
+
+    if (data.success) {
+      showToast('临时不可用状态已清除', 'success')
+      // 强制刷新，绕过前端缓存
+      loadAccounts(true)
+    } else {
+      showToast(data.message || '清除状态失败', 'error')
+    }
+  } catch (error) {
+    showToast('清除状态失败', 'error')
+  } finally {
+    account.isResetting = false
+  }
+}
+
 const resetAccountStatus = async (account) => {
   if (account.isResetting) return
 
@@ -3901,6 +3953,8 @@ const getSchedulableReason = (account) => {
 
 // 获取账户状态文本
 const getAccountStatusText = (account) => {
+  // 检查是否临时不可用（overload）
+  if (account.overloadStatus === 'overloaded') return '临时不可用'
   // 检查是否被封锁
   if (account.status === 'blocked') return '已封锁'
   // 检查是否未授权（401错误）
@@ -3925,6 +3979,9 @@ const getAccountStatusText = (account) => {
 
 // 获取账户状态样式类
 const getAccountStatusClass = (account) => {
+  if (account.overloadStatus === 'overloaded') {
+    return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
+  }
   if (account.status === 'blocked') {
     return 'bg-red-100 text-red-800'
   }
@@ -3953,6 +4010,9 @@ const getAccountStatusClass = (account) => {
 
 // 获取账户状态点样式类
 const getAccountStatusDotClass = (account) => {
+  if (account.overloadStatus === 'overloaded') {
+    return 'bg-purple-500'
+  }
   if (account.status === 'blocked') {
     return 'bg-red-500'
   }

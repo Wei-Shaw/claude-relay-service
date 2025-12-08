@@ -2099,30 +2099,36 @@ class ClaudeRelayService {
 
       // 根据错误类型设置不同的阈值和日志前缀
       const isTimeout = statusCode === 504
-      const threshold = 3 // 统一使用3次阈值
+      const threshold = config.failover?.errorThreshold || 3 // 从配置读取阈值
       const prefix = context ? `${context} ` : ''
 
       logger.warn(
         `⏱️ ${prefix}${isTimeout ? 'Timeout' : 'Server'} error for account ${accountId}, error count: ${errorCount}/${threshold}`
       )
 
-      // 标记账户为临时不可用（5分钟）
-      try {
-        await unifiedClaudeScheduler.markAccountTemporarilyUnavailable(
-          accountId,
-          accountType,
-          sessionHash,
-          300
-        )
-      } catch (markError) {
-        logger.error(`❌ Failed to mark account temporarily unavailable: ${accountId}`, markError)
-      }
-
-      if (errorCount > threshold) {
+      // 只有达到阈值才标记账户为临时不可用（避免因上游偶发错误而过早标记）
+      if (errorCount >= threshold) {
         const errorTypeLabel = isTimeout ? 'timeout' : '5xx'
-        // ⚠️ 只记录5xx/504告警，不再自动停止调度，避免上游抖动导致误停
         logger.error(
-          `❌ ${prefix}Account ${accountId} exceeded ${errorTypeLabel} error threshold (${errorCount} errors), please investigate upstream stability`
+          `❌ ${prefix}Account ${accountId} exceeded ${errorTypeLabel} error threshold (${errorCount}/${threshold} errors), marking as temporarily unavailable`
+        )
+
+        try {
+          await unifiedClaudeScheduler.markAccountTemporarilyUnavailable(
+            accountId,
+            accountType,
+            sessionHash,
+            300
+          )
+          logger.warn(
+            `🚫 ${prefix}Account ${accountId} marked as temporarily unavailable for 5 minutes due to repeated ${errorTypeLabel} errors`
+          )
+        } catch (markError) {
+          logger.error(`❌ Failed to mark account temporarily unavailable: ${accountId}`, markError)
+        }
+      } else {
+        logger.info(
+          `ℹ️ ${prefix}Account ${accountId} error count (${errorCount}/${threshold}), not marking as unavailable yet (will retry)`
         )
       }
     } catch (handlingError) {

@@ -56,6 +56,27 @@ const config = {
     }
   },
 
+  // 🔄 Failover配置
+  failover: {
+    enabled: process.env.FAILOVER_ENABLED !== 'false', // 默认启用
+    maxRetries: (() => {
+      const retries = parseInt(process.env.FAILOVER_MAX_RETRIES) || 3
+      return Math.max(1, Math.min(retries, 10)) // 限制1-10次
+    })(),
+    errorThreshold: (() => {
+      const threshold = parseInt(process.env.FAILOVER_ERROR_THRESHOLD) || 3
+      return Math.max(1, Math.min(threshold, 10)) // 限制1-10次
+    })(),
+    tempUnavailableTTL: (() => {
+      const ttl = parseInt(process.env.FAILOVER_TEMP_UNAVAILABLE_TTL) || 300
+      return Math.max(60, Math.min(ttl, 3600)) // 限制60秒-1小时
+    })(),
+    retryableStatusCodes: (() => {
+      const codes = process.env.FAILOVER_RETRYABLE_STATUS_CODES || '500,502,503,504,529'
+      return codes.split(',').map((code) => parseInt(code.trim()))
+    })()
+  },
+
   // ☁️ Bedrock API配置
   bedrock: {
     enabled: process.env.CLAUDE_CODE_USE_BEDROCK === '1',

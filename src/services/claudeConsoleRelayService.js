@@ -5,6 +5,7 @@ const unifiedClaudeScheduler = require('./unifiedClaudeScheduler')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
+const errorCounter = require('../utils/errorCounter')
 const {
   sanitizeUpstreamError,
   sanitizeErrorMessage,
@@ -445,15 +446,38 @@ class ClaudeConsoleRelayService {
         error.errorData = sanitizedErrorData
         throw error
       } else if (response.status === 502 || response.status === 504) {
-        logger.warn(
-          `⚠️ Upstream error (${response.status}) detected for Claude Console account ${accountId}${autoProtectionDisabled ? ' (auto-protection disabled, skipping status change)' : ''}`
-        )
         if (!autoProtectionDisabled) {
-          await unifiedClaudeScheduler.markAccountTemporarilyUnavailable(
+          // 记录错误并检查是否达到阈值
+          const errorCount = await errorCounter.recordError(
             accountId,
             'claude-console',
-            null,
-            300
+            response.status
+          )
+          const threshold = config.failover?.errorThreshold || 3
+
+          logger.warn(
+            `⚠️ Upstream error (${response.status}) detected for Claude Console account ${accountId}, error count: ${errorCount}/${threshold}`
+          )
+
+          // 只有达到阈值才标记为临时不可用
+          if (errorCount >= threshold) {
+            logger.error(
+              `❌ Claude Console account ${accountId} exceeded error threshold (${errorCount}/${threshold}), marking as temporarily unavailable`
+            )
+            await unifiedClaudeScheduler.markAccountTemporarilyUnavailable(
+              accountId,
+              'claude-console',
+              null,
+              300
+            )
+          } else {
+            logger.info(
+              `ℹ️ Claude Console account ${accountId} error count (${errorCount}/${threshold}), will retry with other accounts`
+            )
+          }
+        } else {
+          logger.warn(
+            `⚠️ Upstream error (${response.status}) detected for Claude Console account ${accountId} (auto-protection disabled, skipping status change)`
           )
         }
       } else if (response.status === 200 || response.status === 201) {
@@ -980,15 +1004,38 @@ class ClaudeConsoleRelayService {
                   await claudeConsoleAccountService.markAccountOverloaded(accountId)
                 }
               } else if (response.status === 502 || response.status === 504) {
-                logger.warn(
-                  `⚠️ [Stream] Upstream error (${response.status}) detected for Claude Console account ${accountId}${autoProtectionDisabled ? ' (auto-protection disabled, skipping status change)' : ''}`
-                )
                 if (!autoProtectionDisabled) {
-                  await unifiedClaudeScheduler.markAccountTemporarilyUnavailable(
+                  // 记录错误并检查是否达到阈值
+                  const errorCount = await errorCounter.recordError(
                     accountId,
                     'claude-console',
-                    null,
-                    300
+                    response.status
+                  )
+                  const threshold = config.failover?.errorThreshold || 3
+
+                  logger.warn(
+                    `⚠️ [Stream] Upstream error (${response.status}) detected for Claude Console account ${accountId}, error count: ${errorCount}/${threshold}`
+                  )
+
+                  // 只有达到阈值才标记为临时不可用
+                  if (errorCount >= threshold) {
+                    logger.error(
+                      `❌ [Stream] Claude Console account ${accountId} exceeded error threshold (${errorCount}/${threshold}), marking as temporarily unavailable`
+                    )
+                    await unifiedClaudeScheduler.markAccountTemporarilyUnavailable(
+                      accountId,
+                      'claude-console',
+                      null,
+                      300
+                    )
+                  } else {
+                    logger.info(
+                      `ℹ️ [Stream] Claude Console account ${accountId} error count (${errorCount}/${threshold}), will retry with other accounts`
+                    )
+                  }
+                } else {
+                  logger.warn(
+                    `⚠️ [Stream] Upstream error (${response.status}) detected for Claude Console account ${accountId} (auto-protection disabled, skipping status change)`
                   )
                 }
               }
@@ -1347,7 +1394,7 @@ class ClaudeConsoleRelayService {
             reject(upstreamError)
           })
         })
-        .catch((error) => {
+        .catch(async (error) => {
           if (aborted) {
             return
           }
@@ -1360,25 +1407,40 @@ class ClaudeConsoleRelayService {
           // 检查错误状态
           if (error.response) {
             if (error.response.status === 401) {
-              claudeConsoleAccountService.markAccountUnauthorized(accountId)
+              await claudeConsoleAccountService.markAccountUnauthorized(accountId)
             } else if (error.response.status === 429) {
-              claudeConsoleAccountService.markAccountRateLimited(accountId)
+              await claudeConsoleAccountService.markAccountRateLimited(accountId)
               // 检查是否因为超过每日额度
               claudeConsoleAccountService.checkQuotaUsage(accountId).catch((err) => {
                 logger.error('❌ Failed to check quota after 429 error:', err)
               })
             } else if (error.response.status === 529) {
-              claudeConsoleAccountService.markAccountOverloaded(accountId)
+              await claudeConsoleAccountService.markAccountOverloaded(accountId)
             } else if (error.response.status === 502 || error.response.status === 504) {
-              logger.warn(
-                `⚠️ Upstream error (${error.response.status}) in catch block for account ${accountId}`
-              )
-              unifiedClaudeScheduler.markAccountTemporarilyUnavailable(
+              // 记录错误并检查是否达到阈值
+              const errorCount = await errorCounter.recordError(
                 accountId,
                 'claude-console',
-                null,
-                300
+                error.response.status
               )
+              const threshold = config.failover?.errorThreshold || 3
+
+              logger.warn(
+                `⚠️ Upstream error (${error.response.status}) in catch block for account ${accountId}, error count: ${errorCount}/${threshold}`
+              )
+
+              // 只有达到阈值才标记为临时不可用
+              if (errorCount >= threshold) {
+                logger.error(
+                  `❌ Claude Console account ${accountId} exceeded error threshold in catch block (${errorCount}/${threshold}), marking as temporarily unavailable`
+                )
+                await unifiedClaudeScheduler.markAccountTemporarilyUnavailable(
+                  accountId,
+                  'claude-console',
+                  null,
+                  300
+                )
+              }
             }
           }
 
