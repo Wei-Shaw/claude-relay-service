@@ -40,7 +40,10 @@ router.put('/claude-relay-config', authenticateAdmin, async (req, res) => {
       claudeCodeOnlyEnabled,
       globalSessionBindingEnabled,
       sessionBindingErrorMessage,
-      sessionBindingTtlDays
+      sessionBindingTtlDays,
+      userMessageQueueEnabled,
+      userMessageQueueDelayMs,
+      userMessageQueueTimeoutMs
     } = req.body
 
     // 验证输入
@@ -78,15 +81,57 @@ router.put('/claude-relay-config', authenticateAdmin, async (req, res) => {
       }
     }
 
+    // 验证用户消息队列配置
+    if (userMessageQueueEnabled !== undefined && typeof userMessageQueueEnabled !== 'boolean') {
+      return res.status(400).json({ error: 'userMessageQueueEnabled must be a boolean' })
+    }
+
+    if (userMessageQueueDelayMs !== undefined) {
+      if (
+        typeof userMessageQueueDelayMs !== 'number' ||
+        userMessageQueueDelayMs < 0 ||
+        userMessageQueueDelayMs > 10000
+      ) {
+        return res
+          .status(400)
+          .json({ error: 'userMessageQueueDelayMs must be a number between 0 and 10000' })
+      }
+    }
+
+    if (userMessageQueueTimeoutMs !== undefined) {
+      if (
+        typeof userMessageQueueTimeoutMs !== 'number' ||
+        userMessageQueueTimeoutMs < 1000 ||
+        userMessageQueueTimeoutMs > 300000
+      ) {
+        return res
+          .status(400)
+          .json({ error: 'userMessageQueueTimeoutMs must be a number between 1000 and 300000' })
+      }
+    }
+
     const updateData = {}
-    if (claudeCodeOnlyEnabled !== undefined)
+    if (claudeCodeOnlyEnabled !== undefined) {
       updateData.claudeCodeOnlyEnabled = claudeCodeOnlyEnabled
-    if (globalSessionBindingEnabled !== undefined)
+    }
+    if (globalSessionBindingEnabled !== undefined) {
       updateData.globalSessionBindingEnabled = globalSessionBindingEnabled
-    if (sessionBindingErrorMessage !== undefined)
+    }
+    if (sessionBindingErrorMessage !== undefined) {
       updateData.sessionBindingErrorMessage = sessionBindingErrorMessage
-    if (sessionBindingTtlDays !== undefined)
+    }
+    if (sessionBindingTtlDays !== undefined) {
       updateData.sessionBindingTtlDays = sessionBindingTtlDays
+    }
+    if (userMessageQueueEnabled !== undefined) {
+      updateData.userMessageQueueEnabled = userMessageQueueEnabled
+    }
+    if (userMessageQueueDelayMs !== undefined) {
+      updateData.userMessageQueueDelayMs = userMessageQueueDelayMs
+    }
+    if (userMessageQueueTimeoutMs !== undefined) {
+      updateData.userMessageQueueTimeoutMs = userMessageQueueTimeoutMs
+    }
 
     const updatedConfig = await claudeRelayConfigService.updateConfig(
       updateData,

@@ -804,6 +804,100 @@
               </div>
             </div>
 
+            <!-- 用户消息串行队列 -->
+            <div
+              class="mb-6 rounded-lg bg-white/80 p-6 shadow-lg backdrop-blur-sm dark:bg-gray-800/80"
+            >
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="flex items-center">
+                    <div
+                      class="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-teal-600 text-white shadow-lg"
+                    >
+                      <i class="fas fa-list-ol"></i>
+                    </div>
+                    <div>
+                      <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                        用户消息串行队列
+                      </h2>
+                      <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                        启用后，同一账户的用户消息请求将串行执行，并在请求之间添加延迟，防止触发上游限流
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <label class="relative inline-flex cursor-pointer items-center">
+                  <input
+                    v-model="claudeConfig.userMessageQueueEnabled"
+                    class="peer sr-only"
+                    type="checkbox"
+                    @change="saveClaudeConfig"
+                  />
+                  <div
+                    class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-teal-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-teal-800"
+                  ></div>
+                </label>
+              </div>
+
+              <!-- 队列配置详情（仅在启用时显示） -->
+              <div v-if="claudeConfig.userMessageQueueEnabled" class="mt-6 space-y-4">
+                <!-- 请求间隔 -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <i class="fas fa-hourglass-half mr-2 text-gray-400"></i>
+                    请求间隔（毫秒）
+                  </label>
+                  <input
+                    v-model.number="claudeConfig.userMessageQueueDelayMs"
+                    class="mt-1 block w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-gray-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                    max="10000"
+                    min="0"
+                    placeholder="200"
+                    type="number"
+                    @change="saveClaudeConfig"
+                  />
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    同一账户的用户消息请求之间的最小间隔时间（0-10000毫秒）
+                  </p>
+                </div>
+
+                <!-- 队列超时 -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <i class="fas fa-stopwatch mr-2 text-gray-400"></i>
+                    队列超时（毫秒）
+                  </label>
+                  <input
+                    v-model.number="claudeConfig.userMessageQueueTimeoutMs"
+                    class="mt-1 block w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-gray-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                    max="300000"
+                    min="1000"
+                    placeholder="30000"
+                    type="number"
+                    @change="saveClaudeConfig"
+                  />
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    请求在队列中等待的最大时间，超时将返回 503 错误（1000-300000毫秒）
+                  </p>
+                </div>
+              </div>
+
+              <div class="mt-4 rounded-lg bg-teal-50 p-4 dark:bg-teal-900/20">
+                <div class="flex">
+                  <i class="fas fa-info-circle mt-0.5 text-teal-500"></i>
+                  <div class="ml-3">
+                    <p class="text-sm text-teal-700 dark:text-teal-300">
+                      <strong>工作原理：</strong>系统检测请求中最后一条消息的
+                      <code class="rounded bg-teal-100 px-1 dark:bg-teal-800">role</code>
+                      是否为
+                      <code class="rounded bg-teal-100 px-1 dark:bg-teal-800">user</code
+                      >。用户消息请求需要排队串行执行，而工具调用结果、助手消息续传等不受此限制。
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- 配置更新信息 -->
             <div
               v-if="claudeConfig.updatedAt"
@@ -1469,6 +1563,9 @@ const claudeConfig = ref({
   globalSessionBindingEnabled: false,
   sessionBindingErrorMessage: '你的本地session已污染，请清理后使用。',
   sessionBindingTtlDays: 30,
+  userMessageQueueEnabled: true,
+  userMessageQueueDelayMs: 200,
+  userMessageQueueTimeoutMs: 30000,
   updatedAt: null,
   updatedBy: null
 })
@@ -1738,6 +1835,9 @@ const loadClaudeConfig = async () => {
         sessionBindingErrorMessage:
           response.config?.sessionBindingErrorMessage || '你的本地session已污染，请清理后使用。',
         sessionBindingTtlDays: response.config?.sessionBindingTtlDays ?? 30,
+        userMessageQueueEnabled: response.config?.userMessageQueueEnabled ?? true,
+        userMessageQueueDelayMs: response.config?.userMessageQueueDelayMs ?? 200,
+        userMessageQueueTimeoutMs: response.config?.userMessageQueueTimeoutMs ?? 30000,
         updatedAt: response.config?.updatedAt || null,
         updatedBy: response.config?.updatedBy || null
       }
@@ -1762,7 +1862,10 @@ const saveClaudeConfig = async () => {
       claudeCodeOnlyEnabled: claudeConfig.value.claudeCodeOnlyEnabled,
       globalSessionBindingEnabled: claudeConfig.value.globalSessionBindingEnabled,
       sessionBindingErrorMessage: claudeConfig.value.sessionBindingErrorMessage,
-      sessionBindingTtlDays: claudeConfig.value.sessionBindingTtlDays
+      sessionBindingTtlDays: claudeConfig.value.sessionBindingTtlDays,
+      userMessageQueueEnabled: claudeConfig.value.userMessageQueueEnabled,
+      userMessageQueueDelayMs: claudeConfig.value.userMessageQueueDelayMs,
+      userMessageQueueTimeoutMs: claudeConfig.value.userMessageQueueTimeoutMs
     }
 
     const response = await apiClient.put('/admin/claude-relay-config', payload, {
