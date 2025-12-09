@@ -73,6 +73,15 @@ class UserMessageQueueService {
    * @returns {Promise<Object>} 配置对象
    */
   async getConfig() {
+    // 默认配置（防止 config.userMessageQueue 未定义）
+    const queueConfig = config.userMessageQueue || {}
+    const defaults = {
+      enabled: queueConfig.enabled ?? false,
+      delayMs: queueConfig.delayMs ?? 100,
+      timeoutMs: queueConfig.timeoutMs ?? 60000,
+      lockTtlMs: queueConfig.lockTtlMs ?? 120000
+    }
+
     // 尝试从 claudeRelayConfigService 获取 Web 界面配置
     try {
       const claudeRelayConfigService = require('./claudeRelayConfigService')
@@ -82,25 +91,20 @@ class UserMessageQueueService {
         enabled:
           webConfig.userMessageQueueEnabled !== undefined
             ? webConfig.userMessageQueueEnabled
-            : config.userMessageQueue.enabled,
+            : defaults.enabled,
         delayMs:
           webConfig.userMessageQueueDelayMs !== undefined
             ? webConfig.userMessageQueueDelayMs
-            : config.userMessageQueue.delayMs,
+            : defaults.delayMs,
         timeoutMs:
           webConfig.userMessageQueueTimeoutMs !== undefined
             ? webConfig.userMessageQueueTimeoutMs
-            : config.userMessageQueue.timeoutMs,
-        lockTtlMs: config.userMessageQueue.lockTtlMs
+            : defaults.timeoutMs,
+        lockTtlMs: defaults.lockTtlMs
       }
     } catch {
       // 回退到环境变量配置
-      return {
-        enabled: config.userMessageQueue.enabled,
-        delayMs: config.userMessageQueue.delayMs,
-        timeoutMs: config.userMessageQueue.timeoutMs,
-        lockTtlMs: config.userMessageQueue.lockTtlMs
-      }
+      return defaults
     }
   }
 
