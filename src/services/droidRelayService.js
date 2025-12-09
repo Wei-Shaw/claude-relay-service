@@ -634,7 +634,7 @@ class DroidRelayService {
       // 客户端断开连接时清理
       clientResponse.on('close', () => {
         if (req && !req.destroyed) {
-          req.destroy()
+          req.destroy(new Error('Client disconnected'))
         }
       })
 
