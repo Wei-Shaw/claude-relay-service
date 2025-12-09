@@ -73,7 +73,6 @@ class BedrockRelayService {
     const accountId = bedrockAccount?.id
     let queueLockAcquired = false
     let queueRequestId = null
-    let queueLockRenewalStopper = null
 
     try {
       // 📬 用户消息队列处理
@@ -127,9 +126,8 @@ class BedrockRelayService {
         if (queueResult.acquired && !queueResult.skipped) {
           queueLockAcquired = true
           queueRequestId = queueResult.requestId
-          queueLockRenewalStopper = await userMessageQueueService.startLockRenewal(
-            accountId,
-            queueRequestId
+          logger.debug(
+            `📬 User message queue lock acquired for Bedrock account ${accountId}, requestId: ${queueRequestId}`
           )
         }
       }
@@ -154,6 +152,23 @@ class BedrockRelayService {
       const response = await client.send(command)
       const duration = Date.now() - startTime
 
+      // 📬 请求已发送成功，立即释放队列锁（无需等待响应处理完成）
+      // 因为限流基于请求发送时刻计算（RPM），不是请求完成时刻
+      if (queueLockAcquired && queueRequestId && accountId) {
+        try {
+          await userMessageQueueService.releaseQueueLock(accountId, queueRequestId)
+          queueLockAcquired = false // 标记已释放，防止 finally 重复释放
+          logger.debug(
+            `📬 User message queue lock released early for Bedrock account ${accountId}, requestId: ${queueRequestId}`
+          )
+        } catch (releaseError) {
+          logger.error(
+            `❌ Failed to release user message queue lock early for Bedrock account ${accountId}:`,
+            releaseError.message
+          )
+        }
+      }
+
       // 解析响应
       const responseBody = JSON.parse(new TextDecoder().decode(response.body))
       const claudeResponse = this._convertFromBedrockFormat(responseBody)
@@ -171,13 +186,13 @@ class BedrockRelayService {
       logger.error('❌ Bedrock非流式请求失败:', error)
       throw this._handleBedrockError(error)
     } finally {
-      // 📬 释放用户消息队列锁
+      // 📬 释放用户消息队列锁（兜底，正常情况下已在请求发送后提前释放）
       if (queueLockAcquired && queueRequestId && accountId) {
         try {
-          if (queueLockRenewalStopper) {
-            queueLockRenewalStopper()
-          }
           await userMessageQueueService.releaseQueueLock(accountId, queueRequestId)
+          logger.debug(
+            `📬 User message queue lock released in finally for Bedrock account ${accountId}, requestId: ${queueRequestId}`
+          )
         } catch (releaseError) {
           logger.error(
             `❌ Failed to release user message queue lock for Bedrock account ${accountId}:`,
@@ -193,7 +208,6 @@ class BedrockRelayService {
     const accountId = bedrockAccount?.id
     let queueLockAcquired = false
     let queueRequestId = null
-    let queueLockRenewalStopper = null
 
     try {
       // 📬 用户消息队列处理
@@ -252,9 +266,8 @@ class BedrockRelayService {
         if (queueResult.acquired && !queueResult.skipped) {
           queueLockAcquired = true
           queueRequestId = queueResult.requestId
-          queueLockRenewalStopper = await userMessageQueueService.startLockRenewal(
-            accountId,
-            queueRequestId
+          logger.debug(
+            `📬 User message queue lock acquired for Bedrock account ${accountId} (stream), requestId: ${queueRequestId}`
           )
         }
       }
@@ -277,6 +290,23 @@ class BedrockRelayService {
 
       const startTime = Date.now()
       const response = await client.send(command)
+
+      // 📬 请求已发送成功，立即释放队列锁（无需等待响应处理完成）
+      // 因为限流基于请求发送时刻计算（RPM），不是请求完成时刻
+      if (queueLockAcquired && queueRequestId && accountId) {
+        try {
+          await userMessageQueueService.releaseQueueLock(accountId, queueRequestId)
+          queueLockAcquired = false // 标记已释放，防止 finally 重复释放
+          logger.debug(
+            `📬 User message queue lock released early for Bedrock stream account ${accountId}, requestId: ${queueRequestId}`
+          )
+        } catch (releaseError) {
+          logger.error(
+            `❌ Failed to release user message queue lock early for Bedrock stream account ${accountId}:`,
+            releaseError.message
+          )
+        }
+      }
 
       // 设置SSE响应头
       res.writeHead(200, {
@@ -339,13 +369,13 @@ class BedrockRelayService {
 
       throw this._handleBedrockError(error)
     } finally {
-      // 📬 释放用户消息队列锁
+      // 📬 释放用户消息队列锁（兜底，正常情况下已在请求发送后提前释放）
       if (queueLockAcquired && queueRequestId && accountId) {
         try {
-          if (queueLockRenewalStopper) {
-            queueLockRenewalStopper()
-          }
           await userMessageQueueService.releaseQueueLock(accountId, queueRequestId)
+          logger.debug(
+            `📬 User message queue lock released in finally for Bedrock stream account ${accountId}, requestId: ${queueRequestId}`
+          )
         } catch (releaseError) {
           logger.error(
             `❌ Failed to release user message queue lock for Bedrock stream account ${accountId}:`,

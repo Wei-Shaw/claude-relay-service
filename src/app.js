@@ -669,10 +669,9 @@ class Application {
             logger.error('❌ Error stopping rate limit cleanup service:', error)
           }
 
-          // 停止用户消息队列清理服务和续租定时器
+          // 停止用户消息队列清理服务
           try {
             const userMessageQueueService = require('./services/userMessageQueueService')
-            userMessageQueueService.stopAllRenewalTimers()
             userMessageQueueService.stopCleanupTask()
             logger.info('📬 User message queue service stopped')
           } catch (error) {
