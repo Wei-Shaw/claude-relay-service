@@ -137,6 +137,7 @@ const createLogFormat = (colorize = false) => {
 
 const logFormat = createLogFormat(false)
 const consoleFormat = createLogFormat(true)
+const isTestEnv = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID
 
 // 📁 确保日志目录存在并设置权限
 if (!fs.existsSync(config.logging.dirname)) {
@@ -159,18 +160,20 @@ const createRotateTransport = (filename, level = null) => {
     transport.level = level
   }
 
-  // 监听轮转事件
-  transport.on('rotate', (oldFilename, newFilename) => {
-    console.log(`📦 Log rotated: ${oldFilename} -> ${newFilename}`)
-  })
+  // 监听轮转事件（测试环境关闭以避免 Jest 退出后输出）
+  if (!isTestEnv) {
+    transport.on('rotate', (oldFilename, newFilename) => {
+      console.log(`📦 Log rotated: ${oldFilename} -> ${newFilename}`)
+    })
 
-  transport.on('new', (newFilename) => {
-    console.log(`📄 New log file created: ${newFilename}`)
-  })
+    transport.on('new', (newFilename) => {
+      console.log(`📄 New log file created: ${newFilename}`)
+    })
 
-  transport.on('archive', (zipFilename) => {
-    console.log(`🗜️ Log archived: ${zipFilename}`)
-  })
+    transport.on('archive', (zipFilename) => {
+      console.log(`🗜️ Log archived: ${zipFilename}`)
+    })
+  }
 
   return transport
 }

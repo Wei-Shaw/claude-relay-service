@@ -6,6 +6,8 @@ const logger = require('../utils/logger')
 const redis = require('../models/redis')
 // const { RateLimiterRedis } = require('rate-limiter-flexible') // 暂时未使用
 const ClientValidator = require('../validators/clientValidator')
+const ClaudeCodeValidator = require('../validators/clients/claudeCodeValidator')
+const claudeRelayConfigService = require('../services/claudeRelayConfigService')
 
 const FALLBACK_CONCURRENCY_CONFIG = {
   leaseSeconds: 300,
@@ -201,6 +203,53 @@ const authenticateApiKey = async (req, res, next) => {
       )
     }
 
+    // 🔒 检查全局 Claude Code 限制（与 API Key 级别是 OR 逻辑）
+    // 仅对 Claude 服务端点生效 (/api/v1/messages 和 /claude/v1/messages)
+    if (!skipKeyRestrictions) {
+      const normalizedPath = (req.originalUrl || req.path || '').toLowerCase()
+      const isClaudeMessagesEndpoint =
+        normalizedPath.includes('/v1/messages') &&
+        (normalizedPath.startsWith('/api') || normalizedPath.startsWith('/claude'))
+
+      if (isClaudeMessagesEndpoint) {
+        try {
+          const globalClaudeCodeOnly = await claudeRelayConfigService.isClaudeCodeOnlyEnabled()
+
+          // API Key 级别的 Claude Code 限制
+          const keyClaudeCodeOnly =
+            validation.keyData.enableClientRestriction &&
+            Array.isArray(validation.keyData.allowedClients) &&
+            validation.keyData.allowedClients.length === 1 &&
+            validation.keyData.allowedClients.includes('claude_code')
+
+          // OR 逻辑：全局开启 或 API Key 级别限制为仅 claude_code
+          if (globalClaudeCodeOnly || keyClaudeCodeOnly) {
+            const isClaudeCode = ClaudeCodeValidator.validate(req)
+
+            if (!isClaudeCode) {
+              const clientIP = req.ip || req.connection?.remoteAddress || 'unknown'
+              logger.api(
+                `❌ Claude Code client validation failed (global: ${globalClaudeCodeOnly}, key: ${keyClaudeCodeOnly}) from ${clientIP}`
+              )
+              return res.status(403).json({
+                error: {
+                  type: 'client_validation_error',
+                  message: 'This endpoint only accepts requests from Claude Code CLI'
+                }
+              })
+            }
+
+            logger.api(
+              `✅ Claude Code client validated (global: ${globalClaudeCodeOnly}, key: ${keyClaudeCodeOnly})`
+            )
+          }
+        } catch (error) {
+          logger.error('❌ Error checking Claude Code restriction:', error)
+          // 配置服务出错时不阻断请求
+        }
+      }
+    }
+
     // 检查并发限制
     const concurrencyLimit = validation.keyData.concurrencyLimit || 0
     if (!skipKeyRestrictions && concurrencyLimit > 0) {
@@ -226,8 +275,18 @@ const authenticateApiKey = async (req, res, next) => {
       )
 
       if (currentConcurrency > concurrencyLimit) {
-        // 如果超过限制，立即减少计数
-        await redis.decrConcurrency(validation.keyData.id, requestId)
+        // 如果超过限制，立即减少计数（添加 try-catch 防止异常导致并发泄漏）
+        try {
+          const newCount = await redis.decrConcurrency(validation.keyData.id, requestId)
+          logger.api(
+            `📉 Decremented concurrency (429 rejected) for key: ${validation.keyData.id} (${validation.keyData.name}), new count: ${newCount}`
+          )
+        } catch (error) {
+          logger.error(
+            `Failed to decrement concurrency after limit exceeded for key ${validation.keyData.id}:`,
+            error
+          )
+        }
         logger.security(
           `🚦 Concurrency limit exceeded for key: ${validation.keyData.id} (${
             validation.keyData.name
@@ -249,7 +308,38 @@ const authenticateApiKey = async (req, res, next) => {
       let leaseRenewInterval = null
 
       if (renewIntervalMs > 0) {
+        // 🔴 关键修复：添加最大刷新次数限制，防止租约永不过期
+        // 默认最大生存时间为 10 分钟，可通过环境变量配置
+        const maxLifetimeMinutes = parseInt(process.env.CONCURRENCY_MAX_LIFETIME_MINUTES) || 10
+        const maxRefreshCount = Math.ceil((maxLifetimeMinutes * 60 * 1000) / renewIntervalMs)
+        let refreshCount = 0
+
         leaseRenewInterval = setInterval(() => {
+          refreshCount++
+
+          // 超过最大刷新次数，强制停止并清理
+          if (refreshCount > maxRefreshCount) {
+            logger.warn(
+              `⚠️ Lease refresh exceeded max count (${maxRefreshCount}) for key ${validation.keyData.id} (${validation.keyData.name}), forcing cleanup after ${maxLifetimeMinutes} minutes`
+            )
+            // 清理定时器
+            if (leaseRenewInterval) {
+              clearInterval(leaseRenewInterval)
+              leaseRenewInterval = null
+            }
+            // 强制减少并发计数（如果还没减少）
+            if (!concurrencyDecremented) {
+              concurrencyDecremented = true
+              redis.decrConcurrency(validation.keyData.id, requestId).catch((error) => {
+                logger.error(
+                  `Failed to decrement concurrency after max refresh for key ${validation.keyData.id}:`,
+                  error
+                )
+              })
+            }
+            return
+          }
+
           redis
             .refreshConcurrencyLease(validation.keyData.id, requestId, leaseSeconds)
             .catch((error) => {

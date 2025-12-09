@@ -1451,6 +1451,26 @@
                   </p>
                 </div>
               </div>
+
+              <!-- 上游错误处理 -->
+              <div v-if="form.platform === 'claude-console'">
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  >上游错误处理</label
+                >
+                <label class="inline-flex cursor-pointer items-center">
+                  <input
+                    v-model="form.disableAutoProtection"
+                    class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700"
+                    type="checkbox"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">
+                    上游错误不自动暂停调度
+                  </span>
+                </label>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  勾选后遇到 401/400/429/529 等上游错误仅记录日志并透传，不自动禁用或限流
+                </p>
+              </div>
             </div>
 
             <!-- OpenAI-Responses 特定字段 -->
@@ -1924,6 +1944,22 @@
                   rows="4"
                 />
               </div>
+
+              <!-- Droid User-Agent 配置 (OAuth/Manual 模式) -->
+              <div v-if="form.platform === 'droid'">
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  >自定义 User-Agent (可选)</label
+                >
+                <input
+                  v-model="form.userAgent"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  placeholder="factory-cli/0.32.1"
+                  type="text"
+                />
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  留空使用默认值 factory-cli/0.32.1，可根据需要自定义
+                </p>
+              </div>
             </div>
 
             <!-- API Key 模式输入 -->
@@ -1966,6 +2002,22 @@
                 <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                   <i class="fas fa-info-circle mr-1" />
                   建议为每条 Key 提供独立额度；系统会自动去重并忽略空白行。
+                </p>
+              </div>
+
+              <!-- Droid User-Agent 配置 -->
+              <div>
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  >自定义 User-Agent (可选)</label
+                >
+                <input
+                  v-model="form.userAgent"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  placeholder="factory-cli/0.32.1"
+                  type="text"
+                />
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  留空使用默认值 factory-cli/0.32.1，可根据需要自定义
                 </p>
               </div>
 
@@ -2029,6 +2081,7 @@
         <!-- 步骤2: OAuth授权 -->
         <OAuthFlow
           v-if="oauthStep === 2 && form.addType === 'oauth'"
+          ref="oauthFlowRef"
           :platform="form.platform"
           :proxy="form.proxy"
           @back="oauthStep = 1"
@@ -2052,11 +2105,45 @@
                   <h4 class="mb-3 font-semibold text-blue-900 dark:text-blue-200">
                     Claude Setup Token 授权
                   </h4>
-                  <p class="mb-4 text-sm text-blue-800 dark:text-blue-300">
-                    请按照以下步骤通过 Setup Token 完成 Claude 账户的授权：
-                  </p>
 
-                  <div class="space-y-4">
+                  <!-- 授权方式选择 -->
+                  <div class="mb-4">
+                    <p class="mb-3 text-sm font-medium text-blue-800 dark:text-blue-300">
+                      选择授权方式：
+                    </p>
+                    <div class="flex flex-wrap gap-4">
+                      <label class="flex cursor-pointer items-center">
+                        <input
+                          v-model="authMethod"
+                          class="mr-2 text-blue-600 focus:ring-blue-500"
+                          type="radio"
+                          value="manual"
+                          @change="onAuthMethodChange"
+                        />
+                        <span class="text-sm text-blue-800 dark:text-blue-300">
+                          <i class="fas fa-link mr-1" />手动授权
+                        </span>
+                      </label>
+                      <label class="flex cursor-pointer items-center">
+                        <input
+                          v-model="authMethod"
+                          class="mr-2 text-blue-600 focus:ring-blue-500"
+                          type="radio"
+                          value="cookie"
+                          @change="onAuthMethodChange"
+                        />
+                        <span class="text-sm text-blue-800 dark:text-blue-300">
+                          <i class="fas fa-cookie mr-1" />Cookie 自动授权
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- 手动授权流程 -->
+                  <div v-if="authMethod === 'manual'" class="space-y-4">
+                    <p class="mb-4 text-sm text-blue-800 dark:text-blue-300">
+                      请按照以下步骤通过 Setup Token 完成 Claude 账户的授权：
+                    </p>
                     <!-- 步骤1: 生成授权链接 -->
                     <div
                       class="rounded-lg border border-blue-300 bg-white/80 p-4 dark:border-blue-600 dark:bg-gray-800/80"
@@ -2182,6 +2269,113 @@
                       </div>
                     </div>
                   </div>
+
+                  <!-- Cookie自动授权流程 -->
+                  <div v-if="authMethod === 'cookie'" class="space-y-4">
+                    <p class="mb-4 text-sm text-blue-800 dark:text-blue-300">
+                      使用 sessionKey 自动完成授权，无需手动打开链接。
+                    </p>
+
+                    <div
+                      class="rounded-lg border border-blue-300 bg-white/80 p-4 dark:border-blue-600 dark:bg-gray-800/80"
+                    >
+                      <div class="space-y-4">
+                        <div>
+                          <label
+                            class="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300"
+                          >
+                            <i class="fas fa-cookie text-blue-500" />sessionKey
+                            <span
+                              v-if="parsedSessionKeyCount > 1"
+                              class="rounded-full bg-blue-500 px-2 py-0.5 text-xs text-white"
+                            >
+                              {{ parsedSessionKeyCount }} 个
+                            </span>
+                          </label>
+                          <textarea
+                            v-model="sessionKey"
+                            class="form-input w-full resize-y border-gray-300 font-mono text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                            :class="{ 'border-red-500': cookieAuthError }"
+                            placeholder="每行一个 sessionKey，例如：&#10;sk-ant-sid01-xxxxx...&#10;sk-ant-sid01-yyyyy..."
+                            rows="3"
+                          />
+                          <p
+                            v-if="parsedSessionKeyCount > 1"
+                            class="mt-1 text-xs text-blue-600 dark:text-blue-400"
+                          >
+                            <i class="fas fa-info-circle mr-1" />
+                            将批量创建 {{ parsedSessionKeyCount }} 个账户
+                          </p>
+                          <p v-if="cookieAuthError" class="mt-1 text-xs text-red-500">
+                            {{ cookieAuthError }}
+                          </p>
+                        </div>
+
+                        <!-- 帮助说明 -->
+                        <div>
+                          <button
+                            class="flex items-center text-xs text-blue-600 hover:text-blue-700"
+                            type="button"
+                            @click="showSessionKeyHelp = !showSessionKeyHelp"
+                          >
+                            <i
+                              :class="
+                                showSessionKeyHelp
+                                  ? 'fas fa-chevron-down mr-1'
+                                  : 'fas fa-chevron-right mr-1'
+                              "
+                            />
+                            如何获取 sessionKey？
+                          </button>
+                          <div
+                            v-if="showSessionKeyHelp"
+                            class="mt-3 rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-700"
+                          >
+                            <ol class="space-y-2 text-xs text-gray-600 dark:text-gray-300">
+                              <li>1. 在浏览器中登录 <strong>claude.ai</strong></li>
+                              <li>2. 按 <strong>F12</strong> 打开开发者工具</li>
+                              <li>3. 切换到 <strong>"Application"</strong> (应用) 标签页</li>
+                              <li>
+                                4. 在左侧选择 <strong>"Cookies"</strong> →
+                                <strong>"https://claude.ai"</strong>
+                              </li>
+                              <li>5. 找到键为 <strong>"sessionKey"</strong> 的那一行</li>
+                              <li>6. 复制其 <strong>"Value"</strong> (值) 列的内容</li>
+                            </ol>
+                            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                              <i class="fas fa-info-circle mr-1" />
+                              sessionKey 通常以 "sk-ant-" 开头
+                            </p>
+                          </div>
+                        </div>
+
+                        <!-- 开始授权按钮 -->
+                        <button
+                          class="btn btn-primary w-full px-4 py-3"
+                          :disabled="cookieAuthLoading || !sessionKey.trim()"
+                          type="button"
+                          @click="handleCookieAuth"
+                        >
+                          <div v-if="cookieAuthLoading" class="loading-spinner mr-2" />
+                          <i v-else class="fas fa-magic mr-2" />
+                          <template v-if="cookieAuthLoading && batchProgress.total > 1">
+                            正在授权 {{ batchProgress.current }}/{{ batchProgress.total }}...
+                          </template>
+                          <template v-else-if="cookieAuthLoading"> 授权中... </template>
+                          <template v-else> 开始自动授权 </template>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div
+                      class="rounded border border-yellow-300 bg-yellow-50 p-3 dark:border-yellow-700 dark:bg-yellow-900/30"
+                    >
+                      <p class="text-xs text-yellow-800 dark:text-yellow-300">
+                        <i class="fas fa-exclamation-triangle mr-1" />
+                        <strong>提示：</strong>如果您设置了代理，Cookie授权也会使用相同的代理配置。
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2196,6 +2390,7 @@
               上一步
             </button>
             <button
+              v-if="authMethod === 'manual'"
               class="btn btn-primary flex-1 px-6 py-3 font-semibold"
               :disabled="!canExchangeSetupToken || setupTokenExchanging"
               type="button"
@@ -2927,6 +3122,26 @@
                 <p class="mt-1 text-xs text-gray-500">账号被限流后暂停调度的时间（分钟）</p>
               </div>
             </div>
+
+            <!-- 上游错误处理（编辑模式）-->
+            <div v-if="form.platform === 'claude-console'">
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                上游错误处理
+              </label>
+              <label class="inline-flex cursor-pointer items-center">
+                <input
+                  v-model="form.disableAutoProtection"
+                  class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700"
+                  type="checkbox"
+                />
+                <span class="text-sm text-gray-700 dark:text-gray-300">
+                  上游错误不自动暂停调度
+                </span>
+              </label>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                勾选后遇到 401/400/429/529 等上游错误仅记录日志并透传，不自动禁用或限流
+              </p>
+            </div>
           </div>
 
           <!-- OpenAI-Responses 特定字段（编辑模式）-->
@@ -3456,6 +3671,22 @@
             </div>
           </div>
 
+          <!-- Droid User-Agent 配置 (编辑模式) -->
+          <div v-if="form.platform === 'droid'">
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >自定义 User-Agent (可选)</label
+            >
+            <input
+              v-model="form.userAgent"
+              class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+              placeholder="factory-cli/0.32.1"
+              type="text"
+            />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              留空使用默认值 factory-cli/0.32.1，可根据需要自定义
+            </p>
+          </div>
+
           <!-- 代理设置 -->
           <ProxyConfig v-model="form.proxy" />
 
@@ -3538,6 +3769,9 @@ const { showConfirmModal, confirmOptions, showConfirm, handleConfirm, handleCanc
 const isEdit = computed(() => !!props.account)
 const show = ref(true)
 
+// OAuthFlow 组件引用
+const oauthFlowRef = ref(null)
+
 // OAuth步骤
 const oauthStep = ref(1)
 const loading = ref(false)
@@ -3550,6 +3784,22 @@ const setupTokenAuthUrl = ref('')
 const setupTokenAuthCode = ref('')
 const setupTokenCopied = ref(false)
 const setupTokenSessionId = ref('')
+
+// Cookie自动授权相关状态
+const authMethod = ref('manual') // 'manual' | 'cookie'
+const sessionKey = ref('')
+const cookieAuthLoading = ref(false)
+const cookieAuthError = ref('')
+const showSessionKeyHelp = ref(false)
+const batchProgress = ref({ current: 0, total: 0 }) // 批量进度
+
+// 解析后的 sessionKey 数量
+const parsedSessionKeyCount = computed(() => {
+  return sessionKey.value
+    .split('\n')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0).length
+})
 
 // Claude Code 统一 User-Agent 信息
 const unifiedUserAgent = ref('')
@@ -3750,6 +4000,7 @@ const form = ref({
   })(),
   userAgent: props.account?.userAgent || '',
   enableRateLimit: props.account ? props.account.rateLimitDuration > 0 : true,
+  disableAutoProtection: props.account?.disableAutoProtection === true,
   // 额度管理字段
   dailyQuota: props.account?.dailyQuota || 0,
   dailyUsage: props.account?.dailyUsage || 0,
@@ -4193,10 +4444,198 @@ const exchangeSetupTokenCode = async () => {
   }
 }
 
-// 处理OAuth成功
-const handleOAuthSuccess = async (tokenInfo) => {
+// =============================================================================
+// Cookie自动授权相关方法
+// =============================================================================
+
+// Cookie自动授权（支持批量）
+const handleCookieAuth = async () => {
+  // 解析多行输入
+  const sessionKeys = sessionKey.value
+    .split('\n')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+
+  if (sessionKeys.length === 0) {
+    cookieAuthError.value = '请输入至少一个 sessionKey'
+    return
+  }
+
+  cookieAuthLoading.value = true
+  cookieAuthError.value = ''
+  batchProgress.value = { current: 0, total: sessionKeys.length }
+
+  const isSetupToken = form.value.addType === 'setup-token'
+  const proxyPayload = buildProxyPayload(form.value.proxy)
+
+  const results = []
+  const errors = []
+
+  for (let i = 0; i < sessionKeys.length; i++) {
+    batchProgress.value.current = i + 1
+    try {
+      const payload = {
+        sessionKey: sessionKeys[i],
+        ...(proxyPayload && { proxy: proxyPayload })
+      }
+
+      let result
+      if (isSetupToken) {
+        result = await accountsStore.oauthSetupTokenWithCookie(payload)
+      } else {
+        result = await accountsStore.oauthWithCookie(payload)
+      }
+      results.push(result)
+    } catch (error) {
+      errors.push({
+        index: i + 1,
+        key: sessionKeys[i].substring(0, 20) + '...',
+        error: error.message
+      })
+    }
+  }
+
+  batchProgress.value = { current: 0, total: 0 }
+
+  if (results.length > 0) {
+    try {
+      // 成功后处理OAuth数据（传递数组）
+      // cookieAuthLoading 保持 true，直到账号创建完成
+      await handleOAuthSuccess(results)
+    } finally {
+      cookieAuthLoading.value = false
+    }
+  } else {
+    cookieAuthLoading.value = false
+  }
+
+  if (errors.length > 0 && results.length === 0) {
+    cookieAuthError.value = '全部授权失败，请检查 sessionKey 是否有效'
+  } else if (errors.length > 0) {
+    cookieAuthError.value = `${errors.length} 个授权失败`
+  }
+}
+
+// 重置Cookie授权状态
+const resetCookieAuth = () => {
+  sessionKey.value = ''
+  cookieAuthError.value = ''
+  showSessionKeyHelp.value = false
+  batchProgress.value = { current: 0, total: 0 }
+}
+
+// 切换授权方式时重置状态
+const onAuthMethodChange = () => {
+  // 切换到手动模式时清除Cookie相关状态
+  if (authMethod.value === 'manual') {
+    resetCookieAuth()
+  } else {
+    // 切换到Cookie模式时清除手动授权状态
+    setupTokenAuthUrl.value = ''
+    setupTokenAuthCode.value = ''
+    setupTokenSessionId.value = ''
+  }
+}
+
+// 构建 Claude 账户数据（辅助函数）
+const buildClaudeAccountData = (tokenInfo, accountName, clientId) => {
+  const proxyPayload = buildProxyPayload(form.value.proxy)
+  const claudeOauthPayload = tokenInfo.claudeAiOauth || tokenInfo
+
+  const data = {
+    name: accountName,
+    description: form.value.description,
+    accountType: form.value.accountType,
+    groupId: form.value.accountType === 'group' ? form.value.groupId : undefined,
+    groupIds: form.value.accountType === 'group' ? form.value.groupIds : undefined,
+    expiresAt: form.value.expiresAt || undefined,
+    proxy: proxyPayload,
+    claudeAiOauth: claudeOauthPayload,
+    priority: form.value.priority || 50,
+    autoStopOnWarning: form.value.autoStopOnWarning || false,
+    useUnifiedUserAgent: form.value.useUnifiedUserAgent || false,
+    useUnifiedClientId: form.value.useUnifiedClientId || false,
+    unifiedClientId: clientId,
+    subscriptionInfo: {
+      accountType: form.value.subscriptionType || 'claude_max',
+      hasClaudeMax: form.value.subscriptionType === 'claude_max',
+      hasClaudePro: form.value.subscriptionType === 'claude_pro',
+      manuallySet: true
+    }
+  }
+
+  // 处理 extInfo
+  if (claudeOauthPayload) {
+    const extInfoPayload = {}
+    const extSource = claudeOauthPayload.extInfo
+    if (extSource?.org_uuid) extInfoPayload.org_uuid = extSource.org_uuid
+    if (extSource?.account_uuid) extInfoPayload.account_uuid = extSource.account_uuid
+
+    if (!extSource) {
+      if (claudeOauthPayload.organization?.uuid) {
+        extInfoPayload.org_uuid = claudeOauthPayload.organization.uuid
+      }
+      if (claudeOauthPayload.account?.uuid) {
+        extInfoPayload.account_uuid = claudeOauthPayload.account.uuid
+      }
+    }
+
+    if (Object.keys(extInfoPayload).length > 0) {
+      data.extInfo = extInfoPayload
+    }
+  }
+
+  return data
+}
+
+// 处理OAuth成功（支持批量）
+const handleOAuthSuccess = async (tokenInfoOrList) => {
   loading.value = true
   try {
+    const currentPlatform = form.value.platform
+
+    // Claude 平台支持批量创建
+    if (currentPlatform === 'claude' && Array.isArray(tokenInfoOrList)) {
+      const tokenInfoList = tokenInfoOrList
+      const isBatch = tokenInfoList.length > 1
+      const baseName = form.value.name
+
+      const results = []
+      const errors = []
+
+      for (let i = 0; i < tokenInfoList.length; i++) {
+        const tokenInfo = tokenInfoList[i]
+        // 批量时自动命名
+        const accountName = isBatch ? `${baseName}_${i + 1}` : baseName
+        // 如果启用统一客户端标识，为每个账户生成独立 ID
+        const clientId = form.value.useUnifiedClientId ? generateClientId() : ''
+        const data = buildClaudeAccountData(tokenInfo, accountName, clientId)
+
+        try {
+          const result = await accountsStore.createClaudeAccount(data)
+          results.push(result)
+        } catch (error) {
+          errors.push({ name: accountName, error: error.message })
+        }
+      }
+
+      // 处理结果
+      if (results.length > 0) {
+        const msg = isBatch
+          ? `成功创建 ${results.length}/${tokenInfoList.length} 个账户`
+          : '账户创建成功'
+        showToast(msg, 'success')
+        emit('success', results[0]) // 兼容单个创建的返回
+      }
+      if (errors.length > 0) {
+        showToast(`${errors.length} 个账户创建失败`, 'error')
+      }
+      return
+    }
+
+    // 单个 tokenInfo 或其他平台的处理（保持原有逻辑）
+    const tokenInfo = Array.isArray(tokenInfoOrList) ? tokenInfoOrList[0] : tokenInfoOrList
+
     // OAuth模式也需要确保生成客户端ID
     if (
       form.value.platform === 'claude' &&
@@ -4217,8 +4656,6 @@ const handleOAuthSuccess = async (tokenInfo) => {
       expiresAt: form.value.expiresAt || undefined,
       proxy: proxyPayload
     }
-
-    const currentPlatform = form.value.platform
 
     if (currentPlatform === 'claude') {
       // Claude使用claudeAiOauth字段
@@ -4380,6 +4817,8 @@ const handleOAuthSuccess = async (tokenInfo) => {
     // 错误已通过 toast 显示给用户
   } finally {
     loading.value = false
+    // 重置 OAuthFlow 组件的加载状态（如果是通过 OAuth 模式调用）
+    oauthFlowRef.value?.resetCookieAuth()
   }
 }
 
@@ -4665,6 +5104,10 @@ const createAccount = async () => {
       data.userAgent = form.value.userAgent || null
       // 如果不启用限流，传递 0 表示不限流
       data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
+      // 上游错误处理（仅 Claude Console）
+      if (form.value.platform === 'claude-console') {
+        data.disableAutoProtection = !!form.value.disableAutoProtection
+      }
       // 额度管理字段
       data.dailyQuota = form.value.dailyQuota || 0
       data.quotaResetTime = form.value.quotaResetTime || '00:00'
@@ -4993,6 +5436,8 @@ const updateAccount = async () => {
       data.userAgent = form.value.userAgent || null
       // 如果不启用限流，传递 0 表示不限流
       data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
+      // 上游错误处理
+      data.disableAutoProtection = !!form.value.disableAutoProtection
       // 额度管理字段
       data.dailyQuota = form.value.dailyQuota || 0
       data.quotaResetTime = form.value.quotaResetTime || '00:00'
@@ -5614,7 +6059,9 @@ watch(
         dailyUsage: newAccount.dailyUsage || 0,
         quotaResetTime: newAccount.quotaResetTime || '00:00',
         // 并发控制字段
-        maxConcurrentTasks: newAccount.maxConcurrentTasks || 0
+        maxConcurrentTasks: newAccount.maxConcurrentTasks || 0,
+        // 上游错误处理
+        disableAutoProtection: newAccount.disableAutoProtection === true
       }
 
       // 如果是Claude Console账户，加载实时使用情况

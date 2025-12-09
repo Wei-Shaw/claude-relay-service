@@ -44,12 +44,20 @@
               </p>
             </div>
           </div>
-          <button
-            class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition hover:bg-gray-200 hover:text-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
-            @click="handleClose"
-          >
-            <i class="fas fa-times" />
-          </button>
+          <div class="flex items-center gap-2">
+            <button
+              class="flex items-center gap-2 rounded-full bg-purple-100 px-3 py-2 text-xs font-semibold text-purple-700 transition hover:bg-purple-200 dark:bg-purple-500/10 dark:text-purple-200 dark:hover:bg-purple-500/20"
+              @click="goTimeline"
+            >
+              <i class="fas fa-clock" /> 请求时间线
+            </button>
+            <button
+              class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition hover:bg-gray-200 hover:text-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+              @click="handleClose"
+            >
+              <i class="fas fa-times" />
+            </button>
+          </div>
         </div>
 
         <!-- 内容区域 -->
@@ -325,6 +333,7 @@
 
 <script setup>
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import Chart from 'chart.js/auto'
 import { useThemeStore } from '@/stores/theme'
@@ -343,6 +352,7 @@ const emit = defineEmits(['close'])
 
 const themeStore = useThemeStore()
 const { isDarkMode } = storeToRefs(themeStore)
+const router = useRouter()
 
 const chartCanvas = ref(null)
 let chartInstance = null
@@ -577,6 +587,14 @@ const cleanupChart = () => {
 const handleClose = () => {
   cleanupChart()
   emit('close')
+}
+
+const goTimeline = () => {
+  if (!props.account?.id) return
+  router.push({
+    path: `/accounts/${props.account.id}/usage-records`,
+    query: { platform: props.account.platform || props.account.accountType }
+  })
 }
 
 watch(

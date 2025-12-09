@@ -116,6 +116,29 @@
                 </div>
               </div>
 
+              <!-- 模型筛选器 -->
+              <div class="group relative min-w-[140px]">
+                <div
+                  class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+                ></div>
+                <div class="relative">
+                  <CustomDropdown
+                    v-model="selectedModels"
+                    icon="fa-cube"
+                    icon-color="text-orange-500"
+                    :multiple="true"
+                    :options="modelOptions"
+                    placeholder="所有模型"
+                  />
+                  <span
+                    v-if="selectedModels.length > 0"
+                    class="absolute -right-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-xs text-white shadow-sm"
+                  >
+                    {{ selectedModels.length }}
+                  </span>
+                </div>
+              </div>
+
               <!-- 搜索模式与搜索框 -->
               <div class="flex min-w-[240px] flex-col gap-2 sm:flex-row sm:items-center">
                 <div class="sm:w-44">
@@ -2085,17 +2108,18 @@
       @save="handleSaveExpiry"
     />
 
-    <!-- 使用详情弹窗 -->
     <UsageDetailModal
       :api-key="selectedApiKeyForDetail || {}"
       :show="showUsageDetailModal"
       @close="showUsageDetailModal = false"
+      @open-timeline="openTimeline"
     />
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
 import { useClientsStore } from '@/stores/clients'
@@ -2114,6 +2138,7 @@ import CustomDropdown from '@/components/common/CustomDropdown.vue'
 import ActionDropdown from '@/components/common/ActionDropdown.vue'
 
 // 响应式数据
+const router = useRouter()
 const clientsStore = useClientsStore()
 const authStore = useAuthStore()
 const apiKeys = ref([])
@@ -2218,6 +2243,10 @@ const selectedApiKeyForDetail = ref(null)
 const selectedTagFilter = ref('')
 const availableTags = ref([])
 
+// 模型筛选相关
+const selectedModels = ref([])
+const availableModels = ref([])
+
 // 搜索相关
 const searchKeyword = ref('')
 const searchMode = ref('apiKey')
@@ -2232,6 +2261,14 @@ const tagOptions = computed(() => {
     options.push({ value: tag, label: tag, icon: 'fa-tag' })
   })
   return options
+})
+
+const modelOptions = computed(() => {
+  return availableModels.value.map((model) => ({
+    value: model,
+    label: model,
+    icon: 'fa-cube'
+  }))
 })
 
 const selectedTagCount = computed(() => {
@@ -2472,6 +2509,18 @@ const loadAccounts = async (forceRefresh = false) => {
   }
 }
 
+// 加载已使用的模型列表
+const loadUsedModels = async () => {
+  try {
+    const data = await apiClient.get('/admin/api-keys/used-models')
+    if (data.success) {
+      availableModels.value = data.data || []
+    }
+  } catch (error) {
+    console.error('Failed to load used models:', error)
+  }
+}
+
 // 加载API Keys（使用后端分页）
 const loadApiKeys = async (clearStatsCache = true) => {
   apiKeysLoading.value = true
@@ -2498,6 +2547,11 @@ const loadApiKeys = async (clearStatsCache = true) => {
     // 筛选参数
     if (selectedTagFilter.value) {
       params.set('tag', selectedTagFilter.value)
+    }
+
+    // 模型筛选参数
+    if (selectedModels.value.length > 0) {
+      params.set('models', selectedModels.value.join(','))
     }
 
     // 排序参数（支持费用排序）
@@ -4193,19 +4247,15 @@ const formatWindowTime = (seconds) => {
 
 // 显示使用详情
 const showUsageDetails = (apiKey) => {
-  // 获取异步加载的统计数据
   const cachedStats = getCachedStats(apiKey.id)
 
-  // 合并异步统计数据到 apiKey 对象
   const enrichedApiKey = {
     ...apiKey,
-    // 合并实时限制数据
     dailyCost: cachedStats?.dailyCost ?? apiKey.dailyCost ?? 0,
     currentWindowCost: cachedStats?.currentWindowCost ?? apiKey.currentWindowCost ?? 0,
     windowRemainingSeconds: cachedStats?.windowRemainingSeconds ?? apiKey.windowRemainingSeconds,
     windowStartTime: cachedStats?.windowStartTime ?? apiKey.windowStartTime ?? null,
     windowEndTime: cachedStats?.windowEndTime ?? apiKey.windowEndTime ?? null,
-    // 合并 usage 数据（用于详情弹窗中的统计卡片）
     usage: {
       ...apiKey.usage,
       total: {
@@ -4224,6 +4274,13 @@ const showUsageDetails = (apiKey) => {
 
   selectedApiKeyForDetail.value = enrichedApiKey
   showUsageDetailModal.value = true
+}
+
+const openTimeline = (keyId) => {
+  const id = keyId || selectedApiKeyForDetail.value?.id
+  if (!id) return
+  showUsageDetailModal.value = false
+  router.push(`/api-keys/${id}/usage-records`)
 }
 
 // 格式化时间（秒转换为可读格式） - 已移到 WindowLimitBar 组件中
@@ -4706,6 +4763,12 @@ watch(selectedTagFilter, () => {
   loadApiKeys(false)
 })
 
+// 监听模型筛选变化
+watch(selectedModels, () => {
+  currentPage.value = 1
+  loadApiKeys(false)
+})
+
 // 监听排序变化，重新加载数据
 watch([apiKeysSortBy, apiKeysSortOrder], () => {
   loadApiKeys(false)
@@ -4740,7 +4803,7 @@ onMounted(async () => {
   fetchCostSortStatus()
 
   // 先加载 API Keys（优先显示列表）
-  await Promise.all([clientsStore.loadSupportedClients(), loadApiKeys()])
+  await Promise.all([clientsStore.loadSupportedClients(), loadApiKeys(), loadUsedModels()])
 
   // 初始化全选状态
   updateSelectAllState()
@@ -4841,40 +4904,40 @@ onUnmounted(() => {
   z-index: 12;
 }
 
-/* 确保操作列在浅色模式下有正确的背景 */
+/* 确保操作列在浅色模式下有正确的背景 - 使用纯色避免滚动时重叠 */
 .table-container thead .operations-column {
   z-index: 30;
-  background: linear-gradient(to bottom, #f9fafb, rgba(243, 244, 246, 0.9));
+  background: linear-gradient(to bottom, #f9fafb, #f3f4f6);
 }
 
 .dark .table-container thead .operations-column {
-  background: linear-gradient(to bottom, #374151, rgba(31, 41, 55, 0.9));
+  background: linear-gradient(to bottom, #374151, #1f2937);
 }
 
-/* tbody 中的操作列背景处理 */
+/* tbody 中的操作列背景处理 - 使用纯色避免滚动时重叠 */
 .table-container tbody tr:nth-child(odd) .operations-column {
   background-color: #ffffff;
 }
 
 .table-container tbody tr:nth-child(even) .operations-column {
-  background-color: rgba(249, 250, 251, 0.7);
+  background-color: #f9fafb;
 }
 
 .dark .table-container tbody tr:nth-child(odd) .operations-column {
-  background-color: rgba(31, 41, 55, 0.4);
+  background-color: #1f2937;
 }
 
 .dark .table-container tbody tr:nth-child(even) .operations-column {
-  background-color: rgba(55, 65, 81, 0.3);
+  background-color: #374151;
 }
 
 /* hover 状态下的操作列背景 */
 .table-container tbody tr:hover .operations-column {
-  background-color: rgba(239, 246, 255, 0.6);
+  background-color: #eff6ff;
 }
 
 .dark .table-container tbody tr:hover .operations-column {
-  background-color: rgba(30, 58, 138, 0.2);
+  background-color: #1e3a5f;
 }
 
 .table-container tbody .operations-column {
@@ -4892,19 +4955,19 @@ onUnmounted(() => {
   z-index: 12;
 }
 
-/* 表头左侧固定列背景 */
+/* 表头左侧固定列背景 - 使用纯色避免滚动时重叠 */
 .table-container thead .checkbox-column,
 .table-container thead .name-column {
   z-index: 30;
-  background: linear-gradient(to bottom, #f9fafb, rgba(243, 244, 246, 0.9));
+  background: linear-gradient(to bottom, #f9fafb, #f3f4f6);
 }
 
 .dark .table-container thead .checkbox-column,
 .dark .table-container thead .name-column {
-  background: linear-gradient(to bottom, #374151, rgba(31, 41, 55, 0.9));
+  background: linear-gradient(to bottom, #374151, #1f2937);
 }
 
-/* tbody 中的左侧固定列背景处理 */
+/* tbody 中的左侧固定列背景处理 - 使用纯色避免滚动时重叠 */
 .table-container tbody tr:nth-child(odd) .checkbox-column,
 .table-container tbody tr:nth-child(odd) .name-column {
   background-color: #ffffff;
@@ -4912,28 +4975,28 @@ onUnmounted(() => {
 
 .table-container tbody tr:nth-child(even) .checkbox-column,
 .table-container tbody tr:nth-child(even) .name-column {
-  background-color: rgba(249, 250, 251, 0.7);
+  background-color: #f9fafb;
 }
 
 .dark .table-container tbody tr:nth-child(odd) .checkbox-column,
 .dark .table-container tbody tr:nth-child(odd) .name-column {
-  background-color: rgba(31, 41, 55, 0.4);
+  background-color: #1f2937;
 }
 
 .dark .table-container tbody tr:nth-child(even) .checkbox-column,
 .dark .table-container tbody tr:nth-child(even) .name-column {
-  background-color: rgba(55, 65, 81, 0.3);
+  background-color: #374151;
 }
 
 /* hover 状态下的左侧固定列背景 */
 .table-container tbody tr:hover .checkbox-column,
 .table-container tbody tr:hover .name-column {
-  background-color: rgba(239, 246, 255, 0.6);
+  background-color: #eff6ff;
 }
 
 .dark .table-container tbody tr:hover .checkbox-column,
 .dark .table-container tbody tr:hover .name-column {
-  background-color: rgba(30, 58, 138, 0.2);
+  background-color: #1e3a5f;
 }
 
 /* 名称列右侧阴影（分隔效果） */

@@ -231,6 +231,9 @@
 
         <!-- 底部按钮 -->
         <div class="mt-4 flex justify-end gap-2 sm:mt-6 sm:gap-3">
+          <button class="btn btn-primary px-4 py-2 text-sm" type="button" @click="openTimeline">
+            查看请求时间线
+          </button>
           <button class="btn btn-secondary px-4 py-2 text-sm" type="button" @click="close">
             关闭
           </button>
@@ -256,7 +259,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'open-timeline'])
 
 // 计算属性
 const totalRequests = computed(() => props.apiKey.usage?.total?.requests || 0)
@@ -319,6 +322,10 @@ const formatTokenCount = (count) => {
 
 const close = () => {
   emit('close')
+}
+
+const openTimeline = () => {
+  emit('open-timeline', props.apiKey?.id)
 }
 </script>
 

@@ -13,128 +13,269 @@
           </div>
           <div class="flex-1">
             <h4 class="mb-3 font-semibold text-blue-900 dark:text-blue-200">Claude 账户授权</h4>
-            <p class="mb-4 text-sm text-blue-800 dark:text-blue-300">
-              请按照以下步骤完成 Claude 账户的授权：
-            </p>
 
-            <div class="space-y-4">
-              <!-- 步骤1: 生成授权链接 -->
+            <!-- 授权方式选择 -->
+            <div class="mb-4">
+              <label class="mb-2 block text-sm font-medium text-blue-800 dark:text-blue-300">
+                选择授权方式
+              </label>
+              <div class="flex gap-4">
+                <label class="flex cursor-pointer items-center gap-2">
+                  <input
+                    v-model="authMethod"
+                    class="text-blue-600 focus:ring-blue-500"
+                    name="claude-auth-method"
+                    type="radio"
+                    value="manual"
+                    @change="onAuthMethodChange"
+                  />
+                  <span class="text-sm text-blue-900 dark:text-blue-200">手动授权</span>
+                </label>
+                <label class="flex cursor-pointer items-center gap-2">
+                  <input
+                    v-model="authMethod"
+                    class="text-blue-600 focus:ring-blue-500"
+                    name="claude-auth-method"
+                    type="radio"
+                    value="cookie"
+                    @change="onAuthMethodChange"
+                  />
+                  <span class="text-sm text-blue-900 dark:text-blue-200">Cookie自动授权</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Cookie自动授权表单 -->
+            <div v-if="authMethod === 'cookie'" class="space-y-4">
               <div
                 class="rounded-lg border border-blue-300 bg-white/80 p-4 dark:border-blue-600 dark:bg-gray-800/80"
               >
-                <div class="flex items-start gap-3">
-                  <div
-                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white"
+                <p class="mb-3 text-sm text-blue-700 dark:text-blue-300">
+                  使用 claude.ai 的 sessionKey 自动完成 OAuth 授权流程，无需手动打开浏览器。
+                </p>
+
+                <!-- sessionKey输入 -->
+                <div class="mb-4">
+                  <label
+                    class="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >
-                    1
-                  </div>
-                  <div class="flex-1">
-                    <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
-                      点击下方按钮生成授权链接
-                    </p>
-                    <button
-                      v-if="!authUrl"
-                      class="btn btn-primary px-4 py-2 text-sm"
-                      :disabled="loading"
-                      @click="generateAuthUrl"
+                    <i class="fas fa-cookie text-blue-500" />
+                    sessionKey
+                    <span
+                      v-if="parsedSessionKeyCount > 1"
+                      class="rounded-full bg-blue-500 px-2 py-0.5 text-xs text-white"
                     >
-                      <i v-if="!loading" class="fas fa-link mr-2" />
-                      <div v-else class="loading-spinner mr-2" />
-                      {{ loading ? '生成中...' : '生成授权链接' }}
+                      {{ parsedSessionKeyCount }} 个
+                    </span>
+                    <button
+                      class="text-blue-500 hover:text-blue-600"
+                      type="button"
+                      @click="showSessionKeyHelp = !showSessionKeyHelp"
+                    >
+                      <i class="fas fa-question-circle" />
                     </button>
-                    <div v-else class="space-y-3">
-                      <div class="flex items-center gap-2">
-                        <input
-                          class="form-input flex-1 bg-gray-50 font-mono text-xs dark:bg-gray-700"
-                          readonly
-                          type="text"
-                          :value="authUrl"
-                        />
+                  </label>
+                  <textarea
+                    v-model="sessionKey"
+                    class="form-input w-full resize-y font-mono text-sm"
+                    placeholder="每行一个 sessionKey，例如：&#10;sk-ant-sid01-xxxxx...&#10;sk-ant-sid01-yyyyy..."
+                    rows="3"
+                  />
+                  <p
+                    v-if="parsedSessionKeyCount > 1"
+                    class="mt-1 text-xs text-blue-600 dark:text-blue-400"
+                  >
+                    <i class="fas fa-info-circle mr-1" />
+                    将批量创建 {{ parsedSessionKeyCount }} 个账户
+                  </p>
+                </div>
+
+                <!-- 帮助说明 -->
+                <div
+                  v-if="showSessionKeyHelp"
+                  class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-900/30"
+                >
+                  <h5 class="mb-2 font-semibold text-amber-800 dark:text-amber-200">
+                    <i class="fas fa-lightbulb mr-1" />如何获取 sessionKey
+                  </h5>
+                  <ol
+                    class="list-inside list-decimal space-y-1 text-xs text-amber-700 dark:text-amber-300"
+                  >
+                    <li>在浏览器中登录 <strong>claude.ai</strong></li>
+                    <li>
+                      按
+                      <kbd class="rounded bg-gray-200 px-1 dark:bg-gray-700">F12</kbd>
+                      打开开发者工具
+                    </li>
+                    <li>切换到 <strong>Application</strong>（应用）标签页</li>
+                    <li>
+                      在左侧找到 <strong>Cookies</strong> → <strong>https://claude.ai</strong>
+                    </li>
+                    <li>找到键为 <strong>sessionKey</strong> 的那一行</li>
+                    <li>复制其 <strong>Value</strong>（值）列的内容</li>
+                  </ol>
+                  <p class="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                    <i class="fas fa-info-circle mr-1" />
+                    sessionKey 通常以
+                    <code class="rounded bg-gray-200 px-1 dark:bg-gray-700">sk-ant-sid01-</code>
+                    开头
+                  </p>
+                </div>
+
+                <!-- 错误信息 -->
+                <div
+                  v-if="cookieAuthError"
+                  class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-700 dark:bg-red-900/30"
+                >
+                  <p class="text-sm text-red-600 dark:text-red-400">
+                    <i class="fas fa-exclamation-circle mr-1" />
+                    {{ cookieAuthError }}
+                  </p>
+                </div>
+
+                <!-- 授权按钮 -->
+                <button
+                  class="btn btn-primary w-full px-4 py-3 text-base font-semibold"
+                  :disabled="cookieAuthLoading || !sessionKey.trim()"
+                  type="button"
+                  @click="handleCookieAuth"
+                >
+                  <div v-if="cookieAuthLoading" class="loading-spinner mr-2" />
+                  <i v-else class="fas fa-magic mr-2" />
+                  <template v-if="cookieAuthLoading && batchProgress.total > 1">
+                    正在授权 {{ batchProgress.current }}/{{ batchProgress.total }}...
+                  </template>
+                  <template v-else-if="cookieAuthLoading"> 正在授权... </template>
+                  <template v-else> 开始自动授权 </template>
+                </button>
+              </div>
+            </div>
+
+            <!-- 手动授权流程 -->
+            <div v-else>
+              <p class="mb-4 text-sm text-blue-800 dark:text-blue-300">
+                请按照以下步骤完成 Claude 账户的授权：
+              </p>
+
+              <div class="space-y-4">
+                <!-- 步骤1: 生成授权链接 -->
+                <div
+                  class="rounded-lg border border-blue-300 bg-white/80 p-4 dark:border-blue-600 dark:bg-gray-800/80"
+                >
+                  <div class="flex items-start gap-3">
+                    <div
+                      class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white"
+                    >
+                      1
+                    </div>
+                    <div class="flex-1">
+                      <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
+                        点击下方按钮生成授权链接
+                      </p>
+                      <button
+                        v-if="!authUrl"
+                        class="btn btn-primary px-4 py-2 text-sm"
+                        :disabled="loading"
+                        @click="generateAuthUrl"
+                      >
+                        <i v-if="!loading" class="fas fa-link mr-2" />
+                        <div v-else class="loading-spinner mr-2" />
+                        {{ loading ? '生成中...' : '生成授权链接' }}
+                      </button>
+                      <div v-else class="space-y-3">
+                        <div class="flex items-center gap-2">
+                          <input
+                            class="form-input flex-1 bg-gray-50 font-mono text-xs dark:bg-gray-700"
+                            readonly
+                            type="text"
+                            :value="authUrl"
+                          />
+                          <button
+                            class="rounded-lg bg-gray-100 px-3 py-2 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
+                            title="复制链接"
+                            @click="copyAuthUrl"
+                          >
+                            <i :class="copied ? 'fas fa-check text-green-500' : 'fas fa-copy'" />
+                          </button>
+                        </div>
                         <button
-                          class="rounded-lg bg-gray-100 px-3 py-2 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
-                          title="复制链接"
-                          @click="copyAuthUrl"
+                          class="text-xs text-blue-600 hover:text-blue-700"
+                          @click="regenerateAuthUrl"
                         >
-                          <i :class="copied ? 'fas fa-check text-green-500' : 'fas fa-copy'" />
+                          <i class="fas fa-sync-alt mr-1" />重新生成
                         </button>
                       </div>
-                      <button
-                        class="text-xs text-blue-600 hover:text-blue-700"
-                        @click="regenerateAuthUrl"
-                      >
-                        <i class="fas fa-sync-alt mr-1" />重新生成
-                      </button>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <!-- 步骤2: 访问链接并授权 -->
-              <div
-                class="rounded-lg border border-blue-300 bg-white/80 p-4 dark:border-blue-600 dark:bg-gray-800/80"
-              >
-                <div class="flex items-start gap-3">
-                  <div
-                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white"
-                  >
-                    2
-                  </div>
-                  <div class="flex-1">
-                    <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
-                      在浏览器中打开链接并完成授权
-                    </p>
-                    <p class="mb-2 text-sm text-blue-700 dark:text-blue-300">
-                      请在新标签页中打开授权链接，登录您的 Claude 账户并授权。
-                    </p>
+                <!-- 步骤2: 访问链接并授权 -->
+                <div
+                  class="rounded-lg border border-blue-300 bg-white/80 p-4 dark:border-blue-600 dark:bg-gray-800/80"
+                >
+                  <div class="flex items-start gap-3">
                     <div
-                      class="rounded border border-yellow-300 bg-yellow-50 p-3 dark:border-yellow-700 dark:bg-yellow-900/30"
+                      class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white"
                     >
-                      <p class="text-xs text-yellow-800 dark:text-yellow-300">
-                        <i class="fas fa-exclamation-triangle mr-1" />
-                        <strong>注意：</strong
-                        >如果您设置了代理，请确保浏览器也使用相同的代理访问授权页面。
+                      2
+                    </div>
+                    <div class="flex-1">
+                      <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
+                        在浏览器中打开链接并完成授权
                       </p>
+                      <p class="mb-2 text-sm text-blue-700 dark:text-blue-300">
+                        请在新标签页中打开授权链接，登录您的 Claude 账户并授权。
+                      </p>
+                      <div
+                        class="rounded border border-yellow-300 bg-yellow-50 p-3 dark:border-yellow-700 dark:bg-yellow-900/30"
+                      >
+                        <p class="text-xs text-yellow-800 dark:text-yellow-300">
+                          <i class="fas fa-exclamation-triangle mr-1" />
+                          <strong>注意：</strong
+                          >如果您设置了代理，请确保浏览器也使用相同的代理访问授权页面。
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <!-- 步骤3: 输入授权码 -->
-              <div
-                class="rounded-lg border border-blue-300 bg-white/80 p-4 dark:border-blue-600 dark:bg-gray-800/80"
-              >
-                <div class="flex items-start gap-3">
-                  <div
-                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white"
-                  >
-                    3
-                  </div>
-                  <div class="flex-1">
-                    <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
-                      输入 Authorization Code
-                    </p>
-                    <p class="mb-3 text-sm text-blue-700 dark:text-blue-300">
-                      授权完成后，页面会显示一个
-                      <strong>Authorization Code</strong>，请将其复制并粘贴到下方输入框：
-                    </p>
-                    <div class="space-y-3">
-                      <div>
-                        <label
-                          class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                        >
-                          <i class="fas fa-key mr-2 text-blue-500" />Authorization Code
-                        </label>
-                        <textarea
-                          v-model="authCode"
-                          class="form-input w-full resize-none font-mono text-sm"
-                          placeholder="粘贴从Claude页面获取的Authorization Code..."
-                          rows="3"
-                        />
-                      </div>
-                      <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                        <i class="fas fa-info-circle mr-1" />
-                        请粘贴从Claude页面复制的Authorization Code
+                <!-- 步骤3: 输入授权码 -->
+                <div
+                  class="rounded-lg border border-blue-300 bg-white/80 p-4 dark:border-blue-600 dark:bg-gray-800/80"
+                >
+                  <div class="flex items-start gap-3">
+                    <div
+                      class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white"
+                    >
+                      3
+                    </div>
+                    <div class="flex-1">
+                      <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
+                        输入 Authorization Code
                       </p>
+                      <p class="mb-3 text-sm text-blue-700 dark:text-blue-300">
+                        授权完成后，页面会显示一个
+                        <strong>Authorization Code</strong>，请将其复制并粘贴到下方输入框：
+                      </p>
+                      <div class="space-y-3">
+                        <div>
+                          <label
+                            class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                          >
+                            <i class="fas fa-key mr-2 text-blue-500" />Authorization Code
+                          </label>
+                          <textarea
+                            v-model="authCode"
+                            class="form-input w-full resize-none font-mono text-sm"
+                            placeholder="粘贴从Claude页面获取的Authorization Code..."
+                            rows="3"
+                          />
+                        </div>
+                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                          <i class="fas fa-info-circle mr-1" />
+                          请粘贴从Claude页面复制的Authorization Code
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -636,7 +777,9 @@
       >
         上一步
       </button>
+      <!-- Cookie自动授权模式不显示此按钮（Claude平台） -->
       <button
+        v-if="!(platform === 'claude' && authMethod === 'cookie')"
         class="btn btn-primary flex-1 px-6 py-3 font-semibold"
         :disabled="!canExchange || exchanging"
         type="button"
@@ -681,6 +824,22 @@ const verificationUri = ref('')
 const verificationUriComplete = ref('')
 const remainingSeconds = ref(0)
 let countdownTimer = null
+
+// Cookie自动授权相关状态
+const authMethod = ref('manual') // 'manual' | 'cookie'
+const sessionKey = ref('')
+const cookieAuthLoading = ref(false)
+const cookieAuthError = ref('')
+const showSessionKeyHelp = ref(false)
+const batchProgress = ref({ current: 0, total: 0 }) // 批量进度
+
+// 解析后的 sessionKey 数量
+const parsedSessionKeyCount = computed(() => {
+  return sessionKey.value
+    .split('\n')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0).length
+})
 
 // 计算是否可以交换code
 const canExchange = computed(() => {
@@ -983,5 +1142,94 @@ const exchangeCode = async () => {
 
 onBeforeUnmount(() => {
   stopCountdown()
+})
+
+// Cookie自动授权处理（支持批量）
+const handleCookieAuth = async () => {
+  // 解析多行输入
+  const sessionKeys = sessionKey.value
+    .split('\n')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+
+  if (sessionKeys.length === 0) {
+    cookieAuthError.value = '请输入至少一个 sessionKey'
+    return
+  }
+
+  cookieAuthLoading.value = true
+  cookieAuthError.value = ''
+  batchProgress.value = { current: 0, total: sessionKeys.length }
+
+  // 构建代理配置
+  const proxyConfig = props.proxy?.enabled
+    ? {
+        type: props.proxy.type,
+        host: props.proxy.host,
+        port: parseInt(props.proxy.port),
+        username: props.proxy.username || null,
+        password: props.proxy.password || null
+      }
+    : null
+
+  const results = []
+  const errors = []
+
+  for (let i = 0; i < sessionKeys.length; i++) {
+    batchProgress.value.current = i + 1
+    try {
+      const result = await accountsStore.oauthWithCookie({
+        sessionKey: sessionKeys[i],
+        proxy: proxyConfig
+      })
+      results.push(result)
+    } catch (error) {
+      errors.push({
+        index: i + 1,
+        key: sessionKeys[i].substring(0, 20) + '...',
+        error: error.message
+      })
+    }
+  }
+
+  batchProgress.value = { current: 0, total: 0 }
+
+  if (results.length > 0) {
+    // emit 后父组件会调用 handleOAuthSuccess 创建账号
+    // cookieAuthLoading 保持 true，成功后表单会关闭，失败时父组件会处理
+    emit('success', results) // 返回数组（单个时也是数组）
+    // 注意：不在这里设置 cookieAuthLoading = false
+    // 父组件创建账号完成后表单会关闭/重置
+  } else {
+    // 全部授权失败时才恢复按钮状态
+    cookieAuthLoading.value = false
+  }
+
+  if (errors.length > 0 && results.length === 0) {
+    cookieAuthError.value = '全部授权失败，请检查 sessionKey 是否有效'
+  } else if (errors.length > 0) {
+    cookieAuthError.value = `${errors.length} 个授权失败`
+  }
+}
+
+// 重置Cookie授权状态
+const resetCookieAuth = () => {
+  sessionKey.value = ''
+  cookieAuthError.value = ''
+  cookieAuthLoading.value = false
+  batchProgress.value = { current: 0, total: 0 }
+}
+
+// 切换授权方式时重置状态
+const onAuthMethodChange = () => {
+  resetCookieAuth()
+  authUrl.value = ''
+  authCode.value = ''
+  sessionId.value = ''
+}
+
+// 暴露方法供父组件调用
+defineExpose({
+  resetCookieAuth
 })
 </script>

@@ -556,7 +556,8 @@ class DroidAccountService {
       tokenType = 'Bearer',
       authenticationMethod = '',
       expiresIn = null,
-      apiKeys = []
+      apiKeys = [],
+      userAgent = '' // 自定义 User-Agent
     } = options
 
     const accountId = uuidv4()
@@ -832,7 +833,8 @@ class DroidAccountService {
           : '',
       apiKeys: hasApiKeys ? JSON.stringify(apiKeyEntries) : '',
       apiKeyCount: hasApiKeys ? String(apiKeyEntries.length) : '0',
-      apiKeyStrategy: hasApiKeys ? 'random_sticky' : ''
+      apiKeyStrategy: hasApiKeys ? 'random_sticky' : '',
+      userAgent: userAgent || '' // 自定义 User-Agent
     }
 
     await redis.setDroidAccount(accountId, accountData)
@@ -929,6 +931,11 @@ class DroidAccountService {
 
     if (sanitizedUpdates.endpointType) {
       sanitizedUpdates.endpointType = this._sanitizeEndpointType(sanitizedUpdates.endpointType)
+    }
+
+    // 处理 userAgent 字段
+    if (typeof sanitizedUpdates.userAgent === 'string') {
+      sanitizedUpdates.userAgent = sanitizedUpdates.userAgent.trim()
     }
 
     const parseProxyConfig = (value) => {

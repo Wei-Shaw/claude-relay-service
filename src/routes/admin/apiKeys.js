@@ -103,6 +103,17 @@ router.get('/api-keys/:keyId/cost-debug', authenticateAdmin, async (req, res) =>
   }
 })
 
+// 获取所有被使用过的模型列表
+router.get('/api-keys/used-models', authenticateAdmin, async (req, res) => {
+  try {
+    const models = await redis.getAllUsedModels()
+    return res.json({ success: true, data: models })
+  } catch (error) {
+    logger.error('❌ Failed to get used models:', error)
+    return res.status(500).json({ error: 'Failed to get used models', message: error.message })
+  }
+})
+
 // 获取所有API Keys
 router.get('/api-keys', authenticateAdmin, async (req, res) => {
   try {
@@ -116,6 +127,7 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
       // 筛选参数
       tag = '',
       isActive = '',
+      models = '', // 模型筛选（逗号分隔）
       // 排序参数
       sortBy = 'createdAt',
       sortOrder = 'desc',
@@ -126,6 +138,9 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
       // 兼容旧参数（不再用于费用计算，仅标记）
       timeRange = 'all'
     } = req.query
+
+    // 解析模型筛选参数
+    const modelFilter = models ? models.split(',').filter((m) => m.trim()) : []
 
     // 验证分页参数
     const pageNum = Math.max(1, parseInt(page) || 1)
@@ -217,7 +232,8 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
           search,
           searchMode,
           tag,
-          isActive
+          isActive,
+          modelFilter
         })
 
         costSortStatus = {
@@ -250,7 +266,8 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
           search,
           searchMode,
           tag,
-          isActive
+          isActive,
+          modelFilter
         })
 
         costSortStatus.isRealTimeCalculation = false
@@ -265,7 +282,8 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
         tag,
         isActive,
         sortBy: validSortBy,
-        sortOrder: validSortOrder
+        sortOrder: validSortOrder,
+        modelFilter
       })
     }
 
@@ -322,7 +340,17 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
  * 使用预计算索引进行费用排序的分页查询
  */
 async function getApiKeysSortedByCostPrecomputed(options) {
-  const { page, pageSize, sortOrder, costTimeRange, search, searchMode, tag, isActive } = options
+  const {
+    page,
+    pageSize,
+    sortOrder,
+    costTimeRange,
+    search,
+    searchMode,
+    tag,
+    isActive,
+    modelFilter = []
+  } = options
   const costRankService = require('../../services/costRankService')
 
   // 1. 获取排序后的全量 keyId 列表
@@ -369,6 +397,15 @@ async function getApiKeysSortedByCostPrecomputed(options) {
     }
   }
 
+  // 模型筛选
+  if (modelFilter.length > 0) {
+    const keyIdsWithModels = await redis.getKeyIdsWithModels(
+      orderedKeys.map((k) => k.id),
+      modelFilter
+    )
+    orderedKeys = orderedKeys.filter((k) => keyIdsWithModels.has(k.id))
+  }
+
   // 5. 收集所有可用标签
   const allTags = new Set()
   for (const key of allKeys) {
@@ -411,8 +448,18 @@ async function getApiKeysSortedByCostPrecomputed(options) {
  * 使用实时计算进行 custom 时间范围的费用排序
  */
 async function getApiKeysSortedByCostCustom(options) {
-  const { page, pageSize, sortOrder, startDate, endDate, search, searchMode, tag, isActive } =
-    options
+  const {
+    page,
+    pageSize,
+    sortOrder,
+    startDate,
+    endDate,
+    search,
+    searchMode,
+    tag,
+    isActive,
+    modelFilter = []
+  } = options
   const costRankService = require('../../services/costRankService')
 
   // 1. 实时计算所有 Keys 的费用
@@ -427,9 +474,9 @@ async function getApiKeysSortedByCostCustom(options) {
   }
 
   // 2. 转换为数组并排序
-  const sortedEntries = [...costs.entries()].sort((a, b) => {
-    return sortOrder === 'desc' ? b[1] - a[1] : a[1] - b[1]
-  })
+  const sortedEntries = [...costs.entries()].sort((a, b) =>
+    sortOrder === 'desc' ? b[1] - a[1] : a[1] - b[1]
+  )
   const rankedKeyIds = sortedEntries.map(([keyId]) => keyId)
 
   // 3. 批量获取 API Key 基础数据
@@ -463,6 +510,15 @@ async function getApiKeysSortedByCostCustom(options) {
       const accountNameCacheService = require('../../services/accountNameCacheService')
       orderedKeys = accountNameCacheService.searchByBindingAccount(orderedKeys, lowerSearch)
     }
+  }
+
+  // 模型筛选
+  if (modelFilter.length > 0) {
+    const keyIdsWithModels = await redis.getKeyIdsWithModels(
+      orderedKeys.map((k) => k.id),
+      modelFilter
+    )
+    orderedKeys = orderedKeys.filter((k) => keyIdsWithModels.has(k.id))
   }
 
   // 6. 收集所有可用标签
@@ -863,6 +919,62 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
   // 去重（避免日数据和月数据重复计算）
   const uniqueKeys = [...new Set(allKeys)]
 
+  // 获取实时限制数据（窗口数据不受时间范围筛选影响，始终获取当前窗口状态）
+  let dailyCost = 0
+  let currentWindowCost = 0
+  let windowRemainingSeconds = null
+  let windowStartTime = null
+  let windowEndTime = null
+  let allTimeCost = 0
+
+  try {
+    // 先获取 API Key 配置，判断是否需要查询限制相关数据
+    const apiKey = await redis.getApiKey(keyId)
+    const rateLimitWindow = parseInt(apiKey?.rateLimitWindow) || 0
+    const dailyCostLimit = parseFloat(apiKey?.dailyCostLimit) || 0
+    const totalCostLimit = parseFloat(apiKey?.totalCostLimit) || 0
+
+    // 只在启用了每日费用限制时查询
+    if (dailyCostLimit > 0) {
+      dailyCost = await redis.getDailyCost(keyId)
+    }
+
+    // 只在启用了总费用限制时查询
+    if (totalCostLimit > 0) {
+      const totalCostKey = `usage:cost:total:${keyId}`
+      allTimeCost = parseFloat((await client.get(totalCostKey)) || '0')
+    }
+
+    // 只在启用了窗口限制时查询窗口数据
+    if (rateLimitWindow > 0) {
+      const costCountKey = `rate_limit:cost:${keyId}`
+      const windowStartKey = `rate_limit:window_start:${keyId}`
+
+      currentWindowCost = parseFloat((await client.get(costCountKey)) || '0')
+
+      // 获取窗口开始时间和计算剩余时间
+      const windowStart = await client.get(windowStartKey)
+      if (windowStart) {
+        const now = Date.now()
+        windowStartTime = parseInt(windowStart)
+        const windowDuration = rateLimitWindow * 60 * 1000 // 转换为毫秒
+        windowEndTime = windowStartTime + windowDuration
+
+        // 如果窗口还有效
+        if (now < windowEndTime) {
+          windowRemainingSeconds = Math.max(0, Math.floor((windowEndTime - now) / 1000))
+        } else {
+          // 窗口已过期
+          windowRemainingSeconds = 0
+          currentWindowCost = 0
+        }
+      }
+    }
+  } catch (error) {
+    logger.warn(`⚠️ 获取实时限制数据失败 (key: ${keyId}):`, error.message)
+  }
+
+  // 如果没有使用数据，返回零值但包含窗口数据
   if (uniqueKeys.length === 0) {
     return {
       requests: 0,
@@ -872,7 +984,14 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
       cacheCreateTokens: 0,
       cacheReadTokens: 0,
       cost: 0,
-      formattedCost: '$0.00'
+      formattedCost: '$0.00',
+      // 实时限制数据（始终返回，不受时间范围影响）
+      dailyCost,
+      currentWindowCost,
+      windowRemainingSeconds,
+      windowStartTime,
+      windowEndTime,
+      allTimeCost
     }
   }
 
@@ -972,52 +1091,6 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
   }
 
   const tokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
-
-  // 获取实时限制数据
-  let dailyCost = 0
-  let currentWindowCost = 0
-  let windowRemainingSeconds = null
-  let windowStartTime = null
-  let windowEndTime = null
-  let allTimeCost = 0
-
-  try {
-    // 获取当日费用
-    dailyCost = await redis.getDailyCost(keyId)
-
-    // 获取历史总费用（用于总费用限制进度条，不受时间范围影响）
-    const totalCostKey = `usage:cost:total:${keyId}`
-    allTimeCost = parseFloat((await client.get(totalCostKey)) || '0')
-
-    // 获取 API Key 配置信息以判断是否需要窗口数据
-    const apiKey = await redis.getApiKey(keyId)
-    if (apiKey && apiKey.rateLimitWindow > 0) {
-      const costCountKey = `rate_limit:cost:${keyId}`
-      const windowStartKey = `rate_limit:window_start:${keyId}`
-
-      currentWindowCost = parseFloat((await client.get(costCountKey)) || '0')
-
-      // 获取窗口开始时间和计算剩余时间
-      const windowStart = await client.get(windowStartKey)
-      if (windowStart) {
-        const now = Date.now()
-        windowStartTime = parseInt(windowStart)
-        const windowDuration = apiKey.rateLimitWindow * 60 * 1000 // 转换为毫秒
-        windowEndTime = windowStartTime + windowDuration
-
-        // 如果窗口还有效
-        if (now < windowEndTime) {
-          windowRemainingSeconds = Math.max(0, Math.floor((windowEndTime - now) / 1000))
-        } else {
-          // 窗口已过期
-          windowRemainingSeconds = 0
-          currentWindowCost = 0
-        }
-      }
-    }
-  } catch (error) {
-    logger.debug(`获取实时限制数据失败 (key: ${keyId}):`, error.message)
-  }
 
   return {
     requests: totalRequests,

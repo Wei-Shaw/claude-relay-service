@@ -255,6 +255,108 @@ router.post('/claude-accounts/exchange-setup-token-code', authenticateAdmin, asy
   }
 })
 
+// =============================================================================
+// Cookie自动授权端点 (基于sessionKey自动完成OAuth流程)
+// =============================================================================
+
+// 普通OAuth的Cookie自动授权
+router.post('/claude-accounts/oauth-with-cookie', authenticateAdmin, async (req, res) => {
+  try {
+    const { sessionKey, proxy } = req.body
+
+    // 验证sessionKey参数
+    if (!sessionKey || typeof sessionKey !== 'string' || sessionKey.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'sessionKey不能为空',
+        message: '请提供有效的sessionKey值'
+      })
+    }
+
+    const trimmedSessionKey = sessionKey.trim()
+
+    logger.info('🍪 Starting Cookie-based OAuth authorization', {
+      sessionKeyLength: trimmedSessionKey.length,
+      sessionKeyPrefix: trimmedSessionKey.substring(0, 10) + '...',
+      hasProxy: !!proxy
+    })
+
+    // 执行Cookie自动授权流程
+    const result = await oauthHelper.oauthWithCookie(trimmedSessionKey, proxy, false)
+
+    logger.success('🎉 Cookie-based OAuth authorization completed successfully')
+
+    return res.json({
+      success: true,
+      data: {
+        claudeAiOauth: result.claudeAiOauth,
+        organizationUuid: result.organizationUuid,
+        capabilities: result.capabilities
+      }
+    })
+  } catch (error) {
+    logger.error('❌ Cookie-based OAuth authorization failed:', {
+      error: error.message,
+      sessionKeyLength: req.body.sessionKey ? req.body.sessionKey.length : 0
+    })
+
+    return res.status(500).json({
+      success: false,
+      error: 'Cookie授权失败',
+      message: error.message
+    })
+  }
+})
+
+// Setup Token的Cookie自动授权
+router.post('/claude-accounts/setup-token-with-cookie', authenticateAdmin, async (req, res) => {
+  try {
+    const { sessionKey, proxy } = req.body
+
+    // 验证sessionKey参数
+    if (!sessionKey || typeof sessionKey !== 'string' || sessionKey.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'sessionKey不能为空',
+        message: '请提供有效的sessionKey值'
+      })
+    }
+
+    const trimmedSessionKey = sessionKey.trim()
+
+    logger.info('🍪 Starting Cookie-based Setup Token authorization', {
+      sessionKeyLength: trimmedSessionKey.length,
+      sessionKeyPrefix: trimmedSessionKey.substring(0, 10) + '...',
+      hasProxy: !!proxy
+    })
+
+    // 执行Cookie自动授权流程（Setup Token模式）
+    const result = await oauthHelper.oauthWithCookie(trimmedSessionKey, proxy, true)
+
+    logger.success('🎉 Cookie-based Setup Token authorization completed successfully')
+
+    return res.json({
+      success: true,
+      data: {
+        claudeAiOauth: result.claudeAiOauth,
+        organizationUuid: result.organizationUuid,
+        capabilities: result.capabilities
+      }
+    })
+  } catch (error) {
+    logger.error('❌ Cookie-based Setup Token authorization failed:', {
+      error: error.message,
+      sessionKeyLength: req.body.sessionKey ? req.body.sessionKey.length : 0
+    })
+
+    return res.status(500).json({
+      success: false,
+      error: 'Cookie授权失败',
+      message: error.message
+    })
+  }
+})
+
 // 获取所有Claude账户
 router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
   try {

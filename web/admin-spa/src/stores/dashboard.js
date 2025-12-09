@@ -67,22 +67,72 @@ export const useDashboardStore = defineStore('dashboard', () => {
     groupLabel: 'Claude账户'
   })
 
+  // 本地偏好
+  const STORAGE_KEYS = {
+    preset: 'dashboard:date:preset',
+    granularity: 'dashboard:trend:granularity'
+  }
+  const defaultPreset = 'today'
+  const defaultGranularity = 'day'
+
+  const getPresetOptions = (granularity) =>
+    granularity === 'hour'
+      ? [
+          { value: 'last24h', label: '近24小时', hours: 24 },
+          { value: 'yesterday', label: '昨天', hours: 24 },
+          { value: 'dayBefore', label: '前天', hours: 24 }
+        ]
+      : [
+          { value: 'today', label: '今日', days: 1 },
+          { value: '7days', label: '7天', days: 7 },
+          { value: '30days', label: '30天', days: 30 }
+        ]
+
+  const readFromStorage = (key, fallback) => {
+    try {
+      const value = localStorage.getItem(key)
+      return value || fallback
+    } catch (error) {
+      return fallback
+    }
+  }
+
+  const saveToStorage = (key, value) => {
+    try {
+      localStorage.setItem(key, value)
+    } catch (error) {
+      // 忽略存储错误，避免影响渲染
+    }
+  }
+
+  const normalizePresetForGranularity = (preset, granularity) => {
+    const options = getPresetOptions(granularity)
+    const hasPreset = options.some((opt) => opt.value === preset)
+    if (hasPreset) return preset
+    return granularity === 'hour' ? 'last24h' : defaultPreset
+  }
+
+  const storedGranularity = readFromStorage(STORAGE_KEYS.granularity, defaultGranularity)
+  const initialGranularity = ['day', 'hour'].includes(storedGranularity)
+    ? storedGranularity
+    : defaultGranularity
+  const initialPreset = normalizePresetForGranularity(
+    readFromStorage(STORAGE_KEYS.preset, defaultPreset),
+    initialGranularity
+  )
+
   // 日期筛选
   const dateFilter = ref({
     type: 'preset', // preset 或 custom
-    preset: '7days', // today, 7days, 30days
+    preset: initialPreset, // today, 7days, 30days
     customStart: '',
     customEnd: '',
     customRange: null,
-    presetOptions: [
-      { value: 'today', label: '今日', days: 1 },
-      { value: '7days', label: '7天', days: 7 },
-      { value: '30days', label: '30天', days: 30 }
-    ]
+    presetOptions: getPresetOptions(initialGranularity)
   })
 
   // 趋势图粒度
-  const trendGranularity = ref('day') // 'day' 或 'hour'
+  const trendGranularity = ref(initialGranularity) // 'day' 或 'hour'
   const apiKeysTrendMetric = ref('requests') // 'requests' 或 'tokens'
   const accountUsageGroup = ref('claude') // claude | openai | gemini
 
@@ -137,6 +187,21 @@ export const useDashboardStore = defineStore('dashboard', () => {
       return new Date(Date.UTC(year, month, day, 15, 59, 59, 999))
     }
   }
+
+  const persistDatePreferences = (
+    preset = dateFilter.value.preset,
+    granularity = trendGranularity.value
+  ) => {
+    saveToStorage(STORAGE_KEYS.preset, preset)
+    saveToStorage(STORAGE_KEYS.granularity, granularity)
+  }
+
+  const getEffectiveGranularity = () =>
+    dateFilter.value.type === 'preset' &&
+    dateFilter.value.preset === 'today' &&
+    trendGranularity.value === 'day'
+      ? 'hour'
+      : trendGranularity.value
 
   // 方法
   async function loadDashboardData(timeRange = null) {
@@ -232,7 +297,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
   }
 
-  async function loadUsageTrend(days = 7, granularity = 'day') {
+  async function loadUsageTrend(days = 7, granularity = getEffectiveGranularity()) {
     try {
       let url = '/admin/usage-trend?'
 
@@ -241,26 +306,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
         url += `granularity=hour`
 
         if (dateFilter.value.customRange && dateFilter.value.customRange.length === 2) {
-          // 使用自定义时间范围 - 需要将系统时区时间转换为UTC
-          const convertToUTC = (systemTzTimeStr) => {
-            // 固定使用UTC+8，因为后端系统时区是UTC+8
-            const systemTz = 8
-            // 解析系统时区时间字符串
-            const [datePart, timePart] = systemTzTimeStr.split(' ')
-            const [year, month, day] = datePart.split('-').map(Number)
-            const [hours, minutes, seconds] = timePart.split(':').map(Number)
-
-            // 创建UTC时间，使其在系统时区显示为用户选择的时间
-            // 例如：用户选择 UTC+8 的 2025-07-25 00:00:00
-            // 对应的UTC时间是 2025-07-24 16:00:00
-            const utcDate = new Date(
-              Date.UTC(year, month - 1, day, hours - systemTz, minutes, seconds)
-            )
-            return utcDate.toISOString()
-          }
-
-          url += `&startDate=${encodeURIComponent(convertToUTC(dateFilter.value.customRange[0]))}`
-          url += `&endDate=${encodeURIComponent(convertToUTC(dateFilter.value.customRange[1]))}`
+          // 使用自定义时间范围 - 直接按系统时区字符串传递，避免额外时区偏移导致窗口错位
+          url += `&startDate=${encodeURIComponent(dateFilter.value.customRange[0])}`
+          url += `&endDate=${encodeURIComponent(dateFilter.value.customRange[1])}`
         } else {
           // 使用预设计算时间范围，与loadApiKeysTrend保持一致
           const now = new Date()
@@ -268,6 +316,12 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
           if (dateFilter.value.type === 'preset') {
             switch (dateFilter.value.preset) {
+              case 'today': {
+                // 今日：使用系统时区的当日0点-23:59
+                startTime = getSystemTimezoneDay(now, true)
+                endTime = getSystemTimezoneDay(now, false)
+                break
+              }
               case 'last24h': {
                 // 近24小时：从当前时间往前推24小时
                 endTime = new Date(now)
@@ -318,34 +372,28 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
   }
 
-  async function loadModelStats(period = 'daily') {
+  async function loadModelStats(period = 'daily', granularity = null) {
+    const currentGranularity = granularity || getEffectiveGranularity()
     try {
       let url = `/admin/model-stats?period=${period}`
 
       // 如果是自定义时间范围或小时粒度，传递具体的时间参数
-      if (dateFilter.value.type === 'custom' || trendGranularity.value === 'hour') {
+      if (dateFilter.value.type === 'custom' || currentGranularity === 'hour') {
         if (dateFilter.value.customRange && dateFilter.value.customRange.length === 2) {
-          // 将系统时区时间转换为UTC
-          const convertToUTC = (systemTzTimeStr) => {
-            const systemTz = 8
-            const [datePart, timePart] = systemTzTimeStr.split(' ')
-            const [year, month, day] = datePart.split('-').map(Number)
-            const [hours, minutes, seconds] = timePart.split(':').map(Number)
-
-            const utcDate = new Date(
-              Date.UTC(year, month - 1, day, hours - systemTz, minutes, seconds)
-            )
-            return utcDate.toISOString()
-          }
-
-          url += `&startDate=${encodeURIComponent(convertToUTC(dateFilter.value.customRange[0]))}`
-          url += `&endDate=${encodeURIComponent(convertToUTC(dateFilter.value.customRange[1]))}`
-        } else if (trendGranularity.value === 'hour' && dateFilter.value.type === 'preset') {
+          // 按系统时区字符串直传，避免额外时区转换
+          url += `&startDate=${encodeURIComponent(dateFilter.value.customRange[0])}`
+          url += `&endDate=${encodeURIComponent(dateFilter.value.customRange[1])}`
+        } else if (currentGranularity === 'hour' && dateFilter.value.type === 'preset') {
           // 小时粒度的预设时间范围
           const now = new Date()
           let startTime, endTime
 
           switch (dateFilter.value.preset) {
+            case 'today': {
+              startTime = getSystemTimezoneDay(now, true)
+              endTime = getSystemTimezoneDay(now, false)
+              break
+            }
             case 'last24h': {
               endTime = new Date(now)
               startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000)
@@ -374,7 +422,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
           url += `&startDate=${encodeURIComponent(startTime.toISOString())}`
           url += `&endDate=${encodeURIComponent(endTime.toISOString())}`
         }
-      } else if (dateFilter.value.type === 'preset' && trendGranularity.value === 'day') {
+      } else if (dateFilter.value.type === 'preset' && currentGranularity === 'day') {
         // 天粒度的预设时间范围，需要传递startDate和endDate参数
         const now = new Date()
         let startDate, endDate
@@ -409,36 +457,20 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
   }
 
-  async function loadApiKeysTrend(metric = 'requests') {
+  async function loadApiKeysTrend(metric = 'requests', granularity = null) {
+    const currentGranularity = granularity || getEffectiveGranularity()
     try {
       let url = '/admin/api-keys-usage-trend?'
       let days = 7
 
-      if (trendGranularity.value === 'hour') {
+      if (currentGranularity === 'hour') {
         // 小时粒度，计算时间范围
         url += `granularity=hour`
 
         if (dateFilter.value.customRange && dateFilter.value.customRange.length === 2) {
-          // 使用自定义时间范围 - 需要将系统时区时间转换为UTC
-          const convertToUTC = (systemTzTimeStr) => {
-            // 固定使用UTC+8，因为后端系统时区是UTC+8
-            const systemTz = 8
-            // 解析系统时区时间字符串
-            const [datePart, timePart] = systemTzTimeStr.split(' ')
-            const [year, month, day] = datePart.split('-').map(Number)
-            const [hours, minutes, seconds] = timePart.split(':').map(Number)
-
-            // 创建UTC时间，使其在系统时区显示为用户选择的时间
-            // 例如：用户选择 UTC+8 的 2025-07-25 00:00:00
-            // 对应的UTC时间是 2025-07-24 16:00:00
-            const utcDate = new Date(
-              Date.UTC(year, month - 1, day, hours - systemTz, minutes, seconds)
-            )
-            return utcDate.toISOString()
-          }
-
-          url += `&startDate=${encodeURIComponent(convertToUTC(dateFilter.value.customRange[0]))}`
-          url += `&endDate=${encodeURIComponent(convertToUTC(dateFilter.value.customRange[1]))}`
+          // 使用自定义时间范围 - 按系统时区字符串直传
+          url += `&startDate=${encodeURIComponent(dateFilter.value.customRange[0])}`
+          url += `&endDate=${encodeURIComponent(dateFilter.value.customRange[1])}`
         } else {
           // 使用预设计算时间范围，与setDateFilterPreset保持一致
           const now = new Date()
@@ -446,6 +478,11 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
           if (dateFilter.value.type === 'preset') {
             switch (dateFilter.value.preset) {
+              case 'today': {
+                startTime = getSystemTimezoneDay(now, true)
+                endTime = getSystemTimezoneDay(now, false)
+                break
+              }
               case 'last24h': {
                 // 近24小时：从当前时间往前推24小时
                 endTime = new Date(now)
@@ -511,29 +548,18 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
   }
 
-  async function loadAccountUsageTrend(group = accountUsageGroup.value) {
+  async function loadAccountUsageTrend(group = accountUsageGroup.value, granularity = null) {
+    const currentGranularity = granularity || getEffectiveGranularity()
     try {
       let url = '/admin/account-usage-trend?'
       let days = 7
 
-      if (trendGranularity.value === 'hour') {
+      if (currentGranularity === 'hour') {
         url += `granularity=hour`
 
         if (dateFilter.value.customRange && dateFilter.value.customRange.length === 2) {
-          const convertToUTC = (systemTzTimeStr) => {
-            const systemTz = 8
-            const [datePart, timePart] = systemTzTimeStr.split(' ')
-            const [year, month, day] = datePart.split('-').map(Number)
-            const [hours, minutes, seconds] = timePart.split(':').map(Number)
-
-            const utcDate = new Date(
-              Date.UTC(year, month - 1, day, hours - systemTz, minutes, seconds)
-            )
-            return utcDate.toISOString()
-          }
-
-          url += `&startDate=${encodeURIComponent(convertToUTC(dateFilter.value.customRange[0]))}`
-          url += `&endDate=${encodeURIComponent(convertToUTC(dateFilter.value.customRange[1]))}`
+          url += `&startDate=${encodeURIComponent(dateFilter.value.customRange[0])}`
+          url += `&endDate=${encodeURIComponent(dateFilter.value.customRange[1])}`
         } else {
           const now = new Date()
           let startTime
@@ -541,6 +567,11 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
           if (dateFilter.value.type === 'preset') {
             switch (dateFilter.value.preset) {
+              case 'today': {
+                startTime = getSystemTimezoneDay(now, true)
+                endTime = getSystemTimezoneDay(now, false)
+                break
+              }
               case 'last24h': {
                 endTime = new Date(now)
                 startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000)
@@ -603,110 +634,87 @@ export const useDashboardStore = defineStore('dashboard', () => {
   }
 
   // 日期筛选相关方法
-  function setDateFilterPreset(preset) {
+  function setDateFilterPreset(preset, options = {}) {
+    const { silent = false, skipSave = false } = options
+    const normalizedPreset = normalizePresetForGranularity(preset, trendGranularity.value)
+
     dateFilter.value.type = 'preset'
-    dateFilter.value.preset = preset
+    dateFilter.value.preset = normalizedPreset
 
-    // 根据预设计算并设置具体的日期范围
-    const option = dateFilter.value.presetOptions.find((opt) => opt.value === preset)
-    if (option) {
-      const now = new Date()
-      let startDate, endDate
+    const option = dateFilter.value.presetOptions.find((opt) => opt.value === normalizedPreset)
+    const now = new Date()
+    let startDate
+    let endDate
 
-      if (trendGranularity.value === 'hour') {
-        // 小时粒度的预设
-        switch (preset) {
-          case 'last24h': {
-            // 近24小时：从当前时间往前推24小时
-            endDate = new Date(now)
-            startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000)
-            break
-          }
-          case 'yesterday': {
-            // 昨天：获取本地时间的昨天
-            const yesterday = new Date()
-            yesterday.setDate(yesterday.getDate() - 1)
-            // 转换为系统时区的昨天0点和23:59
-            startDate = getSystemTimezoneDay(yesterday, true)
-            endDate = getSystemTimezoneDay(yesterday, false)
-            break
-          }
-          case 'dayBefore': {
-            // 前天：获取本地时间的前天
-            const dayBefore = new Date()
-            dayBefore.setDate(dayBefore.getDate() - 2)
-            // 转换为系统时区的前天0点和23:59
-            startDate = getSystemTimezoneDay(dayBefore, true)
-            endDate = getSystemTimezoneDay(dayBefore, false)
-            break
-          }
+    if (trendGranularity.value === 'hour') {
+      switch (normalizedPreset) {
+        case 'today': {
+          startDate = getSystemTimezoneDay(now, true)
+          endDate = getSystemTimezoneDay(now, false)
+          break
         }
-      } else {
-        // 天粒度的预设
-        startDate = new Date(now)
-        endDate = new Date(now)
-
-        if (preset === 'today') {
-          // 今日：从凌晨开始
-          startDate.setHours(0, 0, 0, 0)
-          endDate.setHours(23, 59, 59, 999)
-        } else {
-          // 其他预设：按天数计算
-          startDate.setDate(now.getDate() - (option.days - 1))
-          startDate.setHours(0, 0, 0, 0)
-          endDate.setHours(23, 59, 59, 999)
+        case 'last24h': {
+          endDate = new Date(now)
+          startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+          break
+        }
+        case 'yesterday': {
+          const yesterday = new Date()
+          yesterday.setDate(yesterday.getDate() - 1)
+          startDate = getSystemTimezoneDay(yesterday, true)
+          endDate = getSystemTimezoneDay(yesterday, false)
+          break
+        }
+        case 'dayBefore': {
+          const dayBefore = new Date()
+          dayBefore.setDate(dayBefore.getDate() - 2)
+          startDate = getSystemTimezoneDay(dayBefore, true)
+          endDate = getSystemTimezoneDay(dayBefore, false)
+          break
+        }
+        default: {
+          endDate = new Date(now)
+          startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000)
         }
       }
+    } else {
+      startDate = new Date(now)
+      endDate = new Date(now)
 
-      dateFilter.value.customStart = startDate.toISOString().split('T')[0]
-      dateFilter.value.customEnd = endDate.toISOString().split('T')[0]
-
-      // 设置 customRange 为 Element Plus 需要的格式
-      // 对于小时粒度的昨天/前天，需要特殊处理显示
-      if (trendGranularity.value === 'hour' && (preset === 'yesterday' || preset === 'dayBefore')) {
-        // 获取本地日期
-        const targetDate = new Date()
-        if (preset === 'yesterday') {
-          targetDate.setDate(targetDate.getDate() - 1)
-        } else {
-          targetDate.setDate(targetDate.getDate() - 2)
-        }
-
-        // 显示系统时区的完整一天
-        const year = targetDate.getFullYear()
-        const month = String(targetDate.getMonth() + 1).padStart(2, '0')
-        const day = String(targetDate.getDate()).padStart(2, '0')
-
-        dateFilter.value.customRange = [
-          `${year}-${month}-${day} 00:00:00`,
-          `${year}-${month}-${day} 23:59:59`
-        ]
-      } else {
-        // 其他情况：近24小时或天粒度
-        const formatDateForDisplay = (date) => {
-          // 固定使用UTC+8来显示时间
-          const systemTz = 8
-          const tzOffset = systemTz * 60 * 60 * 1000
-          const localTime = new Date(date.getTime() + tzOffset)
-
-          const year = localTime.getUTCFullYear()
-          const month = String(localTime.getUTCMonth() + 1).padStart(2, '0')
-          const day = String(localTime.getUTCDate()).padStart(2, '0')
-          const hours = String(localTime.getUTCHours()).padStart(2, '0')
-          const minutes = String(localTime.getUTCMinutes()).padStart(2, '0')
-          const seconds = String(localTime.getUTCSeconds()).padStart(2, '0')
-          return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
-        }
-
-        dateFilter.value.customRange = [
-          formatDateForDisplay(startDate),
-          formatDateForDisplay(endDate)
-        ]
+      if (normalizedPreset === 'today') {
+        startDate.setHours(0, 0, 0, 0)
+        endDate.setHours(23, 59, 59, 999)
+      } else if (option?.days) {
+        startDate.setDate(now.getDate() - (option.days - 1))
+        startDate.setHours(0, 0, 0, 0)
+        endDate.setHours(23, 59, 59, 999)
       }
     }
 
-    // 触发数据刷新
-    refreshChartsData()
+    const formatDateForDisplay = (date) => {
+      // 使用本地时间直接格式化，避免多余的时区偏移导致日期错位
+      const localTime = new Date(date)
+      const year = localTime.getFullYear()
+      const month = String(localTime.getMonth() + 1).padStart(2, '0')
+      const day = String(localTime.getDate()).padStart(2, '0')
+      const hours = String(localTime.getHours()).padStart(2, '0')
+      const minutes = String(localTime.getMinutes()).padStart(2, '0')
+      const seconds = String(localTime.getSeconds()).padStart(2, '0')
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+    }
+
+    dateFilter.value.customStart = startDate ? startDate.toISOString().split('T')[0] : ''
+    dateFilter.value.customEnd = endDate ? endDate.toISOString().split('T')[0] : ''
+    dateFilter.value.customRange =
+      startDate && endDate ? [formatDateForDisplay(startDate), formatDateForDisplay(endDate)] : null
+
+    if (!skipSave) {
+      persistDatePreferences(dateFilter.value.preset, trendGranularity.value)
+    }
+
+    if (!silent) {
+      refreshChartsData()
+    }
   }
 
   function onCustomDateRangeChange(value) {
@@ -751,20 +759,17 @@ export const useDashboardStore = defineStore('dashboard', () => {
       refreshChartsData()
     } else if (value === null) {
       // 清空时恢复默认
-      setDateFilterPreset(trendGranularity.value === 'hour' ? 'last24h' : '7days')
+      setDateFilterPreset(trendGranularity.value === 'hour' ? 'last24h' : defaultPreset)
     }
   }
 
-  function setTrendGranularity(granularity) {
+  function setTrendGranularity(granularity, options = {}) {
+    const { silent = false, skipSave = false, presetOverride } = options
     trendGranularity.value = granularity
 
     // 根据粒度更新预设选项
     if (granularity === 'hour') {
-      dateFilter.value.presetOptions = [
-        { value: 'last24h', label: '近24小时', hours: 24 },
-        { value: 'yesterday', label: '昨天', hours: 24 },
-        { value: 'dayBefore', label: '前天', hours: 24 }
-      ]
+      dateFilter.value.presetOptions = getPresetOptions('hour')
 
       // 检查当前自定义日期范围是否超过24小时
       if (
@@ -777,46 +782,53 @@ export const useDashboardStore = defineStore('dashboard', () => {
         const hoursDiff = (end - start) / (1000 * 60 * 60)
         if (hoursDiff > 24) {
           showToast('小时粒度下日期范围不能超过24小时，已切换到近24小时', 'warning')
-          setDateFilterPreset('last24h')
+          setDateFilterPreset('last24h', { silent, skipSave })
           return
         }
       }
-
-      // 如果当前是天粒度的预设，切换到小时粒度的默认预设
-      if (['today', '7days', '30days'].includes(dateFilter.value.preset)) {
-        setDateFilterPreset('last24h')
-        return
-      }
     } else {
       // 天粒度
-      dateFilter.value.presetOptions = [
-        { value: 'today', label: '今日', days: 1 },
-        { value: '7days', label: '7天', days: 7 },
-        { value: '30days', label: '30天', days: 30 }
-      ]
-
-      // 如果当前是小时粒度的预设，切换到天粒度的默认预设
-      if (['last24h', 'yesterday', 'dayBefore'].includes(dateFilter.value.preset)) {
-        setDateFilterPreset('7days')
-        return
-      }
+      dateFilter.value.presetOptions = getPresetOptions('day')
     }
 
-    // 触发数据刷新
-    refreshChartsData()
+    if (dateFilter.value.type === 'custom') {
+      if (!skipSave) {
+        persistDatePreferences(dateFilter.value.preset || defaultPreset, trendGranularity.value)
+      }
+
+      if (!silent) {
+        refreshChartsData()
+      }
+      return
+    }
+
+    const nextPreset =
+      presetOverride ||
+      normalizePresetForGranularity(dateFilter.value.preset, trendGranularity.value)
+
+    setDateFilterPreset(nextPreset, { silent: true, skipSave: true })
+
+    if (!skipSave) {
+      persistDatePreferences(dateFilter.value.preset, trendGranularity.value)
+    }
+
+    if (!silent) {
+      refreshChartsData()
+    }
   }
 
   async function refreshChartsData() {
     // 根据当前筛选条件刷新数据
     let days
     let modelPeriod = 'monthly'
+    const effectiveGranularity = getEffectiveGranularity()
 
     if (dateFilter.value.type === 'preset') {
       const option = dateFilter.value.presetOptions.find(
         (opt) => opt.value === dateFilter.value.preset
       )
 
-      if (trendGranularity.value === 'hour') {
+      if (effectiveGranularity === 'hour') {
         // 小时粒度
         days = 1 // 小时粒度默认查看1天的数据
         modelPeriod = 'daily' // 小时粒度使用日统计
@@ -832,7 +844,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
       }
     } else {
       // 自定义日期范围
-      if (trendGranularity.value === 'hour') {
+      if (effectiveGranularity === 'hour') {
         // 小时粒度下的自定义范围，计算小时数
         const start = new Date(dateFilter.value.customRange[0])
         const end = new Date(dateFilter.value.customRange[1])
@@ -845,16 +857,16 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
 
     await Promise.all([
-      loadUsageTrend(days, trendGranularity.value),
-      loadModelStats(modelPeriod),
-      loadApiKeysTrend(apiKeysTrendMetric.value),
-      loadAccountUsageTrend(accountUsageGroup.value)
+      loadUsageTrend(days, effectiveGranularity),
+      loadModelStats(modelPeriod, effectiveGranularity),
+      loadApiKeysTrend(apiKeysTrendMetric.value, effectiveGranularity),
+      loadAccountUsageTrend(accountUsageGroup.value, effectiveGranularity)
     ])
   }
 
   function setAccountUsageGroup(group) {
     accountUsageGroup.value = group
-    return loadAccountUsageTrend(group)
+    return loadAccountUsageTrend(group, getEffectiveGranularity())
   }
 
   function calculateDaysBetween(start, end) {
@@ -869,6 +881,10 @@ export const useDashboardStore = defineStore('dashboard', () => {
   function disabledDate(date) {
     return date > new Date()
   }
+
+  // 初始化日期筛选：同步本地偏好并填充范围
+  setDateFilterPreset(dateFilter.value.preset, { silent: true, skipSave: true })
+  persistDatePreferences(dateFilter.value.preset, trendGranularity.value)
 
   return {
     // 状态
