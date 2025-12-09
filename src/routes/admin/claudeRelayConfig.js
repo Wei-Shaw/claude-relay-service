@@ -111,20 +111,27 @@ router.put('/claude-relay-config', authenticateAdmin, async (req, res) => {
     }
 
     const updateData = {}
-    if (claudeCodeOnlyEnabled !== undefined)
+    if (claudeCodeOnlyEnabled !== undefined) {
       updateData.claudeCodeOnlyEnabled = claudeCodeOnlyEnabled
-    if (globalSessionBindingEnabled !== undefined)
+    }
+    if (globalSessionBindingEnabled !== undefined) {
       updateData.globalSessionBindingEnabled = globalSessionBindingEnabled
-    if (sessionBindingErrorMessage !== undefined)
+    }
+    if (sessionBindingErrorMessage !== undefined) {
       updateData.sessionBindingErrorMessage = sessionBindingErrorMessage
-    if (sessionBindingTtlDays !== undefined)
+    }
+    if (sessionBindingTtlDays !== undefined) {
       updateData.sessionBindingTtlDays = sessionBindingTtlDays
-    if (userMessageQueueEnabled !== undefined)
+    }
+    if (userMessageQueueEnabled !== undefined) {
       updateData.userMessageQueueEnabled = userMessageQueueEnabled
-    if (userMessageQueueDelayMs !== undefined)
+    }
+    if (userMessageQueueDelayMs !== undefined) {
       updateData.userMessageQueueDelayMs = userMessageQueueDelayMs
-    if (userMessageQueueTimeoutMs !== undefined)
+    }
+    if (userMessageQueueTimeoutMs !== undefined) {
       updateData.userMessageQueueTimeoutMs = userMessageQueueTimeoutMs
+    }
 
     const updatedConfig = await claudeRelayConfigService.updateConfig(
       updateData,

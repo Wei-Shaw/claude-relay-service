@@ -474,23 +474,27 @@ describe('UserMessageQueueService', () => {
 
       const lockState = { held: false, holderId: null }
 
-      jest.spyOn(redis, 'acquireUserMessageLock').mockImplementation(async (accountId, requestId) => {
-        if (!lockState.held) {
-          lockState.held = true
-          lockState.holderId = requestId
-          return { acquired: true, waitMs: 0 }
-        }
-        return { acquired: false, waitMs: -1 }
-      })
+      jest
+        .spyOn(redis, 'acquireUserMessageLock')
+        .mockImplementation(async (accountId, requestId) => {
+          if (!lockState.held) {
+            lockState.held = true
+            lockState.holderId = requestId
+            return { acquired: true, waitMs: 0 }
+          }
+          return { acquired: false, waitMs: -1 }
+        })
 
-      jest.spyOn(redis, 'releaseUserMessageLock').mockImplementation(async (accountId, requestId) => {
-        if (lockState.holderId === requestId) {
-          lockState.held = false
-          lockState.holderId = null
-          return true
-        }
-        return false
-      })
+      jest
+        .spyOn(redis, 'releaseUserMessageLock')
+        .mockImplementation(async (accountId, requestId) => {
+          if (lockState.holderId === requestId) {
+            lockState.held = false
+            lockState.holderId = null
+            return true
+          }
+          return false
+        })
 
       jest.spyOn(userMessageQueueService, '_sleep').mockResolvedValue(undefined)
 
