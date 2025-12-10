@@ -32,7 +32,6 @@ class ClaudeConsoleRelayService {
     let concurrencyAcquired = false
     let queueLockAcquired = false
     let queueRequestId = null
-    let queueLockRenewalStopper = null
 
     try {
       // 📬 用户消息队列处理：如果是用户消息请求，需要获取队列锁
@@ -87,10 +86,6 @@ class ClaudeConsoleRelayService {
         if (queueResult.acquired && !queueResult.skipped) {
           queueLockAcquired = true
           queueRequestId = queueResult.requestId
-          queueLockRenewalStopper = await userMessageQueueService.startLockRenewal(
-            accountId,
-            queueRequestId
-          )
           logger.debug(
             `📬 User message queue lock acquired for console account ${accountId}, requestId: ${queueRequestId}`
           )
@@ -269,6 +264,23 @@ class ClaudeConsoleRelayService {
       )
       const response = await axios(requestConfig)
 
+      // 📬 请求已发送成功，立即释放队列锁（无需等待响应处理完成）
+      // 因为 Claude API 限流基于请求发送时刻计算（RPM），不是请求完成时刻
+      if (queueLockAcquired && queueRequestId && accountId) {
+        try {
+          await userMessageQueueService.releaseQueueLock(accountId, queueRequestId)
+          queueLockAcquired = false // 标记已释放，防止 finally 重复释放
+          logger.debug(
+            `📬 User message queue lock released early for console account ${accountId}, requestId: ${queueRequestId}`
+          )
+        } catch (releaseError) {
+          logger.error(
+            `❌ Failed to release user message queue lock early for console account ${accountId}:`,
+            releaseError.message
+          )
+        }
+      }
+
       // 移除监听器（请求成功完成）
       if (clientRequest) {
         clientRequest.removeListener('close', handleClientDisconnect)
@@ -433,13 +445,13 @@ class ClaudeConsoleRelayService {
         }
       }
 
-      // 📬 释放用户消息队列锁
+      // 📬 释放用户消息队列锁（兜底，正常情况下已在请求发送后提前释放）
       if (queueLockAcquired && queueRequestId && accountId) {
         try {
-          if (queueLockRenewalStopper) {
-            queueLockRenewalStopper()
-          }
           await userMessageQueueService.releaseQueueLock(accountId, queueRequestId)
+          logger.debug(
+            `📬 User message queue lock released in finally for console account ${accountId}, requestId: ${queueRequestId}`
+          )
         } catch (releaseError) {
           logger.error(
             `❌ Failed to release user message queue lock for account ${accountId}:`,
@@ -467,7 +479,6 @@ class ClaudeConsoleRelayService {
     let leaseRefreshInterval = null // 租约刷新定时器
     let queueLockAcquired = false
     let queueRequestId = null
-    let queueLockRenewalStopper = null
 
     try {
       // 📬 用户消息队列处理：如果是用户消息请求，需要获取队列锁
@@ -522,10 +533,6 @@ class ClaudeConsoleRelayService {
         if (queueResult.acquired && !queueResult.skipped) {
           queueLockAcquired = true
           queueRequestId = queueResult.requestId
-          queueLockRenewalStopper = await userMessageQueueService.startLockRenewal(
-            accountId,
-            queueRequestId
-          )
           logger.debug(
             `📬 User message queue lock acquired for console account ${accountId} (stream), requestId: ${queueRequestId}`
           )
@@ -629,7 +636,24 @@ class ClaudeConsoleRelayService {
         accountId,
         usageCallback,
         streamTransformer,
-        options
+        options,
+        // 📬 回调：在收到响应头时释放队列锁
+        async () => {
+          if (queueLockAcquired && queueRequestId && accountId) {
+            try {
+              await userMessageQueueService.releaseQueueLock(accountId, queueRequestId)
+              queueLockAcquired = false // 标记已释放，防止 finally 重复释放
+              logger.debug(
+                `📬 User message queue lock released early for console stream account ${accountId}, requestId: ${queueRequestId}`
+              )
+            } catch (releaseError) {
+              logger.error(
+                `❌ Failed to release user message queue lock early for console stream account ${accountId}:`,
+                releaseError.message
+              )
+            }
+          }
+        }
       )
 
       // 更新最后使用时间
@@ -664,13 +688,13 @@ class ClaudeConsoleRelayService {
         }
       }
 
-      // 📬 释放用户消息队列锁
+      // 📬 释放用户消息队列锁（兜底，正常情况下已在收到响应头后提前释放）
       if (queueLockAcquired && queueRequestId && accountId) {
         try {
-          if (queueLockRenewalStopper) {
-            queueLockRenewalStopper()
-          }
           await userMessageQueueService.releaseQueueLock(accountId, queueRequestId)
+          logger.debug(
+            `📬 User message queue lock released in finally for console stream account ${accountId}, requestId: ${queueRequestId}`
+          )
         } catch (releaseError) {
           logger.error(
             `❌ Failed to release user message queue lock for stream account ${accountId}:`,
@@ -691,7 +715,8 @@ class ClaudeConsoleRelayService {
     accountId,
     usageCallback,
     streamTransformer = null,
-    requestOptions = {}
+    requestOptions = {},
+    onResponseHeaderReceived = null
   ) {
     return new Promise((resolve, reject) => {
       let aborted = false
@@ -754,8 +779,11 @@ class ClaudeConsoleRelayService {
       // 发送请求
       const request = axios(requestConfig)
 
+      // 注意：使用 .then(async ...) 模式处理响应
+      // - 内部的 releaseQueueLock 有独立的 try-catch，不会导致未捕获异常
+      // - queueLockAcquired = false 的赋值会在 finally 执行前完成（JS 单线程保证）
       request
-        .then((response) => {
+        .then(async (response) => {
           logger.debug(`🌊 Claude Console Claude stream response status: ${response.status}`)
 
           // 错误响应处理
@@ -860,6 +888,19 @@ class ClaudeConsoleRelayService {
             })
 
             return
+          }
+
+          // 📬 收到成功响应头（HTTP 200），调用回调释放队列锁
+          // 此时请求已被 Claude API 接受并计入 RPM 配额，无需等待响应完成
+          if (onResponseHeaderReceived && typeof onResponseHeaderReceived === 'function') {
+            try {
+              await onResponseHeaderReceived()
+            } catch (callbackError) {
+              logger.error(
+                `❌ Failed to execute onResponseHeaderReceived callback for console stream account ${accountId}:`,
+                callbackError.message
+              )
+            }
           }
 
           // 成功响应，检查并移除错误状态
