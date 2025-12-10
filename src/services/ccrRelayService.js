@@ -448,7 +448,14 @@ class CcrRelayService {
       // 更新最后使用时间
       await this._updateLastUsedTime(accountId)
     } catch (error) {
-      logger.error(`❌ CCR stream relay failed (Account: ${account?.name || accountId}):`, error)
+      // 客户端主动断开连接是正常情况，使用 INFO 级别
+      if (error.message === 'Client disconnected') {
+        logger.info(
+          `🔌 CCR stream relay ended: Client disconnected (Account: ${account?.name || accountId})`
+        )
+      } else {
+        logger.error(`❌ CCR stream relay failed (Account: ${account?.name || accountId}):`, error)
+      }
       throw error
     } finally {
       // 📬 释放用户消息队列锁

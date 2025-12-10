@@ -1428,7 +1428,12 @@ class ClaudeRelayService {
         isDedicatedOfficialAccount
       )
     } catch (error) {
-      logger.error(`❌ Claude stream relay with usage capture failed:`, error)
+      // 客户端主动断开连接是正常情况，使用 INFO 级别
+      if (error.message === 'Client disconnected') {
+        logger.info(`🔌 Claude stream relay ended: Client disconnected`)
+      } else {
+        logger.error(`❌ Claude stream relay with usage capture failed:`, error)
+      }
       throw error
     } finally {
       // 📬 释放用户消息队列锁
