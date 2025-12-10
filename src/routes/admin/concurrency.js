@@ -7,12 +7,13 @@ const express = require('express')
 const router = express.Router()
 const redis = require('../../models/redis')
 const logger = require('../../utils/logger')
+const { authenticateAdmin } = require('../../middleware/auth')
 
 /**
  * GET /admin/concurrency
  * 获取所有并发状态
  */
-router.get('/concurrency', async (req, res) => {
+router.get('/concurrency', authenticateAdmin, async (req, res) => {
   try {
     const status = await redis.getAllConcurrencyStatus()
 
@@ -42,7 +43,7 @@ router.get('/concurrency', async (req, res) => {
  * GET /admin/concurrency/:apiKeyId
  * 获取特定 API Key 的并发状态详情
  */
-router.get('/concurrency/:apiKeyId', async (req, res) => {
+router.get('/concurrency/:apiKeyId', authenticateAdmin, async (req, res) => {
   try {
     const { apiKeyId } = req.params
     const status = await redis.getConcurrencyStatus(apiKeyId)
@@ -65,7 +66,7 @@ router.get('/concurrency/:apiKeyId', async (req, res) => {
  * DELETE /admin/concurrency/:apiKeyId
  * 强制清理特定 API Key 的并发计数
  */
-router.delete('/concurrency/:apiKeyId', async (req, res) => {
+router.delete('/concurrency/:apiKeyId', authenticateAdmin, async (req, res) => {
   try {
     const { apiKeyId } = req.params
     const result = await redis.forceClearConcurrency(apiKeyId)
@@ -93,7 +94,7 @@ router.delete('/concurrency/:apiKeyId', async (req, res) => {
  * DELETE /admin/concurrency
  * 强制清理所有并发计数
  */
-router.delete('/concurrency', async (req, res) => {
+router.delete('/concurrency', authenticateAdmin, async (req, res) => {
   try {
     const result = await redis.forceClearAllConcurrency()
 
@@ -118,7 +119,7 @@ router.delete('/concurrency', async (req, res) => {
  * POST /admin/concurrency/cleanup
  * 清理过期的并发条目（不影响活跃请求）
  */
-router.post('/concurrency/cleanup', async (req, res) => {
+router.post('/concurrency/cleanup', authenticateAdmin, async (req, res) => {
   try {
     const { apiKeyId } = req.body
     const result = await redis.cleanupExpiredConcurrency(apiKeyId || null)
