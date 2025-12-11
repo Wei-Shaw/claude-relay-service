@@ -1553,7 +1553,7 @@
                   {{ errors.baseUrl }}
                 </p>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  填写 API 基础地址，必须以
+                  填写 API 基础地址，一般以
                   <code class="rounded bg-gray-100 px-1 dark:bg-gray-600">/models</code>
                   结尾。系统会自动拼接
                   <code class="rounded bg-gray-100 px-1 dark:bg-gray-600"
@@ -3256,7 +3256,7 @@
                 {{ errors.baseUrl }}
               </p>
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                填写 API 基础地址，必须以
+                填写 API 基础地址，一般以
                 <code class="rounded bg-gray-100 px-1 dark:bg-gray-600">/models</code>
                 结尾。系统会自动拼接
                 <code class="rounded bg-gray-100 px-1 dark:bg-gray-600"
@@ -4940,12 +4940,9 @@ const createAccount = async () => {
         errors.value.apiKey = '请填写 API Key'
         hasError = true
       }
-      // 验证 baseUrl 必须以 /models 结尾
+      // 验证 baseUrl
       if (!form.value.baseUrl || form.value.baseUrl.trim() === '') {
         errors.value.baseUrl = '请填写 API 基础地址'
-        hasError = true
-      } else if (!form.value.baseUrl.trim().endsWith('/models')) {
-        errors.value.baseUrl = 'API 基础地址必须以 /models 结尾'
         hasError = true
       }
     } else {
@@ -5223,15 +5220,11 @@ const updateAccount = async () => {
     return
   }
 
-  // Gemini API 的 baseUrl 验证（必须以 /models 结尾）
+  // Gemini API 的 baseUrl 验证
   if (form.value.platform === 'gemini-api') {
     const baseUrl = form.value.baseUrl?.trim() || ''
     if (!baseUrl) {
       errors.value.baseUrl = '请填写 API 基础地址'
-      return
-    }
-    if (!baseUrl.endsWith('/models')) {
-      errors.value.baseUrl = 'API 基础地址必须以 /models 结尾'
       return
     }
   }
