@@ -10,6 +10,7 @@ const {
   isAccountDisabledError
 } = require('../utils/errorSanitizer')
 const userMessageQueueService = require('./userMessageQueueService')
+const { isStreamWritable } = require('../utils/streamHelper')
 
 class ClaudeConsoleRelayService {
   constructor() {
@@ -132,10 +133,6 @@ class ClaudeConsoleRelayService {
           `🔓 Acquired concurrency slot for account ${account.name} (${accountId}), current: ${newConcurrency}/${account.maxConcurrentTasks}, request: ${requestId}`
         )
       }
-      logger.debug(`🌐 Account API URL: ${account.apiUrl}`)
-      logger.debug(`🔍 Account supportedModels: ${JSON.stringify(account.supportedModels)}`)
-      logger.debug(`🔑 Account has apiKey: ${!!account.apiKey}`)
-      logger.debug(`📝 Request model: ${requestBody.model}`)
 
       // 处理模型映射
       let mappedModel = requestBody.model
@@ -197,13 +194,8 @@ class ClaudeConsoleRelayService {
         apiEndpoint = cleanUrl.endsWith('/v1/messages') ? cleanUrl : `${cleanUrl}/v1/messages`
       }
 
-      logger.debug(`🎯 Final API endpoint: ${apiEndpoint}`)
-      logger.debug(`[DEBUG] Options passed to relayRequest: ${JSON.stringify(options)}`)
-      logger.debug(`[DEBUG] Client headers received: ${JSON.stringify(clientHeaders)}`)
-
       // 过滤客户端请求头
       const filteredHeaders = this._filterClientHeaders(clientHeaders)
-      logger.debug(`[DEBUG] Filtered client headers: ${JSON.stringify(filteredHeaders)}`)
 
       // 决定使用的 User-Agent：优先使用账户自定义的，否则透传客户端的，最后才使用默认值
       const userAgent =
@@ -238,30 +230,15 @@ class ClaudeConsoleRelayService {
       if (account.apiKey && account.apiKey.startsWith('sk-ant-')) {
         // Anthropic 官方 API Key 使用 x-api-key
         requestConfig.headers['x-api-key'] = account.apiKey
-        logger.debug('[DEBUG] Using x-api-key authentication for sk-ant-* API key')
       } else {
         // 其他 API Key 使用 Authorization Bearer
         requestConfig.headers['Authorization'] = `Bearer ${account.apiKey}`
-        logger.debug('[DEBUG] Using Authorization Bearer authentication')
       }
-
-      logger.debug(
-        `[DEBUG] Initial headers before beta: ${JSON.stringify(requestConfig.headers, null, 2)}`
-      )
 
       // 添加beta header如果需要
       if (options.betaHeader) {
-        logger.debug(`[DEBUG] Adding beta header: ${options.betaHeader}`)
         requestConfig.headers['anthropic-beta'] = options.betaHeader
-      } else {
-        logger.debug('[DEBUG] No beta header to add')
       }
-
-      // 发送请求
-      logger.debug(
-        '📤 Sending request to Claude Console API with headers:',
-        JSON.stringify(requestConfig.headers, null, 2)
-      )
       const response = await axios(requestConfig)
 
       // 📬 请求已发送成功，立即释放队列锁（无需等待响应处理完成）
@@ -289,13 +266,6 @@ class ClaudeConsoleRelayService {
         clientResponse.removeListener('close', handleClientDisconnect)
       }
 
-      logger.debug(`🔗 Claude Console API response: ${response.status}`)
-      logger.debug(`[DEBUG] Response headers: ${JSON.stringify(response.headers)}`)
-      logger.debug(`[DEBUG] Response data type: ${typeof response.data}`)
-      logger.debug(
-        `[DEBUG] Response data length: ${response.data ? (typeof response.data === 'string' ? response.data.length : JSON.stringify(response.data).length) : 0}`
-      )
-
       // 对于错误响应，记录原始错误和清理后的预览
       if (response.status < 200 || response.status >= 300) {
         // 记录原始错误响应（包含供应商信息，用于调试）
@@ -317,10 +287,6 @@ class ClaudeConsoleRelayService {
           const sanitizedText = sanitizeErrorMessage(rawText)
           logger.error(`🧹 [SANITIZED] Error response to client: ${sanitizedText}`)
         }
-      } else {
-        logger.debug(
-          `[DEBUG] Response data preview: ${typeof response.data === 'string' ? response.data.substring(0, 200) : JSON.stringify(response.data).substring(0, 200)}`
-        )
       }
 
       // 检查是否为账户禁用/不可用的 400 错误
@@ -400,8 +366,6 @@ class ClaudeConsoleRelayService {
         responseBody =
           typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
       }
-
-      logger.debug(`[DEBUG] Final response body to return: ${responseBody.substring(0, 200)}...`)
 
       return {
         statusCode: response.status,
@@ -517,10 +481,13 @@ class ClaudeConsoleRelayService {
             isBackendError ? { backendError: queueResult.errorMessage } : {}
           )
           if (!responseStream.headersSent) {
+            const existingConnection = responseStream.getHeader
+              ? responseStream.getHeader('Connection')
+              : null
             responseStream.writeHead(statusCode, {
               'Content-Type': 'text/event-stream',
               'Cache-Control': 'no-cache',
-              Connection: 'keep-alive',
+              Connection: existingConnection || 'keep-alive',
               'x-user-message-queue-error': errorType
             })
           }
@@ -595,8 +562,6 @@ class ClaudeConsoleRelayService {
           5 * 60 * 1000
         ) // 5分钟刷新一次
       }
-
-      logger.debug(`🌐 Account API URL: ${account.apiUrl}`)
 
       // 处理模型映射
       let mappedModel = requestBody.model
@@ -732,11 +697,8 @@ class ClaudeConsoleRelayService {
       const cleanUrl = account.apiUrl.replace(/\/$/, '') // 移除末尾斜杠
       const apiEndpoint = cleanUrl.endsWith('/v1/messages') ? cleanUrl : `${cleanUrl}/v1/messages`
 
-      logger.debug(`🎯 Final API endpoint for stream: ${apiEndpoint}`)
-
       // 过滤客户端请求头
       const filteredHeaders = this._filterClientHeaders(clientHeaders)
-      logger.debug(`[DEBUG] Filtered client headers: ${JSON.stringify(filteredHeaders)}`)
 
       // 决定使用的 User-Agent：优先使用账户自定义的，否则透传客户端的，最后才使用默认值
       const userAgent =
@@ -771,11 +733,9 @@ class ClaudeConsoleRelayService {
       if (account.apiKey && account.apiKey.startsWith('sk-ant-')) {
         // Anthropic 官方 API Key 使用 x-api-key
         requestConfig.headers['x-api-key'] = account.apiKey
-        logger.debug('[DEBUG] Using x-api-key authentication for sk-ant-* API key')
       } else {
         // 其他 API Key 使用 Authorization Bearer
         requestConfig.headers['Authorization'] = `Bearer ${account.apiKey}`
-        logger.debug('[DEBUG] Using Authorization Bearer authentication')
       }
 
       // 添加beta header如果需要
@@ -783,7 +743,6 @@ class ClaudeConsoleRelayService {
         requestConfig.headers['anthropic-beta'] = requestOptions.betaHeader
       }
 
-      // 发送请求
       const request = axios(requestConfig)
 
       // 注意：使用 .then(async ...) 模式处理响应
@@ -791,8 +750,6 @@ class ClaudeConsoleRelayService {
       // - queueLockAcquired = false 的赋值会在 finally 执行前完成（JS 单线程保证）
       request
         .then(async (response) => {
-          logger.debug(`🌊 Claude Console Claude stream response status: ${response.status}`)
-
           // 错误响应处理
           if (response.status !== 200) {
             logger.error(
@@ -878,7 +835,7 @@ class ClaudeConsoleRelayService {
                   `🧹 [Stream] [SANITIZED] Error response to client: ${JSON.stringify(sanitizedError)}`
                 )
 
-                if (!responseStream.destroyed) {
+                if (isStreamWritable(responseStream)) {
                   responseStream.write(JSON.stringify(sanitizedError))
                   responseStream.end()
                 }
@@ -886,7 +843,7 @@ class ClaudeConsoleRelayService {
                 const sanitizedText = sanitizeErrorMessage(errorDataForCheck)
                 logger.error(`🧹 [Stream] [SANITIZED] Error response to client: ${sanitizedText}`)
 
-                if (!responseStream.destroyed) {
+                if (isStreamWritable(responseStream)) {
                   responseStream.write(sanitizedText)
                   responseStream.end()
                 }
@@ -923,11 +880,22 @@ class ClaudeConsoleRelayService {
           })
 
           // 设置响应头
+          // ⚠️ 关键修复：尊重 auth.js 提前设置的 Connection: close
+          // 当并发队列功能启用时，auth.js 会设置 Connection: close 来禁用 Keep-Alive
           if (!responseStream.headersSent) {
+            const existingConnection = responseStream.getHeader
+              ? responseStream.getHeader('Connection')
+              : null
+            const connectionHeader = existingConnection || 'keep-alive'
+            if (existingConnection) {
+              logger.debug(
+                `🔌 [Console Stream] Preserving existing Connection header: ${existingConnection}`
+              )
+            }
             responseStream.writeHead(200, {
               'Content-Type': 'text/event-stream',
               'Cache-Control': 'no-cache',
-              Connection: 'keep-alive',
+              Connection: connectionHeader,
               'X-Accel-Buffering': 'no'
             })
           }
@@ -953,20 +921,33 @@ class ClaudeConsoleRelayService {
               buffer = lines.pop() || ''
 
               // 转发数据并解析usage
-              if (lines.length > 0 && !responseStream.destroyed) {
-                const linesToForward = lines.join('\n') + (lines.length > 0 ? '\n' : '')
+              if (lines.length > 0) {
+                // 检查流是否可写（客户端连接是否有效）
+                if (isStreamWritable(responseStream)) {
+                  const linesToForward = lines.join('\n') + (lines.length > 0 ? '\n' : '')
 
-                // 应用流转换器如果有
-                if (streamTransformer) {
-                  const transformed = streamTransformer(linesToForward)
-                  if (transformed) {
-                    responseStream.write(transformed)
+                  // 应用流转换器如果有
+                  let dataToWrite = linesToForward
+                  if (streamTransformer) {
+                    const transformed = streamTransformer(linesToForward)
+                    if (transformed) {
+                      dataToWrite = transformed
+                    } else {
+                      dataToWrite = null
+                    }
+                  }
+
+                  if (dataToWrite) {
+                    responseStream.write(dataToWrite)
                   }
                 } else {
-                  responseStream.write(linesToForward)
+                  // 客户端连接已断开，记录警告（但仍继续解析usage）
+                  logger.warn(
+                    `⚠️ [Console] Client disconnected during stream, skipping ${lines.length} lines for account: ${account?.name || accountId}`
+                  )
                 }
 
-                // 解析SSE数据寻找usage信息
+                // 解析SSE数据寻找usage信息（无论连接状态如何）
                 for (const line of lines) {
                   if (line.startsWith('data:')) {
                     const jsonStr = line.slice(5).trimStart()
@@ -1074,7 +1055,7 @@ class ClaudeConsoleRelayService {
                 `❌ Error processing Claude Console stream data (Account: ${account?.name || accountId}):`,
                 error
               )
-              if (!responseStream.destroyed) {
+              if (isStreamWritable(responseStream)) {
                 // 如果有 streamTransformer（如测试请求），使用前端期望的格式
                 if (streamTransformer) {
                   responseStream.write(
@@ -1097,7 +1078,7 @@ class ClaudeConsoleRelayService {
           response.data.on('end', () => {
             try {
               // 处理缓冲区中剩余的数据
-              if (buffer.trim() && !responseStream.destroyed) {
+              if (buffer.trim() && isStreamWritable(responseStream)) {
                 if (streamTransformer) {
                   const transformed = streamTransformer(buffer)
                   if (transformed) {
@@ -1146,12 +1127,33 @@ class ClaudeConsoleRelayService {
               }
 
               // 确保流正确结束
-              if (!responseStream.destroyed) {
-                responseStream.end()
-              }
+              if (isStreamWritable(responseStream)) {
+                // 📊 诊断日志：流结束前状态
+                logger.info(
+                  `📤 [STREAM] Ending response | destroyed: ${responseStream.destroyed}, ` +
+                    `socketDestroyed: ${responseStream.socket?.destroyed}, ` +
+                    `socketBytesWritten: ${responseStream.socket?.bytesWritten || 0}`
+                )
 
-              logger.debug('🌊 Claude Console Claude stream response completed')
-              resolve()
+                // 禁用 Nagle 算法确保数据立即发送
+                if (responseStream.socket && !responseStream.socket.destroyed) {
+                  responseStream.socket.setNoDelay(true)
+                }
+
+                // 等待数据完全 flush 到客户端后再 resolve
+                responseStream.end(() => {
+                  logger.info(
+                    `✅ [STREAM] Response ended and flushed | socketBytesWritten: ${responseStream.socket?.bytesWritten || 'unknown'}`
+                  )
+                  resolve()
+                })
+              } else {
+                // 连接已断开，记录警告
+                logger.warn(
+                  `⚠️ [Console] Client disconnected before stream end, data may not have been received | account: ${account?.name || accountId}`
+                )
+                resolve()
+              }
             } catch (error) {
               logger.error('❌ Error processing stream end:', error)
               reject(error)
@@ -1163,7 +1165,7 @@ class ClaudeConsoleRelayService {
               `❌ Claude Console stream error (Account: ${account?.name || accountId}):`,
               error
             )
-            if (!responseStream.destroyed) {
+            if (isStreamWritable(responseStream)) {
               // 如果有 streamTransformer（如测试请求），使用前端期望的格式
               if (streamTransformer) {
                 responseStream.write(
@@ -1211,14 +1213,17 @@ class ClaudeConsoleRelayService {
 
           // 发送错误响应
           if (!responseStream.headersSent) {
+            const existingConnection = responseStream.getHeader
+              ? responseStream.getHeader('Connection')
+              : null
             responseStream.writeHead(error.response?.status || 500, {
               'Content-Type': 'text/event-stream',
               'Cache-Control': 'no-cache',
-              Connection: 'keep-alive'
+              Connection: existingConnection || 'keep-alive'
             })
           }
 
-          if (!responseStream.destroyed) {
+          if (isStreamWritable(responseStream)) {
             // 如果有 streamTransformer（如测试请求），使用前端期望的格式
             if (streamTransformer) {
               responseStream.write(
@@ -1388,7 +1393,7 @@ class ClaudeConsoleRelayService {
           'Cache-Control': 'no-cache'
         })
       }
-      if (!responseStream.destroyed && !responseStream.writableEnded) {
+      if (isStreamWritable(responseStream)) {
         responseStream.write(
           `data: ${JSON.stringify({ type: 'test_complete', success: false, error: error.message })}\n\n`
         )

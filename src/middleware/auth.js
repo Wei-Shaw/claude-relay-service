@@ -9,6 +9,22 @@ const ClientValidator = require('../validators/clientValidator')
 const ClaudeCodeValidator = require('../validators/clients/claudeCodeValidator')
 const claudeRelayConfigService = require('../services/claudeRelayConfigService')
 
+// 工具函数
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+// 排队轮询配置常量（可通过配置文件覆盖）
+// 性能权衡：初始间隔越短响应越快，但 Redis QPS 越高
+// 当前配置：100 个等待者时约 250-300 QPS（指数退避后）
+const QUEUE_POLLING_CONFIG = {
+  pollIntervalMs: 200, // 初始轮询间隔（毫秒）- 平衡响应速度和 Redis 压力
+  maxPollIntervalMs: 2000, // 最大轮询间隔（毫秒）- 长时间等待时降低 Redis 压力
+  backoffFactor: 1.5, // 指数退避系数
+  jitterRatio: 0.2, // 抖动比例（±20%）- 防止惊群效应
+  maxRedisFailCount: 3 // 连续 Redis 失败阈值
+}
+
 const FALLBACK_CONCURRENCY_CONFIG = {
   leaseSeconds: 300,
   renewIntervalSeconds: 30,
@@ -128,9 +144,221 @@ function isTokenCountRequest(req) {
   return false
 }
 
+/**
+ * 等待并发槽位（排队机制核心）
+ *
+ * 采用「先占后检查」模式避免竞态条件：
+ * - 每次轮询时尝试 incrConcurrency 占位
+ * - 如果超限则 decrConcurrency 释放并继续等待
+ * - 成功获取槽位后返回，调用方无需再次 incrConcurrency
+ *
+ * ⚠️ 重要清理责任说明：
+ * - 排队计数：此函数的 finally 块负责调用 decrConcurrencyQueue 清理
+ * - 并发槽位：当返回 acquired=true 时，槽位已被占用（通过 incrConcurrency）
+ *   调用方必须在请求结束时调用 decrConcurrency 释放槽位
+ *   （已在 authenticateApiKey 的 finally 块中处理）
+ *
+ * @param {Object} req - Express 请求对象
+ * @param {Object} res - Express 响应对象
+ * @param {string} apiKeyId - API Key ID
+ * @param {Object} queueOptions - 配置参数
+ * @returns {Promise<Object>} { acquired: boolean, reason?: string, waitTimeMs: number }
+ */
+async function waitForConcurrencySlot(req, res, apiKeyId, queueOptions) {
+  const {
+    concurrencyLimit,
+    requestId,
+    leaseSeconds,
+    timeoutMs,
+    pollIntervalMs,
+    maxPollIntervalMs,
+    backoffFactor,
+    jitterRatio
+  } = queueOptions
+
+  let clientDisconnected = false
+  // 追踪轮询过程中是否临时占用了槽位（用于异常时清理）
+  // 工作流程：
+  // 1. incrConcurrency 成功且 count <= limit 时，设置 internalSlotAcquired = true
+  // 2. 统计记录完成后，设置 internalSlotAcquired = false 并返回（所有权转移给调用方）
+  // 3. 如果在步骤 1-2 之间发生异常，finally 块会检测到 internalSlotAcquired = true 并释放槽位
+  let internalSlotAcquired = false
+
+  // 监听客户端断开事件
+  // ⚠️ 重要：必须监听 socket 的事件，而不是 req 的事件！
+  // 原因：对于 POST 请求，当 body-parser 读取完请求体后，req（IncomingMessage 可读流）
+  // 的 'close' 事件会立即触发，但这不代表客户端断开连接！客户端仍在等待响应。
+  // socket 的 'close' 事件才是真正的连接关闭信号。
+  const { socket } = req
+  const onSocketClose = () => {
+    clientDisconnected = true
+    logger.debug(
+      `🔌 [Queue] Socket closed during queue wait for API key ${apiKeyId}, requestId: ${requestId}`
+    )
+  }
+
+  if (socket) {
+    socket.once('close', onSocketClose)
+  }
+
+  // 检查 socket 是否在监听器注册前已被销毁（边界情况）
+  if (socket?.destroyed) {
+    clientDisconnected = true
+  }
+
+  const startTime = Date.now()
+  let pollInterval = pollIntervalMs
+  let redisFailCount = 0
+  const { maxRedisFailCount } = QUEUE_POLLING_CONFIG
+
+  try {
+    while (Date.now() - startTime < timeoutMs) {
+      // 检测客户端是否断开（双重检查：事件标记 + socket 状态）
+      // socket.destroyed 是同步检查，确保即使事件处理有延迟也能及时检测
+      if (clientDisconnected || socket?.destroyed) {
+        redis
+          .incrConcurrencyQueueStats(apiKeyId, 'cancelled')
+          .catch((e) => logger.warn('Failed to record cancelled stat:', e))
+        return {
+          acquired: false,
+          reason: 'client_disconnected',
+          waitTimeMs: Date.now() - startTime
+        }
+      }
+
+      // 尝试获取槽位（先占后检查）
+      try {
+        const count = await redis.incrConcurrency(apiKeyId, requestId, leaseSeconds)
+        redisFailCount = 0 // 重置失败计数
+
+        if (count <= concurrencyLimit) {
+          // 成功获取槽位！
+          const waitTimeMs = Date.now() - startTime
+
+          // 槽位所有权转移说明：
+          // 1. 此时槽位已通过 incrConcurrency 获取
+          // 2. 先标记 internalSlotAcquired = true，确保异常时 finally 块能清理
+          // 3. 统计操作完成后，清除标记并返回，所有权转移给调用方
+          // 4. 调用方（authenticateApiKey）负责在请求结束时释放槽位
+
+          // 标记槽位已获取（用于异常时 finally 块清理）
+          internalSlotAcquired = true
+
+          // 记录统计（非阻塞，fire-and-forget 模式）
+          // ⚠️ 设计说明：
+          // - 故意不 await 这些 Promise，因为统计记录不应阻塞请求处理
+          // - 每个 Promise 都有独立的 .catch()，确保单个失败不影响其他
+          // - 外层 .catch() 是防御性措施，处理 Promise.all 本身的异常
+          // - 即使统计记录在函数返回后才完成/失败，也是安全的（仅日志记录）
+          // - 统计数据丢失可接受，不影响核心业务逻辑
+          Promise.all([
+            redis
+              .recordQueueWaitTime(apiKeyId, waitTimeMs)
+              .catch((e) => logger.warn('Failed to record queue wait time:', e)),
+            redis
+              .recordGlobalQueueWaitTime(waitTimeMs)
+              .catch((e) => logger.warn('Failed to record global wait time:', e)),
+            redis
+              .incrConcurrencyQueueStats(apiKeyId, 'success')
+              .catch((e) => logger.warn('Failed to increment success stats:', e))
+          ]).catch((e) => logger.warn('Failed to record queue stats batch:', e))
+
+          // 成功返回前清除标记（所有权转移给调用方，由其负责释放）
+          internalSlotAcquired = false
+          return { acquired: true, waitTimeMs }
+        }
+
+        // 超限，释放槽位继续等待
+        try {
+          await redis.decrConcurrency(apiKeyId, requestId)
+        } catch (decrError) {
+          // 释放失败时记录警告但继续轮询
+          // 下次 incrConcurrency 会自然覆盖同一 requestId 的条目
+          logger.warn(
+            `Failed to release slot during polling for ${apiKeyId}, will retry:`,
+            decrError
+          )
+        }
+      } catch (redisError) {
+        redisFailCount++
+        logger.error(
+          `Redis error in queue polling (${redisFailCount}/${maxRedisFailCount}):`,
+          redisError
+        )
+
+        if (redisFailCount >= maxRedisFailCount) {
+          // 连续 Redis 失败，放弃排队
+          return {
+            acquired: false,
+            reason: 'redis_error',
+            waitTimeMs: Date.now() - startTime
+          }
+        }
+      }
+
+      // 指数退避等待
+      await sleep(pollInterval)
+
+      // 计算下一次轮询间隔（指数退避 + 抖动）
+      // 1. 先应用指数退避
+      let nextInterval = pollInterval * backoffFactor
+      // 2. 添加抖动防止惊群效应（±jitterRatio 范围内的随机偏移）
+      //    抖动范围：[-jitterRatio, +jitterRatio]，例如 jitterRatio=0.2 时为 ±20%
+      //    这是预期行为：负抖动可使间隔略微缩短，正抖动可使间隔略微延长
+      //    目的是分散多个等待者的轮询时间点，避免同时请求 Redis
+      const jitter = nextInterval * jitterRatio * (Math.random() * 2 - 1)
+      nextInterval = nextInterval + jitter
+      // 3. 确保在合理范围内：最小 1ms，最大 maxPollIntervalMs
+      //    Math.max(1, ...) 保证即使负抖动也不会产生 ≤0 的间隔
+      pollInterval = Math.max(1, Math.min(nextInterval, maxPollIntervalMs))
+    }
+
+    // 超时
+    redis
+      .incrConcurrencyQueueStats(apiKeyId, 'timeout')
+      .catch((e) => logger.warn('Failed to record timeout stat:', e))
+    return { acquired: false, reason: 'timeout', waitTimeMs: Date.now() - startTime }
+  } finally {
+    // 确保清理：
+    // 1. 减少排队计数（排队计数在调用方已增加，这里负责减少）
+    try {
+      await redis.decrConcurrencyQueue(apiKeyId)
+    } catch (cleanupError) {
+      // 清理失败记录错误（可能导致计数泄漏，但有 TTL 保护）
+      logger.error(
+        `Failed to decrement queue count in finally block for ${apiKeyId}:`,
+        cleanupError
+      )
+    }
+
+    // 2. 如果内部获取了槽位但未正常返回（异常路径），释放槽位
+    if (internalSlotAcquired) {
+      try {
+        await redis.decrConcurrency(apiKeyId, requestId)
+        logger.warn(
+          `⚠️ Released orphaned concurrency slot in finally block for ${apiKeyId}, requestId: ${requestId}`
+        )
+      } catch (slotCleanupError) {
+        logger.error(
+          `Failed to release orphaned concurrency slot for ${apiKeyId}:`,
+          slotCleanupError
+        )
+      }
+    }
+
+    // 清理 socket 事件监听器
+    if (socket) {
+      socket.removeListener('close', onSocketClose)
+    }
+  }
+}
+
 // 🔑 API Key验证中间件（优化版）
 const authenticateApiKey = async (req, res, next) => {
   const startTime = Date.now()
+  let authErrored = false
+  let concurrencyCleanup = null
+  let hasConcurrencySlot = false
 
   try {
     // 安全提取API Key，支持多种格式（包括Gemini CLI支持）
@@ -265,39 +493,324 @@ const authenticateApiKey = async (req, res, next) => {
       }
       const requestId = uuidv4()
 
+      // ⚠️ 关键修复：当并发队列功能启用时，禁用 HTTP Keep-Alive
+      // 问题背景：HTTP Keep-Alive 使多个请求共用同一个 TCP 连接
+      // 当第一个请求正在处理，第二个请求进入排队时，它们共用同一个 socket
+      // 如果客户端超时关闭连接，两个请求都会受影响
+      // 解决方案：在并发检查开始时，如果队列功能启用，就为所有请求设置 Connection: close
+      // 这确保每个请求使用独立的 TCP 连接
+      try {
+        const queueConfigEarly = await claudeRelayConfigService.getConfig()
+        logger.api(
+          `🔌 [Concurrency] Queue config check: enabled=${queueConfigEarly.concurrentRequestQueueEnabled}, headersSent=${res.headersSent}, key: ${validation.keyData.id}`
+        )
+        if (queueConfigEarly.concurrentRequestQueueEnabled && !res.headersSent) {
+          res.setHeader('Connection', 'close')
+          logger.api(
+            `🔌 [Concurrency] Set Connection: close for request (queue enabled), key: ${validation.keyData.id}`
+          )
+        }
+      } catch (configError) {
+        // 配置读取失败时不影响请求处理，但记录日志
+        logger.warn('Failed to check queue config for Connection header:', configError.message)
+      }
+
+      // ============================================================
+      // 🔒 并发槽位状态管理说明
+      // ============================================================
+      // 此函数中有两个关键状态变量：
+      // - hasConcurrencySlot: 当前是否持有并发槽位
+      // - concurrencyCleanup: 错误时调用的清理函数
+      //
+      // 状态转换流程：
+      // 1. incrConcurrency 成功 → hasConcurrencySlot=true, 设置临时清理函数
+      // 2. 若超限 → 释放槽位，hasConcurrencySlot=false, concurrencyCleanup=null
+      // 3. 若排队成功 → hasConcurrencySlot=true, 升级为完整清理函数（含 interval 清理）
+      // 4. 请求结束（res.close/req.close）→ 调用 decrementConcurrency 释放
+      // 5. 认证错误 → finally 块调用 concurrencyCleanup 释放
+      //
+      // 为什么需要两种清理函数？
+      // - 临时清理：在排队/认证过程中出错时使用，只释放槽位
+      // - 完整清理：请求正常开始后使用，还需清理 leaseRenewInterval
+      // ============================================================
+      const setTemporaryConcurrencyCleanup = () => {
+        concurrencyCleanup = async () => {
+          if (!hasConcurrencySlot) {
+            return
+          }
+          hasConcurrencySlot = false
+          try {
+            await redis.decrConcurrency(validation.keyData.id, requestId)
+          } catch (cleanupError) {
+            logger.error(
+              `Failed to decrement concurrency after auth error for key ${validation.keyData.id}:`,
+              cleanupError
+            )
+          }
+        }
+      }
+
       const currentConcurrency = await redis.incrConcurrency(
         validation.keyData.id,
         requestId,
         leaseSeconds
       )
+      hasConcurrencySlot = true
+      setTemporaryConcurrencyCleanup()
       logger.api(
         `📈 Incremented concurrency for key: ${validation.keyData.id} (${validation.keyData.name}), current: ${currentConcurrency}, limit: ${concurrencyLimit}`
       )
 
       if (currentConcurrency > concurrencyLimit) {
-        // 如果超过限制，立即减少计数（添加 try-catch 防止异常导致并发泄漏）
+        // 1. 先释放刚占用的槽位
         try {
-          const newCount = await redis.decrConcurrency(validation.keyData.id, requestId)
-          logger.api(
-            `📉 Decremented concurrency (429 rejected) for key: ${validation.keyData.id} (${validation.keyData.name}), new count: ${newCount}`
-          )
+          await redis.decrConcurrency(validation.keyData.id, requestId)
         } catch (error) {
           logger.error(
             `Failed to decrement concurrency after limit exceeded for key ${validation.keyData.id}:`,
             error
           )
         }
-        logger.security(
-          `🚦 Concurrency limit exceeded for key: ${validation.keyData.id} (${
-            validation.keyData.name
-          }), current: ${currentConcurrency - 1}, limit: ${concurrencyLimit}`
+        hasConcurrencySlot = false
+        concurrencyCleanup = null
+
+        // 2. 获取排队配置
+        const queueConfig = await claudeRelayConfigService.getConfig()
+
+        // 3. 排队功能未启用，直接返回 429（保持现有行为）
+        if (!queueConfig.concurrentRequestQueueEnabled) {
+          logger.security(
+            `🚦 Concurrency limit exceeded for key: ${validation.keyData.id} (${
+              validation.keyData.name
+            }), current: ${currentConcurrency - 1}, limit: ${concurrencyLimit}`
+          )
+          // 建议客户端在短暂延迟后重试（并发场景下通常很快会有槽位释放）
+          res.set('Retry-After', '1')
+          return res.status(429).json({
+            error: 'Concurrency limit exceeded',
+            message: `Too many concurrent requests. Limit: ${concurrencyLimit} concurrent requests`,
+            currentConcurrency: currentConcurrency - 1,
+            concurrencyLimit
+          })
+        }
+
+        // 4. 计算最大排队数
+        const maxQueueSize = Math.max(
+          concurrencyLimit * queueConfig.concurrentRequestQueueMaxSizeMultiplier,
+          queueConfig.concurrentRequestQueueMaxSize
         )
-        return res.status(429).json({
-          error: 'Concurrency limit exceeded',
-          message: `Too many concurrent requests. Limit: ${concurrencyLimit} concurrent requests`,
-          currentConcurrency: currentConcurrency - 1,
-          concurrencyLimit
-        })
+
+        // 5. 尝试进入排队（原子操作：先增加再检查，避免竞态条件）
+        let queueIncremented = false
+        try {
+          const newQueueCount = await redis.incrConcurrencyQueue(
+            validation.keyData.id,
+            queueConfig.concurrentRequestQueueTimeoutMs
+          )
+          queueIncremented = true
+
+          if (newQueueCount > maxQueueSize) {
+            // 超过最大排队数，立即释放并返回 429
+            await redis.decrConcurrencyQueue(validation.keyData.id)
+            queueIncremented = false
+            logger.api(
+              `🚦 Concurrency queue full for key: ${validation.keyData.id} (${validation.keyData.name}), ` +
+                `queue: ${newQueueCount - 1}, maxQueue: ${maxQueueSize}`
+            )
+            // 队列已满，建议客户端在排队超时时间后重试
+            const retryAfterSeconds = Math.ceil(queueConfig.concurrentRequestQueueTimeoutMs / 1000)
+            res.set('Retry-After', String(retryAfterSeconds))
+            return res.status(429).json({
+              error: 'Concurrency queue full',
+              message: `Too many requests waiting in queue. Limit: ${concurrencyLimit} concurrent requests, queue: ${newQueueCount - 1}/${maxQueueSize}, timeout: ${retryAfterSeconds}s`,
+              currentConcurrency: concurrencyLimit,
+              concurrencyLimit,
+              queueCount: newQueueCount - 1,
+              maxQueueSize,
+              queueTimeoutMs: queueConfig.concurrentRequestQueueTimeoutMs,
+              retryAfterSeconds
+            })
+          }
+
+          // 6. 已成功进入排队，记录统计并开始等待槽位
+          logger.api(
+            `⏳ Request entering queue for key: ${validation.keyData.id} (${validation.keyData.name}), ` +
+              `queue position: ${newQueueCount}`
+          )
+          redis
+            .incrConcurrencyQueueStats(validation.keyData.id, 'entered')
+            .catch((e) => logger.warn('Failed to record entered stat:', e))
+
+          // ⚠️ 记录排队开始时的 socket 标识，用于排队完成后验证
+          // 问题背景：HTTP Keep-Alive 连接复用时，长时间排队可能导致 socket 被其他请求使用
+          // 验证方法：记录排队开始时的 socket._handle（原生 handle）或 localPort/remotePort 组合
+          const preQueueSocket = req.socket
+          const preQueueSocketId = preQueueSocket
+            ? `${preQueueSocket.localPort}:${preQueueSocket.remotePort}:${preQueueSocket._handle?.fd || 'no-fd'}`
+            : null
+
+          // ⚠️ 重要：在调用前将 queueIncremented 设为 false
+          // 因为 waitForConcurrencySlot 的 finally 块会负责清理排队计数
+          // 如果在调用后设置，当 waitForConcurrencySlot 抛出异常时
+          // 外层 catch 块会重复减少计数（finally 已经减过一次）
+          queueIncremented = false
+
+          const slot = await waitForConcurrencySlot(req, res, validation.keyData.id, {
+            concurrencyLimit,
+            requestId,
+            leaseSeconds,
+            timeoutMs: queueConfig.concurrentRequestQueueTimeoutMs,
+            pollIntervalMs: QUEUE_POLLING_CONFIG.pollIntervalMs,
+            maxPollIntervalMs: QUEUE_POLLING_CONFIG.maxPollIntervalMs,
+            backoffFactor: QUEUE_POLLING_CONFIG.backoffFactor,
+            jitterRatio: QUEUE_POLLING_CONFIG.jitterRatio
+          })
+
+          // 7. 处理排队结果
+          if (!slot.acquired) {
+            if (slot.reason === 'client_disconnected') {
+              // 客户端已断开，不返回响应（连接已关闭）
+              logger.api(
+                `🔌 Client disconnected while queuing for key: ${validation.keyData.id} (${validation.keyData.name})`
+              )
+              return
+            }
+
+            // ⚠️ 如果已发送心跳数据，需要使用 SSE 格式返回错误
+            // 因为 res.write() 已经开始流式响应，不能再用 res.json()
+            if (slot.heartbeatSent) {
+              const errorMsg =
+                slot.reason === 'redis_error'
+                  ? 'Service temporarily unavailable'
+                  : 'Queue timeout - request timed out waiting for concurrency slot'
+              const errorData = {
+                type: 'error',
+                error: {
+                  type: slot.reason === 'redis_error' ? 'api_error' : 'overloaded_error',
+                  message: errorMsg
+                }
+              }
+              logger.api(
+                `⚠️ Sending SSE error after heartbeat for key: ${validation.keyData.id}, reason: ${slot.reason}`
+              )
+              res.write(`event: error\ndata: ${JSON.stringify(errorData)}\n\n`)
+              res.end()
+              return
+            }
+
+            if (slot.reason === 'redis_error') {
+              // Redis 连续失败，返回 503
+              logger.error(
+                `❌ Redis error during queue wait for key: ${validation.keyData.id} (${validation.keyData.name})`
+              )
+              return res.status(503).json({
+                error: 'Service temporarily unavailable',
+                message: 'Failed to acquire concurrency slot due to internal error'
+              })
+            }
+            // 排队超时（使用 api 级别，与其他排队日志保持一致）
+            logger.api(
+              `⏰ Queue timeout for key: ${validation.keyData.id} (${validation.keyData.name}), waited: ${slot.waitTimeMs}ms`
+            )
+            // 已等待超时，建议客户端稍后重试
+            // ⚠️ Retry-After 策略优化：
+            // - 请求已经等了完整的 timeout 时间，说明系统负载较高
+            // - 过早重试（如固定 5 秒）会加剧拥塞，导致更多超时
+            // - 合理策略：使用 timeout 时间的一半作为重试间隔
+            // - 最小值 5 秒，最大值 30 秒，避免极端情况
+            const timeoutSeconds = Math.ceil(queueConfig.concurrentRequestQueueTimeoutMs / 1000)
+            const retryAfterSeconds = Math.max(5, Math.min(30, Math.ceil(timeoutSeconds / 2)))
+            res.set('Retry-After', String(retryAfterSeconds))
+            return res.status(429).json({
+              error: 'Queue timeout',
+              message: `Request timed out waiting for concurrency slot. Limit: ${concurrencyLimit} concurrent requests, maxQueue: ${maxQueueSize}, Queue timeout: ${timeoutSeconds}s, waited: ${slot.waitTimeMs}ms`,
+              currentConcurrency: concurrencyLimit,
+              concurrencyLimit,
+              maxQueueSize,
+              queueTimeoutMs: queueConfig.concurrentRequestQueueTimeoutMs,
+              waitTimeMs: slot.waitTimeMs,
+              retryAfterSeconds
+            })
+          }
+
+          // 8. 排队成功，slot.acquired 表示已在 waitForConcurrencySlot 中获取到槽位
+          logger.api(
+            `✅ Queue wait completed for key: ${validation.keyData.id} (${validation.keyData.name}), ` +
+              `waited: ${slot.waitTimeMs}ms`
+          )
+          hasConcurrencySlot = true
+          setTemporaryConcurrencyCleanup()
+
+          // 注意：Connection: close 已在并发检查开始时设置（第 585-602 行）
+          // 这确保所有请求（无论是否排队）都使用独立的 TCP 连接
+
+          // 9. ⚠️ 关键检查：排队等待结束后，验证客户端是否还在等待响应
+          // 长时间排队后，客户端可能在应用层已放弃（如 Claude Code 的超时机制），
+          // 但 TCP 连接仍然存活。此时继续处理请求是浪费资源。
+          // 注意：如果发送了心跳，headersSent 会是 true，但这是正常的
+          const postQueueSocket = req.socket
+          // 只检查连接是否真正断开（destroyed/writableEnded/socketDestroyed）
+          // headersSent 在心跳场景下是正常的，不应该作为放弃的依据
+          if (res.destroyed || res.writableEnded || postQueueSocket?.destroyed) {
+            logger.warn(
+              `⚠️ Client no longer waiting after queue for key: ${validation.keyData.id} (${validation.keyData.name}), ` +
+                `waited: ${slot.waitTimeMs}ms | destroyed: ${res.destroyed}, ` +
+                `writableEnded: ${res.writableEnded}, socketDestroyed: ${postQueueSocket?.destroyed}`
+            )
+            // 释放刚获取的槽位
+            hasConcurrencySlot = false
+            await redis
+              .decrConcurrency(validation.keyData.id, requestId)
+              .catch((e) => logger.error('Failed to release slot after client abandoned:', e))
+            // 不返回响应（客户端已不在等待）
+            return
+          }
+
+          // 10. ⚠️ 关键检查：验证 socket 身份是否改变
+          // HTTP Keep-Alive 连接复用可能导致排队期间 socket 被其他请求使用
+          // 如果 socket 标识改变，说明当前 res 对象已经失效，不应继续处理
+          const postQueueSocketId = postQueueSocket
+            ? `${postQueueSocket.localPort}:${postQueueSocket.remotePort}:${postQueueSocket._handle?.fd || 'no-fd'}`
+            : null
+
+          if (preQueueSocketId && postQueueSocketId && preQueueSocketId !== postQueueSocketId) {
+            logger.error(
+              `❌ [Queue] Socket identity changed during queue wait! ` +
+                `key: ${validation.keyData.id} (${validation.keyData.name}), ` +
+                `waited: ${slot.waitTimeMs}ms | ` +
+                `preSocket: ${preQueueSocketId}, postSocket: ${postQueueSocketId}`
+            )
+            // 释放刚获取的槽位
+            hasConcurrencySlot = false
+            await redis
+              .decrConcurrency(validation.keyData.id, requestId)
+              .catch((e) => logger.error('Failed to release slot after socket identity change:', e))
+            // 不返回响应（socket 已被其他请求使用）
+            return
+          }
+        } catch (queueError) {
+          // 异常时清理资源，防止泄漏
+          // 1. 清理排队计数（如果还没被 waitForConcurrencySlot 的 finally 清理）
+          if (queueIncremented) {
+            await redis
+              .decrConcurrencyQueue(validation.keyData.id)
+              .catch((e) => logger.error('Failed to cleanup queue count after error:', e))
+          }
+
+          // 2. 防御性清理：如果 waitForConcurrencySlot 内部获取了槽位但在返回前异常
+          //    虽然这种情况极少发生（统计记录的异常会被内部捕获），但为了安全起见
+          //    尝试释放可能已获取的槽位。decrConcurrency 使用 ZREM，即使成员不存在也安全
+          if (hasConcurrencySlot) {
+            hasConcurrencySlot = false
+            await redis
+              .decrConcurrency(validation.keyData.id, requestId)
+              .catch((e) =>
+                logger.error('Failed to cleanup concurrency slot after queue error:', e)
+              )
+          }
+
+          throw queueError
+        }
       }
 
       const renewIntervalMs =
@@ -358,6 +871,7 @@ const authenticateApiKey = async (req, res, next) => {
       const decrementConcurrency = async () => {
         if (!concurrencyDecremented) {
           concurrencyDecremented = true
+          hasConcurrencySlot = false
           if (leaseRenewInterval) {
             clearInterval(leaseRenewInterval)
             leaseRenewInterval = null
@@ -371,6 +885,11 @@ const authenticateApiKey = async (req, res, next) => {
             logger.error(`Failed to decrement concurrency for key ${validation.keyData.id}:`, error)
           }
         }
+      }
+      // 升级为完整清理函数（包含 leaseRenewInterval 清理逻辑）
+      // 此时请求已通过认证，后续由 res.close/req.close 事件触发清理
+      if (hasConcurrencySlot) {
+        concurrencyCleanup = decrementConcurrency
       }
 
       // 监听最可靠的事件（避免重复监听）
@@ -697,6 +1216,7 @@ const authenticateApiKey = async (req, res, next) => {
 
     return next()
   } catch (error) {
+    authErrored = true
     const authDuration = Date.now() - startTime
     logger.error(`❌ Authentication middleware error (${authDuration}ms):`, {
       error: error.message,
@@ -710,6 +1230,14 @@ const authenticateApiKey = async (req, res, next) => {
       error: 'Authentication error',
       message: 'Internal server error during authentication'
     })
+  } finally {
+    if (authErrored && typeof concurrencyCleanup === 'function') {
+      try {
+        await concurrencyCleanup()
+      } catch (cleanupError) {
+        logger.error('Failed to cleanup concurrency after auth error:', cleanupError)
+      }
+    }
   }
 }
 

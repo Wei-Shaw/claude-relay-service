@@ -243,10 +243,11 @@ class BedrockRelayService {
             isBackendError ? { backendError: queueResult.errorMessage } : {}
           )
           if (!res.headersSent) {
+            const existingConnection = res.getHeader ? res.getHeader('Connection') : null
             res.writeHead(statusCode, {
               'Content-Type': 'text/event-stream',
               'Cache-Control': 'no-cache',
-              Connection: 'keep-alive',
+              Connection: existingConnection || 'keep-alive',
               'x-user-message-queue-error': errorType
             })
           }
@@ -309,10 +310,17 @@ class BedrockRelayService {
       }
 
       // 设置SSE响应头
+      // ⚠️ 关键修复：尊重 auth.js 提前设置的 Connection: close
+      const existingConnection = res.getHeader ? res.getHeader('Connection') : null
+      if (existingConnection) {
+        logger.debug(
+          `🔌 [Bedrock Stream] Preserving existing Connection header: ${existingConnection}`
+        )
+      }
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
+        Connection: existingConnection || 'keep-alive',
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization'
       })

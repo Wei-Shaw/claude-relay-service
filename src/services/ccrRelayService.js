@@ -4,6 +4,7 @@ const logger = require('../utils/logger')
 const config = require('../../config/config')
 const { parseVendorPrefixedModel } = require('../utils/modelHelper')
 const userMessageQueueService = require('./userMessageQueueService')
+const { isStreamWritable } = require('../utils/streamHelper')
 
 class CcrRelayService {
   constructor() {
@@ -92,14 +93,9 @@ class CcrRelayService {
       logger.info(
         `📤 Processing CCR API request for key: ${apiKeyData.name || apiKeyData.id}, account: ${account.name} (${accountId})`
       )
-      logger.debug(`🌐 Account API URL: ${account.apiUrl}`)
-      logger.debug(`🔍 Account supportedModels: ${JSON.stringify(account.supportedModels)}`)
-      logger.debug(`🔑 Account has apiKey: ${!!account.apiKey}`)
-      logger.debug(`📝 Request model: ${requestBody.model}`)
 
       // 处理模型前缀解析和映射
       const { baseModel } = parseVendorPrefixedModel(requestBody.model)
-      logger.debug(`🔄 Parsed base model: ${baseModel} from original: ${requestBody.model}`)
 
       let mappedModel = baseModel
       if (
@@ -155,13 +151,8 @@ class CcrRelayService {
         apiEndpoint = cleanUrl.endsWith('/v1/messages') ? cleanUrl : `${cleanUrl}/v1/messages`
       }
 
-      logger.debug(`🎯 Final API endpoint: ${apiEndpoint}`)
-      logger.debug(`[DEBUG] Options passed to relayRequest: ${JSON.stringify(options)}`)
-      logger.debug(`[DEBUG] Client headers received: ${JSON.stringify(clientHeaders)}`)
-
       // 过滤客户端请求头
       const filteredHeaders = this._filterClientHeaders(clientHeaders)
-      logger.debug(`[DEBUG] Filtered client headers: ${JSON.stringify(filteredHeaders)}`)
 
       // 决定使用的 User-Agent：优先使用账户自定义的，否则透传客户端的，最后才使用默认值
       const userAgent =
@@ -196,30 +187,15 @@ class CcrRelayService {
       if (account.apiKey && account.apiKey.startsWith('sk-ant-')) {
         // Anthropic 官方 API Key 使用 x-api-key
         requestConfig.headers['x-api-key'] = account.apiKey
-        logger.debug('[DEBUG] Using x-api-key authentication for sk-ant-* API key')
       } else {
         // 其他 API Key (包括CCR API Key) 使用 Authorization Bearer
         requestConfig.headers['Authorization'] = `Bearer ${account.apiKey}`
-        logger.debug('[DEBUG] Using Authorization Bearer authentication')
       }
-
-      logger.debug(
-        `[DEBUG] Initial headers before beta: ${JSON.stringify(requestConfig.headers, null, 2)}`
-      )
 
       // 添加beta header如果需要
       if (options.betaHeader) {
-        logger.debug(`[DEBUG] Adding beta header: ${options.betaHeader}`)
         requestConfig.headers['anthropic-beta'] = options.betaHeader
-      } else {
-        logger.debug('[DEBUG] No beta header to add')
       }
-
-      // 发送请求
-      logger.debug(
-        '📤 Sending request to CCR API with headers:',
-        JSON.stringify(requestConfig.headers, null, 2)
-      )
       const response = await axios(requestConfig)
 
       // 📬 请求已发送成功，立即释放队列锁（无需等待响应处理完成）
@@ -246,16 +222,6 @@ class CcrRelayService {
       if (clientResponse) {
         clientResponse.removeListener('close', handleClientDisconnect)
       }
-
-      logger.debug(`🔗 CCR API response: ${response.status}`)
-      logger.debug(`[DEBUG] Response headers: ${JSON.stringify(response.headers)}`)
-      logger.debug(`[DEBUG] Response data type: ${typeof response.data}`)
-      logger.debug(
-        `[DEBUG] Response data length: ${response.data ? (typeof response.data === 'string' ? response.data.length : JSON.stringify(response.data).length) : 0}`
-      )
-      logger.debug(
-        `[DEBUG] Response data preview: ${typeof response.data === 'string' ? response.data.substring(0, 200) : JSON.stringify(response.data).substring(0, 200)}`
-      )
 
       // 检查错误状态并相应处理
       if (response.status === 401) {
@@ -289,7 +255,6 @@ class CcrRelayService {
 
       const responseBody =
         typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
-      logger.debug(`[DEBUG] Final response body to return: ${responseBody}`)
 
       return {
         statusCode: response.status,
@@ -379,10 +344,13 @@ class CcrRelayService {
             isBackendError ? { backendError: queueResult.errorMessage } : {}
           )
           if (!responseStream.headersSent) {
+            const existingConnection = responseStream.getHeader
+              ? responseStream.getHeader('Connection')
+              : null
             responseStream.writeHead(statusCode, {
               'Content-Type': 'text/event-stream',
               'Cache-Control': 'no-cache',
-              Connection: 'keep-alive',
+              Connection: existingConnection || 'keep-alive',
               'x-user-message-queue-error': errorType
             })
           }
@@ -417,11 +385,9 @@ class CcrRelayService {
       logger.info(
         `📡 Processing streaming CCR API request for key: ${apiKeyData.name || apiKeyData.id}, account: ${account.name} (${accountId})`
       )
-      logger.debug(`🌐 Account API URL: ${account.apiUrl}`)
 
       // 处理模型前缀解析和映射
       const { baseModel } = parseVendorPrefixedModel(requestBody.model)
-      logger.debug(`🔄 Parsed base model: ${baseModel} from original: ${requestBody.model}`)
 
       let mappedModel = baseModel
       if (
@@ -525,11 +491,8 @@ class CcrRelayService {
       const cleanUrl = account.apiUrl.replace(/\/$/, '') // 移除末尾斜杠
       const apiEndpoint = cleanUrl.endsWith('/v1/messages') ? cleanUrl : `${cleanUrl}/v1/messages`
 
-      logger.debug(`🎯 Final API endpoint for stream: ${apiEndpoint}`)
-
       // 过滤客户端请求头
       const filteredHeaders = this._filterClientHeaders(clientHeaders)
-      logger.debug(`[DEBUG] Filtered client headers: ${JSON.stringify(filteredHeaders)}`)
 
       // 决定使用的 User-Agent：优先使用账户自定义的，否则透传客户端的，最后才使用默认值
       const userAgent =
@@ -564,11 +527,9 @@ class CcrRelayService {
       if (account.apiKey && account.apiKey.startsWith('sk-ant-')) {
         // Anthropic 官方 API Key 使用 x-api-key
         requestConfig.headers['x-api-key'] = account.apiKey
-        logger.debug('[DEBUG] Using x-api-key authentication for sk-ant-* API key')
       } else {
         // 其他 API Key (包括CCR API Key) 使用 Authorization Bearer
         requestConfig.headers['Authorization'] = `Bearer ${account.apiKey}`
-        logger.debug('[DEBUG] Using Authorization Bearer authentication')
       }
 
       // 添加beta header如果需要
@@ -576,16 +537,11 @@ class CcrRelayService {
         requestConfig.headers['anthropic-beta'] = requestOptions.betaHeader
       }
 
-      // 发送请求
       const request = axios(requestConfig)
 
       // 注意：使用 .then(async ...) 模式处理响应
-      // - 内部的 releaseQueueLock 有独立的 try-catch，不会导致未捕获异常
-      // - queueLockAcquired = false 的赋值会在 finally 执行前完成（JS 单线程保证）
       request
         .then(async (response) => {
-          logger.debug(`🌊 CCR stream response status: ${response.status}`)
-
           // 错误响应处理
           if (response.status !== 200) {
             logger.error(
@@ -606,10 +562,13 @@ class CcrRelayService {
 
             // 设置错误响应的状态码和响应头
             if (!responseStream.headersSent) {
+              const existingConnection = responseStream.getHeader
+                ? responseStream.getHeader('Connection')
+                : null
               const errorHeaders = {
                 'Content-Type': response.headers['content-type'] || 'application/json',
                 'Cache-Control': 'no-cache',
-                Connection: 'keep-alive'
+                Connection: existingConnection || 'keep-alive'
               }
               // 避免 Transfer-Encoding 冲突，让 Express 自动处理
               delete errorHeaders['Transfer-Encoding']
@@ -619,13 +578,13 @@ class CcrRelayService {
 
             // 直接透传错误数据，不进行包装
             response.data.on('data', (chunk) => {
-              if (!responseStream.destroyed) {
+              if (isStreamWritable(responseStream)) {
                 responseStream.write(chunk)
               }
             })
 
             response.data.on('end', () => {
-              if (!responseStream.destroyed) {
+              if (isStreamWritable(responseStream)) {
                 responseStream.end()
               }
               resolve() // 不抛出异常，正常完成流处理
@@ -659,11 +618,20 @@ class CcrRelayService {
           })
 
           // 设置响应头
+          // ⚠️ 关键修复：尊重 auth.js 提前设置的 Connection: close
           if (!responseStream.headersSent) {
+            const existingConnection = responseStream.getHeader
+              ? responseStream.getHeader('Connection')
+              : null
+            if (existingConnection) {
+              logger.debug(
+                `🔌 [CCR Stream] Preserving existing Connection header: ${existingConnection}`
+              )
+            }
             const headers = {
               'Content-Type': 'text/event-stream',
               'Cache-Control': 'no-cache',
-              Connection: 'keep-alive',
+              Connection: existingConnection || 'keep-alive',
               'Access-Control-Allow-Origin': '*',
               'Access-Control-Allow-Headers': 'Cache-Control'
             }
@@ -702,12 +670,17 @@ class CcrRelayService {
                   }
 
                   // 写入到响应流
-                  if (outputLine && !responseStream.destroyed) {
+                  if (outputLine && isStreamWritable(responseStream)) {
                     responseStream.write(`${outputLine}\n`)
+                  } else if (outputLine) {
+                    // 客户端连接已断开，记录警告
+                    logger.warn(
+                      `⚠️ [CCR] Client disconnected during stream, skipping data for account: ${accountId}`
+                    )
                   }
                 } else {
                   // 空行也需要传递
-                  if (!responseStream.destroyed) {
+                  if (isStreamWritable(responseStream)) {
                     responseStream.write('\n')
                   }
                 }
@@ -718,10 +691,6 @@ class CcrRelayService {
           })
 
           response.data.on('end', () => {
-            if (!responseStream.destroyed) {
-              responseStream.end()
-            }
-
             // 如果收集到使用统计数据，调用回调
             if (usageCallback && Object.keys(collectedUsage).length > 0) {
               try {
@@ -733,12 +702,26 @@ class CcrRelayService {
               }
             }
 
-            resolve()
+            if (isStreamWritable(responseStream)) {
+              // 等待数据完全 flush 到客户端后再 resolve
+              responseStream.end(() => {
+                logger.debug(
+                  `🌊 CCR stream response completed and flushed | bytesWritten: ${responseStream.bytesWritten || 'unknown'}`
+                )
+                resolve()
+              })
+            } else {
+              // 连接已断开，记录警告
+              logger.warn(
+                `⚠️ [CCR] Client disconnected before stream end, data may not have been received | account: ${accountId}`
+              )
+              resolve()
+            }
           })
 
           response.data.on('error', (err) => {
             logger.error('❌ Stream data error:', err)
-            if (!responseStream.destroyed) {
+            if (isStreamWritable(responseStream)) {
               responseStream.end()
             }
             reject(err)
@@ -770,7 +753,7 @@ class CcrRelayService {
             }
           }
 
-          if (!responseStream.destroyed) {
+          if (isStreamWritable(responseStream)) {
             responseStream.write(`data: ${JSON.stringify(errorResponse)}\n\n`)
             responseStream.end()
           }
