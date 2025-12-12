@@ -898,6 +898,120 @@
               </div>
             </div>
 
+            <!-- 并发请求排队 -->
+            <div
+              class="mb-6 rounded-lg bg-white/80 p-6 shadow-lg backdrop-blur-sm dark:bg-gray-800/80"
+            >
+              <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                  <div
+                    class="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg"
+                  >
+                    <i class="fas fa-layer-group text-xl"></i>
+                  </div>
+                  <div class="ml-4">
+                    <h4 class="text-lg font-semibold text-gray-900 dark:text-white">
+                      并发请求排队
+                    </h4>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                      当 API Key 并发请求超限时进入队列等待，而非直接拒绝
+                    </p>
+                  </div>
+                </div>
+                <label class="relative inline-flex cursor-pointer items-center">
+                  <input
+                    v-model="claudeConfig.concurrentRequestQueueEnabled"
+                    class="peer sr-only"
+                    type="checkbox"
+                    @change="saveClaudeConfig"
+                  />
+                  <div
+                    class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800"
+                  ></div>
+                </label>
+              </div>
+
+              <!-- 排队配置详情（仅在启用时显示） -->
+              <div v-if="claudeConfig.concurrentRequestQueueEnabled" class="mt-6 space-y-4">
+                <!-- 固定最小排队数 -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <i class="fas fa-list-ol mr-2 text-gray-400"></i>
+                    固定最小排队数
+                  </label>
+                  <input
+                    v-model.number="claudeConfig.concurrentRequestQueueMaxSize"
+                    class="mt-1 block w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                    max="100"
+                    min="1"
+                    placeholder="3"
+                    type="number"
+                    @change="saveClaudeConfig"
+                  />
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    最大排队数的固定最小值（1-100）
+                  </p>
+                </div>
+
+                <!-- 排队数倍数 -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <i class="fas fa-times mr-2 text-gray-400"></i>
+                    排队数倍数
+                  </label>
+                  <input
+                    v-model.number="claudeConfig.concurrentRequestQueueMaxSizeMultiplier"
+                    class="mt-1 block w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                    max="10"
+                    min="0"
+                    placeholder="1"
+                    step="0.5"
+                    type="number"
+                    @change="saveClaudeConfig"
+                  />
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    最大排队数 = MAX(倍数 × 并发限制, 固定值)，设为 0 则仅使用固定值
+                  </p>
+                </div>
+
+                <!-- 排队超时时间 -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <i class="fas fa-stopwatch mr-2 text-gray-400"></i>
+                    排队超时时间（毫秒）
+                  </label>
+                  <input
+                    v-model.number="claudeConfig.concurrentRequestQueueTimeoutMs"
+                    class="mt-1 block w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                    max="300000"
+                    min="5000"
+                    placeholder="10000"
+                    type="number"
+                    @change="saveClaudeConfig"
+                  />
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    请求在排队中等待的最大时间，超时将返回 429 错误（5秒-5分钟，默认10秒）
+                  </p>
+                </div>
+              </div>
+
+              <div class="mt-4 rounded-lg bg-blue-50 p-4 dark:bg-blue-900/20">
+                <div class="flex">
+                  <i class="fas fa-info-circle mt-0.5 text-blue-500"></i>
+                  <div class="ml-3">
+                    <p class="text-sm text-blue-700 dark:text-blue-300">
+                      <strong>工作原理：</strong>当 API Key 的并发请求超过
+                      <code class="rounded bg-blue-100 px-1 dark:bg-blue-800"
+                        >concurrencyLimit</code
+                      >
+                      时，超限请求会进入队列等待而非直接返回 429。适合 Claude Code Agent
+                      并行工具调用场景。
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- 配置更新信息 -->
             <div
               v-if="claudeConfig.updatedAt"
@@ -1563,9 +1677,13 @@ const claudeConfig = ref({
   globalSessionBindingEnabled: false,
   sessionBindingErrorMessage: '你的本地session已污染，请清理后使用。',
   sessionBindingTtlDays: 30,
-  userMessageQueueEnabled: true,
+  userMessageQueueEnabled: false, // 与后端默认值保持一致
   userMessageQueueDelayMs: 200,
-  userMessageQueueTimeoutMs: 30000,
+  userMessageQueueTimeoutMs: 5000, // 与后端默认值保持一致（优化后锁持有时间短无需长等待）
+  concurrentRequestQueueEnabled: false,
+  concurrentRequestQueueMaxSize: 3,
+  concurrentRequestQueueMaxSizeMultiplier: 0,
+  concurrentRequestQueueTimeoutMs: 10000,
   updatedAt: null,
   updatedBy: null
 })
@@ -1835,9 +1953,14 @@ const loadClaudeConfig = async () => {
         sessionBindingErrorMessage:
           response.config?.sessionBindingErrorMessage || '你的本地session已污染，请清理后使用。',
         sessionBindingTtlDays: response.config?.sessionBindingTtlDays ?? 30,
-        userMessageQueueEnabled: response.config?.userMessageQueueEnabled ?? true,
+        userMessageQueueEnabled: response.config?.userMessageQueueEnabled ?? false, // 与后端默认值保持一致
         userMessageQueueDelayMs: response.config?.userMessageQueueDelayMs ?? 200,
-        userMessageQueueTimeoutMs: response.config?.userMessageQueueTimeoutMs ?? 30000,
+        userMessageQueueTimeoutMs: response.config?.userMessageQueueTimeoutMs ?? 5000, // 与后端默认值保持一致
+        concurrentRequestQueueEnabled: response.config?.concurrentRequestQueueEnabled ?? false,
+        concurrentRequestQueueMaxSize: response.config?.concurrentRequestQueueMaxSize ?? 3,
+        concurrentRequestQueueMaxSizeMultiplier:
+          response.config?.concurrentRequestQueueMaxSizeMultiplier ?? 0,
+        concurrentRequestQueueTimeoutMs: response.config?.concurrentRequestQueueTimeoutMs ?? 10000,
         updatedAt: response.config?.updatedAt || null,
         updatedBy: response.config?.updatedBy || null
       }
@@ -1865,7 +1988,12 @@ const saveClaudeConfig = async () => {
       sessionBindingTtlDays: claudeConfig.value.sessionBindingTtlDays,
       userMessageQueueEnabled: claudeConfig.value.userMessageQueueEnabled,
       userMessageQueueDelayMs: claudeConfig.value.userMessageQueueDelayMs,
-      userMessageQueueTimeoutMs: claudeConfig.value.userMessageQueueTimeoutMs
+      userMessageQueueTimeoutMs: claudeConfig.value.userMessageQueueTimeoutMs,
+      concurrentRequestQueueEnabled: claudeConfig.value.concurrentRequestQueueEnabled,
+      concurrentRequestQueueMaxSize: claudeConfig.value.concurrentRequestQueueMaxSize,
+      concurrentRequestQueueMaxSizeMultiplier:
+        claudeConfig.value.concurrentRequestQueueMaxSizeMultiplier,
+      concurrentRequestQueueTimeoutMs: claudeConfig.value.concurrentRequestQueueTimeoutMs
     }
 
     const response = await apiClient.put('/admin/claude-relay-config', payload, {
