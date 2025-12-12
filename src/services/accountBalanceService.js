@@ -2,7 +2,6 @@ const redis = require('../models/redis')
 const balanceScriptService = require('./balanceScriptService')
 const logger = require('../utils/logger')
 const CostCalculator = require('../utils/costCalculator')
-const redis = require('../models/redis')
 
 class AccountBalanceService {
   constructor(options = {}) {
