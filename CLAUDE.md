@@ -22,6 +22,7 @@ Claude Relay Service 是一个多平台 AI API 中转服务，支持 **Claude (�
 - **权限控制**: API Key支持权限配置（all/claude/gemini/openai等），控制可访问的服务类型
 - **客户端限制**: 基于User-Agent的客户端识别和限制，支持ClaudeCode、Gemini-CLI等预定义客户端
 - **模型黑名单**: 支持API Key级别的模型访问限制
+- **并发请求排队**: 当API Key并发数超限时，请求进入队列等待而非立即返回429，支持配置最大排队数、超时时间，适用于Claude Code Agent并行工具调用场景
 
 ### 主要服务组件
 
@@ -196,6 +197,7 @@ npm run service:stop          # 停止服务
 - `DEBUG_HTTP_TRAFFIC`: 启用HTTP请求/响应调试日志（默认false，仅开发环境）
 - `PROXY_USE_IPV4`: 代理使用IPv4（默认true）
 - `REQUEST_TIMEOUT`: 请求超时时间（毫秒，默认600000即10分钟）
+- `CLEAR_CONCURRENCY_QUEUES_ON_STARTUP`: 启动时清理残留的并发排队计数器（默认true，多实例部署时建议设为false）
 
 #### AWS Bedrock配置（可选）
 - `CLAUDE_CODE_USE_BEDROCK`: 启用Bedrock（设置为1启用）
@@ -343,6 +345,34 @@ npm run setup  # 自动生成密钥并创建管理员账户
 12. **成本统计不准确**: 运行 `npm run init:costs` 初始化成本数据，检查pricingService是否正确加载模型价格
 13. **缓存命中率低**: 查看缓存监控统计，调整LRU缓存大小配置
 14. **用户消息队列超时**: 优化后锁持有时间已从分钟级降到毫秒级（请求发送后立即释放），默认 `USER_MESSAGE_QUEUE_TIMEOUT_MS=5000` 已足够。如仍有超时，检查网络延迟或禁用此功能（`USER_MESSAGE_QUEUE_ENABLED=false`）
+15. **并发请求排队问题**:
+   - 排队超时：检查 `concurrentRequestQueueTimeoutMs` 配置是否合理（默认10秒）
+   - 排队数过多：调整 `concurrentRequestQueueMaxSize` 和 `concurrentRequestQueueMaxSizeMultiplier`
+   - 查看排队统计：访问 `/admin/concurrency-queue/stats` 接口查看 entered/success/timeout/cancelled/socket_changed/rejected_overload 统计
+   - 排队计数泄漏：系统重启时自动清理，或访问 `/admin/concurrency-queue` DELETE 接口手动清理
+   - Socket 身份验证失败：查看 `socket_changed` 统计，如果频繁发生，检查代理配置或客户端连接稳定性
+   - 健康检查拒绝：查看 `rejected_overload` 统计，表示队列过载时的快速失败次数
+
+### 代理配置要求（并发请求排队）
+
+使用并发请求排队功能时，需要正确配置代理（如 Nginx）的超时参数：
+
+- **推荐配置**: `proxy_read_timeout >= max(2 × concurrentRequestQueueTimeoutMs, 60s)`
+  - 当前默认排队超时 10 秒，Nginx 默认 `proxy_read_timeout = 60s` 已满足要求
+  - 如果调整排队超时到 60 秒，推荐代理超时 ≥ 120 秒
+- **Nginx 配置示例**:
+  ```nginx
+  location /api/ {
+      proxy_read_timeout 120s;  # 排队超时 60s 时推荐 120s
+      proxy_connect_timeout 10s;
+      # ...其他配置
+  }
+  ```
+- **企业防火墙环境**:
+  - 某些企业防火墙可能静默关闭长时间无数据的连接（20-40 秒）
+  - 如遇此问题，联系网络管理员调整空闲连接超时策略
+  - 或降低 `concurrentRequestQueueTimeoutMs` 配置
+- **后续升级说明**: 如有需要，后续版本可能提供可选的轻量级心跳机制
 
 ### 调试工具
 
@@ -455,6 +485,15 @@ npm run setup  # 自动生成密钥并创建管理员账户
 - **缓存优化**: 多层LRU缓存（解密缓存、账户缓存），全局缓存监控和统计
 - **成本追踪**: 实时token使用统计（input/output/cache_create/cache_read）和成本计算（基于pricingService）
 - **并发控制**: Redis Sorted Set实现的并发计数，支持自动过期清理
+- **并发请求排队**: 当API Key并发超限时，请求进入队列等待而非直接返回429
+  - **工作原理**: 采用「先占后检查」模式，每次轮询尝试占位，超限则释放继续等待
+  - **指数退避**: 初始200ms，指数增长至最大2秒，带±20%抖动防惊群效应
+  - **智能清理**: 排队计数有TTL保护（超时+30秒），进程崩溃也能自动清理
+  - **Socket身份验证**: 使用UUID token + socket对象引用双重验证，避免HTTP Keep-Alive连接复用导致的身份混淆
+  - **健康检查**: P90等待时间超过阈值时快速失败（返回429），避免新请求在过载时继续排队
+  - **配置参数**: `concurrentRequestQueueEnabled`（默认false）、`concurrentRequestQueueMaxSize`（默认3）、`concurrentRequestQueueMaxSizeMultiplier`（默认0）、`concurrentRequestQueueTimeoutMs`（默认10秒）、`concurrentRequestQueueMaxRedisFailCount`（默认5）、`concurrentRequestQueueHealthCheckEnabled`（默认true）、`concurrentRequestQueueHealthThreshold`（默认0.8）
+  - **最大排队数**: max(固定值, 并发限制×倍数)，例如并发限制=10、倍数=2时最大排队数=20
+  - **适用场景**: Claude Code Agent并行工具调用、批量请求处理
 - **客户端识别**: 基于User-Agent的客户端限制，支持预定义客户端（ClaudeCode、Gemini-CLI等）
 - **错误处理**: 529错误自动标记账户过载状态，配置时长内自动排除该账户
 
@@ -514,6 +553,11 @@ npm run setup  # 自动生成密钥并创建管理员账户
   - `overload:{accountId}` - 账户过载状态（529错误）
 - **并发控制**:
   - `concurrency:{accountId}` - Redis Sorted Set实现的并发计数
+- **并发请求排队**:
+  - `concurrency:queue:{apiKeyId}` - API Key级别的排队计数器（TTL由 `concurrentRequestQueueTimeoutMs` + 30秒缓冲决定）
+  - `concurrency:queue:stats:{apiKeyId}` - 排队统计（entered/success/timeout/cancelled）
+  - `concurrency:queue:wait_times:{apiKeyId}` - 按API Key的等待时间记录（用于P50/P90/P99计算）
+  - `concurrency:queue:wait_times:global` - 全局等待时间记录
 - **Webhook配置**:
   - `webhook_config:{id}` - Webhook配置
 - **用户消息队列**:
