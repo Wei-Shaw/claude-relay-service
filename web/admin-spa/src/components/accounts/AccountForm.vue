@@ -1843,7 +1843,7 @@
                     >
                       请从已登录 Gemini CLI 的机器上获取
                       <code class="rounded bg-blue-100 px-1 py-0.5 font-mono dark:bg-blue-900/50"
-                        >~/.config/gemini/credentials.json</code
+                        >~/.config/.gemini/oauth_creds.json</code
                       >
                       文件中的凭证。
                     </p>

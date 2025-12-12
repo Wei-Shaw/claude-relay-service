@@ -426,9 +426,9 @@ class OpenAIResponsesRelayService {
       const lines = data.split('\n')
 
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
+        if (line.startsWith('data:')) {
           try {
-            const jsonStr = line.slice(6)
+            const jsonStr = line.slice(5).trim()
             if (jsonStr === '[DONE]') {
               continue
             }

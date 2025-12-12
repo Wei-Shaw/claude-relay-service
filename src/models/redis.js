@@ -2627,38 +2627,6 @@ redisClient.acquireUserMessageLock = async function (accountId, requestId, lockT
 }
 
 /**
- * 续租用户消息队列锁（仅锁持有者可续租）
- * @param {string} accountId - 账户ID
- * @param {string} requestId - 请求ID
- * @param {number} lockTtlMs - 锁 TTL（毫秒）
- * @returns {Promise<boolean>} 是否续租成功（只有锁持有者才能续租）
- */
-redisClient.refreshUserMessageLock = async function (accountId, requestId, lockTtlMs) {
-  const lockKey = `user_msg_queue_lock:${accountId}`
-
-  const script = `
-    local lockKey = KEYS[1]
-    local requestId = ARGV[1]
-    local lockTtl = tonumber(ARGV[2])
-
-    local currentLock = redis.call('GET', lockKey)
-    if currentLock == requestId then
-      redis.call('PEXPIRE', lockKey, lockTtl)
-      return 1
-    end
-    return 0
-  `
-
-  try {
-    const result = await this.client.eval(script, 1, lockKey, requestId, lockTtlMs)
-    return result === 1
-  } catch (error) {
-    logger.error(`Failed to refresh user message lock for account ${accountId}:`, error)
-    return false
-  }
-}
-
-/**
  * 释放用户消息队列锁并记录完成时间
  * @param {string} accountId - 账户ID
  * @param {string} requestId - 请求ID

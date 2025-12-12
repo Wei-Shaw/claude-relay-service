@@ -186,9 +186,10 @@ npm run service:stop          # 停止服务
 - `CLAUDE_OVERLOAD_HANDLING_MINUTES`: Claude 529错误处理持续时间（分钟，0表示禁用）
 - `STICKY_SESSION_TTL_HOURS`: 粘性会话TTL（小时，默认1）
 - `STICKY_SESSION_RENEWAL_THRESHOLD_MINUTES`: 粘性会话续期阈值（分钟，默认0）
-- `USER_MESSAGE_QUEUE_ENABLED`: 启用用户消息串行队列（默认true）
+- `USER_MESSAGE_QUEUE_ENABLED`: 启用用户消息串行队列（默认false）
 - `USER_MESSAGE_QUEUE_DELAY_MS`: 用户消息请求间隔（毫秒，默认200）
-- `USER_MESSAGE_QUEUE_TIMEOUT_MS`: 队列等待超时（毫秒，默认30000）
+- `USER_MESSAGE_QUEUE_TIMEOUT_MS`: 队列等待超时（毫秒，默认5000，锁持有时间短无需长等待）
+- `USER_MESSAGE_QUEUE_LOCK_TTL_MS`: 锁TTL（毫秒，默认5000，请求发送后立即释放无需长TTL）
 - `METRICS_WINDOW`: 实时指标统计窗口（分钟，1-60，默认5）
 - `MAX_API_KEYS_PER_USER`: 每用户最大API Key数量（默认1）
 - `ALLOW_USER_DELETE_API_KEYS`: 允许用户删除自己的API Keys（默认false）
@@ -341,7 +342,7 @@ npm run setup  # 自动生成密钥并创建管理员账户
 11. **速率限制未清理**: rateLimitCleanupService每5分钟自动清理过期限流状态
 12. **成本统计不准确**: 运行 `npm run init:costs` 初始化成本数据，检查pricingService是否正确加载模型价格
 13. **缓存命中率低**: 查看缓存监控统计，调整LRU缓存大小配置
-14. **用户消息队列超时**: 检查 `USER_MESSAGE_QUEUE_TIMEOUT_MS` 配置是否合理，查看日志中的 `queue_timeout` 错误，可通过 Web 界面或 `USER_MESSAGE_QUEUE_ENABLED=false` 禁用此功能
+14. **用户消息队列超时**: 优化后锁持有时间已从分钟级降到毫秒级（请求发送后立即释放），默认 `USER_MESSAGE_QUEUE_TIMEOUT_MS=5000` 已足够。如仍有超时，检查网络延迟或禁用此功能（`USER_MESSAGE_QUEUE_ENABLED=false`）
 
 ### 调试工具
 
