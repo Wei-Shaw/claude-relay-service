@@ -75,6 +75,10 @@ const getApiKeyName = async (keyId) => {
   }
 }
 
+// 缓存：仪表盘会高频刷新图表数据，短 TTL 能显著降低 Redis 扫描开销
+const API_KEYS_USAGE_TREND_CACHE_TTL_MS = 15 * 1000
+const apiKeysUsageTrendCache = new Map()
+
 // 📊 账户使用统计
 
 // 获取所有账户的使用统计
@@ -1246,289 +1250,370 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
 // 获取按API Key分组的使用趋势
 router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
   try {
-    const { granularity = 'day', days = 7, startDate, endDate } = req.query
+    const {
+      granularity = 'day',
+      metric = 'tokens',
+      days = 7,
+      startDate,
+      endDate
+    } = req.query
 
-    logger.info(`📊 Getting API keys usage trend, granularity: ${granularity}, days: ${days}`)
+    const normalizedGranularity = granularity === 'hour' ? 'hour' : 'day'
+    const normalizedMetric = metric === 'requests' ? 'requests' : 'tokens'
+    const includeCost = normalizedMetric === 'tokens'
+
+    const cacheKey = JSON.stringify({
+      granularity: normalizedGranularity,
+      metric: normalizedMetric,
+      days: normalizedGranularity === 'day' ? String(days) : null,
+      startDate: normalizedGranularity === 'hour' ? (startDate || null) : null,
+      endDate: normalizedGranularity === 'hour' ? (endDate || null) : null
+    })
+
+    const cached = apiKeysUsageTrendCache.get(cacheKey)
+    if (cached && cached.expiresAt > Date.now()) {
+      return res.json(cached.value)
+    }
+
+    logger.info(
+      `📊 Getting API keys usage trend, granularity: ${normalizedGranularity}, metric: ${normalizedMetric}`
+    )
 
     const client = redis.getClientSafe()
-    const trendData = []
+    const scanCount = 1000
+    const chunkSize = 1000
+    const usageFields = ['inputTokens', 'outputTokens', 'cacheCreateTokens', 'cacheReadTokens', 'requests']
+    const modelFields = ['inputTokens', 'outputTokens', 'cacheCreateTokens', 'cacheReadTokens']
 
-    // 获取所有API Keys
-    const apiKeys = await apiKeyService.getAllApiKeys()
-    const apiKeyMap = new Map(apiKeys.map((key) => [key.id, key]))
+    const parseIntSafe = (value) => {
+      const parsed = Number.parseInt(value, 10)
+      return Number.isFinite(parsed) ? parsed : 0
+    }
 
-    if (granularity === 'hour') {
-      // 小时粒度统计
-      let endTime, startTime
+    const scanMatch = async (pattern, onBatch) => {
+      let cursor = '0'
+      do {
+        const [nextCursor, batch] = await client.scan(cursor, 'MATCH', pattern, 'COUNT', scanCount)
+        cursor = nextCursor
+        if (Array.isArray(batch) && batch.length > 0) {
+          await onBatch(batch)
+        }
+      } while (cursor !== '0')
+    }
+
+    // 1) 构造时间桶（同时构造 bucketKeySet 用于快速过滤）
+    const buckets = []
+    const bucketKeySet = new Set()
+
+    if (normalizedGranularity === 'hour') {
+      let startTimeParsed
+      let endTimeParsed
 
       if (startDate && endDate) {
-        // 自定义时间范围
-        startTime = new Date(startDate)
-        endTime = new Date(endDate)
+        startTimeParsed = new Date(startDate)
+        endTimeParsed = new Date(endDate)
+        if (Number.isNaN(startTimeParsed.getTime()) || Number.isNaN(endTimeParsed.getTime())) {
+          return res.status(400).json({ success: false, error: 'Invalid startDate or endDate' })
+        }
       } else {
-        // 默认近24小时
-        endTime = new Date()
-        startTime = new Date(endTime.getTime() - 24 * 60 * 60 * 1000)
+        endTimeParsed = new Date()
+        startTimeParsed = new Date(endTimeParsed.getTime() - 24 * 60 * 60 * 1000)
       }
 
-      // 按小时遍历
-      const currentHour = new Date(startTime)
+      const currentHour = new Date(startTimeParsed)
       currentHour.setMinutes(0, 0, 0)
 
-      while (currentHour <= endTime) {
-        // 使用时区转换后的时间来生成键
+      while (currentHour <= endTimeParsed) {
         const tzCurrentHour = redis.getDateInTimezone(currentHour)
         const dateStr = redis.getDateStringInTimezone(currentHour)
         const hour = String(tzCurrentHour.getUTCHours()).padStart(2, '0')
         const hourKey = `${dateStr}:${hour}`
 
-        // 获取这个小时所有API Key的数据
-        const pattern = `usage:hourly:*:${hourKey}`
-        const keys = await redis.scanKeys(pattern)
-
-        // 格式化时间标签
         const tzDateForLabel = redis.getDateInTimezone(currentHour)
         const monthLabel = String(tzDateForLabel.getUTCMonth() + 1).padStart(2, '0')
         const dayLabel = String(tzDateForLabel.getUTCDate()).padStart(2, '0')
         const hourLabel = String(tzDateForLabel.getUTCHours()).padStart(2, '0')
 
-        const hourData = {
-          hour: currentHour.toISOString(), // 使用原始时间，不进行时区转换
-          label: `${monthLabel}/${dayLabel} ${hourLabel}:00`, // 添加格式化的标签
+        buckets.push({
+          type: 'hour',
+          bucketKey: hourKey,
+          hour: currentHour.toISOString(),
+          label: `${monthLabel}/${dayLabel} ${hourLabel}:00`,
           apiKeys: {}
-        }
+        })
+        bucketKeySet.add(hourKey)
 
-        // 先收集基础数据
-        const apiKeyDataMap = new Map()
-        for (const key of keys) {
-          const match = key.match(/usage:hourly:(.+?):\d{4}-\d{2}-\d{2}:\d{2}/)
-          if (!match) {
-            continue
-          }
-
-          const apiKeyId = match[1]
-          const data = await client.hgetall(key)
-
-          if (data && apiKeyMap.has(apiKeyId)) {
-            const inputTokens = parseInt(data.inputTokens) || 0
-            const outputTokens = parseInt(data.outputTokens) || 0
-            const cacheCreateTokens = parseInt(data.cacheCreateTokens) || 0
-            const cacheReadTokens = parseInt(data.cacheReadTokens) || 0
-            const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
-
-            apiKeyDataMap.set(apiKeyId, {
-              name: apiKeyMap.get(apiKeyId).name,
-              tokens: totalTokens,
-              requests: parseInt(data.requests) || 0,
-              inputTokens,
-              outputTokens,
-              cacheCreateTokens,
-              cacheReadTokens
-            })
-          }
-        }
-
-        // 获取该小时的模型级别数据来计算准确费用
-        const modelPattern = `usage:*:model:hourly:*:${hourKey}`
-        const modelKeys = await redis.scanKeys(modelPattern)
-        const apiKeyCostMap = new Map()
-
-        for (const modelKey of modelKeys) {
-          const match = modelKey.match(/usage:(.+?):model:hourly:(.+?):\d{4}-\d{2}-\d{2}:\d{2}/)
-          if (!match) {
-            continue
-          }
-
-          const apiKeyId = match[1]
-          const model = match[2]
-          const modelData = await client.hgetall(modelKey)
-
-          if (modelData && apiKeyDataMap.has(apiKeyId)) {
-            const usage = {
-              input_tokens: parseInt(modelData.inputTokens) || 0,
-              output_tokens: parseInt(modelData.outputTokens) || 0,
-              cache_creation_input_tokens: parseInt(modelData.cacheCreateTokens) || 0,
-              cache_read_input_tokens: parseInt(modelData.cacheReadTokens) || 0
-            }
-
-            const costResult = CostCalculator.calculateCost(usage, model)
-            const currentCost = apiKeyCostMap.get(apiKeyId) || 0
-            apiKeyCostMap.set(apiKeyId, currentCost + costResult.costs.total)
-          }
-        }
-
-        // 组合数据
-        for (const [apiKeyId, data] of apiKeyDataMap) {
-          const cost = apiKeyCostMap.get(apiKeyId) || 0
-
-          // 如果没有模型级别数据，使用默认模型计算（降级方案）
-          let finalCost = cost
-          let formattedCost = CostCalculator.formatCost(cost)
-
-          if (cost === 0 && data.tokens > 0) {
-            const usage = {
-              input_tokens: data.inputTokens,
-              output_tokens: data.outputTokens,
-              cache_creation_input_tokens: data.cacheCreateTokens,
-              cache_read_input_tokens: data.cacheReadTokens
-            }
-            const fallbackResult = CostCalculator.calculateCost(usage, 'claude-3-5-sonnet-20241022')
-            finalCost = fallbackResult.costs.total
-            formattedCost = fallbackResult.formatted.total
-          }
-
-          hourData.apiKeys[apiKeyId] = {
-            name: data.name,
-            tokens: data.tokens,
-            requests: data.requests,
-            cost: finalCost,
-            formattedCost
-          }
-        }
-
-        trendData.push(hourData)
         currentHour.setHours(currentHour.getHours() + 1)
       }
     } else {
-      // 天粒度统计
-      const daysCount = parseInt(days) || 7
+      const daysCount = Math.max(1, Math.min(365, parseIntSafe(days) || 7))
       const today = new Date()
 
-      // 获取过去N天的数据
       for (let i = 0; i < daysCount; i++) {
         const date = new Date(today)
         date.setDate(date.getDate() - i)
         const dateStr = redis.getDateStringInTimezone(date)
 
-        // 获取这一天所有API Key的数据
-        const pattern = `usage:daily:*:${dateStr}`
-        const keys = await redis.scanKeys(pattern)
-
-        const dayData = {
+        buckets.push({
+          type: 'day',
+          bucketKey: dateStr,
           date: dateStr,
           apiKeys: {}
-        }
-
-        // 先收集基础数据
-        const apiKeyDataMap = new Map()
-        for (const key of keys) {
-          const match = key.match(/usage:daily:(.+?):\d{4}-\d{2}-\d{2}/)
-          if (!match) {
-            continue
-          }
-
-          const apiKeyId = match[1]
-          const data = await client.hgetall(key)
-
-          if (data && apiKeyMap.has(apiKeyId)) {
-            const inputTokens = parseInt(data.inputTokens) || 0
-            const outputTokens = parseInt(data.outputTokens) || 0
-            const cacheCreateTokens = parseInt(data.cacheCreateTokens) || 0
-            const cacheReadTokens = parseInt(data.cacheReadTokens) || 0
-            const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
-
-            apiKeyDataMap.set(apiKeyId, {
-              name: apiKeyMap.get(apiKeyId).name,
-              tokens: totalTokens,
-              requests: parseInt(data.requests) || 0,
-              inputTokens,
-              outputTokens,
-              cacheCreateTokens,
-              cacheReadTokens
-            })
-          }
-        }
-
-        // 获取该天的模型级别数据来计算准确费用
-        const modelPattern = `usage:*:model:daily:*:${dateStr}`
-        const modelKeys = await redis.scanKeys(modelPattern)
-        const apiKeyCostMap = new Map()
-
-        for (const modelKey of modelKeys) {
-          const match = modelKey.match(/usage:(.+?):model:daily:(.+?):\d{4}-\d{2}-\d{2}/)
-          if (!match) {
-            continue
-          }
-
-          const apiKeyId = match[1]
-          const model = match[2]
-          const modelData = await client.hgetall(modelKey)
-
-          if (modelData && apiKeyDataMap.has(apiKeyId)) {
-            const usage = {
-              input_tokens: parseInt(modelData.inputTokens) || 0,
-              output_tokens: parseInt(modelData.outputTokens) || 0,
-              cache_creation_input_tokens: parseInt(modelData.cacheCreateTokens) || 0,
-              cache_read_input_tokens: parseInt(modelData.cacheReadTokens) || 0
-            }
-
-            const costResult = CostCalculator.calculateCost(usage, model)
-            const currentCost = apiKeyCostMap.get(apiKeyId) || 0
-            apiKeyCostMap.set(apiKeyId, currentCost + costResult.costs.total)
-          }
-        }
-
-        // 组合数据
-        for (const [apiKeyId, data] of apiKeyDataMap) {
-          const cost = apiKeyCostMap.get(apiKeyId) || 0
-
-          // 如果没有模型级别数据，使用默认模型计算（降级方案）
-          let finalCost = cost
-          let formattedCost = CostCalculator.formatCost(cost)
-
-          if (cost === 0 && data.tokens > 0) {
-            const usage = {
-              input_tokens: data.inputTokens,
-              output_tokens: data.outputTokens,
-              cache_creation_input_tokens: data.cacheCreateTokens,
-              cache_read_input_tokens: data.cacheReadTokens
-            }
-            const fallbackResult = CostCalculator.calculateCost(usage, 'claude-3-5-sonnet-20241022')
-            finalCost = fallbackResult.costs.total
-            formattedCost = fallbackResult.formatted.total
-          }
-
-          dayData.apiKeys[apiKeyId] = {
-            name: data.name,
-            tokens: data.tokens,
-            requests: data.requests,
-            cost: finalCost,
-            formattedCost
-          }
-        }
-
-        trendData.push(dayData)
+        })
+        bucketKeySet.add(dateStr)
       }
+
+      buckets.sort((a, b) => (a.bucketKey < b.bucketKey ? -1 : 1))
     }
 
-    // 按时间正序排列
-    if (granularity === 'hour') {
-      trendData.sort((a, b) => new Date(a.hour) - new Date(b.hour))
-    } else {
-      trendData.sort((a, b) => new Date(a.date) - new Date(b.date))
-    }
-
-    // 计算每个API Key的总token数，用于排序
+    // 2) 扫描 usage:* 键一次，计算 Top API Keys（按 tokens 或 requests）
     const apiKeyTotals = new Map()
-    for (const point of trendData) {
-      for (const [apiKeyId, data] of Object.entries(point.apiKeys)) {
-        apiKeyTotals.set(apiKeyId, (apiKeyTotals.get(apiKeyId) || 0) + data.tokens)
-      }
-    }
+    const apiKeyIdsSeen = new Set()
 
-    // 获取前10个使用量最多的API Key
+    const usageKeyPattern = normalizedGranularity === 'hour' ? 'usage:hourly:*' : 'usage:daily:*'
+    const usageKeyRegex =
+      normalizedGranularity === 'hour'
+        ? /^usage:hourly:(.+?):(\d{4}-\d{2}-\d{2}):(\d{2})$/
+        : /^usage:daily:(.+?):(\d{4}-\d{2}-\d{2})$/
+
+    await scanMatch(usageKeyPattern, async (batch) => {
+      const matchedKeys = []
+      const matchedApiKeyIds = []
+
+      for (const key of batch) {
+        const match = key.match(usageKeyRegex)
+        if (!match) {
+          continue
+        }
+
+        const apiKeyId = match[1]
+        const bucketKey =
+          normalizedGranularity === 'hour' ? `${match[2]}:${match[3]}` : match[2]
+        if (!bucketKeySet.has(bucketKey)) {
+          continue
+        }
+
+        matchedKeys.push(key)
+        matchedApiKeyIds.push(apiKeyId)
+      }
+
+      if (matchedKeys.length === 0) {
+        return
+      }
+
+      for (let offset = 0; offset < matchedKeys.length; offset += chunkSize) {
+        const chunkKeys = matchedKeys.slice(offset, offset + chunkSize)
+        const chunkIds = matchedApiKeyIds.slice(offset, offset + chunkSize)
+        const pipeline = client.pipeline()
+        chunkKeys.forEach((k) => pipeline.hmget(k, ...usageFields))
+
+        const results = await pipeline.exec()
+        for (let i = 0; i < results.length; i++) {
+          const [, values] = results[i] || []
+          if (!Array.isArray(values)) {
+            continue
+          }
+
+          const inputTokens = parseIntSafe(values[0])
+          const outputTokens = parseIntSafe(values[1])
+          const cacheCreateTokens = parseIntSafe(values[2])
+          const cacheReadTokens = parseIntSafe(values[3])
+          const requests = parseIntSafe(values[4])
+          const tokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
+
+          const apiKeyId = chunkIds[i]
+          apiKeyIdsSeen.add(apiKeyId)
+
+          const metricValue = normalizedMetric === 'requests' ? requests : tokens
+          apiKeyTotals.set(apiKeyId, (apiKeyTotals.get(apiKeyId) || 0) + metricValue)
+        }
+      }
+    })
+
     const topApiKeys = Array.from(apiKeyTotals.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10)
       .map(([apiKeyId]) => apiKeyId)
 
-    return res.json({
+    // 3) 只为 Top API Keys 补充名称（避免全量 getAllApiKeys 的 O(N) 开销）
+    const apiKeyNameMap = new Map()
+    if (topApiKeys.length > 0) {
+      const apiKeyMetas = await redis.batchGetApiKeys(topApiKeys, { parse: false, fields: ['name'] })
+      apiKeyMetas.forEach((meta) => {
+        if (meta && meta.id) {
+          apiKeyNameMap.set(meta.id, meta.name)
+        }
+      })
+    }
+
+    // 4) 可选：仅对 Top API Keys 计算准确费用（扫描 model 键一次，按时间桶聚合）
+    const apiKeyCostByBucket = new Map()
+    if (includeCost && topApiKeys.length > 0) {
+      const topApiKeySet = new Set(topApiKeys)
+      const modelKeyPattern =
+        normalizedGranularity === 'hour' ? 'usage:*:model:hourly:*' : 'usage:*:model:daily:*'
+      const modelKeyRegex =
+        normalizedGranularity === 'hour'
+          ? /^usage:(.+?):model:hourly:(.+?):(\d{4}-\d{2}-\d{2}):(\d{2})$/
+          : /^usage:(.+?):model:daily:(.+?):(\d{4}-\d{2}-\d{2})$/
+
+      await scanMatch(modelKeyPattern, async (batch) => {
+        const matchedKeys = []
+        const matchedMetas = []
+
+        for (const key of batch) {
+          const match = key.match(modelKeyRegex)
+          if (!match) {
+            continue
+          }
+
+          const apiKeyId = match[1]
+          if (!topApiKeySet.has(apiKeyId)) {
+            continue
+          }
+
+          const model = match[2]
+          const bucketKey =
+            normalizedGranularity === 'hour' ? `${match[3]}:${match[4]}` : match[3]
+          if (!bucketKeySet.has(bucketKey)) {
+            continue
+          }
+
+          matchedKeys.push(key)
+          matchedMetas.push({ apiKeyId, bucketKey, model })
+        }
+
+        if (matchedKeys.length === 0) {
+          return
+        }
+
+        for (let offset = 0; offset < matchedKeys.length; offset += chunkSize) {
+          const chunkKeys = matchedKeys.slice(offset, offset + chunkSize)
+          const chunkMetas = matchedMetas.slice(offset, offset + chunkSize)
+          const pipeline = client.pipeline()
+          chunkKeys.forEach((k) => pipeline.hmget(k, ...modelFields))
+
+          const results = await pipeline.exec()
+          for (let i = 0; i < results.length; i++) {
+            const [, values] = results[i] || []
+            if (!Array.isArray(values)) {
+              continue
+            }
+
+            const meta = chunkMetas[i]
+            if (!meta) {
+              continue
+            }
+
+            const inputTokens = parseIntSafe(values[0])
+            const outputTokens = parseIntSafe(values[1])
+            const cacheCreateTokens = parseIntSafe(values[2])
+            const cacheReadTokens = parseIntSafe(values[3])
+
+            if (inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens === 0) {
+              continue
+            }
+
+            const usage = {
+              input_tokens: inputTokens,
+              output_tokens: outputTokens,
+              cache_creation_input_tokens: cacheCreateTokens,
+              cache_read_input_tokens: cacheReadTokens
+            }
+
+            const costResult = CostCalculator.calculateCost(usage, meta.model)
+            const currentBucket = apiKeyCostByBucket.get(meta.bucketKey) || new Map()
+            currentBucket.set(meta.apiKeyId, (currentBucket.get(meta.apiKeyId) || 0) + costResult.costs.total)
+            apiKeyCostByBucket.set(meta.bucketKey, currentBucket)
+          }
+        }
+      })
+    }
+
+    // 5) 生成趋势数据：仅返回 Top API Keys，避免巨大 payload + 前端处理过慢
+    for (const point of buckets) {
+      if (topApiKeys.length === 0) {
+        continue
+      }
+
+      const pipeline = client.pipeline()
+      for (const apiKeyId of topApiKeys) {
+        const usageKey =
+          normalizedGranularity === 'hour'
+            ? `usage:hourly:${apiKeyId}:${point.bucketKey}`
+            : `usage:daily:${apiKeyId}:${point.bucketKey}`
+        pipeline.hmget(usageKey, ...usageFields)
+      }
+
+      const results = await pipeline.exec()
+      for (let i = 0; i < topApiKeys.length; i++) {
+        const apiKeyId = topApiKeys[i]
+        const [, values] = results?.[i] || []
+
+        const inputTokens = parseIntSafe(values?.[0])
+        const outputTokens = parseIntSafe(values?.[1])
+        const cacheCreateTokens = parseIntSafe(values?.[2])
+        const cacheReadTokens = parseIntSafe(values?.[3])
+        const requests = parseIntSafe(values?.[4])
+        const tokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
+
+        let cost = 0
+        let formattedCost = CostCalculator.formatCost(0)
+
+        if (includeCost) {
+          cost = apiKeyCostByBucket.get(point.bucketKey)?.get(apiKeyId) || 0
+
+          if (cost === 0 && tokens > 0) {
+            const fallbackUsage = {
+              input_tokens: inputTokens,
+              output_tokens: outputTokens,
+              cache_creation_input_tokens: cacheCreateTokens,
+              cache_read_input_tokens: cacheReadTokens
+            }
+            const fallbackResult = CostCalculator.calculateCost(
+              fallbackUsage,
+              'claude-3-5-sonnet-20241022'
+            )
+            cost = fallbackResult.costs.total
+            formattedCost = fallbackResult.formatted.total
+          } else {
+            formattedCost = CostCalculator.formatCost(cost)
+          }
+        }
+
+        point.apiKeys[apiKeyId] = {
+          name: apiKeyNameMap.get(apiKeyId) || `API Key ${apiKeyId}`,
+          tokens,
+          requests,
+          cost,
+          formattedCost
+        }
+      }
+    }
+
+    const payload = {
       success: true,
-      data: trendData,
-      granularity,
+      data: buckets.map((b) => {
+        if (b.type === 'hour') {
+          return { hour: b.hour, label: b.label, apiKeys: b.apiKeys }
+        }
+        return { date: b.date, apiKeys: b.apiKeys }
+      }),
+      granularity: normalizedGranularity,
       topApiKeys,
-      totalApiKeys: apiKeyTotals.size
+      totalApiKeys: apiKeyIdsSeen.size
+    }
+
+    // 轻量缓存：避免页面反复刷新时重复扫描 Redis
+    if (apiKeysUsageTrendCache.size > 50) {
+      apiKeysUsageTrendCache.clear()
+    }
+    apiKeysUsageTrendCache.set(cacheKey, {
+      expiresAt: Date.now() + API_KEYS_USAGE_TREND_CACHE_TTL_MS,
+      value: payload
     })
+
+    return res.json(payload)
   } catch (error) {
     logger.error('❌ Failed to get API keys usage trend:', error)
     return res
@@ -1564,8 +1649,8 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
       return model.replace(/-v\d+:\d+$|:latest$/, '')
     }
 
-    // 获取所有API Keys的使用统计
-    const apiKeys = await apiKeyService.getAllApiKeys()
+    // 注意：usage-costs 按“模型聚合”统计费用，不需要遍历所有 API Keys
+    // 遍历大量 API Keys（例如 10k+）会导致仪表盘刷新极慢
 
     const totalCosts = {
       inputCost: 0,
@@ -1765,26 +1850,11 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
         }
       } else {
         // 如果没有详细的模型统计数据，回退到API Key汇总数据
-        logger.warn('No detailed model statistics found, falling back to API Key aggregated data')
-
-        for (const apiKey of apiKeys) {
-          if (apiKey.usage && apiKey.usage.total) {
-            const usage = {
-              input_tokens: apiKey.usage.total.inputTokens || 0,
-              output_tokens: apiKey.usage.total.outputTokens || 0,
-              cache_creation_input_tokens: apiKey.usage.total.cacheCreateTokens || 0,
-              cache_read_input_tokens: apiKey.usage.total.cacheReadTokens || 0
-            }
-
-            // 使用加权平均价格计算（基于当前活跃模型的价格分布）
-            const costResult = CostCalculator.calculateCost(usage, 'claude-3-5-haiku-20241022')
-            totalCosts.inputCost += costResult.costs.input
-            totalCosts.outputCost += costResult.costs.output
-            totalCosts.cacheCreateCost += costResult.costs.cacheWrite
-            totalCosts.cacheReadCost += costResult.costs.cacheRead
-            totalCosts.totalCost += costResult.costs.total
-          }
-        }
+        // 当前没有任何模型级别统计数据时，通常代表系统尚未产生使用记录
+        // 此时直接返回 0 成本，避免回退遍历所有 API Keys（10k+ 会导致仪表盘刷新极慢）
+        logger.info(
+          '💰 Total period calculation: no model statistics found, returning zero costs'
+        )
       }
 
       return res.json({

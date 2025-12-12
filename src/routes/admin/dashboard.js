@@ -17,11 +17,19 @@ const config = require('../../../config/config')
 
 const router = express.Router()
 
+// 仪表盘会频繁刷新，短 TTL 缓存可显著降低 Redis 扫描与聚合开销
+const DASHBOARD_CACHE_TTL_MS = 5 * 1000
+let dashboardCache = null
+
 // 📊 系统统计
 
 // 获取系统概览
 router.get('/dashboard', authenticateAdmin, async (req, res) => {
   try {
+    if (dashboardCache && dashboardCache.expiresAt > Date.now()) {
+      return res.json(dashboardCache.value)
+    }
+
     const [
       apiKeyOverview,
       claudeAccounts,
@@ -447,7 +455,13 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       systemTimezone: config.system.timezoneOffset || 8
     }
 
-    return res.json({ success: true, data: dashboard })
+    const payload = { success: true, data: dashboard }
+    dashboardCache = {
+      expiresAt: Date.now() + DASHBOARD_CACHE_TTL_MS,
+      value: payload
+    }
+
+    return res.json(payload)
   } catch (error) {
     logger.error('❌ Failed to get dashboard data:', error)
     return res.status(500).json({ error: 'Failed to get dashboard data', message: error.message })
