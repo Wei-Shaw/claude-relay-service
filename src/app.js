@@ -52,6 +52,16 @@ class Application {
       await redis.connect()
       logger.success('✅ Redis connected successfully')
 
+      // 💳 初始化账户余额查询服务（Provider 注册）
+      try {
+        const accountBalanceService = require('./services/accountBalanceService')
+        const { registerAllProviders } = require('./services/balanceProviders')
+        registerAllProviders(accountBalanceService)
+        logger.info('✅ 账户余额查询服务已初始化')
+      } catch (error) {
+        logger.warn('⚠️ 账户余额查询服务初始化失败:', error.message)
+      }
+
       // 💰 初始化价格服务
       logger.info('🔄 Initializing pricing service...')
       await pricingService.initialize()
