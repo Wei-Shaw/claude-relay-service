@@ -1614,6 +1614,28 @@ class RedisClient {
     await this.client.del(key, localKey)
   }
 
+  // 🧩 账户余额脚本配置
+  async setBalanceScriptConfig(platform, accountId, config) {
+    const key = `account_balance_script:${platform}:${accountId}`
+    await this.client.set(key, JSON.stringify(config || {}))
+  }
+
+  async getBalanceScriptConfig(platform, accountId) {
+    const key = `account_balance_script:${platform}:${accountId}`
+    const raw = await this.client.get(key)
+    if (!raw) return null
+    try {
+      return JSON.parse(raw)
+    } catch (error) {
+      return null
+    }
+  }
+
+  async deleteBalanceScriptConfig(platform, accountId) {
+    const key = `account_balance_script:${platform}:${accountId}`
+    return await this.client.del(key)
+  }
+
   // 📈 系统统计
   async getSystemStats() {
     const keys = await Promise.all([

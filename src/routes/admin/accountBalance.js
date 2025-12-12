@@ -2,6 +2,7 @@ const express = require('express')
 const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
 const accountBalanceService = require('../../services/accountBalanceService')
+const balanceScriptService = require('../../services/balanceScriptService')
 
 const router = express.Router()
 
@@ -124,6 +125,78 @@ router.delete('/accounts/:accountId/balance/cache', authenticateAdmin, async (re
   } catch (error) {
     logger.error('清除缓存失败', error)
     return res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 6) 获取/保存/测试余额脚本配置（单账户）
+router.get('/accounts/:accountId/balance/script', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+    const { platform } = req.query
+
+    const valid = ensureValidPlatform(platform)
+    if (!valid.ok) {
+      return res.status(valid.status).json({ success: false, error: valid.error })
+    }
+
+    const config = await accountBalanceService.redis.getBalanceScriptConfig(valid.platform, accountId)
+    return res.json({ success: true, data: config || null })
+  } catch (error) {
+    logger.error('获取余额脚本配置失败', error)
+    return res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+router.put('/accounts/:accountId/balance/script', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+    const { platform } = req.query
+    const valid = ensureValidPlatform(platform)
+    if (!valid.ok) {
+      return res.status(valid.status).json({ success: false, error: valid.error })
+    }
+
+    const payload = req.body || {}
+    await accountBalanceService.redis.setBalanceScriptConfig(valid.platform, accountId, payload)
+    return res.json({ success: true, data: payload })
+  } catch (error) {
+    logger.error('保存余额脚本配置失败', error)
+    return res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+router.post('/accounts/:accountId/balance/script/test', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+    const { platform } = req.query
+    const valid = ensureValidPlatform(platform)
+    if (!valid.ok) {
+      return res.status(valid.status).json({ success: false, error: valid.error })
+    }
+
+    const payload = req.body || {}
+    const scriptBody = payload.scriptBody
+    if (!scriptBody) {
+      return res.status(400).json({ success: false, error: '脚本内容不能为空' })
+    }
+
+    const result = await balanceScriptService.execute({
+      scriptBody,
+      timeoutSeconds: payload.timeoutSeconds || 10,
+      variables: {
+        baseUrl: payload.baseUrl || '',
+        apiKey: payload.apiKey || '',
+        token: payload.token || '',
+        accountId,
+        platform: valid.platform,
+        extra: payload.extra || ''
+      }
+    })
+
+    return res.json({ success: true, data: result })
+  } catch (error) {
+    logger.error('测试余额脚本失败', error)
+    return res.status(400).json({ success: false, error: error.message })
   }
 })
 

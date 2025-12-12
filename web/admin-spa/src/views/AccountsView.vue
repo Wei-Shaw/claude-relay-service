@@ -804,6 +804,14 @@
                     @error="(error) => handleBalanceError(account.id, error)"
                     @refreshed="(data) => handleBalanceRefreshed(account.id, data)"
                   />
+                  <div class="mt-1 text-xs">
+                    <button
+                      class="text-blue-500 hover:underline dark:text-blue-300"
+                      @click="openBalanceScriptModal(account)"
+                    >
+                      配置余额脚本
+                    </button>
+                  </div>
                 </td>
                 <td class="whitespace-nowrap px-3 py-4">
                   <div v-if="account.platform === 'claude'" class="space-y-2">
@@ -1475,6 +1483,14 @@
               @error="(error) => handleBalanceError(account.id, error)"
               @refreshed="(data) => handleBalanceRefreshed(account.id, data)"
             />
+            <div class="mt-1 text-xs">
+              <button
+                class="text-blue-500 hover:underline dark:text-blue-300"
+                @click="openBalanceScriptModal(account)"
+              >
+                配置余额脚本
+              </button>
+            </div>
           </div>
 
           <!-- 状态信息 -->
@@ -1958,6 +1974,13 @@
       @saved="handleScheduledTestSaved"
     />
 
+    <AccountBalanceScriptModal
+      :account="selectedAccountForScript"
+      :show="showBalanceScriptModal"
+      @close="closeBalanceScriptModal"
+      @saved="handleBalanceScriptSaved"
+    />
+
     <!-- 账户统计弹窗 -->
     <el-dialog
       v-model="showAccountStatsModal"
@@ -2115,6 +2138,7 @@ import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 import ActionDropdown from '@/components/common/ActionDropdown.vue'
 import BalanceDisplay from '@/components/accounts/BalanceDisplay.vue'
+import AccountBalanceScriptModal from '@/components/accounts/AccountBalanceScriptModal.vue'
 
 // 使用确认弹窗
 const { showConfirmModal, confirmOptions, showConfirm, handleConfirm, handleCancel } = useConfirm()
@@ -2550,6 +2574,25 @@ const closeScheduledTestModal = () => {
 
 const handleScheduledTestSaved = () => {
   showToast('定时测试配置已保存', 'success')
+}
+
+// 余额脚本配置
+const showBalanceScriptModal = ref(false)
+const selectedAccountForScript = ref(null)
+
+const openBalanceScriptModal = (account) => {
+  selectedAccountForScript.value = account
+  showBalanceScriptModal.value = true
+}
+
+const closeBalanceScriptModal = () => {
+  showBalanceScriptModal.value = false
+  selectedAccountForScript.value = null
+}
+
+const handleBalanceScriptSaved = () => {
+  showToast('余额脚本已保存', 'success')
+  closeBalanceScriptModal()
 }
 
 // 计算排序后的账户列表
