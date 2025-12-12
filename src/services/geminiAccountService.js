@@ -630,7 +630,7 @@ async function deleteAccount(accountId) {
   }
 
   // 清理会话映射
-  const sessionMappings = await client.keys(`${ACCOUNT_SESSION_MAPPING_PREFIX}*`)
+  const sessionMappings = await redisClient.scanKeys(`${ACCOUNT_SESSION_MAPPING_PREFIX}*`)
   for (const key of sessionMappings) {
     const mappedAccountId = await client.get(key)
     if (mappedAccountId === accountId) {
@@ -645,14 +645,44 @@ async function deleteAccount(accountId) {
 // 获取所有账户
 async function getAllAccounts() {
   const client = redisClient.getClientSafe()
-  const keys = await client.keys(`${GEMINI_ACCOUNT_KEY_PREFIX}*`)
+  const keys = await redisClient.scanKeys(`${GEMINI_ACCOUNT_KEY_PREFIX}*`)
   const accounts = []
 
-  for (const key of keys) {
-    const accountData = await client.hgetall(key)
-    if (accountData && Object.keys(accountData).length > 0) {
-      // 获取限流状态信息
-      const rateLimitInfo = await getAccountRateLimitInfo(accountData.id)
+  const chunkSize = 200
+  for (let offset = 0; offset < keys.length; offset += chunkSize) {
+    const chunkKeys = keys.slice(offset, offset + chunkSize)
+    const pipeline = client.pipeline()
+    chunkKeys.forEach((key) => pipeline.hgetall(key))
+
+    const results = await pipeline.exec()
+    for (const [error, accountData] of results) {
+      if (error || !accountData || Object.keys(accountData).length === 0) {
+        continue
+      }
+
+      // 获取限流状态信息（从 accountData 直接计算，避免重复读取）
+      const rateLimitInfo = (() => {
+        if (accountData.rateLimitStatus === 'limited' && accountData.rateLimitedAt) {
+          const rateLimitedAt = new Date(accountData.rateLimitedAt)
+          const now = new Date()
+          const minutesSinceRateLimit = Math.floor((now - rateLimitedAt) / (1000 * 60))
+
+          // Gemini 限流持续时间为 1 小时
+          const minutesRemaining = Math.max(0, 60 - minutesSinceRateLimit)
+
+          return {
+            isRateLimited: minutesRemaining > 0,
+            rateLimitedAt: accountData.rateLimitedAt,
+            minutesRemaining
+          }
+        }
+
+        return {
+          isRateLimited: false,
+          rateLimitedAt: null,
+          minutesRemaining: 0
+        }
+      })()
 
       // 解析代理配置
       if (accountData.proxy) {
@@ -694,16 +724,6 @@ async function getAllAccounts() {
         hasRefreshToken: !!accountData.refreshToken,
         // 添加限流状态信息（统一格式）
         rateLimitStatus: rateLimitInfo
-          ? {
-              isRateLimited: rateLimitInfo.isRateLimited,
-              rateLimitedAt: rateLimitInfo.rateLimitedAt,
-              minutesRemaining: rateLimitInfo.minutesRemaining
-            }
-          : {
-              isRateLimited: false,
-              rateLimitedAt: null,
-              minutesRemaining: 0
-            }
       })
     }
   }

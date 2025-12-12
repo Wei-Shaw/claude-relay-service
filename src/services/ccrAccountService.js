@@ -140,12 +140,21 @@ class CcrAccountService {
   async getAllAccounts() {
     try {
       const client = redis.getClientSafe()
-      const keys = await client.keys(`${this.ACCOUNT_KEY_PREFIX}*`)
+      const keys = await redis.scanKeys(`${this.ACCOUNT_KEY_PREFIX}*`)
       const accounts = []
 
-      for (const key of keys) {
-        const accountData = await client.hgetall(key)
-        if (accountData && Object.keys(accountData).length > 0) {
+      const chunkSize = 200
+      for (let offset = 0; offset < keys.length; offset += chunkSize) {
+        const chunkKeys = keys.slice(offset, offset + chunkSize)
+        const pipeline = client.pipeline()
+        chunkKeys.forEach((key) => pipeline.hgetall(key))
+        const results = await pipeline.exec()
+
+        for (const [err, accountData] of results) {
+          if (err || !accountData || Object.keys(accountData).length === 0) {
+            continue
+          }
+
           // 获取限流状态信息
           const rateLimitInfo = this._getRateLimitInfo(accountData)
 

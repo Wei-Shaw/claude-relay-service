@@ -244,7 +244,7 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
 
     const sumModelCostsForDay = async (dateKey) => {
       const modelPattern = `account_usage:model:daily:${accountId}:*:${dateKey}`
-      const modelKeys = await client.keys(modelPattern)
+      const modelKeys = await redis.scanKeys(modelPattern)
       let summedCost = 0
 
       if (modelKeys.length === 0) {
@@ -460,7 +460,7 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
 
         // 获取当前小时的模型统计数据
         const modelPattern = `usage:model:hourly:*:${hourKey}`
-        const modelKeys = await client.keys(modelPattern)
+        const modelKeys = await redis.scanKeys(modelPattern)
 
         let hourInputTokens = 0
         let hourOutputTokens = 0
@@ -505,7 +505,7 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
         // 如果没有模型级别的数据，尝试API Key级别的数据
         if (modelKeys.length === 0) {
           const pattern = `usage:hourly:*:${hourKey}`
-          const keys = await client.keys(pattern)
+          const keys = await redis.scanKeys(pattern)
 
           for (const key of keys) {
             const data = await client.hgetall(key)
@@ -564,7 +564,7 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
 
         // 汇总当天所有API Key的使用数据
         const pattern = `usage:daily:*:${dateStr}`
-        const keys = await client.keys(pattern)
+        const keys = await redis.scanKeys(pattern)
 
         let dayInputTokens = 0
         let dayOutputTokens = 0
@@ -578,7 +578,7 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
 
         // 获取当天所有模型的使用数据
         const modelPattern = `usage:model:daily:*:${dateStr}`
-        const modelKeys = await client.keys(modelPattern)
+        const modelKeys = await redis.scanKeys(modelPattern)
 
         for (const modelKey of modelKeys) {
           // 解析模型名称
@@ -728,7 +728,7 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
     const modelStats = [] // 定义结果数组
 
     for (const pattern of searchPatterns) {
-      const keys = await client.keys(pattern)
+      const keys = await redis.scanKeys(pattern)
       logger.info(`📊 Pattern ${pattern} found ${keys.length} keys`)
 
       for (const key of keys) {
@@ -1025,7 +1025,7 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
 
     const sumModelCosts = async (accountId, period, timeKey) => {
       const modelPattern = `account_usage:model:${period}:${accountId}:*:${timeKey}`
-      const modelKeys = await client.keys(modelPattern)
+      const modelKeys = await redis.scanKeys(modelPattern)
       let totalCost = 0
 
       for (const modelKey of modelKeys) {
@@ -1087,7 +1087,7 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
         }
 
         const pattern = `account_usage:hourly:*:${hourKey}`
-        const keys = await client.keys(pattern)
+        const keys = await redis.scanKeys(pattern)
 
         for (const key of keys) {
           const match = key.match(/account_usage:hourly:(.+?):\d{4}-\d{2}-\d{2}:\d{2}/)
@@ -1158,7 +1158,7 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
         }
 
         const pattern = `account_usage:daily:*:${dateStr}`
-        const keys = await client.keys(pattern)
+        const keys = await redis.scanKeys(pattern)
 
         for (const key of keys) {
           const match = key.match(/account_usage:daily:(.+?):\d{4}-\d{2}-\d{2}/)
@@ -1284,7 +1284,7 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
 
         // 获取这个小时所有API Key的数据
         const pattern = `usage:hourly:*:${hourKey}`
-        const keys = await client.keys(pattern)
+        const keys = await redis.scanKeys(pattern)
 
         // 格式化时间标签
         const tzDateForLabel = redis.getDateInTimezone(currentHour)
@@ -1330,7 +1330,7 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
 
         // 获取该小时的模型级别数据来计算准确费用
         const modelPattern = `usage:*:model:hourly:*:${hourKey}`
-        const modelKeys = await client.keys(modelPattern)
+        const modelKeys = await redis.scanKeys(modelPattern)
         const apiKeyCostMap = new Map()
 
         for (const modelKey of modelKeys) {
@@ -1402,7 +1402,7 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
 
         // 获取这一天所有API Key的数据
         const pattern = `usage:daily:*:${dateStr}`
-        const keys = await client.keys(pattern)
+        const keys = await redis.scanKeys(pattern)
 
         const dayData = {
           date: dateStr,
@@ -1441,7 +1441,7 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
 
         // 获取该天的模型级别数据来计算准确费用
         const modelPattern = `usage:*:model:daily:*:${dateStr}`
-        const modelKeys = await client.keys(modelPattern)
+        const modelKeys = await redis.scanKeys(modelPattern)
         const apiKeyCostMap = new Map()
 
         for (const modelKey of modelKeys) {
@@ -1605,7 +1605,7 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
         ).padStart(2, '0')}-${String(currentTzDate.getUTCDate()).padStart(2, '0')}`
         const dayPattern = `usage:model:daily:*:${dateStr}`
 
-        const dayKeys = await client.keys(dayPattern)
+        const dayKeys = await redis.scanKeys(dayPattern)
 
         for (const key of dayKeys) {
           const modelMatch = key.match(/usage:model:daily:(.+):\d{4}-\d{2}-\d{2}$/)
@@ -1691,7 +1691,7 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
       })
     } else {
       // 全部时间，先尝试从Redis获取所有历史模型统计数据（只使用monthly数据避免重复计算）
-      const allModelKeys = await client.keys('usage:model:monthly:*:*')
+      const allModelKeys = await redis.scanKeys('usage:model:monthly:*:*')
       logger.info(`💰 Total period calculation: found ${allModelKeys.length} monthly model keys`)
 
       if (allModelKeys.length > 0) {
@@ -1808,7 +1808,7 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
     }
 
     // 对于今日或本月，从Redis获取详细的模型统计
-    const keys = await client.keys(pattern)
+    const keys = await redis.scanKeys(pattern)
 
     for (const key of keys) {
       const match = key.match(

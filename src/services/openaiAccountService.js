@@ -732,7 +732,7 @@ async function deleteAccount(accountId) {
   }
 
   // 清理会话映射
-  const sessionMappings = await client.keys(`${ACCOUNT_SESSION_MAPPING_PREFIX}*`)
+  const sessionMappings = await redisClient.scanKeys(`${ACCOUNT_SESSION_MAPPING_PREFIX}*`)
   for (const key of sessionMappings) {
     const mappedAccountId = await client.get(key)
     if (mappedAccountId === accountId) {
@@ -747,12 +747,22 @@ async function deleteAccount(accountId) {
 // 获取所有账户
 async function getAllAccounts() {
   const client = redisClient.getClientSafe()
-  const keys = await client.keys(`${OPENAI_ACCOUNT_KEY_PREFIX}*`)
+  const keys = await redisClient.scanKeys(`${OPENAI_ACCOUNT_KEY_PREFIX}*`)
   const accounts = []
 
-  for (const key of keys) {
-    const accountData = await client.hgetall(key)
-    if (accountData && Object.keys(accountData).length > 0) {
+  const chunkSize = 200
+  for (let offset = 0; offset < keys.length; offset += chunkSize) {
+    const chunkKeys = keys.slice(offset, offset + chunkSize)
+    const pipeline = client.pipeline()
+    chunkKeys.forEach((key) => pipeline.hgetall(key))
+
+    const results = await pipeline.exec()
+    for (let i = 0; i < results.length; i++) {
+      const [err, accountData] = results[i]
+      if (err || !accountData || Object.keys(accountData).length === 0) {
+        continue
+      }
+
       const codexUsage = buildCodexUsageSnapshot(accountData)
 
       // 解密敏感数据（但不返回给前端）
@@ -781,8 +791,44 @@ async function getAllAccounts() {
       // 时间戳改由 codexUsage.updatedAt 暴露
       delete accountData.codexUsageUpdatedAt
 
-      // 获取限流状态信息
-      const rateLimitInfo = await getAccountRateLimitInfo(accountData.id)
+      // 获取限流状态信息（从 accountData 直接计算，避免重复读取）
+      const rateLimitInfo = (() => {
+        const status = accountData.rateLimitStatus || 'normal'
+        const rateLimitedAt = accountData.rateLimitedAt || null
+        const rateLimitResetAt = accountData.rateLimitResetAt || null
+
+        if (status !== 'limited') {
+          return {
+            status,
+            isRateLimited: false,
+            rateLimitedAt,
+            rateLimitResetAt,
+            minutesRemaining: 0
+          }
+        }
+
+        const now = Date.now()
+        let remainingTime = 0
+
+        if (rateLimitResetAt) {
+          const resetAt = new Date(rateLimitResetAt).getTime()
+          remainingTime = Math.max(0, resetAt - now)
+        } else if (rateLimitedAt) {
+          const limitedAt = new Date(rateLimitedAt).getTime()
+          const limitDuration = 60 * 60 * 1000 // 默认1小时
+          remainingTime = Math.max(0, limitedAt + limitDuration - now)
+        }
+
+        const minutesRemaining = remainingTime > 0 ? Math.ceil(remainingTime / (60 * 1000)) : 0
+
+        return {
+          status,
+          isRateLimited: minutesRemaining > 0,
+          rateLimitedAt,
+          rateLimitResetAt,
+          minutesRemaining
+        }
+      })()
 
       // 解析代理配置
       if (accountData.proxy) {
@@ -821,21 +867,7 @@ async function getAllAccounts() {
         // 添加 hasRefreshToken 标记
         hasRefreshToken: hasRefreshTokenFlag,
         // 添加限流状态信息（统一格式）
-        rateLimitStatus: rateLimitInfo
-          ? {
-              status: rateLimitInfo.status,
-              isRateLimited: rateLimitInfo.isRateLimited,
-              rateLimitedAt: rateLimitInfo.rateLimitedAt,
-              rateLimitResetAt: rateLimitInfo.rateLimitResetAt,
-              minutesRemaining: rateLimitInfo.minutesRemaining
-            }
-          : {
-              status: 'normal',
-              isRateLimited: false,
-              rateLimitedAt: null,
-              rateLimitResetAt: null,
-              minutesRemaining: 0
-            },
+        rateLimitStatus: rateLimitInfo,
         codexUsage
       })
     }

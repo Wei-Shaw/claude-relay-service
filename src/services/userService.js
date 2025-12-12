@@ -194,7 +194,7 @@ class UserService {
       const client = redis.getClientSafe()
       const { page = 1, limit = 20, role, isActive } = options
       const pattern = `${this.userPrefix}*`
-      const keys = await client.keys(pattern)
+      const keys = await redis.scanKeys(pattern)
 
       const users = []
       for (const key of keys) {
@@ -398,7 +398,7 @@ class UserService {
     try {
       const client = redis.getClientSafe()
       const pattern = `${this.userSessionPrefix}*`
-      const keys = await client.keys(pattern)
+      const keys = await redis.scanKeys(pattern)
 
       for (const key of keys) {
         const sessionData = await client.get(key)
@@ -456,7 +456,7 @@ class UserService {
     try {
       const client = redis.getClientSafe()
       const pattern = `${this.userPrefix}*`
-      const keys = await client.keys(pattern)
+      const keys = await redis.scanKeys(pattern)
 
       const stats = {
         totalUsers: 0,

@@ -23,8 +23,7 @@ const router = express.Router()
 router.get('/dashboard', authenticateAdmin, async (req, res) => {
   try {
     const [
-      ,
-      apiKeys,
+      apiKeyOverview,
       claudeAccounts,
       claudeConsoleAccounts,
       geminiAccounts,
@@ -37,8 +36,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       systemAverages,
       realtimeMetrics
     ] = await Promise.all([
-      redis.getSystemStats(),
-      apiKeyService.getAllApiKeys(),
+      redis.getApiKeyOverviewStats({ excludeDeleted: true }),
       claudeAccountService.getAllAccounts(),
       claudeConsoleAccountService.getAllAccounts(),
       geminiAccountService.getAllAccounts(),
@@ -91,37 +89,17 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       isRateLimitedFlag(acc.rateLimitStatus)
     ).length
 
-    // 计算使用统计（统一使用allTokens）
-    const totalTokensUsed = apiKeys.reduce(
-      (sum, key) => sum + (key.usage?.total?.allTokens || 0),
-      0
-    )
-    const totalRequestsUsed = apiKeys.reduce(
-      (sum, key) => sum + (key.usage?.total?.requests || 0),
-      0
-    )
-    const totalInputTokensUsed = apiKeys.reduce(
-      (sum, key) => sum + (key.usage?.total?.inputTokens || 0),
-      0
-    )
-    const totalOutputTokensUsed = apiKeys.reduce(
-      (sum, key) => sum + (key.usage?.total?.outputTokens || 0),
-      0
-    )
-    const totalCacheCreateTokensUsed = apiKeys.reduce(
-      (sum, key) => sum + (key.usage?.total?.cacheCreateTokens || 0),
-      0
-    )
-    const totalCacheReadTokensUsed = apiKeys.reduce(
-      (sum, key) => sum + (key.usage?.total?.cacheReadTokens || 0),
-      0
-    )
-    const totalAllTokensUsed = apiKeys.reduce(
-      (sum, key) => sum + (key.usage?.total?.allTokens || 0),
-      0
-    )
-
-    const activeApiKeys = apiKeys.filter((key) => key.isActive).length
+    const {
+      totalApiKeys,
+      activeApiKeys,
+      totalTokensUsed,
+      totalRequestsUsed,
+      totalInputTokensUsed,
+      totalOutputTokensUsed,
+      totalCacheCreateTokensUsed,
+      totalCacheReadTokensUsed,
+      totalAllTokensUsed
+    } = apiKeyOverview
 
     // Claude账户统计 - 根据账户管理页面的判断逻辑
     const normalClaudeAccounts = claudeAccounts.filter(
@@ -311,7 +289,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
 
     const dashboard = {
       overview: {
-        totalApiKeys: apiKeys.length,
+        totalApiKeys,
         activeApiKeys,
         // 总账户统计（所有平台）
         totalAccounts:
@@ -556,7 +534,7 @@ router.get('/model-stats', authenticateAdmin, async (req, res) => {
     // 获取所有匹配的keys
     const allKeys = []
     for (const pattern of searchPatterns) {
-      const keys = await client.keys(pattern)
+      const keys = await redis.scanKeys(pattern)
       allKeys.push(...keys)
     }
 

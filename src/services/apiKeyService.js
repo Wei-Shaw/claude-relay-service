@@ -866,7 +866,7 @@ class ApiKeyService {
       await redis.client.del(`usage:monthly:${currentMonth}:${keyId}`)
 
       // 删除所有相关的统计键（通过模式匹配）
-      const usageKeys = await redis.client.keys(`usage:*:${keyId}*`)
+      const usageKeys = await redis.scanKeys(`usage:*:${keyId}*`)
       if (usageKeys.length > 0) {
         await redis.client.del(...usageKeys)
       }
