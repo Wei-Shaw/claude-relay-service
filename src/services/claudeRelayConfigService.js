@@ -20,6 +20,15 @@ const DEFAULT_CONFIG = {
   userMessageQueueDelayMs: 200, // 请求间隔（毫秒）
   userMessageQueueTimeoutMs: 5000, // 队列等待超时（毫秒），优化后锁持有时间短无需长等待
   userMessageQueueLockTtlMs: 5000, // 锁TTL（毫秒），请求发送后立即释放无需长TTL
+  // 并发请求排队配置
+  concurrentRequestQueueEnabled: false, // 是否启用并发请求排队（默认关闭）
+  concurrentRequestQueueMaxSize: 3, // 固定最小排队数（默认3）
+  concurrentRequestQueueMaxSizeMultiplier: 0, // 并发数的倍数（默认0，仅使用固定值）
+  concurrentRequestQueueTimeoutMs: 10000, // 排队超时（毫秒，默认10秒）
+  concurrentRequestQueueMaxRedisFailCount: 5, // 连续 Redis 失败阈值（默认5次）
+  // 排队健康检查配置
+  concurrentRequestQueueHealthCheckEnabled: true, // 是否启用排队健康检查（默认开启）
+  concurrentRequestQueueHealthThreshold: 0.8, // 健康检查阈值（P90 >= 超时 × 阈值时拒绝新请求）
   updatedAt: null,
   updatedBy: null
 }
@@ -105,7 +114,8 @@ class ClaudeRelayConfigService {
 
       logger.info(`✅ Claude relay config updated by ${updatedBy}:`, {
         claudeCodeOnlyEnabled: updatedConfig.claudeCodeOnlyEnabled,
-        globalSessionBindingEnabled: updatedConfig.globalSessionBindingEnabled
+        globalSessionBindingEnabled: updatedConfig.globalSessionBindingEnabled,
+        concurrentRequestQueueEnabled: updatedConfig.concurrentRequestQueueEnabled
       })
 
       return updatedConfig

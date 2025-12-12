@@ -190,12 +190,42 @@ async function handleMessagesRequest(req, res) {
     )
 
     if (isStream) {
+      // 🔍 检查客户端连接是否仍然有效（可能在并发排队等待期间断开）
+      if (res.destroyed || res.socket?.destroyed || res.writableEnded) {
+        logger.warn(
+          `⚠️ Client disconnected before stream response could start for key: ${req.apiKey?.name || 'unknown'}`
+        )
+        return undefined
+      }
+
       // 流式响应 - 只使用官方真实usage数据
       res.setHeader('Content-Type', 'text/event-stream')
       res.setHeader('Cache-Control', 'no-cache')
       res.setHeader('Connection', 'keep-alive')
       res.setHeader('Access-Control-Allow-Origin', '*')
       res.setHeader('X-Accel-Buffering', 'no') // 禁用 Nginx 缓冲
+      // ⚠️ 检查 headers 是否已发送（可能在排队心跳时已设置）
+      if (!res.headersSent) {
+        res.setHeader('Content-Type', 'text/event-stream')
+        res.setHeader('Cache-Control', 'no-cache')
+        // ⚠️ 关键修复：尊重 auth.js 提前设置的 Connection: close
+        // 当并发队列功能启用时，auth.js 会设置 Connection: close 来禁用 Keep-Alive
+        // 这里只在没有设置过 Connection 头时才设置 keep-alive
+        const existingConnection = res.getHeader('Connection')
+        if (!existingConnection) {
+          res.setHeader('Connection', 'keep-alive')
+        } else {
+          logger.api(
+            `🔌 [STREAM] Preserving existing Connection header: ${existingConnection} for key: ${req.apiKey?.name || 'unknown'}`
+          )
+        }
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.setHeader('X-Accel-Buffering', 'no') // 禁用 Nginx 缓冲
+      } else {
+        logger.debug(
+          `📤 [STREAM] Headers already sent, skipping setHeader for key: ${req.apiKey?.name || 'unknown'}`
+        )
+      }
 
       // 禁用 Nagle 算法，确保数据立即发送
       if (res.socket && typeof res.socket.setNoDelay === 'function') {
@@ -657,11 +687,60 @@ async function handleMessagesRequest(req, res) {
         }
       }, 1000) // 1秒后检查
     } else {
+      // 🔍 检查客户端连接是否仍然有效（可能在并发排队等待期间断开）
+      if (res.destroyed || res.socket?.destroyed || res.writableEnded) {
+        logger.warn(
+          `⚠️ Client disconnected before non-stream request could start for key: ${req.apiKey?.name || 'unknown'}`
+        )
+        return undefined
+      }
+
       // 非流式响应 - 只使用官方真实usage数据
       logger.info('📄 Starting non-streaming request', {
         apiKeyId: req.apiKey.id,
         apiKeyName: req.apiKey.name
       })
+
+      // 📊 监听 socket 事件以追踪连接状态变化
+      const nonStreamSocket = res.socket
+      let _clientClosedConnection = false
+      let _socketCloseTime = null
+
+      if (nonStreamSocket) {
+        const onSocketEnd = () => {
+          _clientClosedConnection = true
+          _socketCloseTime = Date.now()
+          logger.warn(
+            `⚠️ [NON-STREAM] Socket 'end' event - client sent FIN | key: ${req.apiKey?.name}, ` +
+              `requestId: ${req.requestId}, elapsed: ${Date.now() - startTime}ms`
+          )
+        }
+        const onSocketClose = () => {
+          _clientClosedConnection = true
+          logger.warn(
+            `⚠️ [NON-STREAM] Socket 'close' event | key: ${req.apiKey?.name}, ` +
+              `requestId: ${req.requestId}, elapsed: ${Date.now() - startTime}ms, ` +
+              `hadError: ${nonStreamSocket.destroyed}`
+          )
+        }
+        const onSocketError = (err) => {
+          logger.error(
+            `❌ [NON-STREAM] Socket error | key: ${req.apiKey?.name}, ` +
+              `requestId: ${req.requestId}, error: ${err.message}`
+          )
+        }
+
+        nonStreamSocket.once('end', onSocketEnd)
+        nonStreamSocket.once('close', onSocketClose)
+        nonStreamSocket.once('error', onSocketError)
+
+        // 清理监听器（在响应结束后）
+        res.once('finish', () => {
+          nonStreamSocket.removeListener('end', onSocketEnd)
+          nonStreamSocket.removeListener('close', onSocketClose)
+          nonStreamSocket.removeListener('error', onSocketError)
+        })
+      }
 
       // 生成会话哈希用于sticky会话
       const sessionHash = sessionHelper.generateSessionHash(req.body)
@@ -867,6 +946,15 @@ async function handleMessagesRequest(req, res) {
         bodyLength: response.body ? response.body.length : 0
       })
 
+      // 🔍 检查客户端连接是否仍然有效
+      // 在长时间请求过程中，客户端可能已经断开连接（超时、用户取消等）
+      if (res.destroyed || res.socket?.destroyed || res.writableEnded) {
+        logger.warn(
+          `⚠️ Client disconnected before non-stream response could be sent for key: ${req.apiKey?.name || 'unknown'}`
+        )
+        return undefined
+      }
+
       res.status(response.statusCode)
 
       // 设置响应头，避免 Content-Length 和 Transfer-Encoding 冲突
@@ -932,10 +1020,12 @@ async function handleMessagesRequest(req, res) {
           logger.warn('⚠️ No usage data found in Claude API JSON response')
         }
 
+        // 使用 Express 内建的 res.json() 发送响应（简单可靠）
         res.json(jsonData)
       } catch (parseError) {
         logger.warn('⚠️ Failed to parse Claude API response as JSON:', parseError.message)
         logger.info('📄 Raw response body:', response.body)
+        // 使用 Express 内建的 res.send() 发送响应（简单可靠）
         res.send(response.body)
       }
 
