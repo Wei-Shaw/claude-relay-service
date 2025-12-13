@@ -150,21 +150,7 @@ const selectTheme = (mode) => {
   overflow: hidden;
 }
 
-/* 简化的 hover 效果 */
-.theme-toggle-button::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.1), transparent);
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  pointer-events: none;
-}
-
-.theme-toggle-button:hover::before {
-  opacity: 1;
-}
+/* Removed hover effect for clean design */
 
 /* 图标样式优化 - 简洁高效 */
 .theme-toggle-button i {
@@ -186,10 +172,7 @@ const selectTheme = (mode) => {
 }
 
 .theme-toggle-button i.fa-circle-half-stroke {
-  background: linear-gradient(90deg, #60a5fa 0%, #2563eb 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  @apply text-blue-500;
 }
 
 /* 创意切换开关样式 */
@@ -201,25 +184,20 @@ const selectTheme = (mode) => {
   @apply relative;
   width: 76px;
   height: 38px;
-  border-radius: 50px;
+  border-radius: 5px;
   padding: 4px;
   cursor: pointer;
-  transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  box-shadow:
-    0 4px 15px rgba(102, 126, 234, 0.3),
-    inset 0 1px 2px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  background: #eaeaea;
+  border: 1px solid #eaeaea;
   overflow: hidden;
   display: flex;
   align-items: center;
 }
 
 .theme-switch:hover {
-  transform: scale(1.05);
-  box-shadow:
-    0 6px 20px rgba(102, 126, 234, 0.4),
-    inset 0 1px 2px rgba(0, 0, 0, 0.1);
+  background: #e0e0e0;
+  border-color: #e0e0e0;
 }
 
 .theme-switch:active {
@@ -228,52 +206,24 @@ const selectTheme = (mode) => {
 
 /* 深色模式样式 */
 .theme-switch.is-dark {
-  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-  border-color: rgba(148, 163, 184, 0.2);
-  box-shadow:
-    0 4px 15px rgba(0, 0, 0, 0.5),
-    inset 0 1px 2px rgba(255, 255, 255, 0.05);
+  background: #333;
+  border-color: #333;
 }
 
 .theme-switch.is-dark:hover {
-  box-shadow:
-    0 6px 20px rgba(0, 0, 0, 0.6),
-    inset 0 1px 2px rgba(255, 255, 255, 0.05);
+  background: #444;
+  border-color: #444;
 }
 
-/* 自动模式样式 - 静态蓝紫渐变设计（优化版） */
+/* 自动模式样式 */
 .theme-switch.is-auto {
-  background: linear-gradient(
-    135deg,
-    #c4b5fd 0%,
-    /* 更柔和的起始：淡紫 */ #a78bfa 15%,
-    /* 浅紫 */ #818cf8 40%,
-    /* 紫蓝 */ #6366f1 60%,
-    /* 靛蓝 */ #4f46e5 85%,
-    /* 深蓝紫 */ #4338ca 100% /* 更深的结束：深紫 */
-  );
-  border-color: rgba(255, 255, 255, 0.2);
-  position: relative;
-  overflow: hidden;
-  background-size: 120% 120%;
-  background-position: center;
-  box-shadow:
-    0 4px 15px rgba(139, 92, 246, 0.25),
-    inset 0 1px 3px rgba(0, 0, 0, 0.1),
-    inset 0 -1px 3px rgba(0, 0, 0, 0.1);
+  background: #0070f3;
+  border-color: #0070f3;
 }
 
-/* 自动模式的分割线效果 */
-.theme-switch.is-auto::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 10%;
-  bottom: 10%;
-  width: 1px;
-  background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.3), transparent);
-  transform: translateX(-50%);
-  pointer-events: none;
+.theme-switch.is-auto:hover {
+  background: #0051bb;
+  border-color: #0051bb;
 }
 
 /* 背景装饰 */
@@ -364,11 +314,9 @@ const selectTheme = (mode) => {
   width: 30px;
   height: 30px;
   background: white;
-  border-radius: 50%;
-  transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.2),
-    0 0 0 1px rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -380,23 +328,15 @@ const selectTheme = (mode) => {
 /* 深色模式滑块位置 */
 .theme-switch.is-dark .switch-handle {
   transform: translateY(-50%) translateX(38px);
-  background: linear-gradient(135deg, #1e293b 0%, #475569 100%);
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(255, 255, 255, 0.1);
+  background: #1f1f1f;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-/* 自动模式滑块位置 - 优化后的半透明设计 */
+/* 自动模式滑块位置 */
 .theme-switch.is-auto .switch-handle {
   transform: translateY(-50%) translateX(19px);
-  background: rgba(255, 255, 255, 0.25);
-  /* 降低 blur 强度，减少 GPU 负担 */
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.1),
-    inset 0 0 8px rgba(255, 255, 255, 0.25);
+  background: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 /* 滑块图标 */
@@ -415,18 +355,15 @@ const selectTheme = (mode) => {
 }
 
 .handle-icon .fa-sun {
-  color: #f59e0b;
-  filter: drop-shadow(0 0 3px rgba(245, 158, 11, 0.5));
+  color: #f5a623;
 }
 
 .handle-icon .fa-moon {
-  color: #fbbf24;
-  filter: drop-shadow(0 0 3px rgba(251, 191, 36, 0.5));
+  color: #fff;
 }
 
 .handle-icon .fa-circle-half-stroke {
-  color: rgba(255, 255, 255, 0.9);
-  filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.5));
+  color: #0070f3;
   font-size: 15px;
 }
 

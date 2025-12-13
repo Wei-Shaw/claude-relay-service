@@ -9,9 +9,9 @@
         <div class="modal-content mx-auto w-full max-w-md p-6">
           <div class="mb-6 flex items-start gap-4">
             <div
-              class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-amber-600"
+              class="flex h-12 w-12 flex-shrink-0 items-center justify-center"
             >
-              <i class="fas fa-exclamation-triangle text-lg text-white" />
+              <i class="fas fa-exclamation-triangle text-2xl text-orange-500" />
             </div>
             <div class="flex-1">
               <h3 class="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
@@ -137,27 +137,26 @@ defineExpose({
 
 <style scoped>
 .modal {
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.4);
 }
 
 :global(.dark) .modal {
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.6);
 }
 
 .modal-content {
   background: white;
-  border-radius: 16px;
-  box-shadow: 0 20px 64px rgba(0, 0, 0, 0.15);
-  border: 1px solid #e5e7eb;
+  border-radius: 5px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid #eaeaea;
   max-height: 90vh;
   overflow-y: auto;
 }
 
 :global(.dark) .modal-content {
-  background: #1f2937;
-  border: 1px solid #374151;
-  box-shadow: 0 20px 64px rgba(0, 0, 0, 0.8);
+  background: #1f1f1f;
+  border: 1px solid #333;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .btn {
@@ -203,28 +202,28 @@ defineExpose({
 }
 
 .modal-content::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: #fafafa;
   border-radius: 3px;
 }
 
 :global(.dark) .modal-content::-webkit-scrollbar-track {
-  background: #374151;
+  background: #2a2a2a;
 }
 
 .modal-content::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #eaeaea;
   border-radius: 3px;
 }
 
 :global(.dark) .modal-content::-webkit-scrollbar-thumb {
-  background: #4b5563;
+  background: #333;
 }
 
 .modal-content::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #e0e0e0;
 }
 
 :global(.dark) .modal-content::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+  background: #444;
 }
 </style>

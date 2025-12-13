@@ -1,13 +1,80 @@
+/* ============================================
+   Vercel-Inspired Design System Variables
+   Bold contrast, black and white focus
+   ============================================ */
+
 :root {
-  --primary-color: #667eea;
-  --secondary-color: #764ba2;
-  --accent-color: #f093fb;
-  --success-color: #10b981;
-  --warning-color: #f59e0b;
-  --error-color: #ef4444;
-  --surface-color: rgba(255, 255, 255, 0.95);
-  --glass-color: rgba(255, 255, 255, 0.1);
-  --text-primary: #1f2937;
-  --text-secondary: #6b7280;
-  --border-color: rgba(255, 255, 255, 0.2);
+  /* Primary Colors - Black & White */
+  --color-black: #000;
+  --color-white: #fff;
+
+  /* Gray Scale */
+  --color-gray-50: #fafafa;
+  --color-gray-100: #f5f5f5;
+  --color-gray-200: #eaeaea;
+  --color-gray-300: #e0e0e0;
+  --color-gray-400: #bdbdbd;
+  --color-gray-500: #9e9e9e;
+  --color-gray-600: #666;
+  --color-gray-700: #424242;
+  --color-gray-800: #212121;
+  --color-gray-900: #000;
+
+  /* Accent Colors (minimal use) */
+  --color-blue: #0070f3;
+  --color-blue-dark: #0051bb;
+  --color-red: #e00;
+  --color-red-dark: #c00;
+  --color-orange: #f5a623;
+  --color-green: #0070f3; /* Using blue for success in Vercel style */
+
+  /* Functional Colors - Light Mode */
+  --bg-primary: #fafafa;
+  --bg-secondary: #fff;
+  --bg-tertiary: #f5f5f5;
+  --border-color: #eaeaea;
+  --border-color-strong: #000;
+  --text-primary: #000;
+  --text-secondary: #666;
+  --text-muted: #999;
+
+  /* Legacy compatibility (will be phased out) */
+  --primary-color: var(--color-black);
+  --secondary-color: var(--color-gray-600);
+  --success-color: var(--color-blue);
+  --warning-color: var(--color-orange);
+  --error-color: var(--color-red);
+  --surface-color: var(--bg-secondary);
+}
+
+/* Dark Mode */
+.dark {
+  /* Backgrounds */
+  --bg-primary: #000;
+  --bg-secondary: #1f1f1f;
+  --bg-tertiary: #2a2a2a;
+
+  /* Borders */
+  --border-color: #333;
+  --border-color-strong: #fff;
+
+  /* Text */
+  --text-primary: #fff;
+  --text-secondary: #999;
+  --text-muted: #666;
+
+  /* Adjust gray scale for dark mode */
+  --color-gray-50: #1f1f1f;
+  --color-gray-100: #2a2a2a;
+  --color-gray-200: #333;
+  --color-gray-300: #3d3d3d;
+  --color-gray-400: #525252;
+  --color-gray-500: #737373;
+  --color-gray-600: #999;
+  --color-gray-700: #b3b3b3;
+  --color-gray-800: #d4d4d4;
+  --color-gray-900: #fff;
+
+  /* Legacy compatibility */
+  --surface-color: var(--bg-secondary);
 }

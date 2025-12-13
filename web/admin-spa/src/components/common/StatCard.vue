@@ -15,8 +15,8 @@
           {{ subtitle }}
         </p>
       </div>
-      <div :class="['stat-icon flex-shrink-0', iconBgClass]">
-        <i :class="[icon, 'text-sm sm:text-base']" />
+      <div class="stat-icon flex-shrink-0">
+        <i :class="[icon, iconColorClass, 'text-sm sm:text-base']" />
       </div>
     </div>
   </div>
@@ -48,13 +48,13 @@ const props = defineProps({
   }
 })
 
-const iconBgClass = computed(() => {
+const iconColorClass = computed(() => {
   const colorMap = {
-    primary: 'bg-gradient-to-br from-blue-500 to-purple-500',
-    success: 'bg-gradient-to-br from-green-500 to-emerald-500',
-    warning: 'bg-gradient-to-br from-yellow-500 to-orange-500',
-    danger: 'bg-gradient-to-br from-red-500 to-pink-500',
-    info: 'bg-gradient-to-br from-cyan-500 to-blue-500'
+    primary: 'text-black dark:text-white',
+    success: 'text-blue-500',
+    warning: 'text-orange-500',
+    danger: 'text-red-500',
+    info: 'text-blue-500'
   }
   return colorMap[props.iconColor] || colorMap.primary
 })

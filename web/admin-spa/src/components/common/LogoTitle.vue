@@ -2,7 +2,7 @@
   <div class="flex items-center gap-4">
     <!-- Logo区域 -->
     <div
-      class="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-300/30 bg-gradient-to-br from-blue-500/20 to-purple-500/20 backdrop-blur-sm dark:border-gray-600/30 dark:from-blue-600/20 dark:to-purple-600/20"
+      class="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"
     >
       <template v-if="!loading">
         <img
@@ -89,6 +89,6 @@ const handleLogoError = (e) => {
 
 /* 标题样式 */
 .header-title {
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  /* Clean, flat design - no shadows */
 }
 </style>

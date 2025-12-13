@@ -5,7 +5,7 @@
 
     <!-- 主内容区域 -->
     <div
-      class="glass-strong rounded-xl p-3 shadow-xl sm:rounded-2xl sm:p-4 md:rounded-3xl md:p-6"
+      class="border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900 sm:p-4 md:p-6"
       style="z-index: 1; min-height: calc(100vh - 120px)"
     >
       <!-- 标签栏 -->
