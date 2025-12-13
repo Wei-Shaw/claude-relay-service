@@ -156,7 +156,7 @@
     <!-- 教程内容 -->
     <div v-if="currentTab === 'tutorial'" class="tab-content">
       <div class="glass-strong rounded-3xl p-4 md:p-6">
-        <TutorialView read-only hide-header />
+        <TutorialView hide-header read-only />
       </div>
     </div>
 
