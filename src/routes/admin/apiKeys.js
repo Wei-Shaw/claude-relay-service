@@ -8,6 +8,21 @@ const config = require('../../../config/config')
 
 const router = express.Router()
 
+const API_KEY_LIST_META_FIELDS = [
+  'name',
+  'isDeleted',
+  'isActive',
+  'tags',
+  'claudeAccountId',
+  'claudeConsoleAccountId',
+  'geminiAccountId',
+  'openaiAccountId',
+  'azureOpenaiAccountId',
+  'bedrockAccountId',
+  'droidAccountId',
+  'ccrAccountId'
+]
+
 // 👥 用户管理 (用于API Key分配)
 
 // 获取所有用户列表（用于API Key分配）
@@ -82,11 +97,19 @@ router.get('/api-keys/:keyId/cost-debug', authenticateAdmin, async (req, res) =>
     const client = redis.getClientSafe()
 
     // 获取所有相关的Redis键
-    const costKeys = await client.keys(`usage:cost:*:${keyId}:*`)
+    const costKeys = await redis.scanKeys(`usage:cost:*:${keyId}:*`)
     const keyValues = {}
 
-    for (const key of costKeys) {
-      keyValues[key] = await client.get(key)
+    if (costKeys.length > 0) {
+      const pipeline = client.pipeline()
+      costKeys.forEach((key) => pipeline.get(key))
+      const results = await pipeline.exec()
+      for (let i = 0; i < costKeys.length; i++) {
+        const value = results?.[i]?.[1]
+        if (value !== undefined) {
+          keyValues[costKeys[i]] = value
+        }
+      }
     }
 
     return res.json({
@@ -171,8 +194,17 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
     let result
     let costSortStatus = null
 
-    // 如果是费用排序
-    if (validSortBy === 'cost') {
+    // rawApiKey 模式：输入完整 API Key 精确查找（不做全量扫描）
+    if (searchMode === 'rawApiKey' && search) {
+      result = await getApiKeysByRawApiKeySearch({
+        page: pageNum,
+        pageSize: pageSizeNum,
+        apiKey: search,
+        tag,
+        isActive,
+        modelFilter
+      })
+    } else if (validSortBy === 'cost') {
       const costRankService = require('../../services/costRankService')
 
       // 验证费用排序的时间范围
@@ -337,6 +369,63 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
 })
 
 /**
+ * 按完整原始 API Key 精确查询（不做全量扫描）
+ */
+async function getApiKeysByRawApiKeySearch(options) {
+  const { page, pageSize, apiKey, tag, isActive, modelFilter = [] } = options
+  const trimmedApiKey = typeof apiKey === 'string' ? apiKey.trim() : ''
+
+  if (!trimmedApiKey) {
+    return {
+      items: [],
+      pagination: { page: 1, pageSize, total: 0, totalPages: 1 }
+    }
+  }
+
+  let keyData = await apiKeyService.findApiKeyByRawKey(trimmedApiKey)
+
+  // 默认排除已删除的 API Keys
+  if (keyData?.isDeleted) {
+    keyData = null
+  }
+
+  // 状态筛选
+  if (keyData && isActive !== '' && isActive !== undefined && isActive !== null) {
+    const activeValue = isActive === 'true' || isActive === true
+    if (keyData.isActive !== activeValue) {
+      keyData = null
+    }
+  }
+
+  // 标签筛选
+  if (keyData && tag) {
+    const tags = Array.isArray(keyData.tags) ? keyData.tags : []
+    if (!tags.includes(tag)) {
+      keyData = null
+    }
+  }
+
+  // 模型筛选
+  if (keyData && modelFilter.length > 0) {
+    const keyIdsWithModels = await redis.getKeyIdsWithModels([keyData.id], modelFilter)
+    if (!keyIdsWithModels.has(keyData.id)) {
+      keyData = null
+    }
+  }
+
+  const allItems = keyData ? [keyData] : []
+  const total = allItems.length
+  const totalPages = Math.ceil(total / pageSize) || 1
+  const validPage = Math.min(Math.max(1, page), totalPages)
+  const start = (validPage - 1) * pageSize
+
+  return {
+    items: allItems.slice(start, start + pageSize),
+    pagination: { page: validPage, pageSize, total, totalPages }
+  }
+}
+
+/**
  * 使用预计算索引进行费用排序的分页查询
  */
 async function getApiKeysSortedByCostPrecomputed(options) {
@@ -365,7 +454,7 @@ async function getApiKeysSortedByCostPrecomputed(options) {
   }
 
   // 2. 批量获取 API Key 基础数据
-  const allKeys = await redis.batchGetApiKeys(rankedKeyIds)
+  const allKeys = await redis.batchGetApiKeys(rankedKeyIds, { fields: API_KEY_LIST_META_FIELDS })
 
   // 3. 保持排序顺序（使用 Map 优化查找）
   const keyMap = new Map(allKeys.map((k) => [k.id, k]))
@@ -421,12 +510,15 @@ async function getApiKeysSortedByCostPrecomputed(options) {
   const totalPages = Math.ceil(total / pageSize) || 1
   const validPage = Math.min(Math.max(1, page), totalPages)
   const start = (validPage - 1) * pageSize
-  const items = orderedKeys.slice(start, start + pageSize)
+  const pageKeys = orderedKeys.slice(start, start + pageSize)
+
+  // 6.1 仅拉取当前页的完整数据，避免全量 HGETALL
+  const items = await redis.batchGetApiKeys(pageKeys.map((k) => k.id))
 
   // 7. 为当前页的 Keys 附加费用数据
   const keyCosts = await costRankService.getBatchKeyCosts(
     costTimeRange,
-    items.map((k) => k.id)
+    pageKeys.map((k) => k.id)
   )
   for (const key of items) {
     key._cost = keyCosts.get(key.id) || 0
@@ -480,7 +572,7 @@ async function getApiKeysSortedByCostCustom(options) {
   const rankedKeyIds = sortedEntries.map(([keyId]) => keyId)
 
   // 3. 批量获取 API Key 基础数据
-  const allKeys = await redis.batchGetApiKeys(rankedKeyIds)
+  const allKeys = await redis.batchGetApiKeys(rankedKeyIds, { fields: API_KEY_LIST_META_FIELDS })
 
   // 4. 保持排序顺序
   const keyMap = new Map(allKeys.map((k) => [k.id, k]))
@@ -536,7 +628,10 @@ async function getApiKeysSortedByCostCustom(options) {
   const totalPages = Math.ceil(total / pageSize) || 1
   const validPage = Math.min(Math.max(1, page), totalPages)
   const start = (validPage - 1) * pageSize
-  const items = orderedKeys.slice(start, start + pageSize)
+  const pageKeys = orderedKeys.slice(start, start + pageSize)
+
+  // 7.1 仅拉取当前页的完整数据，避免全量 HGETALL
+  const items = await redis.batchGetApiKeys(pageKeys.map((k) => k.id))
 
   // 8. 为当前页的 Keys 附加费用数据
   for (const key of items) {
@@ -636,22 +731,7 @@ router.get('/supported-clients', authenticateAdmin, async (req, res) => {
 // 获取已存在的标签列表
 router.get('/api-keys/tags', authenticateAdmin, async (req, res) => {
   try {
-    const apiKeys = await apiKeyService.getAllApiKeys()
-    const tagSet = new Set()
-
-    // 收集所有API Keys的标签
-    for (const apiKey of apiKeys) {
-      if (apiKey.tags && Array.isArray(apiKey.tags)) {
-        apiKey.tags.forEach((tag) => {
-          if (tag && tag.trim()) {
-            tagSet.add(tag.trim())
-          }
-        })
-      }
-    }
-
-    // 转换为数组并排序
-    const tags = Array.from(tagSet).sort()
+    const tags = await redis.getApiKeyAvailableTags(true)
 
     logger.info(`📋 Retrieved ${tags.length} unique tags from API keys`)
     return res.json({ success: true, data: tags })
@@ -670,80 +750,8 @@ router.get('/api-keys/tags', authenticateAdmin, async (req, res) => {
  */
 router.get('/accounts/binding-counts', authenticateAdmin, async (req, res) => {
   try {
-    // 使用优化的分页方法获取所有非删除的 API Keys（只需要绑定字段）
-    const result = await redis.getApiKeysPaginated({
-      page: 1,
-      pageSize: 10000, // 获取所有
-      excludeDeleted: true
-    })
-
-    const apiKeys = result.items
-
-    // 初始化统计对象
-    const bindingCounts = {
-      claudeAccountId: {},
-      claudeConsoleAccountId: {},
-      geminiAccountId: {},
-      openaiAccountId: {},
-      azureOpenaiAccountId: {},
-      bedrockAccountId: {},
-      droidAccountId: {},
-      ccrAccountId: {}
-    }
-
-    // 遍历一次，统计每个账户的绑定数量
-    for (const key of apiKeys) {
-      // Claude 账户
-      if (key.claudeAccountId) {
-        const id = key.claudeAccountId
-        bindingCounts.claudeAccountId[id] = (bindingCounts.claudeAccountId[id] || 0) + 1
-      }
-
-      // Claude Console 账户
-      if (key.claudeConsoleAccountId) {
-        const id = key.claudeConsoleAccountId
-        bindingCounts.claudeConsoleAccountId[id] =
-          (bindingCounts.claudeConsoleAccountId[id] || 0) + 1
-      }
-
-      // Gemini 账户（包括 api: 前缀的 Gemini-API 账户）
-      if (key.geminiAccountId) {
-        const id = key.geminiAccountId
-        bindingCounts.geminiAccountId[id] = (bindingCounts.geminiAccountId[id] || 0) + 1
-      }
-
-      // OpenAI 账户（包括 responses: 前缀的 OpenAI-Responses 账户）
-      if (key.openaiAccountId) {
-        const id = key.openaiAccountId
-        bindingCounts.openaiAccountId[id] = (bindingCounts.openaiAccountId[id] || 0) + 1
-      }
-
-      // Azure OpenAI 账户
-      if (key.azureOpenaiAccountId) {
-        const id = key.azureOpenaiAccountId
-        bindingCounts.azureOpenaiAccountId[id] = (bindingCounts.azureOpenaiAccountId[id] || 0) + 1
-      }
-
-      // Bedrock 账户
-      if (key.bedrockAccountId) {
-        const id = key.bedrockAccountId
-        bindingCounts.bedrockAccountId[id] = (bindingCounts.bedrockAccountId[id] || 0) + 1
-      }
-
-      // Droid 账户
-      if (key.droidAccountId) {
-        const id = key.droidAccountId
-        bindingCounts.droidAccountId[id] = (bindingCounts.droidAccountId[id] || 0) + 1
-      }
-
-      // CCR 账户
-      if (key.ccrAccountId) {
-        const id = key.ccrAccountId
-        bindingCounts.ccrAccountId[id] = (bindingCounts.ccrAccountId[id] || 0) + 1
-      }
-    }
-
-    logger.debug(`📊 Account binding counts calculated from ${apiKeys.length} API keys`)
+    const bindingCounts = await redis.getApiKeyBindingCounts({ excludeDeleted: true })
+    logger.debug(`📊 Account binding counts calculated`)
     return res.json({ success: true, data: bindingCounts })
   } catch (error) {
     logger.error('❌ Failed to get account binding counts:', error)

@@ -127,36 +127,48 @@ class BedrockAccountService {
   async getAllAccounts() {
     try {
       const client = redis.getClientSafe()
-      const keys = await client.keys('bedrock_account:*')
+      const keys = await redis.scanKeys('bedrock_account:*')
       const accounts = []
 
-      for (const key of keys) {
-        const accountData = await client.get(key)
-        if (accountData) {
-          const account = JSON.parse(accountData)
+      if (keys.length > 0) {
+        const chunkSize = 500
+        for (let offset = 0; offset < keys.length; offset += chunkSize) {
+          const chunkKeys = keys.slice(offset, offset + chunkSize)
+          const pipeline = client.pipeline()
+          chunkKeys.forEach((key) => pipeline.get(key))
+          const results = await pipeline.exec()
 
-          // 返回给前端时，不包含敏感信息，只显示掩码
-          accounts.push({
-            id: account.id,
-            name: account.name,
-            description: account.description,
-            region: account.region,
-            defaultModel: account.defaultModel,
-            isActive: account.isActive,
-            accountType: account.accountType,
-            priority: account.priority,
-            schedulable: account.schedulable,
-            credentialType: account.credentialType,
+          for (let i = 0; i < chunkKeys.length; i++) {
+            const accountData = results?.[i]?.[1]
+            if (!accountData) {
+              continue
+            }
 
-            // ✅ 前端显示订阅过期时间（业务字段）
-            expiresAt: account.subscriptionExpiresAt || null,
+            const account = JSON.parse(accountData)
 
-            createdAt: account.createdAt,
-            updatedAt: account.updatedAt,
-            type: 'bedrock',
-            platform: 'bedrock',
-            hasCredentials: !!account.awsCredentials
-          })
+            // 返回给前端时，不包含敏感信息，只显示掩码
+            accounts.push({
+              id: account.id,
+              name: account.name,
+              description: account.description,
+              region: account.region,
+              defaultModel: account.defaultModel,
+              isActive: account.isActive,
+              accountType: account.accountType,
+              priority: account.priority,
+              schedulable: account.schedulable,
+              credentialType: account.credentialType,
+
+              // ✅ 前端显示订阅过期时间（业务字段）
+              expiresAt: account.subscriptionExpiresAt || null,
+
+              createdAt: account.createdAt,
+              updatedAt: account.updatedAt,
+              type: 'bedrock',
+              platform: 'bedrock',
+              hasCredentials: !!account.awsCredentials
+            })
+          }
         }
       }
 

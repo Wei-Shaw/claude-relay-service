@@ -65,15 +65,3 @@ defineProps({
 
 defineEmits(['confirm', 'cancel'])
 </script>
-
-<style scoped>
-.modal {
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(8px);
-}
-
-:global(.dark) .modal {
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(8px);
-}
-</style>

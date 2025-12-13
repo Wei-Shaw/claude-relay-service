@@ -63,6 +63,452 @@ router.post('/api/get-key-id', async (req, res) => {
   }
 })
 
+const parseJsonArraySafe = (value) => {
+  if (!value) {
+    return []
+  }
+  if (Array.isArray(value)) {
+    return value.filter(Boolean)
+  }
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : []
+  } catch (error) {
+    return []
+  }
+}
+
+const normalizeKeyPermissionsForCompare = (keyData) => {
+  const restrictedModels = parseJsonArraySafe(keyData?.restrictedModels).map(String).sort()
+  const allowedClients = parseJsonArraySafe(keyData?.allowedClients).map(String).sort()
+
+  return {
+    permissions: String(keyData?.permissions || 'all'),
+    tokenLimit: Number.parseInt(keyData?.tokenLimit || '0', 10) || 0,
+    concurrencyLimit: Number.parseInt(keyData?.concurrencyLimit || '0', 10) || 0,
+    rateLimitWindow: Number.parseInt(keyData?.rateLimitWindow || '0', 10) || 0,
+    rateLimitRequests: Number.parseInt(keyData?.rateLimitRequests || '0', 10) || 0,
+    rateLimitCost: Number.parseFloat(keyData?.rateLimitCost || '0') || 0,
+    dailyCostLimit: Number.parseFloat(keyData?.dailyCostLimit || '0') || 0,
+    totalCostLimit: Number.parseFloat(keyData?.totalCostLimit || '0') || 0,
+    weeklyOpusCostLimit: Number.parseFloat(keyData?.weeklyOpusCostLimit || '0') || 0,
+    enableModelRestriction:
+      keyData?.enableModelRestriction === true || keyData?.enableModelRestriction === 'true',
+    restrictedModels,
+    enableClientRestriction:
+      keyData?.enableClientRestriction === true || keyData?.enableClientRestriction === 'true',
+    allowedClients,
+    claudeAccountId: String(keyData?.claudeAccountId || ''),
+    claudeConsoleAccountId: String(keyData?.claudeConsoleAccountId || ''),
+    geminiAccountId: String(keyData?.geminiAccountId || ''),
+    openaiAccountId: String(keyData?.openaiAccountId || ''),
+    azureOpenaiAccountId: String(keyData?.azureOpenaiAccountId || ''),
+    bedrockAccountId: String(keyData?.bedrockAccountId || ''),
+    droidAccountId: String(keyData?.droidAccountId || ''),
+    ccrAccountId: String(keyData?.ccrAccountId || '')
+  }
+}
+
+const diffPermissionFields = (a, b) => {
+  const mismatch = []
+  const keys = new Set([...Object.keys(a || {}), ...Object.keys(b || {})])
+  for (const key of keys) {
+    const av = a?.[key]
+    const bv = b?.[key]
+    if (Array.isArray(av) || Array.isArray(bv)) {
+      const aArr = Array.isArray(av) ? av : []
+      const bArr = Array.isArray(bv) ? bv : []
+      if (aArr.length !== bArr.length || aArr.join('|') !== bArr.join('|')) {
+        mismatch.push(key)
+      }
+      continue
+    }
+    if (av !== bv) {
+      mismatch.push(key)
+    }
+  }
+  return mismatch
+}
+
+const ACTIVATION_HOUR_MS = 60 * 60 * 1000
+const ACTIVATION_DAY_MS = 24 * ACTIVATION_HOUR_MS
+
+const normalizeActivationUnit = (unit) => (unit === 'hours' ? 'hours' : 'days')
+
+const parsePositiveIntOrZero = (value) => {
+  const parsed = Number.parseInt(String(value ?? ''), 10)
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return 0
+  }
+  return parsed
+}
+
+const activationPeriodToMs = (period, unit) => {
+  const safePeriod = parsePositiveIntOrZero(period)
+  if (!safePeriod) {
+    return 0
+  }
+  return safePeriod * (unit === 'hours' ? ACTIVATION_HOUR_MS : ACTIVATION_DAY_MS)
+}
+
+const activationMsToBestPeriod = (ms) => {
+  const safeMs = Number.isFinite(ms) && ms > 0 ? ms : 0
+  if (!safeMs) {
+    return { value: 0, unit: 'days' }
+  }
+  if (safeMs % ACTIVATION_DAY_MS === 0) {
+    return { value: safeMs / ACTIVATION_DAY_MS, unit: 'days' }
+  }
+  return { value: safeMs / ACTIVATION_HOUR_MS, unit: 'hours' }
+}
+
+// 🔑 使用“同权限未激活 Key”续费（用户自助）
+router.post('/api/merge-renewal', async (req, res) => {
+  try {
+    const { apiKey, renewKey } = req.body || {}
+    const clientIP = req.ip || req.connection?.remoteAddress || 'unknown'
+
+    if (!apiKey || typeof apiKey !== 'string' || apiKey.length < 10 || apiKey.length > 512) {
+      return res.status(400).json({
+        error: 'Invalid API key format',
+        message: 'API key format is invalid'
+      })
+    }
+
+    if (
+      !renewKey ||
+      typeof renewKey !== 'string' ||
+      renewKey.length < 10 ||
+      renewKey.length > 512
+    ) {
+      return res.status(400).json({
+        error: 'Invalid renew key format',
+        message: 'Renew key format is invalid'
+      })
+    }
+
+    const trimmedApiKey = apiKey.trim()
+    const trimmedRenewKey = renewKey.trim()
+
+    if (!trimmedApiKey || !trimmedRenewKey) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing keys',
+        message: 'API Key 和续费 Key 都不能为空'
+      })
+    }
+
+    if (trimmedApiKey === trimmedRenewKey) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid keys',
+        message: '续费 Key 不能与当前 Key 相同'
+      })
+    }
+
+    const targetKeyData = await apiKeyService.getApiKeyByRawKey(trimmedApiKey)
+    if (!targetKeyData || Object.keys(targetKeyData).length === 0) {
+      logger.security(`🔒 Merge renewal: target key not found from ${clientIP}`)
+      return res.status(404).json({
+        success: false,
+        error: 'API key not found',
+        message: '当前 API Key 不存在'
+      })
+    }
+
+    if (targetKeyData.isDeleted === 'true') {
+      return res.status(403).json({
+        success: false,
+        error: 'API key is deleted',
+        message: '当前 API Key 已删除'
+      })
+    }
+
+    if (targetKeyData.isActive !== 'true') {
+      const keyName = targetKeyData.name || 'Unknown'
+      return res.status(403).json({
+        success: false,
+        error: 'API key is disabled',
+        message: `API Key "${keyName}" 已被禁用`,
+        keyName
+      })
+    }
+
+    const targetExpiresAtMs = Date.parse(targetKeyData.expiresAt || '')
+    const targetExpirationMode = targetKeyData.expirationMode || 'fixed'
+    const targetIsActivated =
+      targetKeyData.isActivated === 'true' || targetKeyData.isActivated === true
+    const targetAllowActivationMerge =
+      targetExpirationMode === 'activation' &&
+      !targetIsActivated &&
+      !Number.isFinite(targetExpiresAtMs)
+
+    if (!Number.isFinite(targetExpiresAtMs) && !targetAllowActivationMerge) {
+      return res.status(400).json({
+        success: false,
+        error: 'API key has no expiry',
+        message: '当前 API Key 没有设置过期时间，无法续费'
+      })
+    }
+
+    const renewKeyData = await apiKeyService.getApiKeyByRawKey(trimmedRenewKey)
+    if (!renewKeyData || Object.keys(renewKeyData).length === 0) {
+      logger.security(`🔒 Merge renewal: renew key not found from ${clientIP}`)
+      return res.status(404).json({
+        success: false,
+        error: 'Renew key not found',
+        message: '续费 Key 不存在'
+      })
+    }
+
+    if (renewKeyData.id === targetKeyData.id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid keys',
+        message: '续费 Key 不能与当前 Key 相同'
+      })
+    }
+
+    if (renewKeyData.isDeleted === 'true') {
+      return res.status(403).json({
+        success: false,
+        error: 'Renew key is deleted',
+        message: '续费 Key 已删除'
+      })
+    }
+
+    if (renewKeyData.isActive !== 'true') {
+      return res.status(403).json({
+        success: false,
+        error: 'Renew key is disabled',
+        message: '续费 Key 已被禁用'
+      })
+    }
+
+    if ((renewKeyData.expirationMode || 'fixed') !== 'activation') {
+      return res.status(400).json({
+        success: false,
+        error: 'Renew key is not activation mode',
+        message: '续费 Key 不是“未激活”类型（需要使用激活模式创建）'
+      })
+    }
+
+    if (renewKeyData.isActivated === 'true') {
+      return res.status(400).json({
+        success: false,
+        error: 'Renew key already activated',
+        message: '续费 Key 已激活/已使用，无法用于续费'
+      })
+    }
+
+    const targetPerm = normalizeKeyPermissionsForCompare(targetKeyData)
+    const renewPerm = normalizeKeyPermissionsForCompare(renewKeyData)
+    const mismatchFields = diffPermissionFields(targetPerm, renewPerm)
+    if (mismatchFields.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Permission mismatch',
+        message: '续费 Key 的权限与当前 Key 不一致，无法合并',
+        data: {
+          mismatchFields
+        }
+      })
+    }
+
+    const activationPeriod = Number.parseInt(renewKeyData.activationDays || '30', 10)
+    const activationUnit = renewKeyData.activationUnit === 'hours' ? 'hours' : 'days'
+
+    if (!Number.isFinite(activationPeriod) || activationPeriod <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid activation period',
+        message: '续费 Key 的激活时长配置异常，请联系管理员'
+      })
+    }
+
+    const extendMs =
+      activationUnit === 'hours'
+        ? activationPeriod * ACTIVATION_HOUR_MS
+        : activationPeriod * ACTIVATION_DAY_MS
+
+    const client = redis.getClientSafe()
+    const targetKey = `apikey:${targetKeyData.id}`
+    const renewKeyHash = `apikey:${renewKeyData.id}`
+    const now = new Date()
+    const nowIso = now.toISOString()
+
+    let lastError = null
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await client.watch(targetKey, renewKeyHash)
+        const [freshTarget, freshRenew] = await Promise.all([
+          client.hgetall(targetKey),
+          client.hgetall(renewKeyHash)
+        ])
+
+        if (!freshTarget || Object.keys(freshTarget).length === 0) {
+          await client.unwatch()
+          return res.status(404).json({
+            success: false,
+            error: 'API key not found',
+            message: '当前 API Key 不存在'
+          })
+        }
+
+        if (!freshRenew || Object.keys(freshRenew).length === 0) {
+          await client.unwatch()
+          return res.status(404).json({
+            success: false,
+            error: 'Renew key not found',
+            message: '续费 Key 不存在'
+          })
+        }
+
+        if (freshRenew.isDeleted === 'true' || freshRenew.isActive !== 'true') {
+          await client.unwatch()
+          return res.status(400).json({
+            success: false,
+            error: 'Renew key already consumed',
+            message: '续费 Key 已被使用或已失效'
+          })
+        }
+
+        if (
+          (freshRenew.expirationMode || 'fixed') !== 'activation' ||
+          freshRenew.isActivated === 'true'
+        ) {
+          await client.unwatch()
+          return res.status(400).json({
+            success: false,
+            error: 'Renew key already activated',
+            message: '续费 Key 已激活/已使用，无法用于续费'
+          })
+        }
+
+        const freshTargetExpiresAtMs = Date.parse(freshTarget.expiresAt || '')
+        const freshTargetExpirationMode = freshTarget.expirationMode || 'fixed'
+        const freshTargetIsActivated =
+          freshTarget.isActivated === 'true' || freshTarget.isActivated === true
+
+        const shouldMergeActivationPeriod =
+          !Number.isFinite(freshTargetExpiresAtMs) &&
+          freshTargetExpirationMode === 'activation' &&
+          !freshTargetIsActivated
+
+        let newExpiresAt = ''
+        let newActivationValue = 0
+        let newActivationUnit = 'days'
+
+        if (Number.isFinite(freshTargetExpiresAtMs)) {
+          const baseMs = Math.max(Date.now(), freshTargetExpiresAtMs)
+          newExpiresAt = new Date(baseMs + extendMs).toISOString()
+        } else if (shouldMergeActivationPeriod) {
+          const currentUnit = normalizeActivationUnit(freshTarget.activationUnit)
+          const currentMs = activationPeriodToMs(freshTarget.activationDays, currentUnit)
+          const mergedMs = currentMs + extendMs
+          const mergedPeriod = activationMsToBestPeriod(mergedMs)
+          newActivationValue = mergedPeriod.value
+          newActivationUnit = mergedPeriod.unit
+        } else {
+          await client.unwatch()
+          return res.status(400).json({
+            success: false,
+            error: 'API key has no expiry',
+            message: '当前 API Key 没有设置过期时间，无法续费'
+          })
+        }
+
+        const tx = client.multi()
+        if (newExpiresAt) {
+          tx.hset(targetKey, { expiresAt: newExpiresAt, updatedAt: nowIso })
+        } else {
+          tx.hset(targetKey, {
+            activationDays: String(newActivationValue),
+            activationUnit: newActivationUnit,
+            updatedAt: nowIso
+          })
+        }
+        tx.expire(targetKey, 86400 * 365)
+        tx.hset(renewKeyHash, {
+          isDeleted: 'true',
+          deletedAt: nowIso,
+          deletedBy: `merge-renewal:${targetKeyData.id}`,
+          deletedByType: 'system',
+          isActive: 'false',
+          mergedToKeyId: targetKeyData.id,
+          mergedAt: nowIso
+        })
+        tx.expire(renewKeyHash, 86400 * 365)
+
+        if (freshRenew.apiKey) {
+          tx.hdel('apikey:hash_map', freshRenew.apiKey)
+        }
+
+        const execResult = await tx.exec()
+        if (!execResult) {
+          lastError = new Error('Redis transaction aborted')
+          continue
+        }
+
+        // best effort: 从费用索引中移除（不影响主流程）
+        try {
+          const costRankService = require('../services/costRankService')
+          await costRankService.removeKeyFromIndexes(renewKeyData.id)
+        } catch (error) {
+          logger.warn(
+            `Failed to remove renew key ${renewKeyData.id} from cost rank indexes:`,
+            error
+          )
+        }
+
+        logger.success(
+          newExpiresAt
+            ? `🔁 Merge renewal success: target=${targetKeyData.id}, renew=${renewKeyData.id}, extend=${activationPeriod} ${activationUnit}, newExpiresAt=${newExpiresAt}, ip=${clientIP}`
+            : `🔁 Merge renewal success: target=${targetKeyData.id}, renew=${renewKeyData.id}, extend=${activationPeriod} ${activationUnit}, newActivation=${newActivationValue} ${newActivationUnit}, ip=${clientIP}`
+        )
+
+        return res.json({
+          success: true,
+          data: {
+            ...(newExpiresAt ? { expiresAt: newExpiresAt } : {}),
+            ...(newExpiresAt
+              ? {}
+              : {
+                  activationValue: newActivationValue,
+                  activationUnit: newActivationUnit
+                }),
+            extendValue: activationPeriod,
+            extendUnit: activationUnit,
+            renewKeyId: renewKeyData.id
+          }
+        })
+      } catch (error) {
+        lastError = error
+      } finally {
+        try {
+          await client.unwatch()
+        } catch (unwatchError) {
+          // ignore
+        }
+      }
+    }
+
+    logger.error('❌ Merge renewal failed:', lastError)
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to merge renewal',
+      message: '续费失败，请稍后重试'
+    })
+  } catch (error) {
+    logger.error('❌ Failed to merge renewal:', error)
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to merge renewal',
+      message: '续费失败，请稍后重试'
+    })
+  }
+})
+
 // 📊 用户API Key统计查询接口 - 安全的自查询接口
 router.post('/api/user-stats', async (req, res) => {
   try {
@@ -100,16 +546,6 @@ router.post('/api/user-stats', async (req, res) => {
         return res.status(403).json({
           error: 'API key is disabled',
           message: `API Key "${keyName}" 已被禁用`,
-          keyName
-        })
-      }
-
-      // 检查是否过期
-      if (keyData.expiresAt && new Date() > new Date(keyData.expiresAt)) {
-        const keyName = keyData.name || 'Unknown'
-        return res.status(403).json({
-          error: 'API key has expired',
-          message: `API Key "${keyName}" 已过期`,
           keyName
         })
       }
@@ -214,7 +650,7 @@ router.post('/api/user-stats', async (req, res) => {
       const client = redis.getClientSafe()
 
       // 获取所有月度模型统计（与model-stats接口相同的逻辑）
-      const allModelKeys = await client.keys(`usage:${keyId}:model:monthly:*:*`)
+      const allModelKeys = await redis.scanKeys(`usage:${keyId}:model:monthly:*:*`)
       const modelUsageMap = new Map()
 
       for (const key of allModelKeys) {
@@ -706,7 +1142,7 @@ router.post('/api/batch-model-stats', async (req, res) => {
             ? `usage:${apiId}:model:daily:*:${today}`
             : `usage:${apiId}:model:monthly:*:${currentMonth}`
 
-        const keys = await client.keys(pattern)
+        const keys = await redis.scanKeys(pattern)
 
         for (const key of keys) {
           const match = key.match(
@@ -942,7 +1378,7 @@ router.post('/api/user-model-stats', async (req, res) => {
         ? `usage:${keyId}:model:daily:*:${today}`
         : `usage:${keyId}:model:monthly:*:${currentMonth}`
 
-    const keys = await client.keys(pattern)
+    const keys = await redis.scanKeys(pattern)
     const modelStats = []
 
     for (const key of keys) {

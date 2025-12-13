@@ -26,7 +26,10 @@ class ApiStatsClient {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message || `请求失败: ${response.status}`)
+        const error = new Error(data.message || `请求失败: ${response.status}`)
+        error.status = response.status
+        error.data = data?.data
+        throw error
       }
 
       return data
@@ -90,6 +93,14 @@ class ApiStatsClient {
     return this.request('/apiStats/api/batch-model-stats', {
       method: 'POST',
       body: JSON.stringify({ apiIds, period })
+    })
+  }
+
+  // 同权限未激活 Key 续费（合并时长）
+  async mergeRenewal(apiKey, renewKey) {
+    return this.request('/apiStats/api/merge-renewal', {
+      method: 'POST',
+      body: JSON.stringify({ apiKey, renewKey })
     })
   }
 }

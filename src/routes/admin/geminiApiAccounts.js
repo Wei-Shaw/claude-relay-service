@@ -14,6 +14,7 @@ router.get('/gemini-api-accounts', authenticateAdmin, async (req, res) => {
   try {
     const { platform, groupId } = req.query
     let accounts = await geminiApiAccountService.getAllAccounts(true)
+    let groupInfosMap = null
 
     // 根据查询参数进行筛选
     if (platform && platform !== 'gemini-api') {
@@ -21,14 +22,36 @@ router.get('/gemini-api-accounts', authenticateAdmin, async (req, res) => {
     }
 
     // 根据分组ID筛选
-    if (groupId) {
-      const group = await accountGroupService.getGroup(groupId)
-      if (group && group.platform === 'gemini') {
-        const groupMembers = await accountGroupService.getGroupMembers(groupId)
-        accounts = accounts.filter((account) => groupMembers.includes(account.id))
+    if (groupId && groupId !== 'all') {
+      if (groupId === 'ungrouped') {
+        groupInfosMap = await accountGroupService.getAccountGroupsMap(accounts.map((a) => a.id))
+        accounts = accounts.filter((account) => (groupInfosMap[account.id] || []).length === 0)
       } else {
-        accounts = []
+        const group = await accountGroupService.getGroup(groupId)
+        if (group && group.platform === 'gemini') {
+          const groupMembers = await accountGroupService.getGroupMembers(groupId)
+          const memberSet = new Set(groupMembers || [])
+          accounts = accounts.filter((account) => memberSet.has(account.id))
+        } else {
+          accounts = []
+        }
       }
+    }
+
+    if (!groupInfosMap) {
+      groupInfosMap = await accountGroupService.getAccountGroupsMap(accounts.map((a) => a.id))
+    }
+
+    // 预计算绑定的 API Key 数量（支持 api: 前缀），避免每个账户都全量扫描
+    const allKeys = await redis.getAllApiKeys()
+    const boundCountMap = {}
+    for (const key of allKeys) {
+      const binding = key.geminiAccountId
+      if (!binding || !binding.startsWith('api:')) {
+        continue
+      }
+      const accountId = binding.substring('api:'.length)
+      boundCountMap[accountId] = (boundCountMap[accountId] || 0) + 1
     }
 
     // 处理使用统计和绑定的 API Key 数量
@@ -50,21 +73,8 @@ router.get('/gemini-api-accounts', authenticateAdmin, async (req, res) => {
           }
         }
 
-        // 计算绑定的API Key数量（支持 api: 前缀）
-        const allKeys = await redis.getAllApiKeys()
-        let boundCount = 0
-
-        for (const key of allKeys) {
-          if (key.geminiAccountId) {
-            // 检查是否绑定了此 Gemini-API 账户（支持 api: 前缀）
-            if (key.geminiAccountId === `api:${account.id}`) {
-              boundCount++
-            }
-          }
-        }
-
         // 获取分组信息
-        const groupInfos = await accountGroupService.getAccountGroups(account.id)
+        const groupInfos = groupInfosMap[account.id] || []
 
         return {
           ...account,
@@ -74,7 +84,7 @@ router.get('/gemini-api-accounts', authenticateAdmin, async (req, res) => {
             total: usageStats.total,
             averages: usageStats.averages || usageStats.monthly
           },
-          boundApiKeys: boundCount
+          boundApiKeys: boundCountMap[account.id] || 0
         }
       })
     )

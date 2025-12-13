@@ -183,100 +183,71 @@ class GeminiApiAccountService {
   // 获取所有账户
   async getAllAccounts(includeInactive = false) {
     const client = redis.getClientSafe()
-    const accountIds = await client.smembers(this.SHARED_ACCOUNTS_KEY)
     const accounts = []
 
-    for (const accountId of accountIds) {
-      const account = await this.getAccount(accountId)
-      if (account) {
-        // 过滤非活跃账户
-        if (includeInactive || account.isActive === 'true') {
-          // 隐藏敏感信息
-          account.apiKey = '***'
+    const keys = await redis.scanKeys(`${this.ACCOUNT_KEY_PREFIX}*`)
+    const chunkSize = 200
 
-          // 获取限流状态信息
-          const rateLimitInfo = this._getRateLimitInfo(account)
+    for (let offset = 0; offset < keys.length; offset += chunkSize) {
+      const chunkKeys = keys.slice(offset, offset + chunkSize)
+      const pipeline = client.pipeline()
+      chunkKeys.forEach((key) => pipeline.hgetall(key))
+      const results = await pipeline.exec()
 
-          // 格式化 rateLimitStatus 为对象
-          account.rateLimitStatus = rateLimitInfo.isRateLimited
-            ? {
-                isRateLimited: true,
-                rateLimitedAt: account.rateLimitedAt || null,
-                minutesRemaining: rateLimitInfo.remainingMinutes || 0
-              }
-            : {
-                isRateLimited: false,
-                rateLimitedAt: null,
-                minutesRemaining: 0
-              }
-
-          // 转换 schedulable 字段为布尔值
-          account.schedulable = account.schedulable !== 'false'
-          // 转换 isActive 字段为布尔值
-          account.isActive = account.isActive === 'true'
-
-          account.platform = account.platform || 'gemini-api'
-
-          accounts.push(account)
+      for (const [err, accountData] of results) {
+        if (err || !accountData || !accountData.id) {
+          continue
         }
-      }
-    }
 
-    // 直接从 Redis 获取所有账户（包括非共享账户）
-    const keys = await client.keys(`${this.ACCOUNT_KEY_PREFIX}*`)
-    for (const key of keys) {
-      const accountId = key.replace(this.ACCOUNT_KEY_PREFIX, '')
-      if (!accountIds.includes(accountId)) {
-        const accountData = await client.hgetall(key)
-        if (accountData && accountData.id) {
-          // 过滤非活跃账户
-          if (includeInactive || accountData.isActive === 'true') {
-            // 隐藏敏感信息
-            accountData.apiKey = '***'
+        // 过滤非活跃账户
+        if (!includeInactive && accountData.isActive !== 'true') {
+          continue
+        }
 
-            // 解析 JSON 字段
-            if (accountData.proxy) {
-              try {
-                accountData.proxy = JSON.parse(accountData.proxy)
-              } catch (e) {
-                accountData.proxy = null
-              }
-            }
+        // 隐藏敏感信息
+        accountData.apiKey = '***'
 
-            if (accountData.supportedModels) {
-              try {
-                accountData.supportedModels = JSON.parse(accountData.supportedModels)
-              } catch (e) {
-                accountData.supportedModels = []
-              }
-            }
-
-            // 获取限流状态信息
-            const rateLimitInfo = this._getRateLimitInfo(accountData)
-
-            // 格式化 rateLimitStatus 为对象
-            accountData.rateLimitStatus = rateLimitInfo.isRateLimited
-              ? {
-                  isRateLimited: true,
-                  rateLimitedAt: accountData.rateLimitedAt || null,
-                  minutesRemaining: rateLimitInfo.remainingMinutes || 0
-                }
-              : {
-                  isRateLimited: false,
-                  rateLimitedAt: null,
-                  minutesRemaining: 0
-                }
-
-            // 转换 schedulable 字段为布尔值
-            accountData.schedulable = accountData.schedulable !== 'false'
-            // 转换 isActive 字段为布尔值
-            accountData.isActive = accountData.isActive === 'true'
-
-            accountData.platform = accountData.platform || 'gemini-api'
-
-            accounts.push(accountData)
+        // 解析 JSON 字段
+        if (accountData.proxy) {
+          try {
+            accountData.proxy = JSON.parse(accountData.proxy)
+          } catch (e) {
+            accountData.proxy = null
           }
         }
+
+        if (accountData.supportedModels) {
+          try {
+            accountData.supportedModels = JSON.parse(accountData.supportedModels)
+          } catch (e) {
+            accountData.supportedModels = []
+          }
+        }
+
+        // 获取限流状态信息
+        const rateLimitInfo = this._getRateLimitInfo(accountData)
+
+        // 格式化 rateLimitStatus 为对象
+        accountData.rateLimitStatus = rateLimitInfo.isRateLimited
+          ? {
+              isRateLimited: true,
+              rateLimitedAt: accountData.rateLimitedAt || null,
+              minutesRemaining: rateLimitInfo.remainingMinutes || 0
+            }
+          : {
+              isRateLimited: false,
+              rateLimitedAt: null,
+              minutesRemaining: 0
+            }
+
+        // 转换 schedulable 字段为布尔值
+        accountData.schedulable = accountData.schedulable !== 'false'
+        // 转换 isActive 字段为布尔值
+        accountData.isActive = accountData.isActive === 'true'
+
+        accountData.platform = accountData.platform || 'gemini-api'
+
+        accounts.push(accountData)
       }
     }
 

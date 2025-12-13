@@ -205,10 +205,10 @@ const selectTheme = (mode) => {
   padding: 4px;
   cursor: pointer;
   transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
   border: 2px solid rgba(255, 255, 255, 0.1);
   box-shadow:
-    0 4px 15px rgba(102, 126, 234, 0.3),
+    0 4px 15px rgba(96, 165, 250, 0.28),
     inset 0 1px 2px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   display: flex;
@@ -218,7 +218,7 @@ const selectTheme = (mode) => {
 .theme-switch:hover {
   transform: scale(1.05);
   box-shadow:
-    0 6px 20px rgba(102, 126, 234, 0.4),
+    0 6px 20px rgba(96, 165, 250, 0.35),
     inset 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
@@ -228,7 +228,7 @@ const selectTheme = (mode) => {
 
 /* 深色模式样式 */
 .theme-switch.is-dark {
-  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-mid) 100%);
   border-color: rgba(148, 163, 184, 0.2);
   box-shadow:
     0 4px 15px rgba(0, 0, 0, 0.5),

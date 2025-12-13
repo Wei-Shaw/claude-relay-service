@@ -187,14 +187,34 @@ class AccountGroupService {
       const client = redis.getClientSafe()
       const groupIds = await client.smembers(this.GROUPS_KEY)
 
-      const groups = []
+      if (!groupIds || groupIds.length === 0) {
+        return []
+      }
+
+      const pipeline = client.pipeline()
       for (const groupId of groupIds) {
-        const group = await this.getGroup(groupId)
-        if (group) {
-          // 如果指定了平台，进行筛选
-          if (!platform || group.platform === platform) {
-            groups.push(group)
-          }
+        pipeline.hgetall(`${this.GROUP_PREFIX}${groupId}`)
+        pipeline.scard(`${this.GROUP_MEMBERS_PREFIX}${groupId}`)
+      }
+      const results = await pipeline.exec()
+
+      const groups = []
+      for (let i = 0; i < groupIds.length; i++) {
+        const groupData = results?.[i * 2]?.[1]
+        const memberCount = results?.[i * 2 + 1]?.[1]
+
+        if (!groupData || Object.keys(groupData).length === 0) {
+          continue
+        }
+
+        const group = {
+          ...groupData,
+          memberCount: memberCount || 0
+        }
+
+        // 如果指定了平台，进行筛选
+        if (!platform || group.platform === platform) {
+          groups.push(group)
         }
       }
 
@@ -379,6 +399,75 @@ class AccountGroupService {
       return memberGroups
     } catch (error) {
       logger.error('❌ 获取账户所属分组列表失败:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 批量获取多个账户所属的分组信息（用于列表页性能优化）
+   * @param {Array<string>} accountIds - 账户ID列表
+   * @param {string|null} platform - 平台筛选 (可选)
+   * @returns {Object} accountId -> groups[]
+   */
+  async getAccountGroupsMap(accountIds = [], platform = null) {
+    try {
+      const uniqueAccountIds = [...new Set((accountIds || []).filter(Boolean))]
+      const resultMap = Object.fromEntries(uniqueAccountIds.map((id) => [id, []]))
+
+      if (uniqueAccountIds.length === 0) {
+        return resultMap
+      }
+
+      const client = redis.getClientSafe()
+      const allGroupIds = await client.smembers(this.GROUPS_KEY)
+
+      if (!allGroupIds || allGroupIds.length === 0) {
+        return resultMap
+      }
+
+      const accountIdSet = new Set(uniqueAccountIds)
+
+      // pipeline 批量获取 group 元数据与成员列表，避免 N×G 的串行 Redis 往返
+      const pipeline = client.pipeline()
+      for (const groupId of allGroupIds) {
+        pipeline.hgetall(`${this.GROUP_PREFIX}${groupId}`)
+        pipeline.smembers(`${this.GROUP_MEMBERS_PREFIX}${groupId}`)
+      }
+      const pipelineResults = await pipeline.exec()
+
+      for (let i = 0; i < allGroupIds.length; i++) {
+        const groupData = pipelineResults?.[i * 2]?.[1]
+        const members = pipelineResults?.[i * 2 + 1]?.[1] || []
+
+        if (!groupData || Object.keys(groupData).length === 0) {
+          continue
+        }
+
+        if (platform && groupData.platform !== platform) {
+          continue
+        }
+
+        const group = {
+          ...groupData,
+          memberCount: Array.isArray(members) ? members.length : 0
+        }
+
+        for (const memberId of members) {
+          if (!accountIdSet.has(memberId)) {
+            continue
+          }
+          resultMap[memberId].push(group)
+        }
+      }
+
+      // 按创建时间倒序排序
+      for (const groups of Object.values(resultMap)) {
+        groups.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      }
+
+      return resultMap
+    } catch (error) {
+      logger.error('❌ 批量获取账户所属分组列表失败:', error)
       throw error
     }
   }
