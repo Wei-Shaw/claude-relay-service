@@ -56,6 +56,7 @@ const tabs = computed(() => {
   const baseTabs = [
     { key: 'dashboard', name: '仪表板', shortName: '仪表板', icon: 'fas fa-tachometer-alt' },
     { key: 'apiKeys', name: 'API Keys', shortName: 'API', icon: 'fas fa-key' },
+    { key: 'fuelPacks', name: '加油包', shortName: '加油包', icon: 'fas fa-gas-pump' },
     { key: 'accounts', name: '账户管理', shortName: '账户', icon: 'fas fa-user-circle' }
   ]
 

@@ -103,6 +103,14 @@ class ApiStatsClient {
       body: JSON.stringify({ apiKey, renewKey })
     })
   }
+
+  // 加油包兑换（临时额度）
+  async redeemFuelPack(apiKey, code) {
+    return this.request('/apiStats/api/redeem-fuel-pack', {
+      method: 'POST',
+      body: JSON.stringify({ apiKey, code })
+    })
+  }
 }
 
 export const apiStatsClient = new ApiStatsClient()

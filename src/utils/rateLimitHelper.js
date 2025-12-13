@@ -29,6 +29,15 @@ async function updateRateLimitCounters(rateLimitInfo, usageSummary, model) {
   }
 
   let totalCost = 0
+  const options = arguments.length >= 4 ? arguments[3] : null
+  const hasCostOverrideKey =
+    options && Object.prototype.hasOwnProperty.call(options, 'costOverride')
+  const overrideRaw = hasCostOverrideKey ? options.costOverride : undefined
+  const overrideNum = Number(overrideRaw)
+  const useCostOverride = hasCostOverrideKey && Number.isFinite(overrideNum)
+  if (useCostOverride) {
+    totalCost = Math.max(0, overrideNum)
+  }
   const usagePayload = {
     input_tokens: inputTokens,
     output_tokens: outputTokens,
@@ -36,26 +45,28 @@ async function updateRateLimitCounters(rateLimitInfo, usageSummary, model) {
     cache_read_input_tokens: cacheReadTokens
   }
 
-  try {
-    const costInfo = pricingService.calculateCost(usagePayload, model)
-    const { totalCost: calculatedCost } = costInfo || {}
-    if (typeof calculatedCost === 'number') {
-      totalCost = calculatedCost
-    }
-  } catch (error) {
-    // 忽略此处错误，后续使用备用计算
-    totalCost = 0
-  }
-
-  if (totalCost === 0) {
+  if (!useCostOverride) {
     try {
-      const fallback = CostCalculator.calculateCost(usagePayload, model)
-      const { costs } = fallback || {}
-      if (costs && typeof costs.total === 'number') {
-        totalCost = costs.total
+      const costInfo = pricingService.calculateCost(usagePayload, model)
+      const { totalCost: calculatedCost } = costInfo || {}
+      if (typeof calculatedCost === 'number') {
+        totalCost = calculatedCost
       }
     } catch (error) {
+      // 忽略此处错误，后续使用备用计算
       totalCost = 0
+    }
+
+    if (totalCost === 0) {
+      try {
+        const fallback = CostCalculator.calculateCost(usagePayload, model)
+        const { costs } = fallback || {}
+        if (costs && typeof costs.total === 'number') {
+          totalCost = costs.total
+        }
+      } catch (error) {
+        totalCost = 0
+      }
     }
   }
 

@@ -14,6 +14,7 @@ const ApiKeysView = () => import('@/views/ApiKeysView.vue')
 const ApiKeyUsageRecordsView = () => import('@/views/ApiKeyUsageRecordsView.vue')
 const AccountsView = () => import('@/views/AccountsView.vue')
 const AccountUsageRecordsView = () => import('@/views/AccountUsageRecordsView.vue')
+const FuelPacksView = () => import('@/views/FuelPacksView.vue')
 const TutorialView = () => import('@/views/TutorialView.vue')
 const SettingsView = () => import('@/views/SettingsView.vue')
 const ApiStatsView = () => import('@/views/ApiStatsView.vue')
@@ -120,6 +121,18 @@ const routes = [
         path: '',
         name: 'AccountUsageRecords',
         component: AccountUsageRecordsView
+      }
+    ]
+  },
+  {
+    path: '/fuel-packs',
+    component: MainLayout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'FuelPacks',
+        component: FuelPacksView
       }
     ]
   },

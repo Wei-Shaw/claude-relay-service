@@ -173,6 +173,7 @@
 <script setup>
 import { ref, reactive, watch } from 'vue'
 import { useUserStore } from '@/stores/user'
+import { copyTextToClipboard } from '@/utils/clipboard'
 import { showToast } from '@/utils/toast'
 
 const props = defineProps({
@@ -234,13 +235,11 @@ const handleSubmit = async () => {
 }
 
 const copyToClipboard = async (text) => {
-  try {
-    await navigator.clipboard.writeText(text)
-    showToast('API key copied to clipboard!', 'success')
-  } catch (err) {
-    console.error('Failed to copy:', err)
-    showToast('Failed to copy to clipboard', 'error')
-  }
+  const ok = await copyTextToClipboard(text)
+  showToast(
+    ok ? 'API key copied to clipboard!' : 'Failed to copy to clipboard',
+    ok ? 'success' : 'error'
+  )
 }
 
 const handleClose = () => {

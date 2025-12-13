@@ -68,7 +68,7 @@ function extractCodexUsageHeaders(headers) {
   return hasData ? snapshot : null
 }
 
-async function applyRateLimitTracking(req, usageSummary, model, context = '') {
+async function applyRateLimitTracking(req, usageSummary, model, context = '', options = null) {
   if (!req.rateLimitInfo) {
     return
   }
@@ -79,7 +79,8 @@ async function applyRateLimitTracking(req, usageSummary, model, context = '') {
     const { totalTokens, totalCost } = await updateRateLimitCounters(
       req.rateLimitInfo,
       usageSummary,
-      model
+      model,
+      options
     )
 
     if (totalTokens > 0) {
@@ -605,7 +606,7 @@ const handleResponses = async (req, res) => {
           // 计算实际输入token（总输入减去缓存部分）
           const actualInputTokens = Math.max(0, totalInputTokens - cacheReadTokens)
 
-          await apiKeyService.recordUsage(
+          const usageResult = await apiKeyService.recordUsage(
             apiKeyData.id,
             actualInputTokens, // 传递实际输入（不含缓存）
             outputTokens,
@@ -628,7 +629,8 @@ const handleResponses = async (req, res) => {
               cacheReadTokens
             },
             actualModel,
-            'openai-non-stream'
+            'openai-non-stream',
+            { costOverride: usageResult?.billableCost }
           )
         }
 
@@ -737,7 +739,7 @@ const handleResponses = async (req, res) => {
           // 使用响应中的真实 model，如果没有则使用请求中的 model，最后回退到默认值
           const modelToRecord = actualModel || requestedModel || 'gpt-4'
 
-          await apiKeyService.recordUsage(
+          const usageResult = await apiKeyService.recordUsage(
             apiKeyData.id,
             actualInputTokens, // 传递实际输入（不含缓存）
             outputTokens,
@@ -761,7 +763,8 @@ const handleResponses = async (req, res) => {
               cacheReadTokens
             },
             modelToRecord,
-            'openai-stream'
+            'openai-stream',
+            { costOverride: usageResult?.billableCost }
           )
         } catch (error) {
           logger.error('Failed to record OpenAI usage:', error)

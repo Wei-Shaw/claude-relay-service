@@ -132,6 +132,7 @@
           <!-- 基本信息和统计概览 -->
           <StatsOverview />
           <KeyMergeRenewal />
+          <FuelPackRedeem />
 
           <!-- Token 分布和限制配置 -->
           <div
@@ -184,6 +185,7 @@ import LimitConfig from '@/components/apistats/LimitConfig.vue'
 import AggregatedStatsCard from '@/components/apistats/AggregatedStatsCard.vue'
 import ModelUsageStats from '@/components/apistats/ModelUsageStats.vue'
 import KeyMergeRenewal from '@/components/apistats/KeyMergeRenewal.vue'
+import FuelPackRedeem from '@/components/apistats/FuelPackRedeem.vue'
 import TutorialView from './TutorialView.vue'
 import ApiKeyTestModal from '@/components/apikeys/ApiKeyTestModal.vue'
 

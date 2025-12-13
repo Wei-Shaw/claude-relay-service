@@ -15,14 +15,14 @@ const claudeRelayConfigService = require('../services/claudeRelayConfigService')
 const { sanitizeUpstreamError } = require('../utils/errorSanitizer')
 const router = express.Router()
 
-function queueRateLimitUpdate(rateLimitInfo, usageSummary, model, context = '') {
+function queueRateLimitUpdate(rateLimitInfo, usageSummary, model, context = '', options = null) {
   if (!rateLimitInfo) {
     return Promise.resolve({ totalTokens: 0, totalCost: 0 })
   }
 
   const label = context ? ` (${context})` : ''
 
-  return updateRateLimitCounters(rateLimitInfo, usageSummary, model)
+  return updateRateLimitCounters(rateLimitInfo, usageSummary, model, options)
     .then(({ totalTokens, totalCost }) => {
       if (totalTokens > 0) {
         logger.api(`📊 Updated rate limit token count${label}: +${totalTokens} tokens`)
@@ -421,21 +421,23 @@ async function handleMessagesRequest(req, res) {
 
               apiKeyService
                 .recordUsageWithDetails(req.apiKey.id, usageObject, model, usageAccountId, 'claude')
+                .then((usageResult) =>
+                  queueRateLimitUpdate(
+                    req.rateLimitInfo,
+                    {
+                      inputTokens,
+                      outputTokens,
+                      cacheCreateTokens,
+                      cacheReadTokens
+                    },
+                    model,
+                    'claude-stream',
+                    { costOverride: usageResult?.billableCost }
+                  )
+                )
                 .catch((error) => {
                   logger.error('❌ Failed to record stream usage:', error)
                 })
-
-              queueRateLimitUpdate(
-                req.rateLimitInfo,
-                {
-                  inputTokens,
-                  outputTokens,
-                  cacheCreateTokens,
-                  cacheReadTokens
-                },
-                model,
-                'claude-stream'
-              )
 
               usageDataCaptured = true
               logger.api(
@@ -512,21 +514,23 @@ async function handleMessagesRequest(req, res) {
                   usageAccountId,
                   'claude-console'
                 )
+                .then((usageResult) =>
+                  queueRateLimitUpdate(
+                    req.rateLimitInfo,
+                    {
+                      inputTokens,
+                      outputTokens,
+                      cacheCreateTokens,
+                      cacheReadTokens
+                    },
+                    model,
+                    'claude-console-stream',
+                    { costOverride: usageResult?.billableCost }
+                  )
+                )
                 .catch((error) => {
                   logger.error('❌ Failed to record stream usage:', error)
                 })
-
-              queueRateLimitUpdate(
-                req.rateLimitInfo,
-                {
-                  inputTokens,
-                  outputTokens,
-                  cacheCreateTokens,
-                  cacheReadTokens
-                },
-                model,
-                'claude-console-stream'
-              )
 
               usageDataCaptured = true
               logger.api(
@@ -562,21 +566,23 @@ async function handleMessagesRequest(req, res) {
 
             apiKeyService
               .recordUsage(req.apiKey.id, inputTokens, outputTokens, 0, 0, result.model, accountId)
+              .then((usageResult) =>
+                queueRateLimitUpdate(
+                  req.rateLimitInfo,
+                  {
+                    inputTokens,
+                    outputTokens,
+                    cacheCreateTokens: 0,
+                    cacheReadTokens: 0
+                  },
+                  result.model,
+                  'bedrock-stream',
+                  { costOverride: usageResult?.billableCost }
+                )
+              )
               .catch((error) => {
                 logger.error('❌ Failed to record Bedrock stream usage:', error)
               })
-
-            queueRateLimitUpdate(
-              req.rateLimitInfo,
-              {
-                inputTokens,
-                outputTokens,
-                cacheCreateTokens: 0,
-                cacheReadTokens: 0
-              },
-              result.model,
-              'bedrock-stream'
-            )
 
             usageDataCaptured = true
             logger.api(
@@ -647,21 +653,23 @@ async function handleMessagesRequest(req, res) {
 
               apiKeyService
                 .recordUsageWithDetails(req.apiKey.id, usageObject, model, usageAccountId, 'ccr')
+                .then((usageResult) =>
+                  queueRateLimitUpdate(
+                    req.rateLimitInfo,
+                    {
+                      inputTokens,
+                      outputTokens,
+                      cacheCreateTokens,
+                      cacheReadTokens
+                    },
+                    model,
+                    'ccr-stream',
+                    { costOverride: usageResult?.billableCost }
+                  )
+                )
                 .catch((error) => {
                   logger.error('❌ Failed to record CCR stream usage:', error)
                 })
-
-              queueRateLimitUpdate(
-                req.rateLimitInfo,
-                {
-                  inputTokens,
-                  outputTokens,
-                  cacheCreateTokens,
-                  cacheReadTokens
-                },
-                model,
-                'ccr-stream'
-              )
 
               usageDataCaptured = true
               logger.api(
@@ -990,7 +998,7 @@ async function handleMessagesRequest(req, res) {
 
           // 记录真实的token使用量（包含模型信息和所有4种token以及账户ID）
           const { accountId: responseAccountId } = response
-          await apiKeyService.recordUsage(
+          const usageResult = await apiKeyService.recordUsage(
             req.apiKey.id,
             inputTokens,
             outputTokens,
@@ -1009,7 +1017,8 @@ async function handleMessagesRequest(req, res) {
               cacheReadTokens
             },
             model,
-            'claude-non-stream'
+            'claude-non-stream',
+            { costOverride: usageResult?.billableCost }
           )
 
           usageRecorded = true

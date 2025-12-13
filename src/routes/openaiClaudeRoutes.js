@@ -23,14 +23,14 @@ function checkPermissions(apiKeyData, requiredPermission = 'claude') {
   return permissions === 'all' || permissions === requiredPermission
 }
 
-function queueRateLimitUpdate(rateLimitInfo, usageSummary, model, context = '') {
+function queueRateLimitUpdate(rateLimitInfo, usageSummary, model, context = '', options = null) {
   if (!rateLimitInfo) {
     return
   }
 
   const label = context ? ` (${context})` : ''
 
-  updateRateLimitCounters(rateLimitInfo, usageSummary, model)
+  updateRateLimitCounters(rateLimitInfo, usageSummary, model, options)
     .then(({ totalTokens, totalCost }) => {
       if (totalTokens > 0) {
         logger.api(`📊 Updated rate limit token count${label}: +${totalTokens} tokens`)
@@ -290,21 +290,23 @@ async function handleChatCompletion(req, res, apiKeyData) {
                 model,
                 accountId
               )
+              .then((usageResult) =>
+                queueRateLimitUpdate(
+                  req.rateLimitInfo,
+                  {
+                    inputTokens: usage.input_tokens || 0,
+                    outputTokens: usage.output_tokens || 0,
+                    cacheCreateTokens,
+                    cacheReadTokens
+                  },
+                  model,
+                  'openai-claude-stream',
+                  { costOverride: usageResult?.billableCost }
+                )
+              )
               .catch((error) => {
                 logger.error('❌ Failed to record usage:', error)
               })
-
-            queueRateLimitUpdate(
-              req.rateLimitInfo,
-              {
-                inputTokens: usage.input_tokens || 0,
-                outputTokens: usage.output_tokens || 0,
-                cacheCreateTokens,
-                cacheReadTokens
-              },
-              model,
-              'openai-claude-stream'
-            )
           }
         },
         // 流转换器
@@ -378,21 +380,23 @@ async function handleChatCompletion(req, res, apiKeyData) {
             claudeRequest.model,
             accountId
           )
+          .then((usageResult) =>
+            queueRateLimitUpdate(
+              req.rateLimitInfo,
+              {
+                inputTokens: usage.input_tokens || 0,
+                outputTokens: usage.output_tokens || 0,
+                cacheCreateTokens,
+                cacheReadTokens
+              },
+              claudeRequest.model,
+              'openai-claude-non-stream',
+              { costOverride: usageResult?.billableCost }
+            )
+          )
           .catch((error) => {
             logger.error('❌ Failed to record usage:', error)
           })
-
-        queueRateLimitUpdate(
-          req.rateLimitInfo,
-          {
-            inputTokens: usage.input_tokens || 0,
-            outputTokens: usage.output_tokens || 0,
-            cacheCreateTokens,
-            cacheReadTokens
-          },
-          claudeRequest.model,
-          'openai-claude-non-stream'
-        )
       }
 
       // 返回 OpenAI 格式响应

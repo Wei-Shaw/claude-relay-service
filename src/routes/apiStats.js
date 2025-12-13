@@ -6,6 +6,7 @@ const CostCalculator = require('../utils/costCalculator')
 const claudeAccountService = require('../services/claudeAccountService')
 const openaiAccountService = require('../services/openaiAccountService')
 const { createClaudeTestPayload } = require('../utils/testPayloadHelper')
+const fuelPackService = require('../services/fuelPackService')
 
 const router = express.Router()
 
@@ -160,6 +161,30 @@ const activationMsToBestPeriod = (ms) => {
     return { value: safeMs / ACTIVATION_DAY_MS, unit: 'days' }
   }
   return { value: safeMs / ACTIVATION_HOUR_MS, unit: 'hours' }
+}
+
+const hasValidPlanForFuelPack = (keyData) => {
+  const dailyCostLimit = Number.parseFloat(keyData?.dailyCostLimit || '0') || 0
+  const totalCostLimit = Number.parseFloat(keyData?.totalCostLimit || '0') || 0
+  const rateLimitCost = Number.parseFloat(keyData?.rateLimitCost || '0') || 0
+
+  return dailyCostLimit > 0 || totalCostLimit > 0 || rateLimitCost > 0
+}
+
+const isPlanExpiredForFuelPack = (keyData) => {
+  const expirationMode = keyData?.expirationMode || 'fixed'
+  const isActivated = keyData?.isActivated === 'true' || keyData?.isActivated === true
+  const expiresAtMs = Date.parse(keyData?.expiresAt || '')
+
+  if (Number.isFinite(expiresAtMs)) {
+    return Date.now() > expiresAtMs
+  }
+
+  if (expirationMode === 'activation' && !isActivated) {
+    return false
+  }
+
+  return false
 }
 
 // 🔑 使用“同权限未激活 Key”续费（用户自助）
@@ -509,6 +534,117 @@ router.post('/api/merge-renewal', async (req, res) => {
   }
 })
 
+// ⛽ 加油包兑换（用户自助）
+router.post('/api/redeem-fuel-pack', async (req, res) => {
+  try {
+    const { apiKey, code } = req.body || {}
+    const clientIP = req.ip || req.connection?.remoteAddress || 'unknown'
+
+    if (!apiKey || typeof apiKey !== 'string' || apiKey.length < 10 || apiKey.length > 512) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid API key format',
+        message: 'API key format is invalid'
+      })
+    }
+
+    if (!code || typeof code !== 'string' || code.length < 4 || code.length > 128) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid code format',
+        message: '兑换码格式无效'
+      })
+    }
+
+    const trimmedApiKey = apiKey.trim()
+    const trimmedCode = code.trim()
+
+    if (!trimmedApiKey || !trimmedCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing input',
+        message: 'API Key 和兑换码都不能为空'
+      })
+    }
+
+    const targetKeyData = await apiKeyService.getApiKeyByRawKey(trimmedApiKey)
+    if (!targetKeyData || Object.keys(targetKeyData).length === 0) {
+      logger.security(`🔒 Fuel pack redeem: target key not found from ${clientIP}`)
+      return res.status(404).json({
+        success: false,
+        error: 'API key not found',
+        message: '当前 API Key 不存在'
+      })
+    }
+
+    if (targetKeyData.isDeleted === 'true') {
+      return res.status(403).json({
+        success: false,
+        error: 'API key is deleted',
+        message: '当前 API Key 已删除'
+      })
+    }
+
+    if (targetKeyData.isActive !== 'true') {
+      const keyName = targetKeyData.name || 'Unknown'
+      return res.status(403).json({
+        success: false,
+        error: 'API key is disabled',
+        message: `API Key "${keyName}" 已被禁用`,
+        keyName
+      })
+    }
+
+    if (!hasValidPlanForFuelPack(targetKeyData)) {
+      return res.status(400).json({
+        success: false,
+        error: 'No active plan',
+        message: '加油包必须在“有有效套餐/限额”的 Key 上使用，请先联系管理员开通套餐'
+      })
+    }
+
+    if (isPlanExpiredForFuelPack(targetKeyData)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Plan expired',
+        message: '当前套餐已过期，请先续费后再使用加油包'
+      })
+    }
+
+    const redeemed = await fuelPackService.redeemCodeToApiKey(
+      trimmedCode,
+      targetKeyData.id,
+      targetKeyData.name || ''
+    )
+
+    logger.success(
+      `⛽ Fuel pack redeemed: key=${targetKeyData.id}, amount=$${redeemed.amount}, expiresAtMs=${redeemed.expiresAtMs}, ip=${clientIP}`
+    )
+
+    return res.json({
+      success: true,
+      data: {
+        amount: redeemed.amount,
+        expiresAtMs: redeemed.expiresAtMs,
+        expiresAt: redeemed.expiresAtMs ? new Date(redeemed.expiresAtMs).toISOString() : '',
+        fuelBalance: redeemed.fuelBalance,
+        fuelNextExpiresAtMs: redeemed.fuelNextExpiresAtMs,
+        fuelNextExpiresAt: redeemed.fuelNextExpiresAtMs
+          ? new Date(redeemed.fuelNextExpiresAtMs).toISOString()
+          : '',
+        fuelEntries: redeemed.fuelEntries
+      }
+    })
+  } catch (error) {
+    logger.warn('❌ Fuel pack redeem failed:', error)
+    return res.status(400).json({
+      success: false,
+      error: 'Fuel pack redeem failed',
+      message: error.message || '兑换失败，请稍后重试'
+    })
+  }
+})
+
 // 📊 用户API Key统计查询接口 - 安全的自查询接口
 router.post('/api/user-stats', async (req, res) => {
   try {
@@ -854,6 +990,18 @@ router.post('/api/user-stats', async (req, res) => {
         }
       },
 
+      fuel: {
+        balance: Number.parseFloat(fullKeyData.fuelBalance || 0) || 0,
+        entries: Number.parseInt(fullKeyData.fuelEntries || 0, 10) || 0,
+        nextExpiresAtMs: Number.parseInt(fullKeyData.fuelNextExpiresAtMs || 0, 10) || 0,
+        nextExpiresAt:
+          fullKeyData.fuelNextExpiresAtMs && Number(fullKeyData.fuelNextExpiresAtMs) > 0
+            ? new Date(Number(fullKeyData.fuelNextExpiresAtMs)).toISOString()
+            : '',
+        usedDaily: Number.parseFloat(fullKeyData.fuelUsedDaily || 0) || 0,
+        usedTotal: Number.parseFloat(fullKeyData.fuelUsedTotal || 0) || 0
+      },
+
       // 限制信息（显示配置和当前使用量）
       limits: {
         tokenLimit: fullKeyData.tokenLimit || 0,
@@ -868,8 +1016,14 @@ router.post('/api/user-stats', async (req, res) => {
         currentWindowRequests,
         currentWindowTokens,
         currentWindowCost, // 新增：当前窗口费用
-        currentDailyCost,
-        currentTotalCost: totalCost,
+        currentDailyCost:
+          fullKeyData.billableDailyCost !== undefined
+            ? Number(fullKeyData.billableDailyCost) || 0
+            : currentDailyCost,
+        currentTotalCost:
+          fullKeyData.billableTotalCost !== undefined
+            ? Number(fullKeyData.billableTotalCost) || 0
+            : totalCost,
         weeklyOpusCost: (await redis.getWeeklyOpusCost(keyId)) || 0, // 当前 Opus 周费用
         // 时间窗口信息
         windowStartTime,

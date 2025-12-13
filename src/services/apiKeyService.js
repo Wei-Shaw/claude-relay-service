@@ -332,11 +332,39 @@ class ApiKeyService {
       const usage = await redis.getUsageStats(keyData.id)
 
       // 获取费用统计
-      const [dailyCost, costStats] = await Promise.all([
+      const nowMs = Date.now()
+      const today = redis.getDateStringInTimezone(new Date(nowMs))
+      const client = redis.getClientSafe()
+      const [dailyCost, costStats, fuelUsedDailyRaw, fuelUsedTotalRaw] = await Promise.all([
         redis.getDailyCost(keyData.id),
-        redis.getCostStats(keyData.id)
+        redis.getCostStats(keyData.id),
+        client.get(`fuelpack:used:daily:${keyData.id}:${today}`),
+        client.get(`fuelpack:used:total:${keyData.id}`)
       ])
       const totalCost = costStats?.total || 0
+      const fuelUsedDaily = parseFloat(fuelUsedDailyRaw || 0)
+      const fuelUsedTotal = parseFloat(fuelUsedTotalRaw || 0)
+
+      let fuelBalance = parseFloat(keyData.fuelBalance || 0)
+      let fuelEntries = parseInt(keyData.fuelEntries || 0)
+      let fuelNextExpiresAtMs = parseInt(keyData.fuelNextExpiresAtMs || 0)
+
+      if (fuelBalance > 0 && fuelNextExpiresAtMs > 0 && fuelNextExpiresAtMs <= nowMs) {
+        try {
+          const fuelPackService = require('./fuelPackService')
+          const refreshed = await fuelPackService.refreshWallet(keyData.id)
+          const {
+            fuelBalance: refreshedFuelBalance,
+            fuelEntries: refreshedFuelEntries,
+            fuelNextExpiresAtMs: refreshedFuelNextExpiresAtMs
+          } = refreshed
+          fuelBalance = refreshedFuelBalance
+          fuelEntries = refreshedFuelEntries
+          fuelNextExpiresAtMs = refreshedFuelNextExpiresAtMs
+        } catch (error) {
+          logger.warn(`Failed to refresh fuel pack wallet for key ${keyData.id}:`, error)
+        }
+      }
 
       // 更新最后使用时间（优化：只在实际API调用时更新，而不是验证时）
       // 注意：lastUsedAt的更新已移至recordUsage方法中
@@ -396,7 +424,14 @@ class ApiKeyService {
           totalCostLimit: parseFloat(keyData.totalCostLimit || 0),
           weeklyOpusCostLimit: parseFloat(keyData.weeklyOpusCostLimit || 0),
           dailyCost: dailyCost || 0,
+          billableDailyCost: Math.max(0, (dailyCost || 0) - fuelUsedDaily),
           totalCost,
+          billableTotalCost: Math.max(0, totalCost - fuelUsedTotal),
+          fuelBalance,
+          fuelEntries,
+          fuelNextExpiresAtMs,
+          fuelUsedDaily,
+          fuelUsedTotal,
           weeklyOpusCost: (await redis.getWeeklyOpusCost(keyData.id)) || 0,
           tags,
           usage
@@ -447,11 +482,39 @@ class ApiKeyService {
         }
       }
 
-      // 获取当日费用
-      const [dailyCost, costStats] = await Promise.all([
+      const nowMs = Date.now()
+      const today = redis.getDateStringInTimezone(new Date(nowMs))
+      const client = redis.getClientSafe()
+      const [dailyCost, costStats, fuelUsedDailyRaw, fuelUsedTotalRaw] = await Promise.all([
         redis.getDailyCost(keyData.id),
-        redis.getCostStats(keyData.id)
+        redis.getCostStats(keyData.id),
+        client.get(`fuelpack:used:daily:${keyData.id}:${today}`),
+        client.get(`fuelpack:used:total:${keyData.id}`)
       ])
+      const totalCost = costStats?.total || 0
+      const fuelUsedDaily = parseFloat(fuelUsedDailyRaw || 0)
+      const fuelUsedTotal = parseFloat(fuelUsedTotalRaw || 0)
+
+      let fuelBalance = parseFloat(keyData.fuelBalance || 0)
+      let fuelEntries = parseInt(keyData.fuelEntries || 0)
+      let fuelNextExpiresAtMs = parseInt(keyData.fuelNextExpiresAtMs || 0)
+
+      if (fuelBalance > 0 && fuelNextExpiresAtMs > 0 && fuelNextExpiresAtMs <= nowMs) {
+        try {
+          const fuelPackService = require('./fuelPackService')
+          const refreshed = await fuelPackService.refreshWallet(keyData.id)
+          const {
+            fuelBalance: refreshedFuelBalance,
+            fuelEntries: refreshedFuelEntries,
+            fuelNextExpiresAtMs: refreshedFuelNextExpiresAtMs
+          } = refreshed
+          fuelBalance = refreshedFuelBalance
+          fuelEntries = refreshedFuelEntries
+          fuelNextExpiresAtMs = refreshedFuelNextExpiresAtMs
+        } catch (error) {
+          logger.warn(`Failed to refresh fuel pack wallet for key ${keyData.id}:`, error)
+        }
+      }
 
       // 获取使用统计
       const usage = await redis.getUsageStats(keyData.id)
@@ -515,7 +578,14 @@ class ApiKeyService {
           totalCostLimit: parseFloat(keyData.totalCostLimit || 0),
           weeklyOpusCostLimit: parseFloat(keyData.weeklyOpusCostLimit || 0),
           dailyCost: dailyCost || 0,
-          totalCost: costStats?.total || 0,
+          billableDailyCost: Math.max(0, (dailyCost || 0) - fuelUsedDaily),
+          totalCost,
+          billableTotalCost: Math.max(0, totalCost - fuelUsedTotal),
+          fuelBalance,
+          fuelEntries,
+          fuelNextExpiresAtMs,
+          fuelUsedDaily,
+          fuelUsedTotal,
           weeklyOpusCost: (await redis.getWeeklyOpusCost(keyData.id)) || 0,
           tags,
           usage
@@ -1102,6 +1172,29 @@ class ApiKeyService {
         isLongContextRequest
       )
 
+      const usageCost = costInfo && costInfo.costs ? costInfo.costs.total || 0 : 0
+      let fuelUsed = 0
+
+      // 获取API Key数据（同时用于加油包判断与更新最后使用时间）
+      const keyData = await redis.getApiKey(keyId)
+      if (keyData && Object.keys(keyData).length > 0) {
+        const fuelBalance = parseFloat(keyData.fuelBalance || 0)
+        const fuelNextExpiresAtMs = parseInt(keyData.fuelNextExpiresAtMs || 0)
+        const nowMs = Date.now()
+        const hasFuel = fuelBalance > 0 && fuelNextExpiresAtMs > nowMs
+
+        if (hasFuel && usageCost > 0) {
+          try {
+            const fuelPackService = require('./fuelPackService')
+            const fuelResult = await fuelPackService.consumeFuel(keyId, usageCost)
+            fuelUsed = fuelResult.fuelUsed || 0
+          } catch (error) {
+            logger.warn(`Failed to consume fuel pack for key ${keyId}:`, error)
+            fuelUsed = 0
+          }
+        }
+      }
+
       // 记录费用统计
       if (costInfo.costs.total > 0) {
         await redis.incrementDailyCost(keyId, costInfo.costs.total)
@@ -1112,8 +1205,6 @@ class ApiKeyService {
         logger.debug(`💰 No cost recorded for ${keyId} - zero cost for model: ${model}`)
       }
 
-      // 获取API Key数据以确定关联的账户
-      const keyData = await redis.getApiKey(keyId)
       if (keyData && Object.keys(keyData).length > 0) {
         // 更新最后使用时间
         keyData.lastUsedAt = new Date().toISOString()
@@ -1142,7 +1233,6 @@ class ApiKeyService {
       }
 
       // 记录单次请求的使用详情
-      const usageCost = costInfo && costInfo.costs ? costInfo.costs.total || 0 : 0
       await redis.addUsageRecord(keyId, {
         timestamp: new Date().toISOString(),
         model,
@@ -1153,6 +1243,8 @@ class ApiKeyService {
         cacheReadTokens,
         totalTokens,
         cost: Number(usageCost.toFixed(6)),
+        fuelCost: Number(fuelUsed.toFixed(6)),
+        billableCost: Number(Math.max(0, usageCost - fuelUsed).toFixed(6)),
         costBreakdown: costInfo && costInfo.costs ? costInfo.costs : undefined
       })
 
@@ -1166,9 +1258,17 @@ class ApiKeyService {
       logParts.push(`Total: ${totalTokens} tokens`)
 
       logger.database(`📊 Recorded usage: ${keyId} - ${logParts.join(', ')}`)
+
+      const totalCost = Number(usageCost.toFixed(6))
+      const fuelCost = Number(fuelUsed.toFixed(6))
+      const billableCost = Number(Math.max(0, usageCost - fuelUsed).toFixed(6))
+
+      return { totalTokens, totalCost, fuelCost, billableCost }
     } catch (error) {
       logger.error('❌ Failed to record usage:', error)
     }
+
+    return null
   }
 
   // 📊 记录 Opus 模型费用（仅限 claude 和 claude-console 账户）
@@ -1292,6 +1392,29 @@ class ApiKeyService {
         costInfo.isLongContextRequest || false // 传递 1M 上下文请求标记
       )
 
+      const usageCost = typeof costInfo.totalCost === 'number' ? costInfo.totalCost : 0
+      let fuelUsed = 0
+
+      // 获取API Key数据（同时用于加油包判断与更新最后使用时间）
+      const keyData = await redis.getApiKey(keyId)
+      if (keyData && Object.keys(keyData).length > 0) {
+        const fuelBalance = parseFloat(keyData.fuelBalance || 0)
+        const fuelNextExpiresAtMs = parseInt(keyData.fuelNextExpiresAtMs || 0)
+        const nowMs = Date.now()
+        const hasFuel = fuelBalance > 0 && fuelNextExpiresAtMs > nowMs
+
+        if (hasFuel && usageCost > 0) {
+          try {
+            const fuelPackService = require('./fuelPackService')
+            const fuelResult = await fuelPackService.consumeFuel(keyId, usageCost)
+            fuelUsed = fuelResult.fuelUsed || 0
+          } catch (error) {
+            logger.warn(`Failed to consume fuel pack for key ${keyId}:`, error)
+            fuelUsed = 0
+          }
+        }
+      }
+
       // 记录费用统计
       if (costInfo.totalCost > 0) {
         await redis.incrementDailyCost(keyId, costInfo.totalCost)
@@ -1322,8 +1445,6 @@ class ApiKeyService {
         }
       }
 
-      // 获取API Key数据以确定关联的账户
-      const keyData = await redis.getApiKey(keyId)
       if (keyData && Object.keys(keyData).length > 0) {
         // 更新最后使用时间
         keyData.lastUsedAt = new Date().toISOString()
@@ -1364,6 +1485,8 @@ class ApiKeyService {
         ephemeral1hTokens,
         totalTokens,
         cost: Number((costInfo.totalCost || 0).toFixed(6)),
+        fuelCost: Number(fuelUsed.toFixed(6)),
+        billableCost: Number(Math.max(0, usageCost - fuelUsed).toFixed(6)),
         costBreakdown: {
           input: costInfo.inputCost || 0,
           output: costInfo.outputCost || 0,
@@ -1430,9 +1553,17 @@ class ApiKeyService {
         // 发布失败不影响主流程，只记录错误
         logger.warn('⚠️ Failed to publish billing event:', err.message)
       })
+
+      const totalCost = Number((usageCost || 0).toFixed(6))
+      const fuelCost = Number(fuelUsed.toFixed(6))
+      const billableCost = Number(Math.max(0, usageCost - fuelUsed).toFixed(6))
+
+      return { totalTokens, totalCost, fuelCost, billableCost }
     } catch (error) {
       logger.error('❌ Failed to record usage:', error)
     }
+
+    return null
   }
 
   async _fetchAccountInfo(accountId, accountType, cache, client) {

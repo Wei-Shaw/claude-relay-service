@@ -38,6 +38,7 @@ const tabRouteMap = computed(() => {
   const baseMap = {
     dashboard: '/dashboard',
     apiKeys: '/api-keys',
+    fuelPacks: '/fuel-packs',
     accounts: '/accounts',
     tutorial: '/tutorial',
     settings: '/settings'
@@ -66,6 +67,7 @@ const initActiveTab = () => {
     const nameToTabMap = {
       Dashboard: 'dashboard',
       ApiKeys: 'apiKeys',
+      FuelPacks: 'fuelPacks',
       Accounts: 'accounts',
       Tutorial: 'tutorial',
       Settings: 'settings'
@@ -95,6 +97,7 @@ watch(
       const nameToTabMap = {
         Dashboard: 'dashboard',
         ApiKeys: 'apiKeys',
+        FuelPacks: 'fuelPacks',
         Accounts: 'accounts',
         Tutorial: 'tutorial',
         Settings: 'settings'

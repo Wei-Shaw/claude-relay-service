@@ -1143,7 +1143,11 @@ const authenticateApiKey = async (req, res, next) => {
         }
       } else if (rateLimitCost > 0) {
         // 使用费用限制（新功能）
-        if (currentCost >= rateLimitCost) {
+        const fuelBalance = validation.keyData.fuelBalance || 0
+        const fuelNextExpiresAtMs = validation.keyData.fuelNextExpiresAtMs || 0
+        const hasActiveFuel = fuelBalance > 0 && fuelNextExpiresAtMs > now
+
+        if (currentCost >= rateLimitCost && !hasActiveFuel) {
           const resetTime = new Date(windowStart + windowDuration)
           const remainingMinutes = Math.ceil((resetTime - now) / 60000)
 
@@ -1186,9 +1190,15 @@ const authenticateApiKey = async (req, res, next) => {
     // 检查每日费用限制
     const dailyCostLimit = validation.keyData.dailyCostLimit || 0
     if (dailyCostLimit > 0) {
-      const dailyCost = validation.keyData.dailyCost || 0
+      const dailyCost =
+        validation.keyData.billableDailyCost !== undefined
+          ? validation.keyData.billableDailyCost
+          : validation.keyData.dailyCost || 0
+      const fuelBalance = validation.keyData.fuelBalance || 0
+      const fuelNextExpiresAtMs = validation.keyData.fuelNextExpiresAtMs || 0
+      const hasActiveFuel = fuelBalance > 0 && fuelNextExpiresAtMs > Date.now()
 
-      if (dailyCost >= dailyCostLimit) {
+      if (dailyCost >= dailyCostLimit && !hasActiveFuel) {
         logger.security(
           `💰 Daily cost limit exceeded for key: ${validation.keyData.id} (${
             validation.keyData.name
@@ -1215,9 +1225,15 @@ const authenticateApiKey = async (req, res, next) => {
     // 检查总费用限制
     const totalCostLimit = validation.keyData.totalCostLimit || 0
     if (totalCostLimit > 0) {
-      const totalCost = validation.keyData.totalCost || 0
+      const totalCost =
+        validation.keyData.billableTotalCost !== undefined
+          ? validation.keyData.billableTotalCost
+          : validation.keyData.totalCost || 0
+      const fuelBalance = validation.keyData.fuelBalance || 0
+      const fuelNextExpiresAtMs = validation.keyData.fuelNextExpiresAtMs || 0
+      const hasActiveFuel = fuelBalance > 0 && fuelNextExpiresAtMs > Date.now()
 
-      if (totalCost >= totalCostLimit) {
+      if (totalCost >= totalCostLimit && !hasActiveFuel) {
         logger.security(
           `💰 Total cost limit exceeded for key: ${validation.keyData.id} (${
             validation.keyData.name
