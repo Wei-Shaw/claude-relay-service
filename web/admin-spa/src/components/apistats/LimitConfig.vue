@@ -163,7 +163,7 @@
             />
           </div>
           <div v-else class="h-2 w-full rounded-full bg-gray-200">
-            <div class="h-2 rounded-full bg-blue-500" style="width: 0%" />
+            <div class="h-2 rounded-full bg-black dark:bg-white" style="width: 0%" />
           </div>
         </div>
 
