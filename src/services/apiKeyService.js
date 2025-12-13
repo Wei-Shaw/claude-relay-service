@@ -1721,6 +1721,38 @@ class ApiKeyService {
     }
   }
 
+  // 🔎 通过完整原始 API Key 查找（用于后台管理精确搜索）
+  async findApiKeyByRawKey(apiKey) {
+    try {
+      if (!apiKey || typeof apiKey !== 'string') {
+        return null
+      }
+
+      const trimmedApiKey = apiKey.trim()
+      if (!trimmedApiKey || !trimmedApiKey.startsWith(this.prefix)) {
+        return null
+      }
+
+      const hashedKey = this._hashApiKey(trimmedApiKey)
+      const client = redis.getClientSafe()
+      const keyId = await client.hget('apikey:hash_map', hashedKey)
+      if (!keyId) {
+        return null
+      }
+
+      const [keyData] = await redis.batchGetApiKeys([keyId])
+      if (keyData) {
+        return keyData
+      }
+
+      await client.hdel('apikey:hash_map', hashedKey)
+      return null
+    } catch (error) {
+      logger.error('❌ Failed to find API key by raw key:', error)
+      return null
+    }
+  }
+
   // 🔄 重新生成API Key
   async regenerateApiKey(keyId) {
     try {

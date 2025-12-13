@@ -194,8 +194,17 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
     let result
     let costSortStatus = null
 
-    // 如果是费用排序
-    if (validSortBy === 'cost') {
+    // rawApiKey 模式：输入完整 API Key 精确查找（不做全量扫描）
+    if (searchMode === 'rawApiKey' && search) {
+      result = await getApiKeysByRawApiKeySearch({
+        page: pageNum,
+        pageSize: pageSizeNum,
+        apiKey: search,
+        tag,
+        isActive,
+        modelFilter
+      })
+    } else if (validSortBy === 'cost') {
       const costRankService = require('../../services/costRankService')
 
       // 验证费用排序的时间范围
@@ -358,6 +367,63 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
     return res.status(500).json({ error: 'Failed to get API keys', message: error.message })
   }
 })
+
+/**
+ * 按完整原始 API Key 精确查询（不做全量扫描）
+ */
+async function getApiKeysByRawApiKeySearch(options) {
+  const { page, pageSize, apiKey, tag, isActive, modelFilter = [] } = options
+  const trimmedApiKey = typeof apiKey === 'string' ? apiKey.trim() : ''
+
+  if (!trimmedApiKey) {
+    return {
+      items: [],
+      pagination: { page: 1, pageSize, total: 0, totalPages: 1 }
+    }
+  }
+
+  let keyData = await apiKeyService.findApiKeyByRawKey(trimmedApiKey)
+
+  // 默认排除已删除的 API Keys
+  if (keyData?.isDeleted) {
+    keyData = null
+  }
+
+  // 状态筛选
+  if (keyData && isActive !== '' && isActive !== undefined && isActive !== null) {
+    const activeValue = isActive === 'true' || isActive === true
+    if (keyData.isActive !== activeValue) {
+      keyData = null
+    }
+  }
+
+  // 标签筛选
+  if (keyData && tag) {
+    const tags = Array.isArray(keyData.tags) ? keyData.tags : []
+    if (!tags.includes(tag)) {
+      keyData = null
+    }
+  }
+
+  // 模型筛选
+  if (keyData && modelFilter.length > 0) {
+    const keyIdsWithModels = await redis.getKeyIdsWithModels([keyData.id], modelFilter)
+    if (!keyIdsWithModels.has(keyData.id)) {
+      keyData = null
+    }
+  }
+
+  const allItems = keyData ? [keyData] : []
+  const total = allItems.length
+  const totalPages = Math.ceil(total / pageSize) || 1
+  const validPage = Math.min(Math.max(1, page), totalPages)
+  const start = (validPage - 1) * pageSize
+
+  return {
+    items: allItems.slice(start, start + pageSize),
+    pagination: { page: validPage, pageSize, total, totalPages }
+  }
+}
 
 /**
  * 使用预计算索引进行费用排序的分页查询

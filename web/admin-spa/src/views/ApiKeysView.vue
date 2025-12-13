@@ -159,11 +159,13 @@
                       v-model="searchKeyword"
                       class="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 pl-9 text-sm text-gray-700 placeholder-gray-400 shadow-sm transition-all duration-200 hover:border-gray-300 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 dark:hover:border-gray-500"
                       :placeholder="
-                        searchMode === 'bindingAccount'
-                          ? '搜索所属账号...'
-                          : isLdapEnabled
-                            ? '搜索名称或所有者...'
-                            : '搜索名称...'
+                        searchMode === 'rawApiKey'
+                          ? '输入完整API Key...'
+                          : searchMode === 'bindingAccount'
+                            ? '搜索所属账号...'
+                            : isLdapEnabled
+                              ? '搜索名称或所有者...'
+                              : '搜索名称...'
                       "
                       type="text"
                     />
@@ -2252,6 +2254,7 @@ const searchKeyword = ref('')
 const searchMode = ref('apiKey')
 const searchModeOptions = computed(() => [
   { value: 'apiKey', label: '按Key名称', icon: 'fa-key' },
+  { value: 'rawApiKey', label: '按API Key', icon: 'fa-key' },
   { value: 'bindingAccount', label: '按所属账号', icon: 'fa-id-badge' }
 ])
 
