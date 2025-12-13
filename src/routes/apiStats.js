@@ -2,6 +2,7 @@ const express = require('express')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const apiKeyService = require('../services/apiKeyService')
+const redeemCodeService = require('../services/redeemCodeService')
 const CostCalculator = require('../utils/costCalculator')
 const claudeAccountService = require('../services/claudeAccountService')
 const openaiAccountService = require('../services/openaiAccountService')
@@ -63,6 +64,50 @@ router.post('/api/get-key-id', async (req, res) => {
   }
 })
 
+// 🎫 兑换码续费接口（用户自助）
+router.post('/api/redeem-code', async (req, res) => {
+  try {
+    const { apiKey, redeemCode } = req.body || {}
+
+    if (!apiKey || typeof apiKey !== 'string' || apiKey.length < 10 || apiKey.length > 512) {
+      return res.status(400).json({
+        error: 'Invalid API key format',
+        message: 'API key format is invalid'
+      })
+    }
+
+    if (
+      !redeemCode ||
+      typeof redeemCode !== 'string' ||
+      redeemCode.length < 4 ||
+      redeemCode.length > 128
+    ) {
+      return res.status(400).json({
+        error: 'Invalid redeem code format',
+        message: 'Redeem code format is invalid'
+      })
+    }
+
+    const result = await redeemCodeService.redeemCode({
+      apiKey,
+      redeemCode,
+      ip: req.ip || req.connection?.remoteAddress || 'unknown'
+    })
+
+    return res.json({
+      success: true,
+      data: result
+    })
+  } catch (error) {
+    logger.error('❌ Failed to redeem code:', error)
+    return res.status(400).json({
+      success: false,
+      error: 'Failed to redeem code',
+      message: error.message
+    })
+  }
+})
+
 // 📊 用户API Key统计查询接口 - 安全的自查询接口
 router.post('/api/user-stats', async (req, res) => {
   try {
@@ -100,16 +145,6 @@ router.post('/api/user-stats', async (req, res) => {
         return res.status(403).json({
           error: 'API key is disabled',
           message: `API Key "${keyName}" 已被禁用`,
-          keyName
-        })
-      }
-
-      // 检查是否过期
-      if (keyData.expiresAt && new Date() > new Date(keyData.expiresAt)) {
-        const keyName = keyData.name || 'Unknown'
-        return res.status(403).json({
-          error: 'API key has expired',
-          message: `API Key "${keyName}" 已过期`,
           keyName
         })
       }

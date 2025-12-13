@@ -92,6 +92,14 @@ class ApiStatsClient {
       body: JSON.stringify({ apiIds, period })
     })
   }
+
+  // 兑换码续费
+  async redeemCode(apiKey, redeemCode) {
+    return this.request('/apiStats/api/redeem-code', {
+      method: 'POST',
+      body: JSON.stringify({ apiKey, redeemCode })
+    })
+  }
 }
 
 export const apiStatsClient = new ApiStatsClient()

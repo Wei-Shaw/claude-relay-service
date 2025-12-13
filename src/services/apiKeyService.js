@@ -433,16 +433,6 @@ class ApiKeyService {
 
       // 注意：这里不处理激活逻辑，保持 API Key 的未激活状态
 
-      // 检查是否过期（仅对已激活的 Key 检查）
-      if (
-        keyData.isActivated === 'true' &&
-        keyData.expiresAt &&
-        new Date() > new Date(keyData.expiresAt)
-      ) {
-        const keyName = keyData.name || 'Unknown'
-        return { valid: false, error: `API Key "${keyName}" 已过期`, keyName }
-      }
-
       // 如果API Key属于某个用户，检查用户是否被禁用
       if (keyData.userId) {
         try {
@@ -535,6 +525,16 @@ class ApiKeyService {
       logger.error('❌ API key validation error (stats):', error)
       return { valid: false, error: 'Internal validation error' }
     }
+  }
+
+  // 🔎 通过明文 API Key 获取数据（不触发激活、不校验过期）
+  async getApiKeyByRawKey(apiKey) {
+    if (!apiKey || typeof apiKey !== 'string' || !apiKey.startsWith(this.prefix)) {
+      return null
+    }
+
+    const hashedKey = this._hashApiKey(apiKey)
+    return await redis.findApiKeyByHash(hashedKey)
   }
 
   // 📋 获取所有API Keys

@@ -131,6 +131,7 @@
 
           <!-- 基本信息和统计概览 -->
           <StatsOverview />
+          <RedeemCodeRenewal />
 
           <!-- Token 分布和限制配置 -->
           <div
@@ -182,6 +183,7 @@ import TokenDistribution from '@/components/apistats/TokenDistribution.vue'
 import LimitConfig from '@/components/apistats/LimitConfig.vue'
 import AggregatedStatsCard from '@/components/apistats/AggregatedStatsCard.vue'
 import ModelUsageStats from '@/components/apistats/ModelUsageStats.vue'
+import RedeemCodeRenewal from '@/components/apistats/RedeemCodeRenewal.vue'
 import TutorialView from './TutorialView.vue'
 import ApiKeyTestModal from '@/components/apikeys/ApiKeyTestModal.vue'
 
