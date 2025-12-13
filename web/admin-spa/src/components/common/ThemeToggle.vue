@@ -172,7 +172,7 @@ const selectTheme = (mode) => {
 }
 
 .theme-toggle-button i.fa-circle-half-stroke {
-  @apply text-blue-500;
+  @apply text-gray-600 dark:text-gray-400;
 }
 
 /* 创意切换开关样式 */
@@ -217,13 +217,13 @@ const selectTheme = (mode) => {
 
 /* 自动模式样式 */
 .theme-switch.is-auto {
-  background: #0070f3;
-  border-color: #0070f3;
+  background: #9e9e9e;
+  border-color: #9e9e9e;
 }
 
 .theme-switch.is-auto:hover {
-  background: #0051bb;
-  border-color: #0051bb;
+  background: #757575;
+  border-color: #757575;
 }
 
 /* 背景装饰 */
@@ -363,7 +363,7 @@ const selectTheme = (mode) => {
 }
 
 .handle-icon .fa-circle-half-stroke {
-  color: #0070f3;
+  color: #666;
   font-size: 15px;
 }
 

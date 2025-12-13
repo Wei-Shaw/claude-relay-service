@@ -10,7 +10,7 @@
       </div>
       <div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
         <button
-          class="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 sm:w-auto"
+          class="inline-flex items-center justify-center rounded-md border border-transparent bg-black px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-gray-100 sm:w-auto"
           :disabled="loading"
           @click="loadUsers"
         >
@@ -293,20 +293,20 @@
                   <div class="ml-2 flex items-center space-x-2">
                     <span
                       :class="[
-                        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
+                        'inline-flex items-center rounded border px-2.5 py-0.5 text-xs font-medium',
                         user.isActive
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                          ? 'border-gray-900 bg-white text-gray-900 dark:border-white dark:bg-gray-800 dark:text-white'
+                          : 'border-gray-400 bg-white text-gray-600 dark:border-gray-500 dark:bg-gray-800 dark:text-gray-400'
                       ]"
                     >
                       {{ user.isActive ? 'Active' : 'Disabled' }}
                     </span>
                     <span
                       :class="[
-                        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
+                        'inline-flex items-center rounded border px-2.5 py-0.5 text-xs font-medium',
                         user.role === 'admin'
-                          ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-                          : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                          ? 'border-gray-900 bg-white text-gray-900 dark:border-white dark:bg-gray-800 dark:text-white'
+                          : 'border-gray-400 bg-white text-gray-600 dark:border-gray-500 dark:bg-gray-800 dark:text-gray-400'
                       ]"
                     >
                       {{ user.role }}

@@ -50,7 +50,7 @@
         </p>
 
         <div
-          class="mb-4 rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 dark:border-blue-500/40 dark:from-blue-950/30 dark:to-indigo-950/30 sm:mb-4 sm:mb-6 sm:p-6"
+          class="mb-4 rounded-xl border border-blue-100 bg-blue-50 p-4 dark:border-blue-500/40 dark:from-blue-950/30 dark:to-indigo-950/30 sm:mb-4 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -149,7 +149,7 @@
         </h4>
 
         <div
-          class="mb-4 rounded-xl border border-green-100 bg-gradient-to-r from-green-50 to-emerald-50 p-4 dark:border-green-500/40 dark:from-green-950/30 dark:to-emerald-950/30 sm:mb-6 sm:p-6"
+          class="mb-4 rounded-xl border border-green-100 bg-green-50 p-4 dark:border-green-500/40 dark:from-green-950/30 dark:to-emerald-950/30 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -217,7 +217,7 @@
         </h4>
 
         <div
-          class="mb-4 rounded-xl border border-purple-100 bg-gradient-to-r from-purple-50 to-pink-50 p-4 dark:border-purple-500/40 dark:from-purple-950/30 dark:to-pink-950/30 sm:mb-6 sm:p-6"
+          class="mb-4 rounded-xl border border-purple-100 bg-purple-50 p-4 dark:border-purple-500/40 dark:from-purple-950/30 dark:to-pink-950/30 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -624,7 +624,7 @@
           开始使用 Claude Code
         </h4>
         <div
-          class="rounded-xl border border-orange-100 bg-gradient-to-r from-orange-50 to-yellow-50 p-4 dark:border-orange-500/40 dark:from-orange-950/30 dark:to-yellow-950/30 sm:p-6"
+          class="rounded-xl border border-orange-100 bg-orange-50 p-4 dark:border-orange-500/40 dark:from-orange-950/30 dark:to-yellow-950/30 sm:p-6"
         >
           <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
             现在你可以开始使用 Claude Code 了！
@@ -754,7 +754,7 @@
         </p>
 
         <div
-          class="mb-4 rounded-xl border border-gray-200 bg-gradient-to-r from-gray-50 to-slate-50 p-4 dark:border-gray-700 dark:from-gray-800 dark:to-slate-800 sm:mb-6 sm:p-6"
+          class="mb-4 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:from-gray-800 dark:to-slate-800 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -852,7 +852,7 @@
         </h4>
 
         <div
-          class="mb-4 rounded-xl border border-purple-100 bg-gradient-to-r from-purple-50 to-pink-50 p-4 dark:border-purple-500/40 dark:from-purple-950/30 dark:to-pink-950/30 sm:mb-6 sm:p-6"
+          class="mb-4 rounded-xl border border-purple-100 bg-purple-50 p-4 dark:border-purple-500/40 dark:from-purple-950/30 dark:to-pink-950/30 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -915,7 +915,7 @@
         </h4>
 
         <div
-          class="mb-4 rounded-xl border border-orange-100 bg-gradient-to-r from-orange-50 to-yellow-50 p-4 dark:border-orange-500/40 dark:from-orange-950/30 dark:to-yellow-950/30 sm:mb-6 sm:p-6"
+          class="mb-4 rounded-xl border border-orange-100 bg-orange-50 p-4 dark:border-orange-500/40 dark:from-orange-950/30 dark:to-yellow-950/30 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -1277,7 +1277,7 @@
           开始使用 Claude Code
         </h4>
         <div
-          class="rounded-xl border border-yellow-100 bg-gradient-to-r from-yellow-50 to-amber-50 p-4 dark:border-yellow-500/40 dark:from-yellow-950/30 dark:to-amber-950/30 sm:p-6"
+          class="rounded-xl border border-yellow-100 bg-yellow-50 p-4 dark:border-yellow-500/40 dark:from-yellow-950/30 dark:to-amber-950/30 sm:p-6"
         >
           <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
             现在你可以开始使用 Claude Code 了！
@@ -1415,7 +1415,7 @@
         </p>
 
         <div
-          class="mb-4 rounded-xl border border-orange-100 bg-gradient-to-r from-orange-50 to-red-50 p-4 dark:border-orange-500/40 dark:from-orange-950/30 dark:to-red-950/30 sm:mb-6 sm:p-6"
+          class="mb-4 rounded-xl border border-orange-100 bg-orange-50 p-4 dark:border-orange-500/40 dark:from-orange-950/30 dark:to-red-950/30 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -1501,7 +1501,7 @@
         </h4>
 
         <div
-          class="mb-4 rounded-xl border border-purple-100 bg-gradient-to-r from-purple-50 to-pink-50 p-4 dark:border-purple-500/40 dark:from-purple-950/30 dark:to-pink-950/30 sm:mb-6 sm:p-6"
+          class="mb-4 rounded-xl border border-purple-100 bg-purple-50 p-4 dark:border-purple-500/40 dark:from-purple-950/30 dark:to-pink-950/30 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -1564,7 +1564,7 @@
         </h4>
 
         <div
-          class="mb-4 rounded-xl border border-orange-100 bg-gradient-to-r from-orange-50 to-yellow-50 p-4 dark:border-orange-500/40 dark:from-orange-950/30 dark:to-yellow-950/30 sm:mb-6 sm:p-6"
+          class="mb-4 rounded-xl border border-orange-100 bg-orange-50 p-4 dark:border-orange-500/40 dark:from-orange-950/30 dark:to-yellow-950/30 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -1920,7 +1920,7 @@
             开始使用 Claude Code
           </h4>
           <div
-            class="rounded-xl border border-yellow-100 bg-gradient-to-r from-yellow-50 to-amber-50 p-4 dark:border-yellow-500/40 dark:from-yellow-950/30 dark:to-amber-950/30 sm:p-6"
+            class="rounded-xl border border-yellow-100 bg-yellow-50 p-4 dark:border-yellow-500/40 dark:from-yellow-950/30 dark:to-amber-950/30 sm:p-6"
           >
             <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
               现在你可以开始使用 Claude Code 了！
@@ -2055,7 +2055,7 @@
 
       <!-- 结尾 -->
       <div
-        class="rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 p-4 text-center text-white sm:p-6"
+        class="rounded-xl bg-blue-600 p-4 text-center text-white sm:p-6"
       >
         <h5 class="mb-2 text-lg font-semibold sm:text-xl">🎉 恭喜你！</h5>
         <p class="mb-3 text-sm text-blue-100 sm:mb-4 sm:text-base">
@@ -2291,15 +2291,6 @@ code {
 
 .tutorial-content h4 {
   scroll-margin-top: 100px;
-}
-
-.tutorial-content .bg-gradient-to-r {
-  transition: all 0.2s ease;
-}
-
-.tutorial-content .bg-gradient-to-r:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* 暗色主题优化 */

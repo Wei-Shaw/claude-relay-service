@@ -7,7 +7,7 @@
           <div class="flex items-center">
             <div class="flex flex-shrink-0 items-center">
               <svg
-                class="h-8 w-8 text-blue-600 dark:text-blue-400"
+                class="h-8 w-8 text-gray-900 dark:text-white"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -27,7 +27,7 @@
                   :class="[
                     'rounded-md px-3 py-2 text-sm font-medium',
                     activeTab === 'overview'
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                      ? 'bg-black text-white dark:bg-white dark:text-black'
                       : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                   ]"
                   @click="handleTabChange('overview')"
@@ -38,7 +38,7 @@
                   :class="[
                     'rounded-md px-3 py-2 text-sm font-medium',
                     activeTab === 'api-keys'
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                      ? 'bg-black text-white dark:bg-white dark:text-black'
                       : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                   ]"
                   @click="handleTabChange('api-keys')"
@@ -49,7 +49,7 @@
                   :class="[
                     'rounded-md px-3 py-2 text-sm font-medium',
                     activeTab === 'usage'
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                      ? 'bg-black text-white dark:bg-white dark:text-black'
                       : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                   ]"
                   @click="handleTabChange('usage')"
@@ -60,7 +60,7 @@
                   :class="[
                     'rounded-md px-3 py-2 text-sm font-medium',
                     activeTab === 'tutorial'
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                      ? 'bg-black text-white dark:bg-white dark:text-black'
                       : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                   ]"
                   @click="handleTabChange('tutorial')"
@@ -293,7 +293,7 @@
                   <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Role</dt>
                   <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
                     <span
-                      class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                      class="inline-flex items-center rounded-full border border-gray-300 bg-white px-2.5 py-0.5 text-xs font-medium text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
                     >
                       {{ userProfile?.role || 'user' }}
                     </span>

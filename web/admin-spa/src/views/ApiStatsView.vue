@@ -18,7 +18,7 @@
           <!-- 分隔线 -->
           <div
             v-if="oemSettings.ldapEnabled || oemSettings.showAdminButton !== false"
-            class="h-8 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent opacity-50 dark:via-gray-600"
+            class="h-8 w-px bg-gray-300 dark:bg-gray-600"
           />
 
           <!-- 用户登录按钮 (仅在 LDAP 启用时显示) -->

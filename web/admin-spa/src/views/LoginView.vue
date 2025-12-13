@@ -11,7 +11,7 @@
       <div class="mb-6 text-center sm:mb-8">
         <!-- 使用自定义布局来保持登录页面的居中大logo样式 -->
         <div
-          class="mx-auto mb-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-gray-300/30 bg-gradient-to-br from-blue-500/20 to-purple-500/20 backdrop-blur-sm sm:mb-6 sm:h-20 sm:w-20 sm:rounded-2xl"
+          class="mx-auto mb-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-gray-300 bg-gray-50 dark:border-gray-600 dark:bg-gray-800 sm:mb-6 sm:h-20 sm:w-20 sm:rounded-2xl"
         >
           <template v-if="!oemLoading">
             <img

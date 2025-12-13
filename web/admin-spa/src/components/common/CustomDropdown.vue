@@ -4,7 +4,7 @@
     <div
       ref="triggerRef"
       class="relative flex cursor-pointer items-center gap-2 border border-gray-200 bg-white px-3 py-2 transition-all duration-200 dark:border-gray-600 dark:bg-gray-800"
-      :class="[isOpen && 'border-blue-400']"
+      :class="[isOpen && 'border-gray-900 dark:border-white']"
       :style="{ borderRadius: '5px', boxShadow: isOpen ? '0 4px 12px rgba(0, 0, 0, 0.08)' : 'none' }"
       @click="toggleDropdown"
     >
@@ -45,7 +45,7 @@
               class="flex cursor-pointer items-center gap-2 whitespace-nowrap py-2 text-sm transition-colors duration-150"
               :class="[
                 isSelected(option.value)
-                  ? 'bg-blue-50 font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                  ? 'bg-gray-100 font-medium text-gray-900 dark:bg-gray-700 dark:text-white'
                   : option.isGroup
                     ? 'bg-gray-50 font-semibold text-gray-800 dark:bg-gray-700/50 dark:text-gray-200'
                     : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
@@ -60,7 +60,7 @@
               <span>{{ option.label }}</span>
               <i
                 v-if="isSelected(option.value)"
-                class="fas fa-check ml-auto pl-3 text-xs text-blue-600 dark:text-blue-400"
+                class="fas fa-check ml-auto pl-3 text-xs text-gray-900 dark:text-white"
               ></i>
             </div>
           </div>

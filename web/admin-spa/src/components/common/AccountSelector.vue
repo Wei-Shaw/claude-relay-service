@@ -71,7 +71,7 @@
                 v-for="option in specialOptionsList"
                 :key="`special-${option.value}`"
                 class="cursor-pointer px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
-                :class="{ 'bg-blue-50 dark:bg-blue-900/20': modelValue === option.value }"
+                :class="{ 'bg-gray-100 dark:bg-gray-700': modelValue === option.value }"
                 @click="selectAccount(option.value)"
               >
                 <span class="text-gray-700 dark:text-gray-300">{{ option.label }}</span>
@@ -87,7 +87,7 @@
             <!-- 默认选项 -->
             <div
               class="cursor-pointer px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
-              :class="{ 'bg-blue-50 dark:bg-blue-900/20': !modelValue }"
+              :class="{ 'bg-gray-100 dark:bg-gray-700': !modelValue }"
               @click="selectAccount(null)"
             >
               <span class="text-gray-700 dark:text-gray-300">{{ defaultOptionText }}</span>
@@ -104,7 +104,7 @@
                 v-for="group in filteredGroups"
                 :key="`group:${group.id}`"
                 class="cursor-pointer px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
-                :class="{ 'bg-blue-50 dark:bg-blue-900/20': modelValue === `group:${group.id}` }"
+                :class="{ 'bg-gray-100 dark:bg-gray-700': modelValue === `group:${group.id}` }"
                 @click="selectAccount(`group:${group.id}`)"
               >
                 <div class="flex items-center justify-between">
@@ -137,7 +137,7 @@
                 v-for="account in filteredOAuthAccounts"
                 :key="account.id"
                 class="cursor-pointer px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
-                :class="{ 'bg-blue-50 dark:bg-blue-900/20': modelValue === account.id }"
+                :class="{ 'bg-gray-100 dark:bg-gray-700': modelValue === account.id }"
                 @click="selectAccount(account.id)"
               >
                 <div class="flex items-center justify-between">
@@ -175,7 +175,7 @@
                 :key="account.id"
                 class="cursor-pointer px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
                 :class="{
-                  'bg-blue-50 dark:bg-blue-900/20': modelValue === `console:${account.id}`
+                  'bg-gray-100 dark:bg-gray-700': modelValue === `console:${account.id}`
                 }"
                 @click="selectAccount(`console:${account.id}`)"
               >
@@ -214,7 +214,7 @@
                 :key="account.id"
                 class="cursor-pointer px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
                 :class="{
-                  'bg-blue-50 dark:bg-blue-900/20': modelValue === `responses:${account.id}`
+                  'bg-gray-100 dark:bg-gray-700': modelValue === `responses:${account.id}`
                 }"
                 @click="selectAccount(`responses:${account.id}`)"
               >
@@ -253,7 +253,7 @@
                 :key="account.id"
                 class="cursor-pointer px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
                 :class="{
-                  'bg-blue-50 dark:bg-blue-900/20': modelValue === `api:${account.id}`
+                  'bg-gray-100 dark:bg-gray-700': modelValue === `api:${account.id}`
                 }"
                 @click="selectAccount(`api:${account.id}`)"
               >

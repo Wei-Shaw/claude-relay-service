@@ -376,7 +376,7 @@
               :class="[
                 'rounded-md px-3 py-1 text-sm font-medium transition-colors',
                 dateFilter.preset === option.value && dateFilter.type === 'preset'
-                  ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
+                  ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
                   : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
               ]"
               @click="setDateFilterPreset(option.value)"
@@ -391,7 +391,7 @@
               :class="[
                 'rounded-md px-3 py-1 text-sm font-medium transition-colors',
                 trendGranularity === 'day'
-                  ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
+                  ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
                   : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
               ]"
               @click="setTrendGranularity('day')"
@@ -402,7 +402,7 @@
               :class="[
                 'rounded-md px-3 py-1 text-sm font-medium transition-colors',
                 trendGranularity === 'hour'
-                  ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
+                  ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
                   : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
               ]"
               @click="setTrendGranularity('hour')"
@@ -441,7 +441,7 @@
                 <input v-model="autoRefreshEnabled" class="peer sr-only" type="checkbox" />
                 <!-- 更小的开关 -->
                 <div
-                  class="peer relative h-5 w-9 rounded-full bg-gray-300 transition-all duration-200 after:absolute after:left-[2px] after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:duration-200 after:content-[''] peer-checked:bg-blue-500 peer-checked:after:translate-x-4 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:bg-gray-600 dark:after:bg-gray-300 dark:peer-focus:ring-blue-600"
+                  class="peer relative h-5 w-9 rounded-full bg-gray-300 transition-all duration-200 after:absolute after:left-[2px] after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:duration-200 after:content-[''] peer-checked:bg-gray-900 peer-checked:after:translate-x-4 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-gray-400 dark:bg-gray-600 dark:after:bg-gray-300 dark:peer-checked:bg-white dark:peer-focus:ring-gray-500"
                 />
                 <span
                   class="ml-2.5 flex select-none items-center gap-1 text-sm font-medium text-gray-600 dark:text-gray-300"
@@ -450,7 +450,7 @@
                   <span>自动刷新</span>
                   <span
                     v-if="autoRefreshEnabled"
-                    class="ml-1 font-mono text-xs text-blue-600 transition-opacity"
+                    class="ml-1 font-mono text-xs text-gray-900 transition-opacity dark:text-white"
                     :class="refreshCountdown > 0 ? 'opacity-100' : 'opacity-0'"
                   >
                     {{ refreshCountdown }}s
@@ -461,7 +461,7 @@
 
             <!-- 刷新按钮 -->
             <button
-              class="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-blue-600 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-700 sm:gap-2"
+              class="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-gray-900 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700 sm:gap-2"
               :disabled="isRefreshing"
               title="立即刷新数据"
               @click="refreshAllData()"
@@ -553,7 +553,7 @@
                     class="hidden px-2 py-2 text-right text-xs font-medium sm:table-cell sm:px-4 sm:text-sm"
                   >
                     <span
-                      class="inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                      class="inline-flex items-center rounded-full border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
                     >
                       {{ calculatePercentage(stat.allTokens, dashboardModelStats) }}%
                     </span>
@@ -588,7 +588,7 @@
               :class="[
                 'rounded-md px-2 py-1 text-xs font-medium transition-colors sm:px-3 sm:text-sm',
                 apiKeysTrendMetric === 'requests'
-                  ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
+                  ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
                   : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
               ]"
               @click="((apiKeysTrendMetric = 'requests'), updateApiKeysUsageTrendChart())"
@@ -600,7 +600,7 @@
               :class="[
                 'rounded-md px-2 py-1 text-xs font-medium transition-colors sm:px-3 sm:text-sm',
                 apiKeysTrendMetric === 'tokens'
-                  ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
+                  ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
                   : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
               ]"
               @click="((apiKeysTrendMetric = 'tokens'), updateApiKeysUsageTrendChart())"
@@ -642,7 +642,7 @@
                 :class="[
                   'rounded-md px-2 py-1 text-xs font-medium transition-colors sm:px-3 sm:text-sm',
                   accountUsageGroup === option.value
-                    ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
+                    ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
                     : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
                 ]"
                 @click="handleAccountUsageGroupChange(option.value)"
