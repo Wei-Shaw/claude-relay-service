@@ -1,5 +1,5 @@
 <template>
-  <div class="api-input-wide-card mb-8 rounded-3xl p-6 shadow-xl">
+  <div class="api-input-wide-card mb-8 rounded p-6 shadow-xl">
     <!-- 标题区域 -->
     <div class="wide-card-title mb-6">
       <h2 class="mb-2 text-2xl font-bold text-gray-900 dark:text-gray-200">

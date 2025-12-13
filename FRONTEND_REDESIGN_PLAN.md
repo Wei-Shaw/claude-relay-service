@@ -569,103 +569,188 @@ web/admin-spa/src/assets/styles/
 
 ## Component Inventory
 
-### Common Components (15 files)
-1. ✅ StatCard.vue
-2. ✅ ThemeToggle.vue
-3. ✅ ToastNotification.vue
-4. ✅ ConfirmDialog.vue
-5. ✅ ConfirmModal.vue
-6. ✅ ActionDropdown.vue
-7. ✅ CustomDropdown.vue
-8. ✅ AccountSelector.vue
-9. ✅ LogoTitle.vue
+**Migration Reference:** All components marked ✅ have been migrated following patterns from `DesignDemoView.vue`
 
-### Layout Components (3 files)
-1. ✅ MainLayout.vue
-2. ✅ AppHeader.vue
-3. ✅ TabBar.vue
+### Common Components (9 files) - Phase 2 ✅ COMPLETED
+1. ✅ StatCard.vue → Uses flat colors (Reference: Demo Cards Section)
+2. ✅ ThemeToggle.vue → Flat toggle (Reference: Demo Inputs Section - Toggle)
+3. ✅ ToastNotification.vue → Flat alerts (Reference: Demo Alerts Section)
+4. ✅ ConfirmDialog.vue → Clean modal (Reference: Demo Cards Section)
+5. ✅ ConfirmModal.vue → Clean modal (Reference: Demo Cards Section)
+6. ✅ ActionDropdown.vue → Flat dropdown (Reference: Demo Buttons Section)
+7. ✅ CustomDropdown.vue → Flat dropdown (Reference: Demo Inputs Section - Select)
+8. ✅ AccountSelector.vue → Flat select (Reference: Demo Inputs Section - Select)
+9. ✅ LogoTitle.vue → Clean typography (Reference: Demo Typography Section)
 
-### View Pages (12 files)
-1. ✅ DashboardView.vue
-2. ✅ ApiKeysView.vue
-3. ✅ AccountsView.vue
-4. ✅ SettingsView.vue
-5. ✅ TutorialView.vue
-6. ✅ LoginView.vue
-7. ✅ UserLoginView.vue
-8. ✅ UserDashboardView.vue
-9. ✅ UserManagementView.vue
-10. ✅ ApiStatsView.vue
-11. ✅ ApiKeyUsageRecordsView.vue
-12. ✅ AccountUsageRecordsView.vue
+### Layout Components (3 files) - Phase 3 ✅ COMPLETED
+1. ✅ MainLayout.vue → Sharp edges, white bg (Reference: Demo Cards Section)
+2. ✅ AppHeader.vue → Flat header (Reference: Demo Typography Section)
+3. ✅ TabBar.vue → Bottom border tabs (Reference: Demo Misc Section - Tabs)
 
-### API Keys Components (12 files)
-1. ✅ CreateApiKeyModal.vue
-2. ✅ EditApiKeyModal.vue
-3. ✅ NewApiKeyModal.vue
-4. ✅ RenewApiKeyModal.vue
-5. ✅ BatchApiKeyModal.vue
-6. ✅ BatchEditApiKeyModal.vue
-7. ✅ ExpiryEditModal.vue
-8. ✅ ApiKeyTestModal.vue
-9. ✅ UsageDetailModal.vue
-10. ✅ RecordDetailModal.vue
-11. ✅ LimitBadge.vue
-12. ✅ LimitProgressBar.vue
-13. ✅ WindowLimitBar.vue
-14. ✅ WindowCountdown.vue
+### View Pages (12 files) - Phase 4 ✅ COMPLETED
+1. ✅ DashboardView.vue → Stat cards (Reference: Demo Cards Section)
+2. ✅ ApiKeysView.vue → Table + badges (Reference: Demo Tables + Badges)
+3. ✅ AccountsView.vue → Table + badges (Reference: Demo Tables + Badges)
+4. ✅ SettingsView.vue → Forms (Reference: Demo Inputs Section)
+5. ✅ TutorialView.vue → Typography + alerts (Reference: Demo Typography + Alerts)
+6. ✅ LoginView.vue → Forms (Reference: Demo Inputs Section)
+7. ✅ UserLoginView.vue → Forms (Reference: Demo Inputs Section)
+8. ✅ UserDashboardView.vue → Cards + tabs (Reference: Demo Cards + Tabs)
+9. ✅ UserManagementView.vue → Table + badges (Reference: Demo Tables + Badges)
+10. ✅ ApiStatsView.vue → Cards (Reference: Demo Cards Section)
+11. ✅ ApiKeyUsageRecordsView.vue → Table (Reference: Demo Tables Section)
+12. ✅ AccountUsageRecordsView.vue → Table (Reference: Demo Tables Section)
 
-### Account Components (9 files)
-1. ✅ AccountForm.vue
-2. ✅ CcrAccountForm.vue
-3. ✅ OAuthFlow.vue
-4. ✅ ProxyConfig.vue
-5. ✅ AccountTestModal.vue
-6. ✅ AccountUsageDetailModal.vue
-7. ✅ AccountExpiryEditModal.vue
-8. ✅ ApiKeyManagementModal.vue
-9. ✅ GroupManagementModal.vue
+### API Keys Components (14 files) - Phase 5 ⏭️ PENDING
+**Reference Sections from DesignDemoView.vue:**
+- Modals: Cards Section (content cards with header/body/footer)
+- Progress bars: Misc Section (progress bars)
+- Badges: Badges Section (all variants)
 
-### API Stats Components (6 files)
-1. ✅ StatsOverview.vue
-2. ✅ ModelUsageStats.vue
-3. ✅ TokenDistribution.vue
-4. ✅ AggregatedStatsCard.vue
-5. ✅ ApiKeyInput.vue
-6. ✅ LimitConfig.vue
+1. [ ] CreateApiKeyModal.vue
+2. [ ] EditApiKeyModal.vue
+3. [ ] NewApiKeyModal.vue
+4. [ ] RenewApiKeyModal.vue
+5. [ ] BatchApiKeyModal.vue
+6. [ ] BatchEditApiKeyModal.vue
+7. [ ] ExpiryEditModal.vue
+8. [ ] ApiKeyTestModal.vue
+9. [ ] UsageDetailModal.vue
+10. [ ] RecordDetailModal.vue
+11. [ ] LimitBadge.vue
+12. [ ] LimitProgressBar.vue
+13. [ ] WindowLimitBar.vue
+14. [ ] WindowCountdown.vue
 
-### Dashboard Components (2 files)
-1. ✅ UsageTrend.vue
-2. ✅ ModelDistribution.vue
+### Account Components (9 files) - Phase 5 ⏭️ PENDING
+**Reference Sections from DesignDemoView.vue:**
+- Forms: Inputs Section (all input types)
+- Modals: Cards Section (content cards)
+- Badges: Badges Section
 
-### User Components (4 files)
-1. ✅ CreateApiKeyModal.vue (user)
-2. ✅ ViewApiKeyModal.vue
-3. ✅ UserApiKeysManager.vue
-4. ✅ UserUsageStats.vue
+1. [ ] AccountForm.vue
+2. [ ] CcrAccountForm.vue
+3. [ ] OAuthFlow.vue
+4. [ ] ProxyConfig.vue
+5. [ ] AccountTestModal.vue
+6. [ ] AccountUsageDetailModal.vue
+7. [ ] AccountExpiryEditModal.vue
+8. [ ] ApiKeyManagementModal.vue
+9. [ ] GroupManagementModal.vue
 
-### Admin Components (2 files)
-1. ✅ ChangeRoleModal.vue
-2. ✅ UserUsageStatsModal.vue
+### API Stats Components (6 files) - Phase 5 ⏭️ PENDING
+**Reference Sections from DesignDemoView.vue:**
+- Stats: Cards Section (stat cards)
+- Charts: Use minimal black/white colors
+- Inputs: Inputs Section
 
-**Total: ~55 component files to migrate**
+1. [ ] StatsOverview.vue
+2. [ ] ModelUsageStats.vue
+3. [ ] TokenDistribution.vue
+4. [ ] AggregatedStatsCard.vue
+5. [ ] ApiKeyInput.vue
+6. [ ] LimitConfig.vue
+
+### Dashboard Components (2 files) - Phase 5 ⏭️ PENDING
+**Reference Sections from DesignDemoView.vue:**
+- Charts: Use minimal colors
+- Cards: Cards Section (stat cards)
+
+1. [ ] UsageTrend.vue
+2. [ ] ModelDistribution.vue
+
+### User Components (4 files) - Phase 5 ⏭️ PENDING
+**Reference Sections from DesignDemoView.vue:**
+- Modals: Cards Section
+- Stats: Cards Section
+- Buttons: Buttons Section
+
+1. [ ] CreateApiKeyModal.vue (user)
+2. [ ] ViewApiKeyModal.vue
+3. [ ] UserApiKeysManager.vue
+4. [ ] UserUsageStats.vue
+
+### Admin Components (2 files) - Phase 5 ⏭️ PENDING
+**Reference Sections from DesignDemoView.vue:**
+- Modals: Cards Section
+- Stats: Cards Section
+
+1. [ ] ChangeRoleModal.vue
+2. [ ] UserUsageStatsModal.vue
+
+**Total: ~59 component files**
+- **Completed:** 24 files (Phase 1-4: Foundation + Common + Layout + Views)
+- **Remaining:** 35 files (Phase 5: Specialized components)
 
 ---
 
 ## Reference: Design Demo Components
 
-The design demo at `DesignDemoView.vue` contains all the new component examples:
-- Typography system
-- Button variants
-- Form inputs (text, textarea, select, checkbox, radio, toggle, icon inputs)
-- Card types (stat cards, content cards, interactive cards)
-- Tables (default, compact)
-- Badges (status, dot, count)
-- Alerts (success, error, warning, info, dismissible)
-- Loading states (spinners, skeletons)
-- Miscellaneous (progress bars, dividers, code blocks, tooltips, breadcrumbs, pagination, tabs)
+**IMPORTANT:** The design demo at `/Users/lujuncheng/CursorProjects/claude-relay-service/web/admin-spa/src/views/DesignDemoView.vue` is the **SINGLE SOURCE OF TRUTH** for all migration work.
 
-Each section in the demo should be referenced when migrating corresponding components.
+The demo contains complete implementations of:
+
+### Typography Section (Lines 24-66)
+- Heading 1-4 with exact font sizes, weights, and letter-spacing
+- Body text variants (large, normal, small, caption)
+- Text styles (bold, italic, code, link, muted, error, success)
+
+### Buttons Section (Lines 68-142)
+- Primary, secondary, outline, danger, ghost buttons
+- Icon buttons and button groups
+- All size variants (sm, md, lg)
+- Disabled and loading states
+
+### Form Inputs Section (Lines 144-295)
+- Text inputs with all states (default, focus, error, disabled)
+- Textarea, select dropdowns
+- Checkbox, radio buttons, toggle switches
+- Input with icons
+- Form labels, help text, error messages
+
+### Cards Section (Lines 297-371)
+- Stat cards with trend indicators
+- Content cards with header/body/footer
+- Interactive cards with actions
+- Grid layouts with 1px borders
+
+### Tables Section (Lines 373-467)
+- Default and compact table styles
+- Table headers (uppercase, gray text, 0.75rem)
+- Row hover states
+- Cell content structure
+
+### Badges Section (Lines 469-517)
+- Status badges (success, error, warning, info, neutral)
+- Dot badges for online/offline states
+- Count badges for notifications
+
+### Alerts Section (Lines 519-552)
+- All alert types with colored backgrounds and borders
+- Dismissible alerts
+
+### Loading Section (Lines 554-587)
+- Spinners (sm, md, lg)
+- Skeleton loaders (text, rect, circle)
+- Loading cards
+
+### Miscellaneous Section (Lines 589-675)
+- Progress bars with fills
+- Dividers (plain and with text)
+- Code blocks (black background)
+- Tooltips (hover states)
+- Breadcrumbs
+- Pagination
+- Tabs (bottom border indicator style)
+
+### Complete Styles Section (Lines 698-1898)
+**The entire style section contains the exact CSS for all components.** Use these exact values for:
+- Colors, spacing, typography
+- Border radius, shadows, transitions
+- Hover states, active states, disabled states
+- Responsive breakpoints
+
+**When migrating any component, copy the exact patterns from DesignDemoView.vue. Do not deviate unless there's a specific reason.**
 
 ---
 

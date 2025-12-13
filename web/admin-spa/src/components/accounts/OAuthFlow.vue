@@ -3,7 +3,7 @@
     <!-- Claude OAuth流程 -->
     <div v-if="platform === 'claude'">
       <div
-        class="rounded-lg border border-blue-200 bg-blue-50 p-6 dark:border-blue-700 dark:bg-blue-900/30"
+        class="rounded-lg border border-gray-300 bg-blue-50 p-6 dark:border-gray-700 dark:bg-blue-900/30"
       >
         <div class="flex items-start gap-4">
           <div
@@ -23,7 +23,7 @@
                 <label class="flex cursor-pointer items-center gap-2">
                   <input
                     v-model="authMethod"
-                    class="text-blue-600 focus:ring-blue-500"
+                    class="text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white"
                     name="claude-auth-method"
                     type="radio"
                     value="manual"
@@ -34,7 +34,7 @@
                 <label class="flex cursor-pointer items-center gap-2">
                   <input
                     v-model="authMethod"
-                    class="text-blue-600 focus:ring-blue-500"
+                    class="text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white"
                     name="claude-auth-method"
                     type="radio"
                     value="cookie"
@@ -68,7 +68,7 @@
                       {{ parsedSessionKeyCount }} 个
                     </span>
                     <button
-                      class="text-blue-500 hover:text-blue-600"
+                      class="text-blue-500 hover:text-gray-900 dark:text-gray-100"
                       type="button"
                       @click="showSessionKeyHelp = !showSessionKeyHelp"
                     >
@@ -83,7 +83,7 @@
                   />
                   <p
                     v-if="parsedSessionKeyCount > 1"
-                    class="mt-1 text-xs text-blue-600 dark:text-blue-400"
+                    class="mt-1 text-xs text-gray-900 dark:text-gray-100 dark:text-blue-400"
                   >
                     <i class="fas fa-info-circle mr-1" />
                     将批量创建 {{ parsedSessionKeyCount }} 个账户
@@ -199,7 +199,7 @@
                           </button>
                         </div>
                         <button
-                          class="text-xs text-blue-600 hover:text-blue-700"
+                          class="text-xs text-gray-900 dark:text-gray-100 hover:text-blue-700"
                           @click="regenerateAuthUrl"
                         >
                           <i class="fas fa-sync-alt mr-1" />重新生成
@@ -577,19 +577,19 @@
                         />
                       </div>
                       <div
-                        class="rounded border border-blue-300 bg-blue-50 p-2 dark:border-blue-700 dark:bg-blue-900/30"
+                        class="rounded border border-blue-300 bg-blue-50 p-2 dark:border-gray-700 dark:bg-blue-900/30"
                       >
                         <p class="text-xs text-blue-700 dark:text-blue-300">
                           <i class="fas fa-lightbulb mr-1" />
                           <strong>提示：</strong>您可以直接复制整个链接或仅复制 code
                           参数值，系统会自动识别。
                         </p>
-                        <p class="mt-1 text-xs text-blue-600 dark:text-blue-400">
+                        <p class="mt-1 text-xs text-gray-900 dark:text-gray-100 dark:text-blue-400">
                           • 完整链接示例：<span class="font-mono"
                             >http://localhost:1455/auth/callback?code=ac_4hm8...</span
                           >
                         </p>
-                        <p class="text-xs text-blue-600">
+                        <p class="text-xs text-gray-900 dark:text-gray-100">
                           • 仅 Code 示例：<span class="font-mono"
                             >ac_4hm8iqmx9A2fzMy_cwye7U3W7...</span
                           >
@@ -771,7 +771,7 @@
 
     <div class="flex gap-3 pt-4">
       <button
-        class="flex-1 rounded-xl bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+        class="flex-1 rounded bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
         type="button"
         @click="$emit('back')"
       >

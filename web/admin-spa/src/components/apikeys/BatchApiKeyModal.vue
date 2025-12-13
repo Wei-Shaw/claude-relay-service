@@ -7,7 +7,7 @@
         <div class="mb-6 flex items-center justify-between">
           <div class="flex items-center gap-3">
             <div
-              class="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-green-500 to-green-600"
+              class="flex h-12 w-12 items-center justify-center rounded bg-gradient-to-br from-green-500 to-green-600"
             >
               <i class="fas fa-layer-group text-lg text-white" />
             </div>
@@ -46,11 +46,11 @@
         <!-- 统计信息 -->
         <div class="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
           <div
-            class="rounded-lg border border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100 p-4"
+            class="rounded-lg border border-gray-300 bg-gradient-to-br from-blue-50 to-blue-100 p-4"
           >
             <div class="flex items-center justify-between">
               <div>
-                <p class="text-xs font-medium text-blue-600">创建数量</p>
+                <p class="text-xs font-medium text-gray-900 dark:text-gray-100">创建数量</p>
                 <p class="mt-1 text-2xl font-bold text-blue-900">
                   {{ apiKeys.length }}
                 </p>
@@ -58,7 +58,7 @@
               <div
                 class="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500 bg-opacity-20"
               >
-                <i class="fas fa-key text-blue-600" />
+                <i class="fas fa-key text-gray-900 dark:text-gray-100" />
               </div>
             </div>
           </div>
@@ -124,7 +124,7 @@
             <label class="text-sm font-semibold text-gray-700">API Keys 预览</label>
             <div class="flex items-center gap-2">
               <button
-                class="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                class="flex items-center gap-1 text-xs text-gray-900 dark:text-gray-100 hover:text-blue-800"
                 type="button"
                 @click="togglePreview"
               >
@@ -153,7 +153,7 @@
             下载所有 API Keys
           </button>
           <button
-            class="rounded-xl border border-gray-300 bg-gray-200 px-6 py-3 font-semibold text-gray-800 transition-colors hover:bg-gray-300"
+            class="rounded border border-gray-300 bg-gray-200 px-6 py-3 font-semibold text-gray-800 transition-colors hover:bg-gray-300"
             @click="handleClose"
           >
             我已保存
@@ -161,7 +161,7 @@
         </div>
 
         <!-- 额外提示 -->
-        <div class="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
+        <div class="mt-4 rounded-lg border border-gray-300 bg-blue-50 p-3">
           <p class="flex items-start text-xs text-blue-700">
             <i class="fas fa-info-circle mr-2 mt-0.5 flex-shrink-0" />
             <span>

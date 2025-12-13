@@ -1,5 +1,5 @@
 <template>
-  <div class="inline-flex items-center gap-1.5 rounded-md px-2 py-1" :class="badgeClass">
+  <div class="inline-flex items-center gap-1.5 rounded border px-2 py-1" :class="badgeClass">
     <div class="flex items-center gap-1">
       <i :class="['text-xs', iconClass]" />
       <span class="text-xs font-medium">{{ label }}</span>
@@ -50,45 +50,26 @@ const progress = computed(() => {
 })
 
 const badgeClass = computed(() => {
-  switch (props.type) {
-    case 'daily':
-      return 'bg-gray-50 dark:bg-gray-700/50'
-    case 'opus':
-      return 'bg-indigo-50 dark:bg-indigo-900/20'
-    case 'window':
-      return 'bg-blue-50 dark:bg-blue-900/20'
-    default:
-      return 'bg-gray-50 dark:bg-gray-700/50'
-  }
+  return 'bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700'
 })
 
 const iconClass = computed(() => {
   switch (props.type) {
     case 'daily':
-      return 'fas fa-calendar-day text-gray-500'
+      return 'fas fa-calendar-day text-gray-600 dark:text-gray-400'
     case 'opus':
-      return 'fas fa-gem text-indigo-500'
+      return 'fas fa-gem text-gray-600 dark:text-gray-400'
     case 'window':
-      return 'fas fa-clock text-blue-500'
+      return 'fas fa-clock text-gray-600 dark:text-gray-400'
     default:
-      return 'fas fa-info-circle text-gray-500'
+      return 'fas fa-info-circle text-gray-600 dark:text-gray-400'
   }
 })
 
 const progressClass = computed(() => {
   const p = progress.value
-  if (p >= 100) return 'bg-red-500'
-  if (p >= 80) return 'bg-yellow-500'
-
-  switch (props.type) {
-    case 'daily':
-      return 'bg-green-500'
-    case 'opus':
-      return 'bg-indigo-500'
-    case 'window':
-      return 'bg-blue-500'
-    default:
-      return 'bg-gray-500'
-  }
+  if (p >= 100) return 'bg-red-600 dark:bg-red-500'
+  if (p >= 80) return 'bg-orange-500 dark:bg-orange-400'
+  return 'bg-black dark:bg-white'
 })
 </script>

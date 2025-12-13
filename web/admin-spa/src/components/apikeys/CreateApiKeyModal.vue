@@ -5,9 +5,9 @@
         <div class="mb-4 flex items-center justify-between">
           <div class="flex items-center gap-2 sm:gap-3">
             <div
-              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 sm:h-10 sm:w-10 sm:rounded-xl"
+              class="flex h-8 w-8 items-center justify-center rounded bg-gray-900 dark:bg-gray-100 sm:h-10 sm:w-10"
             >
-              <i class="fas fa-key text-sm text-white sm:text-base" />
+              <i class="fas fa-key text-sm text-white dark:text-black sm:text-base" />
             </div>
             <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">
               创建新的 API Key
@@ -27,7 +27,7 @@
         >
           <!-- 创建类型选择 -->
           <div
-            class="rounded-lg border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-3 dark:border-blue-700 dark:from-blue-900/20 dark:to-indigo-900/20 sm:p-4"
+            class="rounded-lg border border-gray-300 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800 sm:p-4"
           >
             <div
               :class="[
@@ -43,7 +43,7 @@
                 <label class="flex cursor-pointer items-center">
                   <input
                     v-model="form.createType"
-                    class="mr-1.5 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 sm:mr-2"
+                    class="mr-1.5 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white dark:border-gray-600 dark:bg-gray-700 sm:mr-2"
                     type="radio"
                     value="single"
                   />
@@ -57,7 +57,7 @@
                 <label class="flex cursor-pointer items-center">
                   <input
                     v-model="form.createType"
-                    class="mr-1.5 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 sm:mr-2"
+                    class="mr-1.5 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white dark:border-gray-600 dark:bg-gray-700 sm:mr-2"
                     type="radio"
                     value="batch"
                   />
@@ -145,7 +145,7 @@
                   <span
                     v-for="(tag, index) in form.tags"
                     :key="'selected-' + index"
-                    class="inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+                    class="inline-flex items-center gap-1 rounded-full border border-gray-300 bg-white px-3 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                   >
                     {{ tag }}
                     <button
@@ -209,7 +209,7 @@
 
           <!-- 速率限制设置 -->
           <div
-            class="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-700 dark:bg-blue-900/20"
+            class="rounded-lg border border-gray-300 bg-blue-50 p-3 dark:border-gray-700 dark:bg-blue-900/20"
           >
             <div class="mb-2 flex items-center gap-2">
               <div
@@ -473,7 +473,7 @@
                 <label class="flex cursor-pointer items-center">
                   <input
                     v-model="form.expirationMode"
-                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    class="mr-2 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white dark:border-gray-600 dark:bg-gray-700"
                     type="radio"
                     value="fixed"
                   />
@@ -482,7 +482,7 @@
                 <label class="flex cursor-pointer items-center">
                   <input
                     v-model="form.expirationMode"
-                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    class="mr-2 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white dark:border-gray-600 dark:bg-gray-700"
                     type="radio"
                     value="activation"
                   />
@@ -583,7 +583,7 @@
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.permissions"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  class="mr-2 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white dark:border-gray-600 dark:bg-gray-700"
                   type="radio"
                   value="all"
                 />
@@ -592,7 +592,7 @@
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.permissions"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  class="mr-2 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white dark:border-gray-600 dark:bg-gray-700"
                   type="radio"
                   value="claude"
                 />
@@ -601,7 +601,7 @@
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.permissions"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  class="mr-2 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white dark:border-gray-600 dark:bg-gray-700"
                   type="radio"
                   value="gemini"
                 />
@@ -610,7 +610,7 @@
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.permissions"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  class="mr-2 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white dark:border-gray-600 dark:bg-gray-700"
                   type="radio"
                   value="openai"
                 />
@@ -619,7 +619,7 @@
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.permissions"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  class="mr-2 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white dark:border-gray-600 dark:bg-gray-700"
                   type="radio"
                   value="droid"
                 />
@@ -637,7 +637,7 @@
                 >专属账号绑定 (可选)</label
               >
               <button
-                class="flex items-center gap-1 text-sm text-blue-600 transition-colors hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+                class="flex items-center gap-1 text-sm text-gray-900 dark:text-gray-100 transition-colors hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
                 :disabled="accountsLoading"
                 title="刷新账号列表"
                 type="button"
@@ -735,7 +735,7 @@
               <input
                 id="enableModelRestriction"
                 v-model="form.enableModelRestriction"
-                class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-blue-600 focus:ring-blue-500"
+                class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white"
                 type="checkbox"
               />
               <label
@@ -821,7 +821,7 @@
               <input
                 id="enableClientRestriction"
                 v-model="form.enableClientRestriction"
-                class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-blue-600 focus:ring-blue-500"
+                class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white"
                 type="checkbox"
               />
               <label
@@ -845,7 +845,7 @@
                     <input
                       :id="`client_${client.id}`"
                       v-model="form.allowedClients"
-                      class="mt-0.5 h-4 w-4 rounded border-gray-300 bg-gray-100 text-blue-600 focus:ring-blue-500"
+                      class="mt-0.5 h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white"
                       type="checkbox"
                       :value="client.id"
                     />

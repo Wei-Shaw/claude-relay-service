@@ -13,7 +13,7 @@
       <div v-if="multiKeyMode && aggregatedStats" class="space-y-4">
         <!-- API Keys 概况 -->
         <div
-          class="rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 p-4 dark:from-blue-900/20 dark:to-indigo-900/20"
+          class="rounded-lg bg-gray-50 p-4 dark:bg-gray-800"
         >
           <div class="mb-3 flex items-center justify-between">
             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">

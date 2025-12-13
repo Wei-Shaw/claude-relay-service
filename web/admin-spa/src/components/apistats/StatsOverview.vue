@@ -142,7 +142,7 @@
             <p class="metric-label">{{ statsPeriod === 'daily' ? '今日' : '本月' }}请求数</p>
           </div>
           <div class="metric-card">
-            <p class="metric-value text-blue-600 dark:text-sky-300">
+            <p class="metric-value text-gray-900 dark:text-gray-100 dark:text-sky-300">
               {{ formatNumber(currentPeriodData.allTokens) }}
             </p>
             <p class="metric-label">{{ statsPeriod === 'daily' ? '今日' : '本月' }}Token 数</p>
@@ -265,7 +265,7 @@
             </div>
             <p
               v-else
-              class="rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300"
+              class="rounded bg-slate-100 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300"
             >
               暂无额度使用数据
             </p>
@@ -510,7 +510,7 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 
 <style scoped>
 .card-section {
-  @apply flex h-full flex-col gap-4 rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-md dark:border-slate-700/60 dark:bg-slate-900/70 md:p-6;
+  @apply flex h-full flex-col gap-4 rounded border border-slate-200/70 bg-white/90 p-4 shadow-md dark:border-slate-700/60 dark:bg-slate-900/70 md:p-6;
 }
 
 :global(.dark) .card-section {
@@ -551,7 +551,7 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 }
 
 .info-item {
-  @apply rounded-xl border border-slate-200 bg-white/70 p-4 dark:border-slate-700 dark:bg-slate-900/60;
+  @apply rounded border border-slate-200 bg-white/70 p-4 dark:border-slate-700 dark:bg-slate-900/60;
   min-height: 86px;
 }
 
@@ -572,7 +572,7 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 }
 
 .metric-card {
-  @apply rounded-xl border border-slate-200 bg-white/70 p-4 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900/60;
+  @apply rounded border border-slate-200 bg-white/70 p-4 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900/60;
 }
 
 .metric-value {
@@ -584,7 +584,7 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 }
 
 .account-card {
-  @apply rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm transition-shadow hover:shadow-md dark:border-slate-700 dark:bg-slate-900/60;
+  @apply rounded border border-slate-200 bg-white/80 p-4 shadow-sm transition-shadow hover:shadow-md dark:border-slate-700 dark:bg-slate-900/60;
 }
 
 .account-icon {
@@ -628,7 +628,7 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 }
 
 .quota-row {
-  @apply rounded-xl border border-slate-200 bg-white/60 p-3 dark:border-slate-700 dark:bg-slate-900/50;
+  @apply rounded border border-slate-200 bg-white/60 p-3 dark:border-slate-700 dark:bg-slate-900/50;
 }
 
 .quota-header {

@@ -8,7 +8,7 @@
       <div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
         <select
           v-model="selectedPeriod"
-          class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+          class="block w-full rounded-md border-gray-300 shadow-sm focus:border-gray-900 dark:focus:border-white focus:ring-gray-900 dark:focus:ring-white sm:text-sm"
           @change="loadUsageStats"
         >
           <option value="day">Last 24 Hours</option>
@@ -22,7 +22,7 @@
     <!-- Loading State -->
     <div v-if="loading" class="py-12 text-center">
       <svg
-        class="mx-auto h-8 w-8 animate-spin text-blue-600"
+        class="mx-auto h-8 w-8 animate-spin text-gray-900 dark:text-white"
         fill="none"
         viewBox="0 0 24 24"
         xmlns="http://www.w3.org/2000/svg"

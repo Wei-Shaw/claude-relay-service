@@ -6,7 +6,7 @@
     >
       <div class="absolute inset-0" @click="handleClose" />
       <div
-        class="relative z-10 mx-3 flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-gray-200/70 bg-white/95 shadow-2xl ring-1 ring-black/5 transition-all dark:border-gray-700/60 dark:bg-gray-900/95 dark:ring-white/10 sm:mx-4 sm:p-1"
+        class="relative z-10 mx-3 flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded border border-gray-200/70 bg-white/95 shadow-2xl ring-1 ring-black/5 transition-all dark:border-gray-700/60 dark:bg-gray-900/95 dark:ring-white/10 sm:mx-4 sm:p-1"
       >
         <!-- 顶部栏 -->
         <div
@@ -14,7 +14,7 @@
         >
           <div class="flex flex-1 items-start gap-3">
             <div
-              class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-lg"
+              class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-lg"
             >
               <i class="fas fa-chart-area text-lg" />
             </div>
@@ -71,7 +71,7 @@
               <div
                 v-for="metric in primaryMetrics"
                 :key="metric.key"
-                class="rounded-2xl border border-gray-100 bg-white/80 p-4 shadow-sm transition dark:border-gray-700 dark:bg-gray-900/70"
+                class="rounded border border-gray-100 bg-white/80 p-4 shadow-sm transition dark:border-gray-700 dark:bg-gray-900/70"
               >
                 <div class="flex items-start justify-between">
                   <div>
@@ -88,7 +88,7 @@
                     </p>
                   </div>
                   <div
-                    class="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-800"
+                    class="flex h-10 w-10 items-center justify-center rounded bg-gray-50 dark:bg-gray-800"
                   >
                     <i :class="['fas', metric.icon, metric.iconClass]"></i>
                   </div>
@@ -99,7 +99,7 @@
             <!-- 今日与峰值 -->
             <div class="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
               <div
-                class="space-y-3 rounded-2xl border border-blue-100 bg-blue-50/60 p-4 dark:border-blue-500/20 dark:bg-blue-900/20"
+                class="space-y-3 rounded border border-blue-100 bg-blue-50/60 p-4 dark:border-blue-500/20 dark:bg-blue-900/20"
               >
                 <div
                   class="flex items-center gap-2 text-sm font-semibold text-blue-700 dark:text-blue-300"
@@ -108,7 +108,7 @@
                   今日概览
                 </div>
                 <div
-                  class="rounded-xl bg-white/80 p-3 text-sm text-gray-600 shadow-sm ring-1 ring-blue-100 dark:bg-gray-900/80 dark:text-gray-300 dark:ring-blue-500/20"
+                  class="rounded bg-white/80 p-3 text-sm text-gray-600 shadow-sm ring-1 ring-blue-100 dark:bg-gray-900/80 dark:text-gray-300 dark:ring-blue-500/20"
                 >
                   <div class="flex items-center justify-between">
                     <span>费用</span>
@@ -132,7 +132,7 @@
               </div>
 
               <div
-                class="space-y-3 rounded-2xl border border-amber-100 bg-amber-50/70 p-4 dark:border-amber-500/20 dark:bg-amber-900/20"
+                class="space-y-3 rounded border border-amber-100 bg-amber-50/70 p-4 dark:border-amber-500/20 dark:bg-amber-900/20"
               >
                 <div
                   class="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-300"
@@ -141,7 +141,7 @@
                   最高费用日
                 </div>
                 <div
-                  class="rounded-xl bg-white/80 p-3 text-sm text-gray-600 shadow-sm ring-1 ring-amber-100 dark:bg-gray-900/80 dark:text-gray-300 dark:ring-amber-500/20"
+                  class="rounded bg-white/80 p-3 text-sm text-gray-600 shadow-sm ring-1 ring-amber-100 dark:bg-gray-900/80 dark:text-gray-300 dark:ring-amber-500/20"
                 >
                   <div class="flex items-center justify-between">
                     <span>日期</span>
@@ -167,7 +167,7 @@
               </div>
 
               <div
-                class="space-y-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 dark:border-emerald-500/20 dark:bg-emerald-900/20"
+                class="space-y-3 rounded border border-emerald-100 bg-emerald-50/60 p-4 dark:border-emerald-500/20 dark:bg-emerald-900/20"
               >
                 <div
                   class="flex items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-300"
@@ -176,7 +176,7 @@
                   最高请求日
                 </div>
                 <div
-                  class="rounded-xl bg-white/80 p-3 text-sm text-gray-600 shadow-sm ring-1 ring-emerald-100 dark:bg-gray-900/80 dark:text-gray-300 dark:ring-emerald-500/20"
+                  class="rounded bg-white/80 p-3 text-sm text-gray-600 shadow-sm ring-1 ring-emerald-100 dark:bg-gray-900/80 dark:text-gray-300 dark:ring-emerald-500/20"
                 >
                   <div class="flex items-center justify-between">
                     <span>日期</span>
@@ -205,7 +205,7 @@
             <!-- 综合统计 -->
             <div class="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
               <div
-                class="rounded-2xl border border-gray-100 bg-white/80 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/70"
+                class="rounded border border-gray-100 bg-white/80 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/70"
               >
                 <h4
                   class="mb-3 flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -237,7 +237,7 @@
                 </div>
               </div>
               <div
-                class="rounded-2xl border border-gray-100 bg-white/80 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/70"
+                class="rounded border border-gray-100 bg-white/80 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/70"
               >
                 <h4
                   class="mb-3 flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -276,7 +276,7 @@
                 </div>
               </div>
               <div
-                class="rounded-2xl border border-gray-100 bg-white/80 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/70"
+                class="rounded border border-gray-100 bg-white/80 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/70"
               >
                 <h4
                   class="mb-3 flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -308,7 +308,7 @@
 
             <!-- 折线图 -->
             <div
-              class="mb-6 rounded-2xl border border-gray-100 bg-white/80 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/70"
+              class="mb-6 rounded border border-gray-100 bg-white/80 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/70"
             >
               <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <h4

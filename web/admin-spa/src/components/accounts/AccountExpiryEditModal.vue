@@ -13,7 +13,7 @@
         <div class="mb-6 flex items-center justify-between">
           <div class="flex items-center gap-3">
             <div
-              class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600"
+              class="flex h-10 w-10 items-center justify-center rounded bg-gradient-to-br from-amber-500 to-orange-600"
             >
               <i class="fas fa-clock text-white" />
             </div>
@@ -128,7 +128,7 @@
           <!-- 预览新的过期时间 -->
           <div
             v-if="localForm.expiresAt !== account.expiresAt"
-            class="rounded-lg border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 dark:border-blue-700 dark:from-blue-900/20 dark:to-indigo-900/20"
+            class="rounded-lg border border-gray-300 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800"
           >
             <div class="flex items-center justify-between">
               <div>

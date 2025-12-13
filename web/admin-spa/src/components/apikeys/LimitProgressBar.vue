@@ -31,7 +31,7 @@
     </div>
     <div
       v-else
-      class="group relative h-9 w-full overflow-hidden rounded-xl border transition-all duration-300 ease-out"
+      class="group relative h-9 w-full overflow-hidden rounded border transition-all duration-300 ease-out"
       :class="containerClass"
     >
       <!-- 背景层 -->
@@ -46,7 +46,7 @@
 
       <!-- 内部高光边框 -->
       <div
-        class="pointer-events-none absolute inset-0 rounded-xl border border-white/50 opacity-40 mix-blend-overlay dark:border-white/10"
+        class="pointer-events-none absolute inset-0 rounded border border-white/50 opacity-40 mix-blend-overlay dark:border-white/10"
       ></div>
 
       <!-- 文字层 - 使用双层文字技术确保可读性 -->
@@ -129,7 +129,7 @@ const containerClass = computed(() => {
     case 'window':
       return 'border-sky-200/80 bg-white/80 shadow-[0_10px_24px_rgba(56,189,248,0.18)] group-hover:shadow-[0_14px_30px_rgba(56,189,248,0.22)] dark:border-sky-500/40 dark:bg-sky-950/40 dark:shadow-[0_12px_28px_rgba(0,0,0,0.45)]'
     case 'total':
-      return 'border-blue-200/80 bg-white/80 shadow-[0_10px_24px_rgba(59,130,246,0.18)] group-hover:shadow-[0_14px_30px_rgba(59,130,246,0.22)] dark:border-blue-500/40 dark:bg-blue-950/40 dark:shadow-[0_12px_28px_rgba(0,0,0,0.45)]'
+      return 'border-gray-300/80 bg-white/80 shadow-[0_10px_24px_rgba(59,130,246,0.18)] group-hover:shadow-[0_14px_30px_rgba(59,130,246,0.22)] dark:border-blue-500/40 dark:bg-blue-950/40 dark:shadow-[0_12px_28px_rgba(0,0,0,0.45)]'
     default:
       return 'border-gray-200/80 bg-white/80 shadow-[0_10px_24px_rgba(148,163,184,0.18)] group-hover:shadow-[0_14px_30px_rgba(148,163,184,0.22)] dark:border-gray-600/50 dark:bg-gray-900/50 dark:shadow-[0_12px_28px_rgba(0,0,0,0.45)]'
   }
@@ -240,7 +240,7 @@ const compactLabelClass = computed(() => {
     case 'window':
       return 'text-sky-600 dark:text-sky-300'
     case 'total':
-      return 'text-blue-600 dark:text-blue-300'
+      return 'text-gray-900 dark:text-gray-100 dark:text-blue-300'
     default:
       return 'text-gray-600 dark:text-gray-300'
   }

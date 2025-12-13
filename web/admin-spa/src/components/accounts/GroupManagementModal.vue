@@ -7,7 +7,7 @@
         <div class="mb-4 flex items-center justify-between sm:mb-6">
           <div class="flex items-center gap-2 sm:gap-3">
             <div
-              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 sm:h-10 sm:w-10 sm:rounded-xl"
+              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 sm:h-10 sm:w-10 sm:rounded"
             >
               <i class="fas fa-layer-group text-sm text-white sm:text-base" />
             </div>
@@ -30,7 +30,7 @@
         </div>
 
         <!-- 创建分组表单 -->
-        <div v-if="showCreateForm" class="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <div v-if="showCreateForm" class="mb-6 rounded-lg border border-gray-300 bg-blue-50 p-4">
           <h4 class="mb-4 text-lg font-semibold text-gray-900">创建新分组</h4>
           <div class="space-y-4">
             <div>
@@ -155,7 +155,7 @@
                 </div>
                 <div class="flex items-center gap-2">
                   <button
-                    class="text-blue-600 transition-colors hover:text-blue-800"
+                    class="text-gray-900 dark:text-gray-100 transition-colors hover:text-blue-800"
                     title="编辑"
                     @click="editGroup(group)"
                   >

@@ -531,52 +531,104 @@ After completing the gradient/glass effect removal, a comprehensive audit reveal
 
 ---
 
-## 📋 Phase 5: Specialized Components (PENDING)
+## 🔄 Phase 5: Specialized Components (IN PROGRESS - 27% Complete)
 
-### API Keys Components (~14 files)
-- [ ] CreateApiKeyModal.vue
-- [ ] EditApiKeyModal.vue
-- [ ] NewApiKeyModal.vue
-- [ ] RenewApiKeyModal.vue
-- [ ] BatchApiKeyModal.vue
-- [ ] BatchEditApiKeyModal.vue
-- [ ] ExpiryEditModal.vue
-- [ ] ApiKeyTestModal.vue
-- [ ] UsageDetailModal.vue
-- [ ] RecordDetailModal.vue
-- [ ] LimitBadge.vue
-- [ ] LimitProgressBar.vue
-- [ ] WindowLimitBar.vue
-- [ ] WindowCountdown.vue
+**IMPORTANT:** Use `/Users/lujuncheng/CursorProjects/claude-relay-service/web/admin-spa/src/views/DesignDemoView.vue` as the reference for ALL components below.
 
-### Account Components (~9 files)
-- [ ] AccountForm.vue
-- [ ] CcrAccountForm.vue
-- [ ] OAuthFlow.vue
-- [ ] ProxyConfig.vue
-- [ ] AccountTestModal.vue
-- [ ] AccountUsageDetailModal.vue
-- [ ] AccountExpiryEditModal.vue
-- [ ] ApiKeyManagementModal.vue
-- [ ] GroupManagementModal.vue
+**Status:** Core components completed (Dashboard, User, Admin). Modal and data visualization components pending.
 
-### Stats Components (~6 files)
-- [ ] StatsOverview.vue
-- [ ] ModelUsageStats.vue
-- [ ] TokenDistribution.vue
-- [ ] AggregatedStatsCard.vue
-- [ ] ApiKeyInput.vue
-- [ ] LimitConfig.vue
+### ✅ Dashboard Components (2/2 files) - COMPLETED
+**Reference:** Demo Cards Section (stat cards)
 
-### Dashboard Components (~2 files)
-- [ ] UsageTrend.vue
-- [ ] ModelDistribution.vue
+- [x] UsageTrend.vue → Removed glass-strong, updated chart colors to black/gray (lines 303-324)
+- [x] ModelDistribution.vue → Removed glass-strong, flat card design (lines 303-324)
 
-### User & Admin Components (~6 files)
-- [ ] User components (4 files)
-- [ ] Admin components (2 files)
+**Changes Applied:**
+- Removed `glass-strong` class
+- Updated container: `rounded border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900`
+- Chart colors: Black/gray for normal data, colors only for differentiation
+- Icon colors: `text-gray-600 dark:text-gray-400`
 
-**Estimated:** ~37 component files
+### ✅ User & Admin Components (6/6 files) - COMPLETED
+**Reference:** Demo Inputs Section (forms), Demo Buttons Section
+
+- [x] CreateApiKeyModal.vue (user) → Updated all focus states and buttons (lines 146-294, 69-142)
+- [x] ViewApiKeyModal.vue → Updated focus states and copy buttons (lines 146-294)
+- [x] UserApiKeysManager.vue → Updated buttons from blue to black/white (lines 69-142)
+- [x] UserUsageStats.vue → Updated focus states (lines 146-294)
+- [x] ChangeRoleModal.vue → Updated radio buttons and primary button (lines 146-294, 69-142)
+- [x] UserUsageStatsModal.vue → Updated select and buttons (lines 146-294, 69-142)
+
+**Changes Applied:**
+- Focus borders: `focus:border-blue-500` → `focus:border-gray-900 dark:focus:border-white`
+- Focus rings: `focus:ring-blue-500` → `focus:ring-gray-900 dark:focus:ring-white`
+- Buttons: `bg-blue-600` → `bg-black dark:bg-white`
+- Hover: `hover:bg-blue-700` → `hover:bg-gray-800 dark:hover:bg-gray-100`
+- Text: `text-blue-600` → `text-gray-900 dark:text-white`
+
+### 🔄 API Keys Display Components (2/14 files) - PARTIALLY COMPLETED
+**Reference:** Demo Badges Section (lines 467-516), Demo Misc Section (progress bars, lines 595-608)
+
+- [x] LimitBadge.vue → Flat bordered badge with black/white progress (lines 467-516)
+- [x] WindowCountdown.vue → Clean typography with flat progress bars (lines 24-66, 595-608)
+- [ ] LimitProgressBar.vue → **102 gradients** - Complex data viz component
+- [ ] WindowLimitBar.vue → **46 gradients** - Complex data viz component
+- [ ] CreateApiKeyModal.vue → **4 gradients** - Modal headers
+- [ ] EditApiKeyModal.vue → **4 gradients** - Modal headers
+- [ ] NewApiKeyModal.vue → **4 gradients** - Modal headers
+- [ ] RenewApiKeyModal.vue → **4 gradients** - Modal headers
+- [ ] BatchApiKeyModal.vue → **20 gradients** - Modal headers & sections
+- [ ] BatchEditApiKeyModal.vue → **4 gradients** - Modal headers
+- [ ] ExpiryEditModal.vue → **16 gradients** - Modal headers & sections
+- [ ] ApiKeyTestModal.vue → **18 gradients** - Modal headers & sections
+- [ ] UsageDetailModal.vue → **28 gradients** - Modal headers & sections
+- [ ] RecordDetailModal.vue → **1 gradient** - Modal header
+
+**Changes Needed for Modals:**
+1. Header icons: `bg-gradient-to-br from-blue-500 to-blue-600` → `bg-gray-900 dark:bg-gray-100`
+2. Section backgrounds: `bg-gradient-to-r from-blue-50 to-indigo-50` → `bg-gray-50 dark:bg-gray-800`
+3. Border radius: `rounded-xl` → `rounded` (5px)
+4. Borders: `border-blue-200` → `border-gray-300`
+
+**Changes Needed for Progress Bars:**
+- Background: `#eaeaea` (light), `#333` (dark)
+- Fill: `#000` (normal), `#f5a623` (warning 80%+), `#e00` (danger 100%)
+- Height: `0.5rem`, border-radius: `4px`
+- Remove all gradient fills except for warning/danger states
+
+### 📋 Account Components (0/9 files) - PENDING
+**Reference:** Demo Inputs Section (forms), Demo Cards Section (modals)
+
+- [ ] AccountForm.vue → **54 gradients** - Forms with gradient sections
+- [ ] CcrAccountForm.vue → **4 gradients** - Forms
+- [ ] OAuthFlow.vue → Badges (lines 467-516) + buttons (lines 69-142)
+- [ ] ProxyConfig.vue → Form patterns (lines 146-294)
+- [ ] AccountTestModal.vue → **18 gradients** - Modal
+- [ ] AccountUsageDetailModal.vue → **4 gradients** - Modal
+- [ ] AccountExpiryEditModal.vue → **10 gradients** - Modal
+- [ ] ApiKeyManagementModal.vue → **28 gradients** - Modal + table
+- [ ] GroupManagementModal.vue → **4 gradients** - Modal
+
+### 📋 API Stats Components (0/6 files) - PENDING
+**Reference:** Demo Cards Section (stat cards), Demo Tables Section
+
+- [ ] StatsOverview.vue → **44 gradients** - Stat cards (lines 303-324)
+- [ ] LimitConfig.vue → **6 gradients** - Form patterns (lines 146-294)
+- [ ] ModelUsageStats.vue → Already clean (charts)
+- [ ] TokenDistribution.vue → Already clean (charts)
+- [ ] AggregatedStatsCard.vue → Already clean
+- [ ] ApiKeyInput.vue → Already clean
+
+**Total Remaining:** 27 files, ~435 gradient instances
+
+### Migration Pattern Summary
+All remaining components need these common changes:
+1. **Modal headers**: `bg-gradient-to-br from-blue-500 to-blue-600` → `bg-gray-900 dark:bg-gray-100`
+2. **Section backgrounds**: Remove all gradient backgrounds → Use `bg-gray-50 dark:bg-gray-800`
+3. **Borders**: Update all blue borders to gray
+4. **Border radius**: `rounded-xl/2xl/3xl` → `rounded` (5px max)
+5. **Progress bars**: Black/white for normal, red/orange only for warnings
+6. **Focus states**: Blue → Black/white with dark mode support
 
 ---
 
@@ -594,49 +646,51 @@ After completing the gradient/glass effect removal, a comprehensive audit reveal
 ## Summary Statistics
 
 ### Overall Progress
-- **Completed:** Phase 1 (Design System Foundation) ✅, Phase 2 (Common Components) ✅, Phase 3 (Layout Components) ✅, Phase 4 (View Pages) ✅ (100% - ALL 12 views)
-- **In Progress:** None - Ready for Phase 5
+- **Completed:** Phase 1-4 ✅ (Design System, Common Components, Layout, View Pages - 100%)
+- **In Progress:** Phase 5 (Specialized Components - 27% complete)
 - **Total Phases:** 8
-- **Progress:** 50% (4/8 phases fully complete)
+- **Progress:** 56% (4.5/8 phases)
 
 ### Files Status
-- **Modified:** 3 core CSS files + 21 Vue component files = 24 files
-  - **Phase 1-3:** 3 CSS files + 12 component files = 15 files
-  - **Phase 4:** 9 view files (major migration) + 3 user views (blue to black) = 12 files
-- **Remaining Components:** ~31 Vue components (mostly modals and specialized components)
-- **Lines Rewritten:** ~2,045+ lines (1,200+ CSS + 845+ Vue)
+- **Modified:** 4 core CSS files + 32 Vue component files = 36 files
+  - **Phase 1:** 4 CSS files (variables, components, global, main)
+  - **Phase 2:** 9 component files (common components)
+  - **Phase 3:** 3 layout files
+  - **Phase 4:** 16 view files (all views + comprehensive blue-to-black migration)
+  - **Phase 5:** 10 component files (Dashboard: 2, User: 4, Admin: 2, API Keys: 2)
+- **Remaining Components:** ~27 Vue components (modals and data viz heavy components)
+- **Lines Rewritten:** ~3,000+ lines (CSS + Vue components)
+  - Phase 1-3: ~1,200 lines
+  - Phase 4: ~1,300 lines (including 200+ blue-to-black conversions)
 
 ### What's Next
 
-**Immediate Next Steps:**
+**Completed Phases:**
 1. ✅ Phase 1: Design System Foundation - COMPLETED
 2. ✅ Phase 2: Common Components - COMPLETED
 3. ✅ Phase 3: Layout Components - COMPLETED
 4. ✅ Phase 4: View Pages - ALL 12 VIEWS COMPLETED (100%) ✅
-   - ✅ DashboardView.vue
-   - ✅ ApiKeysView.vue
-   - ✅ AccountsView.vue
-   - ✅ ApiStatsView.vue
-   - ✅ ApiKeyUsageRecordsView.vue
-   - ✅ AccountUsageRecordsView.vue
-   - ✅ SettingsView.vue
-   - ✅ TutorialView.vue
-   - ✅ LoginView.vue
-   - ✅ UserLoginView.vue (already clean)
-   - ✅ UserDashboardView.vue (already clean)
-   - ✅ UserManagementView.vue (already clean)
-5. **Next:** Phase 5: Specialized Components (Modals, Forms, etc.)
+5. 🔄 Phase 5: Specialized Components (27% complete)
+   - ✅ Dashboard (2/2 files)
+   - ✅ User (4/4 files)
+   - ✅ Admin (2/2 files)
+   - 🔄 API Keys (2/14 files - LimitBadge, WindowCountdown done)
+   - ⏸️ Accounts (0/9 files)
+   - ⏸️ API Stats (0/6 files)
+
+**Next Priority:**
+- API Keys modals (10 files, ~103 gradients)
+- API Keys data viz (2 files, ~148 gradients - requires careful review)
+- Accounts components (9 files, ~130 gradients)
+- API Stats components (2 active files, ~50 gradients)
 
 **Impact:**
-- ✅ Foundation is solid and ready (100%)
-- ✅ Core common components migrated (100%)
-- ✅ All base styles (buttons, cards, forms, modals) are flat (100%)
-- ✅ Toast notifications, modals, theme toggle all updated (100%)
-- ✅ Layout components (MainLayout, AppHeader, TabBar) all flat and clean (100%)
-- ✅ View pages migration (75% - 9/12 completed)
-  - All major admin views completed (Dashboard, API Keys, Accounts, Stats, Settings, Tutorial, Login)
-  - Only user management views remaining (UserLogin, UserDashboard, UserManagement)
-- ⏭️ Next: Phase 5 - Specialized Components (Modals, Forms, etc.)
+- ✅ Foundation complete (100%)
+- ✅ All common components migrated (100%)
+- ✅ All layout components migrated (100%)
+- ✅ All view pages migrated with comprehensive blue-to-black refinement (100%)
+- 🔄 Phase 5: Core specialized components migrated (27%)
+- ⏸️ Phase 5: Modal and data viz components pending (~435 gradients remaining)
 
 ---
 
@@ -649,5 +703,11 @@ After completing the gradient/glass effect removal, a comprehensive audit reveal
 
 ---
 
-**Last Updated:** 2025-12-13
-**Status:** Phase 1, 2, 3 & 4 FULLY COMPLETE (100%) ✅ - All 12 views migrated, ready for Phase 5
+**Last Updated:** 2025-12-14
+**Status:** Phase 1-4 FULLY COMPLETE (100% ✅), Phase 5 IN PROGRESS (27% - Core components done, modals pending)
+
+**Recommended Next Steps:**
+1. Migrate API Keys modals (10 files) - straightforward gradient removal
+2. Migrate Accounts components (9 files) - straightforward gradient removal
+3. Migrate API Stats components (2 files) - straightforward gradient removal
+4. Review complex data viz components (LimitProgressBar, WindowLimitBar) - requires careful evaluation of functional vs decorative gradients
