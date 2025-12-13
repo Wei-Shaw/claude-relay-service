@@ -24,6 +24,7 @@ const standardGeminiRoutes = require('./routes/standardGeminiRoutes')
 const openaiClaudeRoutes = require('./routes/openaiClaudeRoutes')
 const openaiRoutes = require('./routes/openaiRoutes')
 const droidRoutes = require('./routes/droidRoutes')
+const tutorialRoutes = require('./routes/tutorials')
 const userRoutes = require('./routes/userRoutes')
 const azureOpenaiRoutes = require('./routes/azureOpenaiRoutes')
 const webhookRoutes = require('./routes/webhook')
@@ -112,7 +113,9 @@ class Application {
       this.app.use(
         helmet({
           contentSecurityPolicy: false, // 允许内联样式和脚本
-          crossOriginEmbedderPolicy: false
+          crossOriginOpenerPolicy: false, // HTTP 场景下浏览器会忽略并产生警告
+          crossOriginEmbedderPolicy: false,
+          originAgentCluster: false // 避免在 HTTP/IP 场景触发 OAC 相关控制台警告
         })
       )
 
@@ -260,6 +263,24 @@ class Application {
         logger.warn('⚠️ Admin SPA dist directory not found, skipping /admin-next route')
       }
 
+      // 🖼️ 教程图片静态资源（无需登录，便于 Markdown 预览引用）
+      const tutorialAssetsPath = path.join(__dirname, '..', 'data', 'tutorials', 'assets')
+      try {
+        fs.mkdirSync(tutorialAssetsPath, { recursive: true })
+        this.app.use(
+          '/tutorial-assets',
+          express.static(tutorialAssetsPath, {
+            maxAge: '7d',
+            immutable: false,
+            index: false,
+            fallthrough: true
+          })
+        )
+        logger.info('✅ Tutorial assets mounted at /tutorial-assets')
+      } catch (error) {
+        logger.warn('⚠️ Failed to initialize tutorial assets directory:', error.message)
+      }
+
       // 🛣️ 路由
       this.app.use('/api', apiRoutes)
       this.app.use('/api', unifiedRoutes) // 统一智能路由（支持 /v1/chat/completions 等）
@@ -268,6 +289,8 @@ class Application {
       this.app.use('/users', userRoutes)
       // 使用 web 路由（包含 auth 和页面重定向）
       this.app.use('/web', webRoutes)
+      // 教程只读接口（未登录页面可访问）
+      this.app.use('/tutorials', tutorialRoutes)
       this.app.use('/apiStats', apiStatsRoutes)
       // Gemini 路由：同时支持标准格式和原有格式
       this.app.use('/gemini', standardGeminiRoutes) // 标准 Gemini API 格式路由

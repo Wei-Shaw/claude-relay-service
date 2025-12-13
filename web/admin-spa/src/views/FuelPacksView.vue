@@ -450,7 +450,7 @@ const reloadList = async (nextPage = 1) => {
     page.value = nextPage
     selectedIds.value = []
 
-    const result = await apiClient.get('/fuel-packs/codes', {
+    const result = await apiClient.get('/admin/fuel-packs/codes', {
       params: {
         status: filters.status,
         isActive: filters.isActive,
@@ -495,7 +495,7 @@ const handleCreate = async () => {
 
   creating.value = true
   try {
-    const result = await apiClient.post('/fuel-packs/codes', {
+    const result = await apiClient.post('/admin/fuel-packs/codes', {
       amount,
       validitySeconds,
       count,
@@ -537,7 +537,7 @@ const batchAction = async (action) => {
   if (!confirmed) return
 
   try {
-    await apiClient.post('/fuel-packs/codes/batch', {
+    await apiClient.post('/admin/fuel-packs/codes/batch', {
       ids: selectedIds.value,
       action
     })
@@ -553,7 +553,7 @@ const exportSelected = async () => {
 
   try {
     const token = localStorage.getItem('authToken') || ''
-    const response = await fetch(createApiUrl('/fuel-packs/codes/export'), {
+    const response = await fetch(createApiUrl('/admin/fuel-packs/codes/export'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -600,7 +600,7 @@ const deleteOne = async (item) => {
   if (!confirmed) return
 
   try {
-    await apiClient.delete(`/fuel-packs/codes/${item.id}`)
+    await apiClient.delete(`/admin/fuel-packs/codes/${item.id}`)
     showToast('已删除', 'success')
     await reloadList(page.value)
   } catch (error) {
@@ -663,7 +663,7 @@ const saveEdit = async () => {
 
   saving.value = true
   try {
-    await apiClient.patch(`/fuel-packs/codes/${editModal.item.id}`, {
+    await apiClient.patch(`/admin/fuel-packs/codes/${editModal.item.id}`, {
       amount,
       validitySeconds,
       note: editModal.form.note,

@@ -329,7 +329,7 @@
 
       <!-- Tutorial Tab -->
       <div v-else-if="activeTab === 'tutorial'" class="space-y-6">
-        <TutorialView />
+        <TutorialView read-only hide-header />
       </div>
     </main>
   </div>
