@@ -1,5 +1,5 @@
 <template>
-  <div class="api-input-wide-card mb-8 rounded-3xl p-6 shadow-xl">
+  <div class="api-input-wide-card mb-8 rounded-3xl p-6">
     <!-- 标题区域 -->
     <div class="wide-card-title mb-6">
       <h2 class="mb-2 text-2xl font-bold text-gray-900 dark:text-gray-200">
@@ -215,7 +215,7 @@ const hasValidInput = computed(() => {
 }
 
 .wide-card-title .fas.fa-chart-line {
-  color: #3b82f6;
+  color: var(--primary-color);
   text-shadow: 0 1px 2px rgba(59, 130, 246, 0.2);
 }
 
@@ -253,7 +253,7 @@ const hasValidInput = computed(() => {
 
 .wide-card-input:focus {
   outline: none;
-  border-color: #60a5fa;
+  border-color: var(--primary-color);
   box-shadow:
     0 0 0 3px rgba(96, 165, 250, 0.2),
     0 10px 15px -3px rgba(0, 0, 0, 0.1);
@@ -262,7 +262,7 @@ const hasValidInput = computed(() => {
 }
 
 :global(.dark) .wide-card-input:focus {
-  border-color: #60a5fa;
+  border-color: var(--primary-color);
   box-shadow:
     0 0 0 3px rgba(96, 165, 250, 0.15),
     0 10px 15px -3px rgba(0, 0, 0, 0.4);
@@ -270,43 +270,10 @@ const hasValidInput = computed(() => {
   color: #f3f4f6;
 }
 
-/* 按钮样式 */
-.btn {
-  font-weight: 500;
-  border-radius: 12px;
-  border: none;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-  letter-spacing: 0.025em;
-}
-
 /* 查询按钮特定样式 */
 .btn-query {
   padding: 14px 24px;
   font-size: 16px;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  box-shadow:
-    0 10px 15px -3px rgba(102, 126, 234, 0.3),
-    0 4px 6px -2px rgba(102, 126, 234, 0.05);
-}
-
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow:
-    0 20px 25px -5px rgba(102, 126, 234, 0.3),
-    0 10px 10px -5px rgba(102, 126, 234, 0.1);
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
 }
 
 /* 安全提示样式 */
@@ -407,12 +374,12 @@ const hasValidInput = computed(() => {
 
 .mode-switch-btn.active {
   color: white;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+  box-shadow: 0 2px 4px rgba(96, 165, 250, 0.2);
 }
 
 .mode-switch-btn.active:hover {
-  box-shadow: 0 4px 6px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 6px rgba(96, 165, 250, 0.3);
 }
 
 .mode-switch-btn i {

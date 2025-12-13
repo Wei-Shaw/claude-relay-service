@@ -3,8 +3,8 @@ import { Chart } from 'chart.js/auto'
 export function useChartConfig() {
   // 设置Chart.js默认配置
   Chart.defaults.font.family =
-    "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-  Chart.defaults.color = '#6b7280'
+    "'Roboto', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+  Chart.defaults.color = '#475569'
   Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(0, 0, 0, 0.8)'
   Chart.defaults.plugins.tooltip.padding = 12
   Chart.defaults.plugins.tooltip.cornerRadius = 8
@@ -93,10 +93,10 @@ export function useChartConfig() {
 
   // 颜色方案
   const colorSchemes = {
-    primary: ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#00f2fe'],
-    success: ['#10b981', '#059669', '#34d399', '#6ee7b7', '#a7f3d0'],
-    warning: ['#f59e0b', '#d97706', '#fbbf24', '#fcd34d', '#fde68a'],
-    danger: ['#ef4444', '#dc2626', '#f87171', '#fca5a5', '#fecaca']
+    primary: ['#60a5fa', '#a78bfa', '#93c5fd', '#38bdf8', '#c4b5fd'],
+    success: ['#34d399', '#10b981', '#6ee7b7', '#a7f3d0', '#d1fae5'],
+    warning: ['#fbbf24', '#f59e0b', '#fde68a', '#fcd34d', '#fef3c7'],
+    danger: ['#f87171', '#ef4444', '#fca5a5', '#fecaca', '#ffe4e6']
   }
 
   return {

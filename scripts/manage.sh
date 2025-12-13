@@ -496,7 +496,7 @@ EOF
         }
         
         # 复制文件到目标目录（排除 .git 和 README.md）
-        rsync -av --exclude='.git' --exclude='README.md' "$TEMP_CLONE_DIR/" web/admin-spa/dist/ 2>/dev/null || {
+        rsync -av --exclude='.git' --exclude='README.md' --exclude='AGENTS.md' "$TEMP_CLONE_DIR/" web/admin-spa/dist/ 2>/dev/null || {
             # 如果没有 rsync，使用 cp
             cp -r "$TEMP_CLONE_DIR"/* web/admin-spa/dist/ 2>/dev/null
             rm -rf web/admin-spa/dist/.git 2>/dev/null
@@ -717,7 +717,7 @@ update_service() {
         fi
         
         # 复制文件到目标目录（排除 .git 和 README.md）
-        rsync -av --exclude='.git' --exclude='README.md' "$TEMP_CLONE_DIR/" web/admin-spa/dist/ 2>/dev/null || {
+        rsync -av --exclude='.git' --exclude='README.md' --exclude='AGENTS.md' "$TEMP_CLONE_DIR/" web/admin-spa/dist/ 2>/dev/null || {
             # 如果没有 rsync，使用 cp
             cp -r "$TEMP_CLONE_DIR"/* web/admin-spa/dist/ 2>/dev/null
             rm -rf web/admin-spa/dist/.git 2>/dev/null
@@ -1232,7 +1232,7 @@ switch_branch() {
                 "$TEMP_CLONE_DIR" 2>/dev/null; then
                 
                 # 复制文件到目标目录
-                rsync -av --exclude='.git' --exclude='README.md' "$TEMP_CLONE_DIR/" web/admin-spa/dist/ 2>/dev/null || {
+                rsync -av --exclude='.git' --exclude='README.md' --exclude='AGENTS.md' "$TEMP_CLONE_DIR/" web/admin-spa/dist/ 2>/dev/null || {
                     cp -r "$TEMP_CLONE_DIR"/* web/admin-spa/dist/ 2>/dev/null
                     rm -rf web/admin-spa/dist/.git 2>/dev/null
                     rm -f web/admin-spa/dist/README.md 2>/dev/null

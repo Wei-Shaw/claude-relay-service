@@ -1,7 +1,7 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+  <div class="min-h-screen p-4">
     <!-- 导航栏 -->
-    <nav class="bg-white shadow dark:bg-gray-800">
+    <nav class="glass-strong rounded-2xl">
       <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div class="flex h-16 justify-between">
           <div class="flex items-center">
@@ -102,7 +102,7 @@
 
         <!-- Stats Cards -->
         <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-5">
-          <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
+          <div class="card">
             <div class="p-5">
               <div class="flex items-center">
                 <div class="flex-shrink-0">
@@ -134,7 +134,7 @@
             </div>
           </div>
 
-          <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
+          <div class="card">
             <div class="p-5">
               <div class="flex items-center">
                 <div class="flex-shrink-0">
@@ -166,7 +166,7 @@
             </div>
           </div>
 
-          <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
+          <div class="card">
             <div class="p-5">
               <div class="flex items-center">
                 <div class="flex-shrink-0">
@@ -198,7 +198,7 @@
             </div>
           </div>
 
-          <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
+          <div class="card">
             <div class="p-5">
               <div class="flex items-center">
                 <div class="flex-shrink-0">
@@ -230,7 +230,7 @@
             </div>
           </div>
 
-          <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
+          <div class="card">
             <div class="p-5">
               <div class="flex items-center">
                 <div class="flex-shrink-0">
@@ -264,7 +264,7 @@
         </div>
 
         <!-- User Info -->
-        <div class="rounded-lg bg-white shadow dark:bg-gray-800">
+        <div class="card">
           <div class="px-4 py-5 sm:p-6">
             <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
               Account Information

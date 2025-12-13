@@ -1,7 +1,7 @@
 <template>
   <!-- 顶部导航 -->
   <div
-    class="glass-strong mb-4 rounded-xl p-3 shadow-xl sm:mb-6 sm:rounded-2xl sm:p-4 md:mb-8 md:rounded-3xl md:p-6"
+    class="glass-strong mb-4 rounded-xl p-3 sm:mb-6 sm:rounded-2xl sm:p-4 md:mb-8 md:rounded-3xl md:p-6"
     style="z-index: 10; position: relative"
   >
     <div class="flex flex-col items-center justify-between gap-3 sm:flex-row sm:gap-4">
@@ -24,7 +24,7 @@
               <!-- 更新提示 -->
               <a
                 v-if="versionInfo.hasUpdate"
-                class="inline-flex animate-pulse items-center gap-1 rounded-full border border-green-600 bg-green-500 px-2 py-0.5 text-xs text-white transition-colors hover:bg-green-600"
+                class="inline-flex items-center gap-1 rounded-full border border-green-600 bg-green-500 px-2 py-0.5 text-xs text-white transition-all hover:bg-green-600 hover:shadow-md active:scale-95"
                 :href="versionInfo.releaseInfo?.htmlUrl || '#'"
                 target="_blank"
                 title="有新版本可用"
@@ -51,7 +51,7 @@
         <!-- 用户菜单 -->
         <div class="user-menu-container relative">
           <button
-            class="user-menu-button flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl active:scale-95 sm:px-4 sm:py-2.5"
+            class="user-menu-button btn btn-primary flex items-center gap-2 px-3 py-2 text-sm font-semibold text-white transition-all duration-200 active:scale-95 sm:px-4 sm:py-2.5"
             @click="userMenuOpen = !userMenuOpen"
           >
             <i class="fas fa-user-circle text-sm sm:text-base" />
@@ -65,7 +65,7 @@
           <!-- 悬浮菜单 -->
           <div
             v-if="userMenuOpen"
-            class="user-menu-dropdown absolute right-0 top-full mt-2 w-48 rounded-xl border border-gray-200 bg-white py-2 shadow-xl dark:border-gray-700 dark:bg-gray-800 sm:w-56"
+            class="user-menu-dropdown glass-strong absolute right-0 top-full mt-2 w-48 rounded-xl py-2 sm:w-56"
             style="z-index: 999999"
             @click.stop
           >
