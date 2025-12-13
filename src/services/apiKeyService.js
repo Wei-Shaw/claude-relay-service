@@ -70,6 +70,50 @@ function sanitizeAccountIdForType(accountId, accountType) {
   return accountId
 }
 
+const COST_RANK_TIME_RANGES = ['today', '7days', '30days', 'all']
+
+function usageKeyBelongsToKeyIdSet(redisKey, keyIdSet) {
+  if (!redisKey || typeof redisKey !== 'string') {
+    return false
+  }
+
+  const parts = redisKey.split(':')
+  for (const part of parts) {
+    if (keyIdSet.has(part)) {
+      return true
+    }
+  }
+  return false
+}
+
+async function deleteKeysInChunks(client, keys, chunkSize = 500) {
+  if (!Array.isArray(keys) || keys.length === 0) {
+    return 0
+  }
+
+  let deletedCount = 0
+  const pipelineBatchSize = 20
+
+  for (let offset = 0; offset < keys.length; offset += chunkSize * pipelineBatchSize) {
+    const pipeline = client.pipeline()
+    const end = Math.min(keys.length, offset + chunkSize * pipelineBatchSize)
+
+    for (let innerOffset = offset; innerOffset < end; innerOffset += chunkSize) {
+      const chunk = keys.slice(innerOffset, innerOffset + chunkSize)
+      pipeline.del(...chunk)
+    }
+
+    const results = await pipeline.exec()
+    for (const [err, value] of results) {
+      if (!err && typeof value === 'number') {
+        deletedCount += value
+      }
+    }
+  }
+
+  return deletedCount
+}
+
 class ApiKeyService {
   constructor() {
     this.prefix = config.security.apiKeyPrefix
@@ -853,26 +897,55 @@ class ApiKeyService {
         throw new Error('只能彻底删除已经删除的API Key')
       }
 
-      // 删除所有相关的使用统计数据
-      const today = new Date().toISOString().split('T')[0]
-      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+      const client = redis.getClientSafe()
+      const keyIdSet = new Set([keyId])
 
-      // 删除每日统计
-      await redis.client.del(`usage:daily:${today}:${keyId}`)
-      await redis.client.del(`usage:daily:${yesterday}:${keyId}`)
+      // 先扫描并收集（避免 SCAN 过程中删除导致漏删）
+      const usageKeysToDelete = []
+      let cursor = '0'
+      do {
+        const [nextCursor, keys] = await client.scan(cursor, 'MATCH', 'usage:*', 'COUNT', 2000)
+        cursor = nextCursor
+        for (const redisKey of keys) {
+          if (usageKeyBelongsToKeyIdSet(redisKey, keyIdSet)) {
+            usageKeysToDelete.push(redisKey)
+          }
+        }
+      } while (cursor !== '0')
 
-      // 删除月度统计
-      const currentMonth = today.substring(0, 7)
-      await redis.client.del(`usage:monthly:${currentMonth}:${keyId}`)
+      // 删除使用统计相关 key
+      await deleteKeysInChunks(client, usageKeysToDelete)
 
-      // 删除所有相关的统计键（通过模式匹配）
-      const usageKeys = await redis.scanKeys(`usage:*:${keyId}*`)
-      if (usageKeys.length > 0) {
-        await redis.client.del(...usageKeys)
+      // 删除速率限制、并发等杂项 key
+      const extraKeysToDelete = [
+        `usage:${keyId}`,
+        `usage:records:${keyId}`,
+        `usage:cost:total:${keyId}`,
+        `usage:opus:total:${keyId}`,
+        `rate_limit:requests:${keyId}`,
+        `rate_limit:tokens:${keyId}`,
+        `rate_limit:cost:${keyId}`,
+        `rate_limit:window_start:${keyId}`,
+        `concurrency:${keyId}`,
+        `concurrency:queue:${keyId}`,
+        `concurrency:queue:stats:${keyId}`,
+        `concurrency:queue:wait_times:${keyId}`
+      ]
+      if (keyData.apiKey) {
+        extraKeysToDelete.push(`apikey_hash:${keyData.apiKey}`)
       }
+      await deleteKeysInChunks(client, extraKeysToDelete)
 
-      // 删除API Key本身
-      await redis.deleteApiKey(keyId)
+      // 清理哈希映射表 & 成本排序索引
+      const cleanupPipeline = client.pipeline()
+      if (keyData.apiKey) {
+        cleanupPipeline.hdel('apikey:hash_map', keyData.apiKey)
+      }
+      for (const timeRange of COST_RANK_TIME_RANGES) {
+        cleanupPipeline.zrem(`cost_rank:${timeRange}`, keyId)
+      }
+      cleanupPipeline.del(`apikey:${keyId}`)
+      await cleanupPipeline.exec()
 
       logger.success(`🗑️ Permanently deleted API key: ${keyId}`)
 
@@ -886,32 +959,93 @@ class ApiKeyService {
   // 🧹 清空所有已删除的API Keys
   async clearAllDeletedApiKeys() {
     try {
-      const allKeys = await this.getAllApiKeys(true)
-      const deletedKeys = allKeys.filter((key) => key.isDeleted === 'true')
+      const client = redis.getClientSafe()
 
-      let successCount = 0
-      let failedCount = 0
-      const errors = []
+      // 只拉取必要字段，避免 getAllApiKeys(true) 的全量统计开销
+      const keyIds = await redis.scanApiKeyIds()
+      const metas = await redis.batchGetApiKeys(keyIds, { fields: ['isDeleted', 'name', 'apiKey'] })
+      const deletedKeyMetas = metas.filter((k) => k.isDeleted)
 
-      for (const key of deletedKeys) {
-        try {
-          await this.permanentDeleteApiKey(key.id)
-          successCount++
-        } catch (error) {
-          failedCount++
-          errors.push({
-            keyId: key.id,
-            keyName: key.name,
-            error: error.message
-          })
+      if (deletedKeyMetas.length === 0) {
+        return {
+          success: true,
+          total: 0,
+          successCount: 0,
+          failedCount: 0,
+          errors: []
         }
       }
 
-      logger.success(`🧹 Cleared deleted API keys: ${successCount} success, ${failedCount} failed`)
+      const deletedIds = deletedKeyMetas.map((k) => k.id)
+      const deletedIdSet = new Set(deletedIds)
+      const deletedHashedKeys = deletedKeyMetas.map((k) => k.apiKey).filter(Boolean)
+
+      // 先扫描并收集（避免 SCAN 过程中删除导致漏删）
+      const usageKeysToDelete = []
+      let cursor = '0'
+      do {
+        const [nextCursor, keys] = await client.scan(cursor, 'MATCH', 'usage:*', 'COUNT', 2000)
+        cursor = nextCursor
+        for (const redisKey of keys) {
+          if (usageKeyBelongsToKeyIdSet(redisKey, deletedIdSet)) {
+            usageKeysToDelete.push(redisKey)
+          }
+        }
+      } while (cursor !== '0')
+
+      // 构建删除列表（非 usage:* 的固定 key）
+      const extraKeysToDelete = []
+      for (const keyId of deletedIds) {
+        extraKeysToDelete.push(
+          `apikey:${keyId}`,
+          `usage:${keyId}`,
+          `usage:records:${keyId}`,
+          `usage:cost:total:${keyId}`,
+          `usage:opus:total:${keyId}`,
+          `rate_limit:requests:${keyId}`,
+          `rate_limit:tokens:${keyId}`,
+          `rate_limit:cost:${keyId}`,
+          `rate_limit:window_start:${keyId}`,
+          `concurrency:${keyId}`,
+          `concurrency:queue:${keyId}`,
+          `concurrency:queue:stats:${keyId}`,
+          `concurrency:queue:wait_times:${keyId}`
+        )
+      }
+      for (const hashedKey of deletedHashedKeys) {
+        extraKeysToDelete.push(`apikey_hash:${hashedKey}`)
+      }
+
+      // 批量清理 usage:* keys
+      await deleteKeysInChunks(client, usageKeysToDelete)
+
+      // 批量删除固定 key
+      await deleteKeysInChunks(client, extraKeysToDelete)
+
+      // 批量清理 hash_map & 成本排序索引
+      const cleanupChunkSize = 500
+      for (let offset = 0; offset < deletedHashedKeys.length; offset += cleanupChunkSize) {
+        const chunk = deletedHashedKeys.slice(offset, offset + cleanupChunkSize)
+        await client.hdel('apikey:hash_map', ...chunk)
+      }
+      for (const timeRange of COST_RANK_TIME_RANGES) {
+        for (let offset = 0; offset < deletedIds.length; offset += cleanupChunkSize) {
+          const chunk = deletedIds.slice(offset, offset + cleanupChunkSize)
+          await client.zrem(`cost_rank:${timeRange}`, ...chunk)
+        }
+      }
+
+      const successCount = deletedIds.length
+      const failedCount = 0
+      const errors = []
+
+      logger.success(
+        `🧹 Cleared deleted API keys: ${successCount} keys, deleted usage keys: ${usageKeysToDelete.length}`
+      )
 
       return {
         success: true,
-        total: deletedKeys.length,
+        total: deletedIds.length,
         successCount,
         failedCount,
         errors
