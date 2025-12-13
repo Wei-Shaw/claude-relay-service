@@ -9,7 +9,7 @@
           ← 返回
         </button>
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">
+          <p class="text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300">
             账户请求详情时间线
           </p>
           <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">
@@ -20,7 +20,7 @@
         </div>
       </div>
       <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-        <i class="fas fa-clock text-blue-500" />
+        <i class="fas fa-clock text-gray-600 dark:text-gray-400" />
         <span v-if="dateRangeHint">{{ dateRangeHint }}</span>
         <span v-else>显示近 5000 条记录</span>
       </div>
@@ -208,7 +208,7 @@
                   <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-800 dark:text-gray-100">
                     {{ record.model }}
                   </td>
-                  <td class="whitespace-nowrap px-4 py-3 text-sm text-blue-600 dark:text-blue-400">
+                  <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
                     {{ formatNumber(record.inputTokens) }}
                   </td>
                   <td

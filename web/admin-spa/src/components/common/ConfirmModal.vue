@@ -5,9 +5,7 @@
         class="modal-content mx-auto w-full max-w-md rounded-md border border-gray-200 bg-white p-6 shadow-md dark:border-gray-700 dark:bg-gray-900"
       >
         <div class="mb-6 flex items-start gap-4">
-          <div
-            class="flex h-12 w-12 flex-shrink-0 items-center justify-center"
-          >
+          <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center">
             <i class="fas fa-exclamation-triangle text-2xl text-orange-500" />
           </div>
           <div class="flex-1">

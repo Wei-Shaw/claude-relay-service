@@ -91,7 +91,7 @@
               class="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center md:gap-4"
             >
               <div class="flex items-center gap-2 md:gap-3">
-                <i class="fas fa-clock text-base text-blue-500 md:text-lg" />
+                <i class="fas fa-clock text-base text-gray-600 dark:text-gray-400 md:text-lg" />
                 <span class="text-base font-medium text-gray-700 dark:text-gray-200 md:text-lg"
                   >统计时间范围</span
                 >

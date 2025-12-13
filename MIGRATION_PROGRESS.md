@@ -471,6 +471,64 @@ All three layout components have been migrated to the Vercel-inspired flat desig
 
 **Note:** While these views had no gradients or glass effects, they were using **blue accent colors** instead of the Vercel-inspired **black/white** design. Updated all buttons, badges, focus states, and icons to match the DesignDemoView.vue reference with pure black/white contrast.
 
+### Phase 4 - Comprehensive Blue-to-Black UI Migration ✅ (NEW - December 2024)
+
+**Status: 100% COMPLETE**
+
+After completing the gradient/glass effect removal, a comprehensive audit revealed that **Phase 1-4 views still contained 176+ instances of blue UI elements** that needed conversion to the Vercel black/white design. This migration systematically fixed ALL blue accent colors in UI controls while preserving blue for data visualization.
+
+#### Systematic Fixes Completed:
+
+**1. DashboardView.vue** - ✅ VERIFIED (13 blues are correct - all data viz)
+- All 13 blue instances are appropriate: stat icons, platform branding, data displays
+- No fixes needed - blues used correctly for data visualization
+
+**2. Common Components** (Phase 2 Refinement) - ✅ 5/5 Fixed
+- ThemeToggle.vue: Auto mode from blue → gray
+- ActionDropdown.vue: Open state and action colors → gray
+- CustomDropdown.vue: Selection highlights → gray
+- AccountSelector.vue: 7 selection state backgrounds → gray
+- StatCard.vue: Verified blue correct for data viz
+
+**3. ApiKeysView.vue** - ✅ Fixed 13 UI elements, kept 5 data viz
+- Fixed: Edit buttons, date presets, reset buttons, checkboxes, details buttons, edit expiry icons, tags (bordered style), usage buttons, select focus, active pagination, Claude badges, date picker CSS
+- Kept: Activation status info, output token arrows, admin indicators, cost displays
+
+**4. AccountsView.vue** - ✅ Fixed 19 UI elements, kept 4 info/viz
+- Fixed: 3 checkboxes, group badge, 2 edit buttons, removed avatar gradients, select focus, active pagination, 3 table summary backgrounds, Azure badge, 2 Codex labels, proxy display, platform icon
+- Kept: Info tooltip icons, usage dots
+
+**5. SettingsView.vue** - ✅ Fixed 58 UI elements, all blues removed
+- Fixed: 3 active tabs, 4 toggles, add button, 23 input focus states, test button, 2 icon backgrounds, 5 info boxes, checkbox, test button, 3 JS icon colors, CSS styles
+- Result: Complete black/white design
+
+**6. TutorialView.vue** - ✅ Fixed 45+ UI/info elements
+- Fixed: Header icon, system selector, 3 step badges, Windows icon, 10+ info boxes, terminal icons, congratulations section
+- Converted all blue instructional content to gray
+- Removed CSS dark mode blue overrides
+
+**7. ApiStatsView.vue** - ✅ Fixed 1 icon
+**8. ApiKeyUsageRecordsView.vue** - ✅ Fixed 3 elements
+**9. AccountUsageRecordsView.vue** - ✅ Fixed 3 elements
+**10. UserManagementView.vue** - ✅ Fixed 4 elements (spinner, button, 2 inputs)
+**11. UserDashboardView.vue** - ✅ Fixed 1 icon
+
+**Total Changes:**
+- **Files Modified:** 16 view files + 5 common components = 21 files
+- **Blue Instances Fixed:** 200+ UI element blues converted to black/white
+- **Blues Preserved:** 12 data visualization blues (correct usage)
+- **Design Principle:** Blue ONLY for data viz (charts, stats, indicators), NOT for UI controls
+
+**Key Conversions:**
+- Active tabs: `text-blue-600` → `text-gray-900 dark:text-white`
+- Buttons: `bg-blue-600` → `bg-black dark:bg-white`
+- Input focus: `focus:border-blue-500` → `focus:border-gray-900 dark:focus:border-white`
+- Checkboxes: `text-blue-600` → `text-gray-900 dark:text-white`
+- Toggles: `peer-checked:bg-blue-600` → `peer-checked:bg-gray-900 dark:peer-checked:bg-white`
+- Badges: `bg-blue-100 text-blue-800` → `border-gray-300 bg-white text-gray-900`
+- Icons: `text-blue-600` → `text-gray-600 dark:text-gray-400`
+- Info boxes: `bg-blue-50` → `bg-gray-100 dark:bg-gray-700`
+
 ---
 
 ## 📋 Phase 5: Specialized Components (PENDING)

@@ -8,9 +8,7 @@
       >
         <div class="modal-content mx-auto w-full max-w-md p-6">
           <div class="mb-6 flex items-start gap-4">
-            <div
-              class="flex h-12 w-12 flex-shrink-0 items-center justify-center"
-            >
+            <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center">
               <i class="fas fa-exclamation-triangle text-2xl text-orange-500" />
             </div>
             <div class="flex-1">

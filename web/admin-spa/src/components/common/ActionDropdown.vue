@@ -29,7 +29,11 @@
           v-if="isOpen"
           ref="dropdownRef"
           class="fixed z-[9999] min-w-[140px] overflow-hidden border border-gray-200 bg-white py-1 dark:border-gray-600 dark:bg-gray-800"
-          :style="{ ...dropdownStyle, borderRadius: '5px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)' }"
+          :style="{
+            ...dropdownStyle,
+            borderRadius: '5px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)'
+          }"
         >
           <button
             v-for="action in actions"

@@ -34,7 +34,7 @@
           <div class="flex items-center">
             <div class="flex-shrink-0">
               <svg
-                class="h-6 w-6 text-blue-500"
+                class="h-6 w-6 text-gray-600 dark:text-gray-400"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -183,7 +183,7 @@
                 </div>
                 <input
                   v-model="searchQuery"
-                  class="block w-full rounded-md border-gray-300 pl-10 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+                  class="block w-full rounded-md border-gray-300 pl-10 focus:border-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white sm:text-sm"
                   placeholder="Search users..."
                   type="search"
                   @input="debouncedSearch"
@@ -195,7 +195,7 @@
             <div>
               <select
                 v-model="selectedRole"
-                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white sm:text-sm"
                 @change="loadUsers"
               >
                 <option value="">All Roles</option>
@@ -208,7 +208,7 @@
             <div>
               <select
                 v-model="selectedStatus"
-                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white sm:text-sm"
                 @change="loadUsers"
               >
                 <option value="">All Status</option>
@@ -235,7 +235,7 @@
       <!-- Loading State -->
       <div v-if="loading" class="py-12 text-center">
         <svg
-          class="mx-auto h-8 w-8 animate-spin text-blue-600"
+          class="mx-auto h-8 w-8 animate-spin text-gray-900 dark:text-white"
           fill="none"
           viewBox="0 0 24 24"
           xmlns="http://www.w3.org/2000/svg"
@@ -336,7 +336,7 @@
             <div class="flex items-center space-x-2">
               <!-- View Usage Stats -->
               <button
-                class="inline-flex items-center rounded border border-transparent p-1 text-gray-400 hover:text-blue-600"
+                class="inline-flex items-center rounded border border-transparent p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white"
                 title="View Usage Stats"
                 @click="viewUserStats(user)"
               >

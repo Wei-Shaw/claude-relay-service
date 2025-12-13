@@ -240,7 +240,7 @@
             <div class="glass-card p-4">
               <div class="mb-3 flex items-center gap-3">
                 <div
-                  class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gray-700 dark:bg-gray-600 text-white shadow-md"
+                  class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gray-700 text-white shadow-md dark:bg-gray-600"
                 >
                   <i class="fas fa-tag"></i>
                 </div>
@@ -334,7 +334,7 @@
                 <label class="inline-flex cursor-pointer items-center">
                   <input v-model="hideAdminButton" class="peer sr-only" type="checkbox" />
                   <div
-                    class="peer relative h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-gray-700 dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-400 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-gray-500"
+                    class="peer relative h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-400 dark:border-gray-600 dark:bg-gray-600 dark:bg-gray-700 dark:peer-focus:ring-gray-500"
                   ></div>
                   <span class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300">{{
                     hideAdminButton ? '隐藏登录按钮' : '显示登录按钮'
@@ -402,7 +402,7 @@
                   @change="saveWebhookConfig"
                 />
                 <div
-                  class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-gray-700 dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-400 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-gray-500"
+                  class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-400 dark:border-gray-600 dark:bg-gray-600 dark:bg-gray-700 dark:peer-focus:ring-gray-500"
                 ></div>
               </label>
             </div>
@@ -592,7 +592,7 @@
                 </label>
                 <input
                   v-model.number="webhookConfig.retrySettings.maxRetries"
-                  class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 dark:focus:border-white dark:focus:ring-white dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+                  class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white sm:text-sm"
                   max="10"
                   min="0"
                   type="number"
@@ -605,7 +605,7 @@
                 </label>
                 <input
                   v-model.number="webhookConfig.retrySettings.retryDelay"
-                  class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 dark:focus:border-white dark:focus:ring-white dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+                  class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white sm:text-sm"
                   max="10000"
                   min="100"
                   step="100"
@@ -619,7 +619,7 @@
                 </label>
                 <input
                   v-model.number="webhookConfig.retrySettings.timeout"
-                  class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 dark:focus:border-white dark:focus:ring-white dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+                  class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white sm:text-sm"
                   max="30000"
                   min="1000"
                   step="1000"
@@ -905,7 +905,7 @@
               <div class="flex items-center justify-between">
                 <div class="flex items-center">
                   <div
-                    class="flex h-12 w-12 items-center justify-center rounded-lg bg-gray-700 dark:bg-gray-600 text-white shadow-lg"
+                    class="flex h-12 w-12 items-center justify-center rounded-lg bg-gray-700 text-white shadow-lg dark:bg-gray-600"
                   >
                     <i class="fas fa-layer-group text-xl"></i>
                   </div>
@@ -941,7 +941,7 @@
                   </label>
                   <input
                     v-model.number="claudeConfig.concurrentRequestQueueMaxSize"
-                    class="mt-1 block w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:focus:border-white dark:focus:ring-white/20 dark:border-gray-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                    class="mt-1 block w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-500 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white/20 sm:text-sm"
                     max="100"
                     min="1"
                     placeholder="3"
@@ -961,7 +961,7 @@
                   </label>
                   <input
                     v-model.number="claudeConfig.concurrentRequestQueueMaxSizeMultiplier"
-                    class="mt-1 block w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:focus:border-white dark:focus:ring-white/20 dark:border-gray-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                    class="mt-1 block w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-500 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white/20 sm:text-sm"
                     max="10"
                     min="0"
                     placeholder="1"
@@ -982,7 +982,7 @@
                   </label>
                   <input
                     v-model.number="claudeConfig.concurrentRequestQueueTimeoutMs"
-                    class="mt-1 block w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:focus:border-white dark:focus:ring-white/20 dark:border-gray-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                    class="mt-1 block w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-500 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white/20 sm:text-sm"
                     max="300000"
                     min="5000"
                     placeholder="10000"
@@ -1082,7 +1082,7 @@
             <div class="relative">
               <select
                 v-model="platformForm.type"
-                class="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 text-gray-900 shadow-sm transition-all focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:focus:border-white dark:focus:ring-white/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                class="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 text-gray-900 shadow-sm transition-all focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white/20"
                 :disabled="editingPlatform"
               >
                 <option value="wechat_work">🟢 企业微信</option>
@@ -1116,7 +1116,7 @@
             </label>
             <input
               v-model="platformForm.name"
-              class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:focus:border-white dark:focus:ring-white/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+              class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
               placeholder="例如：运维群通知、开发测试群"
               type="text"
             />
@@ -1140,7 +1140,7 @@
             <div class="relative">
               <input
                 v-model="platformForm.url"
-                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:focus:border-white dark:focus:ring-white/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
                 :class="{
                   'border-red-500 focus:border-red-500 focus:ring-red-500/20': urlError,
                   'border-green-500 focus:border-green-500 focus:ring-green-500/20': urlValid
@@ -1180,7 +1180,7 @@
               </label>
               <input
                 v-model="platformForm.botToken"
-                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:focus:border-white dark:focus:ring-white/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
                 placeholder="例如：123456789:ABCDEFghijk-xyz"
                 required
                 type="text"
@@ -1200,7 +1200,7 @@
               </label>
               <input
                 v-model="platformForm.chatId"
-                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:focus:border-white dark:focus:ring-white/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
                 placeholder="例如：123456789 或 -1001234567890"
                 required
                 type="text"
@@ -1220,7 +1220,7 @@
               </label>
               <input
                 v-model="platformForm.apiBaseUrl"
-                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:focus:border-white dark:focus:ring-white/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
                 placeholder="默认: https://api.telegram.org"
                 type="url"
               />
@@ -1239,7 +1239,7 @@
               </label>
               <input
                 v-model="platformForm.proxyUrl"
-                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:focus:border-white dark:focus:ring-white/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
                 placeholder="例如：socks5://user:pass@127.0.0.1:1080"
                 type="text"
               />
@@ -1269,7 +1269,7 @@
               </label>
               <input
                 v-model="platformForm.deviceKey"
-                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:focus:border-white dark:focus:ring-white/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
                 placeholder="例如：aBcDeFgHiJkLmNoPqRsTuVwX"
                 required
                 type="text"
@@ -1290,7 +1290,7 @@
               </label>
               <input
                 v-model="platformForm.serverUrl"
-                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:focus:border-white dark:focus:ring-white/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
                 placeholder="默认: https://api.day.app/push"
                 type="url"
               />
@@ -1306,7 +1306,7 @@
               </label>
               <select
                 v-model="platformForm.level"
-                class="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 text-gray-900 shadow-sm transition-all focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:focus:border-white dark:focus:ring-white/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                class="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 text-gray-900 shadow-sm transition-all focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white/20"
               >
                 <option value="">自动（根据通知类型）</option>
                 <option value="passive">被动</option>
@@ -1326,7 +1326,7 @@
               </label>
               <select
                 v-model="platformForm.sound"
-                class="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 text-gray-900 shadow-sm transition-all focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:focus:border-white dark:focus:ring-white/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                class="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 text-gray-900 shadow-sm transition-all focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white/20"
               >
                 <option value="">自动（根据通知类型）</option>
                 <option value="default">默认</option>
@@ -1351,7 +1351,7 @@
               </label>
               <input
                 v-model="platformForm.group"
-                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:focus:border-white dark:focus:ring-white/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
                 placeholder="默认: claude-relay"
                 type="text"
               />
@@ -1381,7 +1381,7 @@
               </label>
               <input
                 v-model="platformForm.host"
-                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:focus:border-white dark:focus:ring-white/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
                 placeholder="例如: smtp.gmail.com"
                 required
                 type="text"
@@ -1399,7 +1399,7 @@
                 </label>
                 <input
                   v-model.number="platformForm.port"
-                  class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:focus:border-white dark:focus:ring-white/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white/20"
                   max="65535"
                   min="1"
                   placeholder="587"
@@ -1419,7 +1419,7 @@
                 </label>
                 <select
                   v-model="platformForm.secure"
-                  class="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 text-gray-900 shadow-sm transition-all focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:focus:border-white dark:focus:ring-white/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  class="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 text-gray-900 shadow-sm transition-all focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white/20"
                 >
                   <option :value="false">STARTTLS (端口587)</option>
                   <option :value="true">SSL/TLS (端口465)</option>
@@ -1438,7 +1438,7 @@
               </label>
               <input
                 v-model="platformForm.user"
-                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:focus:border-white dark:focus:ring-white/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
                 placeholder="user@example.com"
                 required
                 type="email"
@@ -1456,7 +1456,7 @@
               </label>
               <input
                 v-model="platformForm.pass"
-                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:focus:border-white dark:focus:ring-white/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
                 placeholder="邮箱密码或应用专用密码"
                 required
                 type="password"
@@ -1477,7 +1477,7 @@
               </label>
               <input
                 v-model="platformForm.from"
-                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:focus:border-white dark:focus:ring-white/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
                 placeholder="默认使用用户名邮箱"
                 type="email"
               />
@@ -1494,7 +1494,7 @@
               </label>
               <input
                 v-model="platformForm.to"
-                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:focus:border-white dark:focus:ring-white/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
                 placeholder="admin@example.com"
                 required
                 type="email"
@@ -1545,7 +1545,7 @@
                   </label>
                   <input
                     v-model="platformForm.secret"
-                    class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:focus:border-white dark:focus:ring-white/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500"
+                    class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
                     placeholder="SEC..."
                     type="text"
                   />
@@ -2584,7 +2584,7 @@ const formatDateTime = settingsStore.formatDateTime
 }
 
 .btn-primary {
-  @apply bg-gray-700 dark:bg-gray-600 text-white hover:bg-gray-800 focus:ring-gray-700 dark:hover:bg-gray-500 dark:focus:ring-gray-500;
+  @apply bg-gray-700 text-white hover:bg-gray-800 focus:ring-gray-700 dark:bg-gray-600 dark:hover:bg-gray-500 dark:focus:ring-gray-500;
 }
 
 .btn-success {
