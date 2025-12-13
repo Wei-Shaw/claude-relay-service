@@ -10,7 +10,9 @@
       </div>
 
       <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-        输入一个“同权限未激活续费Key”，系统会把它的时长合并到当前Key，并销毁该续费Key（不可恢复）。当前Key若已过期，则从现在开始续上。
+        输入一个“同权限未激活续费 Key”，系统会把它的时长合并到当前 Key，并销毁该续费
+        Key（不可恢复）。 当前 Key 已过期则从现在开始续上；若当前 Key
+        也尚未激活，则会延长“首次使用后有效期”。
       </p>
 
       <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
@@ -98,6 +100,13 @@ const handleMergeRenewal = async () => {
 
     if (statsData.value && result.data?.expiresAt) {
       statsData.value.expiresAt = result.data.expiresAt
+      if (statsData.value.expirationMode === 'activation') {
+        statsData.value.isActivated = true
+      }
+    }
+    if (statsData.value && result.data?.activationValue && result.data?.activationUnit) {
+      statsData.value.activationDays = result.data.activationValue
+      statsData.value.activationUnit = result.data.activationUnit
     }
 
     const unitLabel = result.data?.extendUnit === 'hours' ? '小时' : '天'
@@ -106,11 +115,22 @@ const handleMergeRenewal = async () => {
         ? `${result.data.extendValue}${unitLabel}`
         : '已续费'
 
-    showToast(
-      `续费成功：${extendText}\n新的过期时间：${result.data.expiresAt}`,
-      'success',
-      '自助续费'
-    )
+    if (result.data?.expiresAt) {
+      showToast(
+        `续费成功：${extendText}\n新的过期时间：${result.data.expiresAt}`,
+        'success',
+        '自助续费'
+      )
+    } else if (result.data?.activationValue && result.data?.activationUnit) {
+      const activationUnitLabel = result.data.activationUnit === 'hours' ? '小时' : '天'
+      showToast(
+        `续费成功：${extendText}\n激活后有效期：${result.data.activationValue}${activationUnitLabel}`,
+        'success',
+        '自助续费'
+      )
+    } else {
+      showToast(`续费成功：${extendText}`, 'success', '自助续费')
+    }
     renewKeyInput.value = ''
   } catch (error) {
     const mismatchFields = error?.data?.mismatchFields

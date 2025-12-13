@@ -130,6 +130,38 @@ const diffPermissionFields = (a, b) => {
   return mismatch
 }
 
+const ACTIVATION_HOUR_MS = 60 * 60 * 1000
+const ACTIVATION_DAY_MS = 24 * ACTIVATION_HOUR_MS
+
+const normalizeActivationUnit = (unit) => (unit === 'hours' ? 'hours' : 'days')
+
+const parsePositiveIntOrZero = (value) => {
+  const parsed = Number.parseInt(String(value ?? ''), 10)
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return 0
+  }
+  return parsed
+}
+
+const activationPeriodToMs = (period, unit) => {
+  const safePeriod = parsePositiveIntOrZero(period)
+  if (!safePeriod) {
+    return 0
+  }
+  return safePeriod * (unit === 'hours' ? ACTIVATION_HOUR_MS : ACTIVATION_DAY_MS)
+}
+
+const activationMsToBestPeriod = (ms) => {
+  const safeMs = Number.isFinite(ms) && ms > 0 ? ms : 0
+  if (!safeMs) {
+    return { value: 0, unit: 'days' }
+  }
+  if (safeMs % ACTIVATION_DAY_MS === 0) {
+    return { value: safeMs / ACTIVATION_DAY_MS, unit: 'days' }
+  }
+  return { value: safeMs / ACTIVATION_HOUR_MS, unit: 'hours' }
+}
+
 // 🔑 使用“同权限未激活 Key”续费（用户自助）
 router.post('/api/merge-renewal', async (req, res) => {
   try {
@@ -203,7 +235,15 @@ router.post('/api/merge-renewal', async (req, res) => {
     }
 
     const targetExpiresAtMs = Date.parse(targetKeyData.expiresAt || '')
-    if (!Number.isFinite(targetExpiresAtMs)) {
+    const targetExpirationMode = targetKeyData.expirationMode || 'fixed'
+    const targetIsActivated =
+      targetKeyData.isActivated === 'true' || targetKeyData.isActivated === true
+    const targetAllowActivationMerge =
+      targetExpirationMode === 'activation' &&
+      !targetIsActivated &&
+      !Number.isFinite(targetExpiresAtMs)
+
+    if (!Number.isFinite(targetExpiresAtMs) && !targetAllowActivationMerge) {
       return res.status(400).json({
         success: false,
         error: 'API key has no expiry',
@@ -288,8 +328,8 @@ router.post('/api/merge-renewal', async (req, res) => {
 
     const extendMs =
       activationUnit === 'hours'
-        ? activationPeriod * 60 * 60 * 1000
-        : activationPeriod * 24 * 60 * 60 * 1000
+        ? activationPeriod * ACTIVATION_HOUR_MS
+        : activationPeriod * ACTIVATION_DAY_MS
 
     const client = redis.getClientSafe()
     const targetKey = `apikey:${targetKeyData.id}`
@@ -346,7 +386,30 @@ router.post('/api/merge-renewal', async (req, res) => {
         }
 
         const freshTargetExpiresAtMs = Date.parse(freshTarget.expiresAt || '')
-        if (!Number.isFinite(freshTargetExpiresAtMs)) {
+        const freshTargetExpirationMode = freshTarget.expirationMode || 'fixed'
+        const freshTargetIsActivated =
+          freshTarget.isActivated === 'true' || freshTarget.isActivated === true
+
+        const shouldMergeActivationPeriod =
+          !Number.isFinite(freshTargetExpiresAtMs) &&
+          freshTargetExpirationMode === 'activation' &&
+          !freshTargetIsActivated
+
+        let newExpiresAt = ''
+        let newActivationValue = 0
+        let newActivationUnit = 'days'
+
+        if (Number.isFinite(freshTargetExpiresAtMs)) {
+          const baseMs = Math.max(Date.now(), freshTargetExpiresAtMs)
+          newExpiresAt = new Date(baseMs + extendMs).toISOString()
+        } else if (shouldMergeActivationPeriod) {
+          const currentUnit = normalizeActivationUnit(freshTarget.activationUnit)
+          const currentMs = activationPeriodToMs(freshTarget.activationDays, currentUnit)
+          const mergedMs = currentMs + extendMs
+          const mergedPeriod = activationMsToBestPeriod(mergedMs)
+          newActivationValue = mergedPeriod.value
+          newActivationUnit = mergedPeriod.unit
+        } else {
           await client.unwatch()
           return res.status(400).json({
             success: false,
@@ -355,11 +418,16 @@ router.post('/api/merge-renewal', async (req, res) => {
           })
         }
 
-        const baseMs = Math.max(Date.now(), freshTargetExpiresAtMs)
-        const newExpiresAt = new Date(baseMs + extendMs).toISOString()
-
         const tx = client.multi()
-        tx.hset(targetKey, { expiresAt: newExpiresAt, updatedAt: nowIso })
+        if (newExpiresAt) {
+          tx.hset(targetKey, { expiresAt: newExpiresAt, updatedAt: nowIso })
+        } else {
+          tx.hset(targetKey, {
+            activationDays: String(newActivationValue),
+            activationUnit: newActivationUnit,
+            updatedAt: nowIso
+          })
+        }
         tx.expire(targetKey, 86400 * 365)
         tx.hset(renewKeyHash, {
           isDeleted: 'true',
@@ -394,13 +462,21 @@ router.post('/api/merge-renewal', async (req, res) => {
         }
 
         logger.success(
-          `🔁 Merge renewal success: target=${targetKeyData.id}, renew=${renewKeyData.id}, extend=${activationPeriod} ${activationUnit}, newExpiresAt=${newExpiresAt}, ip=${clientIP}`
+          newExpiresAt
+            ? `🔁 Merge renewal success: target=${targetKeyData.id}, renew=${renewKeyData.id}, extend=${activationPeriod} ${activationUnit}, newExpiresAt=${newExpiresAt}, ip=${clientIP}`
+            : `🔁 Merge renewal success: target=${targetKeyData.id}, renew=${renewKeyData.id}, extend=${activationPeriod} ${activationUnit}, newActivation=${newActivationValue} ${newActivationUnit}, ip=${clientIP}`
         )
 
         return res.json({
           success: true,
           data: {
-            expiresAt: newExpiresAt,
+            ...(newExpiresAt ? { expiresAt: newExpiresAt } : {}),
+            ...(newExpiresAt
+              ? {}
+              : {
+                  activationValue: newActivationValue,
+                  activationUnit: newActivationUnit
+                }),
             extendValue: activationPeriod,
             extendUnit: activationUnit,
             renewKeyId: renewKeyData.id
