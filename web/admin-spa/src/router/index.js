@@ -11,7 +11,6 @@ const UserManagementView = () => import('@/views/UserManagementView.vue')
 const MainLayout = () => import('@/components/layout/MainLayout.vue')
 const DashboardView = () => import('@/views/DashboardView.vue')
 const ApiKeysView = () => import('@/views/ApiKeysView.vue')
-const RedeemCodesView = () => import('@/views/RedeemCodesView.vue')
 const ApiKeyUsageRecordsView = () => import('@/views/ApiKeyUsageRecordsView.vue')
 const AccountsView = () => import('@/views/AccountsView.vue')
 const AccountUsageRecordsView = () => import('@/views/AccountUsageRecordsView.vue')
@@ -85,18 +84,6 @@ const routes = [
         path: '',
         name: 'ApiKeys',
         component: ApiKeysView
-      }
-    ]
-  },
-  {
-    path: '/redeem-codes',
-    component: MainLayout,
-    meta: { requiresAuth: true },
-    children: [
-      {
-        path: '',
-        name: 'RedeemCodes',
-        component: RedeemCodesView
       }
     ]
   },

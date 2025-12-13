@@ -22,6 +22,7 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
   try {
     const { platform, groupId } = req.query
     let accounts = await openaiResponsesAccountService.getAllAccounts(true)
+    let groupInfosMap = null
 
     // 根据查询参数进行筛选
     if (platform && platform !== 'openai-responses') {
@@ -29,14 +30,51 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
     }
 
     // 根据分组ID筛选
-    if (groupId) {
-      const group = await accountGroupService.getGroup(groupId)
-      if (group && group.platform === 'openai') {
-        const groupMembers = await accountGroupService.getGroupMembers(groupId)
-        accounts = accounts.filter((account) => groupMembers.includes(account.id))
+    if (groupId && groupId !== 'all') {
+      if (groupId === 'ungrouped') {
+        groupInfosMap = await accountGroupService.getAccountGroupsMap(accounts.map((a) => a.id))
+        accounts = accounts.filter((account) => (groupInfosMap[account.id] || []).length === 0)
       } else {
-        accounts = []
+        const group = await accountGroupService.getGroup(groupId)
+        if (group && group.platform === 'openai') {
+          const groupMembers = await accountGroupService.getGroupMembers(groupId)
+          const memberSet = new Set(groupMembers || [])
+          accounts = accounts.filter((account) => memberSet.has(account.id))
+        } else {
+          accounts = []
+        }
       }
+    }
+
+    if (!groupInfosMap) {
+      groupInfosMap = await accountGroupService.getAccountGroupsMap(accounts.map((a) => a.id))
+    }
+
+    // 预计算绑定的 API Key 数量（支持 responses: 前缀），避免每个账户全量扫描
+    const responseAccountIdSet = new Set(accounts.map((a) => a.id))
+    const allKeys = await redis.getAllApiKeys()
+    const boundCountMap = {}
+
+    for (const key of allKeys) {
+      const binding = key.openaiAccountId
+      if (!binding) {
+        continue
+      }
+
+      if (binding.startsWith('responses:')) {
+        const accountId = binding.substring('responses:'.length)
+        if (!responseAccountIdSet.has(accountId)) {
+          continue
+        }
+        boundCountMap[accountId] = (boundCountMap[accountId] || 0) + 1
+        continue
+      }
+
+      if (!responseAccountIdSet.has(binding)) {
+        continue
+      }
+
+      boundCountMap[binding] = (boundCountMap[binding] || 0) + 1
     }
 
     // 处理额度信息、使用统计和绑定的 API Key 数量
@@ -76,19 +114,7 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
             }
           }
 
-          // 计算绑定的API Key数量（支持 responses: 前缀）
-          const allKeys = await redis.getAllApiKeys()
-          let boundCount = 0
-
-          for (const key of allKeys) {
-            // 检查是否绑定了该账户（包括 responses: 前缀）
-            if (
-              key.openaiAccountId === account.id ||
-              key.openaiAccountId === `responses:${account.id}`
-            ) {
-              boundCount++
-            }
-          }
+          const boundCount = boundCountMap[account.id] || 0
 
           // 调试日志：检查绑定计数
           if (boundCount > 0) {
@@ -96,7 +122,7 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
           }
 
           // 获取分组信息
-          const groupInfos = await accountGroupService.getAccountGroups(account.id)
+          const groupInfos = groupInfosMap[account.id] || []
 
           const formattedAccount = formatAccountExpiry(account)
           return {
@@ -114,7 +140,7 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
           const formattedAccount = formatAccountExpiry(account)
           return {
             ...formattedAccount,
-            groupInfos: [],
+            groupInfos: groupInfosMap[account.id] || [],
             boundApiKeysCount: 0,
             usage: {
               daily: { requests: 0, tokens: 0, allTokens: 0 },

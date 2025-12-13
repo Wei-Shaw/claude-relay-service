@@ -26,7 +26,10 @@ class ApiStatsClient {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message || `请求失败: ${response.status}`)
+        const error = new Error(data.message || `请求失败: ${response.status}`)
+        error.status = response.status
+        error.data = data?.data
+        throw error
       }
 
       return data
@@ -93,11 +96,11 @@ class ApiStatsClient {
     })
   }
 
-  // 兑换码续费
-  async redeemCode(apiKey, redeemCode) {
-    return this.request('/apiStats/api/redeem-code', {
+  // 同权限未激活 Key 续费（合并时长）
+  async mergeRenewal(apiKey, renewKey) {
+    return this.request('/apiStats/api/merge-renewal', {
       method: 'POST',
-      body: JSON.stringify({ apiKey, redeemCode })
+      body: JSON.stringify({ apiKey, renewKey })
     })
   }
 }

@@ -141,40 +141,64 @@ router.post('/droid-accounts/exchange-code', authenticateAdmin, async (req, res)
 // 获取所有 Droid 账户
 router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
   try {
-    const accounts = await droidAccountService.getAllAccounts()
+    const { platform, groupId } = req.query
+    let accounts = await droidAccountService.getAllAccounts()
+    let groupInfosMap = null
+
+    // 根据查询参数进行筛选
+    if (platform && platform !== 'all' && platform !== 'droid') {
+      accounts = []
+    }
+
+    // 根据分组ID筛选
+    if (groupId && groupId !== 'all') {
+      if (groupId === 'ungrouped') {
+        groupInfosMap = await accountGroupService.getAccountGroupsMap(accounts.map((a) => a.id))
+        accounts = accounts.filter((account) => (groupInfosMap[account.id] || []).length === 0)
+      } else {
+        const groupMembers = await accountGroupService.getGroupMembers(groupId)
+        const memberSet = new Set(groupMembers || [])
+        accounts = accounts.filter((account) => memberSet.has(account.id))
+      }
+    }
+
+    if (!groupInfosMap) {
+      groupInfosMap = await accountGroupService.getAccountGroupsMap(accounts.map((a) => a.id))
+    }
+
+    // 预计算绑定的 API Key 计数（支持 group: 前缀），避免每个账户全量 reduce
     const allApiKeys = await redis.getAllApiKeys()
+    const directCountMap = {}
+    const groupCountMap = {}
+
+    for (const key of allApiKeys) {
+      const binding = key.droidAccountId
+      if (!binding) {
+        continue
+      }
+
+      if (binding.startsWith('group:')) {
+        const groupIdValue = binding.substring('group:'.length)
+        groupCountMap[groupIdValue] = (groupCountMap[groupIdValue] || 0) + 1
+        continue
+      }
+
+      directCountMap[binding] = (directCountMap[binding] || 0) + 1
+    }
 
     // 添加使用统计
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
+        const groupInfos = groupInfosMap[account.id] || []
+        const groupIds = groupInfos.map((group) => group.id)
+
+        let boundApiKeysCount = directCountMap[account.id] || 0
+        for (const id of groupIds) {
+          boundApiKeysCount += groupCountMap[id] || 0
+        }
+
         try {
           const usageStats = await redis.getAccountUsageStats(account.id, 'droid')
-          let groupInfos = []
-          try {
-            groupInfos = await accountGroupService.getAccountGroups(account.id)
-          } catch (groupError) {
-            logger.debug(`Failed to get group infos for Droid account ${account.id}:`, groupError)
-            groupInfos = []
-          }
-
-          const groupIds = groupInfos.map((group) => group.id)
-          const boundApiKeysCount = allApiKeys.reduce((count, key) => {
-            const binding = key.droidAccountId
-            if (!binding) {
-              return count
-            }
-            if (binding === account.id) {
-              return count + 1
-            }
-            if (binding.startsWith('group:')) {
-              const groupId = binding.substring('group:'.length)
-              if (groupIds.includes(groupId)) {
-                return count + 1
-              }
-            }
-            return count
-          }, 0)
-
           const formattedAccount = formatAccountExpiry(account)
           return {
             ...formattedAccount,
@@ -192,8 +216,8 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
           const formattedAccount = formatAccountExpiry(account)
           return {
             ...formattedAccount,
-            boundApiKeysCount: 0,
-            groupInfos: [],
+            boundApiKeysCount,
+            groupInfos,
             usage: {
               daily: { tokens: 0, requests: 0 },
               total: { tokens: 0, requests: 0 },

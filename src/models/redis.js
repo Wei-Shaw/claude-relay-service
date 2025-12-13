@@ -989,6 +989,27 @@ class RedisClient {
       finalInputTokens + finalOutputTokens + finalCacheCreateTokens + finalCacheReadTokens
     const coreTokens = finalInputTokens + finalOutputTokens
 
+    // 计算本次请求费用（用于账户级别的快速统计，避免列表页按账号扫描模型键）
+    let requestCost = 0
+    try {
+      const CostCalculator = require('../utils/costCalculator')
+      const costResult = CostCalculator.calculateCost(
+        {
+          input_tokens: finalInputTokens,
+          output_tokens: finalOutputTokens,
+          cache_creation_input_tokens: finalCacheCreateTokens,
+          cache_read_input_tokens: finalCacheReadTokens
+        },
+        normalizedModel
+      )
+
+      const rawCost = costResult?.costs?.total
+      requestCost = Number.isFinite(rawCost) && rawCost > 0 ? rawCost : 0
+    } catch (error) {
+      // 费用计算失败不应影响主流程
+      requestCost = 0
+    }
+
     // 构建统计操作数组
     const operations = [
       // 账户总体统计
@@ -999,6 +1020,7 @@ class RedisClient {
       this.client.hincrby(accountKey, 'totalCacheReadTokens', finalCacheReadTokens),
       this.client.hincrby(accountKey, 'totalAllTokens', actualTotalTokens),
       this.client.hincrby(accountKey, 'totalRequests', 1),
+      this.client.hincrbyfloat(accountKey, 'totalCost', requestCost),
 
       // 账户每日统计
       this.client.hincrby(accountDaily, 'tokens', coreTokens),
@@ -1008,6 +1030,7 @@ class RedisClient {
       this.client.hincrby(accountDaily, 'cacheReadTokens', finalCacheReadTokens),
       this.client.hincrby(accountDaily, 'allTokens', actualTotalTokens),
       this.client.hincrby(accountDaily, 'requests', 1),
+      this.client.hincrbyfloat(accountDaily, 'cost', requestCost),
 
       // 账户每月统计
       this.client.hincrby(accountMonthly, 'tokens', coreTokens),
@@ -1017,6 +1040,7 @@ class RedisClient {
       this.client.hincrby(accountMonthly, 'cacheReadTokens', finalCacheReadTokens),
       this.client.hincrby(accountMonthly, 'allTokens', actualTotalTokens),
       this.client.hincrby(accountMonthly, 'requests', 1),
+      this.client.hincrbyfloat(accountMonthly, 'cost', requestCost),
 
       // 账户每小时统计
       this.client.hincrby(accountHourly, 'tokens', coreTokens),
@@ -1540,17 +1564,24 @@ class RedisClient {
     const dailyData = handleAccountData(daily)
     const monthlyData = handleAccountData(monthly)
 
-    // 获取每日费用（基于模型使用）
-    const dailyCost = await this.getAccountDailyCost(accountId)
+    const totalCost = parseFloat(total.totalCost) || 0
+    const dailyCost = parseFloat(daily.cost) || 0
+    const monthlyCost = parseFloat(monthly.cost) || 0
 
     return {
       accountId,
-      total: totalData,
+      total: {
+        ...totalData,
+        cost: totalCost
+      },
       daily: {
         ...dailyData,
         cost: dailyCost
       },
-      monthly: monthlyData,
+      monthly: {
+        ...monthlyData,
+        cost: monthlyCost
+      },
       averages: {
         rpm: Math.round(avgRPM * 100) / 100,
         tpm: Math.round(avgTPM * 100) / 100,
