@@ -9,10 +9,16 @@ Quick reference for migrating each component from the old design to the new Verc
 ## Phase 1: Design System Foundation ✔️ COMPLETED
 
 ### Global Styles
-- [x] `web/admin-spa/src/assets/styles/global.css` - Update CSS variables
-- [x] `web/admin-spa/src/assets/styles/main.css` - Remove gradients and glass effects
-- [x] `web/admin-spa/src/assets/styles/components.css` - Rewrite component base styles
-- [x] `web/admin-spa/src/assets/styles/variables.css` - Update color tokens
+- [x] `web/admin-spa/src/assets/styles/global.css` - Update CSS variables ✅
+- [x] `web/admin-spa/src/assets/styles/main.css` - Remove gradients and glass effects ✅
+  - Removed body gradient background
+  - Removed body::before radial gradient overlay
+  - Updated Element Plus button styles (flat black)
+  - Updated custom scrollbar (flat gray colors with dark mode)
+  - Updated transition timing (0.2s ease)
+  - Updated responsive breakpoints (border-radius 5px)
+- [x] `web/admin-spa/src/assets/styles/components.css` - Rewrite component base styles ✅
+- [x] `web/admin-spa/src/assets/styles/variables.css` - Update color tokens ✅
 
 ---
 
@@ -26,7 +32,7 @@ Quick reference for migrating each component from the old design to the new Verc
 
 ### Badges
 - [x] Update all badge components to bordered style (via components.css)
-- [ ] `components/apikeys/LimitBadge.vue` (pending - Phase 5)
+- [ ] `components/apikeys/LimitBadge.vue` (deferred to Phase 5 - API Keys Components)
 
 ### Cards
 - [x] `components/common/StatCard.vue` → Remove gradient icon backgrounds
@@ -51,46 +57,56 @@ Quick reference for migrating each component from the old design to the new Verc
 ### Utilities
 - [x] `components/common/ThemeToggle.vue` → Simple toggle design
 - [x] `components/common/LogoTitle.vue` → Remove gradient text
-- [ ] `components/common/ActionDropdown.vue` → Flat dropdown (uses global styles)
-- [ ] `components/common/CustomDropdown.vue` → Flat dropdown (uses global styles)
-- [ ] `components/common/AccountSelector.vue` → Flat style (uses global styles)
+- [x] `components/common/ActionDropdown.vue` → Flat dropdown (5px border-radius, minimal shadows)
+- [x] `components/common/CustomDropdown.vue` → Flat dropdown (5px border-radius, minimal shadows)
+- [x] `components/common/AccountSelector.vue` → Flat style (5px border-radius, Vercel scrollbar colors)
 
 ---
 
-## Phase 3: Layout Components (Priority: HIGH)
+## Phase 3: Layout Components (Priority: HIGH) ✔️ COMPLETED
 
-- [ ] `components/layout/MainLayout.vue`
-  - Remove `.glass-strong` class
-  - Remove rounded corners
-  - Solid white background
-  - 1px border
+- [x] `components/layout/MainLayout.vue`
+  - Removed `.glass-strong` class
+  - Removed rounded corners (sharp edges)
+  - Solid white background with dark mode support
+  - 1px border (gray-200/gray-700)
 
-- [ ] `components/layout/AppHeader.vue`
-  - Remove gradient backgrounds
-  - Clean black/white design
-  - Simple divider line
+- [x] `components/layout/AppHeader.vue`
+  - Removed gradient backgrounds from user menu button
+  - Removed gradient icon background in modal
+  - Removed gradient divider
+  - Removed shimmer effect
+  - Clean black/white design with flat backgrounds
+  - Simple solid color divider
 
-- [ ] `components/layout/TabBar.vue`
-  - Horizontal tabs with bottom border indicator
-  - Remove gradient active state
+- [x] `components/layout/TabBar.vue`
+  - Updated to flat backgrounds (no blur/transparency)
+  - Horizontal tabs with bottom border indicator (via components.css)
+  - Removed gradient active state
+  - Updated border-radius to 5px
 
 ---
 
 ## Phase 4: View Pages (Priority: MEDIUM)
 
 ### Dashboard
-- [ ] `views/DashboardView.vue`
-  - Update stat cards grid (1px borders between)
-  - Remove gradient stat icons
-  - Clean typography
-  - Flat charts
+- [x] `views/DashboardView.vue` ✅
+  - ✅ Update stat cards grid (1px borders between)
+  - ✅ Remove gradient stat icons (8 icons updated to flat colors)
+  - ✅ Clean typography
+  - ✅ Flat charts
 
 ### API Keys
-- [ ] `views/ApiKeysView.vue`
-  - Flat table design
-  - Ghost action buttons
-  - New badge system
-  - Clean search input
+- [x] `views/ApiKeysView.vue` ✅
+  - ✅ Flat table design (removed gradient headers)
+  - ✅ Ghost action buttons (removed all decorative gradient hover effects)
+  - ✅ New badge system (updated with flat colors)
+  - ✅ Clean search input (removed gradient effects)
+  - ✅ Main "Create" button updated to flat black/white design
+  - ✅ All card backgrounds converted to flat (8 hover gradients removed)
+  - ✅ Progress bars updated to solid indigo color
+  - ✅ Info boxes updated to flat backgrounds
+  - ✅ Kept functional loading skeleton gradients for UX
 
 ### Accounts
 - [ ] `views/AccountsView.vue`
@@ -354,14 +370,15 @@ Quick reference for migrating each component from the old design to the new Verc
 ## Progress Tracking
 
 **Total Components**: ~55
-**Completed**: 6 (StatCard, ToastNotification, ConfirmDialog, ConfirmModal, LogoTitle, ThemeToggle)
+**Completed**: 14 (StatCard, ToastNotification, ConfirmDialog, ConfirmModal, LogoTitle, ThemeToggle, ActionDropdown, CustomDropdown, AccountSelector, MainLayout, AppHeader, TabBar, DashboardView, ApiKeysView)
 **In Progress**: 0
-**Remaining**: ~49
+**Remaining**: ~41
 
-**Phases Complete**: 2/8 (Phase 1: Foundation ✔️, Phase 2: Common Components ✔️)
+**Phases Complete**: 3/8 (Phase 1: Foundation ✔️, Phase 2: Common Components ✔️ 100%, Phase 3: Layout Components ✔️)
+**Phase 4 Progress**: 2/12 views migrated (17%)
 
 ---
 
-**Start Date**: TBD
+**Start Date**: 2025-12-13
 **Target Completion**: TBD
-**Last Updated**: 2025-12-13
+**Last Updated**: 2025-12-13 (Phase 2 completed 100%)

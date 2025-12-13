@@ -13,7 +13,7 @@
           :logo-src="oemSettings.siteIconData || oemSettings.siteIcon"
           subtitle="管理后台"
           :title="oemSettings.siteName"
-          title-class="text-white dark:text-gray-100"
+          title-class="text-gray-900 dark:text-gray-100"
         >
           <template #after-title>
             <!-- 版本信息 -->
@@ -24,7 +24,7 @@
               <!-- 更新提示 -->
               <a
                 v-if="versionInfo.hasUpdate"
-                class="inline-flex animate-pulse items-center gap-1 rounded-full border border-green-600 bg-green-500 px-2 py-0.5 text-xs text-white transition-colors hover:bg-green-600"
+                class="inline-flex animate-pulse items-center gap-1 rounded border border-green-600 bg-green-500 px-2 py-0.5 text-xs text-white transition-colors hover:bg-green-600"
                 :href="versionInfo.releaseInfo?.htmlUrl || '#'"
                 target="_blank"
                 title="有新版本可用"
@@ -63,7 +63,7 @@
           <!-- 悬浮菜单 -->
           <div
             v-if="userMenuOpen"
-            class="user-menu-dropdown absolute right-0 top-full mt-2 w-48 rounded-xl border border-gray-200 bg-white py-2 shadow-xl dark:border-gray-700 dark:bg-gray-800 sm:w-56"
+            class="user-menu-dropdown absolute right-0 top-full mt-2 w-48 rounded-md border border-gray-200 bg-white py-2 shadow-lg dark:border-gray-700 dark:bg-gray-800 sm:w-56"
             style="z-index: 999999"
             @click.stop
           >
@@ -85,7 +85,7 @@
                   >
                 </div>
                 <a
-                  class="block w-full rounded-lg bg-green-500 px-3 py-1.5 text-center text-sm text-white transition-colors hover:bg-green-600"
+                  class="block w-full rounded-md bg-green-500 px-3 py-1.5 text-center text-sm text-white transition-colors hover:bg-green-600"
                   :href="versionInfo.releaseInfo?.htmlUrl || '#'"
                   target="_blank"
                 >
@@ -104,7 +104,7 @@
                   <div
                     v-if="versionInfo.noUpdateMessage"
                     key="message"
-                    class="inline-block rounded-lg border border-green-200 bg-green-100 px-3 py-1.5 dark:border-green-800 dark:bg-green-900/30"
+                    class="inline-block rounded-md border border-green-200 bg-green-100 px-3 py-1.5 dark:border-green-800 dark:bg-green-900/30"
                   >
                     <p class="text-xs font-medium text-green-700 dark:text-green-400">
                       <i class="fas fa-check-circle mr-1" />当前已是最新版本
@@ -154,9 +154,9 @@
       <div class="mb-6 flex items-center justify-between">
         <div class="flex items-center gap-3">
           <div
-            class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600"
+            class="flex h-10 w-10 items-center justify-center rounded-md bg-gray-100 dark:bg-gray-800"
           >
-            <i class="fas fa-key text-white" />
+            <i class="fas fa-key text-gray-700 dark:text-gray-300" />
           </div>
           <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">修改账户信息</h3>
         </div>
@@ -242,7 +242,7 @@
 
         <div class="flex gap-3 pt-4">
           <button
-            class="flex-1 rounded-xl bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+            class="flex-1 rounded-md bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
             type="button"
             @click="closeChangePasswordModal"
           >
@@ -461,24 +461,7 @@ onUnmounted(() => {
 /* 用户菜单按钮样式 */
 .user-menu-button {
   position: relative;
-  overflow: hidden;
   min-height: 38px;
-}
-
-/* 添加光泽效果 */
-.user-menu-button::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.5s;
-}
-
-.user-menu-button:hover::before {
-  left: 100%;
 }
 
 /* 用户菜单样式优化 */

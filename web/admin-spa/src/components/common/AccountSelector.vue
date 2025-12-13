@@ -31,8 +31,8 @@
         <div
           v-if="showDropdown"
           ref="dropdownRef"
-          class="absolute z-50 flex flex-col rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-800"
-          :style="dropdownStyle"
+          class="absolute z-50 flex flex-col border border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-800"
+          :style="{ ...dropdownStyle, borderRadius: '5px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)' }"
         >
           <!-- 搜索框 -->
           <div class="flex-shrink-0 border-b border-gray-200 p-3 dark:border-gray-600">
@@ -704,9 +704,10 @@ watch(showDropdown, (newVal) => {
 </script>
 
 <style scoped>
+/* Vercel-style scrollbar */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #cbd5e0 #f7fafc;
+  scrollbar-color: #eaeaea #fafafa;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -714,15 +715,31 @@ watch(showDropdown, (newVal) => {
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: #f7fafc;
+  background: #fafafa;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #cbd5e0;
+  background-color: #eaeaea;
   border-radius: 3px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: #a0aec0;
+  background-color: #9e9e9e;
+}
+
+.dark .custom-scrollbar {
+  scrollbar-color: #333 #1f1f1f;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-track {
+  background: #1f1f1f;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #333;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #424242;
 }
 </style>

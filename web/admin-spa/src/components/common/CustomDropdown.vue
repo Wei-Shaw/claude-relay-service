@@ -3,8 +3,9 @@
     <!-- 触发器 -->
     <div
       ref="triggerRef"
-      class="relative flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm transition-all duration-200 hover:shadow-md dark:border-gray-600 dark:bg-gray-800"
-      :class="[isOpen && 'border-blue-400 shadow-md']"
+      class="relative flex cursor-pointer items-center gap-2 border border-gray-200 bg-white px-3 py-2 transition-all duration-200 dark:border-gray-600 dark:bg-gray-800"
+      :class="[isOpen && 'border-blue-400']"
+      :style="{ borderRadius: '5px', boxShadow: isOpen ? '0 4px 12px rgba(0, 0, 0, 0.08)' : 'none' }"
       @click="toggleDropdown"
     >
       <i v-if="icon" :class="['fas', icon, 'text-sm', iconColor]"></i>
@@ -34,8 +35,8 @@
         <div
           v-if="isOpen"
           ref="dropdownRef"
-          class="fixed z-[9999] min-w-max overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-800"
-          :style="dropdownStyle"
+          class="fixed z-[9999] min-w-max overflow-hidden border border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-800"
+          :style="{ ...dropdownStyle, borderRadius: '5px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)' }"
         >
           <div class="max-h-60 overflow-y-auto py-1">
             <div

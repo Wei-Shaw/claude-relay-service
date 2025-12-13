@@ -17,7 +17,7 @@
               活跃: {{ dashboardData.activeApiKeys || 0 }}
             </p>
           </div>
-          <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-blue-500 to-blue-600">
+          <div class="stat-icon flex-shrink-0 bg-blue-600">
             <i class="fas fa-key" />
           </div>
         </div>
@@ -151,7 +151,7 @@
               </span>
             </p>
           </div>
-          <div class="stat-icon ml-2 flex-shrink-0 bg-gradient-to-br from-green-500 to-green-600">
+          <div class="stat-icon ml-2 flex-shrink-0 bg-green-600">
             <i class="fas fa-user-circle" />
           </div>
         </div>
@@ -170,7 +170,7 @@
               总请求: {{ formatNumber(dashboardData.totalRequests || 0) }}
             </p>
           </div>
-          <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-purple-500 to-purple-600">
+          <div class="stat-icon flex-shrink-0 bg-purple-600">
             <i class="fas fa-chart-line" />
           </div>
         </div>
@@ -189,7 +189,7 @@
               运行时间: {{ formattedUptime }}
             </p>
           </div>
-          <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-yellow-500 to-orange-500">
+          <div class="stat-icon flex-shrink-0 bg-orange-600">
             <i class="fas fa-heartbeat" />
           </div>
         </div>
@@ -250,7 +250,7 @@
               </div>
             </div>
           </div>
-          <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-indigo-500 to-indigo-600">
+          <div class="stat-icon flex-shrink-0 bg-indigo-600">
             <i class="fas fa-coins" />
           </div>
         </div>
@@ -306,7 +306,7 @@
               </div>
             </div>
           </div>
-          <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-emerald-500 to-emerald-600">
+          <div class="stat-icon flex-shrink-0 bg-emerald-600">
             <i class="fas fa-database" />
           </div>
         </div>
@@ -329,7 +329,7 @@
               </span>
             </p>
           </div>
-          <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-orange-500 to-orange-600">
+          <div class="stat-icon flex-shrink-0 bg-orange-600">
             <i class="fas fa-tachometer-alt" />
           </div>
         </div>
@@ -352,7 +352,7 @@
               </span>
             </p>
           </div>
-          <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-rose-500 to-rose-600">
+          <div class="stat-icon flex-shrink-0 bg-rose-600">
             <i class="fas fa-rocket" />
           </div>
         </div>

@@ -60,9 +60,6 @@
             <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
               <!-- 时间范围筛选 -->
               <div class="group relative min-w-[140px]">
-                <div
-                  class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
-                ></div>
                 <CustomDropdown
                   v-model="globalDateFilter.preset"
                   icon="fa-calendar-alt"
@@ -96,9 +93,6 @@
 
               <!-- 标签筛选器 -->
               <div class="group relative min-w-[140px]">
-                <div
-                  class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
-                ></div>
                 <div class="relative">
                   <CustomDropdown
                     v-model="selectedTagFilter"
@@ -118,9 +112,6 @@
 
               <!-- 模型筛选器 -->
               <div class="group relative min-w-[140px]">
-                <div
-                  class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
-                ></div>
                 <div class="relative">
                   <CustomDropdown
                     v-model="selectedModels"
@@ -151,9 +142,6 @@
                   />
                 </div>
                 <div class="group relative flex-1">
-                  <div
-                    class="pointer-events-none absolute -inset-0.5 rounded-lg bg-gradient-to-r from-cyan-500 to-teal-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
-                  ></div>
                   <div class="relative flex items-center">
                     <input
                       v-model="searchKeyword"
@@ -188,9 +176,6 @@
                 :disabled="apiKeysLoading"
                 @click="loadApiKeys()"
               >
-                <div
-                  class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-green-500 to-teal-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
-                ></div>
                 <i
                   :class="[
                     'fas relative text-green-500',
@@ -214,9 +199,6 @@
                 class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-500 sm:w-auto"
                 @click="exportToExcel"
               >
-                <div
-                  class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-emerald-500 to-green-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
-                ></div>
                 <i class="fas fa-file-excel relative text-emerald-500" />
                 <span class="relative">导出数据</span>
               </button>
@@ -227,9 +209,6 @@
                 class="group relative flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 shadow-sm transition-all duration-200 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md dark:border-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 sm:w-auto"
                 @click="openBatchEditModal()"
               >
-                <div
-                  class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
-                ></div>
                 <i class="fas fa-edit relative text-blue-600 dark:text-blue-400" />
                 <span class="relative">编辑选中 ({{ selectedApiKeys.length }})</span>
               </button>
@@ -240,16 +219,13 @@
                 class="group relative flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 shadow-sm transition-all duration-200 hover:border-red-300 hover:bg-red-100 hover:shadow-md dark:border-red-700 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50 sm:w-auto"
                 @click="batchDeleteApiKeys()"
               >
-                <div
-                  class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-red-500 to-pink-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
-                ></div>
                 <i class="fas fa-trash relative text-red-600 dark:text-red-400" />
                 <span class="relative">删除选中 ({{ selectedApiKeys.length }})</span>
               </button>
 
               <!-- 创建按钮 -->
               <button
-                class="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 px-5 py-2 text-sm font-medium text-white shadow-md transition-all duration-200 hover:from-blue-600 hover:to-blue-700 hover:shadow-lg sm:w-auto"
+                class="flex w-full items-center justify-center gap-2 rounded-lg bg-black px-5 py-2 text-sm font-medium text-white shadow-md transition-all duration-200 hover:bg-gray-800 hover:shadow-lg dark:bg-white dark:text-black dark:hover:bg-gray-100 sm:w-auto"
                 @click.stop="openCreateApiKeyModal"
               >
                 <i class="fas fa-plus"></i>
@@ -277,9 +253,7 @@
           <div v-else class="table-wrapper hidden md:block">
             <div class="table-container">
               <table class="w-full">
-                <thead
-                  class="sticky top-0 z-10 bg-gradient-to-b from-gray-50 to-gray-100/90 backdrop-blur-sm dark:from-gray-700 dark:to-gray-800/90"
-                >
+                <thead class="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700">
                   <tr>
                     <th
                       v-if="shouldShowCheckboxes"
@@ -1087,7 +1061,7 @@
                             <div
                               v-for="stat in apiKeyModelStats[key.id]"
                               :key="stat.model"
-                              class="rounded-xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-4 transition-all duration-200 hover:border-indigo-300 hover:shadow-lg dark:border-gray-600 dark:from-gray-800 dark:to-gray-700 dark:hover:border-indigo-500"
+                              class="rounded border border-gray-200 bg-white p-4 transition-all duration-200 hover:border-indigo-300 hover:shadow-md dark:border-gray-600 dark:bg-gray-800 dark:hover:border-indigo-500"
                             >
                               <div class="mb-3 flex items-start justify-between">
                                 <div class="flex-1">
@@ -1178,7 +1152,7 @@
                                 class="mt-3 h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700"
                               >
                                 <div
-                                  class="h-2 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 transition-all duration-500"
+                                  class="h-2 rounded-full bg-indigo-600 transition-all duration-500"
                                   :style="{
                                     width:
                                       calculateApiKeyModelPercentage(
@@ -1204,7 +1178,7 @@
                           <!-- 总计统计，仅在有数据时显示 -->
                           <div
                             v-if="apiKeyModelStats[key.id] && apiKeyModelStats[key.id].length > 0"
-                            class="mt-4 rounded-lg border border-indigo-100 bg-gradient-to-r from-indigo-50 to-purple-50 p-3 dark:border-indigo-700 dark:from-indigo-900/20 dark:to-purple-900/20"
+                            class="mt-4 rounded border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-700 dark:bg-indigo-900/20"
                           >
                             <div class="flex items-center justify-between text-sm">
                               <span
@@ -1781,9 +1755,7 @@
             <div class="table-wrapper">
               <div class="table-container">
                 <table class="w-full">
-                  <thead
-                    class="sticky top-0 z-10 bg-gradient-to-b from-gray-50 to-gray-100/90 backdrop-blur-sm dark:from-gray-700 dark:to-gray-800/90"
-                  >
+                  <thead class="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700">
                     <tr>
                       <th
                         class="name-column sticky left-0 z-20 min-w-[140px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
@@ -1848,7 +1820,7 @@
                       <td class="name-column sticky left-0 z-10 px-3 py-3">
                         <div class="flex items-center">
                           <div
-                            class="mr-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-red-500 to-red-600"
+                            class="mr-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-red-600"
                           >
                             <i class="fas fa-trash text-[10px] text-white" />
                           </div>

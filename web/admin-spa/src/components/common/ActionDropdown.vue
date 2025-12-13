@@ -3,11 +3,12 @@
     <!-- 触发器按钮 -->
     <button
       ref="triggerRef"
-      class="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+      class="flex h-8 w-8 items-center justify-center border border-gray-200 bg-white text-gray-600 transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-200"
       :class="[
         isOpen &&
           'border-blue-400 bg-blue-50 text-blue-600 dark:border-blue-500 dark:bg-blue-900/30 dark:text-blue-400'
       ]"
+      style="border-radius: 5px"
       title="更多操作"
       @click.stop="toggleDropdown"
     >
@@ -27,8 +28,8 @@
         <div
           v-if="isOpen"
           ref="dropdownRef"
-          class="fixed z-[9999] min-w-[140px] overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
-          :style="dropdownStyle"
+          class="fixed z-[9999] min-w-[140px] overflow-hidden border border-gray-200 bg-white py-1 dark:border-gray-600 dark:bg-gray-800"
+          :style="{ ...dropdownStyle, borderRadius: '5px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)' }"
         >
           <button
             v-for="action in actions"

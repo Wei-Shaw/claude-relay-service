@@ -108,11 +108,43 @@ body {
 }
 ```
 
+#### 4. Main Styles (`main.css`)
+**Status:** ✅ Complete
+
+- ✅ Removed body gradient background
+- ✅ Removed body::before radial gradient overlay
+- ✅ Updated Element Plus button styles to flat black
+- ✅ Updated custom scrollbar styles (flat gray colors)
+- ✅ Added dark mode scrollbar styles
+- ✅ Updated transition timing (0.3s cubic-bezier → 0.2s ease)
+- ✅ Updated responsive breakpoints (glass → card, border-radius 20px → 5px)
+
+**Key Changes:**
+```css
+/* Old */
+.el-button--primary {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.4) 0%, rgba(118, 75, 162, 0.4) 100%);
+}
+
+/* New */
+.el-button--primary {
+  background: #000;
+  border-color: #000;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #eaeaea;
+}
+```
+
 ### Files Modified
 
 1. ✅ `web/admin-spa/src/assets/styles/variables.css` - Complete rewrite (80 lines)
 2. ✅ `web/admin-spa/src/assets/styles/components.css` - Complete rewrite (1,038 lines)
 3. ✅ `web/admin-spa/src/assets/styles/global.css` - Major cleanup
+4. ✅ `web/admin-spa/src/assets/styles/main.css` - Major cleanup (removed gradients, updated scrollbar, transitions)
 
 ### Design System Tokens Established
 
@@ -195,20 +227,118 @@ All base component styles were already updated in Phase 1:
 
 ---
 
-## 📋 Phase 3: Layout Components (PENDING)
+## ✅ Phase 3: Layout Components (COMPLETED)
 
-- [ ] MainLayout.vue
-- [ ] AppHeader.vue
-- [ ] TabBar.vue
+### What Was Accomplished
 
-**Estimated:** ~3 component files
+All three layout components have been migrated to the Vercel-inspired flat design:
+
+#### Components Migrated
+- ✅ **MainLayout.vue** - Clean container design
+  - Removed `glass-strong` class
+  - Removed all rounded corners (now sharp edges)
+  - Solid white background (`bg-white dark:bg-gray-900`)
+  - 1px border (`border-gray-200 dark:border-gray-700`)
+  - Removed shadow effects
+
+- ✅ **AppHeader.vue** - Flat header with clean navigation
+  - Removed `glass-strong` class from header container
+  - Removed rounded corners (now minimal 5px)
+  - Removed gradient from user menu button (`bg-gradient-to-r from-blue-500 to-blue-600` → flat white/gray button)
+  - Removed gradient icon background in modal (`bg-gradient-to-br from-blue-500 to-blue-600` → flat gray)
+  - Removed gradient divider (`bg-gradient-to-b` → solid `bg-gray-200 dark:bg-gray-700`)
+  - Removed shimmer effect (::before pseudo-element with gradient animation)
+  - Updated all buttons to flat design with minimal shadows
+  - Border radius: xl/2xl/3xl → md (5px)
+
+- ✅ **TabBar.vue** - Bottom border indicator style
+  - Removed transparent/blur backgrounds (`bg-white/10 backdrop-blur-sm` → solid backgrounds)
+  - Updated mobile dropdown to flat design with border
+  - Updated desktop tab container to use bottom border style
+  - Removed rounded corners (2xl → 0)
+  - Tab buttons use global `.tab-btn` styling (already updated in Phase 1)
+  - Border radius: xl/2xl → md/0
+
+**Files Modified:** 3 Vue component files
+**Lines Changed:** ~80 lines
+
+### Design Changes Summary
+- **Backgrounds:** All glass-morphism and blur effects removed, replaced with solid white/gray
+- **Borders:** 1px solid borders (gray-200/gray-700)
+- **Border Radius:** Reduced from xl/2xl/3xl to md (5px) or 0 (sharp edges)
+- **Gradients Removed:**
+  - User menu button gradient
+  - Modal icon background gradient
+  - Divider gradient
+  - Tab container transparency/blur
+- **Effects Removed:**
+  - Glass-strong backdrop-filter
+  - Shimmer animation on user menu button
+  - All shadow-xl effects (now minimal or none)
+- **Colors:** Clean Vercel palette (white, gray-100, gray-200, etc.)
+- **Dark Mode:** Full support for all components
 
 ---
 
-## 📋 Phase 4: View Pages (PENDING)
+## 🚧 Phase 4: View Pages (IN PROGRESS - 2/12 completed)
 
-- [ ] DashboardView.vue
-- [ ] ApiKeysView.vue
+### What Was Accomplished
+
+#### Dashboard View ✅
+- ✅ **DashboardView.vue** - Migrated to flat design
+  - Removed 8 gradient backgrounds from stat icons
+  - Updated all stat icons to use flat colors (blue-600, green-600, purple-600, orange-600, indigo-600, emerald-600, rose-600)
+  - Cards already benefit from global `.card` and `.stat-card` styles updated in Phase 1
+  - Charts remain clean with proper dark mode support
+
+**Changes:**
+- `bg-gradient-to-br from-blue-500 to-blue-600` → `bg-blue-600`
+- `bg-gradient-to-br from-green-500 to-green-600` → `bg-green-600`
+- `bg-gradient-to-br from-purple-500 to-purple-600` → `bg-purple-600`
+- `bg-gradient-to-br from-yellow-500 to-orange-500` → `bg-orange-600`
+- `bg-gradient-to-br from-indigo-500 to-indigo-600` → `bg-indigo-600`
+- `bg-gradient-to-br from-emerald-500 to-emerald-600` → `bg-emerald-600`
+- `bg-gradient-to-br from-orange-500 to-orange-600` → `bg-orange-600`
+- `bg-gradient-to-br from-rose-500 to-rose-600` → `bg-rose-600`
+
+**Files Modified:** 1 Vue component
+**Lines Changed:** ~16 lines
+
+#### API Keys View ✅
+- ✅ **ApiKeysView.vue** - Comprehensive migration to Vercel design
+  - Removed 8 decorative hover gradient blur effects from filter dropdowns and buttons
+  - Updated main "Create New Key" button from gradient (`bg-gradient-to-r from-blue-500 to-blue-600`) to flat black/white design
+  - Converted 2 table headers from gradient backgrounds to flat (`bg-gray-50 dark:bg-gray-700`)
+  - Updated card backgrounds from gradient to flat white/gray
+  - Converted progress bars from gradient (`bg-gradient-to-r from-indigo-500 to-purple-600`) to solid indigo (`bg-indigo-600`)
+  - Updated info boxes from gradient backgrounds to flat
+  - Converted delete icon background from gradient to flat red (`bg-red-600`)
+  - Kept 9 functional loading skeleton gradients for UX (animate-pulse)
+
+**Removed Gradients:**
+1. Time range filter hover effect
+2. Tag filter hover effect
+3. Model filter hover effect
+4. Search input hover effect
+5. Refresh button hover effect
+6. Export button hover effect
+7. Batch edit button hover effect
+8. Batch delete button hover effect
+9. Main create button background
+10. Active API keys table header
+11. Deleted API keys table header
+12. Model stats card backgrounds
+13. Progress bar fills
+14. Info box backgrounds
+15. Delete icon background
+
+**Updated Button Styles:**
+- Create button: `bg-black hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-100`
+
+**Files Modified:** 1 Vue component
+**Lines Changed:** ~50 lines
+
+### Pending Views
 - [ ] AccountsView.vue
 - [ ] SettingsView.vue
 - [ ] TutorialView.vue
@@ -287,30 +417,35 @@ All base component styles were already updated in Phase 1:
 ## Summary Statistics
 
 ### Overall Progress
-- **Completed:** Phase 1 (Design System Foundation) ✅, Phase 2 (Common Components) ✅
-- **In Progress:** None
+- **Completed:** Phase 1 (Design System Foundation) ✅, Phase 2 (Common Components) ✅, Phase 3 (Layout Components) ✅
+- **In Progress:** Phase 4 (View Pages) - 2/12 views completed (17%)
 - **Total Phases:** 8
-- **Progress:** 25% (2/8 phases)
+- **Progress:** 37.5% (3/8 phases complete, Phase 4 in progress)
 
 ### Files Status
-- **Modified:** 3 core CSS files + 6 Vue component files = 9 files
-- **Remaining Components:** ~49 Vue components
-- **Lines Rewritten:** ~1,500+ lines (1,200+ CSS + 300+ Vue)
+- **Modified:** 3 core CSS files + 11 Vue component files = 14 files
+- **Remaining Components:** ~44 Vue components
+- **Lines Rewritten:** ~1,750+ lines (1,200+ CSS + 550+ Vue)
 
 ### What's Next
 
 **Immediate Next Steps:**
 1. ✅ Phase 1: Design System Foundation - COMPLETED
 2. ✅ Phase 2: Common Components - COMPLETED
-3. **Next:** Phase 3: Layout Components (MainLayout, AppHeader, TabBar)
-4. **Then:** Phase 4: View Pages (Dashboard, ApiKeys, Accounts, etc.)
+3. ✅ Phase 3: Layout Components - COMPLETED
+4. ✅ DashboardView.vue - COMPLETED
+5. ✅ ApiKeysView.vue - COMPLETED
+6. **Next:** AccountsView.vue (similar changes as ApiKeysView)
+7. **Then:** Continue Phase 4: Remaining view pages (Settings, Tutorial, Login, etc.)
+8. **Then:** Phase 5: Specialized Components (Modals, Forms, etc.)
 
 **Impact:**
 - ✅ Foundation is solid and ready
 - ✅ Core common components migrated
 - ✅ All base styles (buttons, cards, forms, modals) are flat
 - ✅ Toast notifications, modals, theme toggle all updated
-- ⏭️ Next: Layout components and view pages
+- ✅ Layout components (MainLayout, AppHeader, TabBar) all flat and clean
+- ⏭️ Next: View pages migration
 
 ---
 
@@ -324,4 +459,4 @@ All base component styles were already updated in Phase 1:
 ---
 
 **Last Updated:** 2025-12-13
-**Status:** Phase 1 & 2 Complete, Ready for Phase 3 (Layout Components)
+**Status:** Phase 1, 2 & 3 Complete, Phase 4 In Progress (2/12 views migrated - DashboardView & ApiKeysView)
