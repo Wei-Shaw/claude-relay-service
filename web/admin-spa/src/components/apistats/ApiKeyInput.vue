@@ -115,7 +115,7 @@
       <!-- 多 Key 模式额外提示 -->
       <div
         v-if="multiKeyMode"
-        class="mt-2 rounded-lg bg-blue-50 p-3 text-sm text-blue-700 dark:bg-blue-900/20 dark:text-blue-400"
+        class="mt-2 rounded-lg bg-blue-50 p-3 text-sm text-gray-900 dark:text-white dark:bg-blue-900/20 dark:text-blue-400"
       >
         <i class="fas fa-lightbulb mr-2" />
         <span>提示：最多支持同时查询 30 个 API Keys。使用 Ctrl+Enter 快速查询。</span>
@@ -289,7 +289,7 @@ const hasValidInput = computed(() => {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #000;
   color: white;
   box-shadow:
     0 10px 15px -3px rgba(102, 126, 234, 0.3),
@@ -407,7 +407,7 @@ const hasValidInput = computed(() => {
 
 .mode-switch-btn.active {
   color: white;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #000;
   box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);
 }
 

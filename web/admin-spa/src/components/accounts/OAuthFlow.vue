@@ -7,7 +7,7 @@
       >
         <div class="flex items-start gap-4">
           <div
-            class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-blue-500"
+            class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100"
           >
             <i class="fas fa-link text-white" />
           </div>
@@ -16,7 +16,7 @@
 
             <!-- 授权方式选择 -->
             <div class="mb-4">
-              <label class="mb-2 block text-sm font-medium text-blue-800 dark:text-blue-300">
+              <label class="mb-2 block text-sm font-medium text-gray-900 dark:text-white dark:text-blue-300">
                 选择授权方式
               </label>
               <div class="flex gap-4">
@@ -50,7 +50,7 @@
               <div
                 class="rounded-lg border border-blue-300 bg-white/80 p-4 dark:border-blue-600 dark:bg-gray-800/80"
               >
-                <p class="mb-3 text-sm text-blue-700 dark:text-blue-300">
+                <p class="mb-3 text-sm text-gray-900 dark:text-white dark:text-blue-300">
                   使用 claude.ai 的 sessionKey 自动完成 OAuth 授权流程，无需手动打开浏览器。
                 </p>
 
@@ -93,7 +93,7 @@
                 <!-- 帮助说明 -->
                 <div
                   v-if="showSessionKeyHelp"
-                  class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-900/30"
+                  class="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-600 dark:bg-amber-900/30"
                 >
                   <h5 class="mb-2 font-semibold text-amber-800 dark:text-amber-200">
                     <i class="fas fa-lightbulb mr-1" />如何获取 sessionKey
@@ -153,7 +153,7 @@
 
             <!-- 手动授权流程 -->
             <div v-else>
-              <p class="mb-4 text-sm text-blue-800 dark:text-blue-300">
+              <p class="mb-4 text-sm text-gray-900 dark:text-white dark:text-blue-300">
                 请按照以下步骤完成 Claude 账户的授权：
               </p>
 
@@ -164,7 +164,7 @@
                 >
                   <div class="flex items-start gap-3">
                     <div
-                      class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white"
+                      class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-black dark:bg-white text-xs font-bold text-white dark:text-black"
                     >
                       1
                     </div>
@@ -199,7 +199,7 @@
                           </button>
                         </div>
                         <button
-                          class="text-xs text-gray-900 dark:text-gray-100 hover:text-blue-700"
+                          class="text-xs text-gray-900 dark:text-gray-100 hover:text-gray-900 dark:text-white"
                           @click="regenerateAuthUrl"
                         >
                           <i class="fas fa-sync-alt mr-1" />重新生成
@@ -215,7 +215,7 @@
                 >
                   <div class="flex items-start gap-3">
                     <div
-                      class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white"
+                      class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-black dark:bg-white text-xs font-bold text-white dark:text-black"
                     >
                       2
                     </div>
@@ -223,7 +223,7 @@
                       <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
                         在浏览器中打开链接并完成授权
                       </p>
-                      <p class="mb-2 text-sm text-blue-700 dark:text-blue-300">
+                      <p class="mb-2 text-sm text-gray-900 dark:text-white dark:text-blue-300">
                         请在新标签页中打开授权链接，登录您的 Claude 账户并授权。
                       </p>
                       <div
@@ -245,7 +245,7 @@
                 >
                   <div class="flex items-start gap-3">
                     <div
-                      class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white"
+                      class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-black dark:bg-white text-xs font-bold text-white dark:text-black"
                     >
                       3
                     </div>
@@ -253,7 +253,7 @@
                       <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
                         输入 Authorization Code
                       </p>
-                      <p class="mb-3 text-sm text-blue-700 dark:text-blue-300">
+                      <p class="mb-3 text-sm text-gray-900 dark:text-white dark:text-blue-300">
                         授权完成后，页面会显示一个
                         <strong>Authorization Code</strong>，请将其复制并粘贴到下方输入框：
                       </p>
@@ -289,7 +289,7 @@
     <!-- Gemini OAuth流程 -->
     <div v-else-if="platform === 'gemini'">
       <div
-        class="rounded-lg border border-green-200 bg-green-50 p-6 dark:border-green-700 dark:bg-green-900/30"
+        class="rounded-lg border border-gray-300 bg-green-50 p-6 dark:border-gray-700 dark:bg-green-900/30"
       >
         <div class="flex items-start gap-4">
           <div
@@ -519,7 +519,7 @@
                       请在新标签页中打开授权链接，登录您的 OpenAI 账户并授权。
                     </p>
                     <div
-                      class="mb-3 rounded border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-900/30"
+                      class="mb-3 rounded border border-amber-300 bg-amber-50 p-3 dark:border-amber-600 dark:bg-amber-900/30"
                     >
                       <p class="text-xs text-amber-800 dark:text-amber-300">
                         <i class="fas fa-clock mr-1" />
@@ -579,7 +579,7 @@
                       <div
                         class="rounded border border-blue-300 bg-blue-50 p-2 dark:border-gray-700 dark:bg-blue-900/30"
                       >
-                        <p class="text-xs text-blue-700 dark:text-blue-300">
+                        <p class="text-xs text-gray-900 dark:text-white dark:text-blue-300">
                           <i class="fas fa-lightbulb mr-1" />
                           <strong>提示：</strong>您可以直接复制整个链接或仅复制 code
                           参数值，系统会自动识别。

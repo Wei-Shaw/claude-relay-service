@@ -3,7 +3,7 @@
     <div v-if="show" class="modal fixed inset-0 z-50 flex items-center justify-center p-4">
       <!-- 背景遮罩 -->
       <div
-        class="fixed inset-0 bg-gray-900 bg-opacity-50 backdrop-blur-sm"
+        class="fixed inset-0 bg-gray-900 bg-opacity-50"
         @click="$emit('close')"
       />
 
@@ -13,7 +13,7 @@
         <div class="mb-6 flex items-center justify-between">
           <div class="flex items-center gap-3">
             <div
-              class="flex h-10 w-10 items-center justify-center rounded bg-gradient-to-br from-amber-500 to-orange-600"
+              class="flex h-10 w-10 items-center justify-center rounded bg-gray-900 dark:bg-gray-100"
             >
               <i class="fas fa-clock text-white" />
             </div>
@@ -35,7 +35,7 @@
         <div class="space-y-6">
           <!-- 当前状态显示 -->
           <div
-            class="rounded-lg border border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 p-4 dark:border-gray-600 dark:from-gray-700 dark:to-gray-800"
+            class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-600 dark:bg-gray-800"
           >
             <div class="flex items-center justify-between">
               <div>
@@ -132,7 +132,7 @@
           >
             <div class="flex items-center justify-between">
               <div>
-                <p class="mb-1 text-xs font-medium text-blue-700 dark:text-blue-400">
+                <p class="mb-1 text-xs font-medium text-gray-900 dark:text-white dark:text-blue-400">
                   <i class="fas fa-arrow-right mr-1" />
                   新的到期时间
                 </p>

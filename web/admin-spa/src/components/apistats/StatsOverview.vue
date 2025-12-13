@@ -435,12 +435,12 @@ const formatSessionRemaining = (minutes) => {
 }
 
 const getSessionProgressBarClass = (status, account) => {
-  if (!status) return 'bg-gradient-to-r from-blue-500 to-indigo-500'
-  if (account?.rateLimitStatus?.isRateLimited) return 'bg-gradient-to-r from-red-500 to-red-600'
+  if (!status) return 'bg-black dark:bg-white'
+  if (account?.rateLimitStatus?.isRateLimited) return 'bg-red-600'
   const normalized = String(status).toLowerCase()
-  if (normalized === 'rejected') return 'bg-gradient-to-r from-red-500 to-red-600'
-  if (normalized === 'allowed_warning') return 'bg-gradient-to-r from-yellow-500 to-orange-500'
-  return 'bg-gradient-to-r from-blue-500 to-indigo-500'
+  if (normalized === 'rejected') return 'bg-red-600'
+  if (normalized === 'allowed_warning') return 'bg-orange-500'
+  return 'bg-black dark:bg-white'
 }
 
 const normalizeCodexUsagePercent = (usageItem) => {
@@ -467,10 +467,10 @@ const normalizeCodexUsagePercent = (usageItem) => {
 
 const getCodexUsageBarClass = (usageItem) => {
   const percent = normalizeCodexUsagePercent(usageItem)
-  if (percent === null) return 'bg-gradient-to-r from-gray-300 to-gray-400'
-  if (percent >= 90) return 'bg-gradient-to-r from-red-500 to-red-600'
-  if (percent >= 75) return 'bg-gradient-to-r from-yellow-500 to-orange-500'
-  return 'bg-gradient-to-r from-emerald-500 to-teal-500'
+  if (percent === null) return 'bg-gray-400'
+  if (percent >= 90) return 'bg-red-600'
+  if (percent >= 75) return 'bg-orange-500'
+  return 'bg-black dark:bg-white'
 }
 
 const getCodexUsageWidth = (usageItem) => {
@@ -592,11 +592,11 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 }
 
 .icon-claude {
-  @apply bg-gradient-to-br from-purple-500 to-purple-600;
+  @apply bg-gray-900 dark:bg-gray-100;
 }
 
 .icon-openai {
-  @apply bg-gradient-to-br from-sky-500 to-indigo-500;
+  @apply bg-gray-600 dark:bg-gray-400;
 }
 
 .account-name {

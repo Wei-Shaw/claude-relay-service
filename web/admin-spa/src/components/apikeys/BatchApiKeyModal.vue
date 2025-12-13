@@ -7,7 +7,7 @@
         <div class="mb-6 flex items-center justify-between">
           <div class="flex items-center gap-3">
             <div
-              class="flex h-12 w-12 items-center justify-center rounded bg-gradient-to-br from-green-500 to-green-600"
+              class="flex h-12 w-12 items-center justify-center rounded bg-gray-900 dark:bg-gray-100"
             >
               <i class="fas fa-layer-group text-lg text-white" />
             </div>
@@ -46,7 +46,7 @@
         <!-- 统计信息 -->
         <div class="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
           <div
-            class="rounded-lg border border-gray-300 bg-gradient-to-br from-blue-50 to-blue-100 p-4"
+            class="rounded-lg border border-gray-300 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800"
           >
             <div class="flex items-center justify-between">
               <div>
@@ -56,7 +56,7 @@
                 </p>
               </div>
               <div
-                class="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500 bg-opacity-20"
+                class="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-200 dark:bg-gray-700"
               >
                 <i class="fas fa-key text-gray-900 dark:text-gray-100" />
               </div>
@@ -64,7 +64,7 @@
           </div>
 
           <div
-            class="rounded-lg border border-green-200 bg-gradient-to-br from-green-50 to-green-100 p-4"
+            class="rounded-lg border border-gray-300 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800"
           >
             <div class="flex items-center justify-between">
               <div>
@@ -82,7 +82,7 @@
           </div>
 
           <div
-            class="rounded-lg border border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100 p-4"
+            class="rounded-lg border border-gray-300 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800"
           >
             <div class="flex items-center justify-between">
               <div>
@@ -100,7 +100,7 @@
           </div>
 
           <div
-            class="rounded-lg border border-orange-200 bg-gradient-to-br from-orange-50 to-orange-100 p-4"
+            class="rounded-lg border border-gray-300 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800"
           >
             <div class="flex items-center justify-between">
               <div>
@@ -124,7 +124,7 @@
             <label class="text-sm font-semibold text-gray-700">API Keys 预览</label>
             <div class="flex items-center gap-2">
               <button
-                class="flex items-center gap-1 text-xs text-gray-900 dark:text-gray-100 hover:text-blue-800"
+                class="flex items-center gap-1 text-xs text-gray-900 dark:text-gray-100 hover:text-gray-900 dark:text-white"
                 type="button"
                 @click="togglePreview"
               >
@@ -162,7 +162,7 @@
 
         <!-- 额外提示 -->
         <div class="mt-4 rounded-lg border border-gray-300 bg-blue-50 p-3">
-          <p class="flex items-start text-xs text-blue-700">
+          <p class="flex items-start text-xs text-gray-900 dark:text-white">
             <i class="fas fa-info-circle mr-2 mt-0.5 flex-shrink-0" />
             <span>
               下载的文件格式为文本文件（.txt），每行包含一个 API Key。

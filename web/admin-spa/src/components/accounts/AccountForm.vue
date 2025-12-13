@@ -7,7 +7,7 @@
         <div class="mb-4 flex items-center justify-between sm:mb-6">
           <div class="flex items-center gap-2 sm:gap-3">
             <div
-              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-green-500 to-green-600 sm:h-10 sm:w-10 sm:rounded"
+              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100 sm:h-10 sm:w-10 sm:rounded"
             >
               <i class="fas fa-user-circle text-sm text-white sm:text-base" />
             </div>
@@ -77,7 +77,7 @@
                     class="group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all duration-200"
                     :class="[
                       platformGroup === 'claude'
-                        ? 'border-indigo-500 bg-gradient-to-br from-indigo-50 to-purple-50 shadow-md dark:from-indigo-900/20 dark:to-purple-900/20'
+                        ? 'border-gray-900 bg-white shadow-md dark:border-gray-100 dark:bg-gray-800'
                         : 'border-gray-200 bg-white hover:border-indigo-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-600'
                     ]"
                     @click="selectPlatformGroup('claude')"
@@ -85,7 +85,7 @@
                     <div class="p-3">
                       <div class="flex items-center justify-between">
                         <div
-                          class="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-indigo-500 to-purple-600"
+                          class="flex h-8 w-8 items-center justify-center rounded-md bg-gray-900 dark:bg-gray-100"
                         >
                           <i class="fas fa-brain text-sm text-white"></i>
                         </div>
@@ -108,7 +108,7 @@
                     class="group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all duration-200"
                     :class="[
                       platformGroup === 'openai'
-                        ? 'border-emerald-500 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-md dark:from-emerald-900/20 dark:to-teal-900/20'
+                        ? 'border-gray-900 bg-white shadow-md dark:border-gray-100 dark:bg-gray-800'
                         : 'border-gray-200 bg-white hover:border-emerald-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-emerald-600'
                     ]"
                     @click="selectPlatformGroup('openai')"
@@ -116,7 +116,7 @@
                     <div class="p-3">
                       <div class="flex items-center justify-between">
                         <div
-                          class="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-emerald-500 to-teal-600"
+                          class="flex h-8 w-8 items-center justify-center rounded-md bg-emerald-600"
                         >
                           <svg
                             class="h-5 w-5 text-white"
@@ -148,7 +148,7 @@
                     class="group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all duration-200"
                     :class="[
                       platformGroup === 'gemini'
-                        ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-md dark:bg-gray-800'
+                        ? 'border-gray-900 bg-white shadow-md dark:border-gray-100 dark:bg-gray-800'
                         : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-600'
                     ]"
                     @click="selectPlatformGroup('gemini')"
@@ -156,13 +156,13 @@
                     <div class="p-3">
                       <div class="flex items-center justify-between">
                         <div
-                          class="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-blue-500 to-indigo-600"
+                          class="flex h-8 w-8 items-center justify-center rounded-md bg-gray-900 dark:bg-gray-100"
                         >
                           <i class="fab fa-google text-sm text-white"></i>
                         </div>
                         <div
                           v-if="platformGroup === 'gemini'"
-                          class="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500"
+                          class="flex h-5 w-5 items-center justify-center rounded-full bg-gray-900 dark:bg-gray-100"
                         >
                           <i class="fas fa-check text-xs text-white"></i>
                         </div>
@@ -179,7 +179,7 @@
                     class="group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all duration-200"
                     :class="[
                       platformGroup === 'droid'
-                        ? 'border-rose-500 bg-gradient-to-br from-rose-50 to-orange-50 shadow-md dark:from-rose-900/20 dark:to-orange-900/20'
+                        ? 'border-gray-900 bg-white shadow-md dark:border-gray-100 dark:bg-gray-800'
                         : 'border-gray-200 bg-white hover:border-rose-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-rose-600'
                     ]"
                     @click="selectPlatformGroup('droid')"
@@ -187,7 +187,7 @@
                     <div class="p-3">
                       <div class="flex items-center justify-between">
                         <div
-                          class="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-rose-500 to-orange-500"
+                          class="flex h-8 w-8 items-center justify-center rounded-md bg-gray-900 dark:bg-gray-100"
                         >
                           <i class="fas fa-robot text-sm text-white"></i>
                         </div>
@@ -416,7 +416,7 @@
                         :class="[
                           form.platform === 'azure_openai'
                             ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30'
-                            : 'border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-blue-500 dark:hover:bg-blue-900/20'
+                            : 'border-gray-300 bg-white hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-gray-500 dark:hover:bg-gray-800'
                         ]"
                       >
                         <input
@@ -438,7 +438,7 @@
                         </div>
                         <div
                           v-if="form.platform === 'azure_openai'"
-                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500"
+                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-gray-900 dark:bg-gray-100"
                         >
                           <i class="fas fa-check text-xs text-white"></i>
                         </div>
@@ -452,7 +452,7 @@
                         :class="[
                           form.platform === 'gemini'
                             ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30'
-                            : 'border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-blue-500 dark:hover:bg-blue-900/20'
+                            : 'border-gray-300 bg-white hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-gray-500 dark:hover:bg-gray-800'
                         ]"
                       >
                         <input
@@ -472,7 +472,7 @@
                         </div>
                         <div
                           v-if="form.platform === 'gemini'"
-                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500"
+                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-gray-900 dark:bg-gray-100"
                         >
                           <i class="fas fa-check text-xs text-white"></i>
                         </div>
@@ -751,7 +751,7 @@
                     <!-- 新建分组选项 -->
                     <div class="border-t pt-2 dark:border-gray-600">
                       <button
-                        class="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-100 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                        class="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-100 hover:text-gray-900 dark:text-white dark:text-blue-400 dark:hover:text-blue-300"
                         type="button"
                         @click="handleNewGroup"
                       >
@@ -875,7 +875,7 @@
                 <div class="mt-2 rounded-lg border border-gray-300 bg-blue-50 p-3">
                   <div class="flex items-start gap-2">
                     <i class="fas fa-info-circle mt-0.5 text-gray-900 dark:text-gray-100" />
-                    <div class="text-xs text-blue-700">
+                    <div class="text-xs text-gray-900 dark:text-white">
                       <p class="mb-1 font-medium">常用 AWS 区域参考：</p>
                       <div class="grid grid-cols-2 gap-1 text-xs">
                         <span>• us-east-1 (美国东部)</span>
@@ -919,7 +919,7 @@
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   留空将使用系统默认模型。支持 inference profile ID 或 ARN
                 </p>
-                <div class="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <div class="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3">
                   <div class="flex items-start gap-2">
                     <i class="fas fa-info-circle mt-0.5 text-amber-600" />
                     <div class="text-xs text-amber-700">
@@ -1072,7 +1072,7 @@
                   <label class="inline-flex cursor-pointer items-center">
                     <input
                       v-model="form.enableRateLimit"
-                      class="mr-2 rounded border-gray-300 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700"
+                      class="mr-2 rounded border-gray-300 text-gray-900 dark:text-gray-100 focus:border-gray-900 dark:focus:border-white focus:ring focus:ring-gray-300 dark:focus:ring-gray-700 dark:border-gray-600 dark:bg-gray-700"
                       type="checkbox"
                     />
                     <span class="text-sm text-gray-700 dark:text-gray-300">启用限流机制</span>
@@ -1229,7 +1229,7 @@
                 <!-- 白名单模式 -->
                 <div v-if="modelRestrictionMode === 'whitelist'">
                   <div class="mb-3 rounded-lg bg-blue-50 p-3 dark:bg-blue-900/30">
-                    <p class="text-xs text-blue-700 dark:text-blue-400">
+                    <p class="text-xs text-gray-900 dark:text-white dark:text-blue-400">
                       <i class="fas fa-info-circle mr-1" />
                       选择允许使用此账户的模型。留空表示支持所有模型。
                     </p>
@@ -1317,7 +1317,7 @@
                   <!-- 快捷添加按钮 -->
                   <div class="mt-3 flex flex-wrap gap-2">
                     <button
-                      class="rounded-lg bg-blue-100 px-3 py-1 text-xs text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
+                      class="rounded-lg bg-blue-100 px-3 py-1 text-xs text-gray-900 dark:text-white transition-colors hover:bg-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-blue-900/50"
                       type="button"
                       @click="
                         addPresetMapping('claude-sonnet-4-20250514', 'claude-sonnet-4-20250514')
@@ -1425,7 +1425,7 @@
                   <label class="inline-flex cursor-pointer items-center">
                     <input
                       v-model="form.enableRateLimit"
-                      class="mr-2 rounded border-gray-300 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700"
+                      class="mr-2 rounded border-gray-300 text-gray-900 dark:text-gray-100 focus:border-gray-900 dark:focus:border-white focus:ring focus:ring-gray-300 dark:focus:ring-gray-700 dark:border-gray-600 dark:bg-gray-700"
                       type="checkbox"
                     />
                     <span class="text-sm text-gray-700 dark:text-gray-300">启用限流机制</span>
@@ -1460,7 +1460,7 @@
                 <label class="inline-flex cursor-pointer items-center">
                   <input
                     v-model="form.disableAutoProtection"
-                    class="mr-2 rounded border-gray-300 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700"
+                    class="mr-2 rounded border-gray-300 text-gray-900 dark:text-gray-100 focus:border-gray-900 dark:focus:border-white focus:ring focus:ring-gray-300 dark:focus:ring-gray-700 dark:border-gray-600 dark:bg-gray-700"
                     type="checkbox"
                   />
                   <span class="text-sm text-gray-700 dark:text-gray-300">
@@ -1720,7 +1720,7 @@
                           >客户端标识 ID</span
                         >
                         <button
-                          class="rounded-md bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
+                          class="rounded-md bg-blue-100 px-2.5 py-1 text-xs font-medium text-gray-900 dark:text-white transition-colors hover:bg-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-blue-900/50"
                           type="button"
                           @click="regenerateClientId"
                         >
@@ -1785,7 +1785,7 @@
             >
               <div class="mb-4 flex items-start gap-3">
                 <div
-                  class="mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-blue-500"
+                  class="mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100"
                 >
                   <i class="fas fa-info text-sm text-white" />
                 </div>
@@ -1795,28 +1795,28 @@
                   </h5>
                   <p
                     v-if="form.platform === 'claude'"
-                    class="mb-2 text-sm text-blue-800 dark:text-blue-300"
+                    class="mb-2 text-sm text-gray-900 dark:text-white dark:text-blue-300"
                   >
                     请输入有效的 Claude Access Token。如果您有 Refresh
                     Token，建议也一并填写以支持自动刷新。
                   </p>
                   <p
                     v-else-if="form.platform === 'gemini'"
-                    class="mb-2 text-sm text-blue-800 dark:text-blue-300"
+                    class="mb-2 text-sm text-gray-900 dark:text-white dark:text-blue-300"
                   >
                     请输入有效的 Gemini Access Token。如果您有 Refresh
                     Token，建议也一并填写以支持自动刷新。
                   </p>
                   <p
                     v-else-if="form.platform === 'openai'"
-                    class="mb-2 text-sm text-blue-800 dark:text-blue-300"
+                    class="mb-2 text-sm text-gray-900 dark:text-white dark:text-blue-300"
                   >
                     请输入有效的 OpenAI Access Token。如果您有 Refresh
                     Token，建议也一并填写以支持自动刷新。
                   </p>
                   <p
                     v-else-if="form.platform === 'droid'"
-                    class="mb-2 text-sm text-blue-800 dark:text-blue-300"
+                    class="mb-2 text-sm text-gray-900 dark:text-white dark:text-blue-300"
                   >
                     请输入有效的 Droid Access Token，并同时提供 Refresh Token 以支持自动刷新。
                   </p>
@@ -1829,7 +1829,7 @@
                     </p>
                     <p
                       v-if="form.platform === 'claude'"
-                      class="text-xs text-blue-800 dark:text-blue-300"
+                      class="text-xs text-gray-900 dark:text-white dark:text-blue-300"
                     >
                       请从已登录 Claude Code 的机器上获取
                       <code class="rounded bg-blue-100 px-1 py-0.5 font-mono dark:bg-blue-900/50"
@@ -1839,7 +1839,7 @@
                     </p>
                     <p
                       v-else-if="form.platform === 'gemini'"
-                      class="text-xs text-blue-800 dark:text-blue-300"
+                      class="text-xs text-gray-900 dark:text-white dark:text-blue-300"
                     >
                       请从已登录 Gemini CLI 的机器上获取
                       <code class="rounded bg-blue-100 px-1 py-0.5 font-mono dark:bg-blue-900/50"
@@ -1849,14 +1849,14 @@
                     </p>
                     <p
                       v-else-if="form.platform === 'openai'"
-                      class="text-xs text-blue-800 dark:text-blue-300"
+                      class="text-xs text-gray-900 dark:text-white dark:text-blue-300"
                     >
                       请从已登录 OpenAI 账户的机器上获取认证凭证， 或通过 OAuth 授权流程获取 Access
                       Token。
                     </p>
                     <p
                       v-else-if="form.platform === 'droid'"
-                      class="text-xs text-blue-800 dark:text-blue-300"
+                      class="text-xs text-gray-900 dark:text-white dark:text-blue-300"
                     >
                       请从已完成授权的 Droid CLI 或 Factory.ai 导出的凭证中获取 Access Token 与
                       Refresh Token。
@@ -2097,7 +2097,7 @@
             >
               <div class="flex items-start gap-4">
                 <div
-                  class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-blue-500"
+                  class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100"
                 >
                   <i class="fas fa-key text-white" />
                 </div>
@@ -2108,7 +2108,7 @@
 
                   <!-- 授权方式选择 -->
                   <div class="mb-4">
-                    <p class="mb-3 text-sm font-medium text-blue-800 dark:text-blue-300">
+                    <p class="mb-3 text-sm font-medium text-gray-900 dark:text-white dark:text-blue-300">
                       选择授权方式：
                     </p>
                     <div class="flex flex-wrap gap-4">
@@ -2120,7 +2120,7 @@
                           value="manual"
                           @change="onAuthMethodChange"
                         />
-                        <span class="text-sm text-blue-800 dark:text-blue-300">
+                        <span class="text-sm text-gray-900 dark:text-white dark:text-blue-300">
                           <i class="fas fa-link mr-1" />手动授权
                         </span>
                       </label>
@@ -2132,7 +2132,7 @@
                           value="cookie"
                           @change="onAuthMethodChange"
                         />
-                        <span class="text-sm text-blue-800 dark:text-blue-300">
+                        <span class="text-sm text-gray-900 dark:text-white dark:text-blue-300">
                           <i class="fas fa-cookie mr-1" />Cookie 自动授权
                         </span>
                       </label>
@@ -2141,7 +2141,7 @@
 
                   <!-- 手动授权流程 -->
                   <div v-if="authMethod === 'manual'" class="space-y-4">
-                    <p class="mb-4 text-sm text-blue-800 dark:text-blue-300">
+                    <p class="mb-4 text-sm text-gray-900 dark:text-white dark:text-blue-300">
                       请按照以下步骤通过 Setup Token 完成 Claude 账户的授权：
                     </p>
                     <!-- 步骤1: 生成授权链接 -->
@@ -2189,7 +2189,7 @@
                               </button>
                             </div>
                             <button
-                              class="text-xs text-gray-900 dark:text-gray-100 hover:text-blue-700"
+                              class="text-xs text-gray-900 dark:text-gray-100 hover:text-gray-900 dark:text-white"
                               @click="regenerateSetupTokenAuthUrl"
                             >
                               <i class="fas fa-sync-alt mr-1" />重新生成
@@ -2213,7 +2213,7 @@
                           <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
                             在浏览器中打开链接并完成授权
                           </p>
-                          <p class="mb-2 text-sm text-blue-700 dark:text-blue-300">
+                          <p class="mb-2 text-sm text-gray-900 dark:text-white dark:text-blue-300">
                             请在新标签页中打开授权链接，登录您的 Claude 账户并授权 Claude Code。
                           </p>
                           <div
@@ -2243,7 +2243,7 @@
                           <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
                             输入 Authorization Code
                           </p>
-                          <p class="mb-3 text-sm text-blue-700 dark:text-blue-300">
+                          <p class="mb-3 text-sm text-gray-900 dark:text-white dark:text-blue-300">
                             授权完成后，从返回页面复制 Authorization Code，并粘贴到下方输入框：
                           </p>
                           <div class="space-y-3">
@@ -2272,7 +2272,7 @@
 
                   <!-- Cookie自动授权流程 -->
                   <div v-if="authMethod === 'cookie'" class="space-y-4">
-                    <p class="mb-4 text-sm text-blue-800 dark:text-blue-300">
+                    <p class="mb-4 text-sm text-gray-900 dark:text-white dark:text-blue-300">
                       使用 sessionKey 自动完成授权，无需手动打开链接。
                     </p>
 
@@ -2287,7 +2287,7 @@
                             <i class="fas fa-cookie text-blue-500" />sessionKey
                             <span
                               v-if="parsedSessionKeyCount > 1"
-                              class="rounded-full bg-blue-500 px-2 py-0.5 text-xs text-white"
+                              class="rounded-full bg-gray-900 dark:bg-gray-100 px-2 py-0.5 text-xs text-white"
                             >
                               {{ parsedSessionKeyCount }} 个
                             </span>
@@ -2314,7 +2314,7 @@
                         <!-- 帮助说明 -->
                         <div>
                           <button
-                            class="flex items-center text-xs text-gray-900 dark:text-gray-100 hover:text-blue-700"
+                            class="flex items-center text-xs text-gray-900 dark:text-gray-100 hover:text-gray-900 dark:text-white"
                             type="button"
                             @click="showSessionKeyHelp = !showSessionKeyHelp"
                           >
@@ -2547,7 +2547,7 @@
                   <!-- 新建分组选项 -->
                   <div class="border-t pt-2 dark:border-gray-600">
                     <button
-                      class="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-100 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                      class="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-100 hover:text-gray-900 dark:text-white dark:text-blue-400 dark:hover:text-blue-300"
                       type="button"
                       @click="handleNewGroup"
                     >
@@ -2703,7 +2703,7 @@
                         >客户端标识 ID</span
                       >
                       <button
-                        class="rounded-md bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
+                        class="rounded-md bg-blue-100 px-2.5 py-1 text-xs font-medium text-gray-900 dark:text-white transition-colors hover:bg-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-blue-900/50"
                         type="button"
                         @click="regenerateClientId"
                       >
@@ -2905,7 +2905,7 @@
               <!-- 白名单模式 -->
               <div v-if="modelRestrictionMode === 'whitelist'">
                 <div class="mb-3 rounded-lg bg-blue-50 p-3 dark:bg-blue-900/30">
-                  <p class="text-xs text-blue-700 dark:text-blue-400">
+                  <p class="text-xs text-gray-900 dark:text-white dark:text-blue-400">
                     <i class="fas fa-info-circle mr-1" />
                     选择允许使用此账户的模型。留空表示支持所有模型。
                   </p>
@@ -2993,7 +2993,7 @@
                 <!-- 快捷添加按钮 -->
                 <div class="mt-3 flex flex-wrap gap-2">
                   <button
-                    class="rounded-lg bg-blue-100 px-3 py-1 text-xs text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
+                    class="rounded-lg bg-blue-100 px-3 py-1 text-xs text-gray-900 dark:text-white transition-colors hover:bg-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-blue-900/50"
                     type="button"
                     @click="
                       addPresetMapping('claude-sonnet-4-20250514', 'claude-sonnet-4-20250514')
@@ -3099,7 +3099,7 @@
                 <label class="inline-flex cursor-pointer items-center">
                   <input
                     v-model="form.enableRateLimit"
-                    class="mr-2 rounded border-gray-300 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring focus:ring-blue-200"
+                    class="mr-2 rounded border-gray-300 text-gray-900 dark:text-gray-100 focus:border-gray-900 dark:focus:border-white focus:ring focus:ring-gray-300 dark:focus:ring-gray-700"
                     type="checkbox"
                   />
                   <span class="text-sm text-gray-700">启用限流机制</span>
@@ -3131,7 +3131,7 @@
               <label class="inline-flex cursor-pointer items-center">
                 <input
                   v-model="form.disableAutoProtection"
-                  class="mr-2 rounded border-gray-300 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700"
+                  class="mr-2 rounded border-gray-300 text-gray-900 dark:text-gray-100 focus:border-gray-900 dark:focus:border-white focus:ring focus:ring-gray-300 dark:focus:ring-gray-700 dark:border-gray-600 dark:bg-gray-700"
                   type="checkbox"
                 />
                 <span class="text-sm text-gray-700 dark:text-gray-300">
@@ -3335,7 +3335,7 @@
               <div class="mt-2 rounded-lg border border-gray-300 bg-blue-50 p-3">
                 <div class="flex items-start gap-2">
                   <i class="fas fa-info-circle mt-0.5 text-gray-900 dark:text-gray-100" />
-                  <div class="text-xs text-blue-700">
+                  <div class="text-xs text-gray-900 dark:text-white">
                     <p class="mb-1 font-medium">常用 AWS 区域参考：</p>
                     <div class="grid grid-cols-2 gap-1 text-xs">
                       <span>• us-east-1 (美国东部)</span>
@@ -3394,7 +3394,7 @@
                 <label class="inline-flex cursor-pointer items-center">
                   <input
                     v-model="form.enableRateLimit"
-                    class="mr-2 rounded border-gray-300 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring focus:ring-blue-200"
+                    class="mr-2 rounded border-gray-300 text-gray-900 dark:text-gray-100 focus:border-gray-900 dark:focus:border-white focus:ring focus:ring-gray-300 dark:focus:ring-gray-700"
                     type="checkbox"
                   />
                   <span class="text-sm text-gray-700">启用限流机制</span>
@@ -3578,10 +3578,10 @@
                   </span>
                 </div>
                 <div
-                  class="relative grid h-11 grid-cols-3 overflow-hidden rounded border border-purple-200/80 bg-gradient-to-r from-purple-50/80 via-white to-purple-50/80 shadow-inner dark:border-purple-700/70 dark:from-purple-900/40 dark:via-purple-900/20 dark:to-purple-900/40"
+                  class="relative grid h-11 grid-cols-3 overflow-hidden rounded border border-gray-300 bg-white shadow-inner dark:border-gray-700 dark:bg-gray-800"
                 >
                   <span
-                    class="pointer-events-none absolute inset-y-0 rounded bg-gradient-to-r from-purple-500/90 via-purple-600 to-indigo-500/90 shadow-lg ring-1 ring-purple-100/80 transition-all duration-300 ease-out dark:from-purple-500/70 dark:via-purple-600/70 dark:to-indigo-500/70 dark:ring-purple-400/30"
+                    class="pointer-events-none absolute inset-y-0 rounded bg-black shadow-lg ring-1 ring-gray-300 transition-all duration-300 ease-out dark:bg-white dark:ring-gray-600"
                     :style="apiKeyModeSliderStyle"
                   />
                   <button
@@ -3627,7 +3627,7 @@
               form.platform !== 'azure_openai' &&
               form.platform !== 'openai-responses'
             "
-            class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-900/30"
+            class="rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-600 dark:bg-amber-900/30"
           >
             <div class="mb-4 flex items-start gap-3">
               <div

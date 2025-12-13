@@ -2,12 +2,12 @@
   <Teleport to="body">
     <div v-if="show" class="modal fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <div
-        class="modal-content custom-scrollbar mx-auto max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded bg-white/90 p-4 shadow-xl backdrop-blur-xl dark:bg-gray-800/95 dark:shadow-2xl sm:p-6 md:p-8"
+        class="modal-content custom-scrollbar mx-auto max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded bg-white p-4 shadow-xl dark:bg-gray-900 dark:shadow-2xl sm:p-6 md:p-8"
       >
         <div class="mb-4 flex items-center justify-between sm:mb-6">
           <div class="flex items-center gap-2 sm:gap-3">
             <div
-              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500 to-emerald-600 sm:h-10 sm:w-10 sm:rounded"
+              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100 sm:h-10 sm:w-10 sm:rounded"
             >
               <i class="fas fa-code-branch text-sm text-white sm:text-base" />
             </div>
@@ -185,7 +185,7 @@
               >模型映射表 (可选)</label
             >
             <div class="mb-3 rounded-lg bg-blue-50 p-3 dark:bg-blue-900/30">
-              <p class="text-xs text-blue-700 dark:text-blue-400">
+              <p class="text-xs text-gray-900 dark:text-white dark:text-blue-400">
                 <i class="fas fa-info-circle mr-1" />
                 留空表示支持所有模型且不修改请求。配置映射后，左侧模型会被识别为支持的模型，右侧是实际发送的模型。
               </p>

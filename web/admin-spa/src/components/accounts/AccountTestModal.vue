@@ -2,7 +2,7 @@
   <Teleport to="body">
     <div
       v-if="show"
-      class="fixed inset-0 z-[1050] flex items-center justify-center bg-gray-900/40 backdrop-blur-sm"
+      class="fixed inset-0 z-[1050] flex items-center justify-center bg-gray-900/40"
     >
       <div class="absolute inset-0" @click="handleClose" />
       <div
@@ -10,17 +10,17 @@
       >
         <!-- 顶部栏 -->
         <div
-          class="flex items-center justify-between border-b border-gray-100 bg-white/80 px-5 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/80"
+          class="flex items-center justify-between border-b border-gray-100 bg-white px-5 py-4 dark:border-gray-800 dark:bg-gray-900"
         >
           <div class="flex items-center gap-3">
             <div
               :class="[
                 'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded text-white shadow-lg',
                 testStatus === 'success'
-                  ? 'bg-gradient-to-br from-green-500 to-emerald-500'
+                  ? 'bg-green-600'
                   : testStatus === 'error'
-                    ? 'bg-gradient-to-br from-red-500 to-pink-500'
-                    : 'bg-gradient-to-br from-blue-500 to-indigo-500'
+                    ? 'bg-red-600'
+                    : 'bg-gray-900 dark:bg-gray-100'
               ]"
             >
               <i
@@ -155,7 +155,7 @@
               'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition',
               testStatus === 'testing'
                 ? 'cursor-not-allowed bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500'
-                : 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:from-blue-600 hover:to-indigo-600 hover:shadow-md'
+                : 'bg-black dark:bg-white text-white hover:bg-gray-800 dark:hover:bg-gray-100 hover:shadow-md'
             ]"
             :disabled="testStatus === 'testing'"
             @click="startTest"
@@ -268,7 +268,7 @@ const statusCardClass = computed(() => {
     case 'testing':
       return 'border-gray-300 bg-blue-50 dark:border-blue-500/30 dark:bg-blue-900/20'
     case 'success':
-      return 'border-green-200 bg-green-50 dark:border-green-500/30 dark:bg-green-900/20'
+      return 'border-gray-300 bg-green-50 dark:border-green-500/30 dark:bg-green-900/20'
     case 'error':
       return 'border-red-200 bg-red-50 dark:border-red-500/30 dark:bg-red-900/20'
     default:
@@ -326,7 +326,7 @@ const statusTextClass = computed(() => {
     case 'idle':
       return 'text-gray-700 dark:text-gray-300'
     case 'testing':
-      return 'text-blue-700 dark:text-blue-300'
+      return 'text-gray-900 dark:text-white dark:text-blue-300'
     case 'success':
       return 'text-green-700 dark:text-green-300'
     case 'error':

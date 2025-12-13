@@ -21,7 +21,7 @@
               API Keys 概况
             </span>
             <span
-              class="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-800 dark:text-blue-200"
+              class="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-gray-900 dark:text-white dark:bg-blue-800 dark:text-blue-200"
             >
               {{ aggregatedStats.activeKeys }}/{{ aggregatedStats.totalKeys }}
             </span>
@@ -44,7 +44,7 @@
 
         <!-- 聚合统计数据 -->
         <div
-          class="rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 p-4 dark:from-purple-900/20 dark:to-pink-900/20"
+          class="rounded-lg bg-gray-50 p-4 dark:bg-gray-800"
         >
           <div class="mb-3 flex items-center">
             <i class="fas fa-chart-pie mr-2 text-purple-500" />
@@ -272,7 +272,7 @@
               <span
                 v-for="client in statsData.restrictions.allowedClients"
                 :key="client"
-                class="flex items-center gap-1 rounded-full bg-white px-2 py-1 text-xs text-blue-700 shadow-sm dark:bg-slate-900 dark:text-blue-300 md:text-sm"
+                class="flex items-center gap-1 rounded-full bg-white px-2 py-1 text-xs text-gray-900 dark:text-white shadow-sm dark:bg-slate-900 dark:text-blue-300 md:text-sm"
               >
                 <i class="fas fa-id-badge" />
                 {{ client }}
@@ -293,7 +293,7 @@
       </h3>
 
       <div
-        class="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20 md:p-4"
+        class="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20 md:p-4"
       >
         <h4
           class="mb-2 flex items-center text-sm font-bold text-amber-800 dark:text-amber-300 md:mb-3 md:text-base"
@@ -305,7 +305,7 @@
           <div
             v-for="model in statsData.restrictions.restrictedModels"
             :key="model"
-            class="rounded border border-amber-200 bg-white px-2 py-1 text-xs dark:border-amber-700 dark:bg-gray-800 md:px-3 md:py-2 md:text-sm"
+            class="rounded border border-amber-300 bg-white px-2 py-1 text-xs dark:border-amber-600 dark:bg-gray-800 md:px-3 md:py-2 md:text-sm"
           >
             <i class="fas fa-ban mr-1 text-xs text-red-500 md:mr-2" />
             <span class="break-all text-gray-800 dark:text-gray-200">{{ model }}</span>
@@ -443,7 +443,7 @@ const formatNumber = (num) => {
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  background: #eaeaea;
 }
 
 .card:hover {

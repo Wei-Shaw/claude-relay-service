@@ -7,7 +7,7 @@
         <div class="mb-4 flex items-center justify-between sm:mb-6">
           <div class="flex items-center gap-2 sm:gap-3">
             <div
-              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 sm:h-10 sm:w-10 sm:rounded"
+              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100 sm:h-10 sm:w-10 sm:rounded"
             >
               <i class="fas fa-key text-sm text-white sm:text-base" />
             </div>
@@ -167,7 +167,7 @@
                     >批量操作：</span
                   >
                   <button
-                    class="group rounded-md bg-gradient-to-r from-red-500 to-red-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:from-red-600 hover:to-red-700 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
+                    class="group rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:bg-red-700 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
                     :disabled="errorKeysCount === 0 || batchDeleting"
                     title="删除所有异常状态的 API Key"
                     @click="deleteAllErrorKeys"
@@ -176,7 +176,7 @@
                     删除异常
                   </button>
                   <button
-                    class="group rounded-md bg-gradient-to-r from-red-600 to-red-700 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:from-red-700 hover:to-red-800 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
+                    class="group rounded-md bg-red-700 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:bg-red-800 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
                     :disabled="apiKeys.length === 0 || batchDeleting"
                     title="删除所有 API Key"
                     @click="deleteAllKeys"
@@ -186,7 +186,7 @@
                   </button>
                   <div class="mx-1 h-5 w-px bg-gray-300 dark:bg-gray-600"></div>
                   <button
-                    class="rounded-md bg-gradient-to-r from-blue-500 to-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:from-blue-600 hover:to-blue-700 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
+                    class="rounded-md bg-black dark:bg-white px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:bg-gray-800 dark:hover:bg-gray-100 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
                     :disabled="errorKeysCount === 0"
                     title="导出所有异常状态的 API Key"
                     @click="exportKeys('error')"
@@ -195,7 +195,7 @@
                     导出异常
                   </button>
                   <button
-                    class="rounded-md bg-gradient-to-r from-blue-600 to-blue-700 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:from-blue-700 hover:to-blue-800 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
+                    class="rounded-md bg-black dark:bg-white px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:bg-gray-800 dark:hover:bg-gray-100 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
                     :disabled="apiKeys.length === 0"
                     title="导出所有 API Key"
                     @click="exportKeys('all')"

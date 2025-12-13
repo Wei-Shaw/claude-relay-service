@@ -7,7 +7,7 @@
         <div class="mb-6 flex items-center justify-between">
           <div class="flex items-center gap-3">
             <div
-              class="flex h-12 w-12 items-center justify-center rounded bg-gradient-to-br from-green-500 to-green-600"
+              class="flex h-12 w-12 items-center justify-center rounded bg-gray-900 dark:bg-gray-100"
             >
               <i class="fas fa-check text-lg text-white" />
             </div>
@@ -102,7 +102,7 @@
         <div class="flex flex-col gap-3 sm:gap-4">
           <div class="flex flex-col gap-3 sm:flex-row sm:gap-4">
             <button
-              class="flex w-full items-center justify-center gap-2 rounded border border-gray-300 bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-700 transition-colors hover:border-blue-300 hover:bg-blue-100 dark:border-blue-500/50 dark:bg-blue-500/10 dark:text-blue-200 dark:hover:bg-blue-500/20 sm:flex-1 sm:text-base"
+              class="flex w-full items-center justify-center gap-2 rounded border border-gray-300 bg-blue-50 px-5 py-3 text-sm font-semibold text-gray-900 dark:text-white transition-colors hover:border-blue-300 hover:bg-blue-100 dark:border-blue-500/50 dark:bg-blue-500/10 dark:text-blue-200 dark:hover:bg-blue-500/20 sm:flex-1 sm:text-base"
               @click="copyKeyOnly"
             >
               <i class="fas fa-key" />

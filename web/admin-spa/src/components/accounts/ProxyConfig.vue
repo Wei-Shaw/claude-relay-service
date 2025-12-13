@@ -162,7 +162,7 @@
       <div
         class="rounded-lg border border-gray-300 bg-blue-50 p-3 dark:border-gray-700 dark:bg-blue-900/30"
       >
-        <p class="text-xs text-blue-700 dark:text-blue-300">
+        <p class="text-xs text-gray-900 dark:text-white dark:text-blue-300">
           <i class="fas fa-info-circle mr-1" />
           <strong>提示：</strong
           >代理设置将用于所有与此账户相关的API请求。请确保代理服务器支持HTTPS流量转发。

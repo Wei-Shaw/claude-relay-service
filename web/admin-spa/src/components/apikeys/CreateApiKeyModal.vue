@@ -168,7 +168,7 @@
                   <button
                     v-for="tag in unselectedTags"
                     :key="'available-' + tag"
-                    class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700 transition-colors hover:bg-blue-100 hover:text-blue-700 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-blue-900/30 dark:hover:text-blue-400"
+                    class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700 transition-colors hover:bg-blue-100 hover:text-gray-900 dark:text-white dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-blue-900/30 dark:hover:text-blue-400"
                     type="button"
                     @click="selectTag(tag)"
                   >
@@ -213,7 +213,7 @@
           >
             <div class="mb-2 flex items-center gap-2">
               <div
-                class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-blue-500"
+                class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-gray-900 dark:bg-gray-100"
               >
                 <i class="fas fa-tachometer-alt text-xs text-white" />
               </div>
@@ -270,10 +270,10 @@
 
               <!-- 示例说明 -->
               <div class="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
-                <h5 class="mb-1 text-xs font-semibold text-blue-800 dark:text-blue-400">
+                <h5 class="mb-1 text-xs font-semibold text-gray-900 dark:text-white dark:text-blue-400">
                   💡 使用示例
                 </h5>
-                <div class="space-y-0.5 text-xs text-blue-700 dark:text-blue-300">
+                <div class="space-y-0.5 text-xs text-gray-900 dark:text-white dark:text-blue-300">
                   <div>
                     <strong>示例1:</strong> 时间窗口=60，请求次数=1000 → 每60分钟最多1000次请求
                   </div>
@@ -637,7 +637,7 @@
                 >专属账号绑定 (可选)</label
               >
               <button
-                class="flex items-center gap-1 text-sm text-gray-900 dark:text-gray-100 transition-colors hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+                class="flex items-center gap-1 text-sm text-gray-900 dark:text-gray-100 transition-colors hover:text-gray-900 dark:text-white disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
                 :disabled="accountsLoading"
                 title="刷新账号列表"
                 type="button"
@@ -834,7 +834,7 @@
 
             <div
               v-if="form.enableClientRestriction"
-              class="rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-700 dark:bg-green-900/20"
+              class="rounded-lg border border-gray-300 bg-green-50 p-3 dark:border-gray-700 dark:bg-green-900/20"
             >
               <div>
                 <label class="mb-2 block text-xs font-medium text-gray-700 dark:text-gray-300"

@@ -2,7 +2,7 @@
   <Teleport to="body">
     <div
       v-if="show"
-      class="fixed inset-0 z-[1050] flex items-center justify-center bg-gray-900/40 backdrop-blur-sm"
+      class="fixed inset-0 z-[1050] flex items-center justify-center bg-gray-900/40"
     >
       <div class="absolute inset-0" @click="handleClose" />
       <div
@@ -10,11 +10,11 @@
       >
         <!-- 顶部栏 -->
         <div
-          class="flex flex-col gap-3 border-b border-gray-100 bg-white/80 px-5 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/80 sm:flex-row sm:items-center sm:justify-between"
+          class="flex flex-col gap-3 border-b border-gray-100 bg-white px-5 py-4 dark:border-gray-800 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-between"
         >
           <div class="flex flex-1 items-start gap-3">
             <div
-              class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-lg"
+              class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded bg-gray-900 dark:bg-gray-100 text-white shadow-lg"
             >
               <i class="fas fa-chart-area text-lg" />
             </div>
@@ -25,7 +25,7 @@
                 </h3>
                 <span
                   v-if="account?.platform"
-                  class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/10 dark:text-blue-300"
+                  class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-gray-900 dark:text-white dark:bg-blue-500/10 dark:text-blue-300"
                 >
                   <i class="fas fa-layer-group mr-1" />{{ platformLabel }}
                 </span>
@@ -102,7 +102,7 @@
                 class="space-y-3 rounded border border-blue-100 bg-blue-50/60 p-4 dark:border-blue-500/20 dark:bg-blue-900/20"
               >
                 <div
-                  class="flex items-center gap-2 text-sm font-semibold text-blue-700 dark:text-blue-300"
+                  class="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white dark:text-blue-300"
                 >
                   <i class="fas fa-sun" />
                   今日概览

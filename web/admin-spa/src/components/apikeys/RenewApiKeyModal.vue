@@ -5,7 +5,7 @@
         <div class="mb-6 flex items-center justify-between">
           <div class="flex items-center gap-3">
             <div
-              class="flex h-10 w-10 items-center justify-center rounded bg-gradient-to-br from-green-500 to-green-600"
+              class="flex h-10 w-10 items-center justify-center rounded bg-gray-900 dark:bg-gray-100"
             >
               <i class="fas fa-clock text-white" />
             </div>
@@ -23,7 +23,7 @@
           <div class="rounded-lg border border-gray-300 bg-blue-50 p-4">
             <div class="flex items-start gap-3">
               <div
-                class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-blue-500"
+                class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100"
               >
                 <i class="fas fa-info text-sm text-white" />
               </div>

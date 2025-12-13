@@ -128,7 +128,7 @@ const formatNumber = (num) => {
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  background: #eaeaea(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
 }
 
 .card:hover {
@@ -168,7 +168,7 @@ const formatNumber = (num) => {
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  background: #eaeaea(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
 }
 
 .model-usage-item:hover {

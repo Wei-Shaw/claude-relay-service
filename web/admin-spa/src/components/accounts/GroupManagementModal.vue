@@ -7,7 +7,7 @@
         <div class="mb-4 flex items-center justify-between sm:mb-6">
           <div class="flex items-center gap-2 sm:gap-3">
             <div
-              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 sm:h-10 sm:w-10 sm:rounded"
+              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100 sm:h-10 sm:w-10 sm:rounded"
             >
               <i class="fas fa-layer-group text-sm text-white sm:text-base" />
             </div>
@@ -123,7 +123,7 @@
                       group.platform === 'claude'
                         ? 'bg-purple-100 text-purple-700'
                         : group.platform === 'gemini'
-                          ? 'bg-blue-100 text-blue-700'
+                          ? 'bg-blue-100 text-gray-900 dark:text-white'
                           : group.platform === 'openai'
                             ? 'bg-gray-100 text-gray-700'
                             : 'bg-cyan-100 text-cyan-700'
@@ -155,7 +155,7 @@
                 </div>
                 <div class="flex items-center gap-2">
                   <button
-                    class="text-gray-900 dark:text-gray-100 transition-colors hover:text-blue-800"
+                    class="text-gray-900 dark:text-gray-100 transition-colors hover:text-gray-900 dark:text-white"
                     title="编辑"
                     @click="editGroup(group)"
                   >
