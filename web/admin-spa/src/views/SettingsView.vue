@@ -1119,6 +1119,153 @@
                 </div>
               </div>
 
+              <!-- 出口 IP 测试 -->
+              <div
+                class="mt-8 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
+              >
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <div class="flex items-center">
+                    <i class="fas fa-vial mr-2 text-gray-400"></i>
+                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      出口 IP 测试
+                    </h3>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button
+                      class="btn btn-secondary px-4 py-2"
+                      :disabled="proxyExitIpTesting || proxyPolicySaving"
+                      @click="resetProxyExitIpResults"
+                    >
+                      <i class="fas fa-undo mr-2"></i>
+                      清空结果
+                    </button>
+                    <button
+                      class="btn btn-success px-4 py-2"
+                      :disabled="proxyExitIpTesting || proxyPolicySaving"
+                      @click="testAllProxyExitIps"
+                    >
+                      <i
+                        class="mr-2"
+                        :class="proxyExitIpTesting ? 'fas fa-spinner fa-spin' : 'fas fa-play'"
+                      ></i>
+                      {{ proxyExitIpTesting ? '测试中...' : '一键测试出口 IP' }}
+                    </button>
+                  </div>
+                </div>
+
+                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  由服务端发起请求获取出口
+                  IP；可在保存前先测试当前表单内容。未启用的代理会自动跳过。
+                </p>
+
+                <div class="mt-4 space-y-3">
+                  <div
+                    v-for="row in proxyExitIpTestRows"
+                    :key="row.key"
+                    class="flex items-start justify-between gap-4 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/30"
+                  >
+                    <div class="min-w-0 flex-1">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{
+                          row.label
+                        }}</span>
+                        <span
+                          v-if="proxyExitIpResults[row.key].status === 'success'"
+                          class="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                        >
+                          成功
+                        </span>
+                        <span
+                          v-else-if="proxyExitIpResults[row.key].status === 'testing'"
+                          class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                        >
+                          测试中
+                        </span>
+                        <span
+                          v-else-if="proxyExitIpResults[row.key].status === 'skipped'"
+                          class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700/60 dark:text-gray-300"
+                        >
+                          已跳过
+                        </span>
+                        <span
+                          v-else-if="proxyExitIpResults[row.key].status === 'error'"
+                          class="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/40 dark:text-red-300"
+                        >
+                          失败
+                        </span>
+                        <span
+                          v-else
+                          class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700/60 dark:text-gray-300"
+                        >
+                          未测试
+                        </span>
+                      </div>
+
+                      <div class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                        <template v-if="proxyExitIpResults[row.key].status === 'success'">
+                          IP: <span class="font-mono">{{ proxyExitIpResults[row.key].ip }}</span>
+                          <span v-if="proxyExitIpResults[row.key].elapsedMs" class="ml-2">
+                            用时 {{ proxyExitIpResults[row.key].elapsedMs }}ms
+                          </span>
+                          <span
+                            v-if="
+                              row.key !== 'direct' &&
+                              proxyExitIpResults.direct.status === 'success' &&
+                              proxyExitIpResults.direct.ip
+                            "
+                            class="ml-2"
+                          >
+                            {{
+                              proxyExitIpResults[row.key].ip === proxyExitIpResults.direct.ip
+                                ? '与直连一致'
+                                : '与直连不同'
+                            }}
+                          </span>
+                        </template>
+                        <template v-else-if="proxyExitIpResults[row.key].status === 'skipped'">
+                          {{ proxyExitIpResults[row.key].error || '未启用' }}
+                        </template>
+                        <template v-else-if="proxyExitIpResults[row.key].status === 'error'">
+                          {{ proxyExitIpResults[row.key].error || '测试失败' }}
+                        </template>
+                        <template v-else>点击“测试”或“一键测试”获取出口 IP</template>
+                      </div>
+
+                      <div
+                        v-if="
+                          proxyExitIpResults[row.key].status === 'success' &&
+                          proxyExitIpResults[row.key].proxyInfo
+                        "
+                        class="mt-1 text-xs text-gray-500 dark:text-gray-500"
+                      >
+                        代理: {{ proxyExitIpResults[row.key].proxyInfo }}
+                      </div>
+                    </div>
+
+                    <button
+                      class="btn btn-secondary px-3 py-2"
+                      :disabled="
+                        proxyExitIpTesting ||
+                        proxyPolicySaving ||
+                        proxyExitIpTestingKey === row.key ||
+                        proxyExitIpResults[row.key].status === 'testing'
+                      "
+                      @click="testProxyExitIp(row.key)"
+                    >
+                      <i
+                        class="mr-2"
+                        :class="
+                          proxyExitIpTestingKey === row.key
+                            ? 'fas fa-spinner fa-spin'
+                            : 'fas fa-vial'
+                        "
+                      ></i>
+                      测试
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div class="mt-6 flex items-center justify-between gap-4">
                 <div
                   v-if="proxyPolicyForm.updatedAt"
@@ -1830,6 +1977,37 @@ const proxyPolicyForm = ref({
   updatedBy: null
 })
 
+const createExitIpResult = () => ({
+  status: 'idle', // idle | testing | success | skipped | error
+  ip: '',
+  elapsedMs: 0,
+  error: '',
+  usingProxyAgent: false,
+  proxyInfo: '',
+  provider: '',
+  checkedAt: null
+})
+
+const proxyExitIpTesting = ref(false)
+const proxyExitIpTestingKey = ref('')
+const proxyExitIpResults = ref({
+  direct: createExitIpResult(),
+  global: createExitIpResult(),
+  claude: createExitIpResult(),
+  gemini: createExitIpResult(),
+  openai: createExitIpResult()
+})
+
+const proxyExitIpTestRows = computed(() => {
+  return [
+    { key: 'direct', label: '直连（不走代理）' },
+    { key: 'global', label: '全局账号代理' },
+    { key: 'claude', label: 'Claude 类型代理' },
+    { key: 'gemini', label: 'Gemini 类型代理' },
+    { key: 'openai', label: 'OpenAI 类型代理' }
+  ]
+})
+
 // 平台表单相关
 const showAddPlatformModal = ref(false)
 const editingPlatform = ref(null)
@@ -2255,6 +2433,162 @@ const saveProxyPolicyConfig = async () => {
   } finally {
     if (isMounted.value) {
       proxyPolicySaving.value = false
+    }
+  }
+}
+
+const getProxyStateForExitIpTest = (key) => {
+  if (key === 'global') return proxyPolicyForm.value.globalAccountProxy
+  if (key === 'claude') return proxyPolicyForm.value.platformProxies.claude
+  if (key === 'gemini') return proxyPolicyForm.value.platformProxies.gemini
+  if (key === 'openai') return proxyPolicyForm.value.platformProxies.openai
+  return null
+}
+
+const getExitIpTestLabel = (key) => {
+  return proxyExitIpTestRows.value.find((row) => row.key === key)?.label || key
+}
+
+const resetProxyExitIpResults = () => {
+  proxyExitIpResults.value = {
+    direct: createExitIpResult(),
+    global: createExitIpResult(),
+    claude: createExitIpResult(),
+    gemini: createExitIpResult(),
+    openai: createExitIpResult()
+  }
+  proxyExitIpTestingKey.value = ''
+}
+
+const setProxyExitIpResult = (key, patch) => {
+  proxyExitIpResults.value[key] = {
+    ...(proxyExitIpResults.value[key] || createExitIpResult()),
+    ...patch
+  }
+}
+
+const testProxyExitIp = async (key, options = {}) => {
+  const { silent = false } = options
+  if (!isMounted.value) return
+
+  if (proxyExitIpTestingKey.value) {
+    return
+  }
+
+  const label = getExitIpTestLabel(key)
+  let proxyPayload = null
+
+  if (key !== 'direct') {
+    const state = getProxyStateForExitIpTest(key)
+    if (!state || !state.enabled) {
+      setProxyExitIpResult(key, {
+        status: 'skipped',
+        error: '未启用',
+        checkedAt: new Date().toISOString()
+      })
+      if (!silent) {
+        showToast(`${label} 未启用，已跳过`, 'warning')
+      }
+      return
+    }
+
+    const error = getProxyValidationError(state)
+    if (error) {
+      setProxyExitIpResult(key, {
+        status: 'error',
+        error,
+        checkedAt: new Date().toISOString()
+      })
+      if (!silent) {
+        showToast(`${label}：${error}`, 'error')
+      }
+      return
+    }
+
+    proxyPayload = buildProxyPayload(state)
+    if (!proxyPayload) {
+      const message = '代理配置无效'
+      setProxyExitIpResult(key, {
+        status: 'error',
+        error: message,
+        checkedAt: new Date().toISOString()
+      })
+      if (!silent) {
+        showToast(`${label}：${message}`, 'error')
+      }
+      return
+    }
+  }
+
+  proxyExitIpTestingKey.value = key
+  setProxyExitIpResult(key, {
+    status: 'testing',
+    ip: '',
+    elapsedMs: 0,
+    error: '',
+    proxyInfo: '',
+    provider: '',
+    checkedAt: null
+  })
+
+  try {
+    const response = await apiClient.post(
+      '/admin/proxy-policy/test',
+      { proxy: proxyPayload },
+      { signal: abortController.value.signal }
+    )
+
+    if (response.success && isMounted.value) {
+      const data = response.data || {}
+      setProxyExitIpResult(key, {
+        status: 'success',
+        ip: data.ip || '',
+        elapsedMs: data.elapsedMs || 0,
+        usingProxyAgent: !!data.usingProxyAgent,
+        proxyInfo: data.proxyInfo || '',
+        provider: data.provider || '',
+        checkedAt: new Date().toISOString()
+      })
+
+      if (!silent) {
+        showToast(`${label} 出口 IP：${data.ip || '-'}`, 'success')
+      }
+    }
+  } catch (error) {
+    if (error.name === 'AbortError') return
+    if (!isMounted.value) return
+    const message = error.response?.data?.message || error.response?.data?.error || error.message
+    setProxyExitIpResult(key, {
+      status: 'error',
+      error: message,
+      checkedAt: new Date().toISOString()
+    })
+    if (!silent) {
+      showToast(`${label} 测试失败：${message}`, 'error')
+    }
+    console.error(error)
+  } finally {
+    if (isMounted.value && proxyExitIpTestingKey.value === key) {
+      proxyExitIpTestingKey.value = ''
+    }
+  }
+}
+
+const testAllProxyExitIps = async () => {
+  if (!isMounted.value) return
+  if (proxyExitIpTesting.value) return
+
+  proxyExitIpTesting.value = true
+  try {
+    await testProxyExitIp('direct', { silent: true })
+    await testProxyExitIp('global', { silent: true })
+    await testProxyExitIp('claude', { silent: true })
+    await testProxyExitIp('gemini', { silent: true })
+    await testProxyExitIp('openai', { silent: true })
+    showToast('出口 IP 测试完成', 'success')
+  } finally {
+    if (isMounted.value) {
+      proxyExitIpTesting.value = false
     }
   }
 }
