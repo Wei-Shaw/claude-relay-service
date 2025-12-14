@@ -212,10 +212,10 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
 import { showToast } from '@/utils/toast'
 
-defineProps({
+const props = defineProps({
   show: {
     type: Boolean,
     default: false
@@ -227,6 +227,24 @@ defineProps({
 })
 
 const emit = defineEmits(['close'])
+
+// Lock body scroll when modal is shown
+watch(
+  () => props.show,
+  (newValue) => {
+    if (newValue) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+  },
+  { immediate: true }
+)
+
+// Cleanup on unmount
+onUnmounted(() => {
+  document.body.style.overflow = ''
+})
 
 const showFullKey = ref(false)
 

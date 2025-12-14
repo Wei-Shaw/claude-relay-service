@@ -362,7 +362,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
 import { apiClient } from '@/config/api'
 import { showToast } from '@/utils/toast'
 
@@ -383,6 +383,24 @@ const loading = ref(false)
 const selectedPeriod = ref('week')
 const usageStats = ref(null)
 const userDetails = ref(null)
+
+// Lock body scroll when modal is shown
+watch(
+  () => props.show,
+  (newValue) => {
+    if (newValue) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+  },
+  { immediate: true }
+)
+
+// Cleanup on unmount
+onUnmounted(() => {
+  document.body.style.overflow = ''
+})
 
 const formatNumber = (num) => {
   if (num >= 1000000) {

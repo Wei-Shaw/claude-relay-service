@@ -13,15 +13,6 @@
           <p class="modal-subtitle">请妥善保存您的 API Key</p>
         </div>
 
-        <!-- Alert -->
-        <DsAlert class="modal-section" variant="warning">
-          <div class="alert-content">
-            <strong>重要提醒：</strong>
-            这是您唯一能看到完整 API Key 的机会。关闭此窗口后，系统将不再显示完整的 API
-            Key。请立即复制并妥善保存。
-          </div>
-        </DsAlert>
-
         <!-- API Key Information -->
         <div class="modal-section">
           <div class="info-group">
@@ -74,7 +65,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { showToast } from '@/utils/toast'
 import DsButton from '@/ui/components/Button.vue'
 import DsAlert from '@/ui/components/Alert.vue'
@@ -87,6 +78,16 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close'])
+
+// Lock body scroll when modal is mounted
+onMounted(() => {
+  document.body.style.overflow = 'hidden'
+})
+
+// Restore body scroll when modal is unmounted
+onUnmounted(() => {
+  document.body.style.overflow = ''
+})
 
 const showFullKey = ref(false)
 
@@ -271,7 +272,9 @@ const handleDirectClose = async () => {
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
   animation: slideUp 0.3s ease-out;
   max-height: 90vh;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 @keyframes slideUp {
@@ -294,6 +297,7 @@ const handleDirectClose = async () => {
 .modal-header {
   padding: 2.5rem 2rem 1.5rem;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .header-icon-wrapper {
@@ -346,11 +350,15 @@ const handleDirectClose = async () => {
 /* Sections */
 .modal-section {
   padding: 0 2rem 1.5rem;
+  flex-shrink: 0;
 }
 
 /* Alert Content */
 .alert-content {
   line-height: 1.6;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 
 .alert-content strong {
@@ -479,6 +487,7 @@ const handleDirectClose = async () => {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  flex-shrink: 0;
 }
 
 /* Responsive */

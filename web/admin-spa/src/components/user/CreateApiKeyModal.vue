@@ -176,7 +176,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch } from 'vue'
+import { ref, reactive, watch, onUnmounted } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { showToast } from '@/utils/toast'
 
@@ -188,6 +188,24 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'created'])
+
+// Lock body scroll when modal is shown
+watch(
+  () => props.show,
+  (newValue) => {
+    if (newValue) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+  },
+  { immediate: true }
+)
+
+// Cleanup on unmount
+onUnmounted(() => {
+  document.body.style.overflow = ''
+})
 
 const userStore = useUserStore()
 

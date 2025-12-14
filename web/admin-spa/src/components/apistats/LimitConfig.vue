@@ -210,93 +210,50 @@
         <!-- 其他限制信息 -->
         <div class="space-y-3 border-t border-gray-100 pt-4 dark:border-gray-700 md:space-y-4">
           <!-- 并发限制 -->
-          <div
-            class="flex items-center justify-between rounded-lg border border-purple-200/70 bg-white/60 px-3 py-2.5 text-sm shadow-sm transition-all hover:shadow-md dark:border-purple-500/40 dark:bg-purple-950/20 md:px-4 md:py-3"
-          >
-            <span class="flex items-center gap-2 text-gray-600 dark:text-gray-300">
-              <i class="fas fa-layer-group text-purple-500" />
-              <span>并发限制</span>
-            </span>
-            <span class="font-semibold text-purple-600 dark:text-purple-300">
-              <span v-if="statsData.limits.concurrencyLimit > 0">
-                {{ statsData.limits.concurrencyLimit }}
+          <div>
+            <div class="mb-2 flex items-center justify-between">
+              <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base">
+                并发限制
               </span>
-              <span v-else class="flex items-center gap-1">
-                <i class="fas fa-infinity" />
+              <span class="text-xs text-gray-500 dark:text-gray-400 md:text-sm">
+                <span v-if="statsData.limits.concurrencyLimit > 0">
+                  {{ statsData.limits.concurrencyLimit }}
+                </span>
+                <span v-else class="flex items-center gap-1">
+                  <i class="fas fa-infinity" />
+                </span>
               </span>
-            </span>
+            </div>
           </div>
 
           <!-- 模型限制 -->
-          <div
-            :class="[
-              'flex items-center justify-between rounded-lg border px-3 py-2.5 text-sm shadow-sm transition-all hover:shadow-md md:px-4 md:py-3',
-              hasModelRestrictions
-                ? 'border-orange-200/70 bg-orange-50/60 dark:border-orange-500/40 dark:bg-orange-950/20'
-                : 'border-green-200/70 bg-green-50/60 dark:border-green-500/40 dark:bg-green-950/20'
-            ]"
-          >
-            <span class="flex items-center gap-2 text-gray-600 dark:text-gray-300">
-              <i
-                :class="[
-                  'fas fa-robot',
-                  hasModelRestrictions ? 'text-orange-500' : 'text-green-500'
-                ]"
-              />
-              <span>模型限制</span>
-            </span>
-            <span
-              :class="[
-                'font-semibold',
-                hasModelRestrictions
-                  ? 'text-orange-600 dark:text-orange-300'
-                  : 'text-green-600 dark:text-green-300'
-              ]"
-            >
-              <span v-if="hasModelRestrictions" class="flex items-center gap-1">
-                <i class="fas fa-exclamation-triangle text-xs md:text-sm" />
-                限制 {{ statsData.restrictions.restrictedModels.length }} 个模型
+          <div>
+            <div class="mb-2 flex items-center justify-between">
+              <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base">
+                模型限制
               </span>
-              <span v-else class="flex items-center gap-1">
-                <i class="fas fa-check-circle text-xs md:text-sm" />
-                允许所有模型
+              <span class="text-xs text-gray-500 dark:text-gray-400 md:text-sm">
+                <span v-if="hasModelRestrictions">
+                  限制 {{ statsData.restrictions.restrictedModels.length }} 个模型
+                </span>
+                <span v-else>
+                  允许所有模型
+                </span>
               </span>
-            </span>
+            </div>
           </div>
 
           <!-- 客户端限制 -->
-          <div class="space-y-2">
-            <div
-              :class="[
-                'flex items-center justify-between rounded-lg border px-3 py-2.5 text-sm shadow-sm transition-all hover:shadow-md md:px-4 md:py-3',
-                hasClientRestrictions
-                  ? 'border-orange-200/70 bg-orange-50/60 dark:border-orange-500/40 dark:bg-orange-950/20'
-                  : 'border-green-200/70 bg-green-50/60 dark:border-green-500/40 dark:bg-green-950/20'
-              ]"
-            >
-              <span class="flex items-center gap-2 text-gray-600 dark:text-gray-300">
-                <i
-                  :class="[
-                    'fas fa-desktop',
-                    hasClientRestrictions ? 'text-orange-500' : 'text-green-500'
-                  ]"
-                />
-                <span>客户端限制</span>
+          <div>
+            <div class="mb-2 flex items-center justify-between">
+              <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base">
+                客户端限制
               </span>
-              <span
-                :class="[
-                  'font-semibold',
-                  hasClientRestrictions
-                    ? 'text-orange-600 dark:text-orange-300'
-                    : 'text-green-600 dark:text-green-300'
-                ]"
-              >
-                <span v-if="hasClientRestrictions" class="flex items-center gap-1">
-                  <i class="fas fa-exclamation-triangle text-xs md:text-sm" />
+              <span class="text-xs text-gray-500 dark:text-gray-400 md:text-sm">
+                <span v-if="hasClientRestrictions">
                   限 {{ statsData.restrictions.allowedClients.length }} 种客户端使用
                 </span>
-                <span v-else class="flex items-center gap-1">
-                  <i class="fas fa-check-circle text-xs md:text-sm" />
+                <span v-else>
                   允许所有客户端
                 </span>
               </span>
@@ -305,14 +262,13 @@
             <!-- 客户端列表 -->
             <div
               v-if="hasClientRestrictions"
-              class="flex flex-wrap gap-2 rounded-lg border border-blue-200/50 bg-blue-50/50 p-2 shadow-sm dark:border-blue-500/30 dark:bg-blue-900/20 md:p-3"
+              class="mt-2 flex flex-wrap gap-2"
             >
               <span
                 v-for="client in statsData.restrictions.allowedClients"
                 :key="client"
-                class="flex items-center gap-1 rounded-full border border-blue-300/50 bg-white px-2.5 py-1 text-xs font-medium text-gray-900 shadow-sm transition-all hover:shadow-md dark:border-blue-500/50 dark:bg-slate-900 dark:text-blue-300 md:text-sm"
+                class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-300"
               >
-                <i class="fas fa-id-badge text-blue-500" />
                 {{ client }}
               </span>
             </div>

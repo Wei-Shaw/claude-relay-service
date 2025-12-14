@@ -349,7 +349,6 @@ watch(apiKey, (newValue) => {
     background-color 0.15s ease,
     border-color 0.15s ease,
     color 0.15s ease,
-    transform 0.15s ease,
     box-shadow 0.15s ease;
   cursor: pointer;
   text-decoration: none;
@@ -360,20 +359,18 @@ watch(apiKey, (newValue) => {
 
 .btn:hover {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transform: translateY(-1px);
 }
 
 .btn:active {
-  transform: scale(0.98);
+  /* transform effect removed */
 }
 
 .btn i {
   font-size: 14px;
-  transition: transform 0.15s ease;
 }
 
 .btn:hover i {
-  transform: scale(1.05);
+  /* transform effect removed */
 }
 
 .btn-primary {
@@ -606,7 +603,7 @@ watch(apiKey, (newValue) => {
 }
 
 .period-selector:hover .period-label i {
-  transform: rotate(15deg);
+  /* transform: rotate(15deg); */
 }
 
 .api-stats-page.dark .period-label i {
@@ -651,12 +648,12 @@ watch(apiKey, (newValue) => {
   border-color: #000;
   color: #000;
   background: rgba(0, 0, 0, 0.03);
-  transform: translateY(-1px);
+  /* transform: translateY(-1px); */
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .period-btn:hover:not(:disabled) i {
-  transform: scale(1.1);
+  /* transform: scale(1.1); */
 }
 
 .period-btn.active {
@@ -729,12 +726,12 @@ watch(apiKey, (newValue) => {
 .test-btn:hover:not(:disabled) {
   background: #0060df;
   border-color: #0060df;
-  transform: translateY(-1px);
+  /* transform: translateY(-1px); */
   box-shadow: 0 4px 8px rgba(0, 112, 243, 0.15);
 }
 
 .test-btn:hover:not(:disabled) i {
-  transform: scale(1.1);
+  /* transform: scale(1.1); */
 }
 
 .test-btn:active:not(:disabled) {

@@ -25,24 +25,6 @@
           </button>
         </div>
 
-        <!-- 警告提示 -->
-        <div class="mb-6 border-l-4 border-amber-400 bg-amber-50 p-4">
-          <div class="flex items-start">
-            <div
-              class="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg bg-amber-400"
-            >
-              <i class="fas fa-exclamation-triangle text-sm text-white" />
-            </div>
-            <div class="ml-3">
-              <h5 class="mb-1 font-semibold text-amber-900">重要提醒</h5>
-              <p class="text-sm text-amber-800">
-                这是您唯一能看到所有 API Key 的机会。关闭此窗口后，系统将不再显示完整的 API
-                Key。请立即下载并妥善保存。
-              </p>
-            </div>
-          </div>
-        </div>
-
         <!-- 统计信息 -->
         <div class="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
           <div
