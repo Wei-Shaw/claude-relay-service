@@ -2,39 +2,35 @@
   <Teleport to="body">
     <div
       v-if="isVisible"
-      class="modal fixed inset-0 z-[100] flex items-center justify-center p-4"
+      class="confirm-overlay"
       @click.self="handleCancel"
     >
-      <div class="modal-content mx-auto w-full max-w-md p-6">
-        <div class="mb-6 flex items-start gap-4">
-          <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center">
-            <i class="fas fa-exclamation-triangle text-2xl text-orange-500" />
-          </div>
-          <div class="flex-1">
-            <h3 class="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
-              {{ title }}
-            </h3>
-            <div class="whitespace-pre-line leading-relaxed text-gray-700 dark:text-gray-400">
-              {{ message }}
-            </div>
-          </div>
-        </div>
+      <div class="confirm-dialog">
+        <!-- Title -->
+        <h3 class="dialog-title">
+          {{ title }}
+        </h3>
 
-        <div class="flex items-center justify-end gap-3">
+        <!-- Message -->
+        <p class="dialog-message">
+          {{ message }}
+        </p>
+
+        <!-- Buttons -->
+        <div class="dialog-actions">
           <button
-            class="btn bg-gray-100 px-6 py-3 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+            class="vercel-button cancel-button"
             :disabled="isProcessing"
             @click="handleCancel"
           >
             {{ cancelText }}
           </button>
           <button
-            class="btn btn-warning px-6 py-3"
-            :class="{ 'cursor-not-allowed opacity-50': isProcessing }"
+            class="vercel-button confirm-button"
             :disabled="isProcessing"
             @click="handleConfirm"
           >
-            <div v-if="isProcessing" class="loading-spinner mr-2" />
+            <span v-if="isProcessing" class="button-spinner" />
             {{ confirmText }}
           </button>
         </div>
@@ -132,75 +128,213 @@ defineExpose({
 </script>
 
 <style scoped>
-.modal {
-  background: rgba(0, 0, 0, 0.4);
+/* Vercel-inspired Confirm Dialog */
+
+/* Overlay */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
 }
 
-:global(.dark) .modal {
-  background: rgba(0, 0, 0, 0.6);
+:global(.dark) .confirm-overlay {
+  background: rgba(0, 0, 0, 0.7);
 }
 
-.modal-content {
-  background: white;
-  border-radius: 5px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+/* Dialog */
+.confirm-dialog {
+  width: 100%;
+  max-width: 440px;
+  padding: 2rem;
+  background: #fff;
   border: 1px solid #eaeaea;
-  max-height: 90vh;
-  overflow-y: auto;
+  border-radius: 8px;
+  box-shadow:
+    0 8px 30px rgba(0, 0, 0, 0.12),
+    0 1px 3px rgba(0, 0, 0, 0.08);
+  animation: dialog-appear 0.2s ease-out;
 }
 
-:global(.dark) .modal-content {
-  background: #1f1f1f;
-  border: 1px solid #333;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+:global(.dark) .confirm-dialog {
+  background: #000;
+  border-color: #333;
+  box-shadow:
+    0 8px 30px rgba(0, 0, 0, 0.4),
+    0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
-.btn {
-  @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2;
+@keyframes dialog-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
-.btn-danger {
-  @apply bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+/* Title */
+.dialog-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #000;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
 }
 
-.btn-warning {
-  @apply bg-amber-600 text-white hover:bg-amber-700 focus:ring-amber-500;
+:global(.dark) .dialog-title {
+  color: #fff;
 }
 
-.loading-spinner {
-  @apply h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-white;
+/* Message */
+.dialog-message {
+  margin: 0 0 2rem;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: #666;
+  white-space: pre-line;
 }
 
-/* Modal transitions - removed for immediate display */
-
-/* Scrollbar styling */
-.modal-content::-webkit-scrollbar {
-  width: 6px;
+:global(.dark) .dialog-message {
+  color: #999;
 }
 
-.modal-content::-webkit-scrollbar-track {
+/* Actions */
+.dialog-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+/* Vercel-style Button Base */
+.vercel-button {
+  height: 40px;
+  padding: 0 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 5px;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid transparent;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.vercel-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Cancel Button - Secondary style */
+.cancel-button {
+  color: #000;
+  background: #fff;
+  border-color: #eaeaea;
+}
+
+.cancel-button:hover:not(:disabled) {
   background: #fafafa;
-  border-radius: 3px;
+  border-color: #000;
 }
 
-:global(.dark) .modal-content::-webkit-scrollbar-track {
-  background: #2a2a2a;
-}
-
-.modal-content::-webkit-scrollbar-thumb {
+.cancel-button:active:not(:disabled) {
   background: #eaeaea;
-  border-radius: 3px;
+  transform: scale(0.98);
 }
 
-:global(.dark) .modal-content::-webkit-scrollbar-thumb {
-  background: #333;
+:global(.dark) .cancel-button {
+  color: #fff;
+  background: #000;
+  border-color: #333;
 }
 
-.modal-content::-webkit-scrollbar-thumb:hover {
-  background: #e0e0e0;
+:global(.dark) .cancel-button:hover:not(:disabled) {
+  background: #1a1a1a;
+  border-color: #fff;
 }
 
-:global(.dark) .modal-content::-webkit-scrollbar-thumb:hover {
-  background: #444;
+:global(.dark) .cancel-button:active:not(:disabled) {
+  background: #0a0a0a;
+}
+
+/* Confirm Button - Danger/Red style */
+.confirm-button {
+  color: #fff;
+  background: #e00;
+  border-color: #e00;
+}
+
+.confirm-button:hover:not(:disabled) {
+  background: #c00;
+  border-color: #c00;
+}
+
+.confirm-button:active:not(:disabled) {
+  background: #a00;
+  transform: scale(0.98);
+}
+
+:global(.dark) .confirm-button {
+  color: #fff;
+  background: #e00;
+  border-color: #e00;
+}
+
+:global(.dark) .confirm-button:hover:not(:disabled) {
+  background: #ff1a1a;
+  border-color: #ff1a1a;
+}
+
+:global(.dark) .confirm-button:active:not(:disabled) {
+  background: #c00;
+}
+
+/* Button Spinner */
+.button-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .confirm-dialog {
+    padding: 1.5rem;
+  }
+
+  .dialog-title {
+    font-size: 1.125rem;
+  }
+
+  .dialog-actions {
+    flex-direction: column;
+  }
+
+  .vercel-button {
+    width: 100%;
+  }
 }
 </style>

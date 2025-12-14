@@ -1,5 +1,5 @@
 <template>
-  <div class="vercel-aggregated-card">
+  <div class="aggregated-card">
     <h3 class="card-title">
       <span class="title-text">
         <i class="fas fa-chart-pie title-icon" />
@@ -143,28 +143,21 @@ const formatNumber = (num) => {
 </script>
 
 <style scoped>
-/* ============================================
-   VERCEL AGGREGATED STATS CARD
-   ============================================ */
-.vercel-aggregated-card {
-  background: #fff;
-  border: 1px solid #eaeaea;
-  border-radius: 8px;
-  padding: 24px;
+.aggregated-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  padding: var(--card-padding);
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-}
-
-:global(.dark) .vercel-aggregated-card {
-  background: #000;
-  border-color: #333;
+  gap: var(--card-gap);
+  box-shadow: var(--shadow-card);
 }
 
 @media (max-width: 768px) {
-  .vercel-aggregated-card {
-    padding: 20px;
+  .aggregated-card {
+    padding: var(--card-padding-sm);
   }
 }
 
@@ -174,25 +167,21 @@ const formatNumber = (num) => {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 4px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
 }
 
 .title-text {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 18px;
-  font-weight: 600;
-  color: #000;
-}
-
-:global(.dark) .title-text {
-  color: #fff;
+  gap: var(--space-3);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
 }
 
 .title-icon {
-  font-size: 18px;
+  font-size: var(--font-size-xl);
   color: #f97316;
 }
 
@@ -201,79 +190,63 @@ const formatNumber = (num) => {
 }
 
 .title-period {
-  font-size: 13px;
-  font-weight: 400;
-  color: #666;
-}
-
-:global(.dark) .title-period {
-  color: #999;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+  color: var(--text-secondary);
 }
 
 /* Keys List */
 .keys-list {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--card-gap);
 }
 
 .key-item {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .key-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .key-name {
-  font-size: 14px;
-  font-weight: 500;
-  color: #000;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
 }
 
-:global(.dark) .key-name {
-  color: #fff;
-}
-
 .key-percentage {
-  font-size: 13px;
-  font-weight: 600;
-  color: #666;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
   flex-shrink: 0;
-}
-
-:global(.dark) .key-percentage {
-  color: #999;
 }
 
 .key-stats {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 12px;
-  color: #999;
-}
-
-:global(.dark) .key-stats {
-  color: #666;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
 }
 
 .key-requests {
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
 }
 
 .key-cost {
-  font-weight: 600;
-  color: #10b981;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-green);
 }
 
 :global(.dark) .key-cost {
@@ -285,26 +258,20 @@ const formatNumber = (num) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px;
-  background: #fafafa;
-  border: 1px solid #eaeaea;
-  border-radius: 6px;
-  font-size: 13px;
-  color: #666;
-}
-
-:global(.dark) .other-keys {
-  background: #0a0a0a;
-  border-color: #333;
-  color: #999;
+  padding: var(--space-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
 }
 
 .other-label {
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
 }
 
 .other-percentage {
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 /* Empty State */
@@ -313,27 +280,19 @@ const formatNumber = (num) => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 48px 24px;
-  gap: 16px;
+  padding: var(--space-12) var(--space-6);
+  gap: var(--space-4);
   min-height: 200px;
 }
 
 .empty-icon {
-  font-size: 32px;
-  color: #999;
-}
-
-:global(.dark) .empty-icon {
-  color: #666;
+  font-size: var(--font-size-4xl);
+  color: var(--text-muted);
 }
 
 .empty-text {
-  font-size: 14px;
-  color: #999;
+  font-size: var(--font-size-base);
+  color: var(--text-muted);
   text-align: center;
-}
-
-:global(.dark) .empty-text {
-  color: #666;
 }
 </style>

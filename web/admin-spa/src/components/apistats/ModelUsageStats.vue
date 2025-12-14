@@ -1,5 +1,5 @@
 <template>
-  <div class="vercel-model-card">
+  <div class="model-card">
     <div class="card-header">
       <h3 class="card-title">
         <span class="title-text">
@@ -86,10 +86,7 @@ const formatNumber = (num) => {
 </script>
 
 <style scoped>
-/* ============================================
-   VERCEL MODEL USAGE STATS CARD
-   ============================================ */
-.vercel-model-card {
+.model-card {
   background: #fff;
   border: 1px solid #eaeaea;
   border-radius: 8px;
@@ -99,13 +96,13 @@ const formatNumber = (num) => {
   gap: 20px;
 }
 
-:global(.dark) .vercel-model-card {
+:global(.dark) .model-card {
   background: #000;
   border-color: #333;
 }
 
 @media (max-width: 768px) {
-  .vercel-model-card {
+  .model-card {
     padding: 20px;
   }
 }

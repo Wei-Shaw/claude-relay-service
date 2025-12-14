@@ -1,8 +1,8 @@
 <template>
   <div class="min-h-screen" :class="isDarkMode ? 'page-bg-dark' : 'page-bg'">
-    <!-- Vercel-style header: maximalist whitespace, minimal design -->
-    <div class="vercel-header">
-      <div class="vercel-container">
+    <!-- Header -->
+    <div class="page-header">
+      <div class="container">
         <div class="header-content">
           <LogoTitle
             :loading="oemLoading"
@@ -17,7 +17,7 @@
             <!-- 用户登录按钮 -->
             <router-link
               v-if="oemSettings.ldapEnabled"
-              class="vercel-btn vercel-btn-secondary"
+              class="btn btn-secondary"
               to="/user-login"
             >
               <i class="fas fa-user" />
@@ -27,7 +27,7 @@
             <!-- 管理后台按钮 -->
             <router-link
               v-if="oemSettings.showAdminButton !== false"
-              class="vercel-btn vercel-btn-primary"
+              class="btn btn-primary"
               to="/dashboard"
             >
               <i class="fas fa-shield-alt" />
@@ -38,9 +38,9 @@
       </div>
     </div>
 
-    <!-- Vercel-style tab navigation -->
-    <div class="vercel-tabs">
-      <div class="vercel-container">
+    <!-- Tab navigation -->
+    <div class="tabs-section">
+      <div class="container">
         <div class="tabs-wrapper">
           <button
             :class="['tab-button', { active: currentTab === 'stats' }]"
@@ -61,14 +61,14 @@
     </div>
 
     <!-- Main content -->
-    <div class="vercel-container">
+    <div class="container">
       <!-- 统计内容 -->
       <div v-if="currentTab === 'stats'" class="content-wrapper">
         <!-- API Key 输入区域 -->
         <ApiKeyInput />
 
         <!-- 错误提示 -->
-        <div v-if="error" class="vercel-error-card">
+        <div v-if="error" class="error-card">
           <i class="fas fa-exclamation-triangle" />
           <span>{{ error }}</span>
         </div>
@@ -83,7 +83,7 @@
             </div>
             <div class="period-buttons">
               <button
-                :class="['vercel-period-btn', { active: statsPeriod === 'daily' }]"
+                :class="['period-btn', { active: statsPeriod === 'daily' }]"
                 :disabled="loading || modelStatsLoading"
                 @click="switchPeriod('daily')"
               >
@@ -91,7 +91,7 @@
                 <span>今日</span>
               </button>
               <button
-                :class="['vercel-period-btn', { active: statsPeriod === 'monthly' }]"
+                :class="['period-btn', { active: statsPeriod === 'monthly' }]"
                 :disabled="loading || modelStatsLoading"
                 @click="switchPeriod('monthly')"
               >
@@ -101,7 +101,7 @@
               <!-- 测试按钮 -->
               <button
                 v-if="!multiKeyMode"
-                class="vercel-test-btn"
+                class="test-btn"
                 :disabled="loading"
                 @click="openTestModal"
               >
@@ -132,7 +132,7 @@
 
       <!-- 教程内容 -->
       <div v-if="currentTab === 'tutorial'" class="content-wrapper">
-        <div class="vercel-card">
+        <div class="content-card">
           <TutorialView />
         </div>
       </div>
@@ -221,9 +221,7 @@ const handleKeyDown = (event) => {
 
 // 初始化
 onMounted(() => {
-  // API Stats Page loaded
-
-  // 初始化主题（因为该页面不在 MainLayout 内）
+  // 初始化主题
   themeStore.initTheme()
 
   // 加载 OEM 设置
@@ -263,11 +261,6 @@ watch(apiKey, (newValue) => {
 </script>
 
 <style scoped>
-/* ============================================
-   VERCEL-INSPIRED DESIGN SYSTEM
-   Clean, minimal, maximum whitespace
-   ============================================ */
-
 /* Background */
 .page-bg {
   background: #fafafa;
@@ -285,8 +278,8 @@ watch(apiKey, (newValue) => {
     color 0.3s ease;
 }
 
-/* Container - Vercel's max-width approach */
-.vercel-container {
+/* Container */
+.container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 24px;
@@ -294,15 +287,13 @@ watch(apiKey, (newValue) => {
 }
 
 @media (max-width: 768px) {
-  .vercel-container {
+  .container {
     padding: 0 16px;
   }
 }
 
-/* ============================================
-   HEADER SECTION
-   ============================================ */
-.vercel-header {
+/* Header Section */
+.page-header {
   border-bottom: 1px solid #eaeaea;
   background: #fff;
   padding: 24px 0;
@@ -312,7 +303,7 @@ watch(apiKey, (newValue) => {
     border-color 0.3s ease;
 }
 
-:global(.dark) .vercel-header {
+:global(.dark) .page-header {
   background: #000;
   border-bottom-color: #333;
 }
@@ -339,8 +330,8 @@ watch(apiKey, (newValue) => {
   transition: all 0.3s ease;
 }
 
-/* Vercel Button System */
-.vercel-btn {
+/* Button System */
+.btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -362,77 +353,75 @@ watch(apiKey, (newValue) => {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-.vercel-btn:hover {
+.btn:hover {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transform: translateY(-1px);
 }
 
-.vercel-btn:active {
+.btn:active {
   transform: translateY(0);
 }
 
-.vercel-btn i {
+.btn i {
   font-size: 14px;
   transition: transform 0.15s ease;
 }
 
-.vercel-btn:hover i {
+.btn:hover i {
   transform: scale(1.05);
 }
 
-.vercel-btn-primary {
+.btn-primary {
   background: #000;
   border-color: #000;
   color: #fff;
 }
 
-.vercel-btn-primary:hover {
+.btn-primary:hover {
   background: #1a1a1a;
   border-color: #1a1a1a;
 }
 
-:global(.dark) .vercel-btn-primary {
+:global(.dark) .btn-primary {
   background: #fff;
   border-color: #fff;
   color: #000;
   box-shadow: 0 1px 2px rgba(255, 255, 255, 0.1);
 }
 
-:global(.dark) .vercel-btn-primary:hover {
+:global(.dark) .btn-primary:hover {
   background: #e5e5e5;
   border-color: #e5e5e5;
   box-shadow: 0 2px 4px rgba(255, 255, 255, 0.2);
 }
 
-.vercel-btn-secondary {
+.btn-secondary {
   background: transparent;
   border-color: #eaeaea;
   color: #666;
 }
 
-.vercel-btn-secondary:hover {
+.btn-secondary:hover {
   border-color: #000;
   color: #000;
   background: rgba(0, 0, 0, 0.02);
 }
 
-:global(.dark) .vercel-btn-secondary {
+:global(.dark) .btn-secondary {
   border-color: #333;
   color: #999;
   box-shadow: 0 1px 2px rgba(255, 255, 255, 0.02);
 }
 
-:global(.dark) .vercel-btn-secondary:hover {
+:global(.dark) .btn-secondary:hover {
   border-color: #fff;
   color: #fff;
   background: rgba(255, 255, 255, 0.05);
   box-shadow: 0 2px 4px rgba(255, 255, 255, 0.05);
 }
 
-/* ============================================
-   TABS NAVIGATION
-   ============================================ */
-.vercel-tabs {
+/* Tabs Navigation */
+.tabs-section {
   margin-bottom: 48px;
   transition: all 0.3s ease;
 }
@@ -506,9 +495,7 @@ watch(apiKey, (newValue) => {
   border-bottom-color: #fff;
 }
 
-/* ============================================
-   CONTENT WRAPPER
-   ============================================ */
+/* Content Wrapper */
 .content-wrapper {
   display: flex;
   flex-direction: column;
@@ -517,10 +504,8 @@ watch(apiKey, (newValue) => {
   transition: all 0.3s ease;
 }
 
-/* ============================================
-   ERROR CARD
-   ============================================ */
-.vercel-error-card {
+/* Error Card */
+.error-card {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -538,25 +523,23 @@ watch(apiKey, (newValue) => {
   box-shadow: 0 2px 4px rgba(255, 0, 0, 0.1);
 }
 
-.vercel-error-card i {
+.error-card i {
   font-size: 16px;
   transition: transform 0.2s ease;
 }
 
-.vercel-error-card:hover i {
+.error-card:hover i {
   transform: scale(1.1);
 }
 
-:global(.dark) .vercel-error-card {
+:global(.dark) .error-card {
   background: #1a0000;
   border-color: #ff3333;
   color: #ff6666;
   box-shadow: 0 2px 4px rgba(255, 51, 51, 0.2);
 }
 
-/* ============================================
-   STATS SECTION
-   ============================================ */
+/* Stats Section */
 .stats-section {
   display: flex;
   flex-direction: column;
@@ -632,7 +615,7 @@ watch(apiKey, (newValue) => {
 }
 
 /* Period Buttons */
-.vercel-period-btn {
+.period-btn {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -654,12 +637,12 @@ watch(apiKey, (newValue) => {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
-.vercel-period-btn i {
+.period-btn i {
   font-size: 14px;
   transition: transform 0.15s ease;
 }
 
-.vercel-period-btn:hover:not(:disabled) {
+.period-btn:hover:not(:disabled) {
   border-color: #000;
   color: #000;
   background: rgba(0, 0, 0, 0.03);
@@ -667,44 +650,44 @@ watch(apiKey, (newValue) => {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.vercel-period-btn:hover:not(:disabled) i {
+.period-btn:hover:not(:disabled) i {
   transform: scale(1.1);
 }
 
-.vercel-period-btn.active {
+.period-btn.active {
   background: #000;
   border-color: #000;
   color: #fff;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
-.vercel-period-btn.active i {
+.period-btn.active i {
   transform: scale(1.05);
 }
 
-.vercel-period-btn:active:not(:disabled) {
+.period-btn:active:not(:disabled) {
   transform: translateY(0);
 }
 
-.vercel-period-btn:disabled {
+.period-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-:global(.dark) .vercel-period-btn {
+:global(.dark) .period-btn {
   border-color: #333;
   color: #999;
   box-shadow: 0 1px 2px rgba(255, 255, 255, 0.02);
 }
 
-:global(.dark) .vercel-period-btn:hover:not(:disabled) {
+:global(.dark) .period-btn:hover:not(:disabled) {
   border-color: #fff;
   color: #fff;
   background: rgba(255, 255, 255, 0.05);
   box-shadow: 0 2px 4px rgba(255, 255, 255, 0.08);
 }
 
-:global(.dark) .vercel-period-btn.active {
+:global(.dark) .period-btn.active {
   background: #fff;
   border-color: #fff;
   color: #000;
@@ -712,7 +695,7 @@ watch(apiKey, (newValue) => {
 }
 
 /* Test Button */
-.vercel-test-btn {
+.test-btn {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -733,38 +716,38 @@ watch(apiKey, (newValue) => {
   box-shadow: 0 2px 4px rgba(0, 112, 243, 0.2);
 }
 
-.vercel-test-btn i {
+.test-btn i {
   font-size: 14px;
   transition: transform 0.15s ease;
 }
 
-.vercel-test-btn:hover:not(:disabled) {
+.test-btn:hover:not(:disabled) {
   background: #0060df;
   border-color: #0060df;
   transform: translateY(-1px);
   box-shadow: 0 4px 8px rgba(0, 112, 243, 0.3);
 }
 
-.vercel-test-btn:hover:not(:disabled) i {
+.test-btn:hover:not(:disabled) i {
   transform: scale(1.1);
 }
 
-.vercel-test-btn:active:not(:disabled) {
+.test-btn:active:not(:disabled) {
   transform: translateY(0);
 }
 
-.vercel-test-btn:disabled {
+.test-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-:global(.dark) .vercel-test-btn {
+:global(.dark) .test-btn {
   background: #0080ff;
   border-color: #0080ff;
   box-shadow: 0 2px 4px rgba(0, 128, 255, 0.3);
 }
 
-:global(.dark) .vercel-test-btn:hover:not(:disabled) {
+:global(.dark) .test-btn:hover:not(:disabled) {
   background: #0070f3;
   border-color: #0070f3;
   box-shadow: 0 4px 8px rgba(0, 128, 255, 0.4);
@@ -783,10 +766,8 @@ watch(apiKey, (newValue) => {
   }
 }
 
-/* ============================================
-   VERCEL CARD (Generic)
-   ============================================ */
-.vercel-card {
+/* Content Card */
+.content-card {
   background: #fff;
   border: 1px solid #eaeaea;
   border-radius: 8px;
@@ -798,35 +779,28 @@ watch(apiKey, (newValue) => {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-.vercel-card:hover {
+.content-card:hover {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
 }
 
-:global(.dark) .vercel-card {
+:global(.dark) .content-card {
   background: #000;
   border-color: #333;
   box-shadow: 0 1px 2px rgba(255, 255, 255, 0.02);
 }
 
-:global(.dark) .vercel-card:hover {
+:global(.dark) .content-card:hover {
   box-shadow: 0 2px 4px rgba(255, 255, 255, 0.05);
 }
 
-/* ============================================
-   ANIMATIONS
-   ============================================ */
-/* Removed fade-in animation for immediate content display */
-
-/* ============================================
-   RESPONSIVE
-   ============================================ */
+/* Responsive */
 @media (max-width: 768px) {
-  .vercel-header {
+  .page-header {
     padding: 16px 0;
     margin-bottom: 32px;
   }
 
-  .vercel-tabs {
+  .tabs-section {
     margin-bottom: 32px;
   }
 
@@ -845,8 +819,8 @@ watch(apiKey, (newValue) => {
     width: 100%;
   }
 
-  .vercel-period-btn,
-  .vercel-test-btn {
+  .period-btn,
+  .test-btn {
     flex: 1;
     justify-content: center;
   }

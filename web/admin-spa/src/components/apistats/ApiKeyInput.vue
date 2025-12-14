@@ -1,5 +1,5 @@
 <template>
-  <div class="vercel-input-card">
+  <div class="input-card">
     <!-- 标题区域 -->
     <div class="card-header">
       <div class="header-content">
@@ -52,7 +52,7 @@
           <input
             v-if="!multiKeyMode"
             v-model="apiKey"
-            class="vercel-input"
+            class="text-input"
             :disabled="loading"
             placeholder="请输入您的 API Key (cr_...)"
             type="password"
@@ -63,7 +63,7 @@
           <div v-else class="textarea-wrapper">
             <textarea
               v-model="apiKey"
-              class="vercel-textarea"
+              class="text-area"
               :disabled="loading"
               placeholder="请输入您的 API Keys，每行一个或用逗号分隔&#10;例如：&#10;cr_xxx&#10;cr_yyy"
               rows="4"
@@ -76,7 +76,7 @@
         </div>
 
         <!-- 查询按钮 -->
-        <button class="vercel-query-btn" :disabled="loading || !hasValidInput" @click="queryStats">
+        <button class="query-btn" :disabled="loading || !hasValidInput" @click="queryStats">
           <i v-if="loading" class="fas fa-spinner spinner" />
           <i v-else class="fas fa-search" />
           <span>{{ loading ? '查询中...' : '查询' }}</span>
@@ -138,17 +138,17 @@ const hasValidInput = computed(() => {
 </script>
 
 <style scoped>
-/* ============================================
-   VERCEL INPUT CARD
-   ============================================ */
-.vercel-input-card {
+.input-card {
   background: #fff;
   border: 1px solid #eaeaea;
   border-radius: 8px;
   overflow: hidden;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
 }
 
-:global(.dark) .vercel-input-card {
+:global(.dark) .input-card {
   background: #000;
   border-color: #333;
 }
@@ -158,10 +158,13 @@ const hasValidInput = computed(() => {
   padding: 24px;
   border-bottom: 1px solid #eaeaea;
   background: #fff;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
 }
 
 :global(.dark) .card-header {
-  background: #000;
+  background: #000 !important;
   border-bottom-color: #333;
 }
 
@@ -219,10 +222,11 @@ const hasValidInput = computed(() => {
   flex-direction: column;
   gap: 20px;
   background: #fff;
+  transition: background-color 0.3s ease;
 }
 
 :global(.dark) .card-body {
-  background: #000;
+  background: #000 !important;
 }
 
 /* Control Bar */
@@ -327,15 +331,15 @@ const hasValidInput = computed(() => {
   flex: 1;
 }
 
-/* Vercel Input */
-.vercel-input,
-.vercel-textarea {
+/* Text Input */
+.text-input,
+.text-area {
   width: 100%;
   padding: 0 16px;
   height: 48px;
   font-size: 14px;
   color: #000;
-  background: #fff;
+  background: #fafafa;
   border: 1px solid #eaeaea;
   border-radius: 6px;
   outline: none;
@@ -343,54 +347,54 @@ const hasValidInput = computed(() => {
   font-family: inherit;
 }
 
-.vercel-textarea {
+.text-area {
   height: auto;
   padding: 12px 16px;
   resize: vertical;
   line-height: 1.5;
 }
 
-.vercel-input::placeholder,
-.vercel-textarea::placeholder {
+.text-input::placeholder,
+.text-area::placeholder {
   color: #999;
 }
 
-.vercel-input:hover,
-.vercel-textarea:hover {
+.text-input:hover,
+.text-area:hover {
   border-color: #000;
 }
 
-.vercel-input:focus,
-.vercel-textarea:focus {
+.text-input:focus,
+.text-area:focus {
   border-color: #000;
   box-shadow: 0 0 0 1px #000;
 }
 
-.vercel-input:disabled,
-.vercel-textarea:disabled {
+.text-input:disabled,
+.text-area:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-:global(.dark) .vercel-input,
-:global(.dark) .vercel-textarea {
+:global(.dark) .text-input,
+:global(.dark) .text-area {
   color: #fff;
-  background: #000;
+  background: #0a0a0a !important;
   border-color: #333;
 }
 
-:global(.dark) .vercel-input::placeholder,
-:global(.dark) .vercel-textarea::placeholder {
+:global(.dark) .text-input::placeholder,
+:global(.dark) .text-area::placeholder {
   color: #666;
 }
 
-:global(.dark) .vercel-input:hover,
-:global(.dark) .vercel-textarea:hover {
+:global(.dark) .text-input:hover,
+:global(.dark) .text-area:hover {
   border-color: #fff;
 }
 
-:global(.dark) .vercel-input:focus,
-:global(.dark) .vercel-textarea:focus {
+:global(.dark) .text-input:focus,
+:global(.dark) .text-area:focus {
   border-color: #fff;
   box-shadow: 0 0 0 1px #fff;
 }
@@ -428,7 +432,7 @@ const hasValidInput = computed(() => {
 }
 
 /* Query Button */
-.vercel-query-btn {
+.query-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -446,27 +450,27 @@ const hasValidInput = computed(() => {
   white-space: nowrap;
 }
 
-.vercel-query-btn i {
+.query-btn i {
   font-size: 14px;
 }
 
-.vercel-query-btn:hover:not(:disabled) {
+.query-btn:hover:not(:disabled) {
   background: #1a1a1a;
   border-color: #1a1a1a;
 }
 
-.vercel-query-btn:disabled {
+.query-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-:global(.dark) .vercel-query-btn {
+:global(.dark) .query-btn {
   color: #000;
   background: #fff;
   border-color: #fff;
 }
 
-:global(.dark) .vercel-query-btn:hover:not(:disabled) {
+:global(.dark) .query-btn:hover:not(:disabled) {
   background: #e5e5e5;
   border-color: #e5e5e5;
 }
@@ -535,9 +539,7 @@ const hasValidInput = computed(() => {
   color: #38bdf8;
 }
 
-/* ============================================
-   RESPONSIVE
-   ============================================ */
+/* Responsive */
 @media (max-width: 768px) {
   .card-header,
   .card-body {
@@ -558,7 +560,7 @@ const hasValidInput = computed(() => {
     grid-template-columns: 1fr;
   }
 
-  .vercel-query-btn {
+  .query-btn {
     width: 100%;
   }
 

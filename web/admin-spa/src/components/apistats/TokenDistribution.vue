@@ -1,5 +1,5 @@
 <template>
-  <div class="vercel-token-card">
+  <div class="token-card">
     <h3 class="card-title">
       <span class="title-text">
         <i class="fas fa-coins title-icon" />
@@ -73,10 +73,7 @@ const formatNumber = (num) => {
 </script>
 
 <style scoped>
-/* ============================================
-   VERCEL TOKEN DISTRIBUTION CARD
-   ============================================ */
-.vercel-token-card {
+.token-card {
   background: #fff;
   border: 1px solid #eaeaea;
   border-radius: 8px;
@@ -87,13 +84,13 @@ const formatNumber = (num) => {
   gap: 20px;
 }
 
-:global(.dark) .vercel-token-card {
+:global(.dark) .token-card {
   background: #000;
   border-color: #333;
 }
 
 @media (max-width: 768px) {
-  .vercel-token-card {
+  .token-card {
     padding: 20px;
   }
 }

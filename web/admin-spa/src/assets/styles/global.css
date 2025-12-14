@@ -1,154 +1,34 @@
 /* Global styles for Vercel-inspired design
-   Variables are defined in variables.css */
+   Tokens and variables are defined in tokens.css and variables.css */
 
-/* 优化后的transition - 避免布局跳动 */
+/* ============================================
+   OPTIMIZED TRANSITIONS
+   ============================================ */
 button,
 input,
 select,
 textarea {
   transition:
-    background-color 0.3s ease,
-    border-color 0.3s ease,
-    box-shadow 0.3s ease,
-    transform 0.2s ease;
+    background-color var(--transition-slow),
+    border-color var(--transition-slow),
+    box-shadow var(--transition-slow),
+    transform var(--transition-base);
 }
 
-/* 颜色和背景过渡 */
 .transition-colors {
-  transition:
-    color 0.3s ease,
-    background-color 0.3s ease,
-    border-color 0.3s ease;
+  transition: var(--transition-colors);
 }
 
-body {
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
-    sans-serif;
-  background: var(--bg-primary);
-  min-height: 100vh;
-  margin: 0;
-  overflow-x: hidden;
-  color: var(--text-primary);
-  transition:
-    background-color 0.3s ease,
-    color 0.3s ease;
-}
-
-/* Legacy glass effects - converted to flat design */
-.glass,
-.glass-strong {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  box-shadow: none;
-  transition:
-    background-color 0.3s ease,
-    border-color 0.3s ease;
-}
-
-/* Legacy tab buttons - now using bottom-border style */
-.tab-btn {
-  padding: 0.75rem 1.5rem;
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  color: var(--text-secondary);
-  letter-spacing: 0.025em;
-}
-
-.tab-btn:hover:not(:disabled) {
-  color: var(--text-primary);
-}
-
-.tab-btn.active {
-  color: var(--text-primary);
-  border-bottom-color: var(--text-primary);
-}
-
-/* Legacy button styles - All styles now in components.css */
-/* Legacy form input styles - All styles now in components.css */
-/* Legacy card styles - All styles now in components.css */
-
-/* These classes are kept for backward compatibility but redirect to components.css */
-
-.loading-spinner {
-  display: inline-block;
-  width: 20px;
-  height: 20px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  border-top: 2px solid white;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-/* Fade and slide transitions removed for immediate display */
-
-.toast {
-  position: fixed;
-  top: 80px;
-  right: 20px;
-  z-index: 1000;
-  min-width: 320px;
-  max-width: 500px;
-  transform: translateX(100%);
-  transition: transform 0.3s ease-in-out;
-}
-
-.toast.show {
-  transform: translateX(0);
-}
-
-/* Toast notification styles moved to ToastNotification.vue component */
-/* Using Vercel-inspired flat design with solid backgrounds */
-
+/* ============================================
+   V-CLOAK DIRECTIVE
+   ============================================ */
 [v-cloak] {
   display: none;
 }
 
-/* Custom scrollbar styles moved to main.css for Vercel flat design */
-
-/* 弹窗滚动内容样式 */
-.modal-scroll-content {
-  max-height: calc(90vh - 160px);
-  overflow-y: auto;
-  padding-right: 8px;
-}
-
-@media (max-width: 768px) {
-  .glass,
-  .glass-strong {
-    margin: 16px;
-    border-radius: 5px;
-  }
-
-  .stat-card {
-    padding: 16px;
-  }
-
-  .tab-btn {
-    font-size: 14px;
-    padding: 12px 8px;
-  }
-
-  .modal-scroll-content {
-    max-height: calc(85vh - 120px);
-  }
-}
-
-/* 版本更新提醒动画 */
+/* ============================================
+   ANIMATIONS
+   ============================================ */
 @keyframes pulse {
   0% {
     transform: scale(1);
@@ -165,25 +45,33 @@ body {
 }
 
 .animate-pulse {
-  /* 移除无限脉冲动画，改为 hover 效果 */
-  transition: transform 0.2s ease;
+  transition: transform var(--transition-base);
 }
 
 .animate-pulse:hover {
   animation: pulse 0.3s ease;
 }
 
-/* 用户菜单下拉框优化 */
-.user-menu-dropdown {
-  min-width: 240px;
-  box-shadow:
-    0 10px 15px -3px rgba(0, 0, 0, 0.1),
-    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+/* ============================================
+   RESPONSIVE STYLES
+   ============================================ */
+@media (max-width: 768px) {
+  .glass,
+  .glass-strong {
+    margin: var(--space-4);
+    border-radius: var(--radius-button);
+  }
+  
+  .stat-card {
+    padding: var(--space-4);
+  }
+  
+  .tab-btn {
+    font-size: var(--font-size-base);
+    padding: var(--space-3) var(--space-2);
+  }
+  
+  .modal-scroll-content {
+    max-height: calc(85vh - 120px);
+  }
 }
-
-/* Tab 内容区域样式 */
-.tab-content {
-  /* Animation removed for immediate display */
-}
-
-/* @keyframes fadeIn removed for immediate display */

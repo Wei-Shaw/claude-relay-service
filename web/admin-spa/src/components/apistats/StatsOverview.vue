@@ -509,9 +509,6 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 </script>
 
 <style scoped>
-/* ============================================
-   VERCEL STATS OVERVIEW CARDS
-   ============================================ */
 .card-section {
   background: #fff;
   border: 1px solid #eaeaea;
