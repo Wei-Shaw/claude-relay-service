@@ -1,7 +1,9 @@
 <template>
   <div class="logo-title-wrapper">
     <!-- Logo区域 -->
-    <div class="logo-container !border !border-gray-200 !bg-white dark:!border-gray-700 dark:!bg-gray-900">
+    <div
+      class="logo-container !border !border-gray-200 !bg-white dark:!border-gray-700 dark:!bg-gray-900"
+    >
       <template v-if="!loading">
         <img v-if="logoSrc" alt="Logo" class="logo-image" :src="logoSrc" @error="handleLogoError" />
         <i v-else class="fas fa-cloud logo-icon !text-gray-600 dark:!text-gray-400" />

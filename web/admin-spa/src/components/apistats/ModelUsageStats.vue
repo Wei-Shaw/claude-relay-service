@@ -87,29 +87,25 @@ const formatNumber = (num) => {
 
 <style scoped>
 .model-card {
-  background: #fff;
-  border: 1px solid #eaeaea;
-  border-radius: 8px;
-  padding: 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  padding: var(--card-padding);
   display: flex;
   flex-direction: column;
-  gap: 20px;
-}
-
-:global(.dark) .model-card {
-  background: #000;
-  border-color: #333;
+  gap: var(--card-gap);
+  box-shadow: var(--shadow-card);
 }
 
 @media (max-width: 768px) {
   .model-card {
-    padding: 20px;
+    padding: var(--card-padding-sm);
   }
 }
 
 /* Card Header */
 .card-header {
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
 }
 
 .card-title {
@@ -117,24 +113,20 @@ const formatNumber = (num) => {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .title-text {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 18px;
-  font-weight: 600;
-  color: #000;
-}
-
-:global(.dark) .title-text {
-  color: #fff;
+  gap: var(--space-3);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
 }
 
 .title-icon {
-  font-size: 18px;
+  font-size: var(--font-size-xl);
   color: #6366f1;
 }
 
@@ -143,13 +135,9 @@ const formatNumber = (num) => {
 }
 
 .title-period {
-  font-size: 13px;
-  font-weight: 400;
-  color: #666;
-}
-
-:global(.dark) .title-period {
-  color: #999;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+  color: var(--text-secondary);
 }
 
 /* Loading State */
@@ -158,27 +146,19 @@ const formatNumber = (num) => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 48px 24px;
-  gap: 16px;
+  padding: var(--space-12) var(--space-6);
+  gap: var(--space-4);
 }
 
 .loading-spinner {
-  font-size: 24px;
-  color: #666;
+  font-size: var(--font-size-3xl);
+  color: var(--text-secondary);
   animation: spin 1s linear infinite;
 }
 
-:global(.dark) .loading-spinner {
-  color: #999;
-}
-
 .loading-text {
-  font-size: 14px;
-  color: #666;
-}
-
-:global(.dark) .loading-text {
-  color: #999;
+  font-size: var(--font-size-base);
+  color: var(--text-secondary);
 }
 
 @keyframes spin {
@@ -194,36 +174,26 @@ const formatNumber = (num) => {
 .models-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 /* Model Item */
 .model-item {
-  background: #fafafa;
-  border: 1px solid #eaeaea;
-  border-radius: 6px;
-  padding: 20px;
-  transition: all 0.15s ease;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--card-gap);
+  transition: var(--transition-all);
 }
 
 .model-item:hover {
-  background: #f5f5f5;
-  border-color: #ddd;
-}
-
-:global(.dark) .model-item {
-  background: #0a0a0a;
-  border-color: #333;
-}
-
-:global(.dark) .model-item:hover {
-  background: #111;
-  border-color: #444;
+  background: var(--bg-card-hover);
+  border-color: var(--border-subtle);
 }
 
 @media (max-width: 768px) {
   .model-item {
-    padding: 16px;
+    padding: var(--space-4);
   }
 }
 
@@ -232,8 +202,8 @@ const formatNumber = (num) => {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
 }
 
 .model-info {
@@ -242,24 +212,16 @@ const formatNumber = (num) => {
 }
 
 .model-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: #000;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
   word-break: break-word;
-  margin-bottom: 4px;
-}
-
-:global(.dark) .model-name {
-  color: #fff;
+  margin-bottom: var(--space-1);
 }
 
 .model-requests {
-  font-size: 13px;
-  color: #666;
-}
-
-:global(.dark) .model-requests {
-  color: #999;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
 }
 
 .model-cost {
@@ -268,9 +230,9 @@ const formatNumber = (num) => {
 }
 
 .cost-value {
-  font-size: 16px;
-  font-weight: 600;
-  color: #10b981;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-green);
   margin-bottom: 2px;
 }
 
@@ -279,19 +241,15 @@ const formatNumber = (num) => {
 }
 
 .cost-label {
-  font-size: 12px;
-  color: #666;
-}
-
-:global(.dark) .cost-label {
-  color: #999;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
 }
 
 /* Model Stats */
 .model-stats {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 @media (min-width: 768px) {
@@ -307,35 +265,22 @@ const formatNumber = (num) => {
 }
 
 .stat-box {
-  padding: 12px;
-  background: #fff;
-  border: 1px solid #eaeaea;
-  border-radius: 6px;
-}
-
-:global(.dark) .stat-box {
-  background: #000;
-  border-color: #333;
+  padding: var(--space-3);
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
 }
 
 .stat-label {
-  font-size: 12px;
-  color: #666;
-  margin-bottom: 4px;
-}
-
-:global(.dark) .stat-label {
-  color: #999;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-1);
 }
 
 .stat-value {
-  font-size: 14px;
-  font-weight: 600;
-  color: #000;
-}
-
-:global(.dark) .stat-value {
-  color: #fff;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
 }
 
 /* Empty State */
@@ -344,25 +289,17 @@ const formatNumber = (num) => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 48px 24px;
-  gap: 16px;
+  padding: var(--space-12) var(--space-6);
+  gap: var(--space-4);
 }
 
 .empty-icon {
-  font-size: 32px;
-  color: #999;
-}
-
-:global(.dark) .empty-icon {
-  color: #666;
+  font-size: var(--font-size-4xl);
+  color: var(--text-muted);
 }
 
 .empty-text {
-  font-size: 14px;
-  color: #999;
-}
-
-:global(.dark) .empty-text {
-  color: #666;
+  font-size: var(--font-size-base);
+  color: var(--text-muted);
 }
 </style>

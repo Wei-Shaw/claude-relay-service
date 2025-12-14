@@ -15,11 +15,7 @@
             <ThemeToggle mode="dropdown" />
 
             <!-- 用户登录按钮 -->
-            <router-link
-              v-if="oemSettings.ldapEnabled"
-              class="btn btn-secondary"
-              to="/user-login"
-            >
+            <router-link v-if="oemSettings.ldapEnabled" class="btn btn-secondary" to="/user-login">
               <i class="fas fa-user" />
               <span>用户登录</span>
             </router-link>

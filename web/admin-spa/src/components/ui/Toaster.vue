@@ -1,10 +1,10 @@
 <template>
   <Sonner
-    :theme="theme"
+    class="toaster"
+    :close-button="closeButton"
     :position="position"
     :rich-colors="richColors"
-    :close-button="closeButton"
-    class="toaster"
+    :theme="theme"
     :toast-options="{
       classNames: {
         toast:
@@ -13,7 +13,8 @@
         description: 'text-sm text-gray-600 dark:text-gray-400',
         actionButton:
           'bg-gray-900 text-white hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900',
-        cancelButton: 'bg-gray-100 text-gray-900 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-100',
+        cancelButton:
+          'bg-gray-100 text-gray-900 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-100',
         closeButton: 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700',
         success: 'border-l-blue-500',
         error: 'border-l-red-500',
@@ -23,19 +24,19 @@
     }"
   >
     <template #success-icon>
-      <i class="fas fa-check-circle text-blue-500 text-lg" />
+      <i class="fas fa-check-circle text-lg text-blue-500" />
     </template>
     <template #error-icon>
-      <i class="fas fa-exclamation-circle text-red-500 text-lg" />
+      <i class="fas fa-exclamation-circle text-lg text-red-500" />
     </template>
     <template #warning-icon>
-      <i class="fas fa-exclamation-triangle text-yellow-500 text-lg" />
+      <i class="fas fa-exclamation-triangle text-lg text-yellow-500" />
     </template>
     <template #info-icon>
-      <i class="fas fa-info-circle text-blue-500 text-lg" />
+      <i class="fas fa-info-circle text-lg text-blue-500" />
     </template>
     <template #loading-icon>
-      <i class="fas fa-spinner fa-spin text-blue-500 text-lg" />
+      <i class="fas fa-spinner fa-spin text-lg text-blue-500" />
     </template>
   </Sonner>
 </template>

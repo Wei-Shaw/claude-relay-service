@@ -61,16 +61,16 @@ textarea {
     margin: var(--space-4);
     border-radius: var(--radius-button);
   }
-  
+
   .stat-card {
     padding: var(--space-4);
   }
-  
+
   .tab-btn {
     font-size: var(--font-size-base);
     padding: var(--space-3) var(--space-2);
   }
-  
+
   .modal-scroll-content {
     max-height: calc(85vh - 120px);
   }

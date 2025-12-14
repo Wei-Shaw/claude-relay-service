@@ -1,10 +1,6 @@
 <template>
   <Teleport to="body">
-    <div
-      v-if="isVisible"
-      class="confirm-overlay"
-      @click.self="handleCancel"
-    >
+    <div v-if="isVisible" class="confirm-overlay" @click.self="handleCancel">
       <div class="confirm-dialog">
         <!-- Title -->
         <h3 class="dialog-title">

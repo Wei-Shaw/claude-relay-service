@@ -74,24 +74,20 @@ const formatNumber = (num) => {
 
 <style scoped>
 .token-card {
-  background: #fff;
-  border: 1px solid #eaeaea;
-  border-radius: 8px;
-  padding: 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  padding: var(--card-padding);
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-}
-
-:global(.dark) .token-card {
-  background: #000;
-  border-color: #333;
+  gap: var(--card-gap);
+  box-shadow: var(--shadow-card);
 }
 
 @media (max-width: 768px) {
   .token-card {
-    padding: 20px;
+    padding: var(--card-padding-sm);
   }
 }
 
@@ -101,25 +97,21 @@ const formatNumber = (num) => {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 4px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
 }
 
 .title-text {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 18px;
-  font-weight: 600;
-  color: #000;
-}
-
-:global(.dark) .title-text {
-  color: #fff;
+  gap: var(--space-3);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
 }
 
 .title-icon {
-  font-size: 18px;
+  font-size: var(--font-size-xl);
   color: #f59e0b;
 }
 
@@ -128,67 +120,49 @@ const formatNumber = (num) => {
 }
 
 .title-period {
-  font-size: 13px;
-  font-weight: 400;
-  color: #666;
-}
-
-:global(.dark) .title-period {
-  color: #999;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+  color: var(--text-secondary);
 }
 
 /* Token List */
 .token-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .token-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px;
-  background: #fafafa;
-  border: 1px solid #eaeaea;
-  border-radius: 6px;
-  transition: all 0.15s ease;
+  padding: var(--space-3);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  transition: var(--transition-all);
 }
 
 .token-item:hover {
-  background: #f5f5f5;
-  border-color: #ddd;
-}
-
-:global(.dark) .token-item {
-  background: #0a0a0a;
-  border-color: #333;
-}
-
-:global(.dark) .token-item:hover {
-  background: #111;
-  border-color: #444;
+  background: var(--bg-card-hover);
+  border-color: var(--border-subtle);
 }
 
 .token-label {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 14px;
-  color: #666;
-  font-weight: 500;
-}
-
-:global(.dark) .token-label {
-  color: #999;
+  font-size: var(--font-size-base);
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
 }
 
 .token-icon {
-  font-size: 14px;
+  font-size: var(--font-size-base);
 }
 
 .token-icon-green {
-  color: #10b981;
+  color: var(--color-green);
 }
 
 :global(.dark) .token-icon-green {
@@ -220,23 +194,15 @@ const formatNumber = (num) => {
 }
 
 .token-value {
-  font-size: 15px;
-  font-weight: 600;
-  color: #000;
-}
-
-:global(.dark) .token-value {
-  color: #fff;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
 }
 
 /* Card Footer */
 .card-footer {
-  padding-top: 16px;
-  border-top: 1px solid #eaeaea;
-}
-
-:global(.dark) .card-footer {
-  border-top-color: #333;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-default);
 }
 
 .footer-content {
@@ -246,32 +212,24 @@ const formatNumber = (num) => {
 }
 
 .footer-label {
-  font-size: 14px;
-  font-weight: 600;
-  color: #000;
-}
-
-:global(.dark) .footer-label {
-  color: #fff;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
 }
 
 .footer-value {
-  font-size: 20px;
-  font-weight: 700;
-  color: #000;
-}
-
-:global(.dark) .footer-value {
-  color: #fff;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
 }
 
 @media (max-width: 768px) {
   .title-text {
-    font-size: 16px;
+    font-size: var(--font-size-lg);
   }
 
   .title-icon {
-    font-size: 16px;
+    font-size: var(--font-size-lg);
   }
 
   .token-item {
@@ -279,7 +237,7 @@ const formatNumber = (num) => {
   }
 
   .footer-value {
-    font-size: 18px;
+    font-size: var(--font-size-xl);
   }
 }
 </style>
