@@ -544,8 +544,8 @@
                           <Badge
                             v-for="tag in key.tags || []"
                             :key="tag"
-                            variant="neutral"
                             size="sm"
+                            variant="neutral"
                           >
                             {{ tag }}
                           </Badge>
@@ -975,8 +975,8 @@
                                 v-if="
                                   apiKeyModelStats[key.id] && apiKeyModelStats[key.id].length > 0
                                 "
-                                variant="neutral"
                                 size="sm"
+                                variant="neutral"
                               >
                                 {{ apiKeyModelStats[key.id].length }} 个模型
                               </Badge>
@@ -1065,7 +1065,7 @@
                                     class="mb-1 block text-sm font-semibold text-gray-800 dark:text-gray-200"
                                     >{{ stat.model }}</span
                                   >
-                                  <Badge variant="neutral" size="sm">
+                                  <Badge size="sm" variant="neutral">
                                     {{ stat.requests }} 次请求
                                   </Badge>
                                 </div>
@@ -1145,9 +1145,14 @@
                               <!-- 进度条 -->
                               <div class="mt-3">
                                 <Progress
-                                  :value="calculateApiKeyModelPercentage(stat.allTokens, apiKeyModelStats[key.id])"
-                                  variant="success"
                                   size="md"
+                                  :value="
+                                    calculateApiKeyModelPercentage(
+                                      stat.allTokens,
+                                      apiKeyModelStats[key.id]
+                                    )
+                                  "
+                                  variant="success"
                                 />
                               </div>
                               <div class="mt-1 text-right">
@@ -1235,11 +1240,7 @@
                     </p>
                   </div>
                 </div>
-                <Badge
-                  :variant="key.isActive ? 'success' : 'error'"
-                  size="sm"
-                  dot
-                >
+                <Badge dot size="sm" :variant="key.isActive ? 'success' : 'error'">
                   {{ key.isActive ? '活跃' : '已停用' }}
                 </Badge>
               </div>
@@ -1551,12 +1552,7 @@
 
               <!-- 标签 -->
               <div v-if="key.tags && key.tags.length > 0" class="mb-3 flex flex-wrap gap-1">
-                <Badge
-                  v-for="tag in key.tags"
-                  :key="tag"
-                  variant="neutral"
-                  size="sm"
-                >
+                <Badge v-for="tag in key.tags" :key="tag" size="sm" variant="neutral">
                   {{ tag }}
                 </Badge>
               </div>
@@ -1860,7 +1856,10 @@
                       <!-- 创建者 -->
                       <td v-if="isLdapEnabled" class="px-3 py-3">
                         <div class="text-xs">
-                          <span v-if="key.createdBy === 'admin'" class="text-gray-900 dark:text-gray-100">
+                          <span
+                            v-if="key.createdBy === 'admin'"
+                            class="text-gray-900 dark:text-gray-100"
+                          >
                             <i class="fas fa-user-shield mr-1 text-xs" />
                             管理员
                           </span>
@@ -1884,7 +1883,10 @@
                       <!-- 删除者 -->
                       <td class="px-3 py-3">
                         <div class="text-xs">
-                          <span v-if="key.deletedByType === 'admin'" class="text-gray-900 dark:text-gray-100">
+                          <span
+                            v-if="key.deletedByType === 'admin'"
+                            class="text-gray-900 dark:text-gray-100"
+                          >
                             <i class="fas fa-user-shield mr-1 text-xs" />
                             {{ key.deletedBy }}
                           </span>

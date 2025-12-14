@@ -32,8 +32,10 @@
             <div class="flex items-start gap-3">
               <i class="fas fa-info-circle mt-1 text-blue-500" />
               <div>
-                <p class="text-sm font-medium text-gray-900 dark:text-white dark:text-blue-300">批量编辑说明</p>
-                <p class="mt-1 text-sm text-gray-900 dark:text-white dark:text-blue-400">
+                <p class="text-sm font-medium text-gray-900 dark:text-blue-300 dark:text-white">
+                  批量编辑说明
+                </p>
+                <p class="mt-1 text-sm text-gray-900 dark:text-blue-400 dark:text-white">
                   以下设置将应用到所选的 {{ selectedCount }} 个 API
                   Key。只有填写或修改的字段才会被更新，空白字段将保持原值不变。
                 </p>
@@ -109,7 +111,7 @@
                     <button
                       v-for="tag in unselectedTags"
                       :key="'available-' + tag"
-                      class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700 transition-colors hover:bg-blue-100 hover:text-gray-900 dark:text-white dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-blue-900/30 dark:hover:text-blue-300"
+                      class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700 transition-colors hover:bg-blue-100 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:text-white dark:hover:bg-blue-900/30 dark:hover:text-blue-300"
                       type="button"
                       @click="selectTag(tag)"
                     >
@@ -325,7 +327,7 @@
                 >专属账号绑定</label
               >
               <button
-                class="flex items-center gap-1 text-sm text-gray-900 dark:text-gray-100 transition-colors hover:text-gray-900 dark:text-white disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+                class="flex items-center gap-1 text-sm text-gray-900 transition-colors hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:text-gray-100 dark:text-white dark:hover:text-blue-300"
                 :disabled="accountsLoading"
                 title="刷新账号列表"
                 type="button"

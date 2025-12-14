@@ -30,67 +30,62 @@ export const spacing = {
   40: '10rem', // 160px
   48: '12rem', // 192px
   56: '14rem', // 224px
-  64: '16rem', // 256px
+  64: '16rem' // 256px
 }
 
 // Component-specific spacing presets
 export const componentSpacing = {
   button: {
     sm: {
-      padding: '0.375rem 0.75rem',
+      padding: '0.375rem 0.75rem'
     },
     md: {
-      padding: '0.625rem 1.25rem',
+      padding: '0.625rem 1.25rem'
     },
     lg: {
-      padding: '0.875rem 1.75rem',
+      padding: '0.875rem 1.75rem'
     },
     icon: {
       size: '2.5rem',
-      sizeSm: '2rem',
-    },
+      sizeSm: '2rem'
+    }
   },
 
   input: {
-    padding: '0.75rem',
+    padding: '0.75rem'
   },
 
   card: {
     padding: '1.5rem',
-    gap: '1rem',
+    gap: '1rem'
   },
 
   badge: {
-    padding: '0.25rem 0.625rem',
+    padding: '0.25rem 0.625rem'
   },
 
   alert: {
-    padding: '1rem 1.25rem',
+    padding: '1rem 1.25rem'
   },
 
   table: {
     cellPadding: '1rem',
     cellPaddingCompact: '0.625rem 1rem',
     headerPadding: '0.75rem 1rem',
-    headerPaddingCompact: '0.5rem 1rem',
+    headerPaddingCompact: '0.5rem 1rem'
   },
 
   tab: {
-    padding: '0.75rem 1.5rem',
+    padding: '0.75rem 1.5rem'
   },
 
   pagination: {
-    padding: '0.5rem 0.75rem',
+    padding: '0.5rem 0.75rem'
   },
 
   toggle: {
     width: '3rem',
     height: '1.5rem',
-    knobSize: '1.25rem',
-  },
+    knobSize: '1.25rem'
+  }
 }
-
-
-
-
-

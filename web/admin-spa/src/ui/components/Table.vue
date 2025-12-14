@@ -58,7 +58,9 @@ defineProps({
 .ds-table {
   width: 100%;
   border-collapse: collapse;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
+    sans-serif;
 }
 
 .ds-table :deep(th) {
@@ -139,8 +141,3 @@ defineProps({
   }
 }
 </style>
-
-
-
-
-

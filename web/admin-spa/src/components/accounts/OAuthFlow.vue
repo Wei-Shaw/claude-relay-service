@@ -16,14 +16,16 @@
 
             <!-- 授权方式选择 -->
             <div class="mb-4">
-              <label class="mb-2 block text-sm font-medium text-gray-900 dark:text-white dark:text-blue-300">
+              <label
+                class="mb-2 block text-sm font-medium text-gray-900 dark:text-blue-300 dark:text-white"
+              >
                 选择授权方式
               </label>
               <div class="flex gap-4">
                 <label class="flex cursor-pointer items-center gap-2">
                   <input
                     v-model="authMethod"
-                    class="text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white"
+                    class="text-gray-900 focus:ring-gray-900 dark:text-gray-100 dark:focus:ring-white"
                     name="claude-auth-method"
                     type="radio"
                     value="manual"
@@ -34,7 +36,7 @@
                 <label class="flex cursor-pointer items-center gap-2">
                   <input
                     v-model="authMethod"
-                    class="text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white"
+                    class="text-gray-900 focus:ring-gray-900 dark:text-gray-100 dark:focus:ring-white"
                     name="claude-auth-method"
                     type="radio"
                     value="cookie"
@@ -50,7 +52,7 @@
               <div
                 class="rounded-lg border border-blue-300 bg-white/80 p-4 dark:border-blue-600 dark:bg-gray-800/80"
               >
-                <p class="mb-3 text-sm text-gray-900 dark:text-white dark:text-blue-300">
+                <p class="mb-3 text-sm text-gray-900 dark:text-blue-300 dark:text-white">
                   使用 claude.ai 的 sessionKey 自动完成 OAuth 授权流程，无需手动打开浏览器。
                 </p>
 
@@ -83,7 +85,7 @@
                   />
                   <p
                     v-if="parsedSessionKeyCount > 1"
-                    class="mt-1 text-xs text-gray-900 dark:text-gray-100 dark:text-blue-400"
+                    class="mt-1 text-xs text-gray-900 dark:text-blue-400 dark:text-gray-100"
                   >
                     <i class="fas fa-info-circle mr-1" />
                     将批量创建 {{ parsedSessionKeyCount }} 个账户
@@ -153,7 +155,7 @@
 
             <!-- 手动授权流程 -->
             <div v-else>
-              <p class="mb-4 text-sm text-gray-900 dark:text-white dark:text-blue-300">
+              <p class="mb-4 text-sm text-gray-900 dark:text-blue-300 dark:text-white">
                 请按照以下步骤完成 Claude 账户的授权：
               </p>
 
@@ -164,7 +166,7 @@
                 >
                   <div class="flex items-start gap-3">
                     <div
-                      class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-black dark:bg-white text-xs font-bold text-white dark:text-black"
+                      class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-black text-xs font-bold text-white dark:bg-white dark:text-black"
                     >
                       1
                     </div>
@@ -199,7 +201,7 @@
                           </button>
                         </div>
                         <button
-                          class="text-xs text-gray-900 dark:text-gray-100 hover:text-gray-900 dark:text-white"
+                          class="text-xs text-gray-900 hover:text-gray-900 dark:text-gray-100 dark:text-white"
                           @click="regenerateAuthUrl"
                         >
                           <i class="fas fa-sync-alt mr-1" />重新生成
@@ -215,7 +217,7 @@
                 >
                   <div class="flex items-start gap-3">
                     <div
-                      class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-black dark:bg-white text-xs font-bold text-white dark:text-black"
+                      class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-black text-xs font-bold text-white dark:bg-white dark:text-black"
                     >
                       2
                     </div>
@@ -223,7 +225,7 @@
                       <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
                         在浏览器中打开链接并完成授权
                       </p>
-                      <p class="mb-2 text-sm text-gray-900 dark:text-white dark:text-blue-300">
+                      <p class="mb-2 text-sm text-gray-900 dark:text-blue-300 dark:text-white">
                         请在新标签页中打开授权链接，登录您的 Claude 账户并授权。
                       </p>
                       <div
@@ -245,7 +247,7 @@
                 >
                   <div class="flex items-start gap-3">
                     <div
-                      class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-black dark:bg-white text-xs font-bold text-white dark:text-black"
+                      class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-black text-xs font-bold text-white dark:bg-white dark:text-black"
                     >
                       3
                     </div>
@@ -253,7 +255,7 @@
                       <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
                         输入 Authorization Code
                       </p>
-                      <p class="mb-3 text-sm text-gray-900 dark:text-white dark:text-blue-300">
+                      <p class="mb-3 text-sm text-gray-900 dark:text-blue-300 dark:text-white">
                         授权完成后，页面会显示一个
                         <strong>Authorization Code</strong>，请将其复制并粘贴到下方输入框：
                       </p>
@@ -579,12 +581,12 @@
                       <div
                         class="rounded border border-blue-300 bg-blue-50 p-2 dark:border-gray-700 dark:bg-blue-900/30"
                       >
-                        <p class="text-xs text-gray-900 dark:text-white dark:text-blue-300">
+                        <p class="text-xs text-gray-900 dark:text-blue-300 dark:text-white">
                           <i class="fas fa-lightbulb mr-1" />
                           <strong>提示：</strong>您可以直接复制整个链接或仅复制 code
                           参数值，系统会自动识别。
                         </p>
-                        <p class="mt-1 text-xs text-gray-900 dark:text-gray-100 dark:text-blue-400">
+                        <p class="mt-1 text-xs text-gray-900 dark:text-blue-400 dark:text-gray-100">
                           • 完整链接示例：<span class="font-mono"
                             >http://localhost:1455/auth/callback?code=ac_4hm8...</span
                           >

@@ -1,9 +1,6 @@
 <template>
   <Teleport to="body">
-    <div
-      v-if="show"
-      class="fixed inset-0 z-[1050] flex items-center justify-center bg-gray-900/40"
-    >
+    <div v-if="show" class="fixed inset-0 z-[1050] flex items-center justify-center bg-gray-900/40">
       <div class="absolute inset-0" @click="handleClose" />
       <div
         class="relative z-10 mx-3 flex w-full max-w-lg flex-col overflow-hidden rounded border border-gray-200/70 bg-white/95 shadow-2xl ring-1 ring-black/5 transition-all dark:border-gray-700/60 dark:bg-gray-900/95 dark:ring-white/10 sm:mx-4"
@@ -82,7 +79,7 @@
             <div class="flex items-center justify-between text-sm">
               <span class="text-gray-500 dark:text-gray-400">测试端点</span>
               <span
-                class="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-gray-900 dark:text-white dark:bg-blue-500/20 dark:text-blue-300"
+                class="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-gray-900 dark:bg-blue-500/20 dark:text-blue-300 dark:text-white"
               >
                 <i class="fas fa-link" />
                 /api/v1/messages
@@ -179,7 +176,7 @@
               'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition',
               testStatus === 'testing' || !apiKeyValue
                 ? 'cursor-not-allowed bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500'
-                : 'bg-black dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-100 hover:shadow-md'
+                : 'bg-black text-white hover:bg-gray-800 hover:shadow-md dark:bg-white dark:text-black dark:hover:bg-gray-100'
             ]"
             :disabled="testStatus === 'testing' || !apiKeyValue"
             @click="startTest"

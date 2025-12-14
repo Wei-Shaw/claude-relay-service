@@ -13,7 +13,7 @@ export const radius = {
   xl: '12px',
   '2xl': '16px',
   '3xl': '24px',
-  full: '9999px', // Circles
+  full: '9999px' // Circles
 }
 
 // Component-specific radius
@@ -28,10 +28,5 @@ export const componentRadius = {
   pagination: '5px',
   tab: '0', // No radius for tabs
   tooltip: '4px',
-  skeleton: '4px',
+  skeleton: '4px'
 }
-
-
-
-
-

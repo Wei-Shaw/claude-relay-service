@@ -1,5 +1,7 @@
 <template>
-  <div class="mb-8 rounded border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+  <div
+    class="mb-8 rounded border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900"
+  >
     <div class="mb-6 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
       <h2 class="flex items-center text-xl font-bold text-gray-900 dark:text-gray-100">
         <i class="fas fa-chart-area mr-2 text-gray-600 dark:text-gray-400" />

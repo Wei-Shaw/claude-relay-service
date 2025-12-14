@@ -12,16 +12,14 @@
       <!-- 多 Key 模式下的聚合统计信息 -->
       <div v-if="multiKeyMode && aggregatedStats" class="space-y-4">
         <!-- API Keys 概况 -->
-        <div
-          class="rounded-lg bg-gray-50 p-4 dark:bg-gray-800"
-        >
+        <div class="rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
           <div class="mb-3 flex items-center justify-between">
             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
               <i class="fas fa-layer-group mr-2 text-blue-500" />
               API Keys 概况
             </span>
             <span
-              class="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-gray-900 dark:text-white dark:bg-blue-800 dark:text-blue-200"
+              class="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-gray-900 dark:bg-blue-800 dark:text-blue-200 dark:text-white"
             >
               {{ aggregatedStats.activeKeys }}/{{ aggregatedStats.totalKeys }}
             </span>
@@ -43,9 +41,7 @@
         </div>
 
         <!-- 聚合统计数据 -->
-        <div
-          class="rounded-lg bg-gray-50 p-4 dark:bg-gray-800"
-        >
+        <div class="rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
           <div class="mb-3 flex items-center">
             <i class="fas fa-chart-pie mr-2 text-purple-500" />
             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">聚合统计摘要</span>
@@ -122,11 +118,11 @@
           </div>
           <Progress
             v-if="statsData.limits.dailyCostLimit > 0"
+            size="md"
             :value="getDailyCostProgress()"
             :variant="getDailyCostProgressVariant()"
-            size="md"
           />
-          <Progress v-else :value="0" variant="success" size="md" />
+          <Progress v-else size="md" :value="0" variant="success" />
         </div>
 
         <!-- 总费用限制 -->
@@ -148,11 +144,11 @@
           </div>
           <Progress
             v-if="statsData.limits.totalCostLimit > 0"
+            size="md"
             :value="getTotalCostProgress()"
             :variant="getTotalCostProgressVariant()"
-            size="md"
           />
-          <Progress v-else :value="0" variant="default" size="md" />
+          <Progress v-else size="md" :value="0" variant="default" />
         </div>
 
         <!-- Opus 模型周费用限制 -->
@@ -168,9 +164,9 @@
             </span>
           </div>
           <Progress
+            size="md"
             :value="getOpusWeeklyCostProgress()"
             :variant="getOpusWeeklyCostProgressVariant()"
-            size="md"
           />
         </div>
 
@@ -258,7 +254,7 @@
               <span
                 v-for="client in statsData.restrictions.allowedClients"
                 :key="client"
-                class="flex items-center gap-1 rounded-full bg-white px-2 py-1 text-xs text-gray-900 dark:text-white shadow-sm dark:bg-slate-900 dark:text-blue-300 md:text-sm"
+                class="flex items-center gap-1 rounded-full bg-white px-2 py-1 text-xs text-gray-900 shadow-sm dark:bg-slate-900 dark:text-blue-300 dark:text-white md:text-sm"
               >
                 <i class="fas fa-id-badge" />
                 {{ client }}

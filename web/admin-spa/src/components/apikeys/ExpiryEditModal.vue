@@ -2,10 +2,7 @@
   <Teleport to="body">
     <div v-if="show" class="modal fixed inset-0 z-50 flex items-center justify-center p-4">
       <!-- 背景遮罩 -->
-      <div
-        class="fixed inset-0 bg-gray-900 bg-opacity-50"
-        @click="$emit('close')"
-      />
+      <div class="fixed inset-0 bg-gray-900 bg-opacity-50" @click="$emit('close')" />
 
       <!-- 模态框内容 -->
       <div class="modal-content relative mx-auto w-full max-w-lg p-8">
@@ -87,7 +84,7 @@
           <!-- 激活按钮（仅在未激活状态显示） -->
           <div v-if="apiKey.expirationMode === 'activation' && !apiKey.isActivated" class="mb-4">
             <button
-              class="w-full rounded-lg bg-black dark:bg-white px-4 py-3 font-semibold text-white dark:text-black transition-all hover:bg-gray-800 dark:hover:bg-gray-100 hover:shadow-lg"
+              class="w-full rounded-lg bg-black px-4 py-3 font-semibold text-white transition-all hover:bg-gray-800 hover:shadow-lg dark:bg-white dark:text-black dark:hover:bg-gray-100"
               @click="handleActivateNow"
             >
               <i class="fas fa-rocket mr-2" />
@@ -161,7 +158,9 @@
           >
             <div class="flex items-center justify-between">
               <div>
-                <p class="mb-1 text-xs font-medium text-gray-900 dark:text-white dark:text-blue-400">
+                <p
+                  class="mb-1 text-xs font-medium text-gray-900 dark:text-blue-400 dark:text-white"
+                >
                   <i class="fas fa-arrow-right mr-1" />
                   新的过期时间
                 </p>

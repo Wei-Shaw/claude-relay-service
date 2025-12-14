@@ -384,9 +384,7 @@
         <!-- Webhook 设置部分 -->
         <div v-show="activeSection === 'webhook'">
           <!-- 主开关 -->
-          <div
-            class="mb-6 rounded-lg bg-white/80 p-6 shadow-lg  dark:bg-gray-800/80"
-          >
+          <div class="mb-6 rounded-lg bg-white/80 p-6 shadow-lg dark:bg-gray-800/80">
             <div class="flex items-center justify-between">
               <div>
                 <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">启用通知</h2>
@@ -409,9 +407,7 @@
           </div>
 
           <!-- 通知类型设置 -->
-          <div
-            class="mb-6 rounded-lg bg-white/80 p-6 shadow-lg  dark:bg-gray-800/80"
-          >
+          <div class="mb-6 rounded-lg bg-white/80 p-6 shadow-lg dark:bg-gray-800/80">
             <h2 class="mb-4 text-lg font-semibold text-gray-800 dark:text-gray-200">通知类型</h2>
             <div class="space-y-3">
               <div
@@ -443,9 +439,7 @@
           </div>
 
           <!-- 平台列表 -->
-          <div
-            class="mb-6 rounded-lg bg-white/80 p-6 shadow-lg  dark:bg-gray-800/80"
-          >
+          <div class="mb-6 rounded-lg bg-white/80 p-6 shadow-lg dark:bg-gray-800/80">
             <div class="mb-4 flex items-center justify-between">
               <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">通知平台</h2>
               <button
@@ -583,7 +577,7 @@
           </div>
 
           <!-- 高级设置 -->
-          <div class="rounded-lg bg-white/80 p-6 shadow-lg  dark:bg-gray-800/80">
+          <div class="rounded-lg bg-white/80 p-6 shadow-lg dark:bg-gray-800/80">
             <h2 class="mb-4 text-lg font-semibold text-gray-800 dark:text-gray-200">高级设置</h2>
             <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div>
@@ -652,9 +646,7 @@
 
           <div v-else>
             <!-- Claude Code 客户端限制 -->
-            <div
-              class="mb-6 rounded-lg bg-white/80 p-6 shadow-lg  dark:bg-gray-800/80"
-            >
+            <div class="mb-6 rounded-lg bg-white/80 p-6 shadow-lg dark:bg-gray-800/80">
               <div class="flex items-center justify-between">
                 <div>
                   <div class="flex items-center">
@@ -707,9 +699,7 @@
             </div>
 
             <!-- 全局会话绑定 -->
-            <div
-              class="mb-6 rounded-lg bg-white/80 p-6 shadow-lg  dark:bg-gray-800/80"
-            >
+            <div class="mb-6 rounded-lg bg-white/80 p-6 shadow-lg dark:bg-gray-800/80">
               <div class="flex items-center justify-between">
                 <div>
                   <div class="flex items-center">
@@ -805,9 +795,7 @@
             </div>
 
             <!-- 用户消息串行队列 -->
-            <div
-              class="mb-6 rounded-lg bg-white/80 p-6 shadow-lg  dark:bg-gray-800/80"
-            >
+            <div class="mb-6 rounded-lg bg-white/80 p-6 shadow-lg dark:bg-gray-800/80">
               <div class="flex items-center justify-between">
                 <div>
                   <div class="flex items-center">
@@ -899,9 +887,7 @@
             </div>
 
             <!-- 并发请求排队 -->
-            <div
-              class="mb-6 rounded-lg bg-white/80 p-6 shadow-lg  dark:bg-gray-800/80"
-            >
+            <div class="mb-6 rounded-lg bg-white/80 p-6 shadow-lg dark:bg-gray-800/80">
               <div class="flex items-center justify-between">
                 <div class="flex items-center">
                   <div
@@ -1032,7 +1018,7 @@
   <!-- 添加/编辑平台模态框 -->
   <div
     v-if="showAddPlatformModal"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60  transition-all duration-300 ease-out"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 transition-all duration-300 ease-out"
     @click="closePlatformModal"
   >
     <div
@@ -1524,13 +1510,7 @@
                     启用签名验证
                   </span>
                 </label>
-                <Badge
-                  v-if="platformForm.enableSign"
-                  variant="success"
-                  size="sm"
-                >
-                  已启用
-                </Badge>
+                <Badge v-if="platformForm.enableSign" size="sm" variant="success"> 已启用 </Badge>
               </div>
               <transition
                 enter-active-class="transition-all duration-200 ease-out"

@@ -24,7 +24,7 @@ defineProps({
   variant: {
     type: String,
     default: 'neutral',
-    validator: (value) => 
+    validator: (value) =>
       ['success', 'inactive', 'warning', 'error', 'info', 'neutral'].includes(value)
   },
 
@@ -72,7 +72,9 @@ defineProps({
   font-weight: 500;
   border-radius: 4px;
   white-space: nowrap;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
+    sans-serif;
 }
 
 /* Sizes */
@@ -165,8 +167,3 @@ defineProps({
   }
 }
 </style>
-
-
-
-
-

@@ -20,7 +20,7 @@ export const colors = {
     600: '#8e8e8e',
     700: '#6e6e6e',
     800: '#4b4b4b',
-    900: '#2c2c2c',
+    900: '#2c2c2c'
   },
 
   // Semantic Colors
@@ -31,7 +31,7 @@ export const colors = {
     link: '#0070f3',
     linkHover: '#0051bb',
     error: '#ee0000',
-    success: '#0070f3',
+    success: '#0070f3'
   },
 
   // Status Colors
@@ -39,7 +39,7 @@ export const colors = {
     success: '#0070f3',
     error: '#ee0000',
     warning: '#f5a623',
-    info: '#0070f3',
+    info: '#0070f3'
   },
 
   // Background Colors
@@ -48,7 +48,7 @@ export const colors = {
     secondary: '#fafafa',
     tertiary: '#f5f5f5',
     hover: '#fafafa',
-    disabled: '#fafafa',
+    disabled: '#fafafa'
   },
 
   // Border Colors
@@ -56,7 +56,7 @@ export const colors = {
     default: '#eaeaea',
     hover: '#000000',
     focus: '#000000',
-    error: '#ee0000',
+    error: '#ee0000'
   },
 
   // Component-specific Colors
@@ -66,29 +66,29 @@ export const colors = {
       text: '#ffffff',
       border: '#000000',
       hoverBg: '#333333',
-      hoverBorder: '#333333',
+      hoverBorder: '#333333'
     },
     secondary: {
       bg: '#ffffff',
       text: '#000000',
       border: '#eaeaea',
       hoverBg: '#ffffff',
-      hoverBorder: '#000000',
+      hoverBorder: '#000000'
     },
     danger: {
       bg: '#ee0000',
       text: '#ffffff',
       border: '#ee0000',
       hoverBg: '#cc0000',
-      hoverBorder: '#cc0000',
+      hoverBorder: '#cc0000'
     },
     ghost: {
       bg: 'transparent',
       text: '#666666',
       border: 'transparent',
       hoverBg: '#fafafa',
-      hoverText: '#000000',
-    },
+      hoverText: '#000000'
+    }
   },
 
   // Alert Colors
@@ -96,23 +96,23 @@ export const colors = {
     success: {
       bg: '#f0f9ff',
       text: '#0070f3',
-      border: '#0070f3',
+      border: '#0070f3'
     },
     error: {
       bg: '#fff0f0',
       text: '#ee0000',
-      border: '#ee0000',
+      border: '#ee0000'
     },
     warning: {
       bg: '#fffbeb',
       text: '#f5a623',
-      border: '#f5a623',
+      border: '#f5a623'
     },
     info: {
       bg: '#f0f9ff',
       text: '#0070f3',
-      border: '#0070f3',
-    },
+      border: '#0070f3'
+    }
   },
 
   // Badge Colors
@@ -120,40 +120,40 @@ export const colors = {
     success: {
       bg: '#ffffff',
       text: '#0070f3',
-      border: '#0070f3',
+      border: '#0070f3'
     },
     inactive: {
       bg: '#ffffff',
       text: '#666666',
-      border: '#eaeaea',
+      border: '#eaeaea'
     },
     warning: {
       bg: '#ffffff',
       text: '#f5a623',
-      border: '#f5a623',
+      border: '#f5a623'
     },
     error: {
       bg: '#ffffff',
       text: '#ee0000',
-      border: '#ee0000',
+      border: '#ee0000'
     },
     info: {
       bg: '#ffffff',
       text: '#0070f3',
-      border: '#0070f3',
+      border: '#0070f3'
     },
     neutral: {
       bg: '#ffffff',
       text: '#000000',
-      border: '#eaeaea',
-    },
+      border: '#eaeaea'
+    }
   },
 
   // Progress Bar Colors
   progress: {
     bg: '#eaeaea',
     fill: '#000000',
-    fillSuccess: '#0070f3',
+    fillSuccess: '#0070f3'
   },
 
   // Code Block Colors
@@ -161,18 +161,13 @@ export const colors = {
     bg: '#000000',
     text: '#ffffff',
     inlineBg: '#fafafa',
-    inlineBorder: '#eaeaea',
+    inlineBorder: '#eaeaea'
   },
 
   // Skeleton Loading Colors
   skeleton: {
     from: '#fafafa',
     mid: '#eaeaea',
-    to: '#fafafa',
-  },
+    to: '#fafafa'
+  }
 }
-
-
-
-
-

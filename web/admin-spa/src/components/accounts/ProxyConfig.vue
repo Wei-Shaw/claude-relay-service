@@ -5,7 +5,7 @@
       <label class="flex cursor-pointer items-center">
         <input
           v-model="proxy.enabled"
-          class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white"
+          class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:text-gray-100 dark:focus:ring-white"
           type="checkbox"
         />
         <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">启用代理</span>
@@ -17,7 +17,9 @@
       class="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-600 dark:bg-gray-800"
     >
       <div class="mb-3 flex items-start gap-3">
-        <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gray-500 dark:bg-gray-600">
+        <div
+          class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gray-500 dark:bg-gray-600"
+        >
           <i class="fas fa-server text-sm text-white" />
         </div>
         <div class="flex-1">
@@ -113,7 +115,7 @@
           <input
             id="proxyAuth"
             v-model="showAuth"
-            class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white"
+            class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:text-gray-100 dark:focus:ring-white"
             type="checkbox"
           />
           <label
@@ -162,7 +164,7 @@
       <div
         class="rounded-lg border border-gray-300 bg-blue-50 p-3 dark:border-gray-700 dark:bg-blue-900/30"
       >
-        <p class="text-xs text-gray-900 dark:text-white dark:text-blue-300">
+        <p class="text-xs text-gray-900 dark:text-blue-300 dark:text-white">
           <i class="fas fa-info-circle mr-1" />
           <strong>提示：</strong
           >代理设置将用于所有与此账户相关的API请求。请确保代理服务器支持HTTPS流量转发。

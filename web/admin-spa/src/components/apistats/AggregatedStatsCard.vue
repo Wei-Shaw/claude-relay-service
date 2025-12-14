@@ -24,9 +24,9 @@
           </span>
         </div>
         <Progress
+          size="md"
           :value="calculatePercentage(stat)"
           :variant="getProgressVariant(index)"
-          size="md"
         />
         <div
           class="mt-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"

@@ -32,7 +32,7 @@ defineProps({
   variant: {
     type: String,
     default: 'secondary',
-    validator: (value) => 
+    validator: (value) =>
       ['primary', 'secondary', 'outline', 'danger', 'danger-outline', 'ghost'].includes(value)
   },
 
@@ -105,7 +105,9 @@ defineProps({
   border-radius: 5px;
   font-size: 0.875rem;
   font-weight: 500;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
+    sans-serif;
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
@@ -293,8 +295,3 @@ defineProps({
   }
 }
 </style>
-
-
-
-
-

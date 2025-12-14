@@ -6,15 +6,23 @@
         <i class="fas fa-clock mr-1 text-gray-600 dark:text-gray-400" />
         {{ formatTime(remainingSeconds) }}
       </span>
-      <span v-else-if="windowState === 'expired'" class="font-medium text-orange-600 dark:text-orange-400">
+      <span
+        v-else-if="windowState === 'expired'"
+        class="font-medium text-orange-600 dark:text-orange-400"
+      >
         <i class="fas fa-sync-alt mr-1" />
         窗口已过期
       </span>
-      <span v-else-if="windowState === 'notStarted'" class="font-medium text-gray-500 dark:text-gray-400">
+      <span
+        v-else-if="windowState === 'notStarted'"
+        class="font-medium text-gray-500 dark:text-gray-400"
+      >
         <i class="fas fa-pause-circle mr-1" />
         窗口未激活
       </span>
-      <span v-else class="font-medium text-gray-400 dark:text-gray-500"> {{ rateLimitWindow }} 分钟 </span>
+      <span v-else class="font-medium text-gray-400 dark:text-gray-500">
+        {{ rateLimitWindow }} 分钟
+      </span>
     </div>
 
     <!-- 进度条（仅在有限制时显示） -->
@@ -22,7 +30,9 @@
       <div v-if="hasRequestLimit" class="space-y-0.5">
         <div class="flex items-center justify-between text-xs">
           <span class="text-gray-500 dark:text-gray-400">请求</span>
-          <span class="text-gray-700 dark:text-gray-300"> {{ currentRequests || 0 }}/{{ requestLimit }} </span>
+          <span class="text-gray-700 dark:text-gray-300">
+            {{ currentRequests || 0 }}/{{ requestLimit }}
+          </span>
         </div>
         <div class="h-1 w-full rounded-full bg-gray-200 dark:bg-gray-700">
           <div
@@ -69,7 +79,10 @@
     </div>
 
     <!-- 额外提示信息 -->
-    <div v-if="windowState === 'active' && showTooltip" class="text-xs text-gray-600 dark:text-gray-400">
+    <div
+      v-if="windowState === 'active' && showTooltip"
+      class="text-xs text-gray-600 dark:text-gray-400"
+    >
       <i class="fas fa-info-circle mr-1" />
       <span v-if="remainingSeconds < 60">即将重置</span>
       <span v-else-if="remainingSeconds < 300"

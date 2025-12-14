@@ -22,11 +22,7 @@
 <template>
   <div>
     <!-- ✅ NEW: Design System component, clean and reusable -->
-    <Progress
-      :value="dailyCostPercentage"
-      :variant="dailyCostVariant"
-      size="md"
-    />
+    <Progress :value="dailyCostPercentage" :variant="dailyCostVariant" size="md" />
   </div>
 </template>
 
@@ -63,8 +59,3 @@ BENEFITS OF REFACTORING:
 5. ✅ Consistent progress bars across entire app
 6. ✅ Easy to maintain and test
 -->
-
-
-
-
-

@@ -65,7 +65,9 @@ defineProps({
   border: 1px solid #eaeaea;
   border-radius: 0; /* Sharp edges per Vercel design */
   transition: all 0.2s;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
+    sans-serif;
 }
 
 /* Hover effects */
@@ -144,8 +146,3 @@ defineProps({
   }
 }
 </style>
-
-
-
-
-

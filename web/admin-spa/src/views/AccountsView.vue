@@ -285,7 +285,9 @@
                             </div>
                             <div class="space-y-1 text-gray-200 dark:text-gray-600">
                               <div class="flex items-start gap-2">
-                                <i class="fas fa-clock mt-[2px] text-[10px] text-gray-400 dark:text-gray-500"></i>
+                                <i
+                                  class="fas fa-clock mt-[2px] text-[10px] text-gray-400 dark:text-gray-500"
+                                ></i>
                                 <span class="font-medium text-white dark:text-gray-900"
                                   >5h 窗口：5小时使用量进度，到达重置时间后会自动归零。</span
                                 >
@@ -336,7 +338,9 @@
                                 >
                               </div>
                               <div class="flex items-start gap-2">
-                                <i class="fas fa-sync-alt mt-[2px] text-[10px] text-gray-400 dark:text-gray-500"></i>
+                                <i
+                                  class="fas fa-sync-alt mt-[2px] text-[10px] text-gray-400 dark:text-gray-500"
+                                ></i>
                                 <span class="font-medium text-white dark:text-gray-900"
                                   >到达重置时间后自动归零。</span
                                 >
@@ -433,25 +437,17 @@
                         >
                           {{ account.name }}
                         </div>
-                        <Badge
-                          v-if="account.accountType === 'dedicated'"
-                          variant="info"
-                          size="sm"
-                        >
+                        <Badge v-if="account.accountType === 'dedicated'" size="sm" variant="info">
                           <i class="fas fa-lock mr-1" />专属
                         </Badge>
                         <Badge
                           v-else-if="account.accountType === 'group'"
-                          variant="neutral"
                           size="sm"
+                          variant="neutral"
                         >
                           <i class="fas fa-layer-group mr-1" />分组调度
                         </Badge>
-                        <Badge
-                          v-else
-                          variant="success"
-                          size="sm"
-                        >
+                        <Badge v-else size="sm" variant="success">
                           <i class="fas fa-share-alt mr-1" />共享
                         </Badge>
                       </div>
@@ -463,9 +459,9 @@
                         <Badge
                           v-for="group in account.groupInfos"
                           :key="group.id"
-                          variant="neutral"
                           size="sm"
                           :title="`所属分组: ${group.name}`"
+                          variant="neutral"
                         >
                           <i class="fas fa-folder mr-1" />{{ group.name }}
                         </Badge>
@@ -744,16 +740,14 @@
                       <!-- 5小时窗口 -->
                       <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70">
                         <div class="flex items-center gap-2">
-                          <Badge variant="info" size="sm">
-                            5h
-                          </Badge>
+                          <Badge size="sm" variant="info"> 5h </Badge>
                           <div class="flex-1">
                             <div class="flex items-center gap-2">
                               <div class="flex-1">
                                 <Progress
+                                  size="md"
                                   :value="account.claudeUsage.fiveHour.utilization || 0"
                                   :variant="getClaudeUsageVariant(account.claudeUsage.fiveHour)"
-                                  size="md"
                                 />
                               </div>
                               <span
@@ -771,16 +765,14 @@
                       <!-- 7天窗口 -->
                       <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70">
                         <div class="flex items-center gap-2">
-                          <Badge variant="success" size="sm">
-                            7d
-                          </Badge>
+                          <Badge size="sm" variant="success"> 7d </Badge>
                           <div class="flex-1">
                             <div class="flex items-center gap-2">
                               <div class="flex-1">
                                 <Progress
+                                  size="md"
                                   :value="account.claudeUsage.sevenDay.utilization || 0"
                                   :variant="getClaudeUsageVariant(account.claudeUsage.sevenDay)"
-                                  size="md"
                                 />
                               </div>
                               <span
@@ -798,16 +790,14 @@
                       <!-- 7天Opus窗口 -->
                       <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70">
                         <div class="flex items-center gap-2">
-                          <Badge variant="info" size="sm">
-                            sonnet
-                          </Badge>
+                          <Badge size="sm" variant="info"> sonnet </Badge>
                           <div class="flex-1">
                             <div class="flex items-center gap-2">
                               <div class="flex-1">
                                 <Progress
+                                  size="md"
                                   :value="account.claudeUsage.sevenDayOpus.utilization || 0"
                                   :variant="getClaudeUsageVariant(account.claudeUsage.sevenDayOpus)"
-                                  size="md"
                                 />
                               </div>
                               <span
@@ -855,9 +845,14 @@
                       <div class="flex items-center gap-2">
                         <div class="w-24">
                           <Progress
-                            :value="account.sessionWindow.progress"
-                            :variant="getSessionProgressVariant(account.sessionWindow.sessionWindowStatus, account)"
                             size="md"
+                            :value="account.sessionWindow.progress"
+                            :variant="
+                              getSessionProgressVariant(
+                                account.sessionWindow.sessionWindowStatus,
+                                account
+                              )
+                            "
                           />
                         </div>
                         <span
@@ -900,9 +895,15 @@
                         <div class="flex items-center gap-2">
                           <div class="w-24">
                             <Progress
-                              :value="Math.min(100, getQuotaUsagePercent(account))"
-                              :variant="getQuotaUsagePercent(account) >= 90 ? 'error' : getQuotaUsagePercent(account) >= 70 ? 'warning' : 'success'"
                               size="md"
+                              :value="Math.min(100, getQuotaUsagePercent(account))"
+                              :variant="
+                                getQuotaUsagePercent(account) >= 90
+                                  ? 'error'
+                                  : getQuotaUsagePercent(account) >= 70
+                                    ? 'warning'
+                                    : 'success'
+                              "
                             />
                           </div>
                           <span
@@ -943,9 +944,15 @@
                       >
                         <div class="w-24">
                           <Progress
-                            :value="Math.min(100, getConsoleConcurrencyPercent(account))"
-                            :variant="getConsoleConcurrencyPercent(account) >= 90 ? 'error' : getConsoleConcurrencyPercent(account) >= 70 ? 'warning' : 'success'"
                             size="md"
+                            :value="Math.min(100, getConsoleConcurrencyPercent(account))"
+                            :variant="
+                              getConsoleConcurrencyPercent(account) >= 90
+                                ? 'error'
+                                : getConsoleConcurrencyPercent(account) >= 70
+                                  ? 'warning'
+                                  : 'success'
+                            "
                           />
                         </div>
                         <span
@@ -958,11 +965,7 @@
                           {{ Number(account.maxConcurrentTasks || 0) }}
                         </span>
                       </div>
-                      <Badge
-                        v-else
-                        variant="neutral"
-                        size="sm"
-                      >
+                      <Badge v-else size="sm" variant="neutral">
                         <i class="fas fa-infinity mr-1" />并发无限制
                       </Badge>
                     </div>
@@ -971,16 +974,18 @@
                     <div v-if="account.codexUsage" class="space-y-2">
                       <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70">
                         <div class="flex items-center gap-2">
-                          <Badge variant="info" size="sm">
+                          <Badge size="sm" variant="info">
                             {{ getCodexWindowLabel('primary') }}
                           </Badge>
                           <div class="flex-1">
                             <div class="flex items-center gap-2">
                               <div class="flex-1">
                                 <Progress
-                                  :value="normalizeCodexUsagePercent(account.codexUsage.primary) || 0"
-                                  :variant="getCodexUsageVariant(account.codexUsage.primary)"
                                   size="md"
+                                  :value="
+                                    normalizeCodexUsagePercent(account.codexUsage.primary) || 0
+                                  "
+                                  :variant="getCodexUsageVariant(account.codexUsage.primary)"
                                 />
                               </div>
                               <span
@@ -997,16 +1002,18 @@
                       </div>
                       <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70">
                         <div class="flex items-center gap-2">
-                          <Badge variant="neutral" size="sm">
+                          <Badge size="sm" variant="neutral">
                             {{ getCodexWindowLabel('secondary') }}
                           </Badge>
                           <div class="flex-1">
                             <div class="flex items-center gap-2">
                               <div class="flex-1">
                                 <Progress
-                                  :value="normalizeCodexUsagePercent(account.codexUsage.secondary) || 0"
-                                  :variant="getCodexUsageVariant(account.codexUsage.secondary)"
                                   size="md"
+                                  :value="
+                                    normalizeCodexUsagePercent(account.codexUsage.secondary) || 0
+                                  "
+                                  :variant="getCodexUsageVariant(account.codexUsage.secondary)"
                                 />
                               </div>
                               <span
@@ -1051,9 +1058,9 @@
                   >
                     <div class="w-16">
                       <Progress
+                        size="md"
                         :value="101 - (account.priority || 50)"
                         variant="success"
-                        size="md"
                       />
                     </div>
                     <span class="min-w-[20px] text-xs font-medium text-gray-700 dark:text-gray-200">
@@ -1141,10 +1148,10 @@
                       :class="[
                         'rounded px-2.5 py-1 text-xs font-medium transition-colors',
                         account.isTogglingSchedulable
-                          ? 'cursor-not-allowed bg-gray-100 dark:bg-gray-700 text-gray-400'
+                          ? 'cursor-not-allowed bg-gray-100 text-gray-400 dark:bg-gray-700'
                           : account.schedulable
-                            ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800'
-                            : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+                            ? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900 dark:text-green-200 dark:hover:bg-green-800'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'
                       ]"
                       :disabled="account.isTogglingSchedulable"
                       :title="account.schedulable ? '点击禁用调度' : '点击启用调度'"
@@ -1291,11 +1298,7 @@
                 </div>
               </div>
             </div>
-            <Badge
-              :variant="getAccountStatusVariant(account)"
-              size="sm"
-              dot
-            >
+            <Badge dot size="sm" :variant="getAccountStatusVariant(account)">
               {{ getAccountStatusText(account) }}
             </Badge>
           </div>
@@ -1354,16 +1357,14 @@
                 <!-- 5小时窗口 -->
                 <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70">
                   <div class="flex items-center gap-2">
-                    <Badge variant="info" size="sm">
-                      5h
-                    </Badge>
+                    <Badge size="sm" variant="info"> 5h </Badge>
                     <div class="flex-1">
                       <div class="flex items-center gap-2">
                         <div class="flex-1">
                           <Progress
+                            size="md"
                             :value="account.claudeUsage.fiveHour.utilization || 0"
                             :variant="getClaudeUsageVariant(account.claudeUsage.fiveHour)"
-                            size="md"
                           />
                         </div>
                         <span
@@ -1381,16 +1382,14 @@
                 <!-- 7天窗口 -->
                 <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70">
                   <div class="flex items-center gap-2">
-                    <Badge variant="success" size="sm">
-                      7d
-                    </Badge>
+                    <Badge size="sm" variant="success"> 7d </Badge>
                     <div class="flex-1">
                       <div class="flex items-center gap-2">
                         <div class="flex-1">
                           <Progress
+                            size="md"
                             :value="account.claudeUsage.sevenDay.utilization || 0"
                             :variant="getClaudeUsageVariant(account.claudeUsage.sevenDay)"
-                            size="md"
                           />
                         </div>
                         <span
@@ -1408,16 +1407,14 @@
                 <!-- 7天Opus窗口 -->
                 <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70">
                   <div class="flex items-center gap-2">
-                    <Badge variant="info" size="sm">
-                      Opus
-                    </Badge>
+                    <Badge size="sm" variant="info"> Opus </Badge>
                     <div class="flex-1">
                       <div class="flex items-center gap-2">
                         <div class="flex-1">
                           <Progress
+                            size="md"
                             :value="account.claudeUsage.sevenDayOpus.utilization || 0"
                             :variant="getClaudeUsageVariant(account.claudeUsage.sevenDayOpus)"
-                            size="md"
                           />
                         </div>
                         <span
@@ -1459,9 +1456,11 @@
                   </span>
                 </div>
                 <Progress
-                  :value="account.sessionWindow.progress"
-                  :variant="getSessionProgressVariant(account.sessionWindow.sessionWindowStatus, account)"
                   size="md"
+                  :value="account.sessionWindow.progress"
+                  :variant="
+                    getSessionProgressVariant(account.sessionWindow.sessionWindowStatus, account)
+                  "
                 />
                 <div class="flex items-center justify-between text-xs">
                   <span class="text-gray-500 dark:text-gray-400">
@@ -1487,16 +1486,16 @@
               <div v-if="account.codexUsage" class="space-y-2">
                 <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
                   <div class="flex items-center gap-2">
-                    <Badge variant="info" size="sm">
+                    <Badge size="sm" variant="info">
                       {{ getCodexWindowLabel('primary') }}
                     </Badge>
                     <div class="flex-1">
                       <div class="flex items-center gap-2">
                         <div class="flex-1">
                           <Progress
+                            size="md"
                             :value="normalizeCodexUsagePercent(account.codexUsage.primary) || 0"
                             :variant="getCodexUsageVariant(account.codexUsage.primary)"
-                            size="md"
                           />
                         </div>
                         <span
@@ -1513,16 +1512,16 @@
                 </div>
                 <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
                   <div class="flex items-center gap-2">
-                    <Badge variant="neutral" size="sm">
+                    <Badge size="sm" variant="neutral">
                       {{ getCodexWindowLabel('secondary') }}
                     </Badge>
                     <div class="flex-1">
                       <div class="flex items-center gap-2">
                         <div class="flex-1">
                           <Progress
+                            size="md"
                             :value="normalizeCodexUsagePercent(account.codexUsage.secondary) || 0"
                             :variant="getCodexUsageVariant(account.codexUsage.secondary)"
-                            size="md"
                           />
                         </div>
                         <span

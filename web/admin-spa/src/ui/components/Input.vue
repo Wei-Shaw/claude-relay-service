@@ -70,7 +70,9 @@ defineProps({
   font-size: 0.875rem;
   color: #000;
   transition: all 0.2s;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
+    sans-serif;
   background: #fff;
 }
 
@@ -132,8 +134,3 @@ defineProps({
   }
 }
 </style>
-
-
-
-
-

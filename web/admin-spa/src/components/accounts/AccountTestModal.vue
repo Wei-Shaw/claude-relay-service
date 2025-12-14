@@ -1,9 +1,6 @@
 <template>
   <Teleport to="body">
-    <div
-      v-if="show"
-      class="fixed inset-0 z-[1050] flex items-center justify-center bg-gray-900/40"
-    >
+    <div v-if="show" class="fixed inset-0 z-[1050] flex items-center justify-center bg-gray-900/40">
       <div class="absolute inset-0" @click="handleClose" />
       <div
         class="relative z-10 mx-3 flex w-full max-w-lg flex-col overflow-hidden rounded border border-gray-200/70 bg-white/95 shadow-2xl ring-1 ring-black/5 transition-all dark:border-gray-700/60 dark:bg-gray-900/95 dark:ring-white/10 sm:mx-4"
@@ -155,7 +152,7 @@
               'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition',
               testStatus === 'testing'
                 ? 'cursor-not-allowed bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500'
-                : 'bg-black dark:bg-white text-white hover:bg-gray-800 dark:hover:bg-gray-100 hover:shadow-md'
+                : 'bg-black text-white hover:bg-gray-800 hover:shadow-md dark:bg-white dark:hover:bg-gray-100'
             ]"
             :disabled="testStatus === 'testing'"
             @click="startTest"

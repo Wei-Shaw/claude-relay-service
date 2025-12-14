@@ -186,7 +186,7 @@
                   </button>
                   <div class="mx-1 h-5 w-px bg-gray-300 dark:bg-gray-600"></div>
                   <button
-                    class="rounded-md bg-black dark:bg-white px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:bg-gray-800 dark:hover:bg-gray-100 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
+                    class="rounded-md bg-black px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:bg-gray-800 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm dark:bg-white dark:hover:bg-gray-100"
                     :disabled="errorKeysCount === 0"
                     title="导出所有异常状态的 API Key"
                     @click="exportKeys('error')"
@@ -195,7 +195,7 @@
                     导出异常
                   </button>
                   <button
-                    class="rounded-md bg-black dark:bg-white px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:bg-gray-800 dark:hover:bg-gray-100 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
+                    class="rounded-md bg-black px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:bg-gray-800 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm dark:bg-white dark:hover:bg-gray-100"
                     :disabled="apiKeys.length === 0"
                     title="导出所有 API Key"
                     @click="exportKeys('all')"

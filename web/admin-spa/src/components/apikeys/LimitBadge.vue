@@ -11,7 +11,7 @@
     </div>
     <!-- 小型进度条 -->
     <div class="w-12">
-      <Progress :value="progress" :variant="progressVariant" size="sm" />
+      <Progress size="sm" :value="progress" :variant="progressVariant" />
     </div>
   </div>
 </template>

@@ -124,7 +124,7 @@
             <label class="text-sm font-semibold text-gray-700">API Keys 预览</label>
             <div class="flex items-center gap-2">
               <button
-                class="flex items-center gap-1 text-xs text-gray-900 dark:text-gray-100 hover:text-gray-900 dark:text-white"
+                class="flex items-center gap-1 text-xs text-gray-900 hover:text-gray-900 dark:text-gray-100 dark:text-white"
                 type="button"
                 @click="togglePreview"
               >

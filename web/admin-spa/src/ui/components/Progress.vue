@@ -1,5 +1,8 @@
 <template>
   <div
+    :aria-valuemax="100"
+    :aria-valuemin="0"
+    :aria-valuenow="clampedValue"
     :class="[
       'ds-progress',
       `ds-progress--${variant}`,
@@ -7,14 +10,8 @@
       { 'ds-progress--animated': animated }
     ]"
     role="progressbar"
-    :aria-valuenow="clampedValue"
-    :aria-valuemin="0"
-    :aria-valuemax="100"
   >
-    <div
-      class="ds-progress__fill"
-      :style="{ width: `${clampedValue}%` }"
-    />
+    <div class="ds-progress__fill" :style="{ width: `${clampedValue}%` }" />
   </div>
 </template>
 
@@ -123,14 +120,9 @@ const clampedValue = computed(() => Math.max(0, Math.min(100, props.value)))
   .ds-progress {
     background: #2c2c2c;
   }
-  
+
   .ds-progress--default .ds-progress__fill {
     background: #ffffff;
   }
 }
 </style>
-
-
-
-
-

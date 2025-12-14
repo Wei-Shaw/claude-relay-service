@@ -1,16 +1,16 @@
 /**
  * Design System - Component Index
  * Unified export of all UI components
- * 
+ *
  * USAGE RULES:
  * 1. Import components ONLY from this index
  * 2. Never import components directly from their file paths
  * 3. Never use raw Tailwind utilities in business components/views
- * 
+ *
  * @example
  * // ✅ CORRECT
  * import { Button, Progress, Badge } from '@/ui'
- * 
+ *
  * // ❌ WRONG
  * import Button from '@/ui/components/Button.vue'
  */
@@ -28,8 +28,3 @@ export { default as Tabs } from './components/Tabs.vue'
 
 // Design Tokens
 export * from './tokens'
-
-
-
-
-

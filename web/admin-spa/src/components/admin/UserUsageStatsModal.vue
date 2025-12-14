@@ -3,7 +3,9 @@
     v-if="show"
     class="fixed inset-0 z-50 h-full w-full overflow-y-auto bg-gray-600 bg-opacity-50"
   >
-    <div class="relative top-10 mx-auto w-4/5 max-w-4xl rounded-md border bg-white dark:bg-gray-800 p-5 shadow-lg">
+    <div
+      class="relative top-10 mx-auto w-4/5 max-w-4xl rounded-md border bg-white p-5 shadow-lg dark:bg-gray-800"
+    >
       <div class="mt-3">
         <div class="mb-6 flex items-center justify-between">
           <div>
@@ -28,7 +30,7 @@
         <div class="mb-6">
           <select
             v-model="selectedPeriod"
-            class="block w-32 rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-gray-900 dark:focus:border-white focus:ring-gray-900 dark:focus:ring-white sm:text-sm"
+            class="block w-32 rounded-md border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:focus:border-white dark:focus:ring-white sm:text-sm"
             @change="loadUsageStats"
           >
             <option value="day">Last 24 Hours</option>
@@ -87,7 +89,9 @@
                   </div>
                   <div class="ml-5 w-0 flex-1">
                     <dl>
-                      <dt class="truncate text-sm font-medium text-gray-900 dark:text-white">Requests</dt>
+                      <dt class="truncate text-sm font-medium text-gray-900 dark:text-white">
+                        Requests
+                      </dt>
                       <dd class="text-lg font-medium text-blue-900">
                         {{ formatNumber(usageStats?.totalRequests || 0) }}
                       </dd>
@@ -191,10 +195,12 @@
           <!-- User API Keys Table -->
           <div
             v-if="userDetails?.apiKeys?.length > 0"
-            class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+            class="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"
           >
-            <div class="border-b border-gray-200 dark:border-gray-700 px-4 py-5 sm:px-6">
-              <h4 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">API Keys Usage</h4>
+            <div class="border-b border-gray-200 px-4 py-5 dark:border-gray-700 sm:px-6">
+              <h4 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
+                API Keys Usage
+              </h4>
             </div>
             <div class="overflow-hidden">
               <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -238,10 +244,14 @@
                     </th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
+                <tbody
+                  class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800"
+                >
                   <tr v-for="apiKey in userDetails.apiKeys" :key="apiKey.id">
                     <td class="whitespace-nowrap px-6 py-4">
-                      <div class="text-sm font-medium text-gray-900 dark:text-white">{{ apiKey.name }}</div>
+                      <div class="text-sm font-medium text-gray-900 dark:text-white">
+                        {{ apiKey.name }}
+                      </div>
                       <div class="text-sm text-gray-500">{{ apiKey.keyPreview }}</div>
                     </td>
                     <td class="whitespace-nowrap px-6 py-4">
@@ -276,9 +286,13 @@
           </div>
 
           <!-- Chart Placeholder -->
-          <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-            <div class="border-b border-gray-200 dark:border-gray-700 px-4 py-5 sm:px-6">
-              <h4 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">Usage Trend</h4>
+          <div
+            class="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"
+          >
+            <div class="border-b border-gray-200 px-4 py-5 dark:border-gray-700 sm:px-6">
+              <h4 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
+                Usage Trend
+              </h4>
             </div>
             <div class="p-6">
               <div
@@ -298,7 +312,9 @@
                       stroke-width="2"
                     />
                   </svg>
-                  <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">Usage Chart</h3>
+                  <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">
+                    Usage Chart
+                  </h3>
                   <p class="mt-1 text-sm text-gray-500">
                     Daily usage trends for {{ selectedPeriod }} period
                   </p>
@@ -334,7 +350,7 @@
 
         <div class="mt-6 flex justify-end">
           <button
-            class="rounded-md border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white focus:ring-offset-2"
+            class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 dark:focus:ring-white"
             @click="$emit('close')"
           >
             Close

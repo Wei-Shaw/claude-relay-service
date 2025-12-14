@@ -1,10 +1,6 @@
 <template>
   <div
-    :class="[
-      'ds-alert',
-      `ds-alert--${variant}`,
-      { 'ds-alert--dismissible': dismissible }
-    ]"
+    :class="['ds-alert', `ds-alert--${variant}`, { 'ds-alert--dismissible': dismissible }]"
     role="alert"
   >
     <div class="ds-alert__content">
@@ -12,9 +8,9 @@
     </div>
     <button
       v-if="dismissible"
+      aria-label="Close alert"
       class="ds-alert__close"
       type="button"
-      aria-label="Close alert"
       @click="$emit('dismiss')"
     >
       ×
@@ -59,7 +55,9 @@ defineProps({
   border-radius: 5px;
   font-size: 0.875rem;
   line-height: 1.5;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
+    sans-serif;
 }
 
 .ds-alert--dismissible {
@@ -138,8 +136,3 @@ defineProps({
   }
 }
 </style>
-
-
-
-
-

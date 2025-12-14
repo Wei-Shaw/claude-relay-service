@@ -1,7 +1,9 @@
 <template>
   <div class="min-h-screen p-4 md:p-6" :class="isDarkMode ? 'gradient-bg-dark' : 'gradient-bg'">
     <!-- 顶部导航 -->
-    <div class="mb-6 rounded border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900 md:mb-8 md:p-6">
+    <div
+      class="mb-6 rounded border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900 md:mb-8 md:p-6"
+    >
       <div class="flex flex-col items-center justify-between gap-4 md:flex-row">
         <LogoTitle
           :loading="oemLoading"
@@ -84,7 +86,9 @@
 
       <!-- 统计数据展示区域 -->
       <div v-if="statsData" class="fade-in">
-        <div class="rounded border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900 md:p-6">
+        <div
+          class="rounded border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900 md:p-6"
+        >
           <!-- 时间范围选择器 -->
           <div class="mb-4 border-b border-gray-200 pb-4 dark:border-gray-700 md:mb-6 md:pb-6">
             <div
@@ -153,7 +157,9 @@
 
     <!-- 教程内容 -->
     <div v-if="currentTab === 'tutorial'" class="tab-content">
-      <div class="rounded border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+      <div
+        class="rounded border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900"
+      >
         <TutorialView />
       </div>
     </div>

@@ -32,7 +32,7 @@ defineProps({
   tabs: {
     type: Array,
     required: true,
-    validator: (tabs) => tabs.every(tab => tab.label && tab.value !== undefined)
+    validator: (tabs) => tabs.every((tab) => tab.label && tab.value !== undefined)
   }
 })
 </script>
@@ -60,7 +60,9 @@ defineProps({
   cursor: pointer;
   transition: all 0.2s;
   color: #666;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
+    sans-serif;
 }
 
 .ds-tab:hover:not(:disabled) {
@@ -97,8 +99,3 @@ defineProps({
   }
 }
 </style>
-
-
-
-
-

@@ -20,7 +20,7 @@
         </div>
 
         <div class="modal-scroll-content custom-scrollbar flex-1 space-y-6">
-          <div class="rounded-lg border border-gray-300 dark:border-gray-600 bg-blue-50 p-4">
+          <div class="rounded-lg border border-gray-300 bg-blue-50 p-4 dark:border-gray-600">
             <div class="flex items-start gap-3">
               <div
                 class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100 dark:bg-gray-700"
@@ -42,7 +42,9 @@
           </div>
 
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-200">续期时长</label>
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-200"
+              >续期时长</label
+            >
             <select
               v-model="form.renewDuration"
               class="form-input w-full"
@@ -73,7 +75,7 @@
 
         <div class="flex gap-3 pt-4">
           <button
-            class="flex-1 rounded bg-gray-100 dark:bg-gray-700 px-6 py-3 font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-200"
+            class="flex-1 rounded bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200"
             type="button"
             @click="$emit('close')"
           >

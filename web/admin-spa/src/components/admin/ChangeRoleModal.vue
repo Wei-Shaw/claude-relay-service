@@ -3,7 +3,9 @@
     v-if="show"
     class="fixed inset-0 z-50 h-full w-full overflow-y-auto bg-gray-600 bg-opacity-50"
   >
-    <div class="relative top-20 mx-auto w-96 rounded-md border bg-white dark:bg-gray-800 p-5 shadow-lg">
+    <div
+      class="relative top-20 mx-auto w-96 rounded-md border bg-white p-5 shadow-lg dark:bg-gray-800"
+    >
       <div class="mt-3">
         <div class="mb-4 flex items-center justify-between">
           <h3 class="text-lg font-medium text-gray-900 dark:text-white">Change User Role</h3>
@@ -21,10 +23,12 @@
 
         <div v-if="user" class="space-y-4">
           <!-- User Info -->
-          <div class="rounded-md bg-gray-50 dark:bg-gray-700 p-4">
+          <div class="rounded-md bg-gray-50 p-4 dark:bg-gray-700">
             <div class="flex items-center">
               <div class="flex-shrink-0">
-                <div class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-300 dark:bg-gray-600">
+                <div
+                  class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-300 dark:bg-gray-600"
+                >
                   <svg
                     class="h-6 w-6 text-gray-600 dark:text-gray-300"
                     fill="none"
@@ -64,12 +68,14 @@
           <!-- Role Selection -->
           <form class="space-y-4" @submit.prevent="handleSubmit">
             <div>
-              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200"> New Role </label>
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">
+                New Role
+              </label>
               <div class="space-y-2">
                 <label class="flex items-center">
                   <input
                     v-model="selectedRole"
-                    class="h-4 w-4 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white focus:ring-gray-900 dark:focus:ring-white"
+                    class="h-4 w-4 border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:text-white dark:focus:ring-white"
                     :disabled="loading"
                     type="radio"
                     value="user"
@@ -82,13 +88,15 @@
                 <label class="flex items-center">
                   <input
                     v-model="selectedRole"
-                    class="h-4 w-4 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white focus:ring-gray-900 dark:focus:ring-white"
+                    class="h-4 w-4 border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:text-white dark:focus:ring-white"
                     :disabled="loading"
                     type="radio"
                     value="admin"
                   />
                   <div class="ml-3">
-                    <div class="text-sm font-medium text-gray-900 dark:text-white">Administrator</div>
+                    <div class="text-sm font-medium text-gray-900 dark:text-white">
+                      Administrator
+                    </div>
                     <div class="text-xs text-gray-500">Full access to manage users and system</div>
                   </div>
                 </label>
@@ -145,7 +153,7 @@
 
             <div class="flex justify-end space-x-3 pt-4">
               <button
-                class="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white focus:ring-offset-2 disabled:opacity-50"
+                class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 dark:focus:ring-white"
                 :disabled="loading"
                 type="button"
                 @click="$emit('close')"
@@ -153,7 +161,7 @@
                 Cancel
               </button>
               <button
-                class="rounded-md border border-transparent bg-black dark:bg-white px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-800 dark:hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                class="rounded-md border border-transparent bg-black px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:hover:bg-gray-100 dark:focus:ring-white"
                 :disabled="loading || selectedRole === user.role"
                 type="submit"
               >

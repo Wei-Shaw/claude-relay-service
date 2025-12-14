@@ -3,12 +3,14 @@
     <div class="sm:flex sm:items-center">
       <div class="sm:flex-auto">
         <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">Usage Statistics</h1>
-        <p class="mt-2 text-sm text-gray-700 dark:text-gray-200">View your API usage statistics and costs</p>
+        <p class="mt-2 text-sm text-gray-700 dark:text-gray-200">
+          View your API usage statistics and costs
+        </p>
       </div>
       <div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
         <select
           v-model="selectedPeriod"
-          class="block w-full rounded-md border-gray-300 shadow-sm focus:border-gray-900 dark:focus:border-white focus:ring-gray-900 dark:focus:ring-white sm:text-sm"
+          class="block w-full rounded-md border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 dark:focus:border-white dark:focus:ring-white sm:text-sm"
           @change="loadUsageStats"
         >
           <option value="day">Last 24 Hours</option>
@@ -46,7 +48,7 @@
 
     <!-- Stats Cards -->
     <div v-else class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-      <div class="overflow-hidden rounded-lg bg-white dark:bg-gray-800 shadow">
+      <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
         <div class="p-5">
           <div class="flex items-center">
             <div class="flex-shrink-0">
@@ -76,7 +78,7 @@
         </div>
       </div>
 
-      <div class="overflow-hidden rounded-lg bg-white dark:bg-gray-800 shadow">
+      <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
         <div class="p-5">
           <div class="flex items-center">
             <div class="flex-shrink-0">
@@ -106,7 +108,7 @@
         </div>
       </div>
 
-      <div class="overflow-hidden rounded-lg bg-white dark:bg-gray-800 shadow">
+      <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
         <div class="p-5">
           <div class="flex items-center">
             <div class="flex-shrink-0">
@@ -136,7 +138,7 @@
         </div>
       </div>
 
-      <div class="overflow-hidden rounded-lg bg-white dark:bg-gray-800 shadow">
+      <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
         <div class="p-5">
           <div class="flex items-center">
             <div class="flex-shrink-0">
@@ -168,9 +170,11 @@
     </div>
 
     <!-- Daily Usage Chart -->
-    <div v-if="!loading && usageStats" class="rounded-lg bg-white dark:bg-gray-800 shadow">
+    <div v-if="!loading && usageStats" class="rounded-lg bg-white shadow dark:bg-gray-800">
       <div class="px-4 py-5 sm:p-6">
-        <h3 class="mb-4 text-lg font-medium leading-6 text-gray-900 dark:text-white">Daily Usage Trend</h3>
+        <h3 class="mb-4 text-lg font-medium leading-6 text-gray-900 dark:text-white">
+          Daily Usage Trend
+        </h3>
 
         <!-- Placeholder for chart - you can integrate Chart.js or similar -->
         <div
@@ -203,10 +207,12 @@
     <!-- Model Usage Breakdown -->
     <div
       v-if="!loading && usageStats && usageStats.modelStats?.length > 0"
-      class="rounded-lg bg-white dark:bg-gray-800 shadow"
+      class="rounded-lg bg-white shadow dark:bg-gray-800"
     >
       <div class="px-4 py-5 sm:p-6">
-        <h3 class="mb-4 text-lg font-medium leading-6 text-gray-900 dark:text-white">Usage by Model</h3>
+        <h3 class="mb-4 text-lg font-medium leading-6 text-gray-900 dark:text-white">
+          Usage by Model
+        </h3>
         <div class="space-y-3">
           <div
             v-for="model in usageStats.modelStats"
@@ -222,7 +228,9 @@
               </div>
             </div>
             <div class="text-right">
-              <p class="text-sm text-gray-900 dark:text-white">{{ formatNumber(model.requests) }} requests</p>
+              <p class="text-sm text-gray-900 dark:text-white">
+                {{ formatNumber(model.requests) }} requests
+              </p>
               <p class="text-xs text-gray-500">${{ model.cost.toFixed(4) }}</p>
             </div>
           </div>
@@ -231,9 +239,14 @@
     </div>
 
     <!-- Detailed Usage Table -->
-    <div v-if="!loading && userApiKeys.length > 0" class="rounded-lg bg-white dark:bg-gray-800 shadow">
+    <div
+      v-if="!loading && userApiKeys.length > 0"
+      class="rounded-lg bg-white shadow dark:bg-gray-800"
+    >
       <div class="px-4 py-5 sm:p-6">
-        <h3 class="mb-4 text-lg font-medium leading-6 text-gray-900 dark:text-white">Usage by API Key</h3>
+        <h3 class="mb-4 text-lg font-medium leading-6 text-gray-900 dark:text-white">
+          Usage by API Key
+        </h3>
         <div class="overflow-hidden">
           <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead class="bg-gray-50 dark:bg-gray-700">
@@ -276,10 +289,12 @@
                 </th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
+            <tbody class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
               <tr v-for="apiKey in userApiKeys" :key="apiKey.id">
                 <td class="whitespace-nowrap px-6 py-4">
-                  <div class="text-sm font-medium text-gray-900 dark:text-white">{{ apiKey.name }}</div>
+                  <div class="text-sm font-medium text-gray-900 dark:text-white">
+                    {{ apiKey.name }}
+                  </div>
                   <div class="text-sm text-gray-500">{{ apiKey.keyPreview }}</div>
                 </td>
                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white">
@@ -299,10 +314,10 @@
                     :class="[
                       'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
                       apiKey.isDeleted === 'true' || apiKey.deletedAt
-                        ? 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
+                        ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
                         : apiKey.isActive
-                          ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
-                          : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                     ]"
                   >
                     {{

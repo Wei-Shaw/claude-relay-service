@@ -38,8 +38,12 @@
             <span class="font-medium text-gray-900 dark:text-gray-100">{{ stat.model }}</span>
           </div>
           <div class="text-right">
-            <p class="font-semibold text-gray-900 dark:text-gray-100">{{ formatNumber(stat.requests) }} 请求</p>
-            <p class="text-sm text-gray-600 dark:text-gray-400">{{ formatNumber(stat.totalTokens) }} tokens</p>
+            <p class="font-semibold text-gray-900 dark:text-gray-100">
+              {{ formatNumber(stat.requests) }} 请求
+            </p>
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+              {{ formatNumber(stat.totalTokens) }} tokens
+            </p>
           </div>
         </div>
       </div>

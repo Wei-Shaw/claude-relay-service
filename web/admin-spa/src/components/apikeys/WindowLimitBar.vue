@@ -6,14 +6,14 @@
     >
       <!-- 时间进度条背景 -->
       <div
-        class="absolute inset-0 h-full bg-gray-400 dark:bg-gray-500 opacity-20 transition-all duration-1000"
+        class="absolute inset-0 h-full bg-gray-400 opacity-20 transition-all duration-1000 dark:bg-gray-500"
         :style="{ width: timeProgress + '%' }"
       ></div>
 
       <!-- 文字层 -->
       <div class="relative z-10 flex h-full items-center justify-between px-2">
         <div class="flex items-center gap-1.5">
-          <i class="fas fa-clock text-xs text-gray-900 dark:text-gray-100 dark:text-blue-400" />
+          <i class="fas fa-clock text-xs text-gray-900 dark:text-blue-400 dark:text-gray-100" />
           <span class="text-xs font-medium text-gray-700 dark:text-gray-200">
             {{ rateLimitWindow }}分钟窗口
           </span>
@@ -22,7 +22,7 @@
           class="text-xs font-bold"
           :class="
             remainingSeconds > 0
-              ? 'text-gray-900 dark:text-white dark:text-blue-300'
+              ? 'text-gray-900 dark:text-blue-300 dark:text-white'
               : 'text-gray-400 dark:text-gray-500'
           "
         >

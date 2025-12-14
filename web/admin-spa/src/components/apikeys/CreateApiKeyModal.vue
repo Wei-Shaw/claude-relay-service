@@ -43,7 +43,7 @@
                 <label class="flex cursor-pointer items-center">
                   <input
                     v-model="form.createType"
-                    class="mr-1.5 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white dark:border-gray-600 dark:bg-gray-700 sm:mr-2"
+                    class="mr-1.5 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white sm:mr-2"
                     type="radio"
                     value="single"
                   />
@@ -57,7 +57,7 @@
                 <label class="flex cursor-pointer items-center">
                   <input
                     v-model="form.createType"
-                    class="mr-1.5 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white dark:border-gray-600 dark:bg-gray-700 sm:mr-2"
+                    class="mr-1.5 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white sm:mr-2"
                     type="radio"
                     value="batch"
                   />
@@ -168,7 +168,7 @@
                   <button
                     v-for="tag in unselectedTags"
                     :key="'available-' + tag"
-                    class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700 transition-colors hover:bg-blue-100 hover:text-gray-900 dark:text-white dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-blue-900/30 dark:hover:text-blue-400"
+                    class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700 transition-colors hover:bg-blue-100 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:text-white dark:hover:bg-blue-900/30 dark:hover:text-blue-400"
                     type="button"
                     @click="selectTag(tag)"
                   >
@@ -270,10 +270,12 @@
 
               <!-- 示例说明 -->
               <div class="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
-                <h5 class="mb-1 text-xs font-semibold text-gray-900 dark:text-white dark:text-blue-400">
+                <h5
+                  class="mb-1 text-xs font-semibold text-gray-900 dark:text-blue-400 dark:text-white"
+                >
                   💡 使用示例
                 </h5>
-                <div class="space-y-0.5 text-xs text-gray-900 dark:text-white dark:text-blue-300">
+                <div class="space-y-0.5 text-xs text-gray-900 dark:text-blue-300 dark:text-white">
                   <div>
                     <strong>示例1:</strong> 时间窗口=60，请求次数=1000 → 每60分钟最多1000次请求
                   </div>
@@ -473,7 +475,7 @@
                 <label class="flex cursor-pointer items-center">
                   <input
                     v-model="form.expirationMode"
-                    class="mr-2 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white dark:border-gray-600 dark:bg-gray-700"
+                    class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                     type="radio"
                     value="fixed"
                   />
@@ -482,7 +484,7 @@
                 <label class="flex cursor-pointer items-center">
                   <input
                     v-model="form.expirationMode"
-                    class="mr-2 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white dark:border-gray-600 dark:bg-gray-700"
+                    class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                     type="radio"
                     value="activation"
                   />
@@ -559,7 +561,7 @@
                 <button
                   v-for="value in getQuickTimeOptions()"
                   :key="value.value"
-                  class="rounded-md border border-gray-300 px-3 py-1 text-xs hover:bg-gray-100 dark:bg-gray-700 dark:border-gray-600 dark:hover:bg-gray-700"
+                  class="rounded-md border border-gray-300 px-3 py-1 text-xs hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-700"
                   type="button"
                   @click="form.activationDays = value.value"
                 >
@@ -583,7 +585,7 @@
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.permissions"
-                  class="mr-2 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white dark:border-gray-600 dark:bg-gray-700"
+                  class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                   type="radio"
                   value="all"
                 />
@@ -592,7 +594,7 @@
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.permissions"
-                  class="mr-2 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white dark:border-gray-600 dark:bg-gray-700"
+                  class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                   type="radio"
                   value="claude"
                 />
@@ -601,7 +603,7 @@
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.permissions"
-                  class="mr-2 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white dark:border-gray-600 dark:bg-gray-700"
+                  class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                   type="radio"
                   value="gemini"
                 />
@@ -610,7 +612,7 @@
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.permissions"
-                  class="mr-2 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white dark:border-gray-600 dark:bg-gray-700"
+                  class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                   type="radio"
                   value="openai"
                 />
@@ -619,7 +621,7 @@
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.permissions"
-                  class="mr-2 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white dark:border-gray-600 dark:bg-gray-700"
+                  class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                   type="radio"
                   value="droid"
                 />
@@ -637,7 +639,7 @@
                 >专属账号绑定 (可选)</label
               >
               <button
-                class="flex items-center gap-1 text-sm text-gray-900 dark:text-gray-100 transition-colors hover:text-gray-900 dark:text-white disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+                class="flex items-center gap-1 text-sm text-gray-900 transition-colors hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:text-gray-100 dark:text-white dark:hover:text-blue-300"
                 :disabled="accountsLoading"
                 title="刷新账号列表"
                 type="button"
@@ -735,7 +737,7 @@
               <input
                 id="enableModelRestriction"
                 v-model="form.enableModelRestriction"
-                class="h-4 w-4 rounded border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white"
+                class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                 type="checkbox"
               />
               <label
@@ -750,7 +752,7 @@
               <div>
                 <label class="mb-2 block text-sm font-medium text-gray-600">限制的模型列表</label>
                 <div
-                  class="mb-3 flex min-h-[32px] flex-wrap gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 p-2"
+                  class="mb-3 flex min-h-[32px] flex-wrap gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-700"
                 >
                   <span
                     v-for="(model, index) in form.restrictedModels"
@@ -776,7 +778,7 @@
                     <button
                       v-for="model in availableQuickModels"
                       :key="model"
-                      class="flex-shrink-0 rounded-lg bg-gray-100 dark:bg-gray-700 px-3 py-1 text-xs text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-200 sm:text-sm"
+                      class="flex-shrink-0 rounded-lg bg-gray-100 px-3 py-1 text-xs text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 sm:text-sm"
                       type="button"
                       @click="quickAddRestrictedModel(model)"
                     >
@@ -821,7 +823,7 @@
               <input
                 id="enableClientRestriction"
                 v-model="form.enableClientRestriction"
-                class="h-4 w-4 rounded border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white"
+                class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                 type="checkbox"
               />
               <label
@@ -845,7 +847,7 @@
                     <input
                       :id="`client_${client.id}`"
                       v-model="form.allowedClients"
-                      class="mt-0.5 h-4 w-4 rounded border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white"
+                      class="mt-0.5 h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                       type="checkbox"
                       :value="client.id"
                     />

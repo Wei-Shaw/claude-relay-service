@@ -1,12 +1,8 @@
 <template>
   <div
-    :class="[
-      'ds-spinner',
-      `ds-spinner--${size}`,
-      `ds-spinner--${variant}`
-    ]"
-    role="status"
     aria-label="Loading"
+    :class="['ds-spinner', `ds-spinner--${size}`, `ds-spinner--${variant}`]"
+    role="status"
   />
 </template>
 
@@ -98,8 +94,3 @@ defineProps({
   }
 }
 </style>
-
-
-
-
-

@@ -8,7 +8,7 @@ export const typography = {
   // Font Families
   fontFamily: {
     sans: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif",
-    mono: "'Monaco', 'Menlo', monospace",
+    mono: "'Monaco', 'Menlo', monospace"
   },
 
   // Font Sizes
@@ -22,7 +22,7 @@ export const typography = {
     '2xl': '1.5rem', // 24px - heading 4
     '3xl': '2rem', // 32px - heading 3
     '4xl': '2.5rem', // 40px - heading 2
-    '5xl': '3rem', // 48px - heading 1, demo title
+    '5xl': '3rem' // 48px - heading 1, demo title
   },
 
   // Font Weights
@@ -30,7 +30,7 @@ export const typography = {
     normal: 400,
     medium: 500,
     semibold: 600,
-    bold: 700,
+    bold: 700
   },
 
   // Line Heights
@@ -41,7 +41,7 @@ export const typography = {
     normal: 1.3,
     relaxed: 1.4,
     loose: 1.5,
-    extraLoose: 1.6,
+    extraLoose: 1.6
   },
 
   // Letter Spacing
@@ -50,7 +50,7 @@ export const typography = {
     tight: '-0.04em',
     normal: '-0.03em',
     snug: '-0.02em',
-    wide: '0.05em',
+    wide: '0.05em'
   },
 
   // Typography Styles (Presets)
@@ -60,43 +60,43 @@ export const typography = {
       fontWeight: 700,
       lineHeight: 1.1,
       letterSpacing: '-0.05em',
-      color: '#000000',
+      color: '#000000'
     },
     h2: {
       fontSize: '2.5rem',
       fontWeight: 700,
       lineHeight: 1.2,
       letterSpacing: '-0.04em',
-      color: '#000000',
+      color: '#000000'
     },
     h3: {
       fontSize: '2rem',
       fontWeight: 600,
       lineHeight: 1.3,
       letterSpacing: '-0.03em',
-      color: '#000000',
+      color: '#000000'
     },
     h4: {
       fontSize: '1.5rem',
       fontWeight: 600,
       lineHeight: 1.4,
       letterSpacing: '-0.02em',
-      color: '#000000',
+      color: '#000000'
     },
     large: {
       fontSize: '1.25rem',
       lineHeight: 1.6,
-      color: '#000000',
+      color: '#000000'
     },
     body: {
       fontSize: '1rem',
       lineHeight: 1.6,
-      color: '#000000',
+      color: '#000000'
     },
     small: {
       fontSize: '0.875rem',
       lineHeight: 1.5,
-      color: '#666666',
+      color: '#666666'
     },
     caption: {
       fontSize: '0.75rem',
@@ -104,12 +104,7 @@ export const typography = {
       letterSpacing: '0.05em',
       fontWeight: 500,
       color: '#666666',
-      textTransform: 'uppercase',
-    },
-  },
+      textTransform: 'uppercase'
+    }
+  }
 }
-
-
-
-
-

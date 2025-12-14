@@ -119,11 +119,11 @@
           <!-- ✅ NEW: Design System Progress -->
           <Progress
             v-if="statsData.limits.dailyCostLimit > 0"
+            size="md"
             :value="dailyCostPercentage"
             :variant="dailyCostVariant"
-            size="md"
           />
-          <Progress v-else :value="0" variant="success" size="md" />
+          <Progress v-else size="md" :value="0" variant="success" />
         </div>
 
         <!-- 总费用限制 -->
@@ -147,11 +147,11 @@
           <!-- ✅ NEW: Design System Progress -->
           <Progress
             v-if="statsData.limits.totalCostLimit > 0"
+            size="md"
             :value="totalCostPercentage"
             :variant="totalCostVariant"
-            size="md"
           />
-          <Progress v-else :value="0" variant="default" size="md" />
+          <Progress v-else size="md" :value="0" variant="default" />
         </div>
 
         <!-- Opus 模型周费用限制 -->
@@ -167,11 +167,7 @@
             </span>
           </div>
           <!-- ✅ NEW: Design System Progress -->
-          <Progress
-            :value="opusWeeklyCostPercentage"
-            :variant="opusWeeklyCostVariant"
-            size="md"
-          />
+          <Progress size="md" :value="opusWeeklyCostPercentage" :variant="opusWeeklyCostVariant" />
         </div>
 
         <!-- 时间窗口限制 -->
@@ -184,14 +180,14 @@
           "
         >
           <WindowCountdown
-            :rate-limit-window="statsData.limits.rateLimitWindow"
-            :last-used-time="statsData.limits.lastUsedTime"
-            :rate-limit-requests="statsData.limits.rateLimitRequests"
             :current-window-requests="statsData.limits.currentWindowRequests"
-            :token-limit="statsData.limits.tokenLimit"
-            :current-window-tokens="statsData.limits.currentWindowTokens"
-            :rate-limit-cost="statsData.limits.rateLimitCost"
             :current-window-cost="statsData.limits.currentWindowCost"
+            :current-window-tokens="statsData.limits.currentWindowTokens"
+            :last-used-time="statsData.limits.lastUsedTime"
+            :rate-limit-cost="statsData.limits.rateLimitCost"
+            :rate-limit-requests="statsData.limits.rateLimitRequests"
+            :rate-limit-window="statsData.limits.rateLimitWindow"
+            :token-limit="statsData.limits.tokenLimit"
           />
         </div>
       </div>
@@ -268,8 +264,3 @@ const opusWeeklyCostVariant = computed(() =>
 <style scoped>
 /* Removed old progress bar styles - now handled by Design System */
 </style>
-
-
-
-
-

@@ -552,7 +552,7 @@
                   <td
                     class="hidden px-2 py-2 text-right text-xs font-medium sm:table-cell sm:px-4 sm:text-sm"
                   >
-                    <Badge variant="neutral" size="sm">
+                    <Badge size="sm" variant="neutral">
                       {{ calculatePercentage(stat.allTokens, dashboardModelStats) }}%
                     </Badge>
                   </td>

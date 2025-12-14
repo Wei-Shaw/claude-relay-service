@@ -44,7 +44,7 @@
               <span class="ml-2 hidden sm:inline">聚合</span>
               <span
                 v-if="multiKeyMode && parsedApiKeys.length > 0"
-                class="ml-1 rounded-full bg-white dark:bg-gray-800/20 px-1.5 py-0.5 text-xs font-semibold"
+                class="ml-1 rounded-full bg-white px-1.5 py-0.5 text-xs font-semibold dark:bg-gray-800/20"
               >
                 {{ parsedApiKeys.length }}
               </span>
@@ -115,7 +115,7 @@
       <!-- 多 Key 模式额外提示 -->
       <div
         v-if="multiKeyMode"
-        class="mt-2 rounded-lg bg-blue-50 p-3 text-sm text-gray-900 dark:text-white dark:bg-blue-900/20 dark:text-blue-400"
+        class="mt-2 rounded-lg bg-blue-50 p-3 text-sm text-gray-900 dark:bg-blue-900/20 dark:text-blue-400 dark:text-white"
       >
         <i class="fas fa-lightbulb mr-2" />
         <span>提示：最多支持同时查询 30 个 API Keys。使用 Ctrl+Enter 快速查询。</span>

@@ -135,14 +135,10 @@ import { Progress } from '@/ui'
 ```vue
 <template>
   <!-- Primary button -->
-  <Button variant="primary" size="md" @click="handleClick">
-    Save Changes
-  </Button>
+  <Button variant="primary" size="md" @click="handleClick"> Save Changes </Button>
 
   <!-- Loading state -->
-  <Button variant="primary" :loading="isSubmitting">
-    Submit
-  </Button>
+  <Button variant="primary" :loading="isSubmitting"> Submit </Button>
 
   <!-- Icon-only button -->
   <Button variant="ghost" icon-only>
@@ -177,9 +173,7 @@ import { Button } from '@/ui'
   <Badge variant="success" dot>Online</Badge>
 
   <!-- Count badge -->
-  <Button variant="secondary">
-    Messages <Badge variant="error" count>99+</Badge>
-  </Button>
+  <Button variant="secondary"> Messages <Badge variant="error" count>99+</Badge> </Button>
 </template>
 
 <script setup>
@@ -191,9 +185,7 @@ import { Badge, Button } from '@/ui'
 
 ```vue
 <template>
-  <Alert variant="success">
-    <strong>Success!</strong> Your changes have been saved.
-  </Alert>
+  <Alert variant="success"> <strong>Success!</strong> Your changes have been saved. </Alert>
 
   <Alert variant="error" dismissible @dismiss="handleDismiss">
     <strong>Error!</strong> Something went wrong.
@@ -250,7 +242,9 @@ import { Card, Button } from '@/ui'
     <tbody>
       <tr v-for="item in items" :key="item.id">
         <td>{{ item.name }}</td>
-        <td><Badge :variant="item.status">{{ item.status }}</Badge></td>
+        <td>
+          <Badge :variant="item.status">{{ item.status }}</Badge>
+        </td>
         <td><Button variant="ghost" size="sm">Edit</Button></td>
       </tr>
     </tbody>
@@ -343,7 +337,7 @@ const usagePercentage = computed(() => (props.usage / props.limit) * 100)
 
     <div class="space-y-4">
       <div>
-        <div class="flex justify-between text-sm mb-1">
+        <div class="mb-1 flex justify-between text-sm">
           <span>API Calls</span>
           <span>{{ formatNumber(apiCalls) }} / {{ formatNumber(limit) }}</span>
         </div>
@@ -351,7 +345,7 @@ const usagePercentage = computed(() => (props.usage / props.limit) * 100)
       </div>
 
       <div>
-        <div class="flex justify-between text-sm mb-1">
+        <div class="mb-1 flex justify-between text-sm">
           <span>Tokens Used</span>
           <span>{{ formatNumber(tokens) }}</span>
         </div>
@@ -360,9 +354,7 @@ const usagePercentage = computed(() => (props.usage / props.limit) * 100)
     </div>
 
     <template #footer>
-      <Button variant="ghost" size="sm" @click="viewDetails">
-        View Details
-      </Button>
+      <Button variant="ghost" size="sm" @click="viewDetails"> View Details </Button>
     </template>
   </Card>
 </template>
@@ -453,7 +445,8 @@ module.exports = {
     'vue/no-restricted-syntax': [
       'error',
       {
-        selector: 'VAttribute[key.name="class"][value.value=/\\b(h-\\d+|w-\\d+|bg-|text-|rounded)/]',
+        selector:
+          'VAttribute[key.name="class"][value.value=/\\b(h-\\d+|w-\\d+|bg-|text-|rounded)/]',
         message: 'Use Design System components from @/ui instead of raw Tailwind classes'
       }
     ]
@@ -520,7 +513,7 @@ describe('Progress Component', () => {
     const wrapper = mount(Progress, {
       props: { value: 50 }
     })
-    
+
     const fill = wrapper.find('.ds-progress__fill')
     expect(fill.attributes('style')).toContain('width: 50%')
   })
@@ -529,7 +522,7 @@ describe('Progress Component', () => {
     const wrapper = mount(Progress, {
       props: { value: 150 }
     })
-    
+
     expect(wrapper.vm.clampedValue).toBe(100)
   })
 })
@@ -578,6 +571,7 @@ No JavaScript dark mode toggle needed at the component level.
 ### Q: How do I handle one-off styling?
 
 **A: You don't.** One-off styles indicate either:
+
 1. The Design System is incomplete (add the component)
 2. The design is inconsistent (discuss with design team)
 
@@ -594,8 +588,3 @@ This Design System enforces:
 - **Dark Mode**: Built-in support across all components
 
 **Remember**: If it's visual, it belongs in `ui/`. If it's business logic, it belongs in `components/`.
-
-
-
-
-

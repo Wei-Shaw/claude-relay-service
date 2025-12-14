@@ -3,7 +3,9 @@
     <!-- Header -->
     <div class="demo-header">
       <h1 class="demo-title">Vercel-Inspired Design System</h1>
-      <p class="demo-subtitle">Bold contrast with black and white. Sharp edges and maximum clarity.</p>
+      <p class="demo-subtitle">
+        Bold contrast with black and white. Sharp edges and maximum clarity.
+      </p>
     </div>
 
     <!-- Navigation -->
@@ -11,8 +13,8 @@
       <button
         v-for="section in sections"
         :key="section.id"
-        @click="activeSection = section.id"
         :class="['nav-btn', { active: activeSection === section.id }]"
+        @click="activeSection = section.id"
       >
         {{ section.name }}
       </button>
@@ -38,14 +40,19 @@
           <div class="component-label">Body Text</div>
           <div class="typography-examples">
             <p class="text-large">
-              Large text - This is a paragraph with larger text size. Used for emphasis or introductions.
+              Large text - This is a paragraph with larger text size. Used for emphasis or
+              introductions.
             </p>
             <p class="text-normal">
-              Normal text - This is the standard paragraph text used throughout the application. It's
-              optimized for readability.
+              Normal text - This is the standard paragraph text used throughout the application.
+              It's optimized for readability.
             </p>
-            <p class="text-small">Small text - Used for secondary information, captions, or metadata.</p>
-            <p class="text-caption">Caption text - Used for labels, table headers, and small UI elements.</p>
+            <p class="text-small">
+              Small text - Used for secondary information, captions, or metadata.
+            </p>
+            <p class="text-caption">
+              Caption text - Used for labels, table headers, and small UI elements.
+            </p>
           </div>
         </div>
 
@@ -54,10 +61,10 @@
           <div class="typography-examples">
             <p class="text-normal"><strong>Bold text</strong> for emphasis</p>
             <p class="text-normal"><em>Italic text</em> for subtle emphasis</p>
-            <p class="text-normal"><code class="inline-code">inline code</code> for technical terms</p>
             <p class="text-normal">
-              <a href="#" class="text-link">Link text</a> for navigation
+              <code class="inline-code">inline code</code> for technical terms
             </p>
+            <p class="text-normal"><a class="text-link" href="#">Link text</a> for navigation</p>
             <p class="text-muted">Muted text for less important information</p>
             <p class="text-error">Error text for validation messages</p>
             <p class="text-success">Success text for confirmation messages</p>
@@ -150,24 +157,24 @@
           <div class="form-examples">
             <div class="form-field">
               <label class="form-label">Default Input</label>
-              <input type="text" class="form-input" placeholder="Enter text..." />
+              <input class="form-input" placeholder="Enter text..." type="text" />
             </div>
             <div class="form-field">
               <label class="form-label">With Value</label>
-              <input type="text" class="form-input" value="Sample value" />
+              <input class="form-input" type="text" value="Sample value" />
             </div>
             <div class="form-field">
               <label class="form-label">Disabled</label>
-              <input type="text" class="form-input" placeholder="Disabled input" disabled />
+              <input class="form-input" disabled placeholder="Disabled input" type="text" />
             </div>
             <div class="form-field">
               <label class="form-label">With Error</label>
-              <input type="text" class="form-input error" value="Invalid value" />
+              <input class="form-input error" type="text" value="Invalid value" />
               <span class="form-error">This field is required</span>
             </div>
             <div class="form-field">
               <label class="form-label">With Help Text</label>
-              <input type="text" class="form-input" placeholder="username" />
+              <input class="form-input" placeholder="username" type="text" />
               <span class="form-help">Choose a unique username</span>
             </div>
           </div>
@@ -178,11 +185,17 @@
           <div class="form-examples">
             <div class="form-field">
               <label class="form-label">Default Textarea</label>
-              <textarea class="form-textarea" rows="4" placeholder="Enter description..."></textarea>
+              <textarea
+                class="form-textarea"
+                placeholder="Enter description..."
+                rows="4"
+              ></textarea>
             </div>
             <div class="form-field">
               <label class="form-label">With Content</label>
-              <textarea class="form-textarea" rows="4">This is some sample content in a textarea.</textarea>
+              <textarea class="form-textarea" rows="4">
+This is some sample content in a textarea.</textarea
+              >
             </div>
           </div>
         </div>
@@ -212,19 +225,19 @@
           <div class="component-label">Checkbox</div>
           <div class="form-examples">
             <label class="checkbox-label">
-              <input type="checkbox" class="form-checkbox" checked />
+              <input checked class="form-checkbox" type="checkbox" />
               <span>Checked checkbox</span>
             </label>
             <label class="checkbox-label">
-              <input type="checkbox" class="form-checkbox" />
+              <input class="form-checkbox" type="checkbox" />
               <span>Unchecked checkbox</span>
             </label>
             <label class="checkbox-label">
-              <input type="checkbox" class="form-checkbox" disabled />
+              <input class="form-checkbox" disabled type="checkbox" />
               <span>Disabled checkbox</span>
             </label>
             <label class="checkbox-label">
-              <input type="checkbox" class="form-checkbox" disabled checked />
+              <input checked class="form-checkbox" disabled type="checkbox" />
               <span>Disabled checked</span>
             </label>
           </div>
@@ -234,19 +247,19 @@
           <div class="component-label">Radio Buttons</div>
           <div class="form-examples">
             <label class="radio-label">
-              <input type="radio" name="radio-demo" class="form-radio" checked />
+              <input checked class="form-radio" name="radio-demo" type="radio" />
               <span>Option 1 (selected)</span>
             </label>
             <label class="radio-label">
-              <input type="radio" name="radio-demo" class="form-radio" />
+              <input class="form-radio" name="radio-demo" type="radio" />
               <span>Option 2</span>
             </label>
             <label class="radio-label">
-              <input type="radio" name="radio-demo" class="form-radio" />
+              <input class="form-radio" name="radio-demo" type="radio" />
               <span>Option 3</span>
             </label>
             <label class="radio-label">
-              <input type="radio" name="radio-disabled" class="form-radio" disabled />
+              <input class="form-radio" disabled name="radio-disabled" type="radio" />
               <span>Disabled option</span>
             </label>
           </div>
@@ -256,17 +269,17 @@
           <div class="component-label">Toggle Switch</div>
           <div class="form-examples">
             <label class="toggle-label">
-              <input type="checkbox" class="toggle-input" checked />
+              <input checked class="toggle-input" type="checkbox" />
               <span class="toggle-slider"></span>
               <span class="toggle-text">Enabled</span>
             </label>
             <label class="toggle-label">
-              <input type="checkbox" class="toggle-input" />
+              <input class="toggle-input" type="checkbox" />
               <span class="toggle-slider"></span>
               <span class="toggle-text">Disabled</span>
             </label>
             <label class="toggle-label">
-              <input type="checkbox" class="toggle-input" disabled checked />
+              <input checked class="toggle-input" disabled type="checkbox" />
               <span class="toggle-slider"></span>
               <span class="toggle-text">Disabled (on)</span>
             </label>
@@ -280,14 +293,14 @@
               <label class="form-label">Search</label>
               <div class="input-with-icon">
                 <span class="input-icon">🔍</span>
-                <input type="text" class="form-input with-icon" placeholder="Search..." />
+                <input class="form-input with-icon" placeholder="Search..." type="text" />
               </div>
             </div>
             <div class="form-field">
               <label class="form-label">Email</label>
               <div class="input-with-icon">
                 <span class="input-icon">✉</span>
-                <input type="email" class="form-input with-icon" placeholder="email@example.com" />
+                <input class="form-input with-icon" placeholder="email@example.com" type="email" />
               </div>
             </div>
           </div>
@@ -333,7 +346,10 @@
                 <button class="btn btn-ghost btn-sm">Action</button>
               </div>
               <div class="card-body">
-                <p>This is a content card with a header, body, and footer. It can contain any content.</p>
+                <p>
+                  This is a content card with a header, body, and footer. It can contain any
+                  content.
+                </p>
               </div>
               <div class="card-footer">
                 <span class="text-small text-muted">Updated 2 hours ago</span>
@@ -432,7 +448,7 @@
         <div class="component-group">
           <div class="component-label">Compact Table</div>
           <div class="table-container">
-            <table class="table table-compact">
+            <table class="table-compact table">
               <thead>
                 <tr>
                   <th>Model</th>
@@ -634,7 +650,9 @@
         <div class="component-group">
           <div class="component-label">Tooltips (Hover over buttons)</div>
           <div class="button-row">
-            <button class="btn btn-secondary tooltip" data-tooltip="This is a tooltip">Hover me</button>
+            <button class="btn btn-secondary tooltip" data-tooltip="This is a tooltip">
+              Hover me
+            </button>
             <button class="btn btn-secondary tooltip" data-tooltip="Another tooltip">And me</button>
           </div>
         </div>
@@ -642,9 +660,9 @@
         <div class="component-group">
           <div class="component-label">Breadcrumbs</div>
           <nav class="breadcrumbs">
-            <a href="#" class="breadcrumb-item">Dashboard</a>
+            <a class="breadcrumb-item" href="#">Dashboard</a>
             <span class="breadcrumb-separator">›</span>
-            <a href="#" class="breadcrumb-item">API Keys</a>
+            <a class="breadcrumb-item" href="#">API Keys</a>
             <span class="breadcrumb-separator">›</span>
             <span class="breadcrumb-item active">Details</span>
           </nav>
@@ -708,13 +726,7 @@ const sections = [
   padding: 2rem;
   background: #fafafa;
   font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    'Roboto',
-    'Oxygen',
-    'Ubuntu',
-    'Cantarell',
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
     sans-serif;
 }
 
