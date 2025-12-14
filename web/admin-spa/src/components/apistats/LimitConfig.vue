@@ -236,7 +236,7 @@
                 <span v-if="hasModelRestrictions">
                   限制 {{ statsData.restrictions.restrictedModels.length }} 个模型
                 </span>
-                <span v-else> 允许所有模型 </span>
+                <span v-else>允许所有模型</span>
               </span>
             </div>
           </div>

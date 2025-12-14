@@ -68,7 +68,6 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { showToast } from '@/utils/toast'
 import DsButton from '@/ui/components/Button.vue'
-import DsAlert from '@/ui/components/Alert.vue'
 
 const props = defineProps({
   apiKey: {
