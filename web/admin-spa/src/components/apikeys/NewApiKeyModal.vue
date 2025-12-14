@@ -1,128 +1,72 @@
 <template>
   <Teleport to="body">
-    <div class="modal fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        class="modal-content custom-scrollbar mx-auto max-h-[90vh] w-full max-w-lg overflow-y-auto p-8"
-      >
-        <div class="mb-6 flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div
-              class="flex h-12 w-12 items-center justify-center rounded bg-gray-900 dark:bg-gray-100"
-            >
-              <i class="fas fa-check text-lg text-white" />
-            </div>
-            <div>
-              <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">API Key 创建成功</h3>
-              <p class="text-sm text-gray-600 dark:text-gray-400">请妥善保存您的 API Key</p>
+    <div class="api-key-modal-overlay" @click.self="handleDirectClose">
+      <div class="api-key-modal-content">
+        <!-- Header -->
+        <div class="modal-header">
+          <div class="header-icon-wrapper">
+            <div class="header-icon">
+              <i class="fas fa-check" />
             </div>
           </div>
-          <button
-            class="text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-            title="直接关闭（不推荐）"
-            @click="handleDirectClose"
-          >
-            <i class="fas fa-times text-xl" />
-          </button>
+          <h2 class="modal-title">API Key 创建成功</h2>
+          <p class="modal-subtitle">请妥善保存您的 API Key</p>
         </div>
 
-        <!-- 警告提示 -->
-        <div
-          class="mb-6 border-l-4 border-amber-400 bg-amber-50 p-4 dark:border-amber-500 dark:bg-amber-900/20"
-        >
-          <div class="flex items-start">
-            <div
-              class="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg bg-amber-400 dark:bg-amber-500"
-            >
-              <i class="fas fa-exclamation-triangle text-sm text-white" />
-            </div>
-            <div class="ml-3">
-              <h5 class="mb-1 font-semibold text-amber-900 dark:text-amber-400">重要提醒</h5>
-              <p class="text-sm text-amber-800 dark:text-amber-300">
-                这是您唯一能看到完整 API Key 的机会。关闭此窗口后，系统将不再显示完整的 API
-                Key。请立即复制并妥善保存。
-              </p>
-            </div>
+        <!-- Alert -->
+        <DsAlert class="modal-section" variant="warning">
+          <div class="alert-content">
+            <strong>重要提醒：</strong>
+            这是您唯一能看到完整 API Key 的机会。关闭此窗口后，系统将不再显示完整的 API
+            Key。请立即复制并妥善保存。
           </div>
-        </div>
+        </DsAlert>
 
-        <!-- API Key 信息 -->
-        <div class="mb-6 space-y-4">
-          <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >API Key 名称</label
-            >
-            <div
-              class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800"
-            >
-              <span class="font-medium text-gray-900 dark:text-gray-100">{{ apiKey.name }}</span>
-            </div>
+        <!-- API Key Information -->
+        <div class="modal-section">
+          <div class="info-group">
+            <label class="info-label">API Key 名称</label>
+            <div class="info-value">{{ apiKey.name }}</div>
           </div>
 
-          <div v-if="apiKey.description">
-            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >备注</label
-            >
-            <div
-              class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800"
-            >
-              <span class="text-gray-700 dark:text-gray-300">{{
-                apiKey.description || '无描述'
-              }}</span>
-            </div>
+          <div v-if="apiKey.description" class="info-group">
+            <label class="info-label">备注</label>
+            <div class="info-value">{{ apiKey.description }}</div>
           </div>
 
-          <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >API Key</label
-            >
-            <div class="relative">
-              <div
-                class="flex min-h-[60px] items-center break-all rounded-lg border border-gray-700 bg-gray-900 p-4 pr-14 font-mono text-sm text-white dark:border-gray-600 dark:bg-gray-900"
+          <div class="info-group">
+            <label class="info-label">API Key</label>
+            <div class="key-display-wrapper">
+              <div class="key-display">
+                <code class="key-text">{{ getDisplayedApiKey() }}</code>
+              </div>
+              <button
+                class="key-toggle-btn"
+                :title="showFullKey ? '隐藏 API Key' : '显示完整 API Key'"
+                type="button"
+                @click="toggleKeyVisibility"
               >
-                {{ getDisplayedApiKey() }}
-              </div>
-              <div class="absolute right-3 top-3">
-                <button
-                  class="btn-icon-sm bg-gray-700 hover:bg-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600"
-                  :title="showFullKey ? '隐藏API Key' : '显示完整API Key'"
-                  type="button"
-                  @click="toggleKeyVisibility"
-                >
-                  <i :class="['fas', showFullKey ? 'fa-eye-slash' : 'fa-eye', 'text-gray-300']" />
-                </button>
-              </div>
+                <i :class="['fas', showFullKey ? 'fa-eye-slash' : 'fa-eye']" />
+              </button>
             </div>
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              点击眼睛图标切换显示模式，使用下方按钮复制环境变量配置
-            </p>
+            <p class="info-hint">点击眼睛图标切换显示模式</p>
           </div>
         </div>
 
-        <!-- 操作按钮 -->
-        <div class="flex flex-col gap-3 sm:gap-4">
-          <div class="flex flex-col gap-3 sm:flex-row sm:gap-4">
-            <button
-              class="flex w-full items-center justify-center gap-2 rounded border border-gray-300 bg-blue-50 px-5 py-3 text-sm font-semibold text-gray-900 transition-colors hover:border-blue-300 hover:bg-blue-100 dark:border-blue-500/50 dark:bg-blue-500/10 dark:text-blue-200 dark:text-white dark:hover:bg-blue-500/20 sm:flex-1 sm:text-base"
-              @click="copyKeyOnly"
-            >
-              <i class="fas fa-key" />
-              仅复制密钥
-            </button>
-            <button
-              class="btn btn-primary flex w-full items-center justify-center gap-2 px-5 py-3 text-sm font-semibold sm:flex-1 sm:text-base"
-              @click="copyFullConfig"
-            >
-              <i class="fas fa-copy" />
-              复制Claude配置
-            </button>
-          </div>
-          <button
-            class="flex w-full items-center justify-center gap-2 rounded border border-gray-300 bg-gray-200 px-5 py-3 text-sm font-semibold text-gray-800 transition-colors hover:border-gray-400 hover:bg-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 sm:text-base"
-            @click="handleClose"
-          >
+        <!-- Action Buttons -->
+        <div class="modal-actions">
+          <DsButton block variant="outline" @click="copyKeyOnly">
+            <i class="fas fa-key" />
+            仅复制密钥
+          </DsButton>
+          <DsButton block variant="secondary" @click="copyFullConfig">
+            <i class="fas fa-copy" />
+            复制 Claude 配置
+          </DsButton>
+          <DsButton block variant="primary" @click="handleClose">
             <i class="fas fa-check-circle" />
             我已保存
-          </button>
+          </DsButton>
         </div>
       </div>
     </div>
@@ -132,6 +76,8 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { showToast } from '@/utils/toast'
+import DsButton from '@/ui/components/Button.vue'
+import DsAlert from '@/ui/components/Alert.vue'
 
 const props = defineProps({
   apiKey: {
@@ -293,8 +239,275 @@ const handleDirectClose = async () => {
 </script>
 
 <style scoped>
-pre {
-  white-space: pre-wrap;
-  word-wrap: break-word;
+/* Vercel-inspired API Key Modal */
+
+.api-key-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.api-key-modal-content {
+  width: 100%;
+  max-width: 520px;
+  background: #fafafa;
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  animation: slideUp 0.3s ease-out;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+:global(.dark) .api-key-modal-content {
+  background: #000;
+  box-shadow: 0 8px 30px rgba(255, 255, 255, 0.1);
+}
+
+/* Header */
+.modal-header {
+  padding: 2.5rem 2rem 1.5rem;
+  text-align: center;
+}
+
+.header-icon-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+}
+
+.header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  background: #000;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 1.5rem;
+}
+
+:global(.dark) .header-icon {
+  background: #fff;
+  color: #000;
+}
+
+.modal-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: #000;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.5rem 0;
+  line-height: 1.2;
+}
+
+:global(.dark) .modal-title {
+  color: #fff;
+}
+
+.modal-subtitle {
+  font-size: 0.9375rem;
+  color: #666;
+  margin: 0;
+  line-height: 1.5;
+}
+
+:global(.dark) .modal-subtitle {
+  color: #999;
+}
+
+/* Sections */
+.modal-section {
+  padding: 0 2rem 1.5rem;
+}
+
+/* Alert Content */
+.alert-content {
+  line-height: 1.6;
+}
+
+.alert-content strong {
+  font-weight: 600;
+}
+
+/* Info Groups */
+.info-group {
+  margin-bottom: 1.5rem;
+}
+
+.info-group:last-child {
+  margin-bottom: 0;
+}
+
+.info-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #000;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.01em;
+}
+
+:global(.dark) .info-label {
+  color: #fff;
+}
+
+.info-value {
+  padding: 0.875rem 1rem;
+  background: #fff;
+  border: 1px solid #eaeaea;
+  border-radius: 5px;
+  font-size: 0.875rem;
+  color: #000;
+  line-height: 1.5;
+}
+
+:global(.dark) .info-value {
+  background: #1a1a1a;
+  border-color: #333;
+  color: #fff;
+}
+
+/* Key Display */
+.key-display-wrapper {
+  position: relative;
+}
+
+.key-display {
+  padding: 1rem 3.5rem 1rem 1rem;
+  background: #000;
+  border: 1px solid #000;
+  border-radius: 5px;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+}
+
+:global(.dark) .key-display {
+  background: #1a1a1a;
+  border-color: #333;
+}
+
+.key-text {
+  font-family:
+    'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
+  font-size: 0.8125rem;
+  color: #fff;
+  word-break: break-all;
+  line-height: 1.6;
+}
+
+:global(.dark) .key-text {
+  color: #e0e0e0;
+}
+
+.key-toggle-btn {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 5px;
+  color: #999;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9375rem;
+}
+
+.key-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff;
+}
+
+:global(.dark) .key-toggle-btn {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:global(.dark) .key-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.info-hint {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: #666;
+  line-height: 1.4;
+}
+
+:global(.dark) .info-hint {
+  color: #999;
+}
+
+/* Actions */
+.modal-actions {
+  padding: 1.5rem 2rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .api-key-modal-content {
+    max-width: 100%;
+    margin: 1rem;
+  }
+
+  .modal-header {
+    padding: 2rem 1.5rem 1.25rem;
+  }
+
+  .modal-section {
+    padding: 0 1.5rem 1.25rem;
+  }
+
+  .modal-actions {
+    padding: 1.25rem 1.5rem 1.75rem;
+  }
+
+  .modal-title {
+    font-size: 1.5rem;
+  }
+
+  .header-icon {
+    width: 48px;
+    height: 48px;
+    font-size: 1.25rem;
+  }
 }
 </style>

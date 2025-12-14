@@ -2,7 +2,7 @@
   <Teleport to="body">
     <div v-if="show" class="modal fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <div
-        class="modal-content custom-scrollbar mx-auto max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded bg-white p-4 shadow-xl dark:bg-gray-900 dark:shadow-2xl sm:p-6 md:p-8"
+        class="modal-content custom-scrollbar mx-auto max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded bg-white p-4 dark:bg-gray-900 sm:p-6 md:p-8"
       >
         <div class="mb-4 flex items-center justify-between sm:mb-6">
           <div class="flex items-center gap-2 sm:gap-3">

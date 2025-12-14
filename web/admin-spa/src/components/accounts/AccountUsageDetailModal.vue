@@ -3,7 +3,7 @@
     <div v-if="show" class="fixed inset-0 z-[1050] flex items-center justify-center bg-gray-900/40">
       <div class="absolute inset-0" @click="handleClose" />
       <div
-        class="relative z-10 mx-3 flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded border border-gray-200/70 bg-white/95 shadow-2xl ring-1 ring-black/5 transition-all dark:border-gray-700/60 dark:bg-gray-900/95 dark:ring-white/10 sm:mx-4 sm:p-1"
+        class="relative z-10 mx-3 flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded border border-gray-200/70 bg-white/95 ring-1 ring-black/5 transition-all dark:border-gray-700/60 dark:bg-gray-900/95 dark:ring-white/10 sm:mx-4 sm:p-1"
       >
         <!-- 顶部栏 -->
         <div
@@ -11,7 +11,7 @@
         >
           <div class="flex flex-1 items-start gap-3">
             <div
-              class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded bg-gray-900 text-white shadow-lg dark:bg-gray-100"
+              class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded bg-gray-900 text-white dark:bg-gray-100"
             >
               <i class="fas fa-chart-area text-lg" />
             </div>
@@ -68,7 +68,7 @@
               <div
                 v-for="metric in primaryMetrics"
                 :key="metric.key"
-                class="rounded border border-gray-100 bg-white/80 p-4 shadow-sm transition dark:border-gray-700 dark:bg-gray-900/70"
+                class="rounded border border-gray-100 bg-white/80 p-4 transition dark:border-gray-700 dark:bg-gray-900/70"
               >
                 <div class="flex items-start justify-between">
                   <div>
@@ -105,7 +105,7 @@
                   今日概览
                 </div>
                 <div
-                  class="rounded bg-white/80 p-3 text-sm text-gray-600 shadow-sm ring-1 ring-blue-100 dark:bg-gray-900/80 dark:text-gray-300 dark:ring-blue-500/20"
+                  class="rounded bg-white/80 p-3 text-sm text-gray-600 ring-1 ring-blue-100 dark:bg-gray-900/80 dark:text-gray-300 dark:ring-blue-500/20"
                 >
                   <div class="flex items-center justify-between">
                     <span>费用</span>
@@ -138,7 +138,7 @@
                   最高费用日
                 </div>
                 <div
-                  class="rounded bg-white/80 p-3 text-sm text-gray-600 shadow-sm ring-1 ring-amber-100 dark:bg-gray-900/80 dark:text-gray-300 dark:ring-amber-500/20"
+                  class="rounded bg-white/80 p-3 text-sm text-gray-600 ring-1 ring-amber-100 dark:bg-gray-900/80 dark:text-gray-300 dark:ring-amber-500/20"
                 >
                   <div class="flex items-center justify-between">
                     <span>日期</span>
@@ -173,7 +173,7 @@
                   最高请求日
                 </div>
                 <div
-                  class="rounded bg-white/80 p-3 text-sm text-gray-600 shadow-sm ring-1 ring-emerald-100 dark:bg-gray-900/80 dark:text-gray-300 dark:ring-emerald-500/20"
+                  class="rounded bg-white/80 p-3 text-sm text-gray-600 ring-1 ring-emerald-100 dark:bg-gray-900/80 dark:text-gray-300 dark:ring-emerald-500/20"
                 >
                   <div class="flex items-center justify-between">
                     <span>日期</span>

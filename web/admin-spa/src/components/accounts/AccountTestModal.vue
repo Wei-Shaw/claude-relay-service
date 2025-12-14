@@ -3,7 +3,7 @@
     <div v-if="show" class="fixed inset-0 z-[1050] flex items-center justify-center bg-gray-900/40">
       <div class="absolute inset-0" @click="handleClose" />
       <div
-        class="relative z-10 mx-3 flex w-full max-w-lg flex-col overflow-hidden rounded border border-gray-200/70 bg-white/95 shadow-2xl ring-1 ring-black/5 transition-all dark:border-gray-700/60 dark:bg-gray-900/95 dark:ring-white/10 sm:mx-4"
+        class="relative z-10 mx-3 flex w-full max-w-lg flex-col overflow-hidden rounded border border-gray-200/70 bg-white/95 ring-1 ring-black/5 transition-all dark:border-gray-700/60 dark:bg-gray-900/95 dark:ring-white/10 sm:mx-4"
       >
         <!-- 顶部栏 -->
         <div
@@ -12,7 +12,7 @@
           <div class="flex items-center gap-3">
             <div
               :class="[
-                'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded text-white shadow-lg',
+                'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded text-white',
                 testStatus === 'success'
                   ? 'bg-green-600'
                   : testStatus === 'error'
@@ -141,7 +141,7 @@
           class="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50/80 px-5 py-3 dark:border-gray-800 dark:bg-gray-900/50"
         >
           <button
-            class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
             :disabled="testStatus === 'testing'"
             @click="handleClose"
           >

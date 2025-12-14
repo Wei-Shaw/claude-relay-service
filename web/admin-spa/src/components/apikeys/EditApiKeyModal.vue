@@ -734,6 +734,7 @@ import { useClientsStore } from '@/stores/clients'
 import { useApiKeysStore } from '@/stores/apiKeys'
 import { apiClient } from '@/config/api'
 import AccountSelector from '@/components/common/AccountSelector.vue'
+import { Checkbox } from '@/ui'
 
 const props = defineProps({
   apiKey: {

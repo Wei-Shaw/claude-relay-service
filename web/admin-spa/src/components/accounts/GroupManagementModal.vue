@@ -117,7 +117,7 @@
             <div
               v-for="group in groups"
               :key="group.id"
-              class="rounded-lg border bg-white p-4 transition-shadow hover:shadow-md dark:bg-gray-800"
+              class="rounded-lg border bg-white p-4 dark:bg-gray-800"
             >
               <div class="mb-3 flex items-start justify-between">
                 <div class="flex-1">

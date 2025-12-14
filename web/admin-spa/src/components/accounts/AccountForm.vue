@@ -77,8 +77,8 @@
                     class="group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all duration-200"
                     :class="[
                       platformGroup === 'claude'
-                        ? 'border-gray-900 bg-white shadow-md dark:border-gray-100 dark:bg-gray-800'
-                        : 'border-gray-200 bg-white hover:border-indigo-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-600'
+                        ? 'border-gray-900 bg-white dark:border-gray-100 dark:bg-gray-800'
+                        : 'border-gray-200 bg-white hover:border-indigo-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-600'
                     ]"
                     @click="selectPlatformGroup('claude')"
                   >
@@ -108,8 +108,8 @@
                     class="group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all duration-200"
                     :class="[
                       platformGroup === 'openai'
-                        ? 'border-gray-900 bg-white shadow-md dark:border-gray-100 dark:bg-gray-800'
-                        : 'border-gray-200 bg-white hover:border-emerald-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-emerald-600'
+                        ? 'border-gray-900 bg-white dark:border-gray-100 dark:bg-gray-800'
+                        : 'border-gray-200 bg-white hover:border-emerald-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-emerald-600'
                     ]"
                     @click="selectPlatformGroup('openai')"
                   >
@@ -148,8 +148,8 @@
                     class="group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all duration-200"
                     :class="[
                       platformGroup === 'gemini'
-                        ? 'border-gray-900 bg-white shadow-md dark:border-gray-100 dark:bg-gray-800'
-                        : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-600'
+                        ? 'border-gray-900 bg-white dark:border-gray-100 dark:bg-gray-800'
+                        : 'border-gray-200 bg-white hover:border-blue-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-600'
                     ]"
                     @click="selectPlatformGroup('gemini')"
                   >
@@ -179,8 +179,8 @@
                     class="group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all duration-200"
                     :class="[
                       platformGroup === 'droid'
-                        ? 'border-gray-900 bg-white shadow-md dark:border-gray-100 dark:bg-gray-800'
-                        : 'border-gray-200 bg-white hover:border-rose-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-rose-600'
+                        ? 'border-gray-900 bg-white dark:border-gray-100 dark:bg-gray-800'
+                        : 'border-gray-200 bg-white hover:border-rose-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-rose-600'
                     ]"
                     @click="selectPlatformGroup('droid')"
                   >
@@ -1210,7 +1210,7 @@
                     class="flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-all"
                     :class="
                       modelRestrictionMode === 'whitelist'
-                        ? 'bg-blue-500 text-white shadow-md'
+                        ? 'bg-blue-500 text-white'
                         : 'border border-gray-300 text-gray-600 hover:border-blue-300 dark:border-gray-600 dark:text-gray-400 dark:hover:border-blue-500'
                     "
                     type="button"
@@ -1223,7 +1223,7 @@
                     class="flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-all"
                     :class="
                       modelRestrictionMode === 'mapping'
-                        ? 'bg-purple-500 text-white shadow-md'
+                        ? 'bg-purple-500 text-white'
                         : 'border border-gray-300 text-gray-600 hover:border-purple-300 dark:border-gray-600 dark:text-gray-400 dark:hover:border-purple-500'
                     "
                     type="button"
@@ -3576,10 +3576,10 @@
                   </span>
                 </div>
                 <div
-                  class="relative grid h-11 grid-cols-3 overflow-hidden rounded border border-gray-300 bg-white shadow-inner dark:border-gray-700 dark:bg-gray-800"
+                  class="relative grid h-11 grid-cols-3 overflow-hidden rounded border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-800"
                 >
                   <span
-                    class="pointer-events-none absolute inset-y-0 rounded bg-black shadow-lg ring-1 ring-gray-300 transition-all duration-300 ease-out dark:bg-white dark:ring-gray-600"
+                    class="pointer-events-none absolute inset-y-0 rounded bg-black ring-1 ring-gray-300 transition-all duration-300 ease-out dark:bg-white dark:ring-gray-600"
                     :style="apiKeyModeSliderStyle"
                   />
                   <button
@@ -3588,7 +3588,7 @@
                     class="relative z-10 flex items-center justify-center rounded px-2 text-xs font-semibold transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60 dark:focus-visible:ring-purple-400/60"
                     :class="
                       form.apiKeyUpdateMode === option.value
-                        ? 'text-white drop-shadow-sm'
+                        ? 'text-white'
                         : 'text-purple-500/80 hover:text-purple-700 dark:text-purple-200/70 dark:hover:text-purple-100'
                     "
                     type="button"

@@ -108,7 +108,7 @@
                   />
                   <span
                     v-if="selectedTagFilter"
-                    class="absolute -right-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-purple-500 text-xs text-white shadow-sm"
+                    class="absolute -right-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-purple-500 text-xs text-white"
                   >
                     {{ selectedTagCount }}
                   </span>
@@ -128,7 +128,7 @@
                   />
                   <span
                     v-if="selectedModels.length > 0"
-                    class="absolute -right-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-xs text-white shadow-sm"
+                    class="absolute -right-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-xs text-white"
                   >
                     {{ selectedModels.length }}
                   </span>
@@ -150,7 +150,7 @@
                   <div class="relative flex items-center">
                     <input
                       v-model="searchKeyword"
-                      class="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 pl-9 text-sm text-gray-700 placeholder-gray-400 shadow-sm transition-all duration-200 hover:border-gray-300 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 dark:hover:border-gray-500"
+                      class="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 pl-9 text-sm text-gray-700 placeholder-gray-400 transition-all duration-200 hover:border-gray-300 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 dark:hover:border-gray-500"
                       :placeholder="
                         searchMode === 'bindingAccount'
                           ? '搜索所属账号...'
@@ -177,7 +177,7 @@
             <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
               <!-- 刷新按钮 -->
               <button
-                class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-500 sm:w-auto"
+                class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-all duration-200 hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-500 sm:w-auto"
                 :disabled="apiKeysLoading"
                 @click="loadApiKeys()"
               >
@@ -192,7 +192,7 @@
 
               <!-- 选择/取消选择按钮 -->
               <button
-                class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 hover:shadow-md dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                 @click="toggleSelectionMode"
               >
                 <i :class="showCheckboxes ? 'fas fa-times' : 'fas fa-check-square'"></i>
@@ -211,7 +211,7 @@
               <!-- 批量编辑按钮 - 移到刷新按钮旁边 -->
               <button
                 v-if="selectedApiKeys.length > 0"
-                class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 shadow-sm transition-all duration-200 hover:border-gray-400 hover:bg-gray-50 hover:shadow-md dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700 sm:w-auto"
+                class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 transition-all duration-200 hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700 sm:w-auto"
                 @click="openBatchEditModal()"
               >
                 <i class="fas fa-edit relative text-gray-700 dark:text-gray-300" />
@@ -221,7 +221,7 @@
               <!-- 批量删除按钮 - 移到刷新按钮旁边 -->
               <button
                 v-if="selectedApiKeys.length > 0"
-                class="group relative flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 shadow-sm transition-all duration-200 hover:border-red-300 hover:bg-red-100 hover:shadow-md dark:border-red-700 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50 sm:w-auto"
+                class="group relative flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 transition-all duration-200 hover:border-red-300 hover:bg-red-100 dark:border-red-700 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50 sm:w-auto"
                 @click="batchDeleteApiKeys()"
               >
                 <i class="fas fa-trash relative text-red-600 dark:text-red-400" />
@@ -230,7 +230,7 @@
 
               <!-- 创建按钮 -->
               <button
-                class="flex w-full items-center justify-center gap-2 rounded-lg bg-black px-5 py-2 text-sm font-medium text-white shadow-md transition-all duration-200 hover:bg-gray-800 hover:shadow-lg dark:bg-white dark:text-black dark:hover:bg-gray-100 sm:w-auto"
+                class="flex w-full items-center justify-center gap-2 rounded-lg bg-black px-5 py-2 text-sm font-medium text-white transition-all duration-200 hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-100 sm:w-auto"
                 @click.stop="openCreateApiKeyModal"
               >
                 <i class="fas fa-plus"></i>
@@ -413,7 +413,7 @@
                           ? 'bg-white dark:bg-gray-800/40'
                           : 'bg-gray-50/70 dark:bg-gray-700/30',
                         'border-b-2 border-gray-200/80 dark:border-gray-700/50',
-                        'hover:bg-gray-100 hover:shadow-sm dark:hover:bg-gray-700'
+                        'hover:bg-gray-100 dark:hover:bg-gray-700'
                       ]"
                     >
                       <td
@@ -1003,7 +1003,7 @@
                                       'rounded px-2 py-1 text-xs font-medium transition-colors',
                                       getApiKeyDateFilter(key.id).preset === option.value &&
                                       getApiKeyDateFilter(key.id).type === 'preset'
-                                        ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
+                                        ? 'bg-white text-gray-900 dark:bg-gray-800 dark:text-white'
                                         : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
                                     ]"
                                     @click="setApiKeyDateFilterPreset(option.value, key.id)"
@@ -1068,7 +1068,7 @@
                             <div
                               v-for="stat in apiKeyModelStats[key.id]"
                               :key="stat.model"
-                              class="rounded border border-gray-200 bg-white p-4 transition-all duration-200 hover:border-indigo-300 hover:shadow-md dark:border-gray-600 dark:bg-gray-800 dark:hover:border-indigo-500"
+                              class="rounded border border-gray-200 bg-white p-4 transition-all duration-200 hover:border-indigo-300 dark:border-gray-600 dark:bg-gray-800 dark:hover:border-indigo-500"
                             >
                               <div class="mb-3 flex items-start justify-between">
                                 <div class="flex-1">
@@ -1229,7 +1229,7 @@
             <div
               v-for="key in paginatedApiKeys"
               :key="key.id"
-              class="card p-4 transition-shadow hover:shadow-lg"
+              class="card p-4"
             >
               <!-- 卡片头部 -->
               <div class="mb-3 flex items-start justify-between">
@@ -4907,11 +4907,9 @@ onUnmounted(() => {
 }
 
 .table-container tbody .operations-column {
-  box-shadow: -8px 0 12px -8px rgba(15, 23, 42, 0.16);
 }
 
 .dark .table-container tbody .operations-column {
-  box-shadow: -8px 0 12px -8px rgba(30, 41, 59, 0.2);
 }
 
 /* 固定左侧列（复选框和名称列）*/
@@ -4967,11 +4965,9 @@ onUnmounted(() => {
 
 /* 名称列右侧阴影（分隔效果） */
 .table-container tbody .name-column {
-  box-shadow: 8px 0 12px -8px rgba(15, 23, 42, 0.16);
 }
 
 .dark .table-container tbody .name-column {
-  box-shadow: 8px 0 12px -8px rgba(30, 41, 59, 0.2);
 }
 
 .loading-spinner {
@@ -5002,7 +4998,7 @@ onUnmounted(() => {
 
 /* 自定义日期范围选择器高度对齐 */
 .custom-date-range-picker :deep(.el-input__wrapper) {
-  @apply h-[38px] rounded-lg border border-gray-200 bg-white shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md dark:border-gray-600 dark:bg-gray-800;
+  @apply h-[38px] rounded-lg border border-gray-200 bg-white transition-all duration-200 hover:border-gray-300 dark:border-gray-600 dark:bg-gray-800;
 }
 .custom-date-range-picker :deep(.el-input__inner) {
   @apply h-full py-2 text-sm font-medium text-gray-700 dark:text-gray-200;

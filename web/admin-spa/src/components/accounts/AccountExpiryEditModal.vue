@@ -57,7 +57,7 @@
                 </p>
               </div>
               <div
-                class="flex h-12 w-12 items-center justify-center rounded-lg bg-white shadow-sm dark:bg-gray-700"
+                class="flex h-12 w-12 items-center justify-center rounded-lg bg-white dark:bg-gray-700"
               >
                 <i
                   :class="[
@@ -83,7 +83,7 @@
                 :class="[
                   'rounded-lg px-3 py-2 text-sm font-medium transition-all',
                   localForm.expireDuration === option.value
-                    ? 'bg-blue-500 text-white shadow-md'
+                    ? 'bg-blue-500 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
                 ]"
                 @click="selectQuickOption(option.value)"
@@ -94,7 +94,7 @@
                 :class="[
                   'rounded-lg px-3 py-2 text-sm font-medium transition-all',
                   localForm.expireDuration === 'custom'
-                    ? 'bg-blue-500 text-white shadow-md'
+                    ? 'bg-blue-500 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
                 ]"
                 @click="selectQuickOption('custom')"
@@ -153,7 +153,7 @@
                 </p>
               </div>
               <div
-                class="flex h-12 w-12 items-center justify-center rounded-lg bg-white shadow-sm dark:bg-gray-700"
+                class="flex h-12 w-12 items-center justify-center rounded-lg bg-white dark:bg-gray-700"
               >
                 <i class="fas fa-check text-lg text-green-500" />
               </div>

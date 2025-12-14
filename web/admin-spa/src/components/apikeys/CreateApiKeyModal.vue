@@ -733,19 +733,15 @@
           </div>
 
           <div>
-            <div class="mb-2 flex items-center">
-              <input
+            <div class="mb-2">
+              <Checkbox
                 id="enableModelRestriction"
                 v-model="form.enableModelRestriction"
-                class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
-                type="checkbox"
+                label="启用模型限制"
+                :input-class="'h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white'"
+                :label-class="'flex items-center'"
+                :text-class="'ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300'"
               />
-              <label
-                class="ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300"
-                for="enableModelRestriction"
-              >
-                启用模型限制
-              </label>
             </div>
 
             <div v-if="form.enableModelRestriction" class="space-y-3">
@@ -819,19 +815,15 @@
 
           <!-- 客户端限制 -->
           <div>
-            <div class="mb-2 flex items-center">
-              <input
+            <div class="mb-2">
+              <Checkbox
                 id="enableClientRestriction"
                 v-model="form.enableClientRestriction"
-                class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
-                type="checkbox"
+                label="启用客户端限制"
+                :input-class="'h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white'"
+                :label-class="'flex items-center'"
+                :text-class="'ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300'"
               />
-              <label
-                class="ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300"
-                for="enableClientRestriction"
-              >
-                启用客户端限制
-              </label>
             </div>
 
             <div
@@ -844,21 +836,21 @@
                 >
                 <div class="space-y-1">
                   <div v-for="client in supportedClients" :key="client.id" class="flex items-start">
-                    <input
+                    <Checkbox
                       :id="`client_${client.id}`"
                       v-model="form.allowedClients"
-                      class="mt-0.5 h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
-                      type="checkbox"
                       :value="client.id"
-                    />
-                    <label class="ml-2 flex-1 cursor-pointer" :for="`client_${client.id}`">
+                      :input-class="'mt-0.5 h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white'"
+                      :label-class="'flex items-start'"
+                      :text-class="'ml-2 flex-1 cursor-pointer'"
+                    >
                       <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
                         client.name
                       }}</span>
                       <span class="block text-xs text-gray-500 dark:text-gray-400">{{
                         client.description
                       }}</span>
-                    </label>
+                    </Checkbox>
                   </div>
                 </div>
               </div>
@@ -896,6 +888,7 @@ import { useClientsStore } from '@/stores/clients'
 import { useApiKeysStore } from '@/stores/apiKeys'
 import { apiClient } from '@/config/api'
 import AccountSelector from '@/components/common/AccountSelector.vue'
+import { Checkbox } from '@/ui'
 
 const props = defineProps({
   accounts: {
