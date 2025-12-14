@@ -124,3 +124,4 @@ const clampedValue = computed(() => Math.max(0, Math.min(100, props.value)))
   background: #ffffff;
 }
 </style>
+

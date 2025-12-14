@@ -588,3 +588,4 @@ This Design System enforces:
 - **Dark Mode**: Built-in support across all components
 
 **Remember**: If it's visual, it belongs in `ui/`. If it's business logic, it belongs in `components/`.
+

@@ -250,8 +250,7 @@ const handleDirectClose = async () => {
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.4);
   animation: fadeIn 0.2s ease-out;
 }
 

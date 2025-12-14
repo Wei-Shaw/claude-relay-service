@@ -135,8 +135,7 @@ defineExpose({
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.4);
 }
 
 :global(.dark) .confirm-overlay {
