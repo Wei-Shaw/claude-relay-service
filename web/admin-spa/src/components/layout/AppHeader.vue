@@ -1,7 +1,7 @@
 <template>
   <!-- 顶部导航 -->
   <div
-    class="mb-4 border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900 sm:mb-6 sm:p-4 md:mb-8 md:p-6"
+    class="mb-4 border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-900 sm:mb-6 sm:p-4 md:mb-8 md:p-6"
     style="z-index: 10; position: relative"
   >
     <div class="flex flex-col items-center justify-between gap-3 sm:flex-row sm:gap-4">
@@ -13,18 +13,17 @@
           :logo-src="oemSettings.siteIconData || oemSettings.siteIcon"
           subtitle="管理后台"
           :title="oemSettings.siteName"
-          title-class="text-gray-900 dark:text-gray-100"
         >
           <template #after-title>
             <!-- 版本信息 -->
             <div class="flex items-center gap-1 sm:gap-2">
-              <span class="font-mono text-xs text-gray-400 dark:text-gray-500 sm:text-sm"
+              <span class="font-mono text-xs text-gray-500 dark:text-gray-400 sm:text-sm"
                 >v{{ versionInfo.current || '...' }}</span
               >
               <!-- 更新提示 -->
               <a
                 v-if="versionInfo.hasUpdate"
-                class="inline-flex animate-pulse items-center gap-1 rounded border border-green-600 bg-green-500 px-2 py-0.5 text-xs text-white transition-colors hover:bg-green-600"
+                class="inline-flex animate-pulse items-center gap-1 rounded border border-green-600 bg-green-500 px-2 py-0.5 text-xs text-white transition-colors hover:bg-green-600 dark:border-green-500 dark:bg-green-600 dark:hover:bg-green-500"
                 :href="versionInfo.releaseInfo?.htmlUrl || '#'"
                 target="_blank"
                 title="有新版本可用"
@@ -49,13 +48,13 @@
         <!-- 用户菜单 -->
         <div class="user-menu-container relative">
           <button
-            class="user-menu-button flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition-all duration-200 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 sm:px-4 sm:py-2.5"
+            class="user-menu-button flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-all duration-200 hover:bg-gray-50 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 dark:hover:shadow-lg sm:px-4 sm:py-2.5"
             @click="userMenuOpen = !userMenuOpen"
           >
-            <i class="fas fa-user-circle text-sm sm:text-base" />
+            <i class="fas fa-user-circle text-sm text-gray-600 dark:text-gray-400 sm:text-base" />
             <span class="hidden sm:inline">{{ currentUser.username || 'Admin' }}</span>
             <i
-              class="fas fa-chevron-down ml-1 text-xs transition-transform duration-200"
+              class="fas fa-chevron-down ml-1 text-xs text-gray-500 transition-transform duration-200 dark:text-gray-400"
               :class="{ 'rotate-180': userMenuOpen }"
             />
           </button>
@@ -63,7 +62,7 @@
           <!-- 悬浮菜单 -->
           <div
             v-if="userMenuOpen"
-            class="user-menu-dropdown absolute right-0 top-full mt-2 w-48 rounded-md border border-gray-200 bg-white py-2 shadow-lg dark:border-gray-700 dark:bg-gray-800 sm:w-56"
+            class="user-menu-dropdown absolute right-0 top-full mt-2 w-48 rounded-md border border-gray-200 bg-white py-2 shadow-lg dark:border-gray-700 dark:bg-gray-800 dark:shadow-2xl sm:w-56"
             style="z-index: 999999"
             @click.stop
           >

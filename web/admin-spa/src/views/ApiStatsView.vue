@@ -272,11 +272,17 @@ watch(apiKey, (newValue) => {
 .page-bg {
   background: #fafafa;
   min-height: 100vh;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 
 .page-bg-dark {
   background: #000;
   min-height: 100vh;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 
 /* Container - Vercel's max-width approach */
@@ -284,6 +290,7 @@ watch(apiKey, (newValue) => {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 24px;
+  transition: all 0.3s ease;
 }
 
 @media (max-width: 768px) {
@@ -300,6 +307,9 @@ watch(apiKey, (newValue) => {
   background: #fff;
   padding: 24px 0;
   margin-bottom: 48px;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
 }
 
 :global(.dark) .vercel-header {
@@ -312,6 +322,7 @@ watch(apiKey, (newValue) => {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
+  transition: all 0.3s ease;
 }
 
 @media (max-width: 768px) {
@@ -325,6 +336,7 @@ watch(apiKey, (newValue) => {
   display: flex;
   align-items: center;
   gap: 12px;
+  transition: all 0.3s ease;
 }
 
 /* Vercel Button System */
@@ -337,15 +349,35 @@ watch(apiKey, (newValue) => {
   border-radius: 6px;
   font-size: 14px;
   font-weight: 500;
-  transition: all 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
   cursor: pointer;
   text-decoration: none;
   white-space: nowrap;
   border: 1px solid;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.vercel-btn:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.vercel-btn:active {
+  transform: translateY(0);
 }
 
 .vercel-btn i {
   font-size: 14px;
+  transition: transform 0.15s ease;
+}
+
+.vercel-btn:hover i {
+  transform: scale(1.05);
 }
 
 .vercel-btn-primary {
@@ -363,11 +395,13 @@ watch(apiKey, (newValue) => {
   background: #fff;
   border-color: #fff;
   color: #000;
+  box-shadow: 0 1px 2px rgba(255, 255, 255, 0.1);
 }
 
 :global(.dark) .vercel-btn-primary:hover {
   background: #e5e5e5;
   border-color: #e5e5e5;
+  box-shadow: 0 2px 4px rgba(255, 255, 255, 0.2);
 }
 
 .vercel-btn-secondary {
@@ -379,16 +413,20 @@ watch(apiKey, (newValue) => {
 .vercel-btn-secondary:hover {
   border-color: #000;
   color: #000;
+  background: rgba(0, 0, 0, 0.02);
 }
 
 :global(.dark) .vercel-btn-secondary {
   border-color: #333;
   color: #999;
+  box-shadow: 0 1px 2px rgba(255, 255, 255, 0.02);
 }
 
 :global(.dark) .vercel-btn-secondary:hover {
   border-color: #fff;
   color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 2px 4px rgba(255, 255, 255, 0.05);
 }
 
 /* ============================================
@@ -396,12 +434,14 @@ watch(apiKey, (newValue) => {
    ============================================ */
 .vercel-tabs {
   margin-bottom: 48px;
+  transition: all 0.3s ease;
 }
 
 .tabs-wrapper {
   display: flex;
   gap: 8px;
   border-bottom: 1px solid #eaeaea;
+  transition: border-color 0.3s ease;
 }
 
 :global(.dark) .tabs-wrapper {
@@ -420,17 +460,27 @@ watch(apiKey, (newValue) => {
   border: none;
   border-bottom: 2px solid transparent;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    transform 0.15s ease;
   position: relative;
   bottom: -1px;
 }
 
 .tab-button i {
   font-size: 14px;
+  transition: transform 0.15s ease;
 }
 
 .tab-button:hover {
   color: #000;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.tab-button:hover i {
+  transform: scale(1.1);
 }
 
 :global(.dark) .tab-button {
@@ -439,11 +489,16 @@ watch(apiKey, (newValue) => {
 
 :global(.dark) .tab-button:hover {
   color: #fff;
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .tab-button.active {
   color: #000;
   border-bottom-color: #000;
+}
+
+.tab-button.active i {
+  transform: scale(1.05);
 }
 
 :global(.dark) .tab-button.active {
@@ -459,6 +514,7 @@ watch(apiKey, (newValue) => {
   flex-direction: column;
   gap: 32px;
   padding-bottom: 64px;
+  transition: all 0.3s ease;
 }
 
 /* ============================================
@@ -474,12 +530,28 @@ watch(apiKey, (newValue) => {
   border-radius: 8px;
   color: #ff0000;
   font-size: 14px;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease,
+    box-shadow 0.3s ease;
+  box-shadow: 0 2px 4px rgba(255, 0, 0, 0.1);
+}
+
+.vercel-error-card i {
+  font-size: 16px;
+  transition: transform 0.2s ease;
+}
+
+.vercel-error-card:hover i {
+  transform: scale(1.1);
 }
 
 :global(.dark) .vercel-error-card {
   background: #1a0000;
   border-color: #ff3333;
   color: #ff6666;
+  box-shadow: 0 2px 4px rgba(255, 51, 51, 0.2);
 }
 
 /* ============================================
@@ -502,11 +574,25 @@ watch(apiKey, (newValue) => {
   border-radius: 8px;
   flex-wrap: wrap;
   gap: 16px;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.period-selector:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
 }
 
 :global(.dark) .period-selector {
   background: #000;
   border-color: #333;
+  box-shadow: 0 1px 2px rgba(255, 255, 255, 0.02);
+}
+
+:global(.dark) .period-selector:hover {
+  box-shadow: 0 2px 4px rgba(255, 255, 255, 0.05);
 }
 
 .period-label {
@@ -516,6 +602,7 @@ watch(apiKey, (newValue) => {
   font-size: 16px;
   font-weight: 600;
   color: #000;
+  transition: color 0.3s ease;
 }
 
 :global(.dark) .period-label {
@@ -525,6 +612,13 @@ watch(apiKey, (newValue) => {
 .period-label i {
   font-size: 16px;
   color: #666;
+  transition:
+    color 0.3s ease,
+    transform 0.2s ease;
+}
+
+.period-selector:hover .period-label i {
+  transform: rotate(15deg);
 }
 
 :global(.dark) .period-label i {
@@ -551,22 +645,45 @@ watch(apiKey, (newValue) => {
   border: 1px solid #eaeaea;
   color: #666;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
 .vercel-period-btn i {
   font-size: 14px;
+  transition: transform 0.15s ease;
 }
 
 .vercel-period-btn:hover:not(:disabled) {
   border-color: #000;
   color: #000;
+  background: rgba(0, 0, 0, 0.03);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.vercel-period-btn:hover:not(:disabled) i {
+  transform: scale(1.1);
 }
 
 .vercel-period-btn.active {
   background: #000;
   border-color: #000;
   color: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.vercel-period-btn.active i {
+  transform: scale(1.05);
+}
+
+.vercel-period-btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .vercel-period-btn:disabled {
@@ -577,17 +694,21 @@ watch(apiKey, (newValue) => {
 :global(.dark) .vercel-period-btn {
   border-color: #333;
   color: #999;
+  box-shadow: 0 1px 2px rgba(255, 255, 255, 0.02);
 }
 
 :global(.dark) .vercel-period-btn:hover:not(:disabled) {
   border-color: #fff;
   color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 2px 4px rgba(255, 255, 255, 0.08);
 }
 
 :global(.dark) .vercel-period-btn.active {
   background: #fff;
   border-color: #fff;
   color: #000;
+  box-shadow: 0 2px 4px rgba(255, 255, 255, 0.2);
 }
 
 /* Test Button */
@@ -604,21 +725,49 @@ watch(apiKey, (newValue) => {
   border: 1px solid #0070f3;
   color: #fff;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+  box-shadow: 0 2px 4px rgba(0, 112, 243, 0.2);
 }
 
 .vercel-test-btn i {
   font-size: 14px;
+  transition: transform 0.15s ease;
 }
 
 .vercel-test-btn:hover:not(:disabled) {
   background: #0060df;
   border-color: #0060df;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 112, 243, 0.3);
+}
+
+.vercel-test-btn:hover:not(:disabled) i {
+  transform: scale(1.1);
+}
+
+.vercel-test-btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .vercel-test-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+:global(.dark) .vercel-test-btn {
+  background: #0080ff;
+  border-color: #0080ff;
+  box-shadow: 0 2px 4px rgba(0, 128, 255, 0.3);
+}
+
+:global(.dark) .vercel-test-btn:hover:not(:disabled) {
+  background: #0070f3;
+  border-color: #0070f3;
+  box-shadow: 0 4px 8px rgba(0, 128, 255, 0.4);
 }
 
 /* Stats Grid */
@@ -642,11 +791,25 @@ watch(apiKey, (newValue) => {
   border: 1px solid #eaeaea;
   border-radius: 8px;
   overflow: hidden;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.vercel-card:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
 }
 
 :global(.dark) .vercel-card {
   background: #000;
   border-color: #333;
+  box-shadow: 0 1px 2px rgba(255, 255, 255, 0.02);
+}
+
+:global(.dark) .vercel-card:hover {
+  box-shadow: 0 2px 4px rgba(255, 255, 255, 0.05);
 }
 
 /* ============================================

@@ -1,27 +1,27 @@
 <template>
   <div class="logo-title-wrapper">
     <!-- Logo区域 -->
-    <div class="logo-container">
+    <div class="logo-container !border !border-gray-200 !bg-white dark:!border-gray-700 dark:!bg-gray-900">
       <template v-if="!loading">
         <img v-if="logoSrc" alt="Logo" class="logo-image" :src="logoSrc" @error="handleLogoError" />
-        <i v-else class="fas fa-cloud logo-icon" />
+        <i v-else class="fas fa-cloud logo-icon !text-gray-600 dark:!text-gray-400" />
       </template>
-      <div v-else class="logo-skeleton" />
+      <div v-else class="logo-skeleton !bg-gray-200 dark:!bg-gray-700" />
     </div>
 
     <!-- 标题区域 -->
     <div class="title-section">
       <div class="title-row">
         <template v-if="!loading && title">
-          <h1 class="site-title">
+          <h1 class="site-title !text-gray-900 dark:!text-white">
             {{ title }}
           </h1>
         </template>
-        <div v-else-if="loading" class="title-skeleton" />
+        <div v-else-if="loading" class="title-skeleton !bg-gray-200 dark:!bg-gray-700" />
         <!-- 插槽用于版本信息等额外内容 -->
         <slot name="after-title" />
       </div>
-      <p v-if="subtitle" class="site-subtitle">
+      <p v-if="subtitle" class="site-subtitle !text-gray-600 dark:!text-gray-400">
         {{ subtitle }}
       </p>
     </div>
@@ -74,13 +74,9 @@ const handleLogoError = (e) => {
   justify-content: center;
   overflow: hidden;
   border-radius: 8px;
-  border: 1px solid #eaeaea;
-  background: #fff;
-}
-
-:global(.dark) .logo-container {
-  border-color: #333;
-  background: #000;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
 }
 
 .logo-image {
@@ -91,11 +87,7 @@ const handleLogoError = (e) => {
 
 .logo-icon {
   font-size: 20px;
-  color: #666;
-}
-
-:global(.dark) .logo-icon {
-  color: #999;
+  transition: color 0.3s ease;
 }
 
 /* Logo Skeleton */
@@ -103,12 +95,8 @@ const handleLogoError = (e) => {
   width: 32px;
   height: 32px;
   border-radius: 6px;
-  background: #eaeaea;
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-:global(.dark) .logo-skeleton {
-  background: #333;
+  transition: background-color 0.3s ease;
 }
 
 /* Title Section */
@@ -129,24 +117,16 @@ const handleLogoError = (e) => {
   font-size: 24px;
   font-weight: 600;
   line-height: 1.2;
-  color: #000;
   margin: 0;
   letter-spacing: -0.02em;
-}
-
-:global(.dark) .site-title {
-  color: #fff;
+  transition: color 0.3s ease;
 }
 
 .site-subtitle {
   margin: 4px 0 0;
   font-size: 14px;
   line-height: 1.4;
-  color: #666;
-}
-
-:global(.dark) .site-subtitle {
-  color: #999;
+  transition: color 0.3s ease;
 }
 
 /* Title Skeleton */
@@ -154,12 +134,8 @@ const handleLogoError = (e) => {
   width: 256px;
   height: 32px;
   border-radius: 6px;
-  background: #eaeaea;
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-:global(.dark) .title-skeleton {
-  background: #333;
+  transition: background-color 0.3s ease;
 }
 
 /* Pulse Animation */
