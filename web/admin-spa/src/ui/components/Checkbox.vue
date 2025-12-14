@@ -28,7 +28,7 @@ defineOptions({
   inheritAttrs: false
 })
 
-const props = defineProps({
+defineProps({
   /**
    * Checkbox value (v-model)
    */

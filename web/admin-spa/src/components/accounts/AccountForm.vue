@@ -1253,10 +1253,10 @@
                     >
                       <Checkbox
                         v-model="allowedModels"
-                        :value="model.value"
                         :input-class="'mr-2 text-gray-900 focus:ring-gray-900 dark:text-gray-100 dark:focus:ring-white'"
                         :label-class="'flex cursor-pointer items-center'"
                         :text-class="'text-sm font-medium text-gray-700 dark:text-gray-300'"
+                        :value="model.value"
                       >
                         {{ model.label }}
                       </Checkbox>
@@ -1428,8 +1428,8 @@
                 <div class="mb-3">
                   <Checkbox
                     v-model="form.enableRateLimit"
-                    label="启用限流机制"
                     :input-class="'mr-2 rounded border-gray-300 text-gray-900 focus:border-gray-900 focus:ring focus:ring-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:border-white dark:focus:ring-gray-700'"
+                    label="启用限流机制"
                     :label-class="'inline-flex cursor-pointer items-center'"
                     :text-class="'text-sm text-gray-700 dark:text-gray-300'"
                   />
@@ -1693,7 +1693,7 @@
                     </p>
                   </div>
                 </div>
-              </label>
+              </Checkbox>
             </div>
 
             <!-- Claude 统一客户端标识配置 -->

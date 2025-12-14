@@ -1583,7 +1583,7 @@ import { storeToRefs } from 'pinia'
 import { showToast } from '@/utils/toast'
 import { useSettingsStore } from '@/stores/settings'
 import { apiClient } from '@/config/api'
-import { Badge, Checkbox } from '@/ui'
+import { Badge } from '@/ui'
 
 // 定义组件名称，用于keep-alive排除
 defineOptions({
