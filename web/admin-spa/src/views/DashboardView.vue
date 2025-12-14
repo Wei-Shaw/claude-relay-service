@@ -1,7 +1,27 @@
 <template>
   <div>
+    <!-- Skeleton Loading -->
+    <div v-if="loading && !dashboardData.totalApiKeys">
+      <!-- 主要统计骨架 -->
+      <div
+        class="mb-4 grid grid-cols-1 gap-3 sm:mb-6 sm:grid-cols-2 sm:gap-4 md:mb-8 md:gap-6 lg:grid-cols-4"
+      >
+        <div v-for="i in 8" :key="i" class="stat-card">
+          <div class="skeleton skeleton-text mb-2" style="width: 60%; height: 16px"></div>
+          <div class="skeleton skeleton-text mb-2" style="width: 80%; height: 32px"></div>
+          <div class="skeleton skeleton-text" style="width: 50%; height: 14px"></div>
+        </div>
+      </div>
+      <!-- 图表骨架 -->
+      <div class="mb-8">
+        <div class="skeleton skeleton-text mb-4" style="width: 30%; height: 24px"></div>
+        <div class="skeleton skeleton-rect" style="height: 400px"></div>
+      </div>
+    </div>
+
     <!-- 主要统计 -->
     <div
+      v-else
       class="mb-4 grid grid-cols-1 gap-3 sm:mb-6 sm:grid-cols-2 sm:gap-4 md:mb-8 md:gap-6 lg:grid-cols-4"
     >
       <div class="stat-card">
@@ -687,6 +707,7 @@ const themeStore = useThemeStore()
 const { isDarkMode } = storeToRefs(themeStore)
 
 const {
+  loading,
   dashboardData,
   costsData,
   dashboardModelStats,
@@ -1619,5 +1640,34 @@ onUnmounted(() => {
 
 .animate-spin {
   animation: spin 1s linear infinite;
+}
+
+/* Skeleton styles */
+.skeleton {
+  background: linear-gradient(90deg, #fafafa 25%, #eaeaea 50%, #fafafa 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+:global(.dark) .skeleton {
+  background: linear-gradient(90deg, #1f1f1f 25%, #2a2a2a 50%, #1f1f1f 75%);
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-text {
+  width: 100%;
+}
+
+.skeleton-rect {
+  width: 100%;
 }
 </style>

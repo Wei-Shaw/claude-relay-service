@@ -100,25 +100,23 @@
               </div>
               <div v-else class="mt-2 text-center">
                 <!-- 已是最新版提醒 -->
-                <transition mode="out-in" name="fade">
-                  <div
-                    v-if="versionInfo.noUpdateMessage"
-                    key="message"
-                    class="inline-block rounded-md border border-green-200 bg-green-100 px-3 py-1.5 dark:border-green-800 dark:bg-green-900/30"
-                  >
-                    <p class="text-xs font-medium text-green-700 dark:text-green-400">
-                      <i class="fas fa-check-circle mr-1" />当前已是最新版本
-                    </p>
-                  </div>
-                  <button
-                    v-else
-                    key="button"
-                    class="text-xs text-blue-500 transition-colors hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                    @click="checkForUpdates()"
-                  >
-                    <i class="fas fa-sync-alt mr-1" />检查更新
-                  </button>
-                </transition>
+                <div
+                  v-if="versionInfo.noUpdateMessage"
+                  key="message"
+                  class="inline-block rounded-md border border-green-200 bg-green-100 px-3 py-1.5 dark:border-green-800 dark:bg-green-900/30"
+                >
+                  <p class="text-xs font-medium text-green-700 dark:text-green-400">
+                    <i class="fas fa-check-circle mr-1" />当前已是最新版本
+                  </p>
+                </div>
+                <button
+                  v-else
+                  key="button"
+                  class="text-xs text-blue-500 transition-colors hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                  @click="checkForUpdates()"
+                >
+                  <i class="fas fa-sync-alt mr-1" />检查更新
+                </button>
               </div>
             </div>
 
@@ -481,13 +479,5 @@ onUnmounted(() => {
   }
 }
 
-/* fade过渡动画 */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
+/* fade过渡动画 - removed for immediate display */
 </style>

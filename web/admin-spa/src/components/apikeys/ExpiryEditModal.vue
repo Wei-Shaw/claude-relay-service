@@ -135,7 +135,7 @@
           </div>
 
           <!-- 自定义日期选择 -->
-          <div v-if="localForm.expireDuration === 'custom'" class="animate-fadeIn">
+          <div v-if="localForm.expireDuration === 'custom'">
             <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
               >选择日期和时间</label
             >
@@ -439,20 +439,7 @@ defineExpose({
 </script>
 
 <style scoped>
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.2s ease-out;
-}
+/* Animation removed for immediate display */
 
 .loading-spinner {
   width: 16px;

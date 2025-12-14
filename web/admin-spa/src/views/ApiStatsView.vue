@@ -74,7 +74,7 @@
         </div>
 
         <!-- 统计数据展示区域 -->
-        <div v-if="statsData" class="stats-section fade-in">
+        <div v-if="statsData" class="stats-section">
           <!-- 时间范围选择器 -->
           <div class="period-selector">
             <div class="period-label">
@@ -652,20 +652,7 @@ watch(apiKey, (newValue) => {
 /* ============================================
    ANIMATIONS
    ============================================ */
-.fade-in {
-  animation: fadeIn 0.3s ease-out;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+/* Removed fade-in animation for immediate content display */
 
 /* ============================================
    RESPONSIVE

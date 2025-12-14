@@ -46,8 +46,19 @@
         </div>
 
         <!-- Tab Content -->
+        <!-- Skeleton Loading for initial load -->
+        <div v-if="apiKeysLoading && apiKeys.length === 0" class="tab-panel">
+          <div class="space-y-3">
+            <div v-for="i in 5" :key="i" class="skeleton-card">
+              <div class="skeleton skeleton-text mb-2" style="width: 40%; height: 20px"></div>
+              <div class="skeleton skeleton-text mb-2" style="width: 70%; height: 16px"></div>
+              <div class="skeleton skeleton-text" style="width: 50%; height: 16px"></div>
+            </div>
+          </div>
+        </div>
+
         <!-- 活跃 API Keys Tab Panel -->
-        <div v-if="activeTab === 'active'" class="tab-panel">
+        <div v-else-if="activeTab === 'active'" class="tab-panel">
           <!-- 工具栏区域 - 添加 mb-4 增加与表格的间距 -->
           <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <!-- 左侧：查询筛选器组 -->
@@ -5002,5 +5013,35 @@ onUnmounted(() => {
 }
 .custom-date-range-picker :deep(.el-range-separator) {
   @apply mx-2 text-gray-500;
+}
+
+/* Skeleton Loading Styles */
+.skeleton-card {
+  @apply border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900;
+  border-radius: 8px;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #fafafa 25%, #eaeaea 50%, #fafafa 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+:global(.dark) .skeleton {
+  background: linear-gradient(90deg, #1f1f1f 25%, #2a2a2a 50%, #1f1f1f 75%);
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-text {
+  width: 100%;
 }
 </style>

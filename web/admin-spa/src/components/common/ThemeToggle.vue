@@ -7,11 +7,9 @@
       :title="themeTooltip"
       @click="handleCycleTheme"
     >
-      <transition mode="out-in" name="fade">
-        <i v-if="themeStore.themeMode === 'light'" key="sun" class="fas fa-sun" />
-        <i v-else-if="themeStore.themeMode === 'dark'" key="moon" class="fas fa-moon" />
-        <i v-else key="auto" class="fas fa-circle-half-stroke" />
-      </transition>
+      <i v-if="themeStore.themeMode === 'light'" key="sun" class="fas fa-sun" />
+      <i v-else-if="themeStore.themeMode === 'dark'" key="moon" class="fas fa-moon" />
+      <i v-else key="auto" class="fas fa-circle-half-stroke" />
     </button>
 
     <!-- 下拉菜单模式 - 改为创意切换开关 -->
@@ -377,34 +375,7 @@ const selectTheme = (mode) => {
   transition: transform 0.2s ease;
 }
 
-/* 过渡动画 */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
-.dropdown-enter-active {
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.dropdown-leave-active {
-  transition: all 0.2s cubic-bezier(0.4, 0, 1, 1);
-}
-
-.dropdown-enter-from {
-  opacity: 0;
-  transform: translateY(-10px) scale(0.95);
-}
-
-.dropdown-leave-to {
-  opacity: 0;
-  transform: translateY(-5px) scale(0.98);
-}
+/* 过渡动画 - removed for immediate display */
 
 /* 响应式调整 */
 @media (max-width: 640px) {

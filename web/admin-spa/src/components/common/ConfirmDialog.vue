@@ -1,47 +1,45 @@
 <template>
   <Teleport to="body">
-    <Transition appear name="modal">
-      <div
-        v-if="isVisible"
-        class="modal fixed inset-0 z-[100] flex items-center justify-center p-4"
-        @click.self="handleCancel"
-      >
-        <div class="modal-content mx-auto w-full max-w-md p-6">
-          <div class="mb-6 flex items-start gap-4">
-            <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center">
-              <i class="fas fa-exclamation-triangle text-2xl text-orange-500" />
-            </div>
-            <div class="flex-1">
-              <h3 class="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
-                {{ title }}
-              </h3>
-              <div class="whitespace-pre-line leading-relaxed text-gray-700 dark:text-gray-400">
-                {{ message }}
-              </div>
-            </div>
+    <div
+      v-if="isVisible"
+      class="modal fixed inset-0 z-[100] flex items-center justify-center p-4"
+      @click.self="handleCancel"
+    >
+      <div class="modal-content mx-auto w-full max-w-md p-6">
+        <div class="mb-6 flex items-start gap-4">
+          <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center">
+            <i class="fas fa-exclamation-triangle text-2xl text-orange-500" />
           </div>
-
-          <div class="flex items-center justify-end gap-3">
-            <button
-              class="btn bg-gray-100 px-6 py-3 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-              :disabled="isProcessing"
-              @click="handleCancel"
-            >
-              {{ cancelText }}
-            </button>
-            <button
-              class="btn btn-warning px-6 py-3"
-              :class="{ 'cursor-not-allowed opacity-50': isProcessing }"
-              :disabled="isProcessing"
-              @click="handleConfirm"
-            >
-              <div v-if="isProcessing" class="loading-spinner mr-2" />
-              {{ confirmText }}
-            </button>
+          <div class="flex-1">
+            <h3 class="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
+              {{ title }}
+            </h3>
+            <div class="whitespace-pre-line leading-relaxed text-gray-700 dark:text-gray-400">
+              {{ message }}
+            </div>
           </div>
         </div>
+
+        <div class="flex items-center justify-end gap-3">
+          <button
+            class="btn bg-gray-100 px-6 py-3 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+            :disabled="isProcessing"
+            @click="handleCancel"
+          >
+            {{ cancelText }}
+          </button>
+          <button
+            class="btn btn-warning px-6 py-3"
+            :class="{ 'cursor-not-allowed opacity-50': isProcessing }"
+            :disabled="isProcessing"
+            @click="handleConfirm"
+          >
+            <div v-if="isProcessing" class="loading-spinner mr-2" />
+            {{ confirmText }}
+          </button>
+        </div>
       </div>
-    </Transition>
+    </div>
   </Teleport>
 </template>
 
@@ -173,26 +171,7 @@ defineExpose({
   @apply h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-white;
 }
 
-/* Modal transitions */
-.modal-enter-active,
-.modal-leave-active {
-  transition: all 0.3s ease;
-}
-
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
-}
-
-.modal-enter-active .modal-content,
-.modal-leave-active .modal-content {
-  transition: transform 0.3s ease;
-}
-
-.modal-enter-from .modal-content,
-.modal-leave-to .modal-content {
-  transform: scale(0.9) translateY(-20px);
-}
+/* Modal transitions - removed for immediate display */
 
 /* Scrollbar styling */
 .modal-content::-webkit-scrollbar {

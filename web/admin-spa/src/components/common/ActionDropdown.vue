@@ -17,36 +17,27 @@
 
     <!-- 下拉菜单 - 使用 Teleport 避免被父容器裁剪 -->
     <Teleport to="body">
-      <transition
-        enter-active-class="transition duration-200 ease-out"
-        enter-from-class="transform scale-95 opacity-0"
-        enter-to-class="transform scale-100 opacity-100"
-        leave-active-class="transition duration-150 ease-in"
-        leave-from-class="transform scale-100 opacity-100"
-        leave-to-class="transform scale-95 opacity-0"
+      <div
+        v-if="isOpen"
+        ref="dropdownRef"
+        class="fixed z-[9999] min-w-[140px] overflow-hidden border border-gray-200 bg-white py-1 dark:border-gray-600 dark:bg-gray-800"
+        :style="{
+          ...dropdownStyle,
+          borderRadius: '5px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)'
+        }"
       >
-        <div
-          v-if="isOpen"
-          ref="dropdownRef"
-          class="fixed z-[9999] min-w-[140px] overflow-hidden border border-gray-200 bg-white py-1 dark:border-gray-600 dark:bg-gray-800"
-          :style="{
-            ...dropdownStyle,
-            borderRadius: '5px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)'
-          }"
+        <button
+          v-for="action in actions"
+          :key="action.key"
+          class="flex w-full items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-sm transition-colors duration-150"
+          :class="getActionClass(action)"
+          @click.stop="handleAction(action)"
         >
-          <button
-            v-for="action in actions"
-            :key="action.key"
-            class="flex w-full items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-sm transition-colors duration-150"
-            :class="getActionClass(action)"
-            @click.stop="handleAction(action)"
-          >
-            <i :class="['fas', action.icon, 'w-4 text-center text-xs']"></i>
-            <span>{{ action.label }}</span>
-          </button>
-        </div>
-      </transition>
+          <i :class="['fas', action.icon, 'w-4 text-center text-xs']"></i>
+          <span>{{ action.label }}</span>
+        </button>
+      </div>
     </Teleport>
   </div>
 </template>

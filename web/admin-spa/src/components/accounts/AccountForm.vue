@@ -209,7 +209,7 @@
                 <!-- 子平台选择器 -->
                 <div
                   v-if="platformGroup"
-                  class="animate-fadeIn rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50"
+                  class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50"
                 >
                   <p class="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">
                     选择具体平台类型：
@@ -6287,18 +6287,5 @@ watch(
 </script>
 
 <style scoped>
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.3s ease-out;
-}
+/* Animation removed for immediate display */
 </style>

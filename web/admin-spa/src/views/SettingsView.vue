@@ -1512,26 +1512,17 @@
                 </label>
                 <Badge v-if="platformForm.enableSign" size="sm" variant="success"> 已启用 </Badge>
               </div>
-              <transition
-                enter-active-class="transition-all duration-200 ease-out"
-                enter-from-class="opacity-0 -translate-y-2"
-                enter-to-class="opacity-100 translate-y-0"
-                leave-active-class="transition-all duration-150 ease-in"
-                leave-from-class="opacity-100 translate-y-0"
-                leave-to-class="opacity-0 -translate-y-2"
-              >
-                <div v-if="platformForm.enableSign">
-                  <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    签名密钥
-                  </label>
-                  <input
-                    v-model="platformForm.secret"
-                    class="w-full rounded border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
-                    placeholder="SEC..."
-                    type="text"
-                  />
-                </div>
-              </transition>
+              <div v-if="platformForm.enableSign">
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  签名密钥
+                </label>
+                <input
+                  v-model="platformForm.secret"
+                  class="w-full rounded border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
+                  placeholder="SEC..."
+                  type="text"
+                />
+              </div>
             </div>
           </div>
         </div>
