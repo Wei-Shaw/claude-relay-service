@@ -2,8 +2,8 @@
   <div class="space-y-6">
     <div class="sm:flex sm:items-center">
       <div class="sm:flex-auto">
-        <h1 class="text-2xl font-semibold text-gray-900">Usage Statistics</h1>
-        <p class="mt-2 text-sm text-gray-700">View your API usage statistics and costs</p>
+        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">Usage Statistics</h1>
+        <p class="mt-2 text-sm text-gray-700 dark:text-gray-200">View your API usage statistics and costs</p>
       </div>
       <div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
         <select
@@ -46,7 +46,7 @@
 
     <!-- Stats Cards -->
     <div v-else class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-      <div class="overflow-hidden rounded-lg bg-white shadow">
+      <div class="overflow-hidden rounded-lg bg-white dark:bg-gray-800 shadow">
         <div class="p-5">
           <div class="flex items-center">
             <div class="flex-shrink-0">
@@ -67,7 +67,7 @@
             <div class="ml-5 w-0 flex-1">
               <dl>
                 <dt class="truncate text-sm font-medium text-gray-500">Total Requests</dt>
-                <dd class="text-lg font-medium text-gray-900">
+                <dd class="text-lg font-medium text-gray-900 dark:text-white">
                   {{ formatNumber(usageStats?.totalRequests || 0) }}
                 </dd>
               </dl>
@@ -76,7 +76,7 @@
         </div>
       </div>
 
-      <div class="overflow-hidden rounded-lg bg-white shadow">
+      <div class="overflow-hidden rounded-lg bg-white dark:bg-gray-800 shadow">
         <div class="p-5">
           <div class="flex items-center">
             <div class="flex-shrink-0">
@@ -97,7 +97,7 @@
             <div class="ml-5 w-0 flex-1">
               <dl>
                 <dt class="truncate text-sm font-medium text-gray-500">Input Tokens</dt>
-                <dd class="text-lg font-medium text-gray-900">
+                <dd class="text-lg font-medium text-gray-900 dark:text-white">
                   {{ formatNumber(usageStats?.totalInputTokens || 0) }}
                 </dd>
               </dl>
@@ -106,7 +106,7 @@
         </div>
       </div>
 
-      <div class="overflow-hidden rounded-lg bg-white shadow">
+      <div class="overflow-hidden rounded-lg bg-white dark:bg-gray-800 shadow">
         <div class="p-5">
           <div class="flex items-center">
             <div class="flex-shrink-0">
@@ -127,7 +127,7 @@
             <div class="ml-5 w-0 flex-1">
               <dl>
                 <dt class="truncate text-sm font-medium text-gray-500">Output Tokens</dt>
-                <dd class="text-lg font-medium text-gray-900">
+                <dd class="text-lg font-medium text-gray-900 dark:text-white">
                   {{ formatNumber(usageStats?.totalOutputTokens || 0) }}
                 </dd>
               </dl>
@@ -136,7 +136,7 @@
         </div>
       </div>
 
-      <div class="overflow-hidden rounded-lg bg-white shadow">
+      <div class="overflow-hidden rounded-lg bg-white dark:bg-gray-800 shadow">
         <div class="p-5">
           <div class="flex items-center">
             <div class="flex-shrink-0">
@@ -157,7 +157,7 @@
             <div class="ml-5 w-0 flex-1">
               <dl>
                 <dt class="truncate text-sm font-medium text-gray-500">Total Cost</dt>
-                <dd class="text-lg font-medium text-gray-900">
+                <dd class="text-lg font-medium text-gray-900 dark:text-white">
                   ${{ (usageStats?.totalCost || 0).toFixed(4) }}
                 </dd>
               </dl>
@@ -168,13 +168,13 @@
     </div>
 
     <!-- Daily Usage Chart -->
-    <div v-if="!loading && usageStats" class="rounded-lg bg-white shadow">
+    <div v-if="!loading && usageStats" class="rounded-lg bg-white dark:bg-gray-800 shadow">
       <div class="px-4 py-5 sm:p-6">
-        <h3 class="mb-4 text-lg font-medium leading-6 text-gray-900">Daily Usage Trend</h3>
+        <h3 class="mb-4 text-lg font-medium leading-6 text-gray-900 dark:text-white">Daily Usage Trend</h3>
 
         <!-- Placeholder for chart - you can integrate Chart.js or similar -->
         <div
-          class="flex h-64 items-center justify-center rounded-lg border-2 border-dashed border-gray-300"
+          class="flex h-64 items-center justify-center rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600"
         >
           <div class="text-center">
             <svg
@@ -190,7 +190,7 @@
                 stroke-width="2"
               />
             </svg>
-            <h3 class="mt-2 text-sm font-medium text-gray-900">Usage Chart</h3>
+            <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">Usage Chart</h3>
             <p class="mt-1 text-sm text-gray-500">Daily usage trends would be displayed here</p>
             <p class="mt-2 text-xs text-gray-400">
               (Chart integration can be added with Chart.js, D3.js, or similar library)
@@ -203,10 +203,10 @@
     <!-- Model Usage Breakdown -->
     <div
       v-if="!loading && usageStats && usageStats.modelStats?.length > 0"
-      class="rounded-lg bg-white shadow"
+      class="rounded-lg bg-white dark:bg-gray-800 shadow"
     >
       <div class="px-4 py-5 sm:p-6">
-        <h3 class="mb-4 text-lg font-medium leading-6 text-gray-900">Usage by Model</h3>
+        <h3 class="mb-4 text-lg font-medium leading-6 text-gray-900 dark:text-white">Usage by Model</h3>
         <div class="space-y-3">
           <div
             v-for="model in usageStats.modelStats"
@@ -218,11 +218,11 @@
                 <div class="h-2 w-2 rounded-full bg-blue-500"></div>
               </div>
               <div class="ml-3">
-                <p class="text-sm font-medium text-gray-900">{{ model.name }}</p>
+                <p class="text-sm font-medium text-gray-900 dark:text-white">{{ model.name }}</p>
               </div>
             </div>
             <div class="text-right">
-              <p class="text-sm text-gray-900">{{ formatNumber(model.requests) }} requests</p>
+              <p class="text-sm text-gray-900 dark:text-white">{{ formatNumber(model.requests) }} requests</p>
               <p class="text-xs text-gray-500">${{ model.cost.toFixed(4) }}</p>
             </div>
           </div>
@@ -231,67 +231,67 @@
     </div>
 
     <!-- Detailed Usage Table -->
-    <div v-if="!loading && userApiKeys.length > 0" class="rounded-lg bg-white shadow">
+    <div v-if="!loading && userApiKeys.length > 0" class="rounded-lg bg-white dark:bg-gray-800 shadow">
       <div class="px-4 py-5 sm:p-6">
-        <h3 class="mb-4 text-lg font-medium leading-6 text-gray-900">Usage by API Key</h3>
+        <h3 class="mb-4 text-lg font-medium leading-6 text-gray-900 dark:text-white">Usage by API Key</h3>
         <div class="overflow-hidden">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
+          <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-700">
               <tr>
                 <th
-                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   scope="col"
                 >
                   API Key
                 </th>
                 <th
-                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   scope="col"
                 >
                   Requests
                 </th>
                 <th
-                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   scope="col"
                 >
                   Input Tokens
                 </th>
                 <th
-                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   scope="col"
                 >
                   Output Tokens
                 </th>
                 <th
-                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   scope="col"
                 >
                   Cost
                 </th>
                 <th
-                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   scope="col"
                 >
                   Status
                 </th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200 bg-white">
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
               <tr v-for="apiKey in userApiKeys" :key="apiKey.id">
                 <td class="whitespace-nowrap px-6 py-4">
-                  <div class="text-sm font-medium text-gray-900">{{ apiKey.name }}</div>
+                  <div class="text-sm font-medium text-gray-900 dark:text-white">{{ apiKey.name }}</div>
                   <div class="text-sm text-gray-500">{{ apiKey.keyPreview }}</div>
                 </td>
-                <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white">
                   {{ formatNumber(apiKey.usage?.requests || 0) }}
                 </td>
-                <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white">
                   {{ formatNumber(apiKey.usage?.inputTokens || 0) }}
                 </td>
-                <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white">
                   {{ formatNumber(apiKey.usage?.outputTokens || 0) }}
                 </td>
-                <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white">
                   ${{ (apiKey.usage?.totalCost || 0).toFixed(4) }}
                 </td>
                 <td class="whitespace-nowrap px-6 py-4">
@@ -299,10 +299,10 @@
                     :class="[
                       'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
                       apiKey.isDeleted === 'true' || apiKey.deletedAt
-                        ? 'bg-gray-100 text-gray-800'
+                        ? 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
                         : apiKey.isActive
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
+                          ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
+                          : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
                     ]"
                   >
                     {{
@@ -339,7 +339,7 @@
           stroke-width="2"
         />
       </svg>
-      <h3 class="mt-2 text-sm font-medium text-gray-900">No usage data</h3>
+      <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No usage data</h3>
       <p class="mt-1 text-sm text-gray-500">
         You haven't made any API requests yet. Create an API key and start using the service to see
         usage statistics.

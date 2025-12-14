@@ -5,11 +5,11 @@
         <div class="mb-6 flex items-center justify-between">
           <div class="flex items-center gap-3">
             <div
-              class="flex h-10 w-10 items-center justify-center rounded bg-gray-900 dark:bg-gray-100"
+              class="flex h-10 w-10 items-center justify-center rounded bg-gray-900 dark:bg-gray-100 dark:bg-gray-700"
             >
               <i class="fas fa-clock text-white" />
             </div>
-            <h3 class="text-xl font-bold text-gray-900">续期 API Key</h3>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white">续期 API Key</h3>
           </div>
           <button
             class="text-gray-400 transition-colors hover:text-gray-600"
@@ -20,16 +20,16 @@
         </div>
 
         <div class="modal-scroll-content custom-scrollbar flex-1 space-y-6">
-          <div class="rounded-lg border border-gray-300 bg-blue-50 p-4">
+          <div class="rounded-lg border border-gray-300 dark:border-gray-600 bg-blue-50 p-4">
             <div class="flex items-start gap-3">
               <div
-                class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100"
+                class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100 dark:bg-gray-700"
               >
                 <i class="fas fa-info text-sm text-white" />
               </div>
               <div>
                 <h4 class="mb-1 font-semibold text-gray-800">API Key 信息</h4>
-                <p class="text-sm text-gray-700">
+                <p class="text-sm text-gray-700 dark:text-gray-200">
                   {{ apiKey.name }}
                 </p>
                 <p class="mt-1 text-xs text-gray-600">
@@ -42,7 +42,7 @@
           </div>
 
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700">续期时长</label>
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-200">续期时长</label>
             <select
               v-model="form.renewDuration"
               class="form-input w-full"
@@ -73,7 +73,7 @@
 
         <div class="flex gap-3 pt-4">
           <button
-            class="flex-1 rounded bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200"
+            class="flex-1 rounded bg-gray-100 dark:bg-gray-700 px-6 py-3 font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-200"
             type="button"
             @click="$emit('close')"
           >

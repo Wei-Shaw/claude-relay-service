@@ -791,7 +791,7 @@
                       某些 Google 账号（特别是绑定了 Google Cloud 的账号）会被识别为 Workspace
                       账号，需要提供额外的项目 ID。
                     </p>
-                    <div class="mt-2 rounded border border-yellow-300 bg-white p-2">
+                    <div class="mt-2 rounded border border-yellow-300 dark:border-yellow-600 bg-white dark:bg-gray-800 p-2">
                       <p class="mb-1 font-medium">如何获取项目 ID：</p>
                       <ol class="ml-2 list-inside list-decimal space-y-1">
                         <li>

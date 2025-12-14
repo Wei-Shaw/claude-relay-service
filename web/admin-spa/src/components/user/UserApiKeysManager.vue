@@ -2,14 +2,14 @@
   <div class="space-y-6">
     <div class="sm:flex sm:items-center">
       <div class="sm:flex-auto">
-        <h1 class="text-2xl font-semibold text-gray-900">My API Keys</h1>
-        <p class="mt-2 text-sm text-gray-700">
+        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">My API Keys</h1>
+        <p class="mt-2 text-sm text-gray-700 dark:text-gray-200">
           Manage your API keys to access Claude Relay services
         </p>
       </div>
       <div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
         <button
-          class="inline-flex items-center justify-center rounded-md border border-transparent bg-black dark:bg-white px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-800 dark:hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+          class="inline-flex items-center justify-center rounded-md border border-transparent bg-black dark:bg-white dark:bg-gray-800 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-800 dark:hover:bg-gray-100 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           :disabled="activeApiKeysCount >= maxApiKeys"
           @click="showCreateModal = true"
         >
@@ -76,8 +76,8 @@
     </div>
 
     <!-- API Keys List -->
-    <div v-else-if="sortedApiKeys.length > 0" class="overflow-hidden bg-white shadow sm:rounded-md">
-      <ul class="divide-y divide-gray-200" role="list">
+    <div v-else-if="sortedApiKeys.length > 0" class="overflow-hidden bg-white dark:bg-gray-800 shadow sm:rounded-md">
+      <ul class="divide-y divide-gray-200 dark:divide-gray-700" role="list">
         <li v-for="apiKey in sortedApiKeys" :key="apiKey.id" class="px-6 py-4">
           <div class="flex items-center justify-between">
             <div class="flex items-center">
@@ -95,10 +95,10 @@
               </div>
               <div class="ml-4">
                 <div class="flex items-center">
-                  <p class="text-sm font-medium text-gray-900">{{ apiKey.name }}</p>
+                  <p class="text-sm font-medium text-gray-900 dark:text-white">{{ apiKey.name }}</p>
                   <span
                     v-if="apiKey.isDeleted === 'true' || apiKey.deletedAt"
-                    class="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800"
+                    class="ml-2 inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2.5 py-0.5 text-xs font-medium text-gray-800"
                   >
                     Deleted
                   </span>
@@ -199,11 +199,11 @@
           stroke-width="2"
         />
       </svg>
-      <h3 class="mt-2 text-sm font-medium text-gray-900">No API keys</h3>
+      <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No API keys</h3>
       <p class="mt-1 text-sm text-gray-500">Get started by creating your first API key.</p>
       <div class="mt-6">
         <button
-          class="inline-flex items-center rounded-md border border-transparent bg-black dark:bg-white px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-800 dark:hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white focus:ring-offset-2"
+          class="inline-flex items-center rounded-md border border-transparent bg-black dark:bg-white dark:bg-gray-800 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-800 dark:hover:bg-gray-100 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white focus:ring-offset-2"
           @click="showCreateModal = true"
         >
           <svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

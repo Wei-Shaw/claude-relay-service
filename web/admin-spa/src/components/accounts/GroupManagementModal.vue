@@ -7,11 +7,11 @@
         <div class="mb-4 flex items-center justify-between sm:mb-6">
           <div class="flex items-center gap-2 sm:gap-3">
             <div
-              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100 sm:h-10 sm:w-10 sm:rounded"
+              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100 dark:bg-gray-700 sm:h-10 sm:w-10 sm:rounded"
             >
               <i class="fas fa-layer-group text-sm text-white sm:text-base" />
             </div>
-            <h3 class="text-lg font-bold text-gray-900 sm:text-xl">账户分组管理</h3>
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white sm:text-xl">账户分组管理</h3>
           </div>
           <button
             class="p-1 text-gray-400 transition-colors hover:text-gray-600"
@@ -30,11 +30,11 @@
         </div>
 
         <!-- 创建分组表单 -->
-        <div v-if="showCreateForm" class="mb-6 rounded-lg border border-gray-300 bg-blue-50 p-4">
-          <h4 class="mb-4 text-lg font-semibold text-gray-900">创建新分组</h4>
+        <div v-if="showCreateForm" class="mb-6 rounded-lg border border-gray-300 dark:border-gray-600 bg-blue-50 p-4">
+          <h4 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">创建新分组</h4>
           <div class="space-y-4">
             <div>
-              <label class="mb-2 block text-sm font-semibold text-gray-700">分组名称 *</label>
+              <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">分组名称 *</label>
               <input
                 v-model="createForm.name"
                 class="form-input w-full"
@@ -44,29 +44,29 @@
             </div>
 
             <div>
-              <label class="mb-2 block text-sm font-semibold text-gray-700">平台类型 *</label>
+              <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">平台类型 *</label>
               <div class="flex gap-4">
                 <label class="flex cursor-pointer items-center">
                   <input v-model="createForm.platform" class="mr-2" type="radio" value="claude" />
-                  <span class="text-sm text-gray-700">Claude</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-200">Claude</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input v-model="createForm.platform" class="mr-2" type="radio" value="gemini" />
-                  <span class="text-sm text-gray-700">Gemini</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-200">Gemini</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input v-model="createForm.platform" class="mr-2" type="radio" value="openai" />
-                  <span class="text-sm text-gray-700">OpenAI</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-200">OpenAI</span>
                 </label>
                 <label class="flex cursor-pointer items-center">
                   <input v-model="createForm.platform" class="mr-2" type="radio" value="droid" />
-                  <span class="text-sm text-gray-700">Droid</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-200">Droid</span>
                 </label>
               </div>
             </div>
 
             <div>
-              <label class="mb-2 block text-sm font-semibold text-gray-700">描述 (可选)</label>
+              <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">描述 (可选)</label>
               <textarea
                 v-model="createForm.description"
                 class="form-input w-full resize-none"
@@ -96,7 +96,7 @@
             <p class="text-gray-500">加载中...</p>
           </div>
 
-          <div v-else-if="groups.length === 0" class="rounded-lg bg-gray-50 py-8 text-center">
+          <div v-else-if="groups.length === 0" class="rounded-lg bg-gray-50 dark:bg-gray-700 py-8 text-center">
             <i class="fas fa-layer-group mb-4 text-4xl text-gray-300" />
             <p class="text-gray-500">暂无分组</p>
           </div>
@@ -105,11 +105,11 @@
             <div
               v-for="group in groups"
               :key="group.id"
-              class="rounded-lg border bg-white p-4 transition-shadow hover:shadow-md"
+              class="rounded-lg border bg-white dark:bg-gray-800 p-4 transition-shadow hover:shadow-md"
             >
               <div class="mb-3 flex items-start justify-between">
                 <div class="flex-1">
-                  <h4 class="font-semibold text-gray-900">
+                  <h4 class="font-semibold text-gray-900 dark:text-white">
                     {{ group.name }}
                   </h4>
                   <p class="mt-1 text-sm text-gray-500">
@@ -123,10 +123,10 @@
                       group.platform === 'claude'
                         ? 'bg-purple-100 text-purple-700'
                         : group.platform === 'gemini'
-                          ? 'bg-blue-100 text-gray-900 dark:text-white'
+                          ? 'bg-blue-100 dark:bg-blue-900 text-gray-900 dark:text-white'
                           : group.platform === 'openai'
-                            ? 'bg-gray-100 text-gray-700'
-                            : 'bg-cyan-100 text-cyan-700'
+                            ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200'
+                            : 'bg-cyan-100 dark:bg-cyan-900 text-cyan-700 dark:text-cyan-200'
                     ]"
                   >
                     {{
@@ -184,7 +184,7 @@
     >
       <div class="modal-content w-full max-w-lg p-4 sm:p-6">
         <div class="mb-4 flex items-center justify-between">
-          <h3 class="text-lg font-bold text-gray-900">编辑分组</h3>
+          <h3 class="text-lg font-bold text-gray-900 dark:text-white">编辑分组</h3>
           <button class="text-gray-400 transition-colors hover:text-gray-600" @click="cancelEdit">
             <i class="fas fa-times" />
           </button>
@@ -192,7 +192,7 @@
 
         <div class="space-y-4">
           <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700">分组名称 *</label>
+            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">分组名称 *</label>
             <input
               v-model="editForm.name"
               class="form-input w-full"
@@ -202,8 +202,8 @@
           </div>
 
           <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700">平台类型</label>
-            <div class="rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-600">
+            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">平台类型</label>
+            <div class="rounded-lg bg-gray-100 dark:bg-gray-700 px-3 py-2 text-sm text-gray-600">
               {{
                 editForm.platform === 'claude'
                   ? 'Claude'
@@ -216,7 +216,7 @@
           </div>
 
           <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700">描述 (可选)</label>
+            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">描述 (可选)</label>
             <textarea
               v-model="editForm.description"
               class="form-input w-full resize-none"

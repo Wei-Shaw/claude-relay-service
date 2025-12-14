@@ -17,7 +17,7 @@
       class="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-600 dark:bg-gray-800"
     >
       <div class="mb-3 flex items-start gap-3">
-        <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gray-500">
+        <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gray-500 dark:bg-gray-600">
           <i class="fas fa-server text-sm text-white" />
         </div>
         <div class="flex-1">

@@ -5,7 +5,7 @@
         <div class="mb-4 flex items-center justify-between">
           <div class="flex items-center gap-2 sm:gap-3">
             <div
-              class="flex h-8 w-8 items-center justify-center rounded bg-gray-900 dark:bg-gray-100 sm:h-10 sm:w-10"
+              class="flex h-8 w-8 items-center justify-center rounded bg-gray-900 dark:bg-gray-100 dark:bg-gray-700 sm:h-10 sm:w-10"
             >
               <i class="fas fa-key text-sm text-white dark:text-black sm:text-base" />
             </div>
@@ -213,7 +213,7 @@
           >
             <div class="mb-2 flex items-center gap-2">
               <div
-                class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-gray-900 dark:bg-gray-100"
+                class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-gray-900 dark:bg-gray-100 dark:bg-gray-700"
               >
                 <i class="fas fa-tachometer-alt text-xs text-white" />
               </div>
@@ -559,7 +559,7 @@
                 <button
                   v-for="value in getQuickTimeOptions()"
                   :key="value.value"
-                  class="rounded-md border border-gray-300 px-3 py-1 text-xs hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-700"
+                  class="rounded-md border border-gray-300 px-3 py-1 text-xs hover:bg-gray-100 dark:bg-gray-700 dark:border-gray-600 dark:hover:bg-gray-700"
                   type="button"
                   @click="form.activationDays = value.value"
                 >
@@ -735,7 +735,7 @@
               <input
                 id="enableModelRestriction"
                 v-model="form.enableModelRestriction"
-                class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white"
+                class="h-4 w-4 rounded border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white"
                 type="checkbox"
               />
               <label
@@ -750,7 +750,7 @@
               <div>
                 <label class="mb-2 block text-sm font-medium text-gray-600">限制的模型列表</label>
                 <div
-                  class="mb-3 flex min-h-[32px] flex-wrap gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2"
+                  class="mb-3 flex min-h-[32px] flex-wrap gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 p-2"
                 >
                   <span
                     v-for="(model, index) in form.restrictedModels"
@@ -776,7 +776,7 @@
                     <button
                       v-for="model in availableQuickModels"
                       :key="model"
-                      class="flex-shrink-0 rounded-lg bg-gray-100 px-3 py-1 text-xs text-gray-700 transition-colors hover:bg-gray-200 sm:text-sm"
+                      class="flex-shrink-0 rounded-lg bg-gray-100 dark:bg-gray-700 px-3 py-1 text-xs text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-200 sm:text-sm"
                       type="button"
                       @click="quickAddRestrictedModel(model)"
                     >
@@ -821,7 +821,7 @@
               <input
                 id="enableClientRestriction"
                 v-model="form.enableClientRestriction"
-                class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white"
+                class="h-4 w-4 rounded border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white"
                 type="checkbox"
               />
               <label
@@ -845,7 +845,7 @@
                     <input
                       :id="`client_${client.id}`"
                       v-model="form.allowedClients"
-                      class="mt-0.5 h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white"
+                      class="mt-0.5 h-4 w-4 rounded border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-gray-900 dark:focus:ring-white"
                       type="checkbox"
                       :value="client.id"
                     />

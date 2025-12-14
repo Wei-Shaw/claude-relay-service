@@ -44,7 +44,7 @@
               <span class="ml-2 hidden sm:inline">聚合</span>
               <span
                 v-if="multiKeyMode && parsedApiKeys.length > 0"
-                class="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-xs font-semibold"
+                class="ml-1 rounded-full bg-white dark:bg-gray-800/20 px-1.5 py-0.5 text-xs font-semibold"
               >
                 {{ parsedApiKeys.length }}
               </span>

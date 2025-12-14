@@ -1141,10 +1141,10 @@
                       :class="[
                         'rounded px-2.5 py-1 text-xs font-medium transition-colors',
                         account.isTogglingSchedulable
-                          ? 'cursor-not-allowed bg-gray-100 text-gray-400'
+                          ? 'cursor-not-allowed bg-gray-100 dark:bg-gray-700 text-gray-400'
                           : account.schedulable
-                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
                       ]"
                       :disabled="account.isTogglingSchedulable"
                       :title="account.schedulable ? '点击禁用调度' : '点击启用调度'"
