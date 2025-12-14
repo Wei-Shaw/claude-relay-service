@@ -23,13 +23,11 @@
             {{ calculatePercentage(stat) }}%
           </span>
         </div>
-        <div class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
-          <div
-            class="h-2 rounded-full transition-all duration-300"
-            :class="getProgressColor(index)"
-            :style="{ width: calculatePercentage(stat) + '%' }"
-          />
-        </div>
+        <Progress
+          :value="calculatePercentage(stat)"
+          :variant="getProgressVariant(index)"
+          size="md"
+        />
         <div
           class="mt-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
         >
@@ -72,6 +70,7 @@
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
+import { Progress } from '@/ui'
 
 const apiStatsStore = useApiStatsStore()
 const { aggregatedStats, individualStats, statsPeriod, multiKeyMode } = storeToRefs(apiStatsStore)
@@ -139,10 +138,10 @@ const calculatePercentage = (stat) => {
   return Math.round(percentage)
 }
 
-// 获取进度条颜色
-const getProgressColor = (index) => {
-  const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-yellow-500', 'bg-pink-500']
-  return colors[index] || 'bg-gray-400'
+// 获取进度条变体
+const getProgressVariant = (index) => {
+  const variants = ['success', 'success', 'default', 'warning', 'error']
+  return variants[index] || 'default'
 }
 
 // 格式化数字

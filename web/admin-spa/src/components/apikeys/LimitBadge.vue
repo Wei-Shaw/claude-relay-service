@@ -10,18 +10,15 @@
       <span class="text-xs">${{ limit.toFixed(2) }}</span>
     </div>
     <!-- 小型进度条 -->
-    <div class="h-1 w-12 rounded-full bg-gray-200 dark:bg-gray-600">
-      <div
-        class="h-1 rounded-full transition-all duration-300"
-        :class="progressClass"
-        :style="{ width: progress + '%' }"
-      />
+    <div class="w-12">
+      <Progress :value="progress" :variant="progressVariant" size="sm" />
     </div>
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import { Progress } from '@/ui'
 
 const props = defineProps({
   type: {
@@ -66,10 +63,10 @@ const iconClass = computed(() => {
   }
 })
 
-const progressClass = computed(() => {
+const progressVariant = computed(() => {
   const p = progress.value
-  if (p >= 100) return 'bg-red-600 dark:bg-red-500'
-  if (p >= 80) return 'bg-orange-500 dark:bg-orange-400'
-  return 'bg-black dark:bg-white'
+  if (p >= 100) return 'error'
+  if (p >= 80) return 'warning'
+  return 'default'
 })
 </script>

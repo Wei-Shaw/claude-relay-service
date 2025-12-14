@@ -2827,19 +2827,7 @@
                   ${{ calculateCurrentUsage().toFixed(4) }} / ${{ form.dailyQuota.toFixed(2) }}
                 </span>
               </div>
-              <div class="relative h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
-                <div
-                  class="absolute left-0 top-0 h-full rounded-full transition-all"
-                  :class="
-                    usagePercentage >= 90
-                      ? 'bg-red-500'
-                      : usagePercentage >= 70
-                        ? 'bg-yellow-500'
-                        : 'bg-green-500'
-                  "
-                  :style="{ width: `${Math.min(usagePercentage, 100)}%` }"
-                />
-              </div>
+              <Progress :value="Math.min(usagePercentage, 100)" :variant="usageVariant" size="md" />
               <div class="mt-2 flex items-center justify-between text-xs">
                 <span class="text-gray-500 dark:text-gray-400">
                   剩余: ${{ Math.max(0, form.dailyQuota - calculateCurrentUsage()).toFixed(2) }}
@@ -3752,6 +3740,7 @@ import OAuthFlow from './OAuthFlow.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import GroupManagementModal from './GroupManagementModal.vue'
 import ApiKeyManagementModal from './ApiKeyManagementModal.vue'
+import { Progress } from '@/ui'
 
 const props = defineProps({
   account: {
@@ -4210,6 +4199,14 @@ const usagePercentage = computed(() => {
   }
   const currentUsage = calculateCurrentUsage()
   return (currentUsage / form.value.dailyQuota) * 100
+})
+
+// 进度条变体（基于使用百分比）
+const usageVariant = computed(() => {
+  const percentage = usagePercentage.value
+  if (percentage >= 90) return 'error'
+  if (percentage >= 70) return 'warning'
+  return 'success'
 })
 
 // 当前账户的 API Key 数量（仅用于展示）

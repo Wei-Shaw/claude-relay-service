@@ -120,19 +120,13 @@
               </span>
             </span>
           </div>
-          <div
+          <Progress
             v-if="statsData.limits.dailyCostLimit > 0"
-            class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700"
-          >
-            <div
-              class="h-2 rounded-full transition-all duration-300"
-              :class="getDailyCostProgressColor()"
-              :style="{ width: getDailyCostProgress() + '%' }"
-            />
-          </div>
-          <div v-else class="h-2 w-full rounded-full bg-gray-200">
-            <div class="h-2 rounded-full bg-green-500" style="width: 0%" />
-          </div>
+            :value="getDailyCostProgress()"
+            :variant="getDailyCostProgressVariant()"
+            size="md"
+          />
+          <Progress v-else :value="0" variant="success" size="md" />
         </div>
 
         <!-- 总费用限制 -->
@@ -152,19 +146,13 @@
               </span>
             </span>
           </div>
-          <div
+          <Progress
             v-if="statsData.limits.totalCostLimit > 0"
-            class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700"
-          >
-            <div
-              class="h-2 rounded-full transition-all duration-300"
-              :class="getTotalCostProgressColor()"
-              :style="{ width: getTotalCostProgress() + '%' }"
-            />
-          </div>
-          <div v-else class="h-2 w-full rounded-full bg-gray-200">
-            <div class="h-2 rounded-full bg-black dark:bg-white" style="width: 0%" />
-          </div>
+            :value="getTotalCostProgress()"
+            :variant="getTotalCostProgressVariant()"
+            size="md"
+          />
+          <Progress v-else :value="0" variant="default" size="md" />
         </div>
 
         <!-- Opus 模型周费用限制 -->
@@ -179,13 +167,11 @@
               }}
             </span>
           </div>
-          <div class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
-            <div
-              class="h-2 rounded-full transition-all duration-300"
-              :class="getOpusWeeklyCostProgressColor()"
-              :style="{ width: getOpusWeeklyCostProgress() + '%' }"
-            />
-          </div>
+          <Progress
+            :value="getOpusWeeklyCostProgress()"
+            :variant="getOpusWeeklyCostProgressVariant()"
+            size="md"
+          />
         </div>
 
         <!-- 时间窗口限制 -->
@@ -325,6 +311,7 @@ import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
 import WindowCountdown from '@/components/apikeys/WindowCountdown.vue'
+import { Progress } from '@/ui'
 
 const apiStatsStore = useApiStatsStore()
 const { statsData, multiKeyMode, aggregatedStats, invalidKeys } = storeToRefs(apiStatsStore)
@@ -358,12 +345,12 @@ const getDailyCostProgress = () => {
   return Math.min(percentage, 100)
 }
 
-// 获取每日费用进度条颜色
-const getDailyCostProgressColor = () => {
+// 获取每日费用进度条变体
+const getDailyCostProgressVariant = () => {
   const progress = getDailyCostProgress()
-  if (progress >= 100) return 'bg-red-500'
-  if (progress >= 80) return 'bg-yellow-500'
-  return 'bg-green-500'
+  if (progress >= 100) return 'error'
+  if (progress >= 80) return 'warning'
+  return 'success'
 }
 
 // 获取总费用进度
@@ -375,12 +362,12 @@ const getTotalCostProgress = () => {
   return Math.min(percentage, 100)
 }
 
-// 获取总费用进度条颜色
-const getTotalCostProgressColor = () => {
+// 获取总费用进度条变体
+const getTotalCostProgressVariant = () => {
   const progress = getTotalCostProgress()
-  if (progress >= 100) return 'bg-red-500'
-  if (progress >= 80) return 'bg-yellow-500'
-  return 'bg-blue-500'
+  if (progress >= 100) return 'error'
+  if (progress >= 80) return 'warning'
+  return 'success'
 }
 
 // 获取Opus周费用进度
@@ -395,12 +382,12 @@ const getOpusWeeklyCostProgress = () => {
   return Math.min(percentage, 100)
 }
 
-// 获取Opus周费用进度条颜色
-const getOpusWeeklyCostProgressColor = () => {
+// 获取Opus周费用进度条变体
+const getOpusWeeklyCostProgressVariant = () => {
   const progress = getOpusWeeklyCostProgress()
-  if (progress >= 100) return 'bg-red-500'
-  if (progress >= 80) return 'bg-yellow-500'
-  return 'bg-indigo-500' // 使用紫色表示Opus模型
+  if (progress >= 100) return 'error'
+  if (progress >= 80) return 'warning'
+  return 'default' // 使用默认黑色表示Opus模型
 }
 
 // 格式化数字
