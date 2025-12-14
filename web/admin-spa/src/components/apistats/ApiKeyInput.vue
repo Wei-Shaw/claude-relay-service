@@ -1,5 +1,5 @@
 <template>
-  <div class="input-card">
+  <div class="input-card" :class="{ dark: isDarkMode }">
     <!-- 标题区域 -->
     <div class="card-header">
       <div class="header-content">
@@ -108,10 +108,14 @@
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
+import { useThemeStore } from '@/stores/theme'
 
 const apiStatsStore = useApiStatsStore()
 const { apiKey, loading, multiKeyMode } = storeToRefs(apiStatsStore)
 const { queryStats, clearInput } = apiStatsStore
+
+const themeStore = useThemeStore()
+const isDarkMode = computed(() => themeStore.isDarkMode)
 
 // 解析输入的 API Keys
 const parsedApiKeys = computed(() => {
@@ -148,7 +152,7 @@ const hasValidInput = computed(() => {
     border-color 0.3s ease;
 }
 
-:global(.dark) .input-card {
+.input-card.dark {
   background: #000;
   border-color: #333;
 }
@@ -163,7 +167,7 @@ const hasValidInput = computed(() => {
     border-color 0.3s ease;
 }
 
-:global(.dark) .card-header {
+.input-card.dark .card-header {
   background: #000 !important;
   border-bottom-color: #333;
 }
@@ -187,7 +191,7 @@ const hasValidInput = computed(() => {
   color: #000;
 }
 
-:global(.dark) .header-icon {
+.input-card.dark .header-icon {
   background: #0a0a0a;
   border-color: #333;
   color: #fff;
@@ -201,7 +205,7 @@ const hasValidInput = computed(() => {
   line-height: 1.2;
 }
 
-:global(.dark) .header-title {
+.input-card.dark .header-title {
   color: #fff;
 }
 
@@ -211,7 +215,7 @@ const hasValidInput = computed(() => {
   margin: 4px 0 0;
 }
 
-:global(.dark) .header-subtitle {
+.input-card.dark .header-subtitle {
   color: #999;
 }
 
@@ -225,7 +229,7 @@ const hasValidInput = computed(() => {
   transition: background-color 0.3s ease;
 }
 
-:global(.dark) .card-body {
+.input-card.dark .card-body {
   background: #000 !important;
 }
 
@@ -244,7 +248,7 @@ const hasValidInput = computed(() => {
   color: #000;
 }
 
-:global(.dark) .control-label {
+.input-card.dark .control-label {
   color: #fff;
 }
 
@@ -258,7 +262,7 @@ const hasValidInput = computed(() => {
   padding: 4px;
 }
 
-:global(.dark) .mode-switcher {
+.input-card.dark .mode-switcher {
   background: #0a0a0a;
   border-color: #333;
 }
@@ -287,11 +291,11 @@ const hasValidInput = computed(() => {
   background: #fff;
 }
 
-:global(.dark) .mode-btn {
+.input-card.dark .mode-btn {
   color: #999;
 }
 
-:global(.dark) .mode-btn:hover:not(.active) {
+.input-card.dark .mode-btn:hover:not(.active) {
   color: #fff;
   background: #1a1a1a;
 }
@@ -301,7 +305,7 @@ const hasValidInput = computed(() => {
   background: #000;
 }
 
-:global(.dark) .mode-btn.active {
+.input-card.dark .mode-btn.active {
   color: #000;
   background: #fff;
 }
@@ -376,25 +380,25 @@ const hasValidInput = computed(() => {
   cursor: not-allowed;
 }
 
-:global(.dark) .text-input,
-:global(.dark) .text-area {
+.input-card.dark .text-input,
+.input-card.dark .text-area {
   color: #fff;
   background: #0a0a0a !important;
   border-color: #333;
 }
 
-:global(.dark) .text-input::placeholder,
-:global(.dark) .text-area::placeholder {
+.input-card.dark .text-input::placeholder,
+.input-card.dark .text-area::placeholder {
   color: #666;
 }
 
-:global(.dark) .text-input:hover,
-:global(.dark) .text-area:hover {
+.input-card.dark .text-input:hover,
+.input-card.dark .text-area:hover {
   border-color: #fff;
 }
 
-:global(.dark) .text-input:focus,
-:global(.dark) .text-area:focus {
+.input-card.dark .text-input:focus,
+.input-card.dark .text-area:focus {
   border-color: #fff;
   box-shadow: 0 0 0 1px #fff;
 }
@@ -426,7 +430,7 @@ const hasValidInput = computed(() => {
   background: #fafafa;
 }
 
-:global(.dark) .clear-btn:hover {
+.input-card.dark .clear-btn:hover {
   color: #fff;
   background: #1a1a1a;
 }
@@ -464,13 +468,13 @@ const hasValidInput = computed(() => {
   cursor: not-allowed;
 }
 
-:global(.dark) .query-btn {
+.input-card.dark .query-btn {
   color: #000;
   background: #fff;
   border-color: #fff;
 }
 
-:global(.dark) .query-btn:hover:not(:disabled) {
+.input-card.dark .query-btn:hover:not(:disabled) {
   background: #e5e5e5;
   border-color: #e5e5e5;
 }
@@ -513,7 +517,7 @@ const hasValidInput = computed(() => {
   color: #10b981;
 }
 
-:global(.dark) .hint-item {
+.input-card.dark .hint-item {
   color: #999;
   background: #0a0a0a;
   border-color: #333;
@@ -529,13 +533,13 @@ const hasValidInput = computed(() => {
   color: #0284c7;
 }
 
-:global(.dark) .hint-info {
+.input-card.dark .hint-info {
   background: #082f49;
   border-color: #0c4a6e;
   color: #7dd3fc;
 }
 
-:global(.dark) .hint-info i {
+.input-card.dark .hint-info i {
   color: #38bdf8;
 }
 

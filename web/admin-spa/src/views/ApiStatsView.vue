@@ -1,5 +1,14 @@
 <template>
-  <div class="min-h-screen" :class="isDarkMode ? 'page-bg-dark' : 'page-bg'">
+  <!--
+    NOTE:
+    Some components rely on the presence of a `.dark` ancestor (Tailwind `dark:` variants
+    and scoped `:global(.dark) ...` selectors). We always add/remove `.dark` on this
+    view root so dark styling works reliably for this standalone public page.
+  -->
+  <div
+    class="api-stats-page min-h-screen"
+    :class="[{ dark: isDarkMode }, isDarkMode ? 'page-bg-dark' : 'page-bg']"
+  >
     <!-- Header -->
     <div class="page-header">
       <div class="container">
@@ -299,7 +308,7 @@ watch(apiKey, (newValue) => {
     border-color 0.3s ease;
 }
 
-:global(.dark) .page-header {
+.api-stats-page.dark .page-header {
   background: #000;
   border-bottom-color: #333;
 }
@@ -378,14 +387,14 @@ watch(apiKey, (newValue) => {
   border-color: #1a1a1a;
 }
 
-:global(.dark) .btn-primary {
+.api-stats-page.dark .btn-primary {
   background: #fff;
   border-color: #fff;
   color: #000;
   box-shadow: 0 1px 2px rgba(255, 255, 255, 0.1);
 }
 
-:global(.dark) .btn-primary:hover {
+.api-stats-page.dark .btn-primary:hover {
   background: #e5e5e5;
   border-color: #e5e5e5;
   box-shadow: 0 2px 4px rgba(255, 255, 255, 0.2);
@@ -403,13 +412,13 @@ watch(apiKey, (newValue) => {
   background: rgba(0, 0, 0, 0.02);
 }
 
-:global(.dark) .btn-secondary {
+.api-stats-page.dark .btn-secondary {
   border-color: #333;
   color: #999;
   box-shadow: 0 1px 2px rgba(255, 255, 255, 0.02);
 }
 
-:global(.dark) .btn-secondary:hover {
+.api-stats-page.dark .btn-secondary:hover {
   border-color: #fff;
   color: #fff;
   background: rgba(255, 255, 255, 0.05);
@@ -429,7 +438,7 @@ watch(apiKey, (newValue) => {
   transition: border-color 0.3s ease;
 }
 
-:global(.dark) .tabs-wrapper {
+.api-stats-page.dark .tabs-wrapper {
   border-bottom-color: #333;
 }
 
@@ -468,11 +477,11 @@ watch(apiKey, (newValue) => {
   transform: scale(1.1);
 }
 
-:global(.dark) .tab-button {
+.api-stats-page.dark .tab-button {
   color: #999;
 }
 
-:global(.dark) .tab-button:hover {
+.api-stats-page.dark .tab-button:hover {
   color: #fff;
   background: rgba(255, 255, 255, 0.05);
 }
@@ -486,7 +495,7 @@ watch(apiKey, (newValue) => {
   transform: scale(1.05);
 }
 
-:global(.dark) .tab-button.active {
+.api-stats-page.dark .tab-button.active {
   color: #fff;
   border-bottom-color: #fff;
 }
@@ -528,7 +537,7 @@ watch(apiKey, (newValue) => {
   transform: scale(1.1);
 }
 
-:global(.dark) .error-card {
+.api-stats-page.dark .error-card {
   background: #1a0000;
   border-color: #ff3333;
   color: #ff6666;
@@ -564,13 +573,13 @@ watch(apiKey, (newValue) => {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
 }
 
-:global(.dark) .period-selector {
+.api-stats-page.dark .period-selector {
   background: #000;
   border-color: #333;
   box-shadow: 0 1px 2px rgba(255, 255, 255, 0.02);
 }
 
-:global(.dark) .period-selector:hover {
+.api-stats-page.dark .period-selector:hover {
   box-shadow: 0 2px 4px rgba(255, 255, 255, 0.05);
 }
 
@@ -584,7 +593,7 @@ watch(apiKey, (newValue) => {
   transition: color 0.3s ease;
 }
 
-:global(.dark) .period-label {
+.api-stats-page.dark .period-label {
   color: #fff;
 }
 
@@ -600,7 +609,7 @@ watch(apiKey, (newValue) => {
   transform: rotate(15deg);
 }
 
-:global(.dark) .period-label i {
+.api-stats-page.dark .period-label i {
   color: #999;
 }
 
@@ -670,20 +679,20 @@ watch(apiKey, (newValue) => {
   cursor: not-allowed;
 }
 
-:global(.dark) .period-btn {
+.api-stats-page.dark .period-btn {
   border-color: #333;
   color: #999;
   box-shadow: 0 1px 2px rgba(255, 255, 255, 0.02);
 }
 
-:global(.dark) .period-btn:hover:not(:disabled) {
+.api-stats-page.dark .period-btn:hover:not(:disabled) {
   border-color: #fff;
   color: #fff;
   background: rgba(255, 255, 255, 0.05);
   box-shadow: 0 2px 4px rgba(255, 255, 255, 0.08);
 }
 
-:global(.dark) .period-btn.active {
+.api-stats-page.dark .period-btn.active {
   background: #fff;
   border-color: #fff;
   color: #000;
@@ -737,13 +746,13 @@ watch(apiKey, (newValue) => {
   cursor: not-allowed;
 }
 
-:global(.dark) .test-btn {
+.api-stats-page.dark .test-btn {
   background: #0080ff;
   border-color: #0080ff;
   box-shadow: 0 2px 4px rgba(0, 128, 255, 0.15);
 }
 
-:global(.dark) .test-btn:hover:not(:disabled) {
+.api-stats-page.dark .test-btn:hover:not(:disabled) {
   background: #0070f3;
   border-color: #0070f3;
   box-shadow: 0 4px 8px rgba(0, 128, 255, 0.2);
@@ -779,13 +788,13 @@ watch(apiKey, (newValue) => {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
 }
 
-:global(.dark) .content-card {
+.api-stats-page.dark .content-card {
   background: #000;
   border-color: #333;
   box-shadow: 0 1px 2px rgba(255, 255, 255, 0.02);
 }
 
-:global(.dark) .content-card:hover {
+.api-stats-page.dark .content-card:hover {
   box-shadow: 0 2px 4px rgba(255, 255, 255, 0.05);
 }
 

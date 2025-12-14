@@ -1,5 +1,5 @@
 <template>
-  <div class="login-page">
+  <div class="login-page" :class="{ dark: isDarkMode }">
     <!-- Header -->
     <header class="login-header">
       <div class="header-logo">
@@ -82,6 +82,7 @@ import ThemeToggle from '@/components/common/ThemeToggle.vue'
 
 const authStore = useAuthStore()
 const themeStore = useThemeStore()
+const isDarkMode = computed(() => themeStore.isDarkMode)
 const oemLoading = computed(() => authStore.oemLoading)
 
 const loginForm = ref({
@@ -110,7 +111,7 @@ const handleLogin = async () => {
   background: #fafafa;
 }
 
-:global(.dark) .login-page {
+.login-page.dark {
   background: #000;
 }
 
@@ -174,7 +175,7 @@ const handleLogin = async () => {
   margin: 0;
 }
 
-:global(.dark) .login-title {
+.login-page.dark .login-title {
   color: #fff;
 }
 
@@ -219,21 +220,21 @@ const handleLogin = async () => {
   box-shadow: 0 0 0 1px #000;
 }
 
-:global(.dark) .vercel-input {
+.login-page.dark .vercel-input {
   color: #fff;
   background: #000;
   border-color: #333;
 }
 
-:global(.dark) .vercel-input::placeholder {
+.login-page.dark .vercel-input::placeholder {
   color: #666;
 }
 
-:global(.dark) .vercel-input:hover {
+.login-page.dark .vercel-input:hover {
   border-color: #fff;
 }
 
-:global(.dark) .vercel-input:focus {
+.login-page.dark .vercel-input:focus {
   border-color: #fff;
   box-shadow: 0 0 0 1px #fff;
 }
@@ -275,18 +276,18 @@ const handleLogin = async () => {
   cursor: not-allowed;
 }
 
-:global(.dark) .vercel-button {
+.login-page.dark .vercel-button {
   color: #000;
   background: #fff;
   border-color: #fff;
 }
 
-:global(.dark) .vercel-button:hover:not(:disabled) {
+.login-page.dark .vercel-button:hover:not(:disabled) {
   background: #e5e5e5;
   border-color: #e5e5e5;
 }
 
-:global(.dark) .vercel-button:active:not(:disabled) {
+.login-page.dark .vercel-button:active:not(:disabled) {
   background: #fff;
 }
 
@@ -301,7 +302,7 @@ const handleLogin = async () => {
   animation: spin 0.6s linear infinite;
 }
 
-:global(.dark) .button-spinner {
+.login-page.dark .button-spinner {
   border-color: rgba(0, 0, 0, 0.3);
   border-top-color: #000;
 }
@@ -326,7 +327,7 @@ const handleLogin = async () => {
   justify-content: center;
 }
 
-:global(.dark) .error-message {
+.login-page.dark .error-message {
   color: #ff6b6b;
   background: rgba(255, 107, 107, 0.1);
   border-color: rgba(255, 107, 107, 0.2);

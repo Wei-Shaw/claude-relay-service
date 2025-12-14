@@ -1,5 +1,6 @@
 <template>
-  <div id="app">
+  <!-- Root container for the Vue app (avoid duplicate #app id in DOM) -->
+  <div class="app-root">
     <router-view />
 
     <!-- 全局组件 -->
@@ -35,7 +36,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-#app {
+.app-root {
   min-height: 100vh;
 }
 </style>
