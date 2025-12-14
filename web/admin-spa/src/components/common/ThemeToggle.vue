@@ -25,19 +25,6 @@
         :title="themeTooltip"
         @click="handleCycleTheme"
       >
-        <!-- 背景装饰 -->
-        <div class="switch-bg">
-          <div class="stars">
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
-          <div class="clouds">
-            <span></span>
-            <span></span>
-          </div>
-        </div>
-
         <!-- 切换滑块 -->
         <div class="switch-handle">
           <div class="handle-icon">
@@ -175,19 +162,22 @@ const selectTheme = (mode) => {
   @apply text-gray-600 dark:text-gray-400;
 }
 
-/* 创意切换开关样式 */
+/* ============================================
+   VERCEL THEME SWITCH - FULL DARK MODE SUPPORT
+   ============================================ */
 .theme-switch-wrapper {
-  @apply inline-flex items-center;
+  display: inline-flex;
+  align-items: center;
 }
 
 .theme-switch {
-  @apply relative;
+  position: relative;
   width: 76px;
   height: 38px;
-  border-radius: 5px;
+  border-radius: 6px;
   padding: 4px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   background: #eaeaea;
   border: 1px solid #eaeaea;
   overflow: hidden;
@@ -196,15 +186,15 @@ const selectTheme = (mode) => {
 }
 
 .theme-switch:hover {
-  background: #e0e0e0;
-  border-color: #e0e0e0;
+  background: #ddd;
+  border-color: #ddd;
 }
 
 .theme-switch:active {
   transform: scale(0.98);
 }
 
-/* 深色模式样式 */
+/* Dark Mode Styles */
 .theme-switch.is-dark {
   background: #333;
   border-color: #333;
@@ -215,106 +205,55 @@ const selectTheme = (mode) => {
   border-color: #444;
 }
 
-/* 自动模式样式 */
+/* Dark mode switch in dark theme context */
+:global(.dark) .theme-switch {
+  background: #1a1a1a;
+  border-color: #333;
+}
+
+:global(.dark) .theme-switch:hover {
+  background: #222;
+  border-color: #444;
+}
+
+:global(.dark) .theme-switch.is-dark {
+  background: #fff;
+  border-color: #fff;
+}
+
+:global(.dark) .theme-switch.is-dark:hover {
+  background: #e5e5e5;
+  border-color: #e5e5e5;
+}
+
+/* Auto Mode Styles */
 .theme-switch.is-auto {
   background: #9e9e9e;
   border-color: #9e9e9e;
 }
 
 .theme-switch.is-auto:hover {
-  background: #757575;
-  border-color: #757575;
+  background: #888;
+  border-color: #888;
 }
 
-/* 背景装饰 */
-.switch-bg {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  overflow: hidden;
-  pointer-events: none;
+:global(.dark) .theme-switch.is-auto {
+  background: #666;
+  border-color: #666;
 }
 
-/* 星星装饰（深色模式） - 优化版 */
-.stars {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  transition: opacity 0.3s ease;
+:global(.dark) .theme-switch.is-auto:hover {
+  background: #777;
+  border-color: #777;
 }
 
-.theme-switch.is-dark .stars {
-  opacity: 1;
-}
-
-.stars span {
-  position: absolute;
-  display: block;
-  width: 2px;
-  height: 2px;
-  background: white;
-  border-radius: 50%;
-  opacity: 0.6;
-}
-
-.stars span:nth-child(1) {
-  top: 25%;
-  left: 20%;
-}
-
-.stars span:nth-child(2) {
-  top: 40%;
-  left: 40%;
-  width: 1.5px;
-  height: 1.5px;
-}
-
-.stars span:nth-child(3) {
-  top: 60%;
-  left: 25%;
-}
-
-/* 云朵装饰（浅色模式） - 优化版 */
-.clouds {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.theme-switch:not(.is-dark):not(.is-auto) .clouds {
-  opacity: 0.7;
-}
-
-.clouds span {
-  position: absolute;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 100px;
-}
-
-.clouds span:nth-child(1) {
-  width: 20px;
-  height: 8px;
-  top: 40%;
-  left: 15%;
-}
-
-.clouds span:nth-child(2) {
-  width: 15px;
-  height: 6px;
-  top: 60%;
-  left: 35%;
-}
-
-/* 切换滑块 */
+/* Switch Handle - Clean Vercel Style */
 .switch-handle {
   position: absolute;
   width: 30px;
   height: 30px;
-  background: white;
-  border-radius: 4px;
+  background: #fff;
+  border-radius: 5px;
   transition: all 0.2s ease;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   display: flex;
@@ -325,21 +264,39 @@ const selectTheme = (mode) => {
   left: 4px;
 }
 
-/* 深色模式滑块位置 */
+/* Light Mode Handle */
+.theme-switch .switch-handle {
+  background: #fff;
+}
+
+/* Dark Mode Handle Position */
 .theme-switch.is-dark .switch-handle {
   transform: translateY(-50%) translateX(38px);
-  background: #1f1f1f;
+  background: #000;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-/* 自动模式滑块位置 */
+/* Auto Mode Handle Position */
 .theme-switch.is-auto .switch-handle {
   transform: translateY(-50%) translateX(19px);
-  background: white;
+  background: #fff;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* 滑块图标 */
+/* Dark Theme Context - Inverted Colors */
+:global(.dark) .theme-switch .switch-handle {
+  background: #000;
+}
+
+:global(.dark) .theme-switch.is-dark .switch-handle {
+  background: #fff;
+}
+
+:global(.dark) .theme-switch.is-auto .switch-handle {
+  background: #fff;
+}
+
+/* Handle Icon - Full Dark Mode Support */
 .handle-icon {
   position: relative;
   width: 100%;
@@ -351,11 +308,12 @@ const selectTheme = (mode) => {
 
 .handle-icon i {
   font-size: 14px;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
 }
 
+/* Light Mode Icons */
 .handle-icon .fa-sun {
-  color: #f5a623;
+  color: #f59e0b;
 }
 
 .handle-icon .fa-moon {
@@ -367,9 +325,22 @@ const selectTheme = (mode) => {
   font-size: 15px;
 }
 
-/* 移除弹跳动画，保持简洁 */
+/* Dark Theme Context Icons */
+:global(.dark) .handle-icon .fa-sun {
+  color: #f59e0b;
+}
 
-/* 分段按钮样式 - 更现代 */
+:global(.dark) .theme-switch.is-dark .handle-icon .fa-moon {
+  color: #000;
+}
+
+:global(.dark) .handle-icon .fa-circle-half-stroke {
+  color: #000;
+}
+
+/* ============================================
+   SEGMENTED BUTTON MODE
+   ============================================ */
 .theme-segmented {
   @apply inline-flex;
   @apply bg-gray-100 dark:bg-gray-800;

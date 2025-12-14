@@ -1,38 +1,27 @@
 <template>
-  <div class="flex items-center gap-4">
+  <div class="logo-title-wrapper">
     <!-- Logo区域 -->
-    <div
-      class="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"
-    >
+    <div class="logo-container">
       <template v-if="!loading">
-        <img
-          v-if="logoSrc"
-          alt="Logo"
-          class="h-8 w-8 object-contain"
-          :src="logoSrc"
-          @error="handleLogoError"
-        />
-        <i v-else class="fas fa-cloud text-xl text-gray-700 dark:text-gray-300" />
+        <img v-if="logoSrc" alt="Logo" class="logo-image" :src="logoSrc" @error="handleLogoError" />
+        <i v-else class="fas fa-cloud logo-icon" />
       </template>
-      <div v-else class="h-8 w-8 animate-pulse rounded bg-gray-300/50 dark:bg-gray-600/50" />
+      <div v-else class="logo-skeleton" />
     </div>
 
     <!-- 标题区域 -->
-    <div class="flex min-h-[48px] flex-col justify-center">
-      <div class="flex items-center gap-3">
+    <div class="title-section">
+      <div class="title-row">
         <template v-if="!loading && title">
-          <h1 :class="['header-title text-2xl font-bold leading-tight', titleClass]">
+          <h1 class="site-title">
             {{ title }}
           </h1>
         </template>
-        <div
-          v-else-if="loading"
-          class="h-8 w-64 animate-pulse rounded bg-gray-300/50 dark:bg-gray-600/50"
-        />
+        <div v-else-if="loading" class="title-skeleton" />
         <!-- 插槽用于版本信息等额外内容 -->
         <slot name="after-title" />
       </div>
-      <p v-if="subtitle" class="mt-0.5 text-sm leading-tight text-gray-600 dark:text-gray-400">
+      <p v-if="subtitle" class="site-subtitle">
         {{ subtitle }}
       </p>
     </div>
@@ -56,10 +45,6 @@ defineProps({
   logoSrc: {
     type: String,
     default: ''
-  },
-  titleClass: {
-    type: String,
-    default: 'text-gray-900'
   }
 })
 
@@ -70,25 +55,159 @@ const handleLogoError = (e) => {
 </script>
 
 <style scoped>
-/* 骨架屏动画 */
-@keyframes pulse {
-  0% {
-    opacity: 0.7;
-  }
-  50% {
-    opacity: 0.4;
-  }
-  100% {
-    opacity: 0.7;
-  }
+/* ============================================
+   VERCEL LOGO TITLE COMPONENT - DARK MODE READY
+   ============================================ */
+.logo-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
-.animate-pulse {
+/* Logo Container */
+.logo-container {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid #eaeaea;
+  background: #fff;
+}
+
+:global(.dark) .logo-container {
+  border-color: #333;
+  background: #000;
+}
+
+.logo-image {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.logo-icon {
+  font-size: 20px;
+  color: #666;
+}
+
+:global(.dark) .logo-icon {
+  color: #999;
+}
+
+/* Logo Skeleton */
+.logo-skeleton {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: #eaeaea;
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* 标题样式 */
-.header-title {
-  /* Clean, flat design - no shadows */
+:global(.dark) .logo-skeleton {
+  background: #333;
+}
+
+/* Title Section */
+.title-section {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 48px;
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.site-title {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #000;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+:global(.dark) .site-title {
+  color: #fff;
+}
+
+.site-subtitle {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #666;
+}
+
+:global(.dark) .site-subtitle {
+  color: #999;
+}
+
+/* Title Skeleton */
+.title-skeleton {
+  width: 256px;
+  height: 32px;
+  border-radius: 6px;
+  background: #eaeaea;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+:global(.dark) .title-skeleton {
+  background: #333;
+}
+
+/* Pulse Animation */
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 768px) {
+  .logo-title-wrapper {
+    gap: 12px;
+  }
+
+  .logo-container {
+    width: 40px;
+    height: 40px;
+  }
+
+  .logo-image {
+    width: 24px;
+    height: 24px;
+  }
+
+  .logo-icon {
+    font-size: 18px;
+  }
+
+  .site-title {
+    font-size: 20px;
+  }
+
+  .site-subtitle {
+    font-size: 13px;
+  }
+
+  .title-skeleton {
+    width: 180px;
+    height: 28px;
+  }
 }
 </style>

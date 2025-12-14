@@ -157,9 +157,11 @@ const hasValidInput = computed(() => {
 .card-header {
   padding: 24px;
   border-bottom: 1px solid #eaeaea;
+  background: #fff;
 }
 
 :global(.dark) .card-header {
+  background: #000;
   border-bottom-color: #333;
 }
 
@@ -216,6 +218,11 @@ const hasValidInput = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  background: #fff;
+}
+
+:global(.dark) .card-body {
+  background: #000;
 }
 
 /* Control Bar */

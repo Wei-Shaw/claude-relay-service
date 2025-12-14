@@ -54,9 +54,7 @@
     <!-- 无模型数据 -->
     <div v-else class="empty-state">
       <i class="fas fa-chart-pie empty-icon" />
-      <p class="empty-text">
-        暂无{{ statsPeriod === 'daily' ? '今日' : '本月' }}模型使用数据
-      </p>
+      <p class="empty-text">暂无{{ statsPeriod === 'daily' ? '今日' : '本月' }}模型使用数据</p>
     </div>
   </div>
 </template>
