@@ -4,7 +4,7 @@
   >
     <!-- 主题切换按钮 -->
     <div class="fixed right-4 top-4 z-10">
-      <ThemeToggle mode="dropdown" />
+      <ThemeToggle />
     </div>
 
     <div class="w-full max-w-md space-y-8">

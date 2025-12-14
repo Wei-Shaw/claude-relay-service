@@ -14,7 +14,7 @@
           <i v-else class="fas fa-cloud text-xl text-gray-900 dark:text-white" />
         </template>
       </div>
-      <ThemeToggle mode="dropdown" />
+      <ThemeToggle />
     </header>
 
     <!-- Main Content -->

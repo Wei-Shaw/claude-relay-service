@@ -38,9 +38,7 @@
       <!-- 主题切换和用户菜单 -->
       <div class="flex items-center gap-2 sm:gap-4">
         <!-- 主题切换按钮 -->
-        <div class="flex items-center">
-          <ThemeToggle mode="dropdown" />
-        </div>
+        <ThemeToggle />
 
         <!-- 分隔线 -->
         <div class="h-8 w-px bg-gray-200 dark:bg-gray-700" />

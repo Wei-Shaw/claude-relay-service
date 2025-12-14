@@ -21,7 +21,7 @@
           />
           <div class="header-actions">
             <!-- 主题切换按钮 -->
-            <ThemeToggle mode="dropdown" />
+            <ThemeToggle />
 
             <!-- 用户登录按钮 -->
             <router-link v-if="oemSettings.ldapEnabled" class="btn btn-secondary" to="/user-login">
@@ -364,7 +364,7 @@ watch(apiKey, (newValue) => {
 }
 
 .btn:active {
-  transform: translateY(0);
+  transform: scale(0.98);
 }
 
 .btn i {
