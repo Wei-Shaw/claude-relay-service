@@ -81,7 +81,7 @@ const theme = computed(() => (themeStore.isDarkMode ? 'dark' : 'light'))
 
 /* Toast container positioning */
 [data-sonner-toaster] {
-  z-index: 9999 !important;
+  z-index: var(--z-toast, 100) !important;
 }
 
 /* Individual toast styling */

@@ -236,9 +236,7 @@
                 <span v-if="hasModelRestrictions">
                   限制 {{ statsData.restrictions.restrictedModels.length }} 个模型
                 </span>
-                <span v-else>
-                  允许所有模型
-                </span>
+                <span v-else> 允许所有模型 </span>
               </span>
             </div>
           </div>
@@ -253,17 +251,12 @@
                 <span v-if="hasClientRestrictions">
                   限 {{ statsData.restrictions.allowedClients.length }} 种客户端使用
                 </span>
-                <span v-else>
-                  允许所有客户端
-                </span>
+                <span v-else> 允许所有客户端 </span>
               </span>
             </div>
 
             <!-- 客户端列表 -->
-            <div
-              v-if="hasClientRestrictions"
-              class="mt-2 flex flex-wrap gap-2"
-            >
+            <div v-if="hasClientRestrictions" class="mt-2 flex flex-wrap gap-2">
               <span
                 v-for="client in statsData.restrictions.allowedClients"
                 :key="client"

@@ -61,7 +61,7 @@
           <div
             v-if="userMenuOpen"
             class="user-menu-dropdown absolute right-0 top-full mt-2 w-48 rounded-md border border-gray-200 bg-white py-2 shadow-lg dark:border-gray-700 dark:bg-gray-800 dark:shadow-2xl sm:w-56"
-            style="z-index: 999999"
+            style="z-index: var(--z-dropdown, 10)"
             @click.stop
           >
             <!-- 版本信息 -->
