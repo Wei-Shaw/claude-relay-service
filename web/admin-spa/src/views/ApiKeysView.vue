@@ -24,12 +24,9 @@
               @click="activeTab = 'active'"
             >
               活跃 API Keys
-              <span
-                v-if="apiKeys.length > 0"
-                class="ml-2 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-900 dark:bg-gray-700 dark:text-gray-100"
-              >
+              <Badge v-if="apiKeys.length > 0" count size="sm" variant="neutral">
                 {{ apiKeys.length }}
-              </span>
+              </Badge>
             </button>
             <button
               :class="[
@@ -41,12 +38,9 @@
               @click="loadDeletedApiKeys"
             >
               已删除 API Keys
-              <span
-                v-if="deletedApiKeys.length > 0"
-                class="ml-2 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-900 dark:bg-gray-700 dark:text-gray-100"
-              >
+              <Badge v-if="deletedApiKeys.length > 0" count size="sm" variant="neutral">
                 {{ deletedApiKeys.length }}
-              </span>
+              </Badge>
             </button>
           </nav>
         </div>
@@ -547,13 +541,14 @@
                       <!-- 标签列 -->
                       <td class="px-3 py-3">
                         <div class="flex flex-wrap gap-1">
-                          <span
+                          <Badge
                             v-for="tag in key.tags || []"
                             :key="tag"
-                            class="inline-flex items-center rounded-full border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                            variant="neutral"
+                            size="sm"
                           >
                             {{ tag }}
-                          </span>
+                          </Badge>
                           <span
                             v-if="!key.tags || key.tags.length === 0"
                             class="text-xs text-gray-400"
@@ -808,7 +803,7 @@
                           <!-- 未激活状态 -->
                           <span
                             v-if="key.expirationMode === 'activation' && !key.isActivated"
-                            class="inline-flex items-center text-blue-600 dark:text-blue-400"
+                            class="inline-flex items-center text-gray-600 dark:text-gray-400"
                             style="font-size: 13px"
                           >
                             <i class="fas fa-pause-circle mr-1 text-xs" />
@@ -976,14 +971,15 @@
                               模型使用分布
                             </h5>
                             <div class="flex items-center gap-2">
-                              <span
+                              <Badge
                                 v-if="
                                   apiKeyModelStats[key.id] && apiKeyModelStats[key.id].length > 0
                                 "
-                                class="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+                                variant="neutral"
+                                size="sm"
                               >
                                 {{ apiKeyModelStats[key.id].length }} 个模型
-                              </span>
+                              </Badge>
 
                               <!-- API Keys日期筛选器 -->
                               <div class="flex items-center gap-1">
@@ -1069,10 +1065,9 @@
                                     class="mb-1 block text-sm font-semibold text-gray-800 dark:text-gray-200"
                                     >{{ stat.model }}</span
                                   >
-                                  <span
-                                    class="rounded-full border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
-                                    >{{ stat.requests }} 次请求</span
-                                  >
+                                  <Badge variant="neutral" size="sm">
+                                    {{ stat.requests }} 次请求
+                                  </Badge>
                                 </div>
                               </div>
 
@@ -1148,18 +1143,11 @@
                               </div>
 
                               <!-- 进度条 -->
-                              <div
-                                class="mt-3 h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700"
-                              >
-                                <div
-                                  class="h-2 rounded-full bg-indigo-600 transition-all duration-500"
-                                  :style="{
-                                    width:
-                                      calculateApiKeyModelPercentage(
-                                        stat.allTokens,
-                                        apiKeyModelStats[key.id]
-                                      ) + '%'
-                                  }"
+                              <div class="mt-3">
+                                <Progress
+                                  :value="calculateApiKeyModelPercentage(stat.allTokens, apiKeyModelStats[key.id])"
+                                  variant="success"
+                                  size="md"
                                 />
                               </div>
                               <div class="mt-1 text-right">
@@ -1247,22 +1235,13 @@
                     </p>
                   </div>
                 </div>
-                <span
-                  :class="[
-                    'inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold',
-                    key.isActive
-                      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                      : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-                  ]"
+                <Badge
+                  :variant="key.isActive ? 'success' : 'error'"
+                  size="sm"
+                  dot
                 >
-                  <div
-                    :class="[
-                      'mr-1.5 h-1.5 w-1.5 rounded-full',
-                      key.isActive ? 'bg-green-500' : 'bg-red-500'
-                    ]"
-                  />
                   {{ key.isActive ? '活跃' : '已停用' }}
-                </span>
+                </Badge>
               </div>
 
               <!-- 账户绑定信息 -->
@@ -1572,13 +1551,14 @@
 
               <!-- 标签 -->
               <div v-if="key.tags && key.tags.length > 0" class="mb-3 flex flex-wrap gap-1">
-                <span
+                <Badge
                   v-for="tag in key.tags"
                   :key="tag"
-                  class="inline-flex items-center rounded-full border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                  variant="neutral"
+                  size="sm"
                 >
                   {{ tag }}
-                </span>
+                </Badge>
               </div>
 
               <!-- 操作按钮 -->
@@ -1880,7 +1860,7 @@
                       <!-- 创建者 -->
                       <td v-if="isLdapEnabled" class="px-3 py-3">
                         <div class="text-xs">
-                          <span v-if="key.createdBy === 'admin'" class="text-blue-600">
+                          <span v-if="key.createdBy === 'admin'" class="text-gray-900 dark:text-gray-100">
                             <i class="fas fa-user-shield mr-1 text-xs" />
                             管理员
                           </span>
@@ -1904,7 +1884,7 @@
                       <!-- 删除者 -->
                       <td class="px-3 py-3">
                         <div class="text-xs">
-                          <span v-if="key.deletedByType === 'admin'" class="text-blue-600">
+                          <span v-if="key.deletedByType === 'admin'" class="text-gray-900 dark:text-gray-100">
                             <i class="fas fa-user-shield mr-1 text-xs" />
                             {{ key.deletedBy }}
                           </span>
@@ -2108,6 +2088,7 @@ import UsageDetailModal from '@/components/apikeys/UsageDetailModal.vue'
 import LimitProgressBar from '@/components/apikeys/LimitProgressBar.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 import ActionDropdown from '@/components/common/ActionDropdown.vue'
+import { Progress, Badge } from '@/ui'
 
 // 响应式数据
 const router = useRouter()
@@ -4876,14 +4857,14 @@ onUnmounted(() => {
   z-index: 12;
 }
 
-/* 确保操作列在浅色模式下有正确的背景 - 使用纯色避免滚动时重叠 */
+/* 确保操作列在浅色模式下有正确的背景 - 使用纯色避免滚动时重叠 (Vercel flat design) */
 .table-container thead .operations-column {
   z-index: 30;
-  background: linear-gradient(to bottom, #f9fafb, #f3f4f6);
+  background: #fafafa;
 }
 
 .dark .table-container thead .operations-column {
-  background: linear-gradient(to bottom, #374151, #1f2937);
+  background: #1f2937;
 }
 
 /* tbody 中的操作列背景处理 - 使用纯色避免滚动时重叠 */
@@ -4927,16 +4908,16 @@ onUnmounted(() => {
   z-index: 12;
 }
 
-/* 表头左侧固定列背景 - 使用纯色避免滚动时重叠 */
+/* 表头左侧固定列背景 - 使用纯色避免滚动时重叠 (Vercel flat design) */
 .table-container thead .checkbox-column,
 .table-container thead .name-column {
   z-index: 30;
-  background: linear-gradient(to bottom, #f9fafb, #f3f4f6);
+  background: #fafafa;
 }
 
 .dark .table-container thead .checkbox-column,
 .dark .table-container thead .name-column {
-  background: linear-gradient(to bottom, #374151, #1f2937);
+  background: #1f2937;
 }
 
 /* tbody 中的左侧固定列背景处理 - 使用纯色避免滚动时重叠 */

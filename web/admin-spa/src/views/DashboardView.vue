@@ -552,11 +552,9 @@
                   <td
                     class="hidden px-2 py-2 text-right text-xs font-medium sm:table-cell sm:px-4 sm:text-sm"
                   >
-                    <span
-                      class="inline-flex items-center rounded-full border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                    >
+                    <Badge variant="neutral" size="sm">
                       {{ calculatePercentage(stat.allTokens, dashboardModelStats) }}%
-                    </span>
+                    </Badge>
                   </td>
                 </tr>
               </tbody>
@@ -682,6 +680,7 @@ import { storeToRefs } from 'pinia'
 import { useDashboardStore } from '@/stores/dashboard'
 import { useThemeStore } from '@/stores/theme'
 import Chart from 'chart.js/auto'
+import { Badge } from '@/ui'
 
 const dashboardStore = useDashboardStore()
 const themeStore = useThemeStore()

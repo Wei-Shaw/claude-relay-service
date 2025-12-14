@@ -292,11 +292,9 @@
                 <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
                   <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Role</dt>
                   <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
-                    <span
-                      class="inline-flex items-center rounded-full border border-gray-300 bg-white px-2.5 py-0.5 text-xs font-medium text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                    >
+                    <Badge variant="neutral" size="sm">
                       {{ userProfile?.role || 'user' }}
-                    </span>
+                    </Badge>
                   </dd>
                 </div>
                 <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
@@ -345,6 +343,7 @@ import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import UserApiKeysManager from '@/components/user/UserApiKeysManager.vue'
 import UserUsageStats from '@/components/user/UserUsageStats.vue'
 import TutorialView from '@/views/TutorialView.vue'
+import { Badge } from '@/ui'
 
 const router = useRouter()
 const userStore = useUserStore()

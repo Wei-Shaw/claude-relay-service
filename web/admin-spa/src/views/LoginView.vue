@@ -6,12 +6,12 @@
     </div>
 
     <div
-      class="glass-strong w-full max-w-md rounded-xl p-6 shadow-2xl sm:rounded-2xl sm:p-8 md:rounded-3xl md:p-10"
+      class="w-full max-w-md rounded border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900 sm:p-8 md:p-10"
     >
       <div class="mb-6 text-center sm:mb-8">
         <!-- 使用自定义布局来保持登录页面的居中大logo样式 -->
         <div
-          class="mx-auto mb-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-gray-300 bg-gray-50 dark:border-gray-600 dark:bg-gray-800 sm:mb-6 sm:h-20 sm:w-20 sm:rounded-2xl"
+          class="mx-auto mb-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded border border-gray-300 bg-gray-50 dark:border-gray-600 dark:bg-gray-800 sm:mb-6 sm:h-20 sm:w-20"
         >
           <template v-if="!oemLoading">
             <img
@@ -87,7 +87,7 @@
 
       <div
         v-if="authStore.loginError"
-        class="mt-4 rounded-lg border border-red-500/30 bg-red-500/20 p-3 text-center text-xs text-red-800 backdrop-blur-sm dark:text-red-400 sm:mt-6 sm:rounded-xl sm:p-4 sm:text-sm"
+        class="mt-4 rounded border border-red-500/30 bg-red-500/20 p-3 text-center text-xs text-red-800 dark:text-red-400 sm:mt-6 sm:p-4 sm:text-sm"
       >
         <i class="fas fa-exclamation-triangle mr-2" />{{ authStore.loginError }}
       </div>

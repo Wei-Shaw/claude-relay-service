@@ -268,3 +268,8 @@ const opusWeeklyCostVariant = computed(() =>
 <style scoped>
 /* Removed old progress bar styles - now handled by Design System */
 </style>
+
+
+
+
+

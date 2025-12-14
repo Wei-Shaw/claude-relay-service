@@ -28,7 +28,7 @@
 
     <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
       <div
-        class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+        class="rounded border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
       >
         <p class="text-xs uppercase text-gray-500 dark:text-gray-400">总请求</p>
         <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -36,7 +36,7 @@
         </p>
       </div>
       <div
-        class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+        class="rounded border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
       >
         <p class="text-xs uppercase text-gray-500 dark:text-gray-400">总 Token</p>
         <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -44,7 +44,7 @@
         </p>
       </div>
       <div
-        class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+        class="rounded border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
       >
         <p class="text-xs uppercase text-gray-500 dark:text-gray-400">总费用</p>
         <p class="mt-1 text-2xl font-bold text-yellow-600 dark:text-yellow-400">
@@ -52,7 +52,7 @@
         </p>
       </div>
       <div
-        class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+        class="rounded border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
       >
         <p class="text-xs uppercase text-gray-500 dark:text-gray-400">平均费用/次</p>
         <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -62,7 +62,7 @@
     </div>
 
     <div
-      class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+      class="rounded border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
     >
       <div class="flex flex-wrap items-center gap-3">
         <el-date-picker
@@ -120,7 +120,7 @@
     </div>
 
     <div
-      class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
+      class="rounded border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
     >
       <div
         v-if="loading"
