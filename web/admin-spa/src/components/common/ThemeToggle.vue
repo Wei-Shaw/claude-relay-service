@@ -271,7 +271,7 @@ const selectTheme = (mode) => {
 .theme-switch.is-dark .switch-handle {
   transform: translateY(-50%) translateX(38px);
   background: #000;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
 /* Auto Mode Handle Position */

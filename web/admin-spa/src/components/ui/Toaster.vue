@@ -8,7 +8,7 @@
     :toast-options="{
       classNames: {
         toast:
-          'group toast rounded-lg border-l-4 shadow-lg backdrop-blur-sm bg-white dark:bg-[#1f1f1f]',
+          'group toast rounded-lg border-l-4 shadow-lg bg-white dark:bg-[#1f1f1f]',
         title: 'text-sm font-semibold text-gray-900 dark:text-gray-100',
         description: 'text-sm text-gray-600 dark:text-gray-400',
         actionButton:
@@ -93,7 +93,7 @@ const theme = computed(() => (themeStore.isDarkMode ? 'dark' : 'light'))
 }
 
 :global(.dark) [data-sonner-toast] {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
 }
 
 /* Toast icon spacing */

@@ -149,7 +149,7 @@
         </h4>
 
         <div
-          class="mb-4 rounded border border-green-100 bg-green-50 p-4 dark:border-green-500/40 dark:from-green-950/30 dark:to-emerald-950/30 sm:mb-6 sm:p-6"
+          class="mb-4 rounded border border-green-100 bg-green-50 p-4 dark:border-green-500/40 dark:bg-green-950/30 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -217,7 +217,7 @@
         </h4>
 
         <div
-          class="mb-4 rounded border border-purple-100 bg-purple-50 p-4 dark:border-purple-500/40 dark:from-purple-950/30 dark:to-pink-950/30 sm:mb-6 sm:p-6"
+          class="mb-4 rounded border border-purple-100 bg-purple-50 p-4 dark:border-purple-500/40 dark:bg-purple-950/30 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -624,7 +624,7 @@
           开始使用 Claude Code
         </h4>
         <div
-          class="rounded border border-orange-100 bg-orange-50 p-4 dark:border-orange-500/40 dark:from-orange-950/30 dark:to-yellow-950/30 sm:p-6"
+          class="rounded border border-orange-100 bg-orange-50 p-4 dark:border-orange-500/40 dark:bg-orange-950/30 sm:p-6"
         >
           <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
             现在你可以开始使用 Claude Code 了！
@@ -754,7 +754,7 @@
         </p>
 
         <div
-          class="mb-4 rounded border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:from-gray-800 dark:to-slate-800 sm:mb-6 sm:p-6"
+          class="mb-4 rounded border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -852,7 +852,7 @@
         </h4>
 
         <div
-          class="mb-4 rounded border border-purple-100 bg-purple-50 p-4 dark:border-purple-500/40 dark:from-purple-950/30 dark:to-pink-950/30 sm:mb-6 sm:p-6"
+          class="mb-4 rounded border border-purple-100 bg-purple-50 p-4 dark:border-purple-500/40 dark:bg-purple-950/30 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -915,7 +915,7 @@
         </h4>
 
         <div
-          class="mb-4 rounded border border-orange-100 bg-orange-50 p-4 dark:border-orange-500/40 dark:from-orange-950/30 dark:to-yellow-950/30 sm:mb-6 sm:p-6"
+          class="mb-4 rounded border border-orange-100 bg-orange-50 p-4 dark:border-orange-500/40 dark:bg-orange-950/30 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -1277,7 +1277,7 @@
           开始使用 Claude Code
         </h4>
         <div
-          class="rounded border border-yellow-100 bg-yellow-50 p-4 dark:border-yellow-500/40 dark:from-yellow-950/30 dark:to-amber-950/30 sm:p-6"
+          class="rounded border border-yellow-100 bg-yellow-50 p-4 dark:border-yellow-500/40 dark:bg-yellow-950/30 sm:p-6"
         >
           <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
             现在你可以开始使用 Claude Code 了！
@@ -1415,7 +1415,7 @@
         </p>
 
         <div
-          class="mb-4 rounded border border-orange-100 bg-orange-50 p-4 dark:border-orange-500/40 dark:from-orange-950/30 dark:to-red-950/30 sm:mb-6 sm:p-6"
+          class="mb-4 rounded border border-orange-100 bg-orange-50 p-4 dark:border-orange-500/40 dark:bg-orange-950/30 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -1501,7 +1501,7 @@
         </h4>
 
         <div
-          class="mb-4 rounded border border-purple-100 bg-purple-50 p-4 dark:border-purple-500/40 dark:from-purple-950/30 dark:to-pink-950/30 sm:mb-6 sm:p-6"
+          class="mb-4 rounded border border-purple-100 bg-purple-50 p-4 dark:border-purple-500/40 dark:bg-purple-950/30 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -1564,7 +1564,7 @@
         </h4>
 
         <div
-          class="mb-4 rounded border border-orange-100 bg-orange-50 p-4 dark:border-orange-500/40 dark:from-orange-950/30 dark:to-yellow-950/30 sm:mb-6 sm:p-6"
+          class="mb-4 rounded border border-orange-100 bg-orange-50 p-4 dark:border-orange-500/40 dark:bg-orange-950/30 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -1920,7 +1920,7 @@
             开始使用 Claude Code
           </h4>
           <div
-            class="rounded border border-yellow-100 bg-yellow-50 p-4 dark:border-yellow-500/40 dark:from-yellow-950/30 dark:to-amber-950/30 sm:p-6"
+            class="rounded border border-yellow-100 bg-yellow-50 p-4 dark:border-yellow-500/40 dark:bg-yellow-950/30 sm:p-6"
           >
             <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
               现在你可以开始使用 Claude Code 了！
@@ -2298,7 +2298,7 @@ html.dark :deep(.bg-gray-700) {
 html.dark :deep(button.bg-gray-800) {
   background-color: #3b82f6 !important;
   border: 1px solid rgba(59, 130, 246, 0.8);
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
   color: #ffffff !important;
 }
 
@@ -2381,15 +2381,6 @@ html.dark :deep(.border-purple-200) {
 }
 
 /* Vercel flat design - no gradients */
-html.dark :deep(.from-purple-50) {
-  background: rgba(168, 85, 247, 0.1) !important;
-  border: 1px solid rgba(168, 85, 247, 0.3);
-}
-
-html.dark :deep(.from-green-50) {
-  background: rgba(34, 197, 94, 0.1) !important;
-  border: 1px solid rgba(34, 197, 94, 0.3);
-}
 
 /* 文字对比度优化 - 提高可读性 */
 html.dark :deep(.text-gray-400) {

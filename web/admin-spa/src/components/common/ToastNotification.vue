@@ -165,7 +165,7 @@ defineExpose({
 :global(.dark) .toast {
   background: #1f1f1f;
   border: 1px solid #333;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .toast-show {

@@ -4911,7 +4911,7 @@ onUnmounted(() => {
 }
 
 .dark .table-container tbody .operations-column {
-  box-shadow: -8px 0 12px -8px rgba(30, 41, 59, 0.45);
+  box-shadow: -8px 0 12px -8px rgba(30, 41, 59, 0.2);
 }
 
 /* 固定左侧列（复选框和名称列）*/
@@ -4971,7 +4971,7 @@ onUnmounted(() => {
 }
 
 .dark .table-container tbody .name-column {
-  box-shadow: 8px 0 12px -8px rgba(30, 41, 59, 0.45);
+  box-shadow: 8px 0 12px -8px rgba(30, 41, 59, 0.2);
 }
 
 .loading-spinner {

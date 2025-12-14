@@ -1027,7 +1027,7 @@
     >
       <!-- 头部 -->
       <div
-        class="dark:to-gray-750 relative border-b border-gray-200 bg-gray-50 px-6 py-5 dark:border-gray-700 dark:from-gray-800"
+        class="relative border-b border-gray-200 bg-gray-50 px-6 py-5 dark:border-gray-700 dark:bg-gray-800"
       >
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-3">
@@ -2523,7 +2523,7 @@ const formatDateTime = settingsStore.formatDateTime
 :root.dark .card {
   background: #1f2937;
   border: 1px solid #374151;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
 }
 
 .table-container {

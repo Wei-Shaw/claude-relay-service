@@ -721,7 +721,7 @@ watch(apiKey, (newValue) => {
   background: #0060df;
   border-color: #0060df;
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 112, 243, 0.3);
+  box-shadow: 0 4px 8px rgba(0, 112, 243, 0.15);
 }
 
 .test-btn:hover:not(:disabled) i {
@@ -740,13 +740,13 @@ watch(apiKey, (newValue) => {
 :global(.dark) .test-btn {
   background: #0080ff;
   border-color: #0080ff;
-  box-shadow: 0 2px 4px rgba(0, 128, 255, 0.3);
+  box-shadow: 0 2px 4px rgba(0, 128, 255, 0.15);
 }
 
 :global(.dark) .test-btn:hover:not(:disabled) {
   background: #0070f3;
   border-color: #0070f3;
-  box-shadow: 0 4px 8px rgba(0, 128, 255, 0.4);
+  box-shadow: 0 4px 8px rgba(0, 128, 255, 0.2);
 }
 
 /* Stats Grid */

@@ -4612,7 +4612,7 @@ onUnmounted(() => {
 }
 
 .dark .table-container tbody .name-column {
-  box-shadow: 8px 0 12px -8px rgba(30, 41, 59, 0.45);
+  box-shadow: 8px 0 12px -8px rgba(30, 41, 59, 0.2);
 }
 
 /* tbody 中的操作列背景处理 - 使用纯色避免滚动时重叠 */
@@ -4647,6 +4647,6 @@ onUnmounted(() => {
 }
 
 .dark .table-container tbody .operations-column {
-  box-shadow: -8px 0 12px -8px rgba(30, 41, 59, 0.45);
+  box-shadow: -8px 0 12px -8px rgba(30, 41, 59, 0.2);
 }
 </style>
