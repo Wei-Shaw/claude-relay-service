@@ -6,6 +6,7 @@ const geminiAccountService = require('../services/geminiAccountService')
 const unifiedGeminiScheduler = require('../services/unifiedGeminiScheduler')
 const { getAvailableModels } = require('../services/geminiRelayService')
 const crypto = require('crypto')
+const proxyPolicyService = require('../services/proxyPolicyService')
 
 // 生成会话哈希
 function generateSessionHash(req) {
@@ -310,15 +311,12 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
     // 标记账户被使用
     await geminiAccountService.markAccountUsed(account.id)
 
-    // 解析账户的代理配置
-    let proxyConfig = null
-    if (account.proxy) {
-      try {
-        proxyConfig = typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
-      } catch (e) {
-        logger.warn('Failed to parse proxy configuration:', e)
-      }
-    }
+    // 解析账户的代理配置（账号 > 分组 > 平台 > 全局账号代理 > env 回退）
+    const { proxy: proxyConfig } = await proxyPolicyService.resolveEffectiveProxyConfig({
+      accountId: account.id,
+      platform: account.platform || 'gemini',
+      accountProxy: account.proxy
+    })
 
     // 创建中止控制器
     abortController = new AbortController()
@@ -666,7 +664,12 @@ router.get('/v1/models', authenticateApiKey, async (req, res) => {
 
     if (account) {
       // 获取实际的模型列表
-      models = await getAvailableModels(account.accessToken, account.proxy)
+      const { proxy: proxyConfig } = await proxyPolicyService.resolveEffectiveProxyConfig({
+        accountId: account.id,
+        platform: account.platform || 'gemini',
+        accountProxy: account.proxy
+      })
+      models = await getAvailableModels(account.accessToken, proxyConfig)
     } else {
       // 返回默认模型列表
       models = [

@@ -7,6 +7,7 @@ const apiKeyService = require('./apiKeyService')
 const unifiedOpenAIScheduler = require('./unifiedOpenAIScheduler')
 const config = require('../../config/config')
 const crypto = require('crypto')
+const proxyPolicyService = require('./proxyPolicyService')
 
 // 抽取缓存写入 token，兼容多种字段命名
 function extractCacheCreationTokens(usageData) {
@@ -104,17 +105,24 @@ class OpenAIResponsesRelayService {
         signal: abortController.signal
       }
 
-      // 配置代理（如果有）
-      if (fullAccount.proxy) {
-        const proxyAgent = ProxyHelper.createProxyAgent(fullAccount.proxy)
-        if (proxyAgent) {
-          requestOptions.httpAgent = proxyAgent
-          requestOptions.httpsAgent = proxyAgent
-          requestOptions.proxy = false
-          logger.info(
-            `🌐 Using proxy for OpenAI-Responses: ${ProxyHelper.getProxyDescription(fullAccount.proxy)}`
-          )
-        }
+      const { proxy: effectiveProxy, source } = await proxyPolicyService.resolveEffectiveProxyConfig({
+        accountId: fullAccount.id || account.id,
+        platform: fullAccount.platform || 'openai-responses',
+        accountProxy: fullAccount.proxy
+      })
+
+      const proxyAgent = ProxyHelper.createProxyAgentWithFallback(effectiveProxy)
+      if (proxyAgent) {
+        requestOptions.httpAgent = proxyAgent
+        requestOptions.httpsAgent = proxyAgent
+        requestOptions.proxy = false
+        const displayConfig = effectiveProxy || ProxyHelper.getGlobalProxyConfig()
+        const displaySource = effectiveProxy ? source : displayConfig ? 'env' : source
+        logger.info(
+          `🌐 Using proxy for OpenAI-Responses (${displaySource}): ${ProxyHelper.getProxyDescription(
+            displayConfig
+          )}`
+        )
       }
 
       // 记录请求信息

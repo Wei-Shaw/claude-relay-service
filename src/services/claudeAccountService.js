@@ -5,6 +5,7 @@ const axios = require('axios')
 const redis = require('../models/redis')
 const config = require('../../config/config')
 const logger = require('../utils/logger')
+const proxyPolicyService = require('./proxyPolicyService')
 const { maskToken } = require('../utils/tokenMask')
 const {
   logRefreshStart,
@@ -183,7 +184,12 @@ class ClaudeAccountService {
 
       if (hasProfileScope) {
         try {
-          const agent = this._createProxyAgent(proxy)
+          const { proxy: effectiveProxy } = await proxyPolicyService.resolveEffectiveProxyConfig({
+            accountId,
+            platform,
+            accountProxy: proxy
+          })
+          const agent = this._createProxyAgent(effectiveProxy)
           await this.fetchAndUpdateAccountProfile(accountId, claudeAiOauth.accessToken, agent)
           logger.info(`📊 Successfully fetched profile info for new account: ${name}`)
         } catch (profileError) {
@@ -269,7 +275,12 @@ class ClaudeAccountService {
       logger.info(`🔄 Starting token refresh for account: ${accountData.name} (${accountId})`)
 
       // 创建代理agent
-      const agent = this._createProxyAgent(accountData.proxy)
+      const { proxy: effectiveProxy } = await proxyPolicyService.resolveEffectiveProxyConfig({
+        accountId,
+        platform: accountData.platform || 'claude',
+        accountProxy: accountData.proxy
+      })
+      const agent = this._createProxyAgent(effectiveProxy)
 
       const axiosConfig = {
         headers: {
@@ -543,10 +554,10 @@ class ClaudeAccountService {
             // 添加限流状态信息
             rateLimitStatus: rateLimitInfo
               ? {
-                  isRateLimited: rateLimitInfo.isRateLimited,
-                  rateLimitedAt: rateLimitInfo.rateLimitedAt,
-                  minutesRemaining: rateLimitInfo.minutesRemaining
-                }
+                isRateLimited: rateLimitInfo.isRateLimited,
+                rateLimitedAt: rateLimitInfo.rateLimitedAt,
+                minutesRemaining: rateLimitInfo.minutesRemaining
+              }
               : null,
             // 添加会话窗口信息
             sessionWindow: sessionWindowInfo || {
@@ -612,17 +623,17 @@ class ClaudeAccountService {
 
       const rateLimitStatus = rateLimitInfo
         ? {
-            isRateLimited: !!rateLimitInfo.isRateLimited,
-            rateLimitedAt: rateLimitInfo.rateLimitedAt || null,
-            minutesRemaining: rateLimitInfo.minutesRemaining || 0,
-            rateLimitEndAt: rateLimitInfo.rateLimitEndAt || null
-          }
+          isRateLimited: !!rateLimitInfo.isRateLimited,
+          rateLimitedAt: rateLimitInfo.rateLimitedAt || null,
+          minutesRemaining: rateLimitInfo.minutesRemaining || 0,
+          rateLimitEndAt: rateLimitInfo.rateLimitEndAt || null
+        }
         : {
-            isRateLimited: false,
-            rateLimitedAt: null,
-            minutesRemaining: 0,
-            rateLimitEndAt: null
-          }
+          isRateLimited: false,
+          rateLimitedAt: null,
+          minutesRemaining: 0,
+          rateLimitEndAt: null
+        }
 
       return {
         id: accountData.id,
@@ -1127,15 +1138,14 @@ class ClaudeAccountService {
     }
   }
 
-  // 🌐 创建代理agent（使用统一的代理工具）
+  // 🌐 创建代理agent（使用统一的代理工具，支持全局代理回退）
   _createProxyAgent(proxyConfig) {
-    const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+    const proxyAgent = ProxyHelper.createProxyAgentWithFallback(proxyConfig)
     if (proxyAgent) {
+      const displayConfig = proxyConfig || ProxyHelper.getGlobalProxyConfig()
       logger.info(
-        `🌐 Using proxy for Claude request: ${ProxyHelper.getProxyDescription(proxyConfig)}`
+        `🌐 Using proxy for Claude request: ${ProxyHelper.getProxyDescription(displayConfig)}`
       )
-    } else if (proxyConfig) {
-      logger.debug('🌐 Failed to create proxy agent for Claude')
     } else {
       logger.debug('🌐 No proxy configured for Claude request')
     }
@@ -1630,7 +1640,7 @@ class ClaudeAccountService {
 
         // 优先使用 rateLimitEndAt（基于会话窗口）
         if (accountData.rateLimitEndAt) {
-          ;({ rateLimitEndAt } = accountData)
+          ; ({ rateLimitEndAt } = accountData)
           const endTime = new Date(accountData.rateLimitEndAt)
           minutesRemaining = Math.max(0, Math.ceil((endTime - now) / (1000 * 60)))
         } else {
@@ -1884,7 +1894,12 @@ class ClaudeAccountService {
 
       // 如果没有提供 agent，创建代理
       if (!agent) {
-        agent = this._createProxyAgent(accountData.proxy)
+        const { proxy: effectiveProxy } = await proxyPolicyService.resolveEffectiveProxyConfig({
+          accountId,
+          platform: accountData.platform || 'claude',
+          accountProxy: accountData.proxy
+        })
+        agent = this._createProxyAgent(effectiveProxy)
       }
 
       logger.debug(`📊 Fetching OAuth usage for account: ${accountData.name} (${accountId})`)
@@ -2070,7 +2085,12 @@ class ClaudeAccountService {
 
       // 如果没有提供 agent，创建代理
       if (!agent) {
-        agent = this._createProxyAgent(accountData.proxy)
+        const { proxy: effectiveProxy } = await proxyPolicyService.resolveEffectiveProxyConfig({
+          accountId,
+          platform: accountData.platform || 'claude',
+          accountProxy: accountData.proxy
+        })
+        agent = this._createProxyAgent(effectiveProxy)
       }
 
       logger.info(`📊 Fetching profile info for account: ${accountData.name} (${accountId})`)
@@ -2989,8 +3009,8 @@ class ClaudeAccountService {
 
                 logger.info(
                   `🔄 Account ${latestAccount.name} (${latestAccount.id}) has entered new session window. ` +
-                    `Old window: ${latestAccount.sessionWindowStart} - ${latestAccount.sessionWindowEnd}, ` +
-                    `New window: ${newWindowStart.toISOString()} - ${newWindowEnd.toISOString()}`
+                  `Old window: ${latestAccount.sessionWindowStart} - ${latestAccount.sessionWindowEnd}, ` +
+                  `New window: ${newWindowStart.toISOString()} - ${newWindowEnd.toISOString()}`
                 )
               }
             } else {
@@ -3049,16 +3069,16 @@ class ClaudeAccountService {
                 name: latestAccount.name,
                 oldWindow: latestAccount.sessionWindowEnd
                   ? {
-                      start: latestAccount.sessionWindowStart,
-                      end: latestAccount.sessionWindowEnd
-                    }
+                    start: latestAccount.sessionWindowStart,
+                    end: latestAccount.sessionWindowEnd
+                  }
                   : null,
                 newWindow:
                   newWindowStart && newWindowEnd
                     ? {
-                        start: newWindowStart.toISOString(),
-                        end: newWindowEnd.toISOString()
-                      }
+                      start: newWindowStart.toISOString(),
+                      end: newWindowEnd.toISOString()
+                    }
                     : null
               })
 

@@ -11,6 +11,7 @@ const {
 } = require('../utils/errorSanitizer')
 const userMessageQueueService = require('./userMessageQueueService')
 const { isStreamWritable } = require('../utils/streamHelper')
+const proxyPolicyService = require('./proxyPolicyService')
 
 class ClaudeConsoleRelayService {
   constructor() {
@@ -164,7 +165,12 @@ class ClaudeConsoleRelayService {
       // 模型兼容性检查已经在调度器中完成，这里不需要再检查
 
       // 创建代理agent
-      const proxyAgent = claudeConsoleAccountService._createProxyAgent(account.proxy)
+      const { proxy: effectiveProxy } = await proxyPolicyService.resolveEffectiveProxyConfig({
+        accountId,
+        platform: account.platform || 'claude-console',
+        accountProxy: account.proxy
+      })
+      const proxyAgent = claudeConsoleAccountService._createProxyAgent(effectiveProxy)
 
       // 创建AbortController用于取消请求
       abortController = new AbortController()
@@ -628,7 +634,12 @@ class ClaudeConsoleRelayService {
       // 模型兼容性检查已经在调度器中完成，这里不需要再检查
 
       // 创建代理agent
-      const proxyAgent = claudeConsoleAccountService._createProxyAgent(account.proxy)
+      const { proxy: effectiveProxy } = await proxyPolicyService.resolveEffectiveProxyConfig({
+        accountId,
+        platform: account.platform || 'claude-console',
+        accountProxy: account.proxy
+      })
+      const proxyAgent = claudeConsoleAccountService._createProxyAgent(effectiveProxy)
 
       // 发送流式请求
       await this._makeClaudeConsoleStreamRequest(
@@ -1425,11 +1436,18 @@ class ClaudeConsoleRelayService {
         ? cleanUrl
         : `${cleanUrl}/v1/messages?beta=true`
 
+      const { proxy: effectiveProxy } = await proxyPolicyService.resolveEffectiveProxyConfig({
+        accountId,
+        platform: account.platform || 'claude-console',
+        accountProxy: account.proxy
+      })
+      const proxyAgent = claudeConsoleAccountService._createProxyAgent(effectiveProxy)
+
       await sendStreamTestRequest({
         apiUrl,
         authorization: `Bearer ${account.apiKey}`,
         responseStream,
-        proxyAgent: claudeConsoleAccountService._createProxyAgent(account.proxy),
+        proxyAgent,
         extraHeaders: account.userAgent ? { 'User-Agent': account.userAgent } : {}
       })
     } catch (error) {

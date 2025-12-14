@@ -12,10 +12,11 @@ const apiKeyService = require('../services/apiKeyService')
 const crypto = require('crypto')
 const ProxyHelper = require('../utils/proxyHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
+const proxyPolicyService = require('../services/proxyPolicyService')
 
 // 创建代理 Agent（使用统一的代理工具）
 function createProxyAgent(proxy) {
-  return ProxyHelper.createProxyAgent(proxy)
+  return ProxyHelper.createProxyAgentWithFallback(proxy)
 }
 
 // 检查 API Key 是否具备 OpenAI 权限
@@ -195,6 +196,13 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
       logger.info(`Selected OpenAI account: ${account.name} (${result.accountId})`)
     }
 
+    const { proxy: effectiveProxy } = await proxyPolicyService.resolveEffectiveProxyConfig({
+      accountId: result.accountId,
+      platform: account?.platform || (result.accountType === 'openai-responses' ? 'openai-responses' : 'openai'),
+      accountProxy: account?.proxy || null
+    })
+    proxy = effectiveProxy
+
     return {
       accessToken,
       accountId: result.accountId,
@@ -292,7 +300,7 @@ const handleResponses = async (req, res) => {
     }
 
     // 使用调度器选择账户
-    ;({ accessToken, accountId, accountType, proxy, account } = await getOpenAIAuthToken(
+    ; ({ accessToken, accountId, accountType, proxy, account } = await getOpenAIAuthToken(
       apiKeyData,
       sessionId,
       requestedModel
@@ -348,7 +356,10 @@ const handleResponses = async (req, res) => {
       axiosConfig.httpAgent = proxyAgent
       axiosConfig.httpsAgent = proxyAgent
       axiosConfig.proxy = false
-      logger.info(`🌐 Using proxy for OpenAI request: ${ProxyHelper.getProxyDescription(proxy)}`)
+      const displayConfig = proxy || ProxyHelper.getGlobalProxyConfig()
+      logger.info(
+        `🌐 Using proxy for OpenAI request: ${ProxyHelper.getProxyDescription(displayConfig)}`
+      )
     } else {
       logger.debug('🌐 No proxy configured for OpenAI request')
     }
@@ -496,8 +507,8 @@ const handleResponses = async (req, res) => {
       if (errorData) {
         const messageCandidate =
           errorData.error &&
-          typeof errorData.error.message === 'string' &&
-          errorData.error.message.trim()
+            typeof errorData.error.message === 'string' &&
+            errorData.error.message.trim()
             ? errorData.error.message.trim()
             : typeof errorData.message === 'string' && errorData.message.trim()
               ? errorData.message.trim()

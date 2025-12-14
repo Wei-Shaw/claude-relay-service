@@ -15,6 +15,7 @@ const {
 } = require('../utils/tokenRefreshLogger')
 const LRUCache = require('../utils/lruCache')
 const tokenRefreshService = require('./tokenRefreshService')
+const proxyPolicyService = require('./proxyPolicyService')
 
 // 加密相关常量
 const ALGORITHM = 'aes-256-cbc'
@@ -221,13 +222,14 @@ async function refreshAccessToken(refreshToken, proxy = null) {
     }
 
     // 配置代理（如果有）
-    const proxyAgent = ProxyHelper.createProxyAgent(proxy)
+    const proxyAgent = ProxyHelper.createProxyAgentWithFallback(proxy)
     if (proxyAgent) {
       requestOptions.httpAgent = proxyAgent
       requestOptions.httpsAgent = proxyAgent
       requestOptions.proxy = false
+      const displayConfig = proxy || ProxyHelper.getGlobalProxyConfig()
       logger.info(
-        `🌐 Using proxy for OpenAI token refresh: ${ProxyHelper.getProxyDescription(proxy)}`
+        `🌐 Using proxy for OpenAI token refresh: ${ProxyHelper.getProxyDescription(displayConfig)}`
       )
     } else {
       logger.debug('🌐 No proxy configured for OpenAI token refresh')
@@ -403,17 +405,13 @@ async function refreshAccountToken(accountId) {
     logRefreshStart(accountId, accountName, 'openai')
     logger.info(`🔄 Starting token refresh for OpenAI account: ${accountName} (${accountId})`)
 
-    // 获取代理配置
-    let proxy = null
-    if (account.proxy) {
-      try {
-        proxy = typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
-      } catch (e) {
-        logger.warn(`Failed to parse proxy config for account ${accountId}:`, e)
-      }
-    }
+    const { proxy: effectiveProxy } = await proxyPolicyService.resolveEffectiveProxyConfig({
+      accountId,
+      platform: account.platform || 'openai',
+      accountProxy: account.proxy
+    })
 
-    const newTokens = await refreshAccessToken(refreshToken, proxy)
+    const newTokens = await refreshAccessToken(refreshToken, effectiveProxy)
     if (!newTokens) {
       throw new Error('Failed to refresh token')
     }

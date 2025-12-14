@@ -8,6 +8,7 @@ const redis = require('../models/redis')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const logger = require('../utils/logger')
 const runtimeAddon = require('../utils/runtimeAddon')
+const proxyPolicyService = require('./proxyPolicyService')
 
 const SYSTEM_PROMPT = 'You are Droid, an AI software engineering agent built by Factory.'
 const RUNTIME_EVENT_FMT_PAYLOAD = 'fmtPayload'
@@ -195,8 +196,7 @@ class DroidRelayService {
 
     try {
       logger.info(
-        `📤 Processing Droid API request for key: ${
-          keyInfo.name || keyInfo.id || 'unknown'
+        `📤 Processing Droid API request for key: ${keyInfo.name || keyInfo.id || 'unknown'
         }, endpoint: ${normalizedEndpoint}${sessionHash ? `, session: ${sessionHash}` : ''}`
       )
 
@@ -229,12 +229,20 @@ class DroidRelayService {
 
       logger.info(`🌐 Forwarding to Factory.ai: ${apiUrl}`)
 
-      // 获取代理配置
-      const proxyConfig = account.proxy ? JSON.parse(account.proxy) : null
-      const proxyAgent = proxyConfig ? ProxyHelper.createProxyAgent(proxyConfig) : null
+      const { proxy: effectiveProxy, source } = await proxyPolicyService.resolveEffectiveProxyConfig({
+        accountId: account.id,
+        platform: account.platform || 'droid',
+        accountProxy: account.proxy
+      })
+
+      const proxyAgent = ProxyHelper.createProxyAgentWithFallback(effectiveProxy)
 
       if (proxyAgent) {
-        logger.info(`🌐 Using proxy: ${ProxyHelper.getProxyDescription(proxyConfig)}`)
+        const displayConfig = effectiveProxy || ProxyHelper.getGlobalProxyConfig()
+        const displaySource = effectiveProxy ? source : displayConfig ? 'env' : source
+        logger.info(
+          `🌐 Using proxy (${displaySource}): ${ProxyHelper.getProxyDescription(displayConfig)}`
+        )
       }
 
       // 构建请求头
@@ -865,9 +873,9 @@ class DroidRelayService {
 
     const inputTokens = toNumber(
       usageData.input_tokens ??
-        usageData.prompt_tokens ??
-        usageData.inputTokens ??
-        usageData.total_input_tokens
+      usageData.prompt_tokens ??
+      usageData.inputTokens ??
+      usageData.total_input_tokens
     )
     const totalTokens = toNumber(usageData.total_tokens ?? usageData.totalTokens)
 
@@ -881,8 +889,8 @@ class DroidRelayService {
     }
     const cacheReadTokens = toNumber(
       usageData.cache_read_input_tokens ??
-        usageData.cacheReadTokens ??
-        usageData.input_tokens_details?.cached_tokens
+      usageData.cacheReadTokens ??
+      usageData.input_tokens_details?.cached_tokens
     )
 
     const rawCacheCreateTokens =

@@ -142,6 +142,8 @@ router.post('/droid-accounts/exchange-code', authenticateAdmin, async (req, res)
 router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
   try {
     const { platform, groupId } = req.query
+    const includeBoundApiKeysCount =
+      req.query.includeBoundApiKeysCount === 'true' || req.query.includeBoundApiKeysCount === '1'
     let accounts = await droidAccountService.getAllAccounts()
     let groupInfosMap = null
 
@@ -166,24 +168,26 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
       groupInfosMap = await accountGroupService.getAccountGroupsMap(accounts.map((a) => a.id))
     }
 
-    // 预计算绑定的 API Key 计数（支持 group: 前缀），避免每个账户全量 reduce
-    const allApiKeys = await redis.getAllApiKeys()
     const directCountMap = {}
     const groupCountMap = {}
+    if (includeBoundApiKeysCount) {
+      // 预计算绑定的 API Key 计数（支持 group: 前缀）
+      const allApiKeys = await redis.getAllApiKeys()
 
-    for (const key of allApiKeys) {
-      const binding = key.droidAccountId
-      if (!binding) {
-        continue
+      for (const key of allApiKeys) {
+        const binding = key.droidAccountId
+        if (!binding) {
+          continue
+        }
+
+        if (binding.startsWith('group:')) {
+          const groupIdValue = binding.substring('group:'.length)
+          groupCountMap[groupIdValue] = (groupCountMap[groupIdValue] || 0) + 1
+          continue
+        }
+
+        directCountMap[binding] = (directCountMap[binding] || 0) + 1
       }
-
-      if (binding.startsWith('group:')) {
-        const groupIdValue = binding.substring('group:'.length)
-        groupCountMap[groupIdValue] = (groupCountMap[groupIdValue] || 0) + 1
-        continue
-      }
-
-      directCountMap[binding] = (directCountMap[binding] || 0) + 1
     }
 
     // 添加使用统计
@@ -203,11 +207,13 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
         const groupInfos = groupInfosMap[account.id] || []
-        const groupIds = groupInfos.map((group) => group.id)
-
-        let boundApiKeysCount = directCountMap[account.id] || 0
-        for (const id of groupIds) {
-          boundApiKeysCount += groupCountMap[id] || 0
+        let boundApiKeysCount = 0
+        if (includeBoundApiKeysCount) {
+          const groupIds = groupInfos.map((group) => group.id)
+          boundApiKeysCount = directCountMap[account.id] || 0
+          for (const id of groupIds) {
+            boundApiKeysCount += groupCountMap[id] || 0
+          }
         }
 
         const usageStats = usageStatsMap[account.id]

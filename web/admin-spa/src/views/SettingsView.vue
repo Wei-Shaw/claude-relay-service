@@ -48,6 +48,18 @@
             <i class="fas fa-robot mr-2"></i>
             Claude 转发
           </button>
+          <button
+            :class="[
+              'border-b-2 pb-2 text-sm font-medium transition-colors',
+              activeSection === 'proxy'
+                ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            ]"
+            @click="activeSection = 'proxy'"
+          >
+            <i class="fas fa-network-wired mr-2"></i>
+            代理设置
+          </button>
         </nav>
       </div>
 
@@ -1025,6 +1037,115 @@
             </div>
           </div>
         </div>
+
+        <!-- 代理策略配置部分 -->
+        <div v-show="activeSection === 'proxy'">
+          <!-- 加载状态 -->
+          <div v-if="proxyPolicyLoading" class="py-12 text-center">
+            <div class="loading-spinner mx-auto mb-4"></div>
+            <p class="text-gray-500 dark:text-gray-400">正在加载代理策略...</p>
+          </div>
+
+          <div v-else class="space-y-6">
+            <div class="rounded-lg bg-white/80 p-6 shadow-lg backdrop-blur-sm dark:bg-gray-800/80">
+              <div class="flex items-start justify-between gap-4">
+                <div class="flex items-start">
+                  <div
+                    class="mr-3 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-lg"
+                  >
+                    <i class="fas fa-network-wired"></i>
+                  </div>
+                  <div>
+                    <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">代理策略</h2>
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                      统一配置全局账号代理、分组代理与类型（平台）代理
+                    </p>
+                  </div>
+                </div>
+                <button
+                  class="btn btn-secondary px-4 py-2"
+                  :disabled="proxyPolicySaving"
+                  @click="loadProxyPolicyConfig"
+                >
+                  <i class="fas fa-sync-alt mr-2"></i>
+                  刷新
+                </button>
+              </div>
+
+              <div class="mt-4 rounded-lg bg-blue-50 p-4 dark:bg-blue-900/20">
+                <div class="flex">
+                  <i class="fas fa-info-circle mt-0.5 text-blue-500"></i>
+                  <div class="ml-3">
+                    <p class="text-sm text-blue-700 dark:text-blue-300">
+                      <strong>生效优先级：</strong>
+                      账号单独代理 &gt; 分组代理 &gt; 类型代理（平台） &gt; 全局账号代理 &gt;
+                      环境变量全局代理
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-6 space-y-8">
+                <ProxyConfig
+                  v-model="proxyPolicyForm.globalAccountProxy"
+                  title="全局账号代理 (默认)"
+                />
+
+                <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                  <div
+                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
+                  >
+                    <ProxyConfig
+                      v-model="proxyPolicyForm.platformProxies.claude"
+                      title="Claude 类型代理"
+                    />
+                  </div>
+                  <div
+                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
+                  >
+                    <ProxyConfig
+                      v-model="proxyPolicyForm.platformProxies.gemini"
+                      title="Gemini 类型代理"
+                    />
+                  </div>
+                  <div
+                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
+                  >
+                    <ProxyConfig
+                      v-model="proxyPolicyForm.platformProxies.openai"
+                      title="OpenAI 类型代理"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-6 flex items-center justify-between gap-4">
+                <div
+                  v-if="proxyPolicyForm.updatedAt"
+                  class="text-sm text-gray-500 dark:text-gray-400"
+                >
+                  <i class="fas fa-history mr-2"></i>
+                  最后更新：{{ formatDateTime(proxyPolicyForm.updatedAt) }}
+                  <span v-if="proxyPolicyForm.updatedBy" class="ml-2">
+                    由 <strong>{{ proxyPolicyForm.updatedBy }}</strong> 修改
+                  </span>
+                </div>
+                <div v-else class="text-sm text-gray-500 dark:text-gray-400"></div>
+
+                <button
+                  class="btn btn-primary px-6 py-3"
+                  :class="{ 'cursor-not-allowed opacity-50': proxyPolicySaving }"
+                  :disabled="proxyPolicySaving"
+                  @click="saveProxyPolicyConfig"
+                >
+                  <div v-if="proxyPolicySaving" class="loading-spinner mr-2"></div>
+                  <i v-else class="fas fa-save mr-2" />
+                  {{ proxyPolicySaving ? '保存中...' : '保存代理策略' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1612,6 +1733,13 @@ import { storeToRefs } from 'pinia'
 import { showToast } from '@/utils/toast'
 import { useSettingsStore } from '@/stores/settings'
 import { apiClient } from '@/config/api'
+import ProxyConfig from '@/components/accounts/ProxyConfig.vue'
+import {
+  buildProxyPayload,
+  createDefaultProxyState,
+  getProxyValidationError,
+  normalizeProxyFormState
+} from '@/utils/proxy'
 
 // 定义组件名称，用于keep-alive排除
 defineOptions({
@@ -1688,6 +1816,20 @@ const claudeConfig = ref({
   updatedBy: null
 })
 
+// 代理策略配置
+const proxyPolicyLoading = ref(false)
+const proxyPolicySaving = ref(false)
+const proxyPolicyForm = ref({
+  globalAccountProxy: createDefaultProxyState(),
+  platformProxies: {
+    claude: createDefaultProxyState(),
+    gemini: createDefaultProxyState(),
+    openai: createDefaultProxyState()
+  },
+  updatedAt: null,
+  updatedBy: null
+})
+
 // 平台表单相关
 const showAddPlatformModal = ref(false)
 const editingPlatform = ref(null)
@@ -1727,6 +1869,8 @@ const sectionWatcher = watch(activeSection, async (newSection) => {
     await loadWebhookConfig()
   } else if (newSection === 'claude') {
     await loadClaudeConfig()
+  } else if (newSection === 'proxy') {
+    await loadProxyPolicyConfig()
   }
 })
 
@@ -2012,6 +2156,106 @@ const saveClaudeConfig = async () => {
     if (!isMounted.value) return
     showToast('保存 Claude 转发配置失败', 'error')
     console.error(error)
+  }
+}
+
+const validateProxyPolicyForm = () => {
+  const checks = [
+    ['全局账号代理', proxyPolicyForm.value.globalAccountProxy],
+    ['Claude 类型代理', proxyPolicyForm.value.platformProxies.claude],
+    ['Gemini 类型代理', proxyPolicyForm.value.platformProxies.gemini],
+    ['OpenAI 类型代理', proxyPolicyForm.value.platformProxies.openai]
+  ]
+
+  for (const [label, state] of checks) {
+    const error = getProxyValidationError(state)
+    if (error) {
+      showToast(`${label}：${error}`, 'error')
+      return false
+    }
+  }
+
+  return true
+}
+
+const loadProxyPolicyConfig = async () => {
+  if (!isMounted.value) return
+  proxyPolicyLoading.value = true
+  try {
+    const response = await apiClient.get('/admin/proxy-policy', {
+      signal: abortController.value.signal
+    })
+    if (response.success && isMounted.value) {
+      const cfg = response.data || {}
+      proxyPolicyForm.value = {
+        ...proxyPolicyForm.value,
+        globalAccountProxy: normalizeProxyFormState(cfg.globalAccountProxy),
+        platformProxies: {
+          ...proxyPolicyForm.value.platformProxies,
+          claude: normalizeProxyFormState(cfg.platformProxies?.claude),
+          gemini: normalizeProxyFormState(cfg.platformProxies?.gemini),
+          openai: normalizeProxyFormState(cfg.platformProxies?.openai)
+        },
+        updatedAt: cfg.updatedAt || null,
+        updatedBy: cfg.updatedBy || null
+      }
+    }
+  } catch (error) {
+    if (error.name === 'AbortError') return
+    if (!isMounted.value) return
+    showToast('获取代理策略配置失败', 'error')
+    console.error(error)
+  } finally {
+    if (isMounted.value) {
+      proxyPolicyLoading.value = false
+    }
+  }
+}
+
+const saveProxyPolicyConfig = async () => {
+  if (!isMounted.value) return
+  if (!validateProxyPolicyForm()) return
+
+  proxyPolicySaving.value = true
+  try {
+    const payload = {
+      globalAccountProxy: buildProxyPayload(proxyPolicyForm.value.globalAccountProxy),
+      platformProxies: {
+        claude: buildProxyPayload(proxyPolicyForm.value.platformProxies.claude),
+        gemini: buildProxyPayload(proxyPolicyForm.value.platformProxies.gemini),
+        openai: buildProxyPayload(proxyPolicyForm.value.platformProxies.openai)
+      }
+    }
+
+    const response = await apiClient.put('/admin/proxy-policy', payload, {
+      signal: abortController.value.signal
+    })
+
+    if (response.success && isMounted.value) {
+      const cfg = response.data || {}
+      proxyPolicyForm.value = {
+        ...proxyPolicyForm.value,
+        globalAccountProxy: normalizeProxyFormState(cfg.globalAccountProxy),
+        platformProxies: {
+          ...proxyPolicyForm.value.platformProxies,
+          claude: normalizeProxyFormState(cfg.platformProxies?.claude),
+          gemini: normalizeProxyFormState(cfg.platformProxies?.gemini),
+          openai: normalizeProxyFormState(cfg.platformProxies?.openai)
+        },
+        updatedAt: cfg.updatedAt || new Date().toISOString(),
+        updatedBy: cfg.updatedBy || null
+      }
+      showToast('代理策略配置已保存', 'success')
+    }
+  } catch (error) {
+    if (error.name === 'AbortError') return
+    if (!isMounted.value) return
+    showToast(error.response?.data?.error || '保存代理策略配置失败', 'error')
+    console.error(error)
+  } finally {
+    if (isMounted.value) {
+      proxyPolicySaving.value = false
+    }
   }
 }
 

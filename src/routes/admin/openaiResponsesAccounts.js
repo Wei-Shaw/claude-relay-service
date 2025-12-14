@@ -26,6 +26,8 @@ router.get('/openai-responses-accounts/auto-recovery-configs', authenticateAdmin
 router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => {
   try {
     const { platform, groupId } = req.query
+    const includeBoundApiKeysCount =
+      req.query.includeBoundApiKeysCount === 'true' || req.query.includeBoundApiKeysCount === '1'
     let accounts = await openaiResponsesAccountService.getAllAccounts(true)
     let groupInfosMap = null
 
@@ -55,31 +57,33 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
       groupInfosMap = await accountGroupService.getAccountGroupsMap(accounts.map((a) => a.id))
     }
 
-    // 预计算绑定的 API Key 数量（支持 responses: 前缀），避免每个账户全量扫描
-    const responseAccountIdSet = new Set(accounts.map((a) => a.id))
-    const allKeys = await redis.getAllApiKeys()
     const boundCountMap = {}
+    if (includeBoundApiKeysCount) {
+      // 预计算绑定的 API Key 数量（支持 responses: 前缀）
+      const responseAccountIdSet = new Set(accounts.map((a) => a.id))
+      const allKeys = await redis.getAllApiKeys()
 
-    for (const key of allKeys) {
-      const binding = key.openaiAccountId
-      if (!binding) {
-        continue
-      }
-
-      if (binding.startsWith('responses:')) {
-        const accountId = binding.substring('responses:'.length)
-        if (!responseAccountIdSet.has(accountId)) {
+      for (const key of allKeys) {
+        const binding = key.openaiAccountId
+        if (!binding) {
           continue
         }
-        boundCountMap[accountId] = (boundCountMap[accountId] || 0) + 1
-        continue
-      }
 
-      if (!responseAccountIdSet.has(binding)) {
-        continue
-      }
+        if (binding.startsWith('responses:')) {
+          const accountId = binding.substring('responses:'.length)
+          if (!responseAccountIdSet.has(accountId)) {
+            continue
+          }
+          boundCountMap[accountId] = (boundCountMap[accountId] || 0) + 1
+          continue
+        }
 
-      boundCountMap[binding] = (boundCountMap[binding] || 0) + 1
+        if (!responseAccountIdSet.has(binding)) {
+          continue
+        }
+
+        boundCountMap[binding] = (boundCountMap[binding] || 0) + 1
+      }
     }
 
     // 处理额度信息、使用统计和绑定的 API Key 数量
@@ -119,7 +123,7 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
           // 获取使用统计信息
           const usageStats = usageStatsMap[account.id]
 
-          const boundCount = boundCountMap[account.id] || 0
+          const boundCount = includeBoundApiKeysCount ? boundCountMap[account.id] || 0 : 0
 
           // 调试日志：检查绑定计数
           if (boundCount > 0) {

@@ -1,12 +1,58 @@
 const { v4: uuidv4 } = require('uuid')
 const logger = require('../utils/logger')
 const redis = require('../models/redis')
+const ProxyHelper = require('../utils/proxyHelper')
 
 class AccountGroupService {
   constructor() {
     this.GROUPS_KEY = 'account_groups'
     this.GROUP_PREFIX = 'account_group:'
     this.GROUP_MEMBERS_PREFIX = 'account_group_members:'
+    this._groupsSnapshotCache = null
+  }
+
+  _clearGroupsSnapshotCache() {
+    this._groupsSnapshotCache = null
+  }
+
+  async _getGroupsSnapshot(cacheTtlMs = 2000) {
+    const now = Date.now()
+    const cached = this._groupsSnapshotCache
+    if (cached && cached.expiresAt > now && cached.data) {
+      return cached.data
+    }
+
+    const client = redis.getClientSafe()
+    const groupIds = await client.smembers(this.GROUPS_KEY)
+
+    if (!groupIds || groupIds.length === 0) {
+      const data = {
+        groupIds: [],
+        groupDataById: {},
+        membersById: {}
+      }
+      this._groupsSnapshotCache = { expiresAt: now + cacheTtlMs, data }
+      return data
+    }
+
+    const pipeline = client.pipeline()
+    for (const groupId of groupIds) {
+      pipeline.hgetall(`${this.GROUP_PREFIX}${groupId}`)
+      pipeline.smembers(`${this.GROUP_MEMBERS_PREFIX}${groupId}`)
+    }
+    const results = await pipeline.exec()
+
+    const groupDataById = {}
+    const membersById = {}
+    for (let i = 0; i < groupIds.length; i++) {
+      const groupId = groupIds[i]
+      groupDataById[groupId] = results?.[i * 2]?.[1] || {}
+      membersById[groupId] = results?.[i * 2 + 1]?.[1] || []
+    }
+
+    const data = { groupIds, groupDataById, membersById }
+    this._groupsSnapshotCache = { expiresAt: now + cacheTtlMs, data }
+    return data
   }
 
   /**
@@ -15,11 +61,13 @@ class AccountGroupService {
    * @param {string} groupData.name - 分组名称
    * @param {string} groupData.platform - 平台类型 (claude/gemini/openai)
    * @param {string} groupData.description - 分组描述
+   * @param {Object|null} groupData.proxy - 分组代理配置（可选，JSON）
+   * @param {number|string|null} groupData.proxyPriority - 分组代理优先级（可选，数字越小优先级越高）
    * @returns {Object} 创建的分组
    */
   async createGroup(groupData) {
     try {
-      const { name, platform, description = '' } = groupData
+      const { name, platform, description = '', proxy = null, proxyPriority = null } = groupData
 
       // 验证必填字段
       if (!name || !platform) {
@@ -35,11 +83,32 @@ class AccountGroupService {
       const groupId = uuidv4()
       const now = new Date().toISOString()
 
+      // 验证代理配置（可选）
+      let normalizedProxy = null
+      if (proxy !== null && proxy !== undefined && proxy !== '') {
+        if (!ProxyHelper.validateProxyConfig(proxy)) {
+          throw new Error('代理配置无效（需要包含 type/host/port 且 type 必须为 socks5/http/https）')
+        }
+        normalizedProxy = typeof proxy === 'string' ? JSON.parse(proxy) : proxy
+      }
+
+      // 解析代理优先级（可选）
+      let normalizedProxyPriority = null
+      if (proxyPriority !== null && proxyPriority !== undefined && proxyPriority !== '') {
+        const parsed = Number.parseInt(proxyPriority, 10)
+        if (!Number.isFinite(parsed) || parsed < 1 || parsed > 100) {
+          throw new Error('proxyPriority 必须是 1-100 的整数（数字越小优先级越高）')
+        }
+        normalizedProxyPriority = parsed
+      }
+
       const group = {
         id: groupId,
         name,
         platform,
         description,
+        proxy: normalizedProxy ? JSON.stringify(normalizedProxy) : '',
+        proxyPriority: normalizedProxyPriority !== null ? normalizedProxyPriority.toString() : '',
         createdAt: now,
         updatedAt: now
       }
@@ -50,9 +119,10 @@ class AccountGroupService {
       // 添加到分组集合
       await client.sadd(this.GROUPS_KEY, groupId)
 
+      this._clearGroupsSnapshotCache()
       logger.success(`✅ 创建账户分组成功: ${name} (${platform})`)
 
-      return group
+      return this._formatGroupData(group)
     } catch (error) {
       logger.error('❌ 创建账户分组失败:', error)
       throw error
@@ -90,6 +160,34 @@ class AccountGroupService {
         updatedAt: new Date().toISOString()
       }
 
+      // 处理 proxy 字段：对象 -> JSON；null/空字符串 -> 清空
+      if (Object.prototype.hasOwnProperty.call(updateData, 'proxy')) {
+        const incoming = updateData.proxy
+        if (incoming === null || incoming === undefined || incoming === '') {
+          updateData.proxy = ''
+        } else {
+          if (!ProxyHelper.validateProxyConfig(incoming)) {
+            throw new Error('代理配置无效（需要包含 type/host/port 且 type 必须为 socks5/http/https）')
+          }
+          const normalized = typeof incoming === 'string' ? JSON.parse(incoming) : incoming
+          updateData.proxy = JSON.stringify(normalized)
+        }
+      }
+
+      // 处理 proxyPriority 字段：允许 1-100；null/空字符串 -> 清空
+      if (Object.prototype.hasOwnProperty.call(updateData, 'proxyPriority')) {
+        const incoming = updateData.proxyPriority
+        if (incoming === null || incoming === undefined || incoming === '') {
+          updateData.proxyPriority = ''
+        } else {
+          const parsed = Number.parseInt(incoming, 10)
+          if (!Number.isFinite(parsed) || parsed < 1 || parsed > 100) {
+            throw new Error('proxyPriority 必须是 1-100 的整数（数字越小优先级越高）')
+          }
+          updateData.proxyPriority = parsed.toString()
+        }
+      }
+
       // 移除不允许修改的字段
       delete updateData.id
       delete updateData.platform
@@ -101,9 +199,10 @@ class AccountGroupService {
       // 返回更新后的完整数据
       const updatedGroup = await client.hgetall(groupKey)
 
+      this._clearGroupsSnapshotCache()
       logger.success(`✅ 更新账户分组成功: ${updatedGroup.name}`)
 
-      return updatedGroup
+      return this._formatGroupData(updatedGroup)
     } catch (error) {
       logger.error('❌ 更新账户分组失败:', error)
       throw error
@@ -143,6 +242,7 @@ class AccountGroupService {
       // 从分组集合中移除
       await client.srem(this.GROUPS_KEY, groupId)
 
+      this._clearGroupsSnapshotCache()
       logger.success(`✅ 删除账户分组成功: ${group.name}`)
     } catch (error) {
       logger.error('❌ 删除账户分组失败:', error)
@@ -168,7 +268,7 @@ class AccountGroupService {
       const memberCount = await client.scard(`${this.GROUP_MEMBERS_PREFIX}${groupId}`)
 
       return {
-        ...groupData,
+        ...this._formatGroupData(groupData),
         memberCount: memberCount || 0
       }
     } catch (error) {
@@ -208,7 +308,7 @@ class AccountGroupService {
         }
 
         const group = {
-          ...groupData,
+          ...this._formatGroupData(groupData),
           memberCount: memberCount || 0
         }
 
@@ -254,6 +354,7 @@ class AccountGroupService {
       // 添加到分组成员集合
       await client.sadd(`${this.GROUP_MEMBERS_PREFIX}${groupId}`, accountId)
 
+      this._clearGroupsSnapshotCache()
       logger.success(`✅ 添加账户到分组成功: ${accountId} -> ${group.name}`)
     } catch (error) {
       logger.error('❌ 添加账户到分组失败:', error)
@@ -273,6 +374,7 @@ class AccountGroupService {
       // 从分组成员集合中移除
       await client.srem(`${this.GROUP_MEMBERS_PREFIX}${groupId}`, accountId)
 
+      this._clearGroupsSnapshotCache()
       logger.success(`✅ 从分组移除账户成功: ${accountId}`)
     } catch (error) {
       logger.error('❌ 从分组移除账户失败:', error)
@@ -418,8 +520,8 @@ class AccountGroupService {
         return resultMap
       }
 
-      const client = redis.getClientSafe()
-      const allGroupIds = await client.smembers(this.GROUPS_KEY)
+      const snapshot = await this._getGroupsSnapshot()
+      const allGroupIds = snapshot.groupIds
 
       if (!allGroupIds || allGroupIds.length === 0) {
         return resultMap
@@ -427,17 +529,9 @@ class AccountGroupService {
 
       const accountIdSet = new Set(uniqueAccountIds)
 
-      // pipeline 批量获取 group 元数据与成员列表，避免 N×G 的串行 Redis 往返
-      const pipeline = client.pipeline()
       for (const groupId of allGroupIds) {
-        pipeline.hgetall(`${this.GROUP_PREFIX}${groupId}`)
-        pipeline.smembers(`${this.GROUP_MEMBERS_PREFIX}${groupId}`)
-      }
-      const pipelineResults = await pipeline.exec()
-
-      for (let i = 0; i < allGroupIds.length; i++) {
-        const groupData = pipelineResults?.[i * 2]?.[1]
-        const members = pipelineResults?.[i * 2 + 1]?.[1] || []
+        const groupData = snapshot.groupDataById?.[groupId]
+        const members = snapshot.membersById?.[groupId] || []
 
         if (!groupData || Object.keys(groupData).length === 0) {
           continue
@@ -448,7 +542,7 @@ class AccountGroupService {
         }
 
         const group = {
-          ...groupData,
+          ...this._formatGroupData(groupData),
           memberCount: Array.isArray(members) ? members.length : 0
         }
 
@@ -508,11 +602,34 @@ class AccountGroupService {
         await client.srem(`${this.GROUP_MEMBERS_PREFIX}${groupId}`, accountId)
       }
 
+      this._clearGroupsSnapshotCache()
       logger.success(`✅ 从所有分组移除账户成功: ${accountId}`)
     } catch (error) {
       logger.error('❌ 从所有分组移除账户失败:', error)
       throw error
     }
+  }
+
+  _formatGroupData(groupData) {
+    if (!groupData || typeof groupData !== 'object') {
+      return groupData
+    }
+
+    let parsedProxy = null
+    if (groupData.proxy) {
+      try {
+        parsedProxy = typeof groupData.proxy === 'string' ? JSON.parse(groupData.proxy) : groupData.proxy
+      } catch (e) {
+        parsedProxy = null
+      }
+    }
+
+    const formatted = {
+      ...groupData,
+      proxy: parsedProxy
+    }
+
+    return formatted
   }
 }
 

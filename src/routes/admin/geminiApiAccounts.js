@@ -13,6 +13,8 @@ const router = express.Router()
 router.get('/gemini-api-accounts', authenticateAdmin, async (req, res) => {
   try {
     const { platform, groupId } = req.query
+    const includeBoundApiKeysCount =
+      req.query.includeBoundApiKeysCount === 'true' || req.query.includeBoundApiKeysCount === '1'
     let accounts = await geminiApiAccountService.getAllAccounts(true)
     let groupInfosMap = null
 
@@ -42,16 +44,18 @@ router.get('/gemini-api-accounts', authenticateAdmin, async (req, res) => {
       groupInfosMap = await accountGroupService.getAccountGroupsMap(accounts.map((a) => a.id))
     }
 
-    // 预计算绑定的 API Key 数量（支持 api: 前缀），避免每个账户都全量扫描
-    const allKeys = await redis.getAllApiKeys()
     const boundCountMap = {}
-    for (const key of allKeys) {
-      const binding = key.geminiAccountId
-      if (!binding || !binding.startsWith('api:')) {
-        continue
+    if (includeBoundApiKeysCount) {
+      // 预计算绑定的 API Key 数量（支持 api: 前缀）
+      const allKeys = await redis.getAllApiKeys()
+      for (const key of allKeys) {
+        const binding = key.geminiAccountId
+        if (!binding || !binding.startsWith('api:')) {
+          continue
+        }
+        const accountId = binding.substring('api:'.length)
+        boundCountMap[accountId] = (boundCountMap[accountId] || 0) + 1
       }
-      const accountId = binding.substring('api:'.length)
-      boundCountMap[accountId] = (boundCountMap[accountId] || 0) + 1
     }
 
     // 处理使用统计和绑定的 API Key 数量
@@ -87,7 +91,7 @@ router.get('/gemini-api-accounts', authenticateAdmin, async (req, res) => {
             total: usageStats?.total || { requests: 0, tokens: 0, allTokens: 0, cost: 0 },
             averages: usageStats?.averages || { rpm: 0, tpm: 0 }
           },
-          boundApiKeys: boundCountMap[account.id] || 0
+          boundApiKeys: includeBoundApiKeysCount ? boundCountMap[account.id] || 0 : 0
         }
       })
     )

@@ -32,7 +32,7 @@ async function startDeviceAuthorization(proxyConfig = null) {
     client_id: WORKOS_CLIENT_ID
   })
 
-  const agent = ProxyHelper.createProxyAgent(proxyConfig)
+  const agent = ProxyHelper.createProxyAgentWithFallback(proxyConfig)
 
   try {
     logger.info('🔐 请求 WorkOS 设备码授权', {
@@ -82,8 +82,8 @@ async function startDeviceAuthorization(proxyConfig = null) {
       })
       throw new WorkOSDeviceAuthError(
         error.response.data?.error_description ||
-          error.response.data?.error ||
-          'WorkOS 设备码授权失败',
+        error.response.data?.error ||
+        'WorkOS 设备码授权失败',
         error.response.data?.error
       )
     }
@@ -112,7 +112,7 @@ async function pollDeviceAuthorization(deviceCode, proxyConfig = null) {
     client_id: WORKOS_CLIENT_ID
   })
 
-  const agent = ProxyHelper.createProxyAgent(proxyConfig)
+  const agent = ProxyHelper.createProxyAgentWithFallback(proxyConfig)
 
   try {
     const axiosConfig = {

@@ -186,11 +186,11 @@ class DroidAccountService {
     const entries = clearExisting
       ? []
       : normalizedExisting
-          .filter((entry) => entry && entry.id && entry.encryptedKey)
-          .map((entry) => ({
-            ...entry,
-            status: entry.status || 'active' // 确保有默认状态
-          }))
+        .filter((entry) => entry && entry.id && entry.encryptedKey)
+        .map((entry) => ({
+          ...entry,
+          status: entry.status || 'active' // 确保有默认状态
+        }))
 
     const hashSet = new Set(entries.map((entry) => entry.hash).filter(Boolean))
 
@@ -438,7 +438,7 @@ class DroidAccountService {
     }
 
     if (proxyConfig) {
-      const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+      const proxyAgent = ProxyHelper.createProxyAgentWithFallback(proxyConfig)
       if (proxyAgent) {
         requestOptions.httpAgent = proxyAgent
         requestOptions.httpsAgent = proxyAgent
@@ -507,7 +507,7 @@ class DroidAccountService {
     }
 
     if (proxyConfig) {
-      const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+      const proxyAgent = ProxyHelper.createProxyAgentWithFallback(proxyConfig)
       if (proxyAgent) {
         requestOptions.httpAgent = proxyAgent
         requestOptions.httpsAgent = proxyAgent
@@ -607,8 +607,7 @@ class DroidAccountService {
       )
     } else {
       logger.info(
-        `🔍 [Droid ${provisioningMode}] 初始令牌 - AccountName: ${name}, AccessToken: ${
-          normalizedAccessToken || '[empty]'
+        `🔍 [Droid ${provisioningMode}] 初始令牌 - AccountName: ${name}, AccessToken: ${normalizedAccessToken || '[empty]'
         }, RefreshToken: ${normalizedRefreshToken || '[empty]'}`
       )
     }
@@ -630,10 +629,9 @@ class DroidAccountService {
         const refreshed = await this._refreshTokensWithWorkOS(normalizedRefreshToken, proxyConfig)
 
         logger.info(
-          `🔍 [Droid manual] 刷新后令牌 - AccountName: ${name}, AccessToken: ${refreshed.accessToken || '[empty]'}, RefreshToken: ${refreshed.refreshToken || '[empty]'}, ExpiresAt: ${refreshed.expiresAt || '[empty]'}, ExpiresIn: ${
-            refreshed.expiresIn !== null && refreshed.expiresIn !== undefined
-              ? refreshed.expiresIn
-              : '[empty]'
+          `🔍 [Droid manual] 刷新后令牌 - AccountName: ${name}, AccessToken: ${refreshed.accessToken || '[empty]'}, RefreshToken: ${refreshed.refreshToken || '[empty]'}, ExpiresAt: ${refreshed.expiresAt || '[empty]'}, ExpiresIn: ${refreshed.expiresIn !== null && refreshed.expiresIn !== undefined
+            ? refreshed.expiresIn
+            : '[empty]'
           }`
         )
 
@@ -708,8 +706,7 @@ class DroidAccountService {
           )
 
           logger.info(
-            `🔍 [Droid oauth] 组织刷新后令牌 - AccountName: ${name}, AccessToken: ${refreshed.accessToken || '[empty]'}, RefreshToken: ${refreshed.refreshToken || '[empty]'}, OrganizationId: ${
-              refreshed.organizationId || selectedOrgId
+            `🔍 [Droid oauth] 组织刷新后令牌 - AccountName: ${name}, AccessToken: ${refreshed.accessToken || '[empty]'}, RefreshToken: ${refreshed.refreshToken || '[empty]'}, OrganizationId: ${refreshed.organizationId || selectedOrgId
             }, ExpiresAt: ${refreshed.expiresAt || '[empty]'}`
           )
 
@@ -788,10 +785,9 @@ class DroidAccountService {
     }
 
     logger.info(
-      `🔍 [Droid ${provisioningMode}] 写入前令牌快照 - AccountName: ${name}, AccessToken: ${normalizedAccessToken || '[empty]'}, RefreshToken: ${normalizedRefreshToken || '[empty]'}, ExpiresAt: ${normalizedExpiresAt || '[empty]'}, ExpiresIn: ${
-        normalizedExpiresIn !== null && normalizedExpiresIn !== undefined
-          ? normalizedExpiresIn
-          : '[empty]'
+      `🔍 [Droid ${provisioningMode}] 写入前令牌快照 - AccountName: ${name}, AccessToken: ${normalizedAccessToken || '[empty]'}, RefreshToken: ${normalizedRefreshToken || '[empty]'}, ExpiresAt: ${normalizedExpiresAt || '[empty]'}, ExpiresIn: ${normalizedExpiresIn !== null && normalizedExpiresIn !== undefined
+        ? normalizedExpiresIn
+        : '[empty]'
       }`
     )
 

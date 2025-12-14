@@ -6,10 +6,99 @@ const config = require('../../config/config')
 /**
  * 统一的代理创建工具
  * 支持 SOCKS5 和 HTTP/HTTPS 代理，可配置 IPv4/IPv6
+ * 支持全局代理配置（通过环境变量或配置文件）
  */
 class ProxyHelper {
   // 缓存代理 Agent，避免重复创建浪费连接
   static _agentCache = new Map()
+
+  // 缓存全局代理配置
+  static _globalProxyConfig = null
+  static _globalProxyConfigLoaded = false
+
+  /**
+   * 获取全局代理配置（从环境变量或配置文件）
+   * 环境变量格式：
+   *   GLOBAL_PROXY_TYPE: http | https | socks5
+   *   GLOBAL_PROXY_HOST: 代理服务器地址
+   *   GLOBAL_PROXY_PORT: 代理服务器端口
+   *   GLOBAL_PROXY_USERNAME: 代理认证用户名（可选）
+   *   GLOBAL_PROXY_PASSWORD: 代理认证密码（可选）
+   * @returns {object|null} 全局代理配置对象或 null
+   */
+  static getGlobalProxyConfig() {
+    // 只加载一次
+    if (ProxyHelper._globalProxyConfigLoaded) {
+      return ProxyHelper._globalProxyConfig
+    }
+
+    ProxyHelper._globalProxyConfigLoaded = true
+
+    // 优先从环境变量读取
+    const type = process.env.GLOBAL_PROXY_TYPE
+    const host = process.env.GLOBAL_PROXY_HOST
+    const port = process.env.GLOBAL_PROXY_PORT
+
+    if (type && host && port) {
+      ProxyHelper._globalProxyConfig = {
+        type: type.toLowerCase(),
+        host,
+        port: parseInt(port),
+        username: process.env.GLOBAL_PROXY_USERNAME || null,
+        password: process.env.GLOBAL_PROXY_PASSWORD || null
+      }
+
+      logger.info(`🌐 已加载全局代理配置: ${ProxyHelper.maskProxyInfo(ProxyHelper._globalProxyConfig)}`)
+      return ProxyHelper._globalProxyConfig
+    }
+
+    // 从配置文件读取（如果有）
+    if (config.proxy?.global) {
+      const globalConfig = config.proxy.global
+      if (globalConfig.type && globalConfig.host && globalConfig.port) {
+        ProxyHelper._globalProxyConfig = {
+          type: globalConfig.type.toLowerCase(),
+          host: globalConfig.host,
+          port: parseInt(globalConfig.port),
+          username: globalConfig.username || null,
+          password: globalConfig.password || null
+        }
+
+        logger.info(`🌐 已加载全局代理配置（从配置文件）: ${ProxyHelper.maskProxyInfo(ProxyHelper._globalProxyConfig)}`)
+        return ProxyHelper._globalProxyConfig
+      }
+    }
+
+    logger.debug('🌐 未配置全局代理')
+    return null
+  }
+
+  /**
+   * 创建代理 Agent，支持回退到全局代理
+   * @param {object|string|null} proxyConfig - 账号级别的代理配置
+   * @param {object} options - 额外选项
+   * @param {boolean} options.useGlobalFallback - 是否在账号无代理时使用全局代理（默认true）
+   * @returns {Agent|null} 代理 Agent 实例或 null
+   */
+  static createProxyAgentWithFallback(proxyConfig, options = {}) {
+    const { useGlobalFallback = true, ...restOptions } = options
+
+    // 如果有账号级别代理配置，优先使用
+    if (proxyConfig) {
+      return ProxyHelper.createProxyAgent(proxyConfig, restOptions)
+    }
+
+    // 如果允许回退且有全局代理配置，使用全局代理
+    if (useGlobalFallback) {
+      const globalProxy = ProxyHelper.getGlobalProxyConfig()
+      if (globalProxy) {
+        logger.debug('🌐 使用全局代理配置')
+        return ProxyHelper.createProxyAgent(globalProxy, restOptions)
+      }
+    }
+
+    return null
+  }
 
   /**
    * 创建代理 Agent
@@ -244,8 +333,8 @@ class ProxyHelper {
           proxy.username.length <= 2
             ? proxy.username
             : proxy.username[0] +
-              '*'.repeat(Math.max(1, proxy.username.length - 2)) +
-              proxy.username.slice(-1)
+            '*'.repeat(Math.max(1, proxy.username.length - 2)) +
+            proxy.username.slice(-1)
         const maskedPassword = '*'.repeat(Math.min(8, proxy.password.length))
         proxyDesc += ` (auth: ${maskedUsername}:${maskedPassword})`
       }

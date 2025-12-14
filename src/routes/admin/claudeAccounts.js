@@ -404,6 +404,25 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
       usageStatsMap = {}
     }
 
+    // 批量获取会话窗口使用统计（避免逐账户查询造成 N×Redis RTT）
+    let sessionWindowUsageMap = {}
+    try {
+      const activeWindows = accounts
+        .filter((account) => account.sessionWindow && account.sessionWindow.hasActiveWindow)
+        .map((account) => ({
+          accountId: account.id,
+          windowStart: account.sessionWindow.windowStart,
+          windowEnd: account.sessionWindow.windowEnd
+        }))
+
+      if (activeWindows.length > 0) {
+        sessionWindowUsageMap = await redis.getAccountsSessionWindowUsage(activeWindows)
+      }
+    } catch (error) {
+      logger.warn('⚠️ Failed to batch load session window usage for Claude accounts:', error.message)
+      sessionWindowUsageMap = {}
+    }
+
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
         try {
@@ -413,11 +432,15 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
           // 获取会话窗口使用统计（仅对有活跃窗口的账户）
           let sessionWindowUsage = null
           if (account.sessionWindow && account.sessionWindow.hasActiveWindow) {
-            const windowUsage = await redis.getAccountSessionWindowUsage(
-              account.id,
-              account.sessionWindow.windowStart,
-              account.sessionWindow.windowEnd
-            )
+            const windowUsage = sessionWindowUsageMap[account.id] || {
+              totalInputTokens: 0,
+              totalOutputTokens: 0,
+              totalCacheCreateTokens: 0,
+              totalCacheReadTokens: 0,
+              totalAllTokens: 0,
+              totalRequests: 0,
+              modelUsage: {}
+            }
 
             // 计算会话窗口的总费用
             let totalCost = 0

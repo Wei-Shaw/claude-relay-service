@@ -137,7 +137,7 @@ function createOAuth2Client(redirectUri = null, proxyConfig = null) {
 
   // 如果有代理配置，设置 transporterOptions
   if (proxyConfig) {
-    const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+    const proxyAgent = ProxyHelper.createProxyAgentWithFallback(proxyConfig)
     if (proxyAgent) {
       // 通过 transporterOptions 传递代理配置给底层的 Gaxios
       clientOptions.transporterOptions = {
@@ -364,7 +364,7 @@ async function createAccount(accountData) {
       expiresAt = oauthData.expiry_date ? new Date(oauthData.expiry_date).toISOString() : ''
     } else {
       // 如果只提供了 access token
-      ;({ accessToken } = accountData)
+      ; ({ accessToken } = accountData)
       refreshToken = accountData.refreshToken || ''
 
       // 构造完整的 OAuth 数据
@@ -1005,13 +1005,13 @@ async function markAccountUsed(accountId) {
 async function setAccountRateLimited(accountId, isLimited = true) {
   const updates = isLimited
     ? {
-        rateLimitStatus: 'limited',
-        rateLimitedAt: new Date().toISOString()
-      }
+      rateLimitStatus: 'limited',
+      rateLimitedAt: new Date().toISOString()
+    }
     : {
-        rateLimitStatus: '',
-        rateLimitedAt: ''
-      }
+      rateLimitStatus: '',
+      rateLimitedAt: ''
+    }
 
   await updateAccount(accountId, updates)
 }
@@ -1101,7 +1101,7 @@ async function forwardToCodeAssist(client, apiMethod, requestBody, proxyConfig =
   const CODE_ASSIST_API_VERSION = 'v1internal'
 
   const { token } = await client.getAccessToken()
-  const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+  const proxyAgent = ProxyHelper.createProxyAgentWithFallback(proxyConfig)
 
   logger.info(`📡 ${apiMethod} API调用开始`)
 
@@ -1139,7 +1139,7 @@ async function loadCodeAssist(client, projectId = null, proxyConfig = null) {
   const CODE_ASSIST_API_VERSION = 'v1internal'
 
   const { token } = await client.getAccessToken()
-  const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+  const proxyAgent = ProxyHelper.createProxyAgentWithFallback(proxyConfig)
   // 🔍 只有个人账户（无 projectId）才需要调用 tokeninfo/userinfo
   // 这些调用有助于 Google 获取临时 projectId
   if (!projectId) {
@@ -1299,7 +1299,7 @@ async function onboardUser(client, tierId, projectId, clientMetadata, proxyConfi
   }
 
   // 添加代理配置
-  const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+  const proxyAgent = ProxyHelper.createProxyAgentWithFallback(proxyConfig)
   if (proxyAgent) {
     baseAxiosConfig.httpAgent = proxyAgent
     baseAxiosConfig.httpsAgent = proxyAgent
@@ -1432,7 +1432,7 @@ async function countTokens(client, contents, model = 'gemini-2.0-flash-exp', pro
   }
 
   // 添加代理配置
-  const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+  const proxyAgent = ProxyHelper.createProxyAgentWithFallback(proxyConfig)
   if (proxyAgent) {
     // 只设置 httpsAgent，因为目标 URL 是 HTTPS (cloudcode-pa.googleapis.com)
     axiosConfig.httpsAgent = proxyAgent
@@ -1509,7 +1509,7 @@ async function generateContent(
   }
 
   // 添加代理配置
-  const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+  const proxyAgent = ProxyHelper.createProxyAgentWithFallback(proxyConfig)
   if (proxyAgent) {
     // 只设置 httpsAgent，因为目标 URL 是 HTTPS (cloudcode-pa.googleapis.com)
     axiosConfig.httpsAgent = proxyAgent
@@ -1587,7 +1587,7 @@ async function generateContentStream(
   }
 
   // 添加代理配置
-  const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+  const proxyAgent = ProxyHelper.createProxyAgentWithFallback(proxyConfig)
   if (proxyAgent) {
     // 只设置 httpsAgent，因为目标 URL 是 HTTPS (cloudcode-pa.googleapis.com)
     // 同时设置 httpAgent 和 httpsAgent 可能导致 axios/follow-redirects 选择错误的协议

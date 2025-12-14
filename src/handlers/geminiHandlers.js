@@ -17,6 +17,7 @@ const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const { parseSSELine } = require('../utils/sseParser')
 const axios = require('axios')
 const ProxyHelper = require('../utils/proxyHelper')
+const proxyPolicyService = require('../services/proxyPolicyService')
 
 // ============================================================================
 // 工具函数
@@ -277,19 +278,12 @@ async function normalizeAxiosStreamError(error) {
   }
 }
 
-/**
- * 解析账户代理配置
- */
-function parseProxyConfig(account) {
-  let proxyConfig = null
-  if (account.proxy) {
-    try {
-      proxyConfig = typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
-    } catch (e) {
-      logger.warn('Failed to parse proxy configuration:', e)
-    }
-  }
-  return proxyConfig
+async function resolveEffectiveProxyConfig(accountId, account) {
+  return await proxyPolicyService.resolveEffectiveProxyConfig({
+    accountId,
+    platform: account?.platform || 'gemini',
+    accountProxy: account?.proxy || null
+  })
 }
 
 // ============================================================================
@@ -349,7 +343,7 @@ async function handleMessages(req, res) {
         model, // 传递请求的模型进行过滤
         { allowApiAccounts: true } // 允许调度 API 账户
       )
-      ;({ accountId, accountType } = schedulerResult)
+        ; ({ accountId, accountType } = schedulerResult)
     } catch (error) {
       logger.error('Failed to select Gemini account:', error)
       return res.status(503).json({
@@ -393,6 +387,8 @@ async function handleMessages(req, res) {
       await geminiAccountService.markAccountUsed(account.id)
     }
 
+    const { proxy: effectiveProxyConfig } = await resolveEffectiveProxyConfig(accountId, account)
+
     // 创建中止控制器
     abortController = new AbortController()
 
@@ -424,8 +420,8 @@ async function handleMessages(req, res) {
         }
       }
 
-      // 解析代理配置
-      const proxyConfig = parseProxyConfig(account)
+      // 解析代理配置（账号 > 分组 > 平台 > 全局账号代理 > env 回退）
+      const proxyConfig = effectiveProxyConfig
 
       const apiUrl = buildGeminiApiUrl(
         account.baseUrl,
@@ -449,9 +445,11 @@ async function handleMessages(req, res) {
       }
 
       // 添加代理配置
-      if (proxyConfig) {
-        axiosConfig.httpsAgent = ProxyHelper.createProxyAgent(proxyConfig)
-        axiosConfig.httpAgent = ProxyHelper.createProxyAgent(proxyConfig)
+      const proxyAgent = ProxyHelper.createProxyAgentWithFallback(proxyConfig)
+      if (proxyAgent) {
+        axiosConfig.httpsAgent = proxyAgent
+        axiosConfig.httpAgent = proxyAgent
+        axiosConfig.proxy = false
       }
 
       try {
@@ -517,7 +515,7 @@ async function handleMessages(req, res) {
         maxTokens: max_tokens,
         stream,
         accessToken: account.accessToken,
-        proxy: account.proxy,
+        proxy: effectiveProxyConfig,
         apiKeyId: apiKeyData.id,
         signal: abortController.signal,
         projectId: effectiveProjectId,
@@ -685,6 +683,7 @@ async function handleModels(req, res) {
     // 选择账户获取模型列表（允许 API 账户）
     let account = null
     let isApiAccount = false
+    let selectedAccountId = null
     try {
       const accountSelection = await unifiedGeminiScheduler.selectAccountForApiKey(
         apiKeyData,
@@ -692,6 +691,7 @@ async function handleModels(req, res) {
         null,
         { allowApiAccounts: true }
       )
+      selectedAccountId = accountSelection.accountId
       isApiAccount = accountSelection.accountType === 'gemini-api'
       if (isApiAccount) {
         account = await geminiApiAccountService.getAccount(accountSelection.accountId)
@@ -717,11 +717,13 @@ async function handleModels(req, res) {
       })
     }
 
+    const { proxy: effectiveProxyConfig } = await resolveEffectiveProxyConfig(selectedAccountId, account)
+
     // 获取模型列表
     let models
     if (isApiAccount) {
       // API Key 账户：使用 API Key 获取模型列表
-      const proxyConfig = parseProxyConfig(account)
+      const proxyConfig = effectiveProxyConfig
       try {
         const apiUrl = buildGeminiApiUrl(account.baseUrl, null, null, account.apiKey, {
           listModels: true
@@ -731,9 +733,11 @@ async function handleModels(req, res) {
           url: apiUrl,
           headers: { 'Content-Type': 'application/json' }
         }
-        if (proxyConfig) {
-          axiosConfig.httpsAgent = ProxyHelper.createProxyAgent(proxyConfig)
-          axiosConfig.httpAgent = ProxyHelper.createProxyAgent(proxyConfig)
+        const proxyAgent = ProxyHelper.createProxyAgentWithFallback(proxyConfig)
+        if (proxyAgent) {
+          axiosConfig.httpsAgent = proxyAgent
+          axiosConfig.httpAgent = proxyAgent
+          axiosConfig.proxy = false
         }
         const response = await axios(axiosConfig)
         models = (response.data.models || []).map((m) => ({
@@ -756,7 +760,7 @@ async function handleModels(req, res) {
       }
     } else {
       // OAuth 账户：使用 OAuth token 获取模型列表
-      models = await getAvailableModels(account.accessToken, account.proxy)
+      models = await getAvailableModels(account.accessToken, effectiveProxyConfig)
     }
 
     res.json({
@@ -922,8 +926,8 @@ function handleSimpleEndpoint(apiMethod) {
         requestBody: req.body
       })
 
-      // 解析账户的代理配置
-      const proxyConfig = parseProxyConfig(account)
+      // 解析账户的代理配置（账号 > 分组 > 平台 > 全局账号代理 > env 回退）
+      const { proxy: proxyConfig } = await resolveEffectiveProxyConfig(accountId, account)
 
       const client = await geminiAccountService.getOauthClient(
         accessToken,
@@ -1004,8 +1008,8 @@ async function handleLoadCodeAssist(req, res) {
       apiKeyId: req.apiKey?.id || 'unknown'
     })
 
-    // 解析账户的代理配置
-    const proxyConfig = parseProxyConfig(account)
+    // 解析账户的代理配置（账号 > 分组 > 平台 > 全局账号代理 > env 回退）
+    const { proxy: proxyConfig } = await resolveEffectiveProxyConfig(accountId, account)
 
     const client = await geminiAccountService.getOauthClient(accessToken, refreshToken, proxyConfig)
 
@@ -1102,8 +1106,8 @@ async function handleOnboardUser(req, res) {
       apiKeyId: req.apiKey?.id || 'unknown'
     })
 
-    // 解析账户的代理配置
-    const proxyConfig = parseProxyConfig(account)
+    // 解析账户的代理配置（账号 > 分组 > 平台 > 全局账号代理 > env 回退）
+    const { proxy: proxyConfig } = await resolveEffectiveProxyConfig(accountId, account)
 
     const client = await geminiAccountService.getOauthClient(accessToken, refreshToken, proxyConfig)
 
@@ -1216,8 +1220,8 @@ async function handleCountTokens(req, res) {
       }
     )
 
-    // 解析账户的代理配置
-    const proxyConfig = parseProxyConfig(account)
+    // 解析账户的代理配置（账号 > 分组 > 平台 > 全局账号代理 > env 回退）
+    const { proxy: proxyConfig } = await resolveEffectiveProxyConfig(accountId, account)
 
     let response
     if (isApiAccount) {
@@ -1232,9 +1236,11 @@ async function handleCountTokens(req, res) {
         headers: { 'Content-Type': 'application/json' }
       }
 
-      if (proxyConfig) {
-        axiosConfig.httpsAgent = ProxyHelper.createProxyAgent(proxyConfig)
-        axiosConfig.httpAgent = ProxyHelper.createProxyAgent(proxyConfig)
+      const proxyAgent = ProxyHelper.createProxyAgentWithFallback(proxyConfig)
+      if (proxyAgent) {
+        axiosConfig.httpsAgent = proxyAgent
+        axiosConfig.httpAgent = proxyAgent
+        axiosConfig.proxy = false
       }
 
       try {
@@ -1364,8 +1370,8 @@ async function handleGenerateContent(req, res) {
       apiKeyId: req.apiKey?.id || 'unknown'
     })
 
-    // 解析账户的代理配置
-    const proxyConfig = parseProxyConfig(account)
+    // 解析账户的代理配置（账号 > 分组 > 平台 > 全局账号代理 > env 回退）
+    const { proxy: proxyConfig } = await resolveEffectiveProxyConfig(accountId, account)
 
     const client = await geminiAccountService.getOauthClient(accessToken, refreshToken, proxyConfig)
 
@@ -1577,8 +1583,8 @@ async function handleStreamGenerateContent(req, res) {
       }
     })
 
-    // 解析账户的代理配置
-    const proxyConfig = parseProxyConfig(account)
+    // 解析账户的代理配置（账号 > 分组 > 平台 > 全局账号代理 > env 回退）
+    const { proxy: proxyConfig } = await resolveEffectiveProxyConfig(accountId, account)
 
     const client = await geminiAccountService.getOauthClient(accessToken, refreshToken, proxyConfig)
 
@@ -1908,7 +1914,7 @@ async function handleStandardGenerateContent(req, res) {
       model,
       { allowApiAccounts: true }
     )
-    ;({ accountId } = schedulerResult)
+      ; ({ accountId } = schedulerResult)
     const { accountType } = schedulerResult
 
     isApiAccount = accountType === 'gemini-api'
@@ -1945,8 +1951,8 @@ async function handleStandardGenerateContent(req, res) {
       })
     }
 
-    // 解析账户的代理配置
-    const proxyConfig = parseProxyConfig(account)
+    // 解析账户的代理配置（账号 > 分组 > 平台 > 全局账号代理 > env 回退）
+    const { proxy: proxyConfig } = await resolveEffectiveProxyConfig(actualAccountId, account)
 
     let response
 
@@ -1963,9 +1969,11 @@ async function handleStandardGenerateContent(req, res) {
         }
       }
 
-      if (proxyConfig) {
-        axiosConfig.httpsAgent = ProxyHelper.createProxyAgent(proxyConfig)
-        axiosConfig.httpAgent = ProxyHelper.createProxyAgent(proxyConfig)
+      const proxyAgent = ProxyHelper.createProxyAgentWithFallback(proxyConfig)
+      if (proxyAgent) {
+        axiosConfig.httpsAgent = proxyAgent
+        axiosConfig.httpAgent = proxyAgent
+        axiosConfig.proxy = false
       }
 
       try {
@@ -2161,7 +2169,7 @@ async function handleStandardStreamGenerateContent(req, res) {
       model,
       { allowApiAccounts: true }
     )
-    ;({ accountId } = schedulerResult)
+      ; ({ accountId } = schedulerResult)
     const { accountType } = schedulerResult
 
     isApiAccount = accountType === 'gemini-api'
@@ -2215,8 +2223,8 @@ async function handleStandardStreamGenerateContent(req, res) {
       }
     })
 
-    // 解析账户的代理配置
-    const proxyConfig = parseProxyConfig(account)
+    // 解析账户的代理配置（账号 > 分组 > 平台 > 全局账号代理 > env 回退）
+    const { proxy: proxyConfig } = await resolveEffectiveProxyConfig(actualAccountId, account)
 
     let streamResponse
 
@@ -2245,9 +2253,11 @@ async function handleStandardStreamGenerateContent(req, res) {
         signal: abortController.signal
       }
 
-      if (proxyConfig) {
-        axiosConfig.httpsAgent = ProxyHelper.createProxyAgent(proxyConfig)
-        axiosConfig.httpAgent = ProxyHelper.createProxyAgent(proxyConfig)
+      const proxyAgent = ProxyHelper.createProxyAgentWithFallback(proxyConfig)
+      if (proxyAgent) {
+        axiosConfig.httpsAgent = proxyAgent
+        axiosConfig.httpAgent = proxyAgent
+        axiosConfig.proxy = false
       }
 
       try {

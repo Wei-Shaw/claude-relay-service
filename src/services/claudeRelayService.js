@@ -17,6 +17,7 @@ const requestIdentityService = require('./requestIdentityService')
 const { createClaudeTestPayload } = require('../utils/testPayloadHelper')
 const userMessageQueueService = require('./userMessageQueueService')
 const { isStreamWritable } = require('../utils/streamHelper')
+const proxyPolicyService = require('./proxyPolicyService')
 
 class ClaudeRelayService {
   constructor() {
@@ -951,19 +952,29 @@ class ClaudeRelayService {
   // 🌐 获取代理Agent（使用统一的代理工具）
   async _getProxyAgent(accountId) {
     try {
-      const accountData = await claudeAccountService.getAllAccounts()
-      const account = accountData.find((acc) => acc.id === accountId)
-
-      if (!account || !account.proxy) {
-        logger.debug('🌐 No proxy configured for Claude account')
+      const account = await claudeAccountService.getAccount(accountId)
+      if (!account) {
+        logger.debug('🌐 No proxy configured for Claude account (account not found)')
         return null
       }
 
-      const proxyAgent = ProxyHelper.createProxyAgent(account.proxy)
+      const { proxy, source } = await proxyPolicyService.resolveEffectiveProxyConfig({
+        accountId,
+        platform: account.platform || 'claude',
+        accountProxy: account.proxy
+      })
+
+      const proxyAgent = ProxyHelper.createProxyAgentWithFallback(proxy)
       if (proxyAgent) {
+        const displayConfig = proxy || ProxyHelper.getGlobalProxyConfig()
+        const displaySource = proxy ? source : displayConfig ? 'env' : source
         logger.info(
-          `🌐 Using proxy for Claude request: ${ProxyHelper.getProxyDescription(account.proxy)}`
+          `🌐 Using proxy for Claude request (${displaySource}): ${ProxyHelper.getProxyDescription(
+            displayConfig
+          )}`
         )
+      } else {
+        logger.debug('🌐 No proxy configured for Claude request')
       }
       return proxyAgent
     } catch (error) {
@@ -1687,7 +1698,7 @@ class ClaudeRelayService {
               errorData
             )
             if (this._isOrganizationDisabledError(res.statusCode, errorData)) {
-              ;(async () => {
+              ; (async () => {
                 try {
                   logger.error(
                     `🚫 [Stream] Organization disabled error (400) detected for account ${accountId}, marking as blocked`

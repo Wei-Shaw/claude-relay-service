@@ -136,7 +136,7 @@ function generateSetupTokenParams() {
  * @returns {object|null} 代理agent或null
  */
 function createProxyAgent(proxyConfig) {
-  return ProxyHelper.createProxyAgent(proxyConfig)
+  return ProxyHelper.createProxyAgentWithFallback(proxyConfig)
 }
 
 /**

@@ -10,7 +10,7 @@ const DEFAULT_MODEL = 'models/gemini-2.0-flash-exp'
 
 // 创建代理 agent（使用统一的代理工具）
 function createProxyAgent(proxyConfig) {
-  return ProxyHelper.createProxyAgent(proxyConfig)
+  return ProxyHelper.createProxyAgentWithFallback(proxyConfig)
 }
 
 // 转换 OpenAI 消息格式到 Gemini 格式
@@ -534,7 +534,7 @@ async function countTokens({
       const geminiError = error.response.data?.error
       const errorObj = new Error(
         geminiError?.message ||
-          `Gemini countTokens API request failed (Status: ${error.response.status})`
+        `Gemini countTokens API request failed (Status: ${error.response.status})`
       )
       errorObj.status = error.response.status
       errorObj.error = {

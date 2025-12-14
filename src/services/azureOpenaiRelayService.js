@@ -2,6 +2,7 @@ const axios = require('axios')
 const ProxyHelper = require('../utils/proxyHelper')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
+const proxyPolicyService = require('./proxyPolicyService')
 
 // 转换模型名称（去掉 azure/ 前缀）
 function normalizeModelName(model) {
@@ -62,8 +63,14 @@ async function handleAzureOpenAIRequest({
       processedBody.model = 'gpt-4'
     }
 
+    const { proxy: effectiveProxy, source } = await proxyPolicyService.resolveEffectiveProxyConfig({
+      accountId: account.id,
+      platform: account.platform || 'azure-openai',
+      accountProxy: account.proxy
+    })
+
     // 使用统一的代理创建工具
-    proxyAgent = ProxyHelper.createProxyAgent(account.proxy)
+    proxyAgent = ProxyHelper.createProxyAgentWithFallback(effectiveProxy)
 
     // 配置请求选项
     const axiosConfig = {
@@ -90,8 +97,12 @@ async function handleAzureOpenAIRequest({
         proxyAgent.options.keepAlive = true
         proxyAgent.options.keepAliveMsecs = 1000
       }
+      const displayConfig = effectiveProxy || ProxyHelper.getGlobalProxyConfig()
+      const displaySource = effectiveProxy ? source : displayConfig ? 'env' : source
       logger.debug(
-        `Using proxy for Azure OpenAI request: ${ProxyHelper.getProxyDescription(account.proxy)}`
+        `Using proxy for Azure OpenAI request (${displaySource}): ${ProxyHelper.getProxyDescription(
+          displayConfig
+        )}`
       )
     }
 
@@ -110,7 +121,7 @@ async function handleAzureOpenAIRequest({
       deploymentName,
       apiVersion,
       hasProxy: !!proxyAgent,
-      proxyInfo: ProxyHelper.maskProxyInfo(account.proxy),
+      proxyInfo: ProxyHelper.maskProxyInfo(effectiveProxy || ProxyHelper.getGlobalProxyConfig()),
       isStream,
       requestBodySize: JSON.stringify(processedBody).length
     })

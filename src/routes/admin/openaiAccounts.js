@@ -150,7 +150,7 @@ router.post('/exchange-code', authenticateAdmin, async (req, res) => {
     }
 
     // 配置代理（如果有）
-    const proxyAgent = ProxyHelper.createProxyAgent(sessionData.proxy)
+    const proxyAgent = ProxyHelper.createProxyAgentWithFallback(sessionData.proxy)
     if (proxyAgent) {
       axiosConfig.httpAgent = proxyAgent
       axiosConfig.httpsAgent = proxyAgent

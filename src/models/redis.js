@@ -66,6 +66,11 @@ class RedisClient {
   constructor() {
     this.client = null
     this.isConnected = false
+    // ⏱️ 管理后台频繁查询的轻量缓存（避免跨机 Redis RTT 放大）
+    this._apiKeyBindingCountsCache = {
+      excludeDeleted: null,
+      includeDeleted: null
+    }
   }
 
   async connect() {
@@ -134,7 +139,7 @@ class RedisClient {
    * @param {number} count
    * @returns {Promise<string[]>}
    */
-  async scanKeys(pattern, count = 1000) {
+  async scanKeys(pattern, count = 20000) {
     const keys = []
     let cursor = '0'
 
@@ -156,7 +161,7 @@ class RedisClient {
    * @param {number} count
    * @returns {Promise<number>}
    */
-  async countKeysByScan(pattern, filter = null, count = 1000) {
+  async countKeysByScan(pattern, filter = null, count = 20000) {
     let total = 0
     let cursor = '0'
 
@@ -188,8 +193,9 @@ class RedisClient {
 
     // 维护哈希映射表（用于快速查找）
     // hashedKey参数是实际的哈希值，用于建立映射
-    if (hashedKey) {
-      await client.hset('apikey:hash_map', hashedKey, keyId)
+    const resolvedHashedKey = hashedKey || keyData?.apiKey
+    if (resolvedHashedKey) {
+      await client.hset('apikey:hash_map', resolvedHashedKey, keyId)
     }
 
     await client.hset(key, keyData)
@@ -224,11 +230,24 @@ class RedisClient {
    * @returns {Promise<string[]>} API Key ID 列表
    */
   async scanApiKeyIds() {
+    const client = this.getClientSafe()
+
+    // 🚀 优先使用 hash_map 获取 keyIds（避免在大 keyspace 下全量 SCAN 带来的超高 RTT）
+    // hash_map: hashedKey -> keyId，单次 HVALS 就能拿到全部 keyId（去重后返回）
+    try {
+      const mappedIds = await client.hvals('apikey:hash_map')
+      if (Array.isArray(mappedIds) && mappedIds.length > 0) {
+        return [...new Set(mappedIds.filter(Boolean))]
+      }
+    } catch (error) {
+      // hash_map 不可用时回退到 SCAN
+    }
+
     const keyIds = []
     let cursor = '0'
 
     do {
-      const [newCursor, keys] = await this.client.scan(cursor, 'MATCH', 'apikey:*', 'COUNT', 1000)
+      const [newCursor, keys] = await client.scan(cursor, 'MATCH', 'apikey:*', 'COUNT', 20000)
       cursor = newCursor
 
       for (const key of keys) {
@@ -625,7 +644,26 @@ class RedisClient {
    * @param {{excludeDeleted?: boolean, chunkSize?: number}} options
    */
   async getApiKeyBindingCounts(options = {}) {
-    const { excludeDeleted = true, chunkSize = 500 } = options
+    const { excludeDeleted = true } = options
+    const rawChunkSize = Number(options.chunkSize)
+    const chunkSize = Number.isFinite(rawChunkSize) && rawChunkSize > 0 ? rawChunkSize : 2000
+    const rawCacheTtlMs = Number(options.cacheTtlMs)
+    const cacheTtlMs = Number.isFinite(rawCacheTtlMs) ? rawCacheTtlMs : 10 * 1000
+
+    const now = Date.now()
+    const cacheKey = excludeDeleted ? 'excludeDeleted' : 'includeDeleted'
+    const cached = this._apiKeyBindingCountsCache?.[cacheKey]
+    if (
+      cacheTtlMs > 0 &&
+      cached &&
+      cached.expiresAt &&
+      typeof cached.expiresAt === 'number' &&
+      cached.expiresAt > now &&
+      cached.value
+    ) {
+      return cached.value
+    }
+
     const keyIds = await this.scanApiKeyIds()
 
     const bindingCounts = {
@@ -676,6 +714,13 @@ class RedisClient {
           }
           bindingCounts[field][accountId] = (bindingCounts[field][accountId] || 0) + 1
         }
+      }
+    }
+
+    if (cacheTtlMs > 0) {
+      this._apiKeyBindingCountsCache[cacheKey] = {
+        expiresAt: now + cacheTtlMs,
+        value: bindingCounts
       }
     }
 
@@ -2882,6 +2927,151 @@ class RedisClient {
 
   async keys(pattern) {
     return await this.scanKeys(pattern)
+  }
+
+  // 📊 批量获取多个账户会话窗口内的使用统计（包含模型细分）
+  // 说明：管理后台列表页如果逐账户查询，会被跨机 Redis RTT 放大；这里用单/少量 pipeline 合并读取。
+  async getAccountsSessionWindowUsage(accountWindows = [], options = {}) {
+    const rawChunkSize = Number(options.chunkSize)
+    const chunkSize = Number.isFinite(rawChunkSize) && rawChunkSize > 0 ? rawChunkSize : 1500
+
+    const uniqueWindows = []
+    const seenAccountIds = new Set()
+
+    for (const item of Array.isArray(accountWindows) ? accountWindows : []) {
+      const accountId = item?.accountId || item?.id
+      if (!accountId || seenAccountIds.has(accountId)) {
+        continue
+      }
+      if (!item?.windowStart || !item?.windowEnd) {
+        continue
+      }
+      seenAccountIds.add(accountId)
+      uniqueWindows.push({
+        accountId,
+        windowStart: item.windowStart,
+        windowEnd: item.windowEnd
+      })
+    }
+
+    const buildEmptyUsage = () => ({
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      totalCacheCreateTokens: 0,
+      totalCacheReadTokens: 0,
+      totalAllTokens: 0,
+      totalRequests: 0,
+      modelUsage: {}
+    })
+
+    const resultMap = Object.fromEntries(uniqueWindows.map((w) => [w.accountId, buildEmptyUsage()]))
+
+    if (uniqueWindows.length === 0) {
+      return resultMap
+    }
+
+    try {
+      const keyMetas = []
+
+      for (const window of uniqueWindows) {
+        const startDate = new Date(window.windowStart)
+        const endDate = new Date(window.windowEnd)
+
+        if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+          continue
+        }
+
+        const currentHour = new Date(startDate)
+        currentHour.setMinutes(0)
+        currentHour.setSeconds(0)
+        currentHour.setMilliseconds(0)
+
+        while (currentHour <= endDate) {
+          const tzDateStr = getDateStringInTimezone(currentHour)
+          const tzHour = String(getHourInTimezone(currentHour)).padStart(2, '0')
+          keyMetas.push({
+            accountId: window.accountId,
+            key: `account_usage:hourly:${window.accountId}:${tzDateStr}:${tzHour}`
+          })
+          currentHour.setHours(currentHour.getHours() + 1)
+        }
+      }
+
+      for (let offset = 0; offset < keyMetas.length; offset += chunkSize) {
+        const chunkMetas = keyMetas.slice(offset, offset + chunkSize)
+        const pipeline = this.client.pipeline()
+        for (const meta of chunkMetas) {
+          pipeline.hgetall(meta.key)
+        }
+        const results = await pipeline.exec()
+
+        for (let i = 0; i < chunkMetas.length; i++) {
+          const meta = chunkMetas[i]
+          const data = results?.[i]?.[1]
+          if (!data || Object.keys(data).length === 0) {
+            continue
+          }
+
+          if (!resultMap[meta.accountId]) {
+            resultMap[meta.accountId] = buildEmptyUsage()
+          }
+
+          const aggregate = resultMap[meta.accountId]
+
+          aggregate.totalInputTokens += parseInt(data.inputTokens || 0)
+          aggregate.totalOutputTokens += parseInt(data.outputTokens || 0)
+          aggregate.totalCacheCreateTokens += parseInt(data.cacheCreateTokens || 0)
+          aggregate.totalCacheReadTokens += parseInt(data.cacheReadTokens || 0)
+          aggregate.totalAllTokens += parseInt(data.allTokens || 0)
+          aggregate.totalRequests += parseInt(data.requests || 0)
+
+          for (const [key, value] of Object.entries(data)) {
+            if (!key.startsWith('model:')) {
+              continue
+            }
+
+            const parts = key.split(':')
+            if (parts.length < 3) {
+              continue
+            }
+
+            const modelName = parts[1]
+            const metric = parts.slice(2).join(':')
+
+            if (!aggregate.modelUsage[modelName]) {
+              aggregate.modelUsage[modelName] = {
+                inputTokens: 0,
+                outputTokens: 0,
+                cacheCreateTokens: 0,
+                cacheReadTokens: 0,
+                allTokens: 0,
+                requests: 0
+              }
+            }
+
+            const numeric = parseInt(value || 0)
+            if (metric === 'inputTokens') {
+              aggregate.modelUsage[modelName].inputTokens += numeric
+            } else if (metric === 'outputTokens') {
+              aggregate.modelUsage[modelName].outputTokens += numeric
+            } else if (metric === 'cacheCreateTokens') {
+              aggregate.modelUsage[modelName].cacheCreateTokens += numeric
+            } else if (metric === 'cacheReadTokens') {
+              aggregate.modelUsage[modelName].cacheReadTokens += numeric
+            } else if (metric === 'allTokens') {
+              aggregate.modelUsage[modelName].allTokens += numeric
+            } else if (metric === 'requests') {
+              aggregate.modelUsage[modelName].requests += numeric
+            }
+          }
+        }
+      }
+
+      return resultMap
+    } catch (error) {
+      logger.error('❌ Failed to batch get session window usage:', error)
+      return resultMap
+    }
   }
 
   // 📊 获取账户会话窗口内的使用统计（包含模型细分）

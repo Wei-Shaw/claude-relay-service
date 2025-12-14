@@ -1056,15 +1056,14 @@ class ClaudeConsoleAccountService {
     }
   }
 
-  // 🌐 创建代理agent（使用统一的代理工具）
+  // 🌐 创建代理agent（使用统一的代理工具，支持全局代理回退）
   _createProxyAgent(proxyConfig) {
-    const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
+    const proxyAgent = ProxyHelper.createProxyAgentWithFallback(proxyConfig)
     if (proxyAgent) {
+      const displayConfig = proxyConfig || ProxyHelper.getGlobalProxyConfig()
       logger.info(
-        `🌐 Using proxy for Claude Console request: ${ProxyHelper.getProxyDescription(proxyConfig)}`
+        `🌐 Using proxy for Claude Console request: ${ProxyHelper.getProxyDescription(displayConfig)}`
       )
-    } else if (proxyConfig) {
-      logger.debug('🌐 Failed to create proxy agent for Claude Console')
     } else {
       logger.debug('🌐 No proxy configured for Claude Console request')
     }

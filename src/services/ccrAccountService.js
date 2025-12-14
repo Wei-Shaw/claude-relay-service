@@ -710,9 +710,9 @@ class CcrAccountService {
     }
   }
 
-  // 🔧 创建代理客户端
+  // 🔧 创建代理客户端（支持全局代理回退）
   _createProxyAgent(proxy) {
-    return ProxyHelper.createProxyAgent(proxy)
+    return ProxyHelper.createProxyAgentWithFallback(proxy)
   }
 
   // 💰 检查配额使用情况（可选实现）

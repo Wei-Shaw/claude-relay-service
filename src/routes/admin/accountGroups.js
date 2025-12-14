@@ -15,12 +15,14 @@ const router = express.Router()
 // 创建账户分组
 router.post('/', authenticateAdmin, async (req, res) => {
   try {
-    const { name, platform, description } = req.body
+    const { name, platform, description, proxy, proxyPriority } = req.body
 
     const group = await accountGroupService.createGroup({
       name,
       platform,
-      description
+      description,
+      proxy: proxy || null,
+      proxyPriority: proxyPriority ?? null
     })
 
     return res.json({ success: true, data: group })

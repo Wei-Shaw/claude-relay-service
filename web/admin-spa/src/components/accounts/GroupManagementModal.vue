@@ -75,6 +75,25 @@
               />
             </div>
 
+            <div>
+              <label class="mb-2 block text-sm font-semibold text-gray-700"
+                >代理优先级 (可选)</label
+              >
+              <input
+                v-model="createForm.proxyPriority"
+                class="form-input w-full"
+                max="100"
+                min="1"
+                placeholder="1-100，数字越小优先级越高"
+                type="number"
+              />
+              <p class="mt-1 text-xs text-gray-500">
+                当账号属于多个分组且都配置了代理时，将优先使用优先级更高（数字更小）的分组代理
+              </p>
+            </div>
+
+            <ProxyConfig v-model="createForm.proxy" title="分组代理 (可选)" />
+
             <div class="flex gap-3">
               <button
                 class="btn btn-primary px-4 py-2"
@@ -114,6 +133,19 @@
                   </h4>
                   <p class="mt-1 text-sm text-gray-500">
                     {{ group.description || '暂无描述' }}
+                  </p>
+                  <p
+                    v-if="formatProxySummary(group.proxy)"
+                    class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500"
+                  >
+                    <span class="inline-flex items-center">
+                      <i class="fas fa-network-wired mr-1" />
+                      代理: {{ formatProxySummary(group.proxy) }}
+                    </span>
+                    <span v-if="group.proxyPriority" class="inline-flex items-center">
+                      <i class="fas fa-sort-amount-up mr-1" />
+                      优先级: {{ group.proxyPriority }}
+                    </span>
                   </p>
                 </div>
                 <div class="ml-4 flex items-center gap-2">
@@ -209,7 +241,9 @@
                   ? 'Claude'
                   : editForm.platform === 'gemini'
                     ? 'Gemini'
-                    : 'OpenAI'
+                    : editForm.platform === 'openai'
+                      ? 'OpenAI'
+                      : 'Droid'
               }}
               <span class="ml-2 text-xs text-gray-500">(不可修改)</span>
             </div>
@@ -224,6 +258,20 @@
               rows="2"
             />
           </div>
+
+          <div>
+            <label class="mb-2 block text-sm font-semibold text-gray-700">代理优先级 (可选)</label>
+            <input
+              v-model="editForm.proxyPriority"
+              class="form-input w-full"
+              max="100"
+              min="1"
+              placeholder="1-100，数字越小优先级越高"
+              type="number"
+            />
+          </div>
+
+          <ProxyConfig v-model="editForm.proxy" title="分组代理 (可选)" />
 
           <div class="flex gap-3 pt-4">
             <button
@@ -246,6 +294,14 @@
 import { ref, onMounted } from 'vue'
 import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
+import ProxyConfig from '@/components/accounts/ProxyConfig.vue'
+import {
+  buildProxyPayload,
+  createDefaultProxyState,
+  formatProxySummary,
+  getProxyValidationError,
+  normalizeProxyFormState
+} from '@/utils/proxy'
 
 const emit = defineEmits(['close', 'refresh'])
 
@@ -259,7 +315,9 @@ const creating = ref(false)
 const createForm = ref({
   name: '',
   platform: 'claude',
-  description: ''
+  description: '',
+  proxyPriority: '',
+  proxy: createDefaultProxyState()
 })
 
 // 编辑表单
@@ -269,7 +327,9 @@ const editingGroup = ref(null)
 const editForm = ref({
   name: '',
   platform: '',
-  description: ''
+  description: '',
+  proxyPriority: '',
+  proxy: createDefaultProxyState()
 })
 
 // 格式化日期
@@ -299,12 +359,26 @@ const createGroup = async () => {
     return
   }
 
+  const proxyError = getProxyValidationError(createForm.value.proxy)
+  if (proxyError) {
+    showToast(`分组代理：${proxyError}`, 'error')
+    return
+  }
+
+  const normalizedPriority = normalizeProxyPriority(createForm.value.proxyPriority)
+  if (createForm.value.proxyPriority !== '' && normalizedPriority === null) {
+    showToast('代理优先级必须是 1-100 的整数', 'error')
+    return
+  }
+
   creating.value = true
   try {
     await apiClient.post('/admin/account-groups', {
       name: createForm.value.name,
       platform: createForm.value.platform,
-      description: createForm.value.description
+      description: createForm.value.description,
+      proxy: buildProxyPayload(createForm.value.proxy),
+      proxyPriority: normalizedPriority
     })
 
     showToast('分组创建成功', 'success')
@@ -324,7 +398,9 @@ const cancelCreate = () => {
   createForm.value = {
     name: '',
     platform: 'claude',
-    description: ''
+    description: '',
+    proxyPriority: '',
+    proxy: createDefaultProxyState()
   }
 }
 
@@ -334,9 +410,22 @@ const editGroup = (group) => {
   editForm.value = {
     name: group.name,
     platform: group.platform,
-    description: group.description || ''
+    description: group.description || '',
+    proxyPriority: group.proxyPriority ? String(group.proxyPriority) : '',
+    proxy: normalizeProxyFormState(group.proxy)
   }
   showEditForm.value = true
+}
+
+const normalizeProxyPriority = (value) => {
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+  const parsed = Number.parseInt(value, 10)
+  if (!Number.isFinite(parsed) || parsed < 1 || parsed > 100) {
+    return null
+  }
+  return parsed
 }
 
 // 更新分组
@@ -346,11 +435,25 @@ const updateGroup = async () => {
     return
   }
 
+  const proxyError = getProxyValidationError(editForm.value.proxy)
+  if (proxyError) {
+    showToast(`分组代理：${proxyError}`, 'error')
+    return
+  }
+
+  const normalizedPriority = normalizeProxyPriority(editForm.value.proxyPriority)
+  if (editForm.value.proxyPriority !== '' && normalizedPriority === null) {
+    showToast('代理优先级必须是 1-100 的整数', 'error')
+    return
+  }
+
   updating.value = true
   try {
     await apiClient.put(`/admin/account-groups/${editingGroup.value.id}`, {
       name: editForm.value.name,
-      description: editForm.value.description
+      description: editForm.value.description,
+      proxy: buildProxyPayload(editForm.value.proxy),
+      proxyPriority: normalizedPriority
     })
 
     showToast('分组更新成功', 'success')
@@ -371,7 +474,9 @@ const cancelEdit = () => {
   editForm.value = {
     name: '',
     platform: '',
-    description: ''
+    description: '',
+    proxyPriority: '',
+    proxy: createDefaultProxyState()
   }
 }
 

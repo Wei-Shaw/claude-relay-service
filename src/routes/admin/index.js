@@ -26,6 +26,7 @@ const concurrencyRoutes = require('./concurrency')
 const claudeRelayConfigRoutes = require('./claudeRelayConfig')
 const fuelPacksRoutes = require('./fuelPacks')
 const tutorialsRoutes = require('./tutorials')
+const proxyPoliciesRoutes = require('./proxyPolicies')
 
 // 挂载所有子路由
 // 使用完整路径的模块（直接挂载到根路径）
@@ -41,6 +42,7 @@ router.use('/', usageStatsRoutes)
 router.use('/', systemRoutes)
 router.use('/', concurrencyRoutes)
 router.use('/', claudeRelayConfigRoutes)
+router.use('/', proxyPoliciesRoutes)
 router.use('/', fuelPacksRoutes)
 router.use('/', tutorialsRoutes)
 

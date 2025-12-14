@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-4">
     <div class="flex items-center justify-between">
-      <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300">代理设置 (可选)</h4>
+      <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ title }}</h4>
       <label class="flex cursor-pointer items-center">
         <input
           v-model="proxy.enabled"
@@ -164,8 +164,8 @@
       >
         <p class="text-xs text-blue-700 dark:text-blue-300">
           <i class="fas fa-info-circle mr-1" />
-          <strong>提示：</strong
-          >代理设置将用于所有与此账户相关的API请求。请确保代理服务器支持HTTPS流量转发。
+          <strong>提示：</strong>代理设置将用于相关的上游 API 请求。请确保代理服务器支持 HTTPS
+          流量转发。
         </p>
       </div>
     </div>
@@ -176,6 +176,10 @@
 import { ref, watch, onUnmounted } from 'vue'
 
 const props = defineProps({
+  title: {
+    type: String,
+    default: '代理设置 (可选)'
+  },
   modelValue: {
     type: Object,
     default: () => ({
