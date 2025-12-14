@@ -483,7 +483,9 @@
                       class="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-gray-100 px-2.5 py-1 dark:border-gray-600 dark:bg-gray-800"
                     >
                       <i class="fas fa-robot text-xs text-gray-700 dark:text-gray-300" />
-                      <span class="text-xs font-semibold text-gray-800 dark:text-gray-200">Gemini</span>
+                      <span class="text-xs font-semibold text-gray-800 dark:text-gray-200"
+                        >Gemini</span
+                      >
                       <span class="mx-1 h-4 w-px bg-gray-300 dark:bg-gray-600" />
                       <span class="text-xs font-medium text-gray-700 dark:text-gray-300">
                         {{ getGeminiAuthType() }}
@@ -494,16 +496,22 @@
                       class="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-gray-100 px-2.5 py-1 dark:border-gray-600 dark:bg-gray-800"
                     >
                       <i class="fas fa-terminal text-xs text-gray-700 dark:text-gray-300" />
-                      <span class="text-xs font-semibold text-gray-800 dark:text-gray-200">Console</span>
+                      <span class="text-xs font-semibold text-gray-800 dark:text-gray-200"
+                        >Console</span
+                      >
                       <span class="mx-1 h-4 w-px bg-gray-300 dark:bg-gray-600" />
-                      <span class="text-xs font-medium text-gray-700 dark:text-gray-300">API Key</span>
+                      <span class="text-xs font-medium text-gray-700 dark:text-gray-300"
+                        >API Key</span
+                      >
                     </div>
                     <div
                       v-else-if="account.platform === 'bedrock'"
                       class="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-gray-100 px-2.5 py-1 dark:border-gray-600 dark:bg-gray-800"
                     >
                       <i class="fab fa-aws text-xs text-gray-700 dark:text-gray-300" />
-                      <span class="text-xs font-semibold text-gray-800 dark:text-gray-200">Bedrock</span>
+                      <span class="text-xs font-semibold text-gray-800 dark:text-gray-200"
+                        >Bedrock</span
+                      >
                       <span class="mx-1 h-4 w-px bg-gray-300 dark:bg-gray-600" />
                       <span class="text-xs font-medium text-gray-700 dark:text-gray-300">AWS</span>
                     </div>
@@ -580,7 +588,7 @@
                       <span class="text-xs font-semibold text-cyan-800 dark:text-cyan-300"
                         >Droid</span
                       >
-                      <span class="mx-1 h-4 w-px bg-cyan-300 dark:bg-gray-700 dark:bg-gray-600" />
+                      <span class="mx-1 h-4 w-px bg-cyan-300 dark:bg-gray-600 dark:bg-gray-700" />
                       <span class="text-xs font-medium text-cyan-700 dark:text-cyan-300">
                         {{ getDroidAuthType(account) }}
                       </span>
@@ -600,7 +608,7 @@
                       <span class="text-xs font-semibold text-amber-800 dark:text-amber-300"
                         >Gemini-API</span
                       >
-                      <span class="mx-1 h-4 w-px bg-amber-300 dark:bg-gray-700 dark:bg-gray-600" />
+                      <span class="mx-1 h-4 w-px bg-amber-300 dark:bg-gray-600 dark:bg-gray-700" />
                       <span class="text-xs font-medium text-amber-700 dark:text-amber-400"
                         >API Key</span
                       >
@@ -1586,7 +1594,7 @@
 
             <button
               v-if="canViewUsage(account)"
-              class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-indigo-50 px-3 py-2 text-xs text-gray-900 dark:text-gray-100 transition-colors hover:bg-indigo-100"
+              class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-indigo-50 px-3 py-2 text-xs text-gray-900 transition-colors hover:bg-indigo-100 dark:text-gray-100"
               @click="openAccountUsageModal(account)"
             >
               <i class="fas fa-chart-line" />

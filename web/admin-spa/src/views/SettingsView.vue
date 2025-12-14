@@ -778,8 +778,7 @@
                   <div class="ml-3">
                     <p class="text-sm text-purple-700 dark:text-purple-300">
                       <strong>工作原理：</strong>系统会提取请求中的原始 session ID （来自
-                      <code class="rounded bg-gray-100 px-1 dark:bg-gray-700"
-                        >metadata.user_id</code
+                      <code class="rounded bg-gray-100 px-1 dark:bg-gray-700">metadata.user_id</code
                       >）， 并将其与首次调度的账户绑定。后续使用相同 session ID
                       的请求将自动路由到同一账户。
                     </p>
