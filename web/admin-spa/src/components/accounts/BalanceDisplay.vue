@@ -42,9 +42,9 @@
 
         <button
           v-if="!hideRefresh"
-          class="text-xs text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
-          :disabled="refreshing"
-          :title="refreshing ? '刷新中...' : '刷新余额'"
+          class="text-xs text-gray-500 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-400 dark:hover:text-blue-400"
+          :disabled="refreshing || !canRefresh"
+          :title="refreshTitle"
           @click="refresh"
         >
           <i class="fas fa-sync-alt" :class="{ 'fa-spin': refreshing }"></i>
@@ -143,6 +143,25 @@ const quotaBarClass = computed(() => {
   return 'bg-green-500 dark:bg-green-600'
 })
 
+const canRefresh = computed(() => {
+  // 仅在“已启用脚本且该账户配置了脚本”时允许刷新，避免误导（非脚本 Provider 多为降级策略）
+  const data = balanceData.value
+  if (!data) return false
+  if (data.scriptEnabled === false) return false
+  return !!data.scriptConfigured
+})
+
+const refreshTitle = computed(() => {
+  if (refreshing.value) return '刷新中...'
+  if (!canRefresh.value) {
+    if (balanceData.value?.scriptEnabled === false) {
+      return '余额脚本功能已禁用'
+    }
+    return '请先配置余额脚本'
+  }
+  return '刷新余额（调用脚本配置的余额 API）'
+})
+
 const primaryText = computed(() => {
   if (balanceData.value?.balance?.formattedAmount) {
     return balanceData.value.balance.formattedAmount
@@ -178,6 +197,7 @@ const load = async () => {
 const refresh = async () => {
   if (!props.accountId || !props.platform) return
   if (refreshing.value) return
+  if (!canRefresh.value) return
 
   refreshing.value = true
   requestError.value = null

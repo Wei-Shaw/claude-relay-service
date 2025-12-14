@@ -1615,15 +1615,17 @@ class RedisClient {
   }
 
   // 🧩 账户余额脚本配置
-  async setBalanceScriptConfig(platform, accountId, config) {
+  async setBalanceScriptConfig(platform, accountId, scriptConfig) {
     const key = `account_balance_script:${platform}:${accountId}`
-    await this.client.set(key, JSON.stringify(config || {}))
+    await this.client.set(key, JSON.stringify(scriptConfig || {}))
   }
 
   async getBalanceScriptConfig(platform, accountId) {
     const key = `account_balance_script:${platform}:${accountId}`
     const raw = await this.client.get(key)
-    if (!raw) return null
+    if (!raw) {
+      return null
+    }
     try {
       return JSON.parse(raw)
     } catch (error) {

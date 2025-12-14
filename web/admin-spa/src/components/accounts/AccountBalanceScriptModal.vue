@@ -1,7 +1,12 @@
 <template>
   <el-dialog
+    :append-to-body="true"
+    class="balance-script-dialog"
+    :close-on-click-modal="false"
+    :destroy-on-close="true"
     :model-value="show"
     :title="`配置余额脚本 - ${account?.name || ''}`"
+    top="5vh"
     width="720px"
     @close="emitClose"
   >
@@ -71,12 +76,6 @@
         </div>
       </div>
 
-      <div class="flex items-center gap-2">
-        <el-button :loading="testing" @click="testScript">测试脚本</el-button>
-        <el-button :loading="saving" type="primary" @click="saveConfig">保存配置</el-button>
-        <el-button @click="emitClose">取消</el-button>
-      </div>
-
       <div v-if="testResult" class="rounded-lg bg-gray-50 p-3 text-sm dark:bg-gray-800/60">
         <div class="flex items-center justify-between">
           <span class="font-semibold">测试结果</span>
@@ -113,6 +112,14 @@
         </details>
       </div>
     </div>
+
+    <template #footer>
+      <div class="flex items-center gap-2">
+        <el-button :loading="testing" @click="testScript">测试脚本</el-button>
+        <el-button :loading="saving" type="primary" @click="saveConfig">保存配置</el-button>
+        <el-button @click="emitClose">取消</el-button>
+      </div>
+    </template>
   </el-dialog>
 </template>
 
@@ -256,6 +263,22 @@ watch(
 </script>
 
 <style scoped>
+:deep(.balance-script-dialog) {
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+:deep(.balance-script-dialog .el-dialog__body) {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+:deep(.balance-script-dialog .el-dialog__footer) {
+  border-top: 1px solid rgba(229, 231, 235, 0.7);
+}
+
 .input-text {
   @apply w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-indigo-500 dark:focus:ring-indigo-600;
 }

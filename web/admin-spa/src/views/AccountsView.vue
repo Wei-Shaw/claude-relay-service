@@ -143,14 +143,10 @@
 
             <!-- 刷新余额按钮 -->
             <div class="relative">
-              <el-tooltip
-                content="刷新当前页余额（触发查询，失败自动降级）"
-                effect="dark"
-                placement="bottom"
-              >
+              <el-tooltip :content="refreshBalanceTooltip" effect="dark" placement="bottom">
                 <button
                   class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 sm:w-auto"
-                  :disabled="accountsLoading || refreshingBalances"
+                  :disabled="accountsLoading || refreshingBalances || !canRefreshVisibleBalances"
                   @click="refreshVisibleBalances"
                 >
                   <div
@@ -2590,9 +2586,26 @@ const closeBalanceScriptModal = () => {
   selectedAccountForScript.value = null
 }
 
-const handleBalanceScriptSaved = () => {
+const handleBalanceScriptSaved = async () => {
   showToast('余额脚本已保存', 'success')
+  const account = selectedAccountForScript.value
   closeBalanceScriptModal()
+
+  if (!account?.id || !account?.platform) {
+    return
+  }
+
+  // 重新拉取一次余额信息，用于刷新 scriptConfigured 状态（启用“刷新余额”按钮）
+  try {
+    const res = await apiClient.get(`/admin/accounts/${account.id}/balance`, {
+      params: { platform: account.platform, queryApi: false }
+    })
+    if (res?.success && res.data) {
+      handleBalanceRefreshed(account.id, res.data)
+    }
+  } catch (error) {
+    console.debug('Failed to reload balance after saving script:', error)
+  }
 }
 
 // 计算排序后的账户列表
@@ -2865,6 +2878,25 @@ const paginatedAccounts = computed(() => {
   return sortedAccounts.value.slice(start, end)
 })
 
+const canRefreshVisibleBalances = computed(() => {
+  const targets = paginatedAccounts.value
+  if (!Array.isArray(targets) || targets.length === 0) {
+    return false
+  }
+
+  return targets.some((account) => {
+    const info = account?.balanceInfo
+    return info?.scriptEnabled !== false && !!info?.scriptConfigured
+  })
+})
+
+const refreshBalanceTooltip = computed(() => {
+  if (accountsLoading.value) return '正在加载账户...'
+  if (refreshingBalances.value) return '刷新中...'
+  if (!canRefreshVisibleBalances.value) return '当前页未配置余额脚本，无法刷新'
+  return '刷新当前页余额（仅对已配置余额脚本的账户生效）'
+})
+
 // 余额刷新成功回调
 const handleBalanceRefreshed = (accountId, balanceInfo) => {
   accounts.value = accounts.value.map((account) => {
@@ -2888,10 +2920,22 @@ const refreshVisibleBalances = async () => {
     return
   }
 
+  const eligibleTargets = targets.filter((account) => {
+    const info = account?.balanceInfo
+    return info?.scriptEnabled !== false && !!info?.scriptConfigured
+  })
+
+  if (eligibleTargets.length === 0) {
+    showToast('当前页没有配置余额脚本的账户', 'warning')
+    return
+  }
+
+  const skippedCount = targets.length - eligibleTargets.length
+
   refreshingBalances.value = true
   try {
     const results = await Promise.all(
-      targets.map(async (account) => {
+      eligibleTargets.map(async (account) => {
         try {
           const response = await apiClient.post(`/admin/accounts/${account.id}/balance/refresh`, {
             platform: account.platform
@@ -2913,6 +2957,7 @@ const refreshVisibleBalances = async () => {
     const successCount = results.filter((r) => r.success).length
     const failCount = results.length - successCount
 
+    const skippedText = skippedCount > 0 ? `，跳过 ${skippedCount} 个未配置脚本` : ''
     if (Object.keys(updatedMap).length > 0) {
       accounts.value = accounts.value.map((account) => {
         const balanceInfo = updatedMap[account.id]
@@ -2922,9 +2967,9 @@ const refreshVisibleBalances = async () => {
     }
 
     if (failCount === 0) {
-      showToast(`成功刷新 ${successCount} 个账户余额`, 'success')
+      showToast(`成功刷新 ${successCount} 个账户余额${skippedText}`, 'success')
     } else {
-      showToast(`刷新完成：${successCount} 成功，${failCount} 失败`, 'warning')
+      showToast(`刷新完成：${successCount} 成功，${failCount} 失败${skippedText}`, 'warning')
     }
   } finally {
     refreshingBalances.value = false

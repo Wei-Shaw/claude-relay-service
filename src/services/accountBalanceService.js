@@ -2,6 +2,7 @@ const redis = require('../models/redis')
 const balanceScriptService = require('./balanceScriptService')
 const logger = require('../utils/logger')
 const CostCalculator = require('../utils/costCalculator')
+const { isBalanceScriptEnabled } = require('../utils/featureFlags')
 
 class AccountBalanceService {
   constructor(options = {}) {
@@ -277,6 +278,20 @@ class AccountBalanceService {
       throw new Error('账户缺少 id')
     }
 
+    // 余额脚本配置状态（用于前端控制“刷新余额”按钮）
+    let scriptConfig = null
+    let scriptConfigured = false
+    if (typeof this.redis?.getBalanceScriptConfig === 'function') {
+      scriptConfig = await this.redis.getBalanceScriptConfig(platform, accountId)
+      scriptConfigured = !!(
+        scriptConfig &&
+        scriptConfig.scriptBody &&
+        String(scriptConfig.scriptBody).trim().length > 0
+      )
+    }
+    const scriptEnabled = isBalanceScriptEnabled()
+    const scriptMeta = { scriptEnabled, scriptConfigured }
+
     const localBalance = await this._getBalanceFromLocal(accountId, platform)
     const localStatistics = localBalance.statistics || {}
 
@@ -300,7 +315,8 @@ class AccountBalanceService {
             accountId,
             platform,
             'cache',
-            cached.ttlSeconds
+            cached.ttlSeconds,
+            scriptMeta
           )
         }
       }
@@ -317,15 +333,16 @@ class AccountBalanceService {
         },
         accountId,
         platform,
-        'local'
+        'local',
+        null,
+        scriptMeta
       )
     }
 
-    // 强制查询：调用 Provider，失败自动降级到本地统计
-    const scriptConfig = await this.redis.getBalanceScriptConfig(platform, accountId)
+    // 强制查询：优先脚本（如启用且已配置），否则调用 Provider；失败自动降级到本地统计
     let providerResult
 
-    if (scriptConfig && scriptConfig.scriptBody) {
+    if (scriptEnabled && scriptConfigured) {
       providerResult = await this._getBalanceFromScript(scriptConfig, accountId, platform)
     } else {
       const provider = this.providers.get(platform)
@@ -342,15 +359,28 @@ class AccountBalanceService {
           },
           accountId,
           platform,
-          'local'
+          'local',
+          null,
+          scriptMeta
         )
       }
       providerResult = await this._getBalanceFromProvider(provider, account)
     }
 
-    await this.redis.setAccountBalance(platform, accountId, providerResult, this.CACHE_TTL_SECONDS)
+    const isRemoteSuccess =
+      providerResult.status === 'success' && ['api', 'script'].includes(providerResult.queryMethod)
 
-    const source = providerResult.status === 'success' ? 'api' : 'local'
+    // 仅缓存“真实远程查询成功”的结果，避免把字段/本地降级结果当作 API 结果缓存 1h
+    if (isRemoteSuccess) {
+      await this.redis.setAccountBalance(
+        platform,
+        accountId,
+        providerResult,
+        this.CACHE_TTL_SECONDS
+      )
+    }
+
+    const source = isRemoteSuccess ? 'api' : 'local'
 
     return this._buildResponse(
       {
@@ -364,7 +394,9 @@ class AccountBalanceService {
       },
       accountId,
       platform,
-      source
+      source,
+      null,
+      scriptMeta
     )
   }
 
@@ -507,35 +539,50 @@ class AccountBalanceService {
   async _sumModelCostsByKeysPattern(pattern) {
     try {
       const client = this.redis.getClientSafe()
-      const keys = await client.keys(pattern)
-      if (!keys || keys.length === 0) {
-        return 0
-      }
-
-      const pipeline = client.pipeline()
-      keys.forEach((key) => pipeline.hgetall(key))
-      const results = await pipeline.exec()
-
       let totalCost = 0
-      for (let i = 0; i < results.length; i += 1) {
-        const [, data] = results[i] || []
-        if (!data || Object.keys(data).length === 0) {
+      let cursor = '0'
+      const scanCount = 200
+      let iterations = 0
+      const maxIterations = 2000
+
+      do {
+        const [nextCursor, keys] = await client.scan(cursor, 'MATCH', pattern, 'COUNT', scanCount)
+        cursor = nextCursor
+        iterations += 1
+
+        if (!keys || keys.length === 0) {
           continue
         }
 
-        const parts = String(keys[i]).split(':')
-        const model = parts[4] || 'unknown'
+        const pipeline = client.pipeline()
+        keys.forEach((key) => pipeline.hgetall(key))
+        const results = await pipeline.exec()
 
-        const usage = {
-          input_tokens: parseInt(data.inputTokens || 0),
-          output_tokens: parseInt(data.outputTokens || 0),
-          cache_creation_input_tokens: parseInt(data.cacheCreateTokens || 0),
-          cache_read_input_tokens: parseInt(data.cacheReadTokens || 0)
+        for (let i = 0; i < results.length; i += 1) {
+          const [, data] = results[i] || []
+          if (!data || Object.keys(data).length === 0) {
+            continue
+          }
+
+          const parts = String(keys[i]).split(':')
+          const model = parts[4] || 'unknown'
+
+          const usage = {
+            input_tokens: parseInt(data.inputTokens || 0),
+            output_tokens: parseInt(data.outputTokens || 0),
+            cache_creation_input_tokens: parseInt(data.cacheCreateTokens || 0),
+            cache_read_input_tokens: parseInt(data.cacheReadTokens || 0)
+          }
+
+          const costResult = CostCalculator.calculateCost(usage, model)
+          totalCost += costResult.costs.total || 0
         }
 
-        const costResult = CostCalculator.calculateCost(usage, model)
-        totalCost += costResult.costs.total || 0
-      }
+        if (iterations >= maxIterations) {
+          this.logger.warn(`SCAN 次数超过上限，停止汇总：${pattern}`)
+          break
+        }
+      } while (cursor !== '0')
 
       return totalCost
     } catch (error) {
@@ -610,7 +657,7 @@ class AccountBalanceService {
     return new Date(resetAtMs).toISOString()
   }
 
-  _buildResponse(balanceData, accountId, platform, source, ttlSeconds = null) {
+  _buildResponse(balanceData, accountId, platform, source, ttlSeconds = null, extraData = {}) {
     const now = new Date()
 
     const amount = typeof balanceData.balance === 'number' ? balanceData.balance : null
@@ -642,7 +689,8 @@ class AccountBalanceService {
         lastRefreshAt: balanceData.lastRefreshAt || now.toISOString(),
         cacheExpiresAt,
         status: balanceData.status || 'success',
-        error: balanceData.errorMessage || null
+        error: balanceData.errorMessage || null,
+        ...(extraData && typeof extraData === 'object' ? extraData : {})
       }
     }
   }

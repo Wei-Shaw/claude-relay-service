@@ -3,6 +3,7 @@ const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
 const accountBalanceService = require('../../services/accountBalanceService')
 const balanceScriptService = require('../../services/balanceScriptService')
+const { isBalanceScriptEnabled } = require('../../utils/featureFlags')
 
 const router = express.Router()
 
@@ -47,7 +48,7 @@ router.get('/accounts/:accountId/balance', authenticateAdmin, async (req, res) =
   }
 })
 
-// 2) 强制刷新账户余额（触发 Provider）
+// 2) 强制刷新账户余额（强制触发查询：优先脚本；Provider 仅为降级）
 // POST /admin/accounts/:accountId/balance/refresh
 // Body: { platform: 'xxx' }
 router.post('/accounts/:accountId/balance/refresh', authenticateAdmin, async (req, res) => {
@@ -172,6 +173,12 @@ router.post('/accounts/:accountId/balance/script/test', authenticateAdmin, async
     const valid = ensureValidPlatform(platform)
     if (!valid.ok) {
       return res.status(valid.status).json({ success: false, error: valid.error })
+    }
+
+    if (!isBalanceScriptEnabled()) {
+      return res
+        .status(403)
+        .json({ success: false, error: '余额脚本功能已禁用（可通过 BALANCE_SCRIPT_ENABLED=true 启用）' })
     }
 
     const payload = req.body || {}
