@@ -139,16 +139,6 @@ const saving = ref(false)
 const testing = ref(false)
 const testResult = ref(null)
 
-const form = reactive({
-  baseUrl: '',
-  apiKey: '',
-  token: '',
-  extra: '',
-  timeoutSeconds: 10,
-  autoIntervalMinutes: 0,
-  scriptBody: ''
-})
-
 const presetScript = `({
   request: {
     url: "{{baseUrl}}/api/user/self",
@@ -178,7 +168,35 @@ const presetScript = `({
   }
 })`
 
+const form = reactive({
+  baseUrl: '',
+  apiKey: '',
+  token: '',
+  extra: '',
+  timeoutSeconds: 10,
+  autoIntervalMinutes: 0,
+  scriptBody: ''
+})
+
+const buildDefaultForm = () => ({
+  baseUrl: '',
+  apiKey: '',
+  token: '',
+  extra: '',
+  timeoutSeconds: 10,
+  autoIntervalMinutes: 0,
+  // 默认给出示例脚本，字段保持清空，避免“上一个账户的配置污染当前账户”
+  scriptBody: presetScript
+})
+
 const emitClose = () => emit('close')
+
+const resetForm = () => {
+  Object.assign(form, buildDefaultForm())
+  testResult.value = null
+  saving.value = false
+  testing.value = false
+}
 
 const loadConfig = async () => {
   if (!props.account?.id || !props.account?.platform) return
@@ -254,9 +272,8 @@ watch(
   () => props.show,
   (val) => {
     if (val) {
-      applyPreset()
+      resetForm()
       loadConfig()
-      testResult.value = null
     }
   }
 )
