@@ -10,8 +10,8 @@
             class="header-icon"
             :class="
               multiKeyMode
-                ? 'fas fa-layer-group text-purple-500'
-                : 'fas fa-info-circle text-blue-500'
+                ? 'fas fa-layer-group text-gray-700 dark:text-gray-400'
+                : 'fas fa-info-circle text-gray-700 dark:text-gray-400'
             "
           />
           <h3 class="header-title">{{ multiKeyMode ? '批量查询概要' : 'API Key 信息' }}</h3>
@@ -130,7 +130,7 @@
       <!-- 使用统计概览 -->
       <div class="card-section">
         <header class="section-header">
-          <i class="header-icon fas fa-chart-bar text-green-500" />
+          <i class="header-icon fas fa-chart-bar text-gray-700 dark:text-gray-400" />
           <h3 class="header-title">使用统计概览</h3>
           <span class="header-tag">{{ statsPeriod === 'daily' ? '今日' : '本月' }}</span>
         </header>

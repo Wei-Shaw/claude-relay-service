@@ -112,11 +112,11 @@ const formatNumber = (num) => {
 
 .title-icon {
   font-size: var(--font-size-xl);
-  color: #f59e0b;
+  color: #374151;
 }
 
 :global(.dark) .title-icon {
-  color: #fbbf24;
+  color: #9ca3af;
 }
 
 .title-period {

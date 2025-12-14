@@ -101,7 +101,7 @@
                   <td class="w-48 whitespace-nowrap px-6 py-4">
                     <div class="flex items-center">
                       <div
-                        class="mr-3 flex h-8 w-8 items-center justify-center rounded-lg bg-purple-600"
+                        class="mr-3 flex h-8 w-8 items-center justify-center rounded-lg bg-gray-700 dark:bg-gray-600"
                       >
                         <i class="fas fa-image text-xs text-white" />
                       </div>
@@ -164,7 +164,7 @@
                   <td class="w-48 whitespace-nowrap px-6 py-4">
                     <div class="flex items-center">
                       <div
-                        class="mr-3 flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600"
+                        class="mr-3 flex h-8 w-8 items-center justify-center rounded-lg bg-gray-700 dark:bg-gray-600"
                       >
                         <i class="fas fa-eye-slash text-xs text-white" />
                       </div>
@@ -262,7 +262,7 @@
             <div class="glass-card p-4">
               <div class="mb-3 flex items-center gap-3">
                 <div
-                  class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded bg-purple-600 text-white shadow-md"
+                  class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded bg-gray-700 text-white shadow-md dark:bg-gray-600"
                 >
                   <i class="fas fa-image"></i>
                 </div>
@@ -321,7 +321,7 @@
             <div class="glass-card p-4">
               <div class="mb-3 flex items-center gap-3">
                 <div
-                  class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded bg-indigo-600 text-white shadow-md"
+                  class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded bg-gray-700 text-white shadow-md dark:bg-gray-600"
                 >
                   <i class="fas fa-eye-slash"></i>
                 </div>
@@ -431,7 +431,7 @@
                     @change="saveWebhookConfig"
                   />
                   <div
-                    class="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-green-600 peer-checked:after:translate-x-full peer-checked:after:border-white dark:border-gray-600 dark:bg-gray-700"
+                    class="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white dark:border-gray-600 dark:bg-gray-700 dark:peer-checked:bg-white"
                   ></div>
                 </label>
               </div>
@@ -627,7 +627,7 @@
           <!-- 测试通知按钮 -->
           <div class="mt-6 text-center">
             <button
-              class="rounded-lg bg-green-600 px-6 py-3 text-white shadow-lg transition-all hover:bg-green-700 hover:shadow-xl"
+              class="rounded-lg bg-gray-900 px-6 py-3 text-white shadow-lg transition-all hover:bg-gray-700 hover:shadow-xl dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
               @click="sendTestNotification"
             >
               <i class="fas fa-paper-plane mr-2"></i>
@@ -651,7 +651,7 @@
                 <div>
                   <div class="flex items-center">
                     <div
-                      class="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-orange-600 text-white shadow-lg"
+                      class="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-gray-700 text-white shadow-lg dark:bg-gray-600"
                     >
                       <i class="fas fa-terminal"></i>
                     </div>
@@ -681,11 +681,11 @@
                     @change="saveClaudeConfig"
                   />
                   <div
-                    class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-orange-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-orange-800"
+                    class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-400 dark:border-gray-600 dark:bg-gray-700 dark:peer-checked:bg-white dark:peer-focus:ring-gray-500"
                   ></div>
                 </label>
               </div>
-              <div class="mt-4 rounded-lg bg-amber-50 p-4 dark:bg-amber-900/20">
+              <div class="mt-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
                 <div class="flex">
                   <i class="fas fa-info-circle mt-0.5 text-amber-500"></i>
                   <div class="ml-3">
@@ -704,7 +704,7 @@
                 <div>
                   <div class="flex items-center">
                     <div
-                      class="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-purple-600 text-white shadow-lg"
+                      class="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-gray-700 text-white shadow-lg dark:bg-gray-600"
                     >
                       <i class="fas fa-link"></i>
                     </div>
@@ -726,7 +726,7 @@
                     @change="saveClaudeConfig"
                   />
                   <div
-                    class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-purple-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-purple-800"
+                    class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-400 dark:border-gray-600 dark:bg-gray-700 dark:peer-checked:bg-white dark:peer-focus:ring-gray-500"
                   ></div>
                 </label>
               </div>
@@ -772,20 +772,20 @@
                 </div>
               </div>
 
-              <div class="mt-4 rounded-lg bg-purple-50 p-4 dark:bg-purple-900/20">
+              <div class="mt-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
                 <div class="flex">
                   <i class="fas fa-lightbulb mt-0.5 text-purple-500"></i>
                   <div class="ml-3">
                     <p class="text-sm text-purple-700 dark:text-purple-300">
                       <strong>工作原理：</strong>系统会提取请求中的原始 session ID （来自
-                      <code class="rounded bg-purple-100 px-1 dark:bg-purple-800"
+                      <code class="rounded bg-gray-100 px-1 dark:bg-gray-700"
                         >metadata.user_id</code
                       >）， 并将其与首次调度的账户绑定。后续使用相同 session ID
                       的请求将自动路由到同一账户。
                     </p>
                     <p class="mt-2 text-sm text-purple-700 dark:text-purple-300">
                       <strong>新会话识别：</strong>如果绑定会话历史中没有该sessionId但请求中
-                      <code class="rounded bg-purple-100 px-1 dark:bg-purple-800"
+                      <code class="rounded bg-gray-100 px-1 dark:bg-gray-700"
                         >messages.length > 1</code
                       >， 系统会认为这是一个污染的会话并拒绝请求。
                     </p>
@@ -800,7 +800,7 @@
                 <div>
                   <div class="flex items-center">
                     <div
-                      class="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-cyan-600 text-white shadow-lg"
+                      class="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-gray-700 text-white shadow-lg dark:bg-gray-600"
                     >
                       <i class="fas fa-list-ol"></i>
                     </div>
@@ -2561,7 +2561,7 @@ const formatDateTime = settingsStore.formatDateTime
 }
 
 .btn-success {
-  @apply bg-green-600 text-white hover:bg-green-700 focus:ring-green-500;
+  @apply bg-gray-900 text-white hover:bg-gray-700 focus:ring-gray-500 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200;
 }
 
 .loading-spinner {

@@ -256,13 +256,13 @@
                             </div>
                             <div class="space-y-1 pt-1 text-gray-200 dark:text-gray-600">
                               <div class="flex items-center gap-2">
-                                <div class="h-2 w-16 rounded bg-indigo-600"></div>
+                                <div class="h-2 w-16 rounded bg-gray-700 dark:bg-gray-600"></div>
                                 <span class="font-medium text-white dark:text-gray-900"
                                   >正常：请求正常处理</span
                                 >
                               </div>
                               <div class="flex items-center gap-2">
-                                <div class="h-2 w-16 rounded bg-orange-500"></div>
+                                <div class="h-2 w-16 rounded bg-gray-700 dark:bg-gray-600"></div>
                                 <span class="font-medium text-white dark:text-gray-900"
                                   >警告：接近限制</span
                                 >
@@ -425,7 +425,7 @@
                 >
                   <div class="flex items-center">
                     <div
-                      class="mr-2 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-green-600"
+                      class="mr-2 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gray-700 dark:bg-gray-600"
                     >
                       <i class="fas fa-user-circle text-xs text-white" />
                     </div>
@@ -480,32 +480,32 @@
                     <!-- 平台图标和名称 -->
                     <div
                       v-if="account.platform === 'gemini'"
-                      class="flex items-center gap-1.5 rounded-lg border border-yellow-200 bg-yellow-100 px-2.5 py-1"
+                      class="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-gray-100 px-2.5 py-1 dark:border-gray-600 dark:bg-gray-800"
                     >
-                      <i class="fas fa-robot text-xs text-yellow-700" />
-                      <span class="text-xs font-semibold text-yellow-800">Gemini</span>
-                      <span class="mx-1 h-4 w-px bg-yellow-300" />
-                      <span class="text-xs font-medium text-yellow-700">
+                      <i class="fas fa-robot text-xs text-gray-700 dark:text-gray-300" />
+                      <span class="text-xs font-semibold text-gray-800 dark:text-gray-200">Gemini</span>
+                      <span class="mx-1 h-4 w-px bg-gray-300 dark:bg-gray-600" />
+                      <span class="text-xs font-medium text-gray-700 dark:text-gray-300">
                         {{ getGeminiAuthType() }}
                       </span>
                     </div>
                     <div
                       v-else-if="account.platform === 'claude-console'"
-                      class="flex items-center gap-1.5 rounded-lg border border-purple-200 bg-purple-100 px-2.5 py-1"
+                      class="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-gray-100 px-2.5 py-1 dark:border-gray-600 dark:bg-gray-800"
                     >
-                      <i class="fas fa-terminal text-xs text-purple-700" />
-                      <span class="text-xs font-semibold text-purple-800">Console</span>
-                      <span class="mx-1 h-4 w-px bg-purple-300" />
-                      <span class="text-xs font-medium text-purple-700">API Key</span>
+                      <i class="fas fa-terminal text-xs text-gray-700 dark:text-gray-300" />
+                      <span class="text-xs font-semibold text-gray-800 dark:text-gray-200">Console</span>
+                      <span class="mx-1 h-4 w-px bg-gray-300 dark:bg-gray-600" />
+                      <span class="text-xs font-medium text-gray-700 dark:text-gray-300">API Key</span>
                     </div>
                     <div
                       v-else-if="account.platform === 'bedrock'"
-                      class="flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-100 px-2.5 py-1"
+                      class="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-gray-100 px-2.5 py-1 dark:border-gray-600 dark:bg-gray-800"
                     >
-                      <i class="fab fa-aws text-xs text-orange-700" />
-                      <span class="text-xs font-semibold text-orange-800">Bedrock</span>
-                      <span class="mx-1 h-4 w-px bg-orange-300" />
-                      <span class="text-xs font-medium text-orange-700">AWS</span>
+                      <i class="fab fa-aws text-xs text-gray-700 dark:text-gray-300" />
+                      <span class="text-xs font-semibold text-gray-800 dark:text-gray-200">Bedrock</span>
+                      <span class="mx-1 h-4 w-px bg-gray-300 dark:bg-gray-600" />
+                      <span class="text-xs font-medium text-gray-700 dark:text-gray-300">AWS</span>
                     </div>
                     <div
                       v-else-if="account.platform === 'openai'"
@@ -550,12 +550,12 @@
                       "
                       class="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-100 px-2.5 py-1"
                     >
-                      <i class="fas fa-brain text-xs text-indigo-700" />
+                      <i class="fas fa-brain text-xs text-gray-900 dark:text-gray-100" />
                       <span class="text-xs font-semibold text-indigo-800">{{
                         getClaudeAccountType(account)
                       }}</span>
                       <span class="mx-1 h-4 w-px bg-indigo-300" />
-                      <span class="text-xs font-medium text-indigo-700">
+                      <span class="text-xs font-medium text-gray-900 dark:text-gray-100">
                         {{ getClaudeAuthType(account) }}
                       </span>
                     </div>
@@ -580,7 +580,7 @@
                       <span class="text-xs font-semibold text-cyan-800 dark:text-cyan-300"
                         >Droid</span
                       >
-                      <span class="mx-1 h-4 w-px bg-cyan-300 dark:bg-cyan-600" />
+                      <span class="mx-1 h-4 w-px bg-cyan-300 dark:bg-gray-700 dark:bg-gray-600" />
                       <span class="text-xs font-medium text-cyan-700 dark:text-cyan-300">
                         {{ getDroidAuthType(account) }}
                       </span>
@@ -600,7 +600,7 @@
                       <span class="text-xs font-semibold text-amber-800 dark:text-amber-300"
                         >Gemini-API</span
                       >
-                      <span class="mx-1 h-4 w-px bg-amber-300 dark:bg-amber-600" />
+                      <span class="mx-1 h-4 w-px bg-amber-300 dark:bg-gray-700 dark:bg-gray-600" />
                       <span class="text-xs font-medium text-amber-700 dark:text-amber-400"
                         >API Key</span
                       >
@@ -634,11 +634,11 @@
                         :class="[
                           'mr-2 h-2 w-2 rounded-full',
                           account.status === 'blocked'
-                            ? 'bg-orange-500'
+                            ? 'bg-gray-700 dark:bg-gray-600'
                             : account.status === 'unauthorized'
                               ? 'bg-red-500'
                               : account.status === 'temp_error'
-                                ? 'bg-orange-500'
+                                ? 'bg-gray-700 dark:bg-gray-600'
                                 : account.isActive
                                   ? 'bg-green-500'
                                   : 'bg-red-500'
@@ -661,7 +661,7 @@
                         (account.rateLimitStatus && account.rateLimitStatus.isRateLimited) ||
                         account.rateLimitStatus === 'limited'
                       "
-                      class="inline-flex items-center rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-800"
+                      class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-800 dark:bg-gray-800 dark:text-gray-200"
                     >
                       <i class="fas fa-exclamation-triangle mr-1" />
                       限流中
@@ -707,19 +707,19 @@
                 <td class="whitespace-nowrap px-3 py-4 text-sm">
                   <div v-if="account.usage && account.usage.daily" class="space-y-1">
                     <div class="flex items-center gap-2">
-                      <div class="h-2 w-2 rounded-full bg-blue-500" />
+                      <div class="h-2 w-2 rounded-full bg-gray-700 dark:bg-gray-500" />
                       <span class="text-sm font-medium text-gray-900 dark:text-gray-100"
                         >{{ account.usage.daily.requests || 0 }} 次</span
                       >
                     </div>
                     <div class="flex items-center gap-2">
-                      <div class="h-2 w-2 rounded-full bg-purple-500" />
+                      <div class="h-2 w-2 rounded-full bg-gray-700 dark:bg-gray-500" />
                       <span class="text-xs text-gray-600 dark:text-gray-300"
                         >{{ formatNumber(account.usage.daily.allTokens || 0) }}M</span
                       >
                     </div>
                     <div class="flex items-center gap-2">
-                      <div class="h-2 w-2 rounded-full bg-green-500" />
+                      <div class="h-2 w-2 rounded-full bg-gray-700 dark:bg-gray-500" />
                       <span class="text-xs text-gray-600 dark:text-gray-300"
                         >${{ calculateDailyCost(account) }}</span
                       >
@@ -828,13 +828,13 @@
                         class="flex items-center gap-3 text-xs"
                       >
                         <div class="flex items-center gap-1">
-                          <div class="h-1.5 w-1.5 rounded-full bg-purple-500" />
+                          <div class="h-1.5 w-1.5 rounded-full bg-gray-700 dark:bg-gray-500" />
                           <span class="font-medium text-gray-900 dark:text-gray-100">
                             {{ formatNumber(account.usage.sessionWindow.totalTokens) }}M
                           </span>
                         </div>
                         <div class="flex items-center gap-1">
-                          <div class="h-1.5 w-1.5 rounded-full bg-green-500" />
+                          <div class="h-1.5 w-1.5 rounded-full bg-gray-700 dark:bg-gray-500" />
                           <span class="font-medium text-gray-900 dark:text-gray-100">
                             ${{ formatCost(account.usage.sessionWindow.totalCost) }}
                           </span>
@@ -874,7 +874,7 @@
                         </div>
                         <div
                           v-if="account.sessionWindow.remainingTime > 0"
-                          class="font-medium text-indigo-600 dark:text-indigo-400"
+                          class="font-medium text-gray-900 dark:text-gray-100 dark:text-indigo-400"
                         >
                           剩余 {{ formatRemainingTime(account.sessionWindow.remainingTime) }}
                         </div>
@@ -1162,7 +1162,7 @@
                     </button>
                     <button
                       v-if="canViewUsage(account)"
-                      class="rounded bg-indigo-100 px-2.5 py-1 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-200"
+                      class="rounded bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                       title="查看使用详情"
                       @click="openAccountUsageModal(account)"
                     >
@@ -1252,15 +1252,15 @@
                 :class="[
                   'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg',
                   account.platform === 'claude'
-                    ? 'bg-purple-600'
+                    ? 'bg-gray-700 dark:bg-gray-600'
                     : account.platform === 'bedrock'
-                      ? 'bg-orange-600'
+                      ? 'bg-gray-700 dark:bg-gray-600'
                       : account.platform === 'azure_openai'
-                        ? 'bg-cyan-600'
+                        ? 'bg-gray-700 dark:bg-gray-600'
                         : account.platform === 'openai'
                           ? 'bg-gray-700'
                           : account.platform === 'ccr'
-                            ? 'bg-emerald-600'
+                            ? 'bg-gray-700 dark:bg-gray-600'
                             : account.platform === 'droid'
                               ? 'bg-sky-600'
                               : 'bg-gray-600'
@@ -1309,13 +1309,13 @@
               <p class="text-xs text-gray-500 dark:text-gray-400">今日使用</p>
               <div class="space-y-1">
                 <div class="flex items-center gap-1.5">
-                  <div class="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                  <div class="h-1.5 w-1.5 rounded-full bg-gray-700 dark:bg-gray-600" />
                   <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
                     {{ account.usage?.daily?.requests || 0 }} 次
                   </p>
                 </div>
                 <div class="flex items-center gap-1.5">
-                  <div class="h-1.5 w-1.5 rounded-full bg-purple-500" />
+                  <div class="h-1.5 w-1.5 rounded-full bg-gray-700 dark:bg-gray-600" />
                   <p class="text-xs text-gray-600 dark:text-gray-400">
                     {{ formatNumber(account.usage?.daily?.allTokens || 0) }}M
                   </p>
@@ -1332,7 +1332,7 @@
               <p class="text-xs text-gray-500 dark:text-gray-400">会话窗口</p>
               <div v-if="account.usage && account.usage.sessionWindow" class="space-y-1">
                 <div class="flex items-center gap-1.5">
-                  <div class="h-1.5 w-1.5 rounded-full bg-purple-500" />
+                  <div class="h-1.5 w-1.5 rounded-full bg-gray-700 dark:bg-gray-600" />
                   <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
                     {{ formatNumber(account.usage.sessionWindow.totalTokens) }}M
                   </p>
@@ -1473,7 +1473,7 @@
                   </span>
                   <span
                     v-if="account.sessionWindow.remainingTime > 0"
-                    class="font-medium text-indigo-600"
+                    class="font-medium text-gray-900 dark:text-gray-100"
                   >
                     剩余 {{ formatRemainingTime(account.sessionWindow.remainingTime) }}
                   </span>
@@ -1586,7 +1586,7 @@
 
             <button
               v-if="canViewUsage(account)"
-              class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-600 transition-colors hover:bg-indigo-100"
+              class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-indigo-50 px-3 py-2 text-xs text-gray-900 dark:text-gray-100 transition-colors hover:bg-indigo-100"
               @click="openAccountUsageModal(account)"
             >
               <i class="fas fa-chart-line" />
@@ -3884,10 +3884,10 @@ const getAccountStatusVariant = (account) => {
 //     (account.rateLimitStatus && account.rateLimitStatus.isRateLimited) ||
 //     account.rateLimitStatus === 'limited'
 //   ) {
-//     return 'bg-orange-500 dark:bg-orange-600'
+//     return 'bg-gray-700 dark:bg-gray-600 dark:bg-gray-700 dark:bg-gray-600'
 //   }
 //   if (account.status === 'temp_error') {
-//     return 'bg-orange-500 dark:bg-orange-600'
+//     return 'bg-gray-700 dark:bg-gray-600 dark:bg-gray-700 dark:bg-gray-600'
 //   }
 //   if (account.status === 'error' || !account.isActive) {
 //     return 'bg-red-500 dark:bg-red-600'
@@ -3916,7 +3916,7 @@ const formatRelativeTime = (dateString) => {
 //   // 根据状态返回不同的颜色类，包含防御性检查
 //   if (!status) {
 //     // 无状态信息时默认为蓝色
-//     return 'bg-indigo-600'
+//     return 'bg-gray-700 dark:bg-gray-600'
 //   }
 //
 //   // 检查账号是否处于限流状态
@@ -3940,10 +3940,10 @@ const formatRelativeTime = (dateString) => {
 //     return 'bg-red-600'
 //   } else if (normalizedStatus === 'allowed_warning') {
 //     // 警告状态 - 橙色/黄色
-//     return 'bg-orange-500'
+//     return 'bg-gray-700 dark:bg-gray-600'
 //   } else {
 //     // 正常状态（allowed 或其他） - 蓝色
-//     return 'bg-indigo-600'
+//     return 'bg-gray-700 dark:bg-gray-600'
 //   }
 // }
 
@@ -3998,10 +3998,10 @@ const formatClaudeUsagePercent = (window) => {
 // const getClaudeUsageBarClass = (window) => {
 //   const util = window?.utilization || 0
 //   if (util < 60) {
-//     return 'bg-indigo-600'
+//     return 'bg-gray-700 dark:bg-gray-600'
 //   }
 //   if (util < 90) {
-//     return 'bg-orange-500'
+//     return 'bg-gray-700 dark:bg-gray-600'
 //   }
 //   return 'bg-red-600'
 // }
@@ -4094,9 +4094,9 @@ const normalizeCodexUsagePercent = (usageItem) => {
 //     return 'bg-red-600'
 //   }
 //   if (percent >= 75) {
-//     return 'bg-orange-500'
+//     return 'bg-gray-700 dark:bg-gray-600'
 //   }
-//   return 'bg-emerald-600'
+//   return 'bg-gray-700 dark:bg-gray-600'
 // }
 
 // OpenAI 限额进度条变体（用于 Progress 组件）
