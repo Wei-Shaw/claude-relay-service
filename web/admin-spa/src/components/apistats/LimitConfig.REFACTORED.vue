@@ -1,122 +1,99 @@
 <template>
-  <div class="flex h-full flex-col gap-4 md:gap-6">
-    <!-- 限制配置 / 聚合模式提示 -->
-    <div class="card flex h-full flex-col p-4 md:p-6">
-      <h3
-        class="mb-3 flex items-center text-lg font-bold text-gray-900 dark:text-gray-100 md:mb-4 md:text-xl"
-      >
-        <i class="fas fa-shield-alt mr-2 text-sm text-red-500 md:mr-3 md:text-base" />
-        {{ multiKeyMode ? '限制配置（聚合查询模式）' : '限制配置' }}
-      </h3>
+  <div class="vercel-limit-card">
+    <div class="card-header">
+      <div class="header-title">
+        <i class="fas fa-shield-alt" />
+        <span>{{ multiKeyMode ? '限制配置（聚合模式）' : '限制配置' }}</span>
+      </div>
+    </div>
 
+    <div class="card-body">
       <!-- 多 Key 模式下的聚合统计信息 -->
-      <div v-if="multiKeyMode && aggregatedStats" class="space-y-4">
+      <div v-if="multiKeyMode && aggregatedStats" class="aggregated-stats">
         <!-- API Keys 概况 -->
-        <div class="rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
-          <div class="mb-3 flex items-center justify-between">
-            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-              <i class="fas fa-layer-group mr-2 text-blue-500" />
-              API Keys 概况
-            </span>
-            <span
-              class="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-gray-900 dark:bg-blue-800 dark:text-blue-200 dark:text-white"
-            >
-              {{ aggregatedStats.activeKeys }}/{{ aggregatedStats.totalKeys }}
-            </span>
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div class="text-center">
-              <div class="text-lg font-bold text-gray-900 dark:text-gray-100">
-                {{ aggregatedStats.totalKeys }}
-              </div>
-              <div class="text-xs text-gray-600 dark:text-gray-400">总计 Keys</div>
+        <div class="stat-section">
+          <div class="section-header">
+            <div class="section-title">
+              <i class="fas fa-layer-group" />
+              <span>API Keys 概况</span>
             </div>
-            <div class="text-center">
-              <div class="text-lg font-bold text-green-600">
-                {{ aggregatedStats.activeKeys }}
-              </div>
-              <div class="text-xs text-gray-600 dark:text-gray-400">激活 Keys</div>
+            <div class="key-badge">
+              {{ aggregatedStats.activeKeys }}/{{ aggregatedStats.totalKeys }}
+            </div>
+          </div>
+          <div class="keys-grid">
+            <div class="key-stat">
+              <div class="stat-value">{{ aggregatedStats.totalKeys }}</div>
+              <div class="stat-label">总计 Keys</div>
+            </div>
+            <div class="key-stat">
+              <div class="stat-value stat-active">{{ aggregatedStats.activeKeys }}</div>
+              <div class="stat-label">激活 Keys</div>
             </div>
           </div>
         </div>
 
         <!-- 聚合统计数据 -->
-        <div class="rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
-          <div class="mb-3 flex items-center">
-            <i class="fas fa-chart-pie mr-2 text-purple-500" />
-            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">聚合统计摘要</span>
+        <div class="stat-section">
+          <div class="section-title">
+            <i class="fas fa-chart-pie" />
+            <span>聚合统计摘要</span>
           </div>
-          <div class="space-y-2">
-            <div class="flex items-center justify-between">
-              <span class="text-xs text-gray-600 dark:text-gray-400">
-                <i class="fas fa-database mr-1 text-gray-400" />
-                总请求数
-              </span>
-              <span class="text-sm font-medium text-gray-900 dark:text-gray-100">
-                {{ formatNumber(aggregatedStats.usage.requests) }}
-              </span>
+          <div class="usage-list">
+            <div class="usage-item">
+              <div class="usage-label">
+                <i class="fas fa-database" />
+                <span>总请求数</span>
+              </div>
+              <div class="usage-value">{{ formatNumber(aggregatedStats.usage.requests) }}</div>
             </div>
-            <div class="flex items-center justify-between">
-              <span class="text-xs text-gray-600 dark:text-gray-400">
-                <i class="fas fa-coins mr-1 text-yellow-500" />
-                总 Tokens
-              </span>
-              <span class="text-sm font-medium text-gray-900 dark:text-gray-100">
-                {{ formatNumber(aggregatedStats.usage.allTokens) }}
-              </span>
+            <div class="usage-item">
+              <div class="usage-label">
+                <i class="fas fa-coins" />
+                <span>总 Tokens</span>
+              </div>
+              <div class="usage-value">{{ formatNumber(aggregatedStats.usage.allTokens) }}</div>
             </div>
-            <div class="flex items-center justify-between">
-              <span class="text-xs text-gray-600 dark:text-gray-400">
-                <i class="fas fa-dollar-sign mr-1 text-green-500" />
-                总费用
-              </span>
-              <span class="text-sm font-medium text-gray-900 dark:text-gray-100">
-                {{ aggregatedStats.usage.formattedCost }}
-              </span>
+            <div class="usage-item">
+              <div class="usage-label">
+                <i class="fas fa-dollar-sign" />
+                <span>总费用</span>
+              </div>
+              <div class="usage-value">{{ aggregatedStats.usage.formattedCost }}</div>
             </div>
           </div>
         </div>
 
         <!-- 无效 Keys 提示 -->
-        <div
-          v-if="invalidKeys && invalidKeys.length > 0"
-          class="rounded-lg bg-red-50 p-3 text-sm dark:bg-red-900/20"
-        >
-          <i class="fas fa-exclamation-triangle mr-2 text-red-600 dark:text-red-400" />
-          <span class="text-red-700 dark:text-red-300">
-            {{ invalidKeys.length }} 个无效的 API Key
-          </span>
+        <div v-if="invalidKeys && invalidKeys.length > 0" class="error-notice">
+          <i class="fas fa-exclamation-triangle" />
+          <span>{{ invalidKeys.length }} 个无效的 API Key</span>
         </div>
 
         <!-- 提示信息 -->
-        <div
-          class="rounded-lg bg-gray-50 p-3 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-        >
-          <i class="fas fa-info-circle mr-1" />
-          每个 API Key 有独立的限制设置,聚合模式下不显示单个限制配置
+        <div class="info-notice">
+          <i class="fas fa-info-circle" />
+          <span>每个 API Key 有独立的限制设置，聚合模式下不显示单个限制配置</span>
         </div>
       </div>
 
-      <!-- ✅ REFACTORED: Using Design System Progress component -->
-      <div v-if="!multiKeyMode" class="space-y-4 md:space-y-5">
+      <!-- Single Key 模式限制配置 -->
+      <div v-if="!multiKeyMode" class="limits-list">
         <!-- 每日费用限制 -->
-        <div>
-          <div class="mb-2 flex items-center justify-between">
-            <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base"
-              >每日费用限制</span
-            >
-            <span class="text-xs text-gray-500 dark:text-gray-400 md:text-sm">
+        <div class="limit-item">
+          <div class="limit-header">
+            <span class="limit-label">每日费用限制</span>
+            <span class="limit-value">
               <span v-if="statsData.limits.dailyCostLimit > 0">
                 ${{ statsData.limits.currentDailyCost.toFixed(4) }} / ${{
                   statsData.limits.dailyCostLimit.toFixed(2)
                 }}
               </span>
-              <span v-else class="flex items-center gap-1">
+              <span v-else class="unlimited">
                 ${{ statsData.limits.currentDailyCost.toFixed(4) }} / <i class="fas fa-infinity" />
               </span>
             </span>
           </div>
-          <!-- ✅ NEW: Design System Progress -->
           <Progress
             v-if="statsData.limits.dailyCostLimit > 0"
             size="md"
@@ -127,24 +104,20 @@
         </div>
 
         <!-- 总费用限制 -->
-        <div>
-          <div class="mb-2 flex items-center justify-between">
-            <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base"
-              >总费用限制</span
-            >
-            <span class="text-xs text-gray-500 dark:text-gray-400 md:text-sm">
+        <div class="limit-item">
+          <div class="limit-header">
+            <span class="limit-label">总费用限制</span>
+            <span class="limit-value">
               <span v-if="statsData.limits.totalCostLimit > 0">
                 ${{ statsData.limits.currentTotalCost.toFixed(4) }} / ${{
                   statsData.limits.totalCostLimit.toFixed(2)
                 }}
               </span>
-              <span v-else class="flex items-center gap-1">
-                ${{ statsData.limits.currentTotalCost.toFixed(4) }} /
-                <i class="fas fa-infinity" />
+              <span v-else class="unlimited">
+                ${{ statsData.limits.currentTotalCost.toFixed(4) }} / <i class="fas fa-infinity" />
               </span>
             </span>
           </div>
-          <!-- ✅ NEW: Design System Progress -->
           <Progress
             v-if="statsData.limits.totalCostLimit > 0"
             size="md"
@@ -155,18 +128,15 @@
         </div>
 
         <!-- Opus 模型周费用限制 -->
-        <div v-if="statsData.limits.weeklyOpusCostLimit > 0">
-          <div class="mb-2 flex items-center justify-between">
-            <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base"
-              >Opus 模型周费用限制</span
-            >
-            <span class="text-xs text-gray-500 dark:text-gray-400 md:text-sm">
+        <div v-if="statsData.limits.weeklyOpusCostLimit > 0" class="limit-item">
+          <div class="limit-header">
+            <span class="limit-label">Opus 模型周费用限制</span>
+            <span class="limit-value">
               ${{ statsData.limits.weeklyOpusCost.toFixed(4) }} / ${{
                 statsData.limits.weeklyOpusCostLimit.toFixed(2)
               }}
             </span>
           </div>
-          <!-- ✅ NEW: Design System Progress -->
           <Progress size="md" :value="opusWeeklyCostPercentage" :variant="opusWeeklyCostVariant" />
         </div>
 
@@ -178,10 +148,11 @@
               statsData.limits.tokenLimit > 0 ||
               statsData.limits.rateLimitCost > 0)
           "
+          class="limit-item"
         >
           <WindowCountdown
-            :current-window-requests="statsData.limits.currentWindowRequests"
             :current-window-cost="statsData.limits.currentWindowCost"
+            :current-window-requests="statsData.limits.currentWindowRequests"
             :current-window-tokens="statsData.limits.currentWindowTokens"
             :last-used-time="statsData.limits.lastUsedTime"
             :rate-limit-cost="statsData.limits.rateLimitCost"
@@ -262,5 +233,331 @@ const opusWeeklyCostVariant = computed(() =>
 </script>
 
 <style scoped>
-/* Removed old progress bar styles - now handled by Design System */
+/* ============================================
+   VERCEL LIMIT CONFIG CARD
+   ============================================ */
+.vercel-limit-card {
+  background: #fff;
+  border: 1px solid #eaeaea;
+  border-radius: 8px;
+  overflow: hidden;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+:global(.dark) .vercel-limit-card {
+  background: #000;
+  border-color: #333;
+}
+
+/* Card Header */
+.card-header {
+  padding: 24px;
+  border-bottom: 1px solid #eaeaea;
+}
+
+:global(.dark) .card-header {
+  border-bottom-color: #333;
+}
+
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #000;
+}
+
+.header-title i {
+  font-size: 18px;
+  color: #ef4444;
+}
+
+:global(.dark) .header-title {
+  color: #fff;
+}
+
+/* Card Body */
+.card-body {
+  padding: 24px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+@media (max-width: 768px) {
+  .card-header,
+  .card-body {
+    padding: 20px;
+  }
+}
+
+/* ============================================
+   AGGREGATED STATS (Multi-Key Mode)
+   ============================================ */
+.aggregated-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stat-section {
+  padding: 16px;
+  background: #fafafa;
+  border: 1px solid #eaeaea;
+  border-radius: 6px;
+}
+
+:global(.dark) .stat-section {
+  background: #0a0a0a;
+  border-color: #333;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #000;
+}
+
+.section-title i {
+  font-size: 14px;
+  color: #666;
+}
+
+:global(.dark) .section-title {
+  color: #fff;
+}
+
+:global(.dark) .section-title i {
+  color: #999;
+}
+
+.key-badge {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0284c7;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 12px;
+}
+
+:global(.dark) .key-badge {
+  color: #7dd3fc;
+  background: #082f49;
+  border-color: #0c4a6e;
+}
+
+/* Keys Grid */
+.keys-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.key-stat {
+  text-align: center;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #eaeaea;
+  border-radius: 6px;
+}
+
+:global(.dark) .key-stat {
+  background: #000;
+  border-color: #333;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 600;
+  color: #000;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+.stat-value.stat-active {
+  color: #10b981;
+}
+
+:global(.dark) .stat-value {
+  color: #fff;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #666;
+}
+
+:global(.dark) .stat-label {
+  color: #999;
+}
+
+/* Usage List */
+.usage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.usage-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #eaeaea;
+  border-radius: 6px;
+}
+
+:global(.dark) .usage-item {
+  background: #000;
+  border-color: #333;
+}
+
+.usage-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #666;
+}
+
+.usage-label i {
+  font-size: 14px;
+}
+
+:global(.dark) .usage-label {
+  color: #999;
+}
+
+.usage-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #000;
+}
+
+:global(.dark) .usage-value {
+  color: #fff;
+}
+
+/* Error Notice */
+.error-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  font-size: 13px;
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+}
+
+:global(.dark) .error-notice {
+  color: #fca5a5;
+  background: #450a0a;
+  border-color: #991b1b;
+}
+
+/* Info Notice */
+.info-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  font-size: 12px;
+  color: #666;
+  background: #fafafa;
+  border: 1px solid #eaeaea;
+  border-radius: 6px;
+}
+
+:global(.dark) .info-notice {
+  color: #999;
+  background: #0a0a0a;
+  border-color: #333;
+}
+
+/* ============================================
+   LIMITS LIST (Single Key Mode)
+   ============================================ */
+.limits-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.limit-item {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.limit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.limit-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+}
+
+:global(.dark) .limit-label {
+  color: #999;
+}
+
+.limit-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: #000;
+  white-space: nowrap;
+}
+
+:global(.dark) .limit-value {
+  color: #fff;
+}
+
+.limit-value .unlimited {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #666;
+}
+
+:global(.dark) .limit-value .unlimited {
+  color: #999;
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 768px) {
+  .keys-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .limit-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
 </style>

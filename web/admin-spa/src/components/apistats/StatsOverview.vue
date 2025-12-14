@@ -509,149 +509,378 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 </script>
 
 <style scoped>
+/* ============================================
+   VERCEL STATS OVERVIEW CARDS
+   ============================================ */
 .card-section {
-  @apply flex h-full flex-col gap-4 rounded border border-slate-200/70 bg-white/90 p-4 shadow-md dark:border-slate-700/60 dark:bg-slate-900/70 md:p-6;
+  background: #fff;
+  border: 1px solid #eaeaea;
+  border-radius: 8px;
+  padding: 24px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 :global(.dark) .card-section {
-  backdrop-filter: blur(10px);
+  background: #000;
+  border-color: #333;
 }
 
-.section-header {
-  @apply mb-4 flex items-center gap-3;
-}
-
-.header-icon {
-  @apply text-base md:text-lg;
-}
-
-.header-title {
-  @apply text-lg font-semibold text-slate-900 dark:text-slate-100 md:text-xl;
-}
-
-.header-tag {
-  @apply ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-300;
-}
-
-.info-grid {
-  @apply grid gap-3 md:gap-4;
-  grid-template-columns: repeat(1, minmax(0, 1fr));
-}
-
-@media (min-width: 768px) {
-  .info-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 768px) {
+  .card-section {
+    padding: 20px;
   }
 }
 
-@media (min-width: 1280px) {
+/* Section Header */
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 0;
+}
+
+.header-icon {
+  font-size: 18px;
+}
+
+.header-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #000;
+}
+
+:global(.dark) .header-title {
+  color: #fff;
+}
+
+.header-tag {
+  margin-left: auto;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #666;
+  background: #fafafa;
+  border: 1px solid #eaeaea;
+  border-radius: 12px;
+}
+
+:global(.dark) .header-tag {
+  color: #999;
+  background: #0a0a0a;
+  border-color: #333;
+}
+
+/* Info Grid */
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
   .info-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 }
 
 .info-item {
-  @apply rounded border border-slate-200 bg-white/70 p-4 dark:border-slate-700 dark:bg-slate-900/60;
-  min-height: 86px;
+  padding: 16px;
+  background: #fafafa;
+  border: 1px solid #eaeaea;
+  border-radius: 6px;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+:global(.dark) .info-item {
+  background: #0a0a0a;
+  border-color: #333;
 }
 
 .info-label {
-  @apply text-xs uppercase tracking-wide text-slate-400;
+  font-size: 12px;
+  font-weight: 500;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+:global(.dark) .info-label {
+  color: #999;
 }
 
 .info-value {
-  @apply mt-2 text-sm text-slate-800 dark:text-slate-100;
+  font-size: 14px;
+  font-weight: 500;
+  color: #000;
+  word-break: break-word;
 }
 
+:global(.dark) .info-value {
+  color: #fff;
+}
+
+/* Contributor Items */
 .contributor-item {
-  @apply flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #666;
+  background: #fafafa;
+  border: 1px solid #eaeaea;
+  border-radius: 4px;
 }
 
+:global(.dark) .contributor-item {
+  color: #999;
+  background: #0a0a0a;
+  border-color: #333;
+}
+
+/* Metric Grid */
 .metric-grid {
-  @apply grid grid-cols-2 gap-3 md:gap-4;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .metric-grid {
+    gap: 12px;
+  }
 }
 
 .metric-card {
-  @apply rounded border border-slate-200 bg-white/70 p-4 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900/60;
+  padding: 20px;
+  background: #fafafa;
+  border: 1px solid #eaeaea;
+  border-radius: 6px;
+  text-align: center;
+}
+
+:global(.dark) .metric-card {
+  background: #0a0a0a;
+  border-color: #333;
 }
 
 .metric-value {
-  @apply text-xl font-semibold md:text-2xl;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.2;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 768px) {
+  .metric-value {
+    font-size: 24px;
+  }
 }
 
 .metric-label {
-  @apply mt-1 text-xs text-slate-500 dark:text-slate-300;
+  font-size: 12px;
+  color: #666;
 }
 
+:global(.dark) .metric-label {
+  color: #999;
+}
+
+/* Account Card */
 .account-card {
-  @apply rounded border border-slate-200 bg-white/80 p-4 shadow-sm transition-shadow hover:shadow-md dark:border-slate-700 dark:bg-slate-900/60;
+  padding: 20px;
+  background: #fafafa;
+  border: 1px solid #eaeaea;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.account-card:hover {
+  border-color: #000;
+}
+
+:global(.dark) .account-card {
+  background: #0a0a0a;
+  border-color: #333;
+}
+
+:global(.dark) .account-card:hover {
+  border-color: #fff;
 }
 
 .account-icon {
-  @apply inline-flex h-10 w-10 items-center justify-center rounded-full text-white;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: #fff;
 }
 
 .icon-claude {
-  @apply bg-gray-900 dark:bg-gray-100;
+  background: #000;
+}
+
+:global(.dark) .icon-claude {
+  background: #fff;
+  color: #000;
 }
 
 .icon-openai {
-  @apply bg-gray-600 dark:bg-gray-400;
+  background: #666;
+}
+
+:global(.dark) .icon-openai {
+  background: #999;
+  color: #000;
 }
 
 .account-name {
-  @apply text-sm font-semibold text-slate-900 dark:text-slate-100;
+  font-size: 14px;
+  font-weight: 600;
+  color: #000;
+}
+
+:global(.dark) .account-name {
+  color: #fff;
 }
 
 .account-sub {
-  @apply text-xs text-slate-500 dark:text-slate-400;
+  font-size: 12px;
+  color: #666;
+}
+
+:global(.dark) .account-sub {
+  color: #999;
 }
 
 .rate-badge {
-  @apply rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium dark:bg-slate-800;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #fafafa;
+  border: 1px solid #eaeaea;
+  border-radius: 12px;
 }
 
+:global(.dark) .rate-badge {
+  background: #0a0a0a;
+  border-color: #333;
+}
+
+/* Progress */
 .progress-row {
-  @apply flex items-center gap-2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .progress-track {
-  @apply h-1.5 flex-1 rounded-full bg-slate-200 dark:bg-slate-700;
+  flex: 1;
+  height: 6px;
+  background: #eaeaea;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+:global(.dark) .progress-track {
+  background: #333;
 }
 
 .progress-bar {
-  @apply h-1.5 rounded-full transition-all duration-300;
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
 }
 
 .progress-value {
-  @apply text-xs font-semibold text-slate-600 dark:text-slate-200;
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  min-width: 40px;
+  text-align: right;
 }
 
+:global(.dark) .progress-value {
+  color: #999;
+}
+
+/* Quota Row */
 .quota-row {
-  @apply rounded border border-slate-200 bg-white/60 p-3 dark:border-slate-700 dark:bg-slate-900/50;
+  padding: 16px;
+  background: #fafafa;
+  border: 1px solid #eaeaea;
+  border-radius: 6px;
+}
+
+:global(.dark) .quota-row {
+  background: #0a0a0a;
+  border-color: #333;
 }
 
 .quota-header {
-  @apply mb-2 flex items-center justify-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
 }
 
 .quota-tag {
-  @apply inline-flex min-w-[34px] justify-center rounded-full px-2 py-0.5 text-[11px] font-semibold;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 12px;
 }
 
 .tag-indigo {
-  @apply bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-200;
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+:global(.dark) .tag-indigo {
+  background: #312e81;
+  color: #a5b4fc;
 }
 
 .tag-blue {
-  @apply bg-sky-100 text-sky-600 dark:bg-sky-500/20 dark:text-sky-200;
+  background: #f0f9ff;
+  color: #0284c7;
+}
+
+:global(.dark) .tag-blue {
+  background: #0c4a6e;
+  color: #7dd3fc;
 }
 
 .quota-percent {
-  @apply text-xs font-semibold text-slate-600 dark:text-slate-200;
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+}
+
+:global(.dark) .quota-percent {
+  color: #999;
 }
 
 .quota-foot {
-  @apply mt-1 text-[11px] text-slate-400 dark:text-slate-300;
+  font-size: 11px;
+  color: #999;
+  margin-top: 8px;
+}
+
+:global(.dark) .quota-foot {
+  color: #666;
 }
 </style>

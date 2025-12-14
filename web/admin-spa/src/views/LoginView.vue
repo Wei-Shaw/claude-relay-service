@@ -1,97 +1,82 @@
 <template>
-  <div class="flex min-h-screen items-center justify-center p-4 sm:p-6">
-    <!-- 主题切换按钮 - 固定在右上角 -->
-    <div class="fixed right-4 top-4 z-50">
-      <ThemeToggle mode="dropdown" />
-    </div>
-
-    <div
-      class="w-full max-w-md rounded border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900 sm:p-8 md:p-10"
-    >
-      <div class="mb-6 text-center sm:mb-8">
-        <!-- 使用自定义布局来保持登录页面的居中大logo样式 -->
-        <div
-          class="mx-auto mb-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded border border-gray-300 bg-gray-50 dark:border-gray-600 dark:bg-gray-800 sm:mb-6 sm:h-20 sm:w-20"
-        >
-          <template v-if="!oemLoading">
-            <img
-              v-if="authStore.oemSettings.siteIconData || authStore.oemSettings.siteIcon"
-              alt="Logo"
-              class="h-10 w-10 object-contain sm:h-12 sm:w-12"
-              :src="authStore.oemSettings.siteIconData || authStore.oemSettings.siteIcon"
-              @error="(e) => (e.target.style.display = 'none')"
-            />
-            <i v-else class="fas fa-cloud text-2xl text-gray-700 sm:text-3xl" />
-          </template>
-          <div v-else class="h-10 w-10 animate-pulse rounded bg-gray-300/50 sm:h-12 sm:w-12" />
-        </div>
-        <template v-if="!oemLoading && authStore.oemSettings.siteName">
-          <h1 class="header-title mb-2 text-2xl font-bold text-white sm:text-3xl">
-            {{ authStore.oemSettings.siteName }}
-          </h1>
+  <div class="login-page">
+    <!-- Header -->
+    <header class="login-header">
+      <div class="header-logo">
+        <template v-if="!oemLoading">
+          <img
+            v-if="authStore.oemSettings.siteIconData || authStore.oemSettings.siteIcon"
+            alt="Logo"
+            class="logo-image"
+            :src="authStore.oemSettings.siteIconData || authStore.oemSettings.siteIcon"
+            @error="(e) => (e.target.style.display = 'none')"
+          />
+          <i v-else class="fas fa-cloud text-xl text-gray-900 dark:text-white" />
         </template>
-        <div
-          v-else-if="oemLoading"
-          class="mx-auto mb-2 h-8 w-48 animate-pulse rounded bg-gray-300/50 sm:h-9 sm:w-64"
-        />
-        <p class="text-base text-gray-600 dark:text-gray-400 sm:text-lg">管理后台</p>
       </div>
+      <ThemeToggle mode="dropdown" />
+    </header>
 
-      <form class="space-y-4 sm:space-y-6" @submit.prevent="handleLogin">
-        <div>
-          <label
-            class="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100 sm:mb-3"
-            for="username"
-            >用户名</label
-          >
-          <input
-            id="username"
-            v-model="loginForm.username"
-            autocomplete="username"
-            class="form-input w-full"
-            name="username"
-            placeholder="请输入用户名"
-            required
-            type="text"
+    <!-- Main Content -->
+    <main class="login-main">
+      <div class="login-content">
+        <!-- Title -->
+        <div class="login-title-section">
+          <template v-if="!oemLoading && authStore.oemSettings.siteName">
+            <h1 class="login-title">登录到 {{ authStore.oemSettings.siteName }}</h1>
+          </template>
+          <div
+            v-else-if="oemLoading"
+            class="mx-auto h-9 w-64 animate-pulse rounded bg-gray-300/50"
           />
         </div>
 
-        <div>
-          <label
-            class="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100 sm:mb-3"
-            for="password"
-            >密码</label
-          >
-          <input
-            id="password"
-            v-model="loginForm.password"
-            autocomplete="current-password"
-            class="form-input w-full"
-            name="password"
-            placeholder="请输入密码"
-            required
-            type="password"
-          />
+        <!-- Login Form -->
+        <form class="login-form" @submit.prevent="handleLogin">
+          <div class="form-group">
+            <input
+              id="username"
+              v-model="loginForm.username"
+              autocomplete="username"
+              class="vercel-input"
+              name="username"
+              placeholder="用户名"
+              required
+              type="text"
+            />
+          </div>
+
+          <div class="form-group">
+            <input
+              id="password"
+              v-model="loginForm.password"
+              autocomplete="current-password"
+              class="vercel-input"
+              name="password"
+              placeholder="密码"
+              required
+              type="password"
+            />
+          </div>
+
+          <button class="vercel-button" :disabled="authStore.loginLoading" type="submit">
+            <span v-if="authStore.loginLoading" class="button-spinner"></span>
+            {{ authStore.loginLoading ? '登录中...' : '登录' }}
+          </button>
+        </form>
+
+        <!-- Error Message -->
+        <div v-if="authStore.loginError" class="error-message">
+          <i class="fas fa-exclamation-circle mr-2" />{{ authStore.loginError }}
         </div>
-
-        <button
-          class="btn btn-primary w-full px-4 py-3 text-base font-semibold sm:px-6 sm:py-4 sm:text-lg"
-          :disabled="authStore.loginLoading"
-          type="submit"
-        >
-          <i v-if="!authStore.loginLoading" class="fas fa-sign-in-alt mr-2" />
-          <div v-if="authStore.loginLoading" class="loading-spinner mr-2" />
-          {{ authStore.loginLoading ? '登录中...' : '登录' }}
-        </button>
-      </form>
-
-      <div
-        v-if="authStore.loginError"
-        class="mt-4 rounded border border-red-500/30 bg-red-500/20 p-3 text-center text-xs text-red-800 dark:text-red-400 sm:mt-6 sm:p-4 sm:text-sm"
-      >
-        <i class="fas fa-exclamation-triangle mr-2" />{{ authStore.loginError }}
       </div>
-    </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="login-footer">
+      <a class="footer-link" href="#">服务条款</a>
+      <a class="footer-link" href="#">隐私政策</a>
+    </footer>
   </div>
 </template>
 
@@ -123,5 +108,264 @@ const handleLogin = async () => {
 </script>
 
 <style scoped>
-/* 组件特定样式已经在全局样式中定义 */
+/* Vercel-inspired Login Page */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #fafafa;
+}
+
+:global(.dark) .login-page {
+  background: #000;
+}
+
+/* Header */
+.login-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  min-height: 64px;
+  padding: 0 1rem;
+  background: transparent;
+}
+
+@media (min-width: 768px) {
+  .login-header {
+    padding: 0 1.5rem;
+  }
+}
+
+.header-logo {
+  display: flex;
+  align-items: center;
+  height: 24px;
+}
+
+.logo-image {
+  height: 24px;
+  width: auto;
+  object-fit: contain;
+}
+
+/* Main Content */
+.login-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.login-content {
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Title */
+.login-title-section {
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.login-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #000;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+:global(.dark) .login-title {
+  color: #fff;
+}
+
+/* Form */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Vercel-style Input */
+.vercel-input {
+  width: 100%;
+  height: 48px;
+  padding: 0 1rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #000;
+  background: #fff;
+  border: 1px solid #eaeaea;
+  border-radius: 5px;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.vercel-input::placeholder {
+  color: #999;
+}
+
+.vercel-input:hover {
+  border-color: #000;
+}
+
+.vercel-input:focus {
+  border-color: #000;
+  box-shadow: 0 0 0 1px #000;
+}
+
+:global(.dark) .vercel-input {
+  color: #fff;
+  background: #000;
+  border-color: #333;
+}
+
+:global(.dark) .vercel-input::placeholder {
+  color: #666;
+}
+
+:global(.dark) .vercel-input:hover {
+  border-color: #fff;
+}
+
+:global(.dark) .vercel-input:focus {
+  border-color: #fff;
+  box-shadow: 0 0 0 1px #fff;
+}
+
+/* Vercel-style Button */
+.vercel-button {
+  width: 100%;
+  height: 48px;
+  padding: 0 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #fff;
+  background: #000;
+  border: 1px solid #000;
+  border-radius: 5px;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.vercel-button:hover:not(:disabled) {
+  background: #333;
+  border-color: #333;
+}
+
+.vercel-button:active:not(:disabled) {
+  background: #000;
+  transform: scale(0.98);
+}
+
+.vercel-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+:global(.dark) .vercel-button {
+  color: #000;
+  background: #fff;
+  border-color: #fff;
+}
+
+:global(.dark) .vercel-button:hover:not(:disabled) {
+  background: #e5e5e5;
+  border-color: #e5e5e5;
+}
+
+:global(.dark) .vercel-button:active:not(:disabled) {
+  background: #fff;
+}
+
+/* Button Spinner */
+.button-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 0.6s linear infinite;
+}
+
+:global(.dark) .button-spinner {
+  border-color: rgba(0, 0, 0, 0.3);
+  border-top-color: #000;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Error Message */
+.error-message {
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: #e00;
+  background: rgba(224, 0, 0, 0.1);
+  border: 1px solid rgba(224, 0, 0, 0.2);
+  border-radius: 5px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+:global(.dark) .error-message {
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.1);
+  border-color: rgba(255, 107, 107, 0.2);
+}
+
+/* Footer */
+.login-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  height: 64px;
+  min-height: 64px;
+  padding: 0 1rem;
+  background: transparent;
+}
+
+.footer-link {
+  font-size: 0.875rem;
+  color: #666;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.footer-link:hover {
+  color: #000;
+}
+
+:global(.dark) .footer-link {
+  color: #999;
+}
+
+:global(.dark) .footer-link:hover {
+  color: #fff;
+}
 </style>

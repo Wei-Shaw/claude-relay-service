@@ -1,67 +1,47 @@
 <template>
-  <div class="card h-full p-4 md:p-6">
-    <h3
-      class="mb-3 flex flex-col text-lg font-bold text-gray-900 dark:text-gray-100 sm:flex-row sm:items-center md:mb-4 md:text-xl"
-    >
-      <span class="flex items-center">
-        <i class="fas fa-chart-pie mr-2 text-sm text-orange-500 md:mr-3 md:text-base" />
+  <div class="vercel-aggregated-card">
+    <h3 class="card-title">
+      <span class="title-text">
+        <i class="fas fa-chart-pie title-icon" />
         使用占比
       </span>
-      <span class="text-xs font-normal text-gray-600 dark:text-gray-400 sm:ml-2 md:text-sm"
-        >({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span
-      >
+      <span class="title-period">({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span>
     </h3>
 
-    <div v-if="aggregatedStats && individualStats.length > 0" class="space-y-2 md:space-y-3">
+    <div v-if="aggregatedStats && individualStats.length > 0" class="keys-list">
       <!-- 各Key使用占比列表 -->
-      <div v-for="(stat, index) in topKeys" :key="stat.apiId" class="relative">
-        <div class="mb-1 flex items-center justify-between text-sm">
-          <span class="truncate font-medium text-gray-700 dark:text-gray-300">
-            {{ stat.name || `Key ${index + 1}` }}
-          </span>
-          <span class="text-xs text-gray-600 dark:text-gray-400">
-            {{ calculatePercentage(stat) }}%
-          </span>
+      <div v-for="(stat, index) in topKeys" :key="stat.apiId" class="key-item">
+        <div class="key-header">
+          <span class="key-name">{{ stat.name || `Key ${index + 1}` }}</span>
+          <span class="key-percentage">{{ calculatePercentage(stat) }}%</span>
         </div>
         <Progress
           size="md"
           :value="calculatePercentage(stat)"
           :variant="getProgressVariant(index)"
         />
-        <div
-          class="mt-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
-        >
-          <span>{{ formatNumber(getStatUsage(stat)?.requests || 0) }}次</span>
-          <span>{{ getStatUsage(stat)?.formattedCost || '$0.00' }}</span>
+        <div class="key-stats">
+          <span class="key-requests">{{ formatNumber(getStatUsage(stat)?.requests || 0) }}次</span>
+          <span class="key-cost">{{ getStatUsage(stat)?.formattedCost || '$0.00' }}</span>
         </div>
       </div>
 
       <!-- 其他Keys汇总 -->
-      <div v-if="otherKeysCount > 0" class="border-t border-gray-200 pt-2 dark:border-gray-700">
-        <div class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-          <span>其他 {{ otherKeysCount }} 个Keys</span>
-          <span>{{ otherPercentage }}%</span>
-        </div>
+      <div v-if="otherKeysCount > 0" class="other-keys">
+        <span class="other-label">其他 {{ otherKeysCount }} 个Keys</span>
+        <span class="other-percentage">{{ otherPercentage }}%</span>
       </div>
     </div>
 
     <!-- 单个Key模式提示 -->
-    <div
-      v-else-if="!multiKeyMode"
-      class="flex h-32 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
-    >
-      <div class="text-center">
-        <i class="fas fa-chart-pie mb-2 text-2xl" />
-        <p>使用占比仅在多Key查询时显示</p>
-      </div>
+    <div v-else-if="!multiKeyMode" class="empty-state">
+      <i class="fas fa-chart-pie empty-icon" />
+      <p class="empty-text">使用占比仅在多Key查询时显示</p>
     </div>
 
-    <div
-      v-else
-      class="flex h-32 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
-    >
-      <i class="fas fa-chart-pie mr-2" />
-      暂无数据
+    <div v-else class="empty-state">
+      <i class="fas fa-chart-pie empty-icon" />
+      <span class="empty-text">暂无数据</span>
     </div>
   </div>
 </template>
@@ -163,39 +143,197 @@ const formatNumber = (num) => {
 </script>
 
 <style scoped>
-/* 卡片样式 - 使用CSS变量 */
-.card {
-  background: var(--surface-color);
-  border-radius: 16px;
-  border: 1px solid var(--border-color);
-  box-shadow:
-    0 10px 15px -3px rgba(0, 0, 0, 0.1),
-    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+/* ============================================
+   VERCEL AGGREGATED STATS CARD
+   ============================================ */
+.vercel-aggregated-card {
+  background: #fff;
+  border: 1px solid #eaeaea;
+  border-radius: 8px;
+  padding: 24px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+:global(.dark) .vercel-aggregated-card {
+  background: #000;
+  border-color: #333;
+}
+
+@media (max-width: 768px) {
+  .vercel-aggregated-card {
+    padding: 20px;
+  }
+}
+
+/* Card Title */
+.card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.title-text {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #000;
+}
+
+:global(.dark) .title-text {
+  color: #fff;
+}
+
+.title-icon {
+  font-size: 18px;
+  color: #f97316;
+}
+
+:global(.dark) .title-icon {
+  color: #fb923c;
+}
+
+.title-period {
+  font-size: 13px;
+  font-weight: 400;
+  color: #666;
+}
+
+:global(.dark) .title-period {
+  color: #999;
+}
+
+/* Keys List */
+.keys-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.key-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.key-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.key-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #000;
   overflow: hidden;
-  position: relative;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
 }
 
-.card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: #eaeaea;
+:global(.dark) .key-name {
+  color: #fff;
 }
 
-.card:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 20px 25px -5px rgba(0, 0, 0, 0.15),
-    0 10px 10px -5px rgba(0, 0, 0, 0.08);
+.key-percentage {
+  font-size: 13px;
+  font-weight: 600;
+  color: #666;
+  flex-shrink: 0;
 }
 
-:global(.dark) .card:hover {
-  box-shadow:
-    0 20px 25px -5px rgba(0, 0, 0, 0.5),
-    0 10px 10px -5px rgba(0, 0, 0, 0.35);
+:global(.dark) .key-percentage {
+  color: #999;
+}
+
+.key-stats {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #999;
+}
+
+:global(.dark) .key-stats {
+  color: #666;
+}
+
+.key-requests {
+  font-weight: 500;
+}
+
+.key-cost {
+  font-weight: 600;
+  color: #10b981;
+}
+
+:global(.dark) .key-cost {
+  color: #34d399;
+}
+
+/* Other Keys */
+.other-keys {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: #fafafa;
+  border: 1px solid #eaeaea;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #666;
+}
+
+:global(.dark) .other-keys {
+  background: #0a0a0a;
+  border-color: #333;
+  color: #999;
+}
+
+.other-label {
+  font-weight: 500;
+}
+
+.other-percentage {
+  font-weight: 600;
+}
+
+/* Empty State */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  gap: 16px;
+  min-height: 200px;
+}
+
+.empty-icon {
+  font-size: 32px;
+  color: #999;
+}
+
+:global(.dark) .empty-icon {
+  color: #666;
+}
+
+.empty-text {
+  font-size: 14px;
+  color: #999;
+  text-align: center;
+}
+
+:global(.dark) .empty-text {
+  color: #666;
 }
 </style>

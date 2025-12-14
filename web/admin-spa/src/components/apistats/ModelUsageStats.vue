@@ -1,80 +1,60 @@
 <template>
-  <div class="card p-4 md:p-6">
-    <div class="mb-4 md:mb-6">
-      <h3
-        class="flex flex-col text-lg font-bold text-gray-900 dark:text-gray-100 sm:flex-row sm:items-center md:text-xl"
-      >
-        <span class="flex items-center">
-          <i class="fas fa-robot mr-2 text-sm text-indigo-500 md:mr-3 md:text-base" />
+  <div class="vercel-model-card">
+    <div class="card-header">
+      <h3 class="card-title">
+        <span class="title-text">
+          <i class="fas fa-robot title-icon" />
           模型使用统计
         </span>
-        <span class="text-xs font-normal text-gray-600 dark:text-gray-400 sm:ml-2 md:text-sm"
-          >({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span
-        >
+        <span class="title-period">({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span>
       </h3>
     </div>
 
     <!-- 模型统计加载状态 -->
-    <div v-if="modelStatsLoading" class="py-6 text-center md:py-8">
-      <i
-        class="fas fa-spinner loading-spinner mb-2 text-xl text-gray-600 dark:text-gray-400 md:text-2xl"
-      />
-      <p class="text-sm text-gray-600 dark:text-gray-400 md:text-base">加载模型统计数据中...</p>
+    <div v-if="modelStatsLoading" class="loading-state">
+      <i class="fas fa-spinner loading-spinner" />
+      <p class="loading-text">加载模型统计数据中...</p>
     </div>
 
     <!-- 模型统计数据 -->
-    <div v-else-if="modelStats.length > 0" class="space-y-3 md:space-y-4">
-      <div v-for="(model, index) in modelStats" :key="index" class="model-usage-item">
-        <div class="mb-2 flex items-start justify-between md:mb-3">
-          <div class="min-w-0 flex-1">
-            <h4 class="break-all text-base font-bold text-gray-900 dark:text-gray-100 md:text-lg">
-              {{ model.model }}
-            </h4>
-            <p class="text-xs text-gray-600 dark:text-gray-400 md:text-sm">
-              {{ model.requests }} 次请求
-            </p>
+    <div v-else-if="modelStats.length > 0" class="models-list">
+      <div v-for="(model, index) in modelStats" :key="index" class="model-item">
+        <div class="model-header">
+          <div class="model-info">
+            <h4 class="model-name">{{ model.model }}</h4>
+            <p class="model-requests">{{ model.requests }} 次请求</p>
           </div>
-          <div class="ml-3 flex-shrink-0 text-right">
-            <div class="text-base font-bold text-green-600 md:text-lg">
-              {{ model.formatted?.total || '$0.000000' }}
-            </div>
-            <div class="text-xs text-gray-600 dark:text-gray-400 md:text-sm">总费用</div>
+          <div class="model-cost">
+            <div class="cost-value">{{ model.formatted?.total || '$0.000000' }}</div>
+            <div class="cost-label">总费用</div>
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-2 text-xs md:grid-cols-4 md:gap-3 md:text-sm">
-          <div class="rounded bg-gray-50 p-2 dark:bg-gray-700">
-            <div class="text-gray-600 dark:text-gray-400">输入 Token</div>
-            <div class="font-medium text-gray-900 dark:text-gray-100">
-              {{ formatNumber(model.inputTokens) }}
-            </div>
+        <div class="model-stats">
+          <div class="stat-box">
+            <div class="stat-label">输入 Token</div>
+            <div class="stat-value">{{ formatNumber(model.inputTokens) }}</div>
           </div>
-          <div class="rounded bg-gray-50 p-2 dark:bg-gray-700">
-            <div class="text-gray-600 dark:text-gray-400">输出 Token</div>
-            <div class="font-medium text-gray-900 dark:text-gray-100">
-              {{ formatNumber(model.outputTokens) }}
-            </div>
+          <div class="stat-box">
+            <div class="stat-label">输出 Token</div>
+            <div class="stat-value">{{ formatNumber(model.outputTokens) }}</div>
           </div>
-          <div class="rounded bg-gray-50 p-2 dark:bg-gray-700">
-            <div class="text-gray-600 dark:text-gray-400">缓存创建</div>
-            <div class="font-medium text-gray-900 dark:text-gray-100">
-              {{ formatNumber(model.cacheCreateTokens) }}
-            </div>
+          <div class="stat-box">
+            <div class="stat-label">缓存创建</div>
+            <div class="stat-value">{{ formatNumber(model.cacheCreateTokens) }}</div>
           </div>
-          <div class="rounded bg-gray-50 p-2 dark:bg-gray-700">
-            <div class="text-gray-600 dark:text-gray-400">缓存读取</div>
-            <div class="font-medium text-gray-900 dark:text-gray-100">
-              {{ formatNumber(model.cacheReadTokens) }}
-            </div>
+          <div class="stat-box">
+            <div class="stat-label">缓存读取</div>
+            <div class="stat-value">{{ formatNumber(model.cacheReadTokens) }}</div>
           </div>
         </div>
       </div>
     </div>
 
     <!-- 无模型数据 -->
-    <div v-else class="py-6 text-center text-gray-500 dark:text-gray-400 md:py-8">
-      <i class="fas fa-chart-pie mb-3 text-2xl md:text-3xl" />
-      <p class="text-sm md:text-base">
+    <div v-else class="empty-state">
+      <i class="fas fa-chart-pie empty-icon" />
+      <p class="empty-text">
         暂无{{ statsPeriod === 'daily' ? '今日' : '本月' }}模型使用数据
       </p>
     </div>
@@ -108,88 +88,102 @@ const formatNumber = (num) => {
 </script>
 
 <style scoped>
-/* 卡片样式 - 使用CSS变量 */
-.card {
-  background: var(--surface-color);
-  border-radius: 16px;
-  border: 1px solid var(--border-color);
-  box-shadow:
-    0 10px 15px -3px rgba(0, 0, 0, 0.1),
-    0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  overflow: hidden;
-  position: relative;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+/* ============================================
+   VERCEL MODEL USAGE STATS CARD
+   ============================================ */
+.vercel-model-card {
+  background: #fff;
+  border: 1px solid #eaeaea;
+  border-radius: 8px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
-.card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: #eaeaea(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+:global(.dark) .vercel-model-card {
+  background: #000;
+  border-color: #333;
 }
 
-.card:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 20px 25px -5px rgba(0, 0, 0, 0.15),
-    0 10px 10px -5px rgba(0, 0, 0, 0.08);
-}
-
-:global(.dark) .card:hover {
-  box-shadow:
-    0 20px 25px -5px rgba(0, 0, 0, 0.5),
-    0 10px 10px -5px rgba(0, 0, 0, 0.35);
-}
-
-/* 模型使用项样式 - 使用CSS变量 */
-.model-usage-item {
-  background: var(--surface-color);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 12px;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-@media (min-width: 768px) {
-  .model-usage-item {
-    padding: 16px;
+@media (max-width: 768px) {
+  .vercel-model-card {
+    padding: 20px;
   }
 }
 
-.model-usage-item::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: #eaeaea(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+/* Card Header */
+.card-header {
+  margin-bottom: 4px;
 }
 
-.model-usage-item:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 10px 15px -3px rgba(0, 0, 0, 0.1),
-    0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  border-color: rgba(255, 255, 255, 0.3);
+.card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-:global(.dark) .model-usage-item:hover {
-  box-shadow:
-    0 10px 15px -3px rgba(0, 0, 0, 0.4),
-    0 4px 6px -2px rgba(0, 0, 0, 0.25);
-  border-color: rgba(75, 85, 99, 0.6);
+.title-text {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #000;
 }
 
-/* 加载动画 */
+:global(.dark) .title-text {
+  color: #fff;
+}
+
+.title-icon {
+  font-size: 18px;
+  color: #6366f1;
+}
+
+:global(.dark) .title-icon {
+  color: #818cf8;
+}
+
+.title-period {
+  font-size: 13px;
+  font-weight: 400;
+  color: #666;
+}
+
+:global(.dark) .title-period {
+  color: #999;
+}
+
+/* Loading State */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  gap: 16px;
+}
+
 .loading-spinner {
+  font-size: 24px;
+  color: #666;
   animation: spin 1s linear infinite;
-  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.5));
+}
+
+:global(.dark) .loading-spinner {
+  color: #999;
+}
+
+.loading-text {
+  font-size: 14px;
+  color: #666;
+}
+
+:global(.dark) .loading-text {
+  color: #999;
 }
 
 @keyframes spin {
@@ -201,20 +195,179 @@ const formatNumber = (num) => {
   }
 }
 
-/* 响应式优化 */
+/* Models List */
+.models-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Model Item */
+.model-item {
+  background: #fafafa;
+  border: 1px solid #eaeaea;
+  border-radius: 6px;
+  padding: 20px;
+  transition: all 0.15s ease;
+}
+
+.model-item:hover {
+  background: #f5f5f5;
+  border-color: #ddd;
+}
+
+:global(.dark) .model-item {
+  background: #0a0a0a;
+  border-color: #333;
+}
+
+:global(.dark) .model-item:hover {
+  background: #111;
+  border-color: #444;
+}
+
 @media (max-width: 768px) {
-  .model-usage-item .grid {
-    grid-template-columns: 1fr 1fr;
+  .model-item {
+    padding: 16px;
+  }
+}
+
+/* Model Header */
+.model-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.model-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.model-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #000;
+  word-break: break-word;
+  margin-bottom: 4px;
+}
+
+:global(.dark) .model-name {
+  color: #fff;
+}
+
+.model-requests {
+  font-size: 13px;
+  color: #666;
+}
+
+:global(.dark) .model-requests {
+  color: #999;
+}
+
+.model-cost {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.cost-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #10b981;
+  margin-bottom: 2px;
+}
+
+:global(.dark) .cost-value {
+  color: #34d399;
+}
+
+.cost-label {
+  font-size: 12px;
+  color: #666;
+}
+
+:global(.dark) .cost-label {
+  color: #999;
+}
+
+/* Model Stats */
+.model-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+@media (min-width: 768px) {
+  .model-stats {
+    grid-template-columns: repeat(4, 1fr);
   }
 }
 
 @media (max-width: 480px) {
-  .model-usage-item {
-    padding: 10px;
-  }
-
-  .model-usage-item .grid {
+  .model-stats {
     grid-template-columns: 1fr;
   }
+}
+
+.stat-box {
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #eaeaea;
+  border-radius: 6px;
+}
+
+:global(.dark) .stat-box {
+  background: #000;
+  border-color: #333;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+:global(.dark) .stat-label {
+  color: #999;
+}
+
+.stat-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #000;
+}
+
+:global(.dark) .stat-value {
+  color: #fff;
+}
+
+/* Empty State */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  gap: 16px;
+}
+
+.empty-icon {
+  font-size: 32px;
+  color: #999;
+}
+
+:global(.dark) .empty-icon {
+  color: #666;
+}
+
+.empty-text {
+  font-size: 14px;
+  color: #999;
+}
+
+:global(.dark) .empty-text {
+  color: #666;
 }
 </style>

@@ -1,135 +1,113 @@
 <template>
-  <div class="min-h-screen p-4 md:p-6" :class="isDarkMode ? 'gradient-bg-dark' : 'gradient-bg'">
-    <!-- 顶部导航 -->
-    <div
-      class="mb-6 rounded border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900 md:mb-8 md:p-6"
-    >
-      <div class="flex flex-col items-center justify-between gap-4 md:flex-row">
-        <LogoTitle
-          :loading="oemLoading"
-          :logo-src="oemSettings.siteIconData || oemSettings.siteIcon"
-          :subtitle="currentTab === 'stats' ? 'API Key 使用统计' : '使用教程'"
-          :title="oemSettings.siteName"
-        />
-        <div class="flex items-center gap-2 md:gap-4">
-          <!-- 主题切换按钮 -->
-          <div class="flex items-center">
-            <ThemeToggle mode="dropdown" />
-          </div>
-
-          <!-- 分隔线 -->
-          <div
-            v-if="oemSettings.ldapEnabled || oemSettings.showAdminButton !== false"
-            class="h-8 w-px bg-gray-300 dark:bg-gray-600"
+  <div class="min-h-screen" :class="isDarkMode ? 'page-bg-dark' : 'page-bg'">
+    <!-- Vercel-style header: maximalist whitespace, minimal design -->
+    <div class="vercel-header">
+      <div class="vercel-container">
+        <div class="header-content">
+          <LogoTitle
+            :loading="oemLoading"
+            :logo-src="oemSettings.siteIconData || oemSettings.siteIcon"
+            :subtitle="currentTab === 'stats' ? 'API Key 使用统计' : '使用教程'"
+            :title="oemSettings.siteName"
           />
+          <div class="header-actions">
+            <!-- 主题切换按钮 -->
+            <ThemeToggle mode="dropdown" />
 
-          <!-- 用户登录按钮 (仅在 LDAP 启用时显示) -->
-          <router-link
-            v-if="oemSettings.ldapEnabled"
-            class="user-login-button flex items-center gap-2 rounded px-4 py-2 text-white transition-all duration-300 md:px-5 md:py-2.5"
-            to="/user-login"
-          >
-            <i class="fas fa-user text-sm md:text-base" />
-            <span class="text-xs font-semibold tracking-wide md:text-sm">用户登录</span>
-          </router-link>
-          <!-- 管理后台按钮 -->
-          <router-link
-            v-if="oemSettings.showAdminButton !== false"
-            class="admin-button-refined flex items-center gap-2 rounded px-4 py-2 transition-all duration-300 md:px-5 md:py-2.5"
-            to="/dashboard"
-          >
-            <i class="fas fa-shield-alt text-sm md:text-base" />
-            <span class="text-xs font-semibold tracking-wide md:text-sm">管理后台</span>
-          </router-link>
+            <!-- 用户登录按钮 -->
+            <router-link
+              v-if="oemSettings.ldapEnabled"
+              class="vercel-btn vercel-btn-secondary"
+              to="/user-login"
+            >
+              <i class="fas fa-user" />
+              <span>用户登录</span>
+            </router-link>
+
+            <!-- 管理后台按钮 -->
+            <router-link
+              v-if="oemSettings.showAdminButton !== false"
+              class="vercel-btn vercel-btn-primary"
+              to="/dashboard"
+            >
+              <i class="fas fa-shield-alt" />
+              <span>管理后台</span>
+            </router-link>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Tab 切换 -->
-    <div class="mb-6 md:mb-8">
-      <div class="flex justify-center">
-        <div
-          class="inline-flex w-full max-w-md rounded-full border border-gray-200 bg-white p-1 shadow-sm dark:border-gray-700 dark:bg-gray-800 md:w-auto"
-        >
+    <!-- Vercel-style tab navigation -->
+    <div class="vercel-tabs">
+      <div class="vercel-container">
+        <div class="tabs-wrapper">
           <button
-            :class="['tab-pill-button', currentTab === 'stats' ? 'active' : '']"
+            :class="['tab-button', { active: currentTab === 'stats' }]"
             @click="currentTab = 'stats'"
           >
-            <i class="fas fa-chart-line mr-1 md:mr-2" />
-            <span class="text-sm md:text-base">统计查询</span>
+            <i class="fas fa-chart-line" />
+            <span>统计查询</span>
           </button>
           <button
-            :class="['tab-pill-button', currentTab === 'tutorial' ? 'active' : '']"
+            :class="['tab-button', { active: currentTab === 'tutorial' }]"
             @click="currentTab = 'tutorial'"
           >
-            <i class="fas fa-graduation-cap mr-1 md:mr-2" />
-            <span class="text-sm md:text-base">使用教程</span>
+            <i class="fas fa-graduation-cap" />
+            <span>使用教程</span>
           </button>
         </div>
       </div>
     </div>
 
-    <!-- 统计内容 -->
-    <div v-if="currentTab === 'stats'" class="tab-content">
-      <!-- API Key 输入区域 -->
-      <ApiKeyInput />
+    <!-- Main content -->
+    <div class="vercel-container">
+      <!-- 统计内容 -->
+      <div v-if="currentTab === 'stats'" class="content-wrapper">
+        <!-- API Key 输入区域 -->
+        <ApiKeyInput />
 
-      <!-- 错误提示 -->
-      <div v-if="error" class="mb-6 md:mb-8">
-        <div
-          class="rounded border border-red-500/30 bg-red-500/20 p-3 text-sm text-red-800 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200 md:p-4 md:text-base"
-        >
-          <i class="fas fa-exclamation-triangle mr-2" />
-          {{ error }}
+        <!-- 错误提示 -->
+        <div v-if="error" class="vercel-error-card">
+          <i class="fas fa-exclamation-triangle" />
+          <span>{{ error }}</span>
         </div>
-      </div>
 
-      <!-- 统计数据展示区域 -->
-      <div v-if="statsData" class="fade-in">
-        <div
-          class="rounded border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900 md:p-6"
-        >
+        <!-- 统计数据展示区域 -->
+        <div v-if="statsData" class="stats-section fade-in">
           <!-- 时间范围选择器 -->
-          <div class="mb-4 border-b border-gray-200 pb-4 dark:border-gray-700 md:mb-6 md:pb-6">
-            <div
-              class="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center md:gap-4"
-            >
-              <div class="flex items-center gap-2 md:gap-3">
-                <i class="fas fa-clock text-base text-gray-600 dark:text-gray-400 md:text-lg" />
-                <span class="text-base font-medium text-gray-700 dark:text-gray-200 md:text-lg"
-                  >统计时间范围</span
-                >
-              </div>
-              <div class="flex w-full items-center gap-2 md:w-auto">
-                <button
-                  class="flex flex-1 items-center justify-center gap-1 px-4 py-2 text-xs font-medium md:flex-none md:gap-2 md:px-6 md:text-sm"
-                  :class="['period-btn', { active: statsPeriod === 'daily' }]"
-                  :disabled="loading || modelStatsLoading"
-                  @click="switchPeriod('daily')"
-                >
-                  <i class="fas fa-calendar-day text-xs md:text-sm" />
-                  今日
-                </button>
-                <button
-                  class="flex flex-1 items-center justify-center gap-1 px-4 py-2 text-xs font-medium md:flex-none md:gap-2 md:px-6 md:text-sm"
-                  :class="['period-btn', { active: statsPeriod === 'monthly' }]"
-                  :disabled="loading || modelStatsLoading"
-                  @click="switchPeriod('monthly')"
-                >
-                  <i class="fas fa-calendar-alt text-xs md:text-sm" />
-                  本月
-                </button>
-                <!-- 测试按钮 - 仅在单Key模式下显示 -->
-                <button
-                  v-if="!multiKeyMode"
-                  class="test-btn flex items-center justify-center gap-1 px-4 py-2 text-xs font-medium md:gap-2 md:px-6 md:text-sm"
-                  :disabled="loading"
-                  @click="openTestModal"
-                >
-                  <i class="fas fa-vial text-xs md:text-sm" />
-                  测试
-                </button>
-              </div>
+          <div class="period-selector">
+            <div class="period-label">
+              <i class="fas fa-clock" />
+              <span>统计时间范围</span>
+            </div>
+            <div class="period-buttons">
+              <button
+                :class="['vercel-period-btn', { active: statsPeriod === 'daily' }]"
+                :disabled="loading || modelStatsLoading"
+                @click="switchPeriod('daily')"
+              >
+                <i class="fas fa-calendar-day" />
+                <span>今日</span>
+              </button>
+              <button
+                :class="['vercel-period-btn', { active: statsPeriod === 'monthly' }]"
+                :disabled="loading || modelStatsLoading"
+                @click="switchPeriod('monthly')"
+              >
+                <i class="fas fa-calendar-alt" />
+                <span>本月</span>
+              </button>
+              <!-- 测试按钮 -->
+              <button
+                v-if="!multiKeyMode"
+                class="vercel-test-btn"
+                :disabled="loading"
+                @click="openTestModal"
+              >
+                <i class="fas fa-vial" />
+                <span>测试</span>
+              </button>
             </div>
           </div>
 
@@ -137,15 +115,13 @@
           <StatsOverview />
 
           <!-- Token 分布和限制配置 -->
-          <div
-            class="mb-6 mt-6 grid grid-cols-1 gap-4 md:mb-8 md:mt-8 md:gap-6 xl:grid-cols-2 xl:items-stretch"
-          >
-            <TokenDistribution class="h-full" />
+          <div class="stats-grid">
+            <TokenDistribution />
             <template v-if="multiKeyMode">
-              <AggregatedStatsCard class="h-full" />
+              <AggregatedStatsCard />
             </template>
             <template v-else>
-              <LimitConfig class="h-full" />
+              <LimitConfig />
             </template>
           </div>
 
@@ -153,14 +129,12 @@
           <ModelUsageStats />
         </div>
       </div>
-    </div>
 
-    <!-- 教程内容 -->
-    <div v-if="currentTab === 'tutorial'" class="tab-content">
-      <div
-        class="rounded border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900"
-      >
-        <TutorialView />
+      <!-- 教程内容 -->
+      <div v-if="currentTab === 'tutorial'" class="content-wrapper">
+        <div class="vercel-card">
+          <TutorialView />
+        </div>
       </div>
     </div>
 
@@ -289,244 +263,446 @@ watch(apiKey, (newValue) => {
 </script>
 
 <style scoped>
-/* Vercel flat backgrounds */
-.gradient-bg {
+/* ============================================
+   VERCEL-INSPIRED DESIGN SYSTEM
+   Clean, minimal, maximum whitespace
+   ============================================ */
+
+/* Background */
+.page-bg {
   background: #fafafa;
   min-height: 100vh;
-  position: relative;
 }
 
-.gradient-bg-dark {
+.page-bg-dark {
   background: #000;
   min-height: 100vh;
-  position: relative;
 }
 
-/* Removed old glass-strong and gradient styles - using Vercel flat design */
-
-/* 标题 */
-.header-title {
-  color: #000;
-  font-weight: 700;
-  letter-spacing: -0.025em;
+/* Container - Vercel's max-width approach */
+.vercel-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
 }
 
-:global(.dark) .header-title {
+@media (max-width: 768px) {
+  .vercel-container {
+    padding: 0 16px;
+  }
+}
+
+/* ============================================
+   HEADER SECTION
+   ============================================ */
+.vercel-header {
+  border-bottom: 1px solid #eaeaea;
+  background: #fff;
+  padding: 24px 0;
+  margin-bottom: 48px;
+}
+
+:global(.dark) .vercel-header {
+  background: #000;
+  border-bottom-color: #333;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+@media (max-width: 768px) {
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Vercel Button System */
+.vercel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  height: 40px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  border: 1px solid;
+}
+
+.vercel-btn i {
+  font-size: 14px;
+}
+
+.vercel-btn-primary {
+  background: #000;
+  border-color: #000;
   color: #fff;
 }
 
-/* 用户登录按钮 - Vercel flat style */
-.user-login-button {
-  background: #10b981;
-  border: 1px solid #10b981;
-  color: white;
-  text-decoration: none;
-  font-weight: 600;
-  transition: all 0.2s;
+.vercel-btn-primary:hover {
+  background: #1a1a1a;
+  border-color: #1a1a1a;
 }
 
-.user-login-button:hover {
-  background: #059669;
-  border-color: #059669;
-}
-
-:global(.dark) .user-login-button {
-  background: #10b981;
-  border-color: #10b981;
-  color: white;
-}
-
-:global(.dark) .user-login-button:hover {
-  background: #059669;
-  border-color: #059669;
-}
-
-/* 管理后台按钮 - Vercel flat style */
-.admin-button-refined {
-  background: #000;
-  border: 1px solid #000;
-  color: white;
-  text-decoration: none;
-  font-weight: 600;
-  transition: all 0.2s;
-}
-
-.admin-button-refined:hover {
-  background: #333;
-  border-color: #333;
-}
-
-:global(.dark) .admin-button-refined {
-  background: white;
-  border-color: white;
+:global(.dark) .vercel-btn-primary {
+  background: #fff;
+  border-color: #fff;
   color: #000;
 }
 
-:global(.dark) .admin-button-refined:hover {
+:global(.dark) .vercel-btn-primary:hover {
   background: #e5e5e5;
   border-color: #e5e5e5;
 }
 
-/* 时间范围按钮 - Vercel flat style */
-.period-btn {
-  border-radius: 5px;
-  font-weight: 500;
-  letter-spacing: 0.025em;
-  transition: all 0.2s;
-  border: 1px solid #eaeaea;
-  cursor: pointer;
-  background: white;
+.vercel-btn-secondary {
+  background: transparent;
+  border-color: #eaeaea;
   color: #666;
 }
 
-.period-btn.active {
-  background: #000;
+.vercel-btn-secondary:hover {
   border-color: #000;
-  color: white;
+  color: #000;
 }
 
-:global(.dark) .period-btn {
-  background: #1f1f1f;
+:global(.dark) .vercel-btn-secondary {
   border-color: #333;
   color: #999;
 }
 
-:global(.dark) .period-btn.active {
-  background: white;
-  border-color: white;
+:global(.dark) .vercel-btn-secondary:hover {
+  border-color: #fff;
+  color: #fff;
+}
+
+/* ============================================
+   TABS NAVIGATION
+   ============================================ */
+.vercel-tabs {
+  margin-bottom: 48px;
+}
+
+.tabs-wrapper {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid #eaeaea;
+}
+
+:global(.dark) .tabs-wrapper {
+  border-bottom-color: #333;
+}
+
+.tab-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  bottom: -1px;
+}
+
+.tab-button i {
+  font-size: 14px;
+}
+
+.tab-button:hover {
   color: #000;
 }
 
-.period-btn:not(.active):hover {
-  background: #fafafa;
+:global(.dark) .tab-button {
+  color: #999;
 }
 
-:global(.dark) .period-btn:not(.active):hover {
-  background: #2a2a2a;
+:global(.dark) .tab-button:hover {
+  color: #fff;
 }
 
-:global(html.dark) .period-btn:not(.active) {
-  color: #e5e7eb;
-  background: rgba(55, 65, 81, 0.4);
-  border: 1px solid rgba(75, 85, 99, 0.5);
+.tab-button.active {
+  color: #000;
+  border-bottom-color: #000;
 }
 
-.period-btn:not(.active):hover {
-  background: rgba(255, 255, 255, 0.8);
-  color: #1f2937;
-  border-color: rgba(209, 213, 219, 0.8);
+:global(.dark) .tab-button.active {
+  color: #fff;
+  border-bottom-color: #fff;
 }
 
-:global(html.dark) .period-btn:not(.active):hover {
-  background: rgba(75, 85, 99, 0.6);
-  color: #ffffff;
-  border-color: rgba(107, 114, 128, 0.8);
+/* ============================================
+   CONTENT WRAPPER
+   ============================================ */
+.content-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding-bottom: 64px;
 }
 
-/* 测试按钮样式 - Vercel flat style */
-.test-btn {
-  border-radius: 5px;
+/* ============================================
+   ERROR CARD
+   ============================================ */
+.vercel-error-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #ff0000;
+  border-radius: 8px;
+  color: #ff0000;
+  font-size: 14px;
+}
+
+:global(.dark) .vercel-error-card {
+  background: #1a0000;
+  border-color: #ff3333;
+  color: #ff6666;
+}
+
+/* ============================================
+   STATS SECTION
+   ============================================ */
+.stats-section {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* Period Selector */
+.period-selector {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px;
+  background: #fff;
+  border: 1px solid #eaeaea;
+  border-radius: 8px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+:global(.dark) .period-selector {
+  background: #000;
+  border-color: #333;
+}
+
+.period-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #000;
+}
+
+:global(.dark) .period-label {
+  color: #fff;
+}
+
+.period-label i {
+  font-size: 16px;
+  color: #666;
+}
+
+:global(.dark) .period-label i {
+  color: #999;
+}
+
+.period-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Period Buttons */
+.vercel-period-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  height: 36px;
+  border-radius: 6px;
+  font-size: 14px;
   font-weight: 500;
-  letter-spacing: 0.025em;
-  transition: all 0.2s;
-  border: 1px solid #06b6d4;
+  background: transparent;
+  border: 1px solid #eaeaea;
+  color: #666;
   cursor: pointer;
-  background: #06b6d4;
-  color: white;
+  transition: all 0.15s ease;
 }
 
-.test-btn:hover:not(:disabled) {
-  background: #0891b2;
-  border-color: #0891b2;
+.vercel-period-btn i {
+  font-size: 14px;
 }
 
-.test-btn:disabled {
+.vercel-period-btn:hover:not(:disabled) {
+  border-color: #000;
+  color: #000;
+}
+
+.vercel-period-btn.active {
+  background: #000;
+  border-color: #000;
+  color: #fff;
+}
+
+.vercel-period-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-/* Tab 胶囊按钮样式 - Vercel flat style */
-.tab-pill-button {
-  padding: 0.5rem 1rem;
-  border-radius: 9999px;
-  font-weight: 500;
-  font-size: 0.875rem;
-  color: #666;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  white-space: nowrap;
-  flex: 1;
-  justify-content: center;
-}
-
-:global(html.dark) .tab-pill-button {
+:global(.dark) .vercel-period-btn {
+  border-color: #333;
   color: #999;
 }
 
-@media (min-width: 768px) {
-  .tab-pill-button {
-    padding: 0.625rem 1.25rem;
-    flex: none;
-  }
-}
-
-.tab-pill-button:hover {
-  color: #000;
-  background: #fafafa;
-}
-
-:global(html.dark) .tab-pill-button:hover {
+:global(.dark) .vercel-period-btn:hover:not(:disabled) {
+  border-color: #fff;
   color: #fff;
-  background: #2a2a2a;
 }
 
-.tab-pill-button.active {
-  background: #000;
-  color: white;
-}
-
-:global(html.dark) .tab-pill-button.active {
-  background: white;
+:global(.dark) .vercel-period-btn.active {
+  background: #fff;
+  border-color: #fff;
   color: #000;
 }
 
-.tab-pill-button i {
-  font-size: 0.875rem;
+/* Test Button */
+.vercel-test-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  height: 36px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  background: #0070f3;
+  border: 1px solid #0070f3;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
-/* Tab 内容切换动画 */
-.tab-content {
-  animation: tabFadeIn 0.4s ease-out;
+.vercel-test-btn i {
+  font-size: 14px;
 }
 
-@keyframes tabFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
+.vercel-test-btn:hover:not(:disabled) {
+  background: #0060df;
+  border-color: #0060df;
+}
+
+.vercel-test-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
-/* 动画效果 */
+/* ============================================
+   VERCEL CARD (Generic)
+   ============================================ */
+.vercel-card {
+  background: #fff;
+  border: 1px solid #eaeaea;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+:global(.dark) .vercel-card {
+  background: #000;
+  border-color: #333;
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
 .fade-in {
-  animation: fadeIn 0.6s ease-out;
+  animation: fadeIn 0.3s ease-out;
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(30px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 768px) {
+  .vercel-header {
+    padding: 16px 0;
+    margin-bottom: 32px;
+  }
+
+  .vercel-tabs {
+    margin-bottom: 32px;
+  }
+
+  .content-wrapper {
+    gap: 24px;
+    padding-bottom: 48px;
+  }
+
+  .period-selector {
+    padding: 16px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .period-buttons {
+    width: 100%;
+  }
+
+  .vercel-period-btn,
+  .vercel-test-btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .stats-section {
+    gap: 24px;
   }
 }
 </style>

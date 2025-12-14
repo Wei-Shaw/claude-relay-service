@@ -1,28 +1,33 @@
-<!-- BEFORE: LimitConfig.vue with raw Tailwind progress bars -->
-<template>
-  <div>
-    <!-- ❌ OLD: Raw Tailwind utilities, duplicated code -->
-    <div
-      v-if="statsData.limits.dailyCostLimit > 0"
-      class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700"
-    >
-      <div
-        class="h-2 rounded-full transition-all duration-300"
-        :class="getDailyCostProgressColor()"
-        :style="{ width: getDailyCostProgress() + '%' }"
-      />
-    </div>
-    <div v-else class="h-2 w-full rounded-full bg-gray-200">
-      <div class="h-2 rounded-full bg-green-500" style="width: 0%" />
-    </div>
-  </div>
-</template>
+<!--
+  REFACTORING EXAMPLE: Before and After comparison
 
-<!-- AFTER: Using Design System Progress component -->
+  BEFORE: LimitConfig.vue with raw Tailwind progress bars
+  
+  <template>
+    <div>
+      ❌ OLD: Raw Tailwind utilities, duplicated code
+      <div
+        v-if="statsData.limits.dailyCostLimit > 0"
+        class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700"
+      >
+        <div
+          class="h-2 rounded-full transition-all duration-300"
+          :class="getDailyCostProgressColor()"
+          :style="{ width: getDailyCostProgress() + '%' }"
+        />
+      </div>
+      <div v-else class="h-2 w-full rounded-full bg-gray-200">
+        <div class="h-2 rounded-full bg-green-500" style="width: 0%" />
+      </div>
+    </div>
+  </template>
+
+  AFTER: Using Design System Progress component
+-->
 <template>
   <div>
     <!-- ✅ NEW: Design System component, clean and reusable -->
-    <Progress :value="dailyCostPercentage" :variant="dailyCostVariant" size="md" />
+    <Progress size="md" :value="dailyCostPercentage" :variant="dailyCostVariant" />
   </div>
 </template>
 
@@ -31,8 +36,8 @@ import { computed } from 'vue'
 import { Progress } from '@/ui'
 
 const props = defineProps({
-  currentCost: Number,
-  limitCost: Number
+  currentCost: { type: Number, default: 0 },
+  limitCost: { type: Number, default: 0 }
 })
 
 // Business logic - calculate percentage

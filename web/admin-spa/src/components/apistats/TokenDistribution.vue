@@ -1,60 +1,46 @@
 <template>
-  <div class="card p-4 md:p-6">
-    <h3
-      class="mb-3 flex flex-col text-lg font-bold text-gray-900 dark:text-gray-100 sm:flex-row sm:items-center md:mb-4 md:text-xl"
-    >
-      <span class="flex items-center">
-        <i class="fas fa-coins mr-2 text-sm text-yellow-500 md:mr-3 md:text-base" />
+  <div class="vercel-token-card">
+    <h3 class="card-title">
+      <span class="title-text">
+        <i class="fas fa-coins title-icon" />
         Token 使用分布
       </span>
-      <span class="text-xs font-normal text-gray-600 dark:text-gray-400 sm:ml-2 md:text-sm"
-        >({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span
-      >
+      <span class="title-period">({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span>
     </h3>
-    <div class="space-y-2 md:space-y-3">
-      <div class="flex items-center justify-between">
-        <span class="flex items-center text-sm text-gray-600 dark:text-gray-400 md:text-base">
-          <i class="fas fa-arrow-right mr-1 text-xs text-green-500 md:mr-2 md:text-sm" />
+    <div class="token-list">
+      <div class="token-item">
+        <span class="token-label">
+          <i class="fas fa-arrow-right token-icon token-icon-green" />
           输入 Token
         </span>
-        <span class="text-sm font-medium text-gray-900 dark:text-gray-100 md:text-base">{{
-          formatNumber(currentPeriodData.inputTokens)
-        }}</span>
+        <span class="token-value">{{ formatNumber(currentPeriodData.inputTokens) }}</span>
       </div>
-      <div class="flex items-center justify-between">
-        <span class="flex items-center text-sm text-gray-600 dark:text-gray-400 md:text-base">
-          <i class="fas fa-arrow-left mr-1 text-xs text-blue-500 md:mr-2 md:text-sm" />
+      <div class="token-item">
+        <span class="token-label">
+          <i class="fas fa-arrow-left token-icon token-icon-blue" />
           输出 Token
         </span>
-        <span class="text-sm font-medium text-gray-900 dark:text-gray-100 md:text-base">{{
-          formatNumber(currentPeriodData.outputTokens)
-        }}</span>
+        <span class="token-value">{{ formatNumber(currentPeriodData.outputTokens) }}</span>
       </div>
-      <div class="flex items-center justify-between">
-        <span class="flex items-center text-sm text-gray-600 dark:text-gray-400 md:text-base">
-          <i class="fas fa-save mr-1 text-xs text-purple-500 md:mr-2 md:text-sm" />
+      <div class="token-item">
+        <span class="token-label">
+          <i class="fas fa-save token-icon token-icon-purple" />
           缓存创建 Token
         </span>
-        <span class="text-sm font-medium text-gray-900 dark:text-gray-100 md:text-base">{{
-          formatNumber(currentPeriodData.cacheCreateTokens)
-        }}</span>
+        <span class="token-value">{{ formatNumber(currentPeriodData.cacheCreateTokens) }}</span>
       </div>
-      <div class="flex items-center justify-between">
-        <span class="flex items-center text-sm text-gray-600 dark:text-gray-400 md:text-base">
-          <i class="fas fa-download mr-1 text-xs text-orange-500 md:mr-2 md:text-sm" />
+      <div class="token-item">
+        <span class="token-label">
+          <i class="fas fa-download token-icon token-icon-orange" />
           缓存读取 Token
         </span>
-        <span class="text-sm font-medium text-gray-900 dark:text-gray-100 md:text-base">{{
-          formatNumber(currentPeriodData.cacheReadTokens)
-        }}</span>
+        <span class="token-value">{{ formatNumber(currentPeriodData.cacheReadTokens) }}</span>
       </div>
     </div>
-    <div class="mt-3 border-t border-gray-200 pt-3 dark:border-gray-700 md:mt-4 md:pt-4">
-      <div class="flex items-center justify-between font-bold text-gray-900 dark:text-gray-100">
-        <span class="text-sm md:text-base"
-          >{{ statsPeriod === 'daily' ? '今日' : '本月' }}总计</span
-        >
-        <span class="text-lg md:text-xl">{{ formatNumber(currentPeriodData.allTokens) }}</span>
+    <div class="card-footer">
+      <div class="footer-content">
+        <span class="footer-label">{{ statsPeriod === 'daily' ? '今日' : '本月' }}总计</span>
+        <span class="footer-value">{{ formatNumber(currentPeriodData.allTokens) }}</span>
       </div>
     </div>
   </div>
@@ -87,42 +73,216 @@ const formatNumber = (num) => {
 </script>
 
 <style scoped>
-/* 卡片样式 - 使用CSS变量 */
-.card {
-  background: var(--surface-color);
-  border-radius: 16px;
-  border: 1px solid var(--border-color);
-  box-shadow:
-    0 10px 15px -3px rgba(0, 0, 0, 0.1),
-    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+/* ============================================
+   VERCEL TOKEN DISTRIBUTION CARD
+   ============================================ */
+.vercel-token-card {
+  background: #fff;
+  border: 1px solid #eaeaea;
+  border-radius: 8px;
+  padding: 24px;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-  position: relative;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  gap: 20px;
 }
 
-.card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: #eaeaea;
+:global(.dark) .vercel-token-card {
+  background: #000;
+  border-color: #333;
 }
 
-.card:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 20px 25px -5px rgba(0, 0, 0, 0.15),
-    0 10px 10px -5px rgba(0, 0, 0, 0.08);
+@media (max-width: 768px) {
+  .vercel-token-card {
+    padding: 20px;
+  }
 }
 
-:global(.dark) .card:hover {
-  box-shadow:
-    0 20px 25px -5px rgba(0, 0, 0, 0.5),
-    0 10px 10px -5px rgba(0, 0, 0, 0.35);
+/* Card Title */
+.card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.title-text {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #000;
+}
+
+:global(.dark) .title-text {
+  color: #fff;
+}
+
+.title-icon {
+  font-size: 18px;
+  color: #f59e0b;
+}
+
+:global(.dark) .title-icon {
+  color: #fbbf24;
+}
+
+.title-period {
+  font-size: 13px;
+  font-weight: 400;
+  color: #666;
+}
+
+:global(.dark) .title-period {
+  color: #999;
+}
+
+/* Token List */
+.token-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.token-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: #fafafa;
+  border: 1px solid #eaeaea;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.token-item:hover {
+  background: #f5f5f5;
+  border-color: #ddd;
+}
+
+:global(.dark) .token-item {
+  background: #0a0a0a;
+  border-color: #333;
+}
+
+:global(.dark) .token-item:hover {
+  background: #111;
+  border-color: #444;
+}
+
+.token-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+
+:global(.dark) .token-label {
+  color: #999;
+}
+
+.token-icon {
+  font-size: 14px;
+}
+
+.token-icon-green {
+  color: #10b981;
+}
+
+:global(.dark) .token-icon-green {
+  color: #34d399;
+}
+
+.token-icon-blue {
+  color: #3b82f6;
+}
+
+:global(.dark) .token-icon-blue {
+  color: #60a5fa;
+}
+
+.token-icon-purple {
+  color: #8b5cf6;
+}
+
+:global(.dark) .token-icon-purple {
+  color: #a78bfa;
+}
+
+.token-icon-orange {
+  color: #f97316;
+}
+
+:global(.dark) .token-icon-orange {
+  color: #fb923c;
+}
+
+.token-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: #000;
+}
+
+:global(.dark) .token-value {
+  color: #fff;
+}
+
+/* Card Footer */
+.card-footer {
+  padding-top: 16px;
+  border-top: 1px solid #eaeaea;
+}
+
+:global(.dark) .card-footer {
+  border-top-color: #333;
+}
+
+.footer-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.footer-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #000;
+}
+
+:global(.dark) .footer-label {
+  color: #fff;
+}
+
+.footer-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #000;
+}
+
+:global(.dark) .footer-value {
+  color: #fff;
+}
+
+@media (max-width: 768px) {
+  .title-text {
+    font-size: 16px;
+  }
+
+  .title-icon {
+    font-size: 16px;
+  }
+
+  .token-item {
+    padding: 10px;
+  }
+
+  .footer-value {
+    font-size: 18px;
+  }
 }
 </style>
