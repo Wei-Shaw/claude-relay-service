@@ -42,19 +42,32 @@ router.get('/azure-openai-accounts', authenticateAdmin, async (req, res) => {
     }
 
     // 为每个账户添加使用统计信息和分组信息
+    let usageStatsMap = {}
+    try {
+      const createdAtByAccountId = Object.fromEntries(
+        accounts.map((account) => [account.id, account.createdAt])
+      )
+      usageStatsMap = await redis.getAccountsUsageStats(accounts.map((account) => account.id), {
+        createdAtByAccountId
+      })
+    } catch (error) {
+      logger.warn('⚠️ Failed to batch load usage stats for Azure OpenAI accounts:', error.message)
+      usageStatsMap = {}
+    }
+
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
         try {
-          const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
+          const usageStats = usageStatsMap[account.id]
           const groupInfos = groupInfosMap[account.id] || []
           const formattedAccount = formatAccountExpiry(account)
           return {
             ...formattedAccount,
             groupInfos,
             usage: {
-              daily: usageStats.daily,
-              total: usageStats.total,
-              averages: usageStats.averages
+              daily: usageStats?.daily || { requests: 0, tokens: 0, allTokens: 0, cost: 0 },
+              total: usageStats?.total || { requests: 0, tokens: 0, allTokens: 0, cost: 0 },
+              averages: usageStats?.averages || { rpm: 0, tpm: 0 }
             }
           }
         } catch (error) {

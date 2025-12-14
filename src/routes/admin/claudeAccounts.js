@@ -361,6 +361,9 @@ router.post('/claude-accounts/setup-token-with-cookie', authenticateAdmin, async
 router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
   try {
     const { platform, groupId } = req.query
+    const includeSessionWindowModelUsage =
+      req.query.includeSessionWindowModelUsage === 'true' ||
+      req.query.includeSessionWindowModelUsage === '1'
     let accounts = await claudeAccountService.getAllAccounts()
     let groupInfosMap = null
 
@@ -388,11 +391,24 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
     }
 
     // 为每个账户添加使用统计信息
+    let usageStatsMap = {}
+    try {
+      const createdAtByAccountId = Object.fromEntries(
+        accounts.map((account) => [account.id, account.createdAt])
+      )
+      usageStatsMap = await redis.getAccountsUsageStats(accounts.map((account) => account.id), {
+        createdAtByAccountId
+      })
+    } catch (error) {
+      logger.warn('⚠️ Failed to batch load usage stats for Claude accounts:', error.message)
+      usageStatsMap = {}
+    }
+
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
         try {
-          const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
           const groupInfos = groupInfosMap[account.id] || []
+          const usageStats = usageStatsMap[account.id]
 
           // 获取会话窗口使用统计（仅对有活跃窗口的账户）
           let sessionWindowUsage = null
@@ -405,7 +421,7 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
 
             // 计算会话窗口的总费用
             let totalCost = 0
-            const modelCosts = {}
+            const modelCosts = includeSessionWindowModelUsage ? {} : null
 
             for (const [modelName, usage] of Object.entries(windowUsage.modelUsage)) {
               const usageData = {
@@ -415,22 +431,26 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
                 cache_read_input_tokens: usage.cacheReadTokens
               }
 
-              logger.debug(`💰 Calculating cost for model ${modelName}:`, JSON.stringify(usageData))
               const costResult = CostCalculator.calculateCost(usageData, modelName)
-              logger.debug(`💰 Cost result for ${modelName}: total=${costResult.costs.total}`)
 
-              modelCosts[modelName] = {
-                ...usage,
-                cost: costResult.costs.total
+              const cost = costResult?.costs?.total || 0
+              if (includeSessionWindowModelUsage && modelCosts) {
+                modelCosts[modelName] = {
+                  ...usage,
+                  cost
+                }
               }
-              totalCost += costResult.costs.total
+              totalCost += cost
             }
 
             sessionWindowUsage = {
               totalTokens: windowUsage.totalAllTokens,
               totalRequests: windowUsage.totalRequests,
-              totalCost,
-              modelUsage: modelCosts
+              totalCost
+            }
+
+            if (includeSessionWindowModelUsage && modelCosts) {
+              sessionWindowUsage.modelUsage = modelCosts
             }
           }
 
@@ -441,9 +461,9 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
             schedulable: account.schedulable === 'true' || account.schedulable === true,
             groupInfos,
             usage: {
-              daily: usageStats.daily,
-              total: usageStats.total,
-              averages: usageStats.averages,
+              daily: usageStats?.daily || { tokens: 0, requests: 0, allTokens: 0, cost: 0 },
+              total: usageStats?.total || { tokens: 0, requests: 0, allTokens: 0, cost: 0 },
+              averages: usageStats?.averages || { rpm: 0, tpm: 0 },
               sessionWindow: sessionWindowUsage
             }
           }

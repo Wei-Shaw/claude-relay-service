@@ -187,6 +187,19 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
     }
 
     // 添加使用统计
+    let usageStatsMap = {}
+    try {
+      const createdAtByAccountId = Object.fromEntries(
+        accounts.map((account) => [account.id, account.createdAt])
+      )
+      usageStatsMap = await redis.getAccountsUsageStats(accounts.map((account) => account.id), {
+        createdAtByAccountId
+      })
+    } catch (error) {
+      logger.warn('⚠️ Failed to batch load usage stats for Droid accounts:', error.message)
+      usageStatsMap = {}
+    }
+
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
         const groupInfos = groupInfosMap[account.id] || []
@@ -197,32 +210,17 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
           boundApiKeysCount += groupCountMap[id] || 0
         }
 
-        try {
-          const usageStats = await redis.getAccountUsageStats(account.id, 'droid')
-          const formattedAccount = formatAccountExpiry(account)
-          return {
-            ...formattedAccount,
-            schedulable: account.schedulable === 'true',
-            boundApiKeysCount,
-            groupInfos,
-            usage: {
-              daily: usageStats.daily,
-              total: usageStats.total,
-              averages: usageStats.averages
-            }
-          }
-        } catch (error) {
-          logger.warn(`Failed to get stats for Droid account ${account.id}:`, error.message)
-          const formattedAccount = formatAccountExpiry(account)
-          return {
-            ...formattedAccount,
-            boundApiKeysCount,
-            groupInfos,
-            usage: {
-              daily: { tokens: 0, requests: 0 },
-              total: { tokens: 0, requests: 0 },
-              averages: { rpm: 0, tpm: 0 }
-            }
+        const usageStats = usageStatsMap[account.id]
+        const formattedAccount = formatAccountExpiry(account)
+        return {
+          ...formattedAccount,
+          schedulable: account.schedulable === 'true',
+          boundApiKeysCount,
+          groupInfos,
+          usage: {
+            daily: usageStats?.daily || { tokens: 0, requests: 0, allTokens: 0, cost: 0 },
+            total: usageStats?.total || { tokens: 0, requests: 0, allTokens: 0, cost: 0 },
+            averages: usageStats?.averages || { rpm: 0, tpm: 0 }
           }
         }
       })

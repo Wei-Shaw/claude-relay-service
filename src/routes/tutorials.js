@@ -17,4 +17,3 @@ router.get('/content', async (req, res) => {
 })
 
 module.exports = router
-

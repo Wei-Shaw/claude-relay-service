@@ -344,9 +344,27 @@ class GeminiApiAccountService {
   }
 
   // 检查并清除过期的限流状态
-  async checkAndClearRateLimit(accountId) {
-    const account = await this.getAccount(accountId)
-    if (!account || account.rateLimitStatus !== 'limited') {
+  async checkAndClearRateLimit(accountId, accountData = null) {
+    const account = accountData || (await this.getAccount(accountId))
+    if (!account) {
+      return false
+    }
+
+    const isRateLimited = (() => {
+      if (typeof account.rateLimitStatus === 'string') {
+        return account.rateLimitStatus === 'limited'
+      }
+      if (account.rateLimitStatus && typeof account.rateLimitStatus === 'object') {
+        if (account.rateLimitStatus.isRateLimited === true) {
+          return true
+        }
+        const minutesRemaining = Number(account.rateLimitStatus.minutesRemaining || 0)
+        return Number.isFinite(minutesRemaining) && minutesRemaining > 0
+      }
+      return false
+    })()
+
+    if (!isRateLimited) {
       return false
     }
 

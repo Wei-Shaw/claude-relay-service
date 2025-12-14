@@ -496,10 +496,10 @@ class ClaudeAccountService {
       const processedAccounts = await Promise.all(
         accounts.map(async (account) => {
           // 获取限流状态信息
-          const rateLimitInfo = await this.getAccountRateLimitInfo(account.id)
+          const rateLimitInfo = await this.getAccountRateLimitInfo(account.id, account)
 
           // 获取会话窗口信息
-          const sessionWindowInfo = await this.getSessionWindowInfo(account.id)
+          const sessionWindowInfo = await this.getSessionWindowInfo(account.id, account)
 
           // 构建 Claude Usage 快照（从 Redis 读取）
           const claudeUsage = this.buildClaudeUsageSnapshot(account)
@@ -596,8 +596,8 @@ class ClaudeAccountService {
       }
 
       const [sessionWindowInfo, rateLimitInfo] = await Promise.all([
-        this.getSessionWindowInfo(accountId),
-        this.getAccountRateLimitInfo(accountId)
+        this.getSessionWindowInfo(accountId, accountData),
+        this.getAccountRateLimitInfo(accountId, accountData)
       ])
 
       const sessionWindow = sessionWindowInfo || {
@@ -1611,9 +1611,11 @@ class ClaudeAccountService {
   }
 
   // 📊 获取账号的限流信息
-  async getAccountRateLimitInfo(accountId) {
+  async getAccountRateLimitInfo(accountId, accountData = null) {
     try {
-      const accountData = await redis.getClaudeAccount(accountId)
+      if (!accountData) {
+        accountData = await redis.getClaudeAccount(accountId)
+      }
       if (!accountData || Object.keys(accountData).length === 0) {
         return null
       }
@@ -1804,9 +1806,11 @@ class ClaudeAccountService {
   }
 
   // 📊 获取会话窗口信息
-  async getSessionWindowInfo(accountId) {
+  async getSessionWindowInfo(accountId, accountData = null) {
     try {
-      const accountData = await redis.getClaudeAccount(accountId)
+      if (!accountData) {
+        accountData = await redis.getClaudeAccount(accountId)
+      }
       if (!accountData || Object.keys(accountData).length === 0) {
         return null
       }

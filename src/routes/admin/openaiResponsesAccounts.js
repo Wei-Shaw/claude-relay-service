@@ -17,6 +17,11 @@ const router = express.Router()
 
 // ==================== OpenAI-Responses 账户管理 API ====================
 
+// 获取 OpenAI-Responses 账户的自动恢复配置（当前为兼容前端占位接口）
+router.get('/openai-responses-accounts/auto-recovery-configs', authenticateAdmin, async (req, res) => {
+  return res.json({ success: true, data: [] })
+})
+
 // 获取所有 OpenAI-Responses 账户
 router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => {
   try {
@@ -78,6 +83,19 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
     }
 
     // 处理额度信息、使用统计和绑定的 API Key 数量
+    let usageStatsMap = {}
+    try {
+      const createdAtByAccountId = Object.fromEntries(
+        accounts.map((account) => [account.id, account.createdAt])
+      )
+      usageStatsMap = await redis.getAccountsUsageStats(accounts.map((account) => account.id), {
+        createdAtByAccountId
+      })
+    } catch (error) {
+      logger.warn('⚠️ Failed to batch load usage stats for OpenAI-Responses accounts:', error.message)
+      usageStatsMap = {}
+    }
+
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
         try {
@@ -96,23 +114,10 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
           }
 
           // 检查并清除过期的限流状态
-          await openaiResponsesAccountService.checkAndClearRateLimit(account.id)
+          await openaiResponsesAccountService.checkAndClearRateLimit(account.id, account)
 
           // 获取使用统计信息
-          let usageStats
-          try {
-            usageStats = await redis.getAccountUsageStats(account.id, 'openai-responses')
-          } catch (error) {
-            logger.debug(
-              `Failed to get usage stats for OpenAI-Responses account ${account.id}:`,
-              error
-            )
-            usageStats = {
-              daily: { requests: 0, tokens: 0, allTokens: 0 },
-              total: { requests: 0, tokens: 0, allTokens: 0 },
-              monthly: { requests: 0, tokens: 0, allTokens: 0 }
-            }
-          }
+          const usageStats = usageStatsMap[account.id]
 
           const boundCount = boundCountMap[account.id] || 0
 
@@ -130,9 +135,9 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
             groupInfos,
             boundApiKeysCount: boundCount,
             usage: {
-              daily: usageStats.daily,
-              total: usageStats.total,
-              monthly: usageStats.monthly
+              daily: usageStats?.daily || { requests: 0, tokens: 0, allTokens: 0, cost: 0 },
+              total: usageStats?.total || { requests: 0, tokens: 0, allTokens: 0, cost: 0 },
+              monthly: usageStats?.monthly || { requests: 0, tokens: 0, allTokens: 0, cost: 0 }
             }
           }
         } catch (error) {

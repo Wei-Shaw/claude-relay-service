@@ -257,12 +257,38 @@ router.get('/', authenticateAdmin, async (req, res) => {
     }
 
     // 为每个账户添加使用统计信息
+    let usageStatsMap = {}
+    try {
+      const createdAtByAccountId = Object.fromEntries(
+        accounts.map((account) => [account.id, account.createdAt])
+      )
+      usageStatsMap = await redis.getAccountsUsageStats(accounts.map((account) => account.id), {
+        createdAtByAccountId
+      })
+    } catch (error) {
+      logger.debug('Failed to batch load usage stats for OpenAI accounts:', error)
+      usageStatsMap = {}
+    }
+
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
         try {
-          const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
+          const usageStats = usageStatsMap[account.id]
           const groupInfos = groupInfosMap[account.id] || []
           const formattedAccount = formatAccountExpiry(account)
+
+          if (!usageStats) {
+            return {
+              ...formattedAccount,
+              groupInfos,
+              usage: {
+                daily: { requests: 0, tokens: 0, allTokens: 0 },
+                total: { requests: 0, tokens: 0, allTokens: 0 },
+                monthly: { requests: 0, tokens: 0, allTokens: 0 }
+              }
+            }
+          }
+
           return {
             ...formattedAccount,
             groupInfos,

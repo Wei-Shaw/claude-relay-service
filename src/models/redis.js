@@ -1522,9 +1522,15 @@ class RedisClient {
         accountData = await this.client.hgetall(`droid:account:${accountId}`)
       }
     }
-    const createdAt = accountData.createdAt ? new Date(accountData.createdAt) : new Date()
     const now = new Date()
-    const daysSinceCreated = Math.max(1, Math.ceil((now - createdAt) / (1000 * 60 * 60 * 24)))
+    const createdAtMs = accountData.createdAt
+      ? new Date(accountData.createdAt).getTime()
+      : now.getTime()
+    const safeCreatedAtMs = Number.isFinite(createdAtMs) ? createdAtMs : now.getTime()
+    const daysSinceCreated = Math.max(
+      1,
+      Math.ceil((now.getTime() - safeCreatedAtMs) / (1000 * 60 * 60 * 24))
+    )
 
     const totalTokens = parseInt(total.totalTokens) || 0
     const totalRequests = parseInt(total.totalRequests) || 0
@@ -1589,6 +1595,123 @@ class RedisClient {
         dailyTokens: Math.round((totalTokens / daysSinceCreated) * 100) / 100
       }
     }
+  }
+
+  // 📊 批量获取多个账户的使用统计（性能优化：pipeline 批量读取）
+  async getAccountsUsageStats(accountIds = [], options = {}) {
+    const uniqueAccountIds = [...new Set((accountIds || []).filter(Boolean))]
+    const createdAtByAccountId = options.createdAtByAccountId || {}
+    const rawChunkSize = Number(options.chunkSize)
+    const chunkSize = Number.isFinite(rawChunkSize) && rawChunkSize > 0 ? rawChunkSize : 200
+
+    const resultMap = Object.fromEntries(uniqueAccountIds.map((id) => [id, null]))
+
+    if (uniqueAccountIds.length === 0) {
+      return resultMap
+    }
+
+    const today = getDateStringInTimezone()
+    const tzDate = getDateInTimezone()
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
+      2,
+      '0'
+    )}`
+
+    const now = new Date()
+
+    const handleAccountData = (data) => {
+      const tokens = parseInt(data.totalTokens) || parseInt(data.tokens) || 0
+      const inputTokens = parseInt(data.totalInputTokens) || parseInt(data.inputTokens) || 0
+      const outputTokens = parseInt(data.totalOutputTokens) || parseInt(data.outputTokens) || 0
+      const requests = parseInt(data.totalRequests) || parseInt(data.requests) || 0
+      const cacheCreateTokens =
+        parseInt(data.totalCacheCreateTokens) || parseInt(data.cacheCreateTokens) || 0
+      const cacheReadTokens =
+        parseInt(data.totalCacheReadTokens) || parseInt(data.cacheReadTokens) || 0
+      const allTokens = parseInt(data.totalAllTokens) || parseInt(data.allTokens) || 0
+
+      const actualAllTokens =
+        allTokens || inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
+
+      return {
+        tokens,
+        inputTokens,
+        outputTokens,
+        cacheCreateTokens,
+        cacheReadTokens,
+        allTokens: actualAllTokens,
+        requests
+      }
+    }
+
+    for (let offset = 0; offset < uniqueAccountIds.length; offset += chunkSize) {
+      const chunkAccountIds = uniqueAccountIds.slice(offset, offset + chunkSize)
+      const pipeline = this.client.pipeline()
+
+      for (const accountId of chunkAccountIds) {
+        pipeline.hgetall(`account_usage:${accountId}`)
+        pipeline.hgetall(`account_usage:daily:${accountId}:${today}`)
+        pipeline.hgetall(`account_usage:monthly:${accountId}:${currentMonth}`)
+      }
+
+      const results = await pipeline.exec()
+
+      for (let i = 0; i < chunkAccountIds.length; i++) {
+        const accountId = chunkAccountIds[i]
+        const baseIndex = i * 3
+
+        const totalRaw = results?.[baseIndex]?.[1] || {}
+        const dailyRaw = results?.[baseIndex + 1]?.[1] || {}
+        const monthlyRaw = results?.[baseIndex + 2]?.[1] || {}
+
+        const totalTokens = parseInt(totalRaw.totalTokens) || 0
+        const totalRequests = parseInt(totalRaw.totalRequests) || 0
+
+        const createdAtRaw = createdAtByAccountId[accountId]
+        const createdAtMs = createdAtRaw ? new Date(createdAtRaw).getTime() : now.getTime()
+        const safeCreatedAtMs = Number.isFinite(createdAtMs) ? createdAtMs : now.getTime()
+        const daysSinceCreated = Math.max(
+          1,
+          Math.ceil((now.getTime() - safeCreatedAtMs) / (1000 * 60 * 60 * 24))
+        )
+        const totalMinutes = Math.max(1, daysSinceCreated * 24 * 60)
+
+        const avgRPM = totalRequests / totalMinutes
+        const avgTPM = totalTokens / totalMinutes
+
+        const totalCost = parseFloat(totalRaw.totalCost) || 0
+        const dailyCost = parseFloat(dailyRaw.cost) || 0
+        const monthlyCost = parseFloat(monthlyRaw.cost) || 0
+
+        const totalData = handleAccountData(totalRaw)
+        const dailyData = handleAccountData(dailyRaw)
+        const monthlyData = handleAccountData(monthlyRaw)
+
+        resultMap[accountId] = {
+          accountId,
+          total: {
+            ...totalData,
+            cost: totalCost
+          },
+          daily: {
+            ...dailyData,
+            cost: dailyCost
+          },
+          monthly: {
+            ...monthlyData,
+            cost: monthlyCost
+          },
+          averages: {
+            rpm: Math.round(avgRPM * 100) / 100,
+            tpm: Math.round(avgTPM * 100) / 100,
+            dailyRequests: Math.round((totalRequests / daysSinceCreated) * 100) / 100,
+            dailyTokens: Math.round((totalTokens / daysSinceCreated) * 100) / 100
+          }
+        }
+      }
+    }
+
+    return resultMap
   }
 
   // 📈 获取所有账户的使用统计
@@ -2778,11 +2901,14 @@ class RedisClient {
 
       const startDate = new Date(windowStart)
       const endDate = new Date(windowEnd)
+      const debugEnabled = ['debug', 'silly'].includes(logger.level)
 
       // 添加日志以调试时间窗口
-      logger.debug(`📊 Getting session window usage for account ${accountId}`)
-      logger.debug(`   Window: ${windowStart} to ${windowEnd}`)
-      logger.debug(`   Start UTC: ${startDate.toISOString()}, End UTC: ${endDate.toISOString()}`)
+      if (debugEnabled) {
+        logger.debug(`📊 Getting session window usage for account ${accountId}`)
+        logger.debug(`   Window: ${windowStart} to ${windowEnd}`)
+        logger.debug(`   Start UTC: ${startDate.toISOString()}, End UTC: ${endDate.toISOString()}`)
+      }
 
       // 获取窗口内所有可能的小时键
       // 重要：需要使用配置的时区来构建键名，因为数据存储时使用的是配置时区
@@ -2798,7 +2924,9 @@ class RedisClient {
         const tzHour = String(getHourInTimezone(currentHour)).padStart(2, '0')
         const key = `account_usage:hourly:${accountId}:${tzDateStr}:${tzHour}`
 
-        logger.debug(`   Adding hourly key: ${key}`)
+        if (debugEnabled) {
+          logger.debug(`   Adding hourly key: ${key}`)
+        }
         hourlyKeys.push(key)
         currentHour.setHours(currentHour.getHours() + 1)
       }
@@ -2819,7 +2947,9 @@ class RedisClient {
       let totalRequests = 0
       const modelUsage = {}
 
-      logger.debug(`   Processing ${results.length} hourly results`)
+      if (debugEnabled) {
+        logger.debug(`   Processing ${results.length} hourly results`)
+      }
 
       for (const [error, data] of results) {
         if (error || !data || Object.keys(data).length === 0) {
@@ -2841,7 +2971,7 @@ class RedisClient {
         totalAllTokens += hourAllTokens
         totalRequests += hourRequests
 
-        if (hourAllTokens > 0) {
+        if (debugEnabled && hourAllTokens > 0) {
           logger.debug(`   Hour data: allTokens=${hourAllTokens}, requests=${hourRequests}`)
         }
 
@@ -2883,13 +3013,15 @@ class RedisClient {
         }
       }
 
-      logger.debug(`📊 Session window usage summary:`)
-      logger.debug(`   Total allTokens: ${totalAllTokens}`)
-      logger.debug(`   Total requests: ${totalRequests}`)
-      logger.debug(`   Input: ${totalInputTokens}, Output: ${totalOutputTokens}`)
-      logger.debug(
-        `   Cache Create: ${totalCacheCreateTokens}, Cache Read: ${totalCacheReadTokens}`
-      )
+      if (debugEnabled) {
+        logger.debug(`📊 Session window usage summary:`)
+        logger.debug(`   Total allTokens: ${totalAllTokens}`)
+        logger.debug(`   Total requests: ${totalRequests}`)
+        logger.debug(`   Input: ${totalInputTokens}, Output: ${totalOutputTokens}`)
+        logger.debug(
+          `   Cache Create: ${totalCacheCreateTokens}, Cache Read: ${totalCacheReadTokens}`
+        )
+      }
 
       return {
         totalInputTokens,

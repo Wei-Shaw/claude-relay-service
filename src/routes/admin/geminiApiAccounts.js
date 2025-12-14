@@ -55,23 +55,26 @@ router.get('/gemini-api-accounts', authenticateAdmin, async (req, res) => {
     }
 
     // 处理使用统计和绑定的 API Key 数量
+    let usageStatsMap = {}
+    try {
+      const createdAtByAccountId = Object.fromEntries(
+        accounts.map((account) => [account.id, account.createdAt])
+      )
+      usageStatsMap = await redis.getAccountsUsageStats(accounts.map((account) => account.id), {
+        createdAtByAccountId
+      })
+    } catch (error) {
+      logger.warn('⚠️ Failed to batch load usage stats for Gemini-API accounts:', error.message)
+      usageStatsMap = {}
+    }
+
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
         // 检查并清除过期的限流状态
-        await geminiApiAccountService.checkAndClearRateLimit(account.id)
+        await geminiApiAccountService.checkAndClearRateLimit(account.id, account)
 
         // 获取使用统计信息
-        let usageStats
-        try {
-          usageStats = await redis.getAccountUsageStats(account.id, 'gemini-api')
-        } catch (error) {
-          logger.debug(`Failed to get usage stats for Gemini-API account ${account.id}:`, error)
-          usageStats = {
-            daily: { requests: 0, tokens: 0, allTokens: 0 },
-            total: { requests: 0, tokens: 0, allTokens: 0 },
-            monthly: { requests: 0, tokens: 0, allTokens: 0 }
-          }
-        }
+        const usageStats = usageStatsMap[account.id]
 
         // 获取分组信息
         const groupInfos = groupInfosMap[account.id] || []
@@ -80,9 +83,9 @@ router.get('/gemini-api-accounts', authenticateAdmin, async (req, res) => {
           ...account,
           groupInfos,
           usage: {
-            daily: usageStats.daily,
-            total: usageStats.total,
-            averages: usageStats.averages || usageStats.monthly
+            daily: usageStats?.daily || { requests: 0, tokens: 0, allTokens: 0, cost: 0 },
+            total: usageStats?.total || { requests: 0, tokens: 0, allTokens: 0, cost: 0 },
+            averages: usageStats?.averages || { rpm: 0, tpm: 0 }
           },
           boundApiKeys: boundCountMap[account.id] || 0
         }
