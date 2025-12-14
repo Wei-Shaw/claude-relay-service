@@ -113,24 +113,22 @@ defineProps({
 }
 
 /* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .ds-input {
-    background: #1a1a1a;
-    border-color: #2c2c2c;
-    color: #fff;
-  }
+:global(.dark) .ds-input {
+  background: #1a1a1a;
+  border-color: #2c2c2c;
+  color: #fff;
+}
 
-  .ds-input:focus {
-    border-color: #fff;
-  }
+:global(.dark) .ds-input:focus {
+  border-color: #fff;
+}
 
-  .ds-input:disabled {
-    background: #0a0a0a;
-    color: #666;
-  }
+:global(.dark) .ds-input:disabled {
+  background: #0a0a0a;
+  color: #666;
+}
 
-  .ds-input--error {
-    border-color: #e00;
-  }
+:global(.dark) .ds-input--error {
+  border-color: #e00;
 }
 </style>

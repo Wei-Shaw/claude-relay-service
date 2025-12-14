@@ -71,12 +71,6 @@
         </div>
       </div>
     </main>
-
-    <!-- Footer -->
-    <footer class="login-footer">
-      <a class="footer-link" href="#">服务条款</a>
-      <a class="footer-link" href="#">隐私政策</a>
-    </footer>
   </div>
 </template>
 
@@ -336,36 +330,5 @@ const handleLogin = async () => {
   color: #ff6b6b;
   background: rgba(255, 107, 107, 0.1);
   border-color: rgba(255, 107, 107, 0.2);
-}
-
-/* Footer */
-.login-footer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1.5rem;
-  height: 64px;
-  min-height: 64px;
-  padding: 0 1rem;
-  background: transparent;
-}
-
-.footer-link {
-  font-size: 0.875rem;
-  color: #666;
-  text-decoration: none;
-  transition: color 0.2s ease;
-}
-
-.footer-link:hover {
-  color: #000;
-}
-
-:global(.dark) .footer-link {
-  color: #999;
-}
-
-:global(.dark) .footer-link:hover {
-  color: #fff;
 }
 </style>

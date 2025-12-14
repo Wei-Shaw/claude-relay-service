@@ -114,25 +114,23 @@ defineProps({
 }
 
 /* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .ds-alert--success {
-    background: rgba(0, 112, 243, 0.1);
-    border-color: #0070f3;
-  }
+:global(.dark) .ds-alert--success {
+  background: rgba(0, 112, 243, 0.1);
+  border-color: #0070f3;
+}
 
-  .ds-alert--error {
-    background: rgba(238, 0, 0, 0.1);
-    border-color: #e00;
-  }
+:global(.dark) .ds-alert--error {
+  background: rgba(238, 0, 0, 0.1);
+  border-color: #e00;
+}
 
-  .ds-alert--warning {
-    background: rgba(245, 166, 35, 0.1);
-    border-color: #f5a623;
-  }
+:global(.dark) .ds-alert--warning {
+  background: rgba(245, 166, 35, 0.1);
+  border-color: #f5a623;
+}
 
-  .ds-alert--info {
-    background: rgba(0, 112, 243, 0.1);
-    border-color: #0070f3;
-  }
+:global(.dark) .ds-alert--info {
+  background: rgba(0, 112, 243, 0.1);
+  border-color: #0070f3;
 }
 </style>

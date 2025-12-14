@@ -121,28 +121,26 @@ defineProps({
 }
 
 /* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .ds-card {
-    background: #1a1a1a;
-    border-color: #2c2c2c;
-  }
+:global(.dark) .ds-card {
+  background: #1a1a1a;
+  border-color: #2c2c2c;
+}
 
-  .ds-card__header,
-  .ds-card__footer {
-    border-color: #2c2c2c;
-  }
+:global(.dark) .ds-card__header,
+:global(.dark) .ds-card__footer {
+  border-color: #2c2c2c;
+}
 
-  .ds-card__footer {
-    background: #0a0a0a;
-  }
+:global(.dark) .ds-card__footer {
+  background: #0a0a0a;
+}
 
-  .ds-card--stat:hover {
-    background: #0a0a0a;
-  }
+:global(.dark) .ds-card--stat:hover {
+  background: #0a0a0a;
+}
 
-  .ds-card--hoverable:hover,
-  .ds-card--interactive:hover {
-    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.05);
-  }
+:global(.dark) .ds-card--hoverable:hover,
+:global(.dark) .ds-card--interactive:hover {
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.05);
 }
 </style>

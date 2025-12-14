@@ -80,22 +80,20 @@ defineProps({
 }
 
 /* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .ds-tabs {
-    border-bottom-color: #2c2c2c;
-  }
+:global(.dark) .ds-tabs {
+  border-bottom-color: #2c2c2c;
+}
 
-  .ds-tab {
-    color: #b3b3b3;
-  }
+:global(.dark) .ds-tab {
+  color: #b3b3b3;
+}
 
-  .ds-tab:hover:not(:disabled) {
-    color: #fff;
-  }
+:global(.dark) .ds-tab:hover:not(:disabled) {
+  color: #fff;
+}
 
-  .ds-tab--active {
-    color: #fff;
-    border-bottom-color: #fff;
-  }
+:global(.dark) .ds-tab--active {
+  color: #fff;
+  border-bottom-color: #fff;
 }
 </style>

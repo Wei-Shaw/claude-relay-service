@@ -146,24 +146,22 @@ defineProps({
 }
 
 /* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .ds-badge--success,
-  .ds-badge--inactive,
-  .ds-badge--warning,
-  .ds-badge--error,
-  .ds-badge--info,
-  .ds-badge--neutral {
-    background: #2c2c2c;
-  }
+:global(.dark) .ds-badge--success,
+:global(.dark) .ds-badge--inactive,
+:global(.dark) .ds-badge--warning,
+:global(.dark) .ds-badge--error,
+:global(.dark) .ds-badge--info,
+:global(.dark) .ds-badge--neutral {
+  background: #2c2c2c;
+}
 
-  .ds-badge--inactive {
-    color: #b3b3b3;
-    border-color: #4b4b4b;
-  }
+:global(.dark) .ds-badge--inactive {
+  color: #b3b3b3;
+  border-color: #4b4b4b;
+}
 
-  .ds-badge--neutral {
-    color: #fff;
-    border-color: #4b4b4b;
-  }
+:global(.dark) .ds-badge--neutral {
+  color: #fff;
+  border-color: #4b4b4b;
 }
 </style>

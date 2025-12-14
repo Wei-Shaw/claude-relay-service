@@ -87,10 +87,8 @@ defineProps({
 }
 
 /* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .ds-spinner--default {
-    border-color: #2c2c2c;
-    border-top-color: #fff;
-  }
+:global(.dark) .ds-spinner--default {
+  border-color: #2c2c2c;
+  border-top-color: #fff;
 }
 </style>

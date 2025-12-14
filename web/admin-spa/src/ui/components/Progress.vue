@@ -116,13 +116,11 @@ const clampedValue = computed(() => Math.max(0, Math.min(100, props.value)))
 }
 
 /* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .ds-progress {
-    background: #2c2c2c;
-  }
+:global(.dark) .ds-progress {
+  background: #2c2c2c;
+}
 
-  .ds-progress--default .ds-progress__fill {
-    background: #ffffff;
-  }
+:global(.dark) .ds-progress--default .ds-progress__fill {
+  background: #ffffff;
 }
 </style>

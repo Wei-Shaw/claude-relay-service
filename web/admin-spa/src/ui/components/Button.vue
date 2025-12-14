@@ -250,48 +250,46 @@ defineProps({
 }
 
 /* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .ds-button--primary {
-    background: #fff;
-    color: #000;
-    border-color: #fff;
-  }
+:global(.dark) .ds-button--primary {
+  background: #fff;
+  color: #000;
+  border-color: #fff;
+}
 
-  .ds-button--primary:hover:not(:disabled) {
-    background: #e0e0e0;
-    border-color: #e0e0e0;
-  }
+:global(.dark) .ds-button--primary:hover:not(:disabled) {
+  background: #e0e0e0;
+  border-color: #e0e0e0;
+}
 
-  .ds-button--secondary {
-    background: #2c2c2c;
-    color: #fff;
-    border-color: #4b4b4b;
-  }
+:global(.dark) .ds-button--secondary {
+  background: #2c2c2c;
+  color: #fff;
+  border-color: #4b4b4b;
+}
 
-  .ds-button--secondary:hover:not(:disabled) {
-    border-color: #fff;
-  }
+:global(.dark) .ds-button--secondary:hover:not(:disabled) {
+  border-color: #fff;
+}
 
-  .ds-button--outline {
-    color: #fff;
-    border-color: #4b4b4b;
-  }
+:global(.dark) .ds-button--outline {
+  color: #fff;
+  border-color: #4b4b4b;
+}
 
-  .ds-button--outline:hover:not(:disabled) {
-    border-color: #fff;
-  }
+:global(.dark) .ds-button--outline:hover:not(:disabled) {
+  border-color: #fff;
+}
 
-  .ds-button--ghost {
-    color: #b3b3b3;
-  }
+:global(.dark) .ds-button--ghost {
+  color: #b3b3b3;
+}
 
-  .ds-button--ghost:hover:not(:disabled) {
-    background: #2c2c2c;
-    color: #fff;
-  }
+:global(.dark) .ds-button--ghost:hover:not(:disabled) {
+  background: #2c2c2c;
+  color: #fff;
+}
 
-  .ds-button--danger-outline {
-    background: #2c2c2c;
-  }
+:global(.dark) .ds-button--danger-outline {
+  background: #2c2c2c;
 }
 </style>

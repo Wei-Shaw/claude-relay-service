@@ -111,33 +111,31 @@ defineProps({
 }
 
 /* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .ds-table-container {
-    border-color: #2c2c2c;
-  }
+:global(.dark) .ds-table-container {
+  border-color: #2c2c2c;
+}
 
-  .ds-table :deep(th) {
-    background: #0a0a0a;
-    color: #b3b3b3;
-    border-bottom-color: #2c2c2c;
-  }
+:global(.dark) .ds-table :deep(th) {
+  background: #0a0a0a;
+  color: #b3b3b3;
+  border-bottom-color: #2c2c2c;
+}
 
-  .ds-table :deep(td) {
-    color: #fff;
-    border-bottom-color: #2c2c2c;
-  }
+:global(.dark) .ds-table :deep(td) {
+  color: #fff;
+  border-bottom-color: #2c2c2c;
+}
 
-  .ds-table :deep(tbody tr:hover) {
-    background: #1a1a1a;
-  }
+:global(.dark) .ds-table :deep(tbody tr:hover) {
+  background: #1a1a1a;
+}
 
-  .ds-table--striped :deep(tbody tr:nth-child(even)) {
-    background: #0a0a0a;
-  }
+:global(.dark) .ds-table--striped :deep(tbody tr:nth-child(even)) {
+  background: #0a0a0a;
+}
 
-  .ds-table--bordered :deep(th),
-  .ds-table--bordered :deep(td) {
-    border-color: #2c2c2c;
-  }
+:global(.dark) .ds-table--bordered :deep(th),
+:global(.dark) .ds-table--bordered :deep(td) {
+  border-color: #2c2c2c;
 }
 </style>
