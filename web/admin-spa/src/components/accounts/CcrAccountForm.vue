@@ -119,16 +119,13 @@
               >限流机制</label
             >
             <div class="mb-3">
-              <label class="inline-flex cursor-pointer items-center">
-                <input
-                  v-model="enableRateLimit"
-                  class="mr-2 rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
-                  type="checkbox"
-                />
-                <span class="text-sm text-gray-700 dark:text-gray-300"
-                  >启用限流机制（429 时暂停调度）</span
-                >
-              </label>
+              <Checkbox
+                v-model="enableRateLimit"
+                label="启用限流机制（429 时暂停调度）"
+                :input-class="'mr-2 rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white'"
+                :label-class="'inline-flex cursor-pointer items-center'"
+                :text-class="'text-sm text-gray-700 dark:text-gray-300'"
+              />
             </div>
             <div v-if="enableRateLimit">
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -262,6 +259,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { apiClient } from '@/config/api'
 import { showToast } from '@/utils/toast'
 import ProxyConfig from '@/components/accounts/ProxyConfig.vue'
+import { Checkbox } from '@/ui'
 
 const props = defineProps({
   account: {

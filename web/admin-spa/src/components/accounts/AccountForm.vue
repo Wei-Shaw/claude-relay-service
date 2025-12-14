@@ -737,21 +737,17 @@
                     >
                       暂无可用分组
                     </div>
-                    <label
+                    <Checkbox
                       v-for="group in filteredGroups"
                       :key="group.id"
-                      class="flex cursor-pointer items-center gap-2 rounded-md p-2 hover:bg-gray-50 dark:hover:bg-gray-600"
+                      v-model="form.groupIds"
+                      :value="group.id"
+                      :label-class="'flex cursor-pointer items-center gap-2 rounded-md p-2 hover:bg-gray-50 dark:hover:bg-gray-600'"
+                      :input-class="'rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white'"
+                      :text-class="'text-sm text-gray-700 dark:text-gray-200'"
                     >
-                      <input
-                        v-model="form.groupIds"
-                        class="rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
-                        type="checkbox"
-                        :value="group.id"
-                      />
-                      <span class="text-sm text-gray-700 dark:text-gray-200">
-                        {{ group.name }} ({{ group.memberCount || 0 }} 个成员)
-                      </span>
-                    </label>
+                      {{ group.name }} ({{ group.memberCount || 0 }} 个成员)
+                    </Checkbox>
                     <!-- 新建分组选项 -->
                     <div class="border-t pt-2 dark:border-gray-600">
                       <button
@@ -3750,7 +3746,7 @@ import OAuthFlow from './OAuthFlow.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import GroupManagementModal from './GroupManagementModal.vue'
 import ApiKeyManagementModal from './ApiKeyManagementModal.vue'
-import { Progress } from '@/ui'
+import { Progress, Checkbox } from '@/ui'
 
 const props = defineProps({
   account: {

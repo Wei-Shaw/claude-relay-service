@@ -391,19 +391,15 @@
 
           <!-- 激活账号 -->
           <div>
-            <div class="mb-3 flex items-center">
-              <input
+            <div class="mb-3">
+              <Checkbox
                 id="editIsActive"
                 v-model="form.isActive"
-                class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
-                type="checkbox"
+                label="激活账号"
+                :input-class="'h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white'"
+                :label-class="'flex items-center'"
+                :text-class="'ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300'"
               />
-              <label
-                class="ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300"
-                for="editIsActive"
-              >
-                激活账号
-              </label>
             </div>
             <p class="mb-4 text-xs text-gray-500 dark:text-gray-400">
               取消勾选将禁用此 API Key，暂停所有请求，客户端返回 401 错误
@@ -566,20 +562,20 @@
           </div>
 
           <div>
-            <div class="mb-3 flex items-center">
-              <input
+            <div class="mb-3">
+              <Checkbox
                 id="editEnableModelRestriction"
                 v-model="form.enableModelRestriction"
-                class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
-                type="checkbox"
+                label="启用模型限制"
+                :input-class="'h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white'"
+                :label-class="'flex items-center'"
+                :text-class="'ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300'"
               />
-              <label
-                class="ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300"
-                for="editEnableModelRestriction"
-              >
-                启用模型限制
-              </label>
-            </div>
+            </div></thinking>
+
+<function_calls>
+<invoke name="Read">
+<parameter name="path">/Users/lujuncheng/CursorProjects/claude-relay-service-1/web/admin-spa/src/components/apikeys/EditApiKeyModal.vue
 
             <div v-if="form.enableModelRestriction" class="space-y-3">
               <div>
@@ -657,19 +653,15 @@
 
           <!-- 客户端限制 -->
           <div>
-            <div class="mb-3 flex items-center">
-              <input
+            <div class="mb-3">
+              <Checkbox
                 id="editEnableClientRestriction"
                 v-model="form.enableClientRestriction"
-                class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
-                type="checkbox"
+                label="启用客户端限制"
+                :input-class="'h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white'"
+                :label-class="'flex items-center'"
+                :text-class="'ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300'"
               />
-              <label
-                class="ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300"
-                for="editEnableClientRestriction"
-              >
-                启用客户端限制
-              </label>
             </div>
 
             <div v-if="form.enableClientRestriction" class="space-y-3">
@@ -682,21 +674,21 @@
                 </p>
                 <div class="space-y-2">
                   <div v-for="client in supportedClients" :key="client.id" class="flex items-start">
-                    <input
+                    <Checkbox
                       :id="`edit_client_${client.id}`"
                       v-model="form.allowedClients"
-                      class="mt-0.5 h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:text-gray-100 dark:focus:ring-white"
-                      type="checkbox"
                       :value="client.id"
-                    />
-                    <label class="ml-2 flex-1 cursor-pointer" :for="`edit_client_${client.id}`">
+                      :input-class="'mt-0.5 h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:text-gray-100 dark:focus:ring-white'"
+                      :label-class="'flex items-start'"
+                      :text-class="'ml-2 flex-1 cursor-pointer'"
+                    >
                       <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
                         client.name
                       }}</span>
                       <span class="block text-xs text-gray-500 dark:text-gray-400">{{
                         client.description
                       }}</span>
-                    </label>
+                    </Checkbox>
                   </div>
                 </div>
               </div>

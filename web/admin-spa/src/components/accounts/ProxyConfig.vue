@@ -2,14 +2,13 @@
   <div class="space-y-4">
     <div class="flex items-center justify-between">
       <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300">代理设置 (可选)</h4>
-      <label class="flex cursor-pointer items-center">
-        <input
-          v-model="proxy.enabled"
-          class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:text-gray-100 dark:focus:ring-white"
-          type="checkbox"
-        />
-        <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">启用代理</span>
-      </label>
+      <Checkbox
+        v-model="proxy.enabled"
+        label="启用代理"
+        :input-class="'h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:text-gray-100 dark:focus:ring-white'"
+        :label-class="'flex cursor-pointer items-center'"
+        :text-class="'ml-2 text-sm text-gray-700 dark:text-gray-300'"
+      />
     </div>
 
     <div
@@ -111,20 +110,14 @@
       </div>
 
       <div class="space-y-4">
-        <div class="flex items-center">
-          <input
-            id="proxyAuth"
-            v-model="showAuth"
-            class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:text-gray-100 dark:focus:ring-white"
-            type="checkbox"
-          />
-          <label
-            class="ml-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300"
-            for="proxyAuth"
-          >
-            需要身份验证
-          </label>
-        </div>
+        <Checkbox
+          id="proxyAuth"
+          v-model="showAuth"
+          label="需要身份验证"
+          :input-class="'h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:text-gray-100 dark:focus:ring-white'"
+          :label-class="'flex items-center'"
+          :text-class="'ml-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300'"
+        />
 
         <div v-if="showAuth" class="grid grid-cols-2 gap-4">
           <div>
@@ -176,6 +169,7 @@
 
 <script setup>
 import { ref, watch, onUnmounted } from 'vue'
+import { Checkbox } from '@/ui'
 
 const props = defineProps({
   modelValue: {
