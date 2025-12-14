@@ -196,7 +196,8 @@ class DroidRelayService {
 
     try {
       logger.info(
-        `📤 Processing Droid API request for key: ${keyInfo.name || keyInfo.id || 'unknown'
+        `📤 Processing Droid API request for key: ${
+          keyInfo.name || keyInfo.id || 'unknown'
         }, endpoint: ${normalizedEndpoint}${sessionHash ? `, session: ${sessionHash}` : ''}`
       )
 
@@ -229,11 +230,12 @@ class DroidRelayService {
 
       logger.info(`🌐 Forwarding to Factory.ai: ${apiUrl}`)
 
-      const { proxy: effectiveProxy, source } = await proxyPolicyService.resolveEffectiveProxyConfig({
-        accountId: account.id,
-        platform: account.platform || 'droid',
-        accountProxy: account.proxy
-      })
+      const { proxy: effectiveProxy, source } =
+        await proxyPolicyService.resolveEffectiveProxyConfig({
+          accountId: account.id,
+          platform: account.platform || 'droid',
+          accountProxy: account.proxy
+        })
 
       const proxyAgent = ProxyHelper.createProxyAgentWithFallback(effectiveProxy)
 
@@ -873,9 +875,9 @@ class DroidRelayService {
 
     const inputTokens = toNumber(
       usageData.input_tokens ??
-      usageData.prompt_tokens ??
-      usageData.inputTokens ??
-      usageData.total_input_tokens
+        usageData.prompt_tokens ??
+        usageData.inputTokens ??
+        usageData.total_input_tokens
     )
     const totalTokens = toNumber(usageData.total_tokens ?? usageData.totalTokens)
 
@@ -889,8 +891,8 @@ class DroidRelayService {
     }
     const cacheReadTokens = toNumber(
       usageData.cache_read_input_tokens ??
-      usageData.cacheReadTokens ??
-      usageData.input_tokens_details?.cached_tokens
+        usageData.cacheReadTokens ??
+        usageData.input_tokens_details?.cached_tokens
     )
 
     const rawCacheCreateTokens =

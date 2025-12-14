@@ -48,7 +48,9 @@ class ProxyHelper {
         password: process.env.GLOBAL_PROXY_PASSWORD || null
       }
 
-      logger.info(`🌐 已加载全局代理配置: ${ProxyHelper.maskProxyInfo(ProxyHelper._globalProxyConfig)}`)
+      logger.info(
+        `🌐 已加载全局代理配置: ${ProxyHelper.maskProxyInfo(ProxyHelper._globalProxyConfig)}`
+      )
       return ProxyHelper._globalProxyConfig
     }
 
@@ -64,7 +66,9 @@ class ProxyHelper {
           password: globalConfig.password || null
         }
 
-        logger.info(`🌐 已加载全局代理配置（从配置文件）: ${ProxyHelper.maskProxyInfo(ProxyHelper._globalProxyConfig)}`)
+        logger.info(
+          `🌐 已加载全局代理配置（从配置文件）: ${ProxyHelper.maskProxyInfo(ProxyHelper._globalProxyConfig)}`
+        )
         return ProxyHelper._globalProxyConfig
       }
     }
@@ -333,8 +337,8 @@ class ProxyHelper {
           proxy.username.length <= 2
             ? proxy.username
             : proxy.username[0] +
-            '*'.repeat(Math.max(1, proxy.username.length - 2)) +
-            proxy.username.slice(-1)
+              '*'.repeat(Math.max(1, proxy.username.length - 2)) +
+              proxy.username.slice(-1)
         const maskedPassword = '*'.repeat(Math.min(8, proxy.password.length))
         proxyDesc += ` (auth: ${maskedUsername}:${maskedPassword})`
       }

@@ -1698,7 +1698,7 @@ class ClaudeRelayService {
               errorData
             )
             if (this._isOrganizationDisabledError(res.statusCode, errorData)) {
-              ; (async () => {
+              ;(async () => {
                 try {
                   logger.error(
                     `🚫 [Stream] Organization disabled error (400) detected for account ${accountId}, marking as blocked`

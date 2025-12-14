@@ -198,7 +198,9 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
 
     const { proxy: effectiveProxy } = await proxyPolicyService.resolveEffectiveProxyConfig({
       accountId: result.accountId,
-      platform: account?.platform || (result.accountType === 'openai-responses' ? 'openai-responses' : 'openai'),
+      platform:
+        account?.platform ||
+        (result.accountType === 'openai-responses' ? 'openai-responses' : 'openai'),
       accountProxy: account?.proxy || null
     })
     proxy = effectiveProxy
@@ -300,7 +302,7 @@ const handleResponses = async (req, res) => {
     }
 
     // 使用调度器选择账户
-    ; ({ accessToken, accountId, accountType, proxy, account } = await getOpenAIAuthToken(
+    ;({ accessToken, accountId, accountType, proxy, account } = await getOpenAIAuthToken(
       apiKeyData,
       sessionId,
       requestedModel
@@ -507,8 +509,8 @@ const handleResponses = async (req, res) => {
       if (errorData) {
         const messageCandidate =
           errorData.error &&
-            typeof errorData.error.message === 'string' &&
-            errorData.error.message.trim()
+          typeof errorData.error.message === 'string' &&
+          errorData.error.message.trim()
             ? errorData.error.message.trim()
             : typeof errorData.message === 'string' && errorData.message.trim()
               ? errorData.message.trim()

@@ -199,7 +199,11 @@ class Application {
       const adminSpaPath = path.join(__dirname, '..', 'web', 'admin-spa', 'dist')
       if (fs.existsSync(adminSpaPath)) {
         // 处理不带斜杠的路径，重定向到带斜杠的路径
-        this.app.get('/admin-next', (req, res) => {
+        // 注意：Express 默认非严格路由，`/admin-next` 会匹配 `/admin-next/`，会导致自重定向死循环
+        this.app.all(/^\/admin-next$/, (req, res) => {
+          if (req.method !== 'GET' && req.method !== 'HEAD') {
+            return res.status(405).send('Method Not Allowed')
+          }
           res.redirect(301, '/admin-next/')
         })
 

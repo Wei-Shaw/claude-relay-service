@@ -105,11 +105,12 @@ class OpenAIResponsesRelayService {
         signal: abortController.signal
       }
 
-      const { proxy: effectiveProxy, source } = await proxyPolicyService.resolveEffectiveProxyConfig({
-        accountId: fullAccount.id || account.id,
-        platform: fullAccount.platform || 'openai-responses',
-        accountProxy: fullAccount.proxy
-      })
+      const { proxy: effectiveProxy, source } =
+        await proxyPolicyService.resolveEffectiveProxyConfig({
+          accountId: fullAccount.id || account.id,
+          platform: fullAccount.platform || 'openai-responses',
+          accountProxy: fullAccount.proxy
+        })
 
       const proxyAgent = ProxyHelper.createProxyAgentWithFallback(effectiveProxy)
       if (proxyAgent) {

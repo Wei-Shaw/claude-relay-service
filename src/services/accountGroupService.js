@@ -87,7 +87,9 @@ class AccountGroupService {
       let normalizedProxy = null
       if (proxy !== null && proxy !== undefined && proxy !== '') {
         if (!ProxyHelper.validateProxyConfig(proxy)) {
-          throw new Error('代理配置无效（需要包含 type/host/port 且 type 必须为 socks5/http/https）')
+          throw new Error(
+            '代理配置无效（需要包含 type/host/port 且 type 必须为 socks5/http/https）'
+          )
         }
         normalizedProxy = typeof proxy === 'string' ? JSON.parse(proxy) : proxy
       }
@@ -167,7 +169,9 @@ class AccountGroupService {
           updateData.proxy = ''
         } else {
           if (!ProxyHelper.validateProxyConfig(incoming)) {
-            throw new Error('代理配置无效（需要包含 type/host/port 且 type 必须为 socks5/http/https）')
+            throw new Error(
+              '代理配置无效（需要包含 type/host/port 且 type 必须为 socks5/http/https）'
+            )
           }
           const normalized = typeof incoming === 'string' ? JSON.parse(incoming) : incoming
           updateData.proxy = JSON.stringify(normalized)
@@ -618,7 +622,8 @@ class AccountGroupService {
     let parsedProxy = null
     if (groupData.proxy) {
       try {
-        parsedProxy = typeof groupData.proxy === 'string' ? JSON.parse(groupData.proxy) : groupData.proxy
+        parsedProxy =
+          typeof groupData.proxy === 'string' ? JSON.parse(groupData.proxy) : groupData.proxy
       } catch (e) {
         parsedProxy = null
       }

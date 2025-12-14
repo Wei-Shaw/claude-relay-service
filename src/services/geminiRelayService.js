@@ -534,7 +534,7 @@ async function countTokens({
       const geminiError = error.response.data?.error
       const errorObj = new Error(
         geminiError?.message ||
-        `Gemini countTokens API request failed (Status: ${error.response.status})`
+          `Gemini countTokens API request failed (Status: ${error.response.status})`
       )
       errorObj.status = error.response.status
       errorObj.error = {

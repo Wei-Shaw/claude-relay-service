@@ -343,7 +343,7 @@ async function handleMessages(req, res) {
         model, // 传递请求的模型进行过滤
         { allowApiAccounts: true } // 允许调度 API 账户
       )
-        ; ({ accountId, accountType } = schedulerResult)
+      ;({ accountId, accountType } = schedulerResult)
     } catch (error) {
       logger.error('Failed to select Gemini account:', error)
       return res.status(503).json({
@@ -717,7 +717,10 @@ async function handleModels(req, res) {
       })
     }
 
-    const { proxy: effectiveProxyConfig } = await resolveEffectiveProxyConfig(selectedAccountId, account)
+    const { proxy: effectiveProxyConfig } = await resolveEffectiveProxyConfig(
+      selectedAccountId,
+      account
+    )
 
     // 获取模型列表
     let models
@@ -1914,7 +1917,7 @@ async function handleStandardGenerateContent(req, res) {
       model,
       { allowApiAccounts: true }
     )
-      ; ({ accountId } = schedulerResult)
+    ;({ accountId } = schedulerResult)
     const { accountType } = schedulerResult
 
     isApiAccount = accountType === 'gemini-api'
@@ -2169,7 +2172,7 @@ async function handleStandardStreamGenerateContent(req, res) {
       model,
       { allowApiAccounts: true }
     )
-      ; ({ accountId } = schedulerResult)
+    ;({ accountId } = schedulerResult)
     const { accountType } = schedulerResult
 
     isApiAccount = accountType === 'gemini-api'
@@ -2572,7 +2575,6 @@ module.exports = {
   ensureGeminiPermission,
   ensureGeminiPermissionMiddleware,
   applyRateLimitTracking,
-  parseProxyConfig,
   normalizeAxiosStreamError,
 
   // OpenAI 兼容格式处理函数

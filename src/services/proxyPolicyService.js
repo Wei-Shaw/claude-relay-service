@@ -180,7 +180,10 @@ class ProxyPolicyService {
     // 分组代理：按 proxyPriority(小优先) + 更新时间(新优先) 选择第一个
     if (accountId && normalizedPlatform) {
       try {
-        const groupsMap = await accountGroupService.getAccountGroupsMap([accountId], normalizedPlatform)
+        const groupsMap = await accountGroupService.getAccountGroupsMap(
+          [accountId],
+          normalizedPlatform
+        )
         const groups = groupsMap?.[accountId] || []
 
         const candidates = groups
@@ -214,7 +217,10 @@ class ProxyPolicyService {
           }
         }
       } catch (error) {
-        logger.warn('⚠️ Failed to resolve group proxy, falling back to platform/global:', error.message)
+        logger.warn(
+          '⚠️ Failed to resolve group proxy, falling back to platform/global:',
+          error.message
+        )
       }
     }
 
@@ -247,4 +253,3 @@ class ProxyPolicyService {
 }
 
 module.exports = new ProxyPolicyService()
-

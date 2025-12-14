@@ -364,7 +364,7 @@ async function createAccount(accountData) {
       expiresAt = oauthData.expiry_date ? new Date(oauthData.expiry_date).toISOString() : ''
     } else {
       // 如果只提供了 access token
-      ; ({ accessToken } = accountData)
+      ;({ accessToken } = accountData)
       refreshToken = accountData.refreshToken || ''
 
       // 构造完整的 OAuth 数据
@@ -1005,13 +1005,13 @@ async function markAccountUsed(accountId) {
 async function setAccountRateLimited(accountId, isLimited = true) {
   const updates = isLimited
     ? {
-      rateLimitStatus: 'limited',
-      rateLimitedAt: new Date().toISOString()
-    }
+        rateLimitStatus: 'limited',
+        rateLimitedAt: new Date().toISOString()
+      }
     : {
-      rateLimitStatus: '',
-      rateLimitedAt: ''
-    }
+        rateLimitStatus: '',
+        rateLimitedAt: ''
+      }
 
   await updateAccount(accountId, updates)
 }
