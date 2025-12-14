@@ -4,8 +4,8 @@
       <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300">代理设置 (可选)</h4>
       <Checkbox
         v-model="proxy.enabled"
-        label="启用代理"
         :input-class="'h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:text-gray-100 dark:focus:ring-white'"
+        label="启用代理"
         :label-class="'flex cursor-pointer items-center'"
         :text-class="'ml-2 text-sm text-gray-700 dark:text-gray-300'"
       />
@@ -113,8 +113,8 @@
         <Checkbox
           id="proxyAuth"
           v-model="showAuth"
-          label="需要身份验证"
           :input-class="'h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:text-gray-100 dark:focus:ring-white'"
+          label="需要身份验证"
           :label-class="'flex items-center'"
           :text-class="'ml-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300'"
         />

@@ -741,10 +741,10 @@
                       v-for="group in filteredGroups"
                       :key="group.id"
                       v-model="form.groupIds"
-                      :value="group.id"
-                      :label-class="'flex cursor-pointer items-center gap-2 rounded-md p-2 hover:bg-gray-50 dark:hover:bg-gray-600'"
                       :input-class="'rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white'"
+                      :label-class="'flex cursor-pointer items-center gap-2 rounded-md p-2 hover:bg-gray-50 dark:hover:bg-gray-600'"
                       :text-class="'text-sm text-gray-700 dark:text-gray-200'"
+                      :value="group.id"
                     >
                       {{ group.name }} ({{ group.memberCount || 0 }} 个成员)
                     </Checkbox>
@@ -1052,13 +1052,14 @@
                     :key="model"
                     class="flex cursor-pointer items-center"
                   >
-                    <input
+                    <Checkbox
                       v-model="form.supportedModels"
-                      class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
-                      type="checkbox"
+                      :input-class="'mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white'"
+                      :label="model"
+                      :label-class="'flex cursor-pointer items-center'"
+                      :text-class="'text-sm text-gray-700 dark:text-gray-300'"
                       :value="model"
                     />
-                    <span class="text-sm text-gray-700 dark:text-gray-300">{{ model }}</span>
                   </label>
                 </div>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -1073,14 +1074,13 @@
                   >限流机制</label
                 >
                 <div class="mb-3">
-                  <label class="inline-flex cursor-pointer items-center">
-                    <input
-                      v-model="form.enableRateLimit"
-                      class="mr-2 rounded border-gray-300 text-gray-900 focus:border-gray-900 focus:ring focus:ring-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:border-white dark:focus:ring-gray-700"
-                      type="checkbox"
-                    />
-                    <span class="text-sm text-gray-700 dark:text-gray-300">启用限流机制</span>
-                  </label>
+                  <Checkbox
+                    v-model="form.enableRateLimit"
+                    :input-class="'mr-2 rounded border-gray-300 text-gray-900 focus:border-gray-900 focus:ring focus:ring-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:border-white dark:focus:ring-gray-700'"
+                    label="启用限流机制"
+                    :label-class="'inline-flex cursor-pointer items-center'"
+                    :text-class="'text-sm text-gray-700 dark:text-gray-300'"
+                  />
                   <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     启用后，当账号返回429错误时将暂停调度一段时间
                   </p>
@@ -1251,15 +1251,15 @@
                           : 'border-gray-300'
                       "
                     >
-                      <input
+                      <Checkbox
                         v-model="allowedModels"
-                        class="mr-2 text-gray-900 focus:ring-gray-900 dark:text-gray-100 dark:focus:ring-white"
-                        type="checkbox"
                         :value="model.value"
-                      />
-                      <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
-                        model.label
-                      }}</span>
+                        :input-class="'mr-2 text-gray-900 focus:ring-gray-900 dark:text-gray-100 dark:focus:ring-white'"
+                        :label-class="'flex cursor-pointer items-center'"
+                        :text-class="'text-sm font-medium text-gray-700 dark:text-gray-300'"
+                      >
+                        {{ model.label }}
+                      </Checkbox>
                     </label>
                   </div>
 
@@ -1426,14 +1426,13 @@
                   >限流机制</label
                 >
                 <div class="mb-3">
-                  <label class="inline-flex cursor-pointer items-center">
-                    <input
-                      v-model="form.enableRateLimit"
-                      class="mr-2 rounded border-gray-300 text-gray-900 focus:border-gray-900 focus:ring focus:ring-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:border-white dark:focus:ring-gray-700"
-                      type="checkbox"
-                    />
-                    <span class="text-sm text-gray-700 dark:text-gray-300">启用限流机制</span>
-                  </label>
+                  <Checkbox
+                    v-model="form.enableRateLimit"
+                    label="启用限流机制"
+                    :input-class="'mr-2 rounded border-gray-300 text-gray-900 focus:border-gray-900 focus:ring focus:ring-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:border-white dark:focus:ring-gray-700'"
+                    :label-class="'inline-flex cursor-pointer items-center'"
+                    :text-class="'text-sm text-gray-700 dark:text-gray-300'"
+                  />
                   <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     启用后，当账号返回429错误时将暂停调度一段时间
                   </p>
@@ -1461,16 +1460,14 @@
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >上游错误处理</label
                 >
-                <label class="inline-flex cursor-pointer items-center">
-                  <input
-                    v-model="form.disableAutoProtection"
-                    class="mr-2 rounded border-gray-300 text-gray-900 focus:border-gray-900 focus:ring focus:ring-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:border-white dark:focus:ring-gray-700"
-                    type="checkbox"
-                  />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">
-                    上游错误不自动暂停调度
-                  </span>
-                </label>
+                <Checkbox
+                  v-model="form.disableAutoProtection"
+                  :input-class="'mr-2 rounded border-gray-300 text-gray-900 focus:border-gray-900 focus:ring focus:ring-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:border-white dark:focus:ring-gray-700'"
+                  :label-class="'inline-flex cursor-pointer items-center'"
+                  :text-class="'text-sm text-gray-700 dark:text-gray-300'"
+                >
+                  上游错误不自动暂停调度
+                </Checkbox>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   勾选后遇到 401/400/429/529 等上游错误仅记录日志并透传，不自动禁用或限流
                 </p>
@@ -1637,13 +1634,13 @@
 
             <!-- Claude 5小时限制自动停止调度选项 -->
             <div v-if="form.platform === 'claude'" class="mt-4">
-              <label class="flex items-start">
-                <input
-                  v-model="form.autoStopOnWarning"
-                  class="mt-1 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
-                  type="checkbox"
-                />
-                <div class="ml-3">
+              <Checkbox
+                v-model="form.autoStopOnWarning"
+                :input-class="'mt-1 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white'"
+                :label-class="'flex items-start'"
+                :text-class="'ml-3'"
+              >
+                <div>
                   <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
                     5小时使用量接近限制时自动停止调度
                   </span>
@@ -1651,18 +1648,18 @@
                     当系统检测到账户接近5小时使用限制时，自动暂停调度该账户。进入新的时间窗口后会自动恢复调度。
                   </p>
                 </div>
-              </label>
+              </Checkbox>
             </div>
 
             <!-- Claude User-Agent 版本配置 -->
             <div v-if="form.platform === 'claude'" class="mt-4">
-              <label class="flex items-start">
-                <input
-                  v-model="form.useUnifiedUserAgent"
-                  class="mt-1 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
-                  type="checkbox"
-                />
-                <div class="ml-3">
+              <Checkbox
+                v-model="form.useUnifiedUserAgent"
+                :input-class="'mt-1 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white'"
+                :label-class="'flex items-start'"
+                :text-class="'ml-3'"
+              >
+                <div>
                   <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
                     使用统一 Claude Code 版本
                   </span>

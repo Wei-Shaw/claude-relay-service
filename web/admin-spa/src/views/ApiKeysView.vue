@@ -265,11 +265,10 @@
                       class="checkbox-column sticky left-0 z-20 min-w-[50px] px-3 py-4 text-left"
                     >
                       <div class="flex items-center">
-                        <input
+                        <Checkbox
                           v-model="selectAllChecked"
-                          class="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-400 dark:text-white dark:focus:ring-gray-500"
                           :indeterminate="isIndeterminate"
-                          type="checkbox"
+                          :input-class="'h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-400 dark:text-white dark:focus:ring-gray-500'"
                           @change="handleSelectAll"
                         />
                       </div>
@@ -421,10 +420,9 @@
                         class="checkbox-column sticky left-0 z-10 px-3 py-3"
                       >
                         <div class="flex items-center">
-                          <input
+                          <Checkbox
                             v-model="selectedApiKeys"
-                            class="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-400 dark:text-white dark:focus:ring-gray-500"
-                            type="checkbox"
+                            :input-class="'h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-400 dark:text-white dark:focus:ring-gray-500'"
                             :value="key.id"
                             @change="updateSelectAllState"
                           />
@@ -1226,19 +1224,14 @@
 
           <!-- 移动端卡片视图 -->
           <div v-if="!apiKeysLoading && sortedApiKeys.length > 0" class="space-y-3 md:hidden">
-            <div
-              v-for="key in paginatedApiKeys"
-              :key="key.id"
-              class="card p-4"
-            >
+            <div v-for="key in paginatedApiKeys" :key="key.id" class="card p-4">
               <!-- 卡片头部 -->
               <div class="mb-3 flex items-start justify-between">
                 <div class="flex items-center gap-3">
-                  <input
+                  <Checkbox
                     v-if="shouldShowCheckboxes"
                     v-model="selectedApiKeys"
-                    class="mt-1 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:text-white dark:focus:ring-white"
-                    type="checkbox"
+                    :input-class="'mt-1 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:text-white dark:focus:ring-white'"
                     :value="key.id"
                     @change="updateSelectAllState"
                   />
@@ -2101,7 +2094,7 @@ import UsageDetailModal from '@/components/apikeys/UsageDetailModal.vue'
 import LimitProgressBar from '@/components/apikeys/LimitProgressBar.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 import ActionDropdown from '@/components/common/ActionDropdown.vue'
-import { Progress, Badge } from '@/ui'
+import { Progress, Badge, Checkbox } from '@/ui'
 
 // 响应式数据
 const router = useRouter()

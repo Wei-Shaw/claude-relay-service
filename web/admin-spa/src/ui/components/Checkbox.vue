@@ -1,8 +1,7 @@
 <template>
   <label
     :class="
-      labelClass ||
-      [
+      labelClass || [
         'ds-checkbox-label',
         {
           'ds-checkbox-label--disabled': disabled
@@ -12,9 +11,9 @@
   >
     <input
       :checked="modelValue"
-      type="checkbox"
       :class="inputClass || 'ds-checkbox'"
       :disabled="disabled"
+      type="checkbox"
       v-bind="$attrs"
       @change="handleChange"
     />

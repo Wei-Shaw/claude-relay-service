@@ -177,11 +177,10 @@
                   class="checkbox-column sticky left-0 z-20 min-w-[50px] px-3 py-4 text-left"
                 >
                   <div class="flex items-center">
-                    <input
+                    <Checkbox
                       v-model="selectAllChecked"
-                      class="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:text-white dark:focus:ring-white"
                       :indeterminate="isIndeterminate"
-                      type="checkbox"
+                      :input-class="'h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:text-white dark:focus:ring-white'"
                       @change="handleSelectAll"
                     />
                   </div>
@@ -410,10 +409,9 @@
                   class="checkbox-column sticky left-0 z-10 px-3 py-3"
                 >
                   <div class="flex items-center">
-                    <input
+                    <Checkbox
                       v-model="selectedAccounts"
-                      class="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:text-white dark:focus:ring-white"
-                      type="checkbox"
+                      :input-class="'h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:text-white dark:focus:ring-white'"
                       :value="account.id"
                       @change="updateSelectAllState"
                     />
@@ -1240,19 +1238,14 @@
 
       <!-- 移动端卡片视图 -->
       <div v-if="!accountsLoading && sortedAccounts.length > 0" class="space-y-3 md:hidden">
-        <div
-          v-for="account in paginatedAccounts"
-          :key="account.id"
-          class="card p-4"
-        >
+        <div v-for="account in paginatedAccounts" :key="account.id" class="card p-4">
           <!-- 卡片头部 -->
           <div class="mb-3 flex items-start justify-between">
             <div class="flex items-center gap-3">
-              <input
+              <Checkbox
                 v-if="shouldShowCheckboxes"
                 v-model="selectedAccounts"
-                class="mt-1 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:text-white dark:focus:ring-white"
-                type="checkbox"
+                :input-class="'mt-1 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:text-white dark:focus:ring-white'"
                 :value="account.id"
                 @change="updateSelectAllState"
               />
@@ -1937,7 +1930,7 @@ import AccountTestModal from '@/components/accounts/AccountTestModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 import ActionDropdown from '@/components/common/ActionDropdown.vue'
-import { Progress, Badge } from '@/ui'
+import { Progress, Badge, Checkbox } from '@/ui'
 
 // 使用确认弹窗
 const { showConfirmModal, confirmOptions, showConfirm, handleConfirm, handleCancel } = useConfirm()

@@ -700,7 +700,7 @@ import { storeToRefs } from 'pinia'
 import { useDashboardStore } from '@/stores/dashboard'
 import { useThemeStore } from '@/stores/theme'
 import Chart from 'chart.js/auto'
-import { Badge } from '@/ui'
+import { Badge, Checkbox } from '@/ui'
 
 const dashboardStore = useDashboardStore()
 const themeStore = useThemeStore()

@@ -121,8 +121,8 @@
             <div class="mb-3">
               <Checkbox
                 v-model="enableRateLimit"
-                label="启用限流机制（429 时暂停调度）"
                 :input-class="'mr-2 rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white'"
+                label="启用限流机制（429 时暂停调度）"
                 :label-class="'inline-flex cursor-pointer items-center'"
                 :text-class="'text-sm text-gray-700 dark:text-gray-300'"
               />

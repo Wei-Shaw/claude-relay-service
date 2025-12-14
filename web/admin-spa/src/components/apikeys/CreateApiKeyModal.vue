@@ -737,8 +737,8 @@
               <Checkbox
                 id="enableModelRestriction"
                 v-model="form.enableModelRestriction"
-                label="启用模型限制"
                 :input-class="'h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white'"
+                label="启用模型限制"
                 :label-class="'flex items-center'"
                 :text-class="'ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300'"
               />
@@ -819,8 +819,8 @@
               <Checkbox
                 id="enableClientRestriction"
                 v-model="form.enableClientRestriction"
-                label="启用客户端限制"
                 :input-class="'h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white'"
+                label="启用客户端限制"
                 :label-class="'flex items-center'"
                 :text-class="'ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300'"
               />
@@ -839,10 +839,10 @@
                     <Checkbox
                       :id="`client_${client.id}`"
                       v-model="form.allowedClients"
-                      :value="client.id"
                       :input-class="'mt-0.5 h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white'"
                       :label-class="'flex items-start'"
                       :text-class="'ml-2 flex-1 cursor-pointer'"
+                      :value="client.id"
                     >
                       <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
                         client.name
