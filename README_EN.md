@@ -80,16 +80,21 @@ If you have any of these concerns, this project might be suitable for you.
 > 📸 **[Click to view interface preview](docs/preview.md)** - See detailed screenshots of the Web management interface
 
 ### Basic Features
-- ✅ **Multi-account Management**: Add multiple Claude accounts for automatic rotation
-- ✅ **Custom API Keys**: Assign independent keys to each person
-- ✅ **Usage Statistics**: Detailed records of how many tokens each person used
+- ✅ **Multi-platform Account Management**: Support Claude (Official/Console), Gemini, OpenAI, AWS Bedrock, Azure OpenAI, Droid, CCR and other account types
+- ✅ **Custom API Keys**: Assign independent keys with fine-grained permission control
+- ✅ **Usage Statistics**: Detailed token usage records with real-time cost calculation
+- ✅ **User Management System**: Support user registration, login, LDAP/AD integration
+- ✅ **Account Grouping**: Support account grouping and priority scheduling
 
 ### Advanced Features
-- 🔄 **Smart Switching**: Automatically switch to next account when one has issues
-- 🚀 **Performance Optimization**: Connection pooling, caching to reduce latency
-- 📊 **Monitoring Dashboard**: Web interface to view all data
-- 🛡️ **Security Control**: Access restrictions, rate limiting
-- 🌐 **Proxy Support**: Support for HTTP/SOCKS5 proxies
+- 🔄 **Smart Scheduling**: Unified scheduler for cross-platform intelligent account selection and failover
+- 🔗 **Sticky Sessions**: Same session always uses same account, with auto-renewal support
+- 🚀 **Performance Optimization**: Connection pooling, multi-layer caching, concurrency control
+- 📊 **Monitoring Dashboard**: Web interface for all data, real-time metrics, cache monitoring
+- 🛡️ **Security Control**: Access restrictions, rate limiting, client restrictions, model blacklist
+- 🌐 **Proxy Support**: HTTP/SOCKS5 proxy with per-account configuration
+- 🔔 **Webhook Notifications**: Event notification and webhook configuration management
+- ⚡ **Concurrent Queueing**: Smart queueing when API key concurrency limit exceeded, avoiding 429 errors
 
 ---
 
@@ -208,19 +213,33 @@ Browser visit: `http://your-server-IP:3000/web`
 
 Default admin account: Look in data/init.json
 
-### 2. Add Claude Account
+### 2. Add Accounts
 
-This step is quite important, requires OAuth authorization:
+The system supports multiple account types, add as needed:
 
-1. Click "Claude Accounts" tab
-2. If you're worried about multiple accounts sharing 1 IP getting banned, you can optionally set a static proxy IP
-3. Click "Add Account"
-4. Click "Generate Authorization Link", will open a new page
-5. Complete Claude login and authorization in the new page
-6. Copy the returned Authorization Code
-7. Paste to page to complete addition
+#### Claude Accounts (Official/Console)
 
-**Note**: If you're in China, this step may require VPN.
+OAuth authorization method:
+
+1. In account management page, click "Add Account"
+2. Select account type (Claude Official or Claude Console)
+3. If worried about multiple accounts sharing IP getting banned, you can set independent proxy (optional)
+4. Click "Generate Authorization Link", complete Claude login and authorization in new page
+5. Copy the returned Authorization Code and paste to input box to complete addition
+
+#### Other Account Types
+
+- **Gemini Account**: Support Google OAuth authorization or API Key method
+- **OpenAI Responses (Codex)**: Enter OpenAI API Key
+- **AWS Bedrock**: Configure AWS credentials (Access Key, Secret Key, Region)
+- **Azure OpenAI**: Configure Azure endpoint and API Key
+- **Droid (Factory.ai)**: Enter Droid API Key
+- **CCR Account**: Configure CCR credentials
+
+**Notes**:
+- For OAuth authorization, VPN may be required if in China
+- Each account supports independent proxy configuration
+- You can set groups and priorities for accounts
 
 ### 3. Create API Key
 
@@ -228,8 +247,15 @@ Assign a key to each user:
 
 1. Click "API Keys" tab
 2. Click "Create New Key"
-3. Give the key a name, like "Zhang San's Key"
-4. Set usage limits (optional)
+3. Give the key a name, like "User A's Key"
+4. Set usage limits and permissions (optional):
+   - **Permission Control**: Select accessible service types (All/Claude Only/Gemini Only/OpenAI Only, etc.)
+   - **Rate Limiting**: Limit requests and token usage per time window
+   - **Concurrency Limit**: Limit number of simultaneous requests
+   - **Concurrent Queueing**: When enabled, exceeded requests queue instead of returning 429 error
+   - **Client Restrictions**: Restrict to specific clients (like ClaudeCode, Gemini-CLI, etc.)
+   - **Model Blacklist**: Prohibit access to specific models
+   - **Account Group Binding**: Bind to specific account groups
 5. Save, note down the generated key
 
 ### 4. Start Using Claude Code and Gemini CLI
@@ -369,6 +395,46 @@ redis-cli ping
 - Check if API Key is correct
 - View log files for error information
 - Confirm Claude account status is normal
+
+---
+
+## ⚙️ Important Environment Variables
+
+### User Management and Authentication
+
+- `USER_MANAGEMENT_ENABLED`: Enable user management system (default false)
+- `LDAP_ENABLED`: Enable LDAP authentication (default false)
+- `LDAP_URL`: LDAP server address (e.g., ldaps://ldap.example.com:636)
+- `LDAP_TLS_REJECT_UNAUTHORIZED`: LDAP certificate verification (default true, set to false for self-signed certificates)
+- `MAX_API_KEYS_PER_USER`: Maximum API keys per user (default 1)
+- `ALLOW_USER_DELETE_API_KEYS`: Allow users to delete their own API keys (default false)
+
+### Session and Scheduling
+
+- `STICKY_SESSION_TTL_HOURS`: Sticky session TTL in hours (default 1)
+- `STICKY_SESSION_RENEWAL_THRESHOLD_MINUTES`: Sticky session renewal threshold in minutes (default 0)
+- `USER_MESSAGE_QUEUE_ENABLED`: Enable user message serial queue (default false)
+- `CLAUDE_OVERLOAD_HANDLING_MINUTES`: Claude 529 error handling duration in minutes (0 to disable)
+
+### Webhook and Notifications
+
+- `WEBHOOK_ENABLED`: Enable webhook notifications (default true)
+- `WEBHOOK_URLS`: Webhook notification URL list (comma-separated)
+
+### Performance and Monitoring
+
+- `METRICS_WINDOW`: Real-time metrics statistics window in minutes (1-60, default 5)
+- `REQUEST_TIMEOUT`: Request timeout in milliseconds (default 600000, i.e., 10 minutes)
+- `DEBUG_HTTP_TRAFFIC`: Enable HTTP request/response debug logs (default false, dev only)
+- `CLEAR_CONCURRENCY_QUEUES_ON_STARTUP`: Clear residual concurrency queue counters on startup (default true, set to false for multi-instance deployments)
+
+### Proxy Configuration
+
+- `PROXY_USE_IPV4`: Use IPv4 for proxy (default true, better compatibility)
+- `DEFAULT_PROXY_TIMEOUT`: Proxy timeout in milliseconds (default 600000)
+- `MAX_PROXY_RETRIES`: Maximum proxy retries (default 3)
+
+For complete environment variable list, refer to `.env.example` file.
 
 ---
 

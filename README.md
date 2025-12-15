@@ -80,17 +80,22 @@
 
 ### 基础功能
 
-- ✅ **多账户管理**: 可以添加多个Claude账户自动轮换
-- ✅ **自定义API Key**: 给每个人分配独立的Key
-- ✅ **使用统计**: 详细记录每个人用了多少token
+- ✅ **多平台账户管理**: 支持 Claude (官方/Console)、Gemini、OpenAI、AWS Bedrock、Azure OpenAI、Droid、CCR 等多种账户类型
+- ✅ **自定义API Key**: 给每个人分配独立的Key，支持细粒度权限控制
+- ✅ **使用统计**: 详细记录每个人用了多少token，实时成本计算
+- ✅ **用户管理系统**: 支持用户注册、登录，LDAP/AD集成
+- ✅ **账户分组**: 支持账户分组管理和优先级调度
 
 ### 高级功能
 
-- 🔄 **智能切换**: 账户出问题自动换下一个
-- 🚀 **性能优化**: 连接池、缓存，减少延迟
-- 📊 **监控面板**: Web界面查看所有数据
-- 🛡️ **安全控制**: 访问限制、速率控制、客户端限制
-- 🌐 **代理支持**: 支持HTTP/SOCKS5代理
+- 🔄 **智能调度**: 统一调度器实现跨平台账户智能选择和故障转移
+- 🔗 **粘性会话**: 同一会话始终使用同一账户，支持自动续期
+- 🚀 **性能优化**: 连接池、多层缓存、并发控制
+- 📊 **监控面板**: Web界面查看所有数据、实时指标、缓存监控
+- 🛡️ **安全控制**: 访问限制、速率控制、客户端限制、模型黑名单
+- 🌐 **代理支持**: 支持HTTP/SOCKS5代理，每账户独立配置
+- 🔔 **Webhook通知**: 支持事件通知和Webhook配置管理
+- ⚡ **并发排队**: API Key并发超限时智能排队，避免429错误
 
 ---
 
@@ -355,19 +360,33 @@ docker-compose.yml 已包含：
 - 环境变量预设：通过 ADMIN_USERNAME 和 ADMIN_PASSWORD 设置
 - Docker 部署：查看容器日志 `docker logs claude-relay-service`
 
-### 2. 添加Claude账户
+### 2. 添加账户
 
-这一步比较关键，需要OAuth授权：
+系统支持多种账户类型，根据需要添加：
 
-1. 点击「Claude账户」标签
-2. 如果你担心多个账号共用1个IP怕被封禁，可以选择设置静态代理IP（可选）
-3. 点击「添加账户」
-4. 点击「生成授权链接」，会打开一个新页面
-5. 在新页面完成Claude登录和授权
-6. 复制返回的Authorization Code
-7. 粘贴到页面完成添加
+#### Claude账户（官方/Console）
 
-**注意**: 如果你在国内，这一步可能需要科学上网。
+OAuth授权方式：
+
+1. 在账户管理页面点击「添加账户」
+2. 选择账户类型（Claude官方 或 Claude Console）
+3. 如果担心多账号共用IP被封禁，可设置独立代理（可选）
+4. 点击「生成授权链接」，在新页面完成Claude登录和授权
+5. 复制返回的Authorization Code并粘贴到输入框完成添加
+
+#### 其他账户类型
+
+- **Gemini账户**: 支持 Google OAuth 授权或 API Key 方式
+- **OpenAI Responses (Codex)**: 输入 OpenAI API Key
+- **AWS Bedrock**: 配置 AWS 凭据（Access Key、Secret Key、Region）
+- **Azure OpenAI**: 配置 Azure 端点和 API Key
+- **Droid (Factory.ai)**: 输入 Droid API Key
+- **CCR账户**: 配置 CCR 凭据
+
+**注意**:
+- OAuth授权时，如果在国内需要科学上网
+- 每个账户支持独立的代理配置
+- 可以为账户设置分组和优先级
 
 ### 3. 创建API Key
 
@@ -376,11 +395,14 @@ docker-compose.yml 已包含：
 1. 点击「API Keys」标签
 2. 点击「创建新Key」
 3. 给Key起个名字，比如「张三的Key」
-4. 设置使用限制（可选）：
+4. 设置使用限制和权限（可选）：
+   - **权限控制**: 选择可访问的服务类型（所有/仅Claude/仅Gemini/仅OpenAI等）
    - **速率限制**: 限制每个时间窗口的请求次数和Token使用量
    - **并发限制**: 限制同时处理的请求数
-   - **模型限制**: 限制可访问的模型列表
+   - **并发排队**: 启用后，超限请求会排队等待而非直接返回429错误
    - **客户端限制**: 限制只允许特定客户端使用（如ClaudeCode、Gemini-CLI等）
+   - **模型黑名单**: 禁止访问特定模型
+   - **账户组绑定**: 绑定到特定账户组
 5. 保存，记下生成的Key
 
 ### 4. 开始使用 Claude Code 和 Gemini CLI
@@ -595,19 +617,32 @@ gpt-5                      # Codex使用固定模型ID
 **接入要点：**
 
 - 所有账号类型都使用相同的API密钥（在后台统一创建）
-- 根据不同的路由前缀自动识别账号类型
-- `/claude/` - 使用Claude账号池
-- `/droid/claude/` - 使用Droid类型Claude账号池（只建议api调用或Droid Cli中使用）
-- `/gemini/` - 使用Gemini账号池  
-- `/openai/` - 使用Codex账号（只支持Openai-Response格式）
-- `/droid/openai/` - 使用Droid类型OpenAI兼容账号池（只建议api调用或Droid Cli中使用）
-- 支持所有标准API端点（messages、models等）
+- 根据不同的路由前缀自动识别账号类型：
+
+**Claude相关路由：**
+- `/api/` 或 `/claude/` - 使用Claude账号池（官方/Console/Bedrock/CCR统一调度）
+- `/droid/claude/` - 使用Droid类型Claude账号池（Droid CLI专用）
+
+**Gemini相关路由：**
+- `/gemini/` - 使用Gemini账号池（支持OAuth和API Key方式）
+
+**OpenAI相关路由：**
+- `/openai/` - 使用OpenAI Responses账号（Codex，只支持Openai-Response格式）
+- `/droid/openai/` - 使用Droid类型OpenAI兼容账号池（Droid CLI专用）
+
+**其他平台路由：**
+- `/azure/` - 使用Azure OpenAI账号
+- `/droid/comm/` - 通用聊天完成接口（支持Gemini、GLM等模型）
+
+- 支持所有标准API端点（messages、models、chat/completions等）
+- 系统自动根据API Key权限、账户组绑定和路由前缀选择最优账户
 
 **重要说明：**
 
-- 确保在后台已添加对应类型的账号（Claude/Gemini/Codex）
-- API密钥可以通用，系统会根据路由自动选择账号类型
-- 建议为不同用户创建不同的API密钥便于使用统计
+- 确保在后台已添加对应类型的账号（Claude/Gemini/OpenAI/Bedrock/Azure等）
+- API密钥支持权限控制，可限制访问特定平台
+- API密钥可绑定账户组，实现更精细的调度控制
+- 建议为不同用户创建不同的API密钥便于使用统计和权限管理
 
 ---
 
@@ -734,6 +769,46 @@ redis-cli ping
 - 检查API Key是否正确
 - 查看日志文件找错误信息
 - 确认Claude账户状态正常
+
+---
+
+## ⚙️ 重要环境变量配置
+
+### 用户管理和认证
+
+- `USER_MANAGEMENT_ENABLED`: 启用用户管理系统（默认false）
+- `LDAP_ENABLED`: 启用LDAP认证（默认false）
+- `LDAP_URL`: LDAP服务器地址（如 ldaps://ldap.example.com:636）
+- `LDAP_TLS_REJECT_UNAUTHORIZED`: LDAP证书验证（默认true，自签名证书可设为false）
+- `MAX_API_KEYS_PER_USER`: 每用户最大API Key数量（默认1）
+- `ALLOW_USER_DELETE_API_KEYS`: 允许用户删除自己的API Keys（默认false）
+
+### 会话和调度
+
+- `STICKY_SESSION_TTL_HOURS`: 粘性会话TTL（小时，默认1）
+- `STICKY_SESSION_RENEWAL_THRESHOLD_MINUTES`: 粘性会话续期阈值（分钟，默认0）
+- `USER_MESSAGE_QUEUE_ENABLED`: 启用用户消息串行队列（默认false）
+- `CLAUDE_OVERLOAD_HANDLING_MINUTES`: Claude 529错误处理持续时间（分钟，0表示禁用）
+
+### Webhook和通知
+
+- `WEBHOOK_ENABLED`: 启用Webhook通知（默认true）
+- `WEBHOOK_URLS`: Webhook通知URL列表（逗号分隔）
+
+### 性能和监控
+
+- `METRICS_WINDOW`: 实时指标统计窗口（分钟，1-60，默认5）
+- `REQUEST_TIMEOUT`: 请求超时时间（毫秒，默认600000即10分钟）
+- `DEBUG_HTTP_TRAFFIC`: 启用HTTP请求/响应调试日志（默认false，仅开发环境）
+- `CLEAR_CONCURRENCY_QUEUES_ON_STARTUP`: 启动时清理残留的并发排队计数器（默认true，多实例部署时建议设为false）
+
+### 代理配置
+
+- `PROXY_USE_IPV4`: 代理使用IPv4（默认true，兼容性更好）
+- `DEFAULT_PROXY_TIMEOUT`: 代理超时时间（毫秒，默认600000）
+- `MAX_PROXY_RETRIES`: 代理最大重试次数（默认3）
+
+完整环境变量列表请参考 `.env.example` 文件。
 
 ---
 
