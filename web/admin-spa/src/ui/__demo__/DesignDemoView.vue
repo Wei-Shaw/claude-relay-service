@@ -22,6 +22,167 @@
 
     <!-- Demo Content -->
     <div class="demo-content">
+      <!-- Vue Components Section -->
+      <section v-if="activeSection === 'components'" class="demo-section">
+        <h2 class="section-title">Vue Button Component</h2>
+        <p class="section-description">
+          Vercel-inspired button component with smooth hover effects and multiple variants.
+        </p>
+
+        <div class="component-group">
+          <div class="component-label">
+            <strong>Primary Buttons</strong>
+            <span class="component-description"
+              >Bold, high-contrast buttons for primary actions</span
+            >
+          </div>
+          <div class="button-row">
+            <Button size="sm" variant="primary">Small Primary</Button>
+            <Button variant="primary">Default Primary</Button>
+            <Button size="lg" variant="primary">Large Primary</Button>
+            <Button disabled variant="primary">Disabled</Button>
+            <Button :loading="loadingState" variant="primary">
+              {{ loadingState ? 'Loading...' : 'Click to Load' }}
+            </Button>
+            <Button variant="primary" @click="toggleLoading">
+              {{ loadingState ? 'Stop Loading' : 'Start Loading' }}
+            </Button>
+          </div>
+          <div class="hover-hint">
+            💡 Hover effect: Background lightens from #000 to #333 with smooth 0.15s transition
+          </div>
+        </div>
+
+        <div class="component-group">
+          <div class="component-label">
+            <strong>Secondary Buttons</strong>
+            <span class="component-description"
+              >Subtle buttons with border, perfect for secondary actions</span
+            >
+          </div>
+          <div class="button-row">
+            <Button size="sm" variant="secondary">Small Secondary</Button>
+            <Button variant="secondary">Default Secondary</Button>
+            <Button size="lg" variant="secondary">Large Secondary</Button>
+            <Button disabled variant="secondary">Disabled</Button>
+            <Button :loading="loadingState" variant="secondary">Loading</Button>
+          </div>
+          <div class="hover-hint">
+            💡 Hover effect: Subtle gray background overlay (rgba(0,0,0,0.05)) appears with 0.15s
+            ease transition
+          </div>
+        </div>
+
+        <div class="component-group">
+          <div class="component-label">
+            <strong>Outline Buttons</strong>
+            <span class="component-description">Transparent background with border</span>
+          </div>
+          <div class="button-row">
+            <Button size="sm" variant="outline">Small Outline</Button>
+            <Button variant="outline">Default Outline</Button>
+            <Button size="lg" variant="outline">Large Outline</Button>
+            <Button disabled variant="outline">Disabled</Button>
+          </div>
+          <div class="hover-hint">
+            💡 Hover effect: Border darkens and subtle background appears
+          </div>
+        </div>
+
+        <div class="component-group">
+          <div class="component-label">
+            <strong>Danger Buttons</strong>
+            <span class="component-description">Red buttons for destructive actions</span>
+          </div>
+          <div class="button-row">
+            <Button variant="danger">Delete</Button>
+            <Button size="lg" variant="danger">Confirm Delete</Button>
+            <Button disabled variant="danger">Disabled Delete</Button>
+          </div>
+          <div class="hover-hint">💡 Hover effect: Background darkens from #e00 to #c00</div>
+        </div>
+
+        <div class="component-group">
+          <div class="component-label">
+            <strong>Danger Outline Buttons</strong>
+            <span class="component-description"
+              >Less aggressive danger actions with border style</span
+            >
+          </div>
+          <div class="button-row">
+            <Button variant="danger-outline">Remove</Button>
+            <Button size="lg" variant="danger-outline">Clear All</Button>
+            <Button disabled variant="danger-outline">Disabled</Button>
+          </div>
+          <div class="hover-hint">
+            💡 Hover effect: Fills with red background and text turns white
+          </div>
+        </div>
+
+        <div class="component-group">
+          <div class="component-label">
+            <strong>Ghost Buttons</strong>
+            <span class="component-description">Minimal buttons with no border</span>
+          </div>
+          <div class="button-row">
+            <Button size="sm" variant="ghost">Ghost Small</Button>
+            <Button variant="ghost">Ghost Default</Button>
+            <Button size="lg" variant="ghost">Ghost Large</Button>
+            <Button disabled variant="ghost">Disabled</Button>
+          </div>
+          <div class="hover-hint">💡 Hover effect: Light background appears and text darkens</div>
+        </div>
+
+        <div class="component-group">
+          <div class="component-label">
+            <strong>Icon-Only Buttons</strong>
+            <span class="component-description">Square buttons for icons</span>
+          </div>
+          <div class="button-row">
+            <Button icon-only size="sm" variant="primary">✓</Button>
+            <Button icon-only variant="primary">+</Button>
+            <Button icon-only size="lg" variant="primary">★</Button>
+            <Button icon-only variant="secondary">⋯</Button>
+            <Button icon-only variant="danger">×</Button>
+          </div>
+        </div>
+
+        <div class="component-group">
+          <div class="component-label">
+            <strong>Block Buttons</strong>
+            <span class="component-description">Full-width buttons</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 1rem; max-width: 500px">
+            <Button block variant="primary">Primary Block Button</Button>
+            <Button block variant="secondary">Secondary Block Button</Button>
+            <Button block variant="outline">Outline Block Button</Button>
+          </div>
+        </div>
+
+        <div class="component-group">
+          <div class="component-label">
+            <strong>Interactive Demo</strong>
+            <span class="component-description"
+              >Try hovering over these buttons to see the smooth transitions</span
+            >
+          </div>
+          <div
+            style="
+              display: flex;
+              gap: 1rem;
+              padding: 2rem;
+              background: #fff;
+              border: 1px solid #eaeaea;
+              border-radius: 8px;
+            "
+          >
+            <Button variant="primary">Save Changes</Button>
+            <Button variant="secondary">Cancel</Button>
+            <Button variant="danger-outline">Delete</Button>
+          </div>
+        </div>
+      </section>
+
       <!-- Typography Section -->
       <section v-if="activeSection === 'typography'" class="demo-section">
         <h2 class="section-title">Typography</h2>
@@ -697,10 +858,13 @@ This is some sample content in a textarea.</textarea
 
 <script setup>
 import { ref } from 'vue'
+import Button from '../components/Button.vue'
 
-const activeSection = ref('typography')
+const activeSection = ref('components')
+const loadingState = ref(false)
 
 const sections = [
+  { id: 'components', name: 'Vue Components' },
   { id: 'typography', name: 'Typography' },
   { id: 'buttons', name: 'Buttons' },
   { id: 'inputs', name: 'Inputs' },
@@ -711,6 +875,10 @@ const sections = [
   { id: 'loading', name: 'Loading' },
   { id: 'misc', name: 'Misc' }
 ]
+
+const toggleLoading = () => {
+  loadingState.value = !loadingState.value
+}
 </script>
 
 <style scoped>
@@ -776,39 +944,19 @@ const sections = [
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  transition:
-    background-color 0.25s ease,
-    border-color 0.25s ease,
-    color 0.25s ease,
-    transform 0.15s ease,
-    box-shadow 0.25s ease;
+  transition: all 0.2s;
   color: #666;
-  box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
 }
 
 .nav-btn:hover {
   color: #000;
   background: #fafafa;
-  transform: translateY(-1px);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-}
-
-.nav-btn:active {
-  transform: translateY(0);
-  box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
 }
 
 .nav-btn.active {
   background: #000;
   color: white;
   border-color: #000;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-}
-
-.nav-btn.active:hover {
-  background: #333;
-  transform: translateY(-1px);
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
 }
 
 /* Demo Content */
@@ -848,6 +996,35 @@ const sections = [
   margin-bottom: 1rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.component-description {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: #666;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.section-description {
+  font-size: 1rem;
+  color: #666;
+  margin-bottom: 2rem;
+  line-height: 1.6;
+}
+
+.hover-hint {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: #f0f9ff;
+  border-left: 3px solid #0070f3;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  color: #0066cc;
+  line-height: 1.5;
 }
 
 /* ============================================
@@ -974,12 +1151,7 @@ const sections = [
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  transition:
-    background-color 0.25s ease,
-    border-color 0.25s ease,
-    color 0.25s ease,
-    transform 0.15s ease,
-    box-shadow 0.25s ease;
+  transition: all 0.2s;
   border: 1px solid;
   background: white;
   color: #000;
@@ -987,20 +1159,11 @@ const sections = [
   align-items: center;
   gap: 0.5rem;
   white-space: nowrap;
-  position: relative;
-  box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
-}
-
-.btn:focus-visible {
-  outline: 2px solid #0070f3;
-  outline-offset: 2px;
 }
 
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  transform: none !important;
-  box-shadow: none !important;
 }
 
 .btn-primary {
@@ -1012,13 +1175,6 @@ const sections = [
 .btn-primary:hover:not(:disabled) {
   background: #333;
   border-color: #333;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.btn-primary:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 .btn-secondary {
@@ -1028,16 +1184,7 @@ const sections = [
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: #fafafa;
   border-color: #000;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-.btn-secondary:active:not(:disabled) {
-  transform: translateY(0);
-  background: #f5f5f5;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
 }
 
 .btn-secondary.active {
@@ -1053,16 +1200,7 @@ const sections = [
 }
 
 .btn-outline:hover:not(:disabled) {
-  background: #fafafa;
   border-color: #000;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-}
-
-.btn-outline:active:not(:disabled) {
-  transform: translateY(0);
-  background: #f5f5f5;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .btn-danger {
@@ -1074,13 +1212,6 @@ const sections = [
 .btn-danger:hover:not(:disabled) {
   background: #c00;
   border-color: #c00;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(238, 0, 0, 0.25);
-}
-
-.btn-danger:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: 0 2px 6px rgba(238, 0, 0, 0.15);
 }
 
 .btn-danger-outline {
@@ -1093,13 +1224,6 @@ const sections = [
   background: #e00;
   color: white;
   border-color: #e00;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(238, 0, 0, 0.15);
-}
-
-.btn-danger-outline:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: 0 1px 4px rgba(238, 0, 0, 0.1);
 }
 
 .btn-ghost {
@@ -1111,12 +1235,6 @@ const sections = [
 .btn-ghost:hover:not(:disabled) {
   background: #fafafa;
   color: #000;
-  transform: translateY(-1px);
-}
-
-.btn-ghost:active:not(:disabled) {
-  transform: translateY(0);
-  background: #f5f5f5;
 }
 
 .btn-icon {
@@ -1900,46 +2018,23 @@ const sections = [
   border-radius: 5px;
   font-size: 0.875rem;
   cursor: pointer;
-  transition:
-    background-color 0.25s ease,
-    border-color 0.25s ease,
-    color 0.25s ease,
-    transform 0.15s ease,
-    box-shadow 0.25s ease;
+  transition: all 0.2s;
   color: #000;
-  box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
 }
 
 .pagination-btn:hover:not(:disabled):not(.active) {
-  background: #fafafa;
   border-color: #000;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-}
-
-.pagination-btn:active:not(:disabled):not(.active) {
-  transform: translateY(0);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .pagination-btn.active {
   background: #000;
   color: white;
   border-color: #000;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-}
-
-.pagination-btn.active:hover {
-  background: #333;
-  transform: translateY(-1px);
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
 }
 
 .pagination-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  transform: none !important;
-  box-shadow: none !important;
 }
 
 .pagination-ellipsis {
@@ -1961,31 +2056,17 @@ const sections = [
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  transition:
-    background-color 0.25s ease,
-    border-color 0.25s ease,
-    color 0.25s ease,
-    transform 0.15s ease;
+  transition: all 0.2s;
   color: #666;
-  position: relative;
 }
 
 .tab:hover:not(:disabled) {
   color: #000;
-  background: #fafafa;
-}
-
-.tab:active:not(:disabled) {
-  background: #f5f5f5;
 }
 
 .tab.active {
   color: #000;
   border-bottom-color: #000;
-}
-
-.tab.active:hover {
-  background: #fafafa;
 }
 
 .tab:disabled {
