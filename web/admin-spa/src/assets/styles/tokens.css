@@ -165,6 +165,32 @@
   --z-modal: 50;
   --z-tooltip: 60;
   --z-toast: 100;
+
+  /* ============================================
+    Vercel / DS-compatible tokens (subset)
+    These mirror the token names used in `vercel_css/`
+    ============================================ */
+
+  /* Background */
+  --ds-background-100: var(--bg-secondary);
+  --ds-background-200: var(--bg-primary);
+
+  /* Grays */
+  --ds-gray-1000: var(--text-primary);
+  --ds-gray-900: var(--text-secondary);
+  --ds-gray-700: var(--color-gray-600);
+
+  /* Alpha grays (used for borders/dividers) */
+  --ds-gray-alpha-200: rgba(0, 0, 0, 0.06);
+  --ds-gray-alpha-400: rgba(0, 0, 0, 0.12);
+  --ds-gray-alpha-600: rgba(0, 0, 0, 0.2);
+
+  /* Shadow helpers */
+  --ds-shadow-border-small: 0 0 0 1px var(--border-default);
+
+  /* Focus ring (Vercel style uses box-shadow, not outline) */
+  --ds-focus-ring: 0 0 0 4px rgba(0, 112, 243, 0.25);
+  --ds-focus-ring-error: 0 0 0 4px rgba(238, 0, 0, 0.18);
 }
 
 /* ============================================
@@ -198,4 +224,9 @@
 
   --shadow-card: var(--shadow-sm);
   --shadow-card-hover: var(--shadow-md);
+
+  /* DS alpha grays tuned for dark backgrounds */
+  --ds-gray-alpha-200: rgba(255, 255, 255, 0.08);
+  --ds-gray-alpha-400: rgba(255, 255, 255, 0.14);
+  --ds-gray-alpha-600: rgba(255, 255, 255, 0.22);
 }

@@ -57,67 +57,56 @@ defineProps({
 
 .ds-select {
   width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #eaeaea;
-  border-radius: 5px;
-  font-size: 0.875rem;
-  color: #000;
-  transition: all 0.2s;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
-    sans-serif;
-  background: #fff;
+  height: var(--size-input-md);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-input);
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
+  transition: var(--transition-colors);
+  font-family: inherit;
+  background: var(--bg-secondary);
   cursor: pointer;
 }
 
 .ds-select:focus {
   outline: none;
-  border-color: #000;
+  border-color: var(--border-strong);
+}
+
+.ds-select:focus-visible {
+  box-shadow: var(--ds-focus-ring);
 }
 
 .ds-select:disabled {
-  background: #fafafa;
-  color: #999;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
   cursor: not-allowed;
 }
 
 /* Sizes */
 .ds-select--sm {
-  padding: 0.5rem 0.75rem;
-  font-size: 0.8125rem;
+  height: var(--size-input-sm);
+  padding: 0 var(--space-3);
+  font-size: var(--font-size-sm);
 }
 
 .ds-select--lg {
-  padding: 1rem;
-  font-size: 1rem;
+  height: var(--size-input-lg);
+  padding: 0 var(--space-4);
+  font-size: var(--font-size-lg);
 }
 
 /* Error state */
 .ds-select--error {
-  border-color: #e00;
+  border-color: var(--color-red);
 }
 
 .ds-select--error:focus {
-  border-color: #e00;
+  border-color: var(--color-red);
 }
 
-/* Dark mode support */
-:global(.dark) .ds-select {
-  background: #1a1a1a;
-  border-color: #2c2c2c;
-  color: #fff;
-}
-
-:global(.dark) .ds-select:focus {
-  border-color: #fff;
-}
-
-:global(.dark) .ds-select:disabled {
-  background: #0a0a0a;
-  color: #666;
-}
-
-:global(.dark) .ds-select--error {
-  border-color: #e00;
+.ds-select--error:focus-visible {
+  box-shadow: var(--ds-focus-ring-error);
 }
 </style>

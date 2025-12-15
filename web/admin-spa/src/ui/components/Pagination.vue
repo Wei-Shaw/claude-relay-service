@@ -131,30 +131,33 @@ const changePage = (page) => {
 
 .ds-pagination-btn {
   padding: 0.5rem 0.75rem;
-  background: #fff;
-  border: 1px solid #eaeaea;
-  border-radius: 5px;
-  font-size: 0.875rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-button);
+  font-size: var(--font-size-base);
   cursor: pointer;
-  transition: all 0.2s;
-  color: #000;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
-    sans-serif;
-  font-weight: 500;
+  transition: var(--transition-colors);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-weight: var(--font-weight-medium);
   user-select: none;
+}
+
+.ds-pagination-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ds-focus-ring);
 }
 
 .ds-pagination-btn:hover:not(:disabled):not(.ds-pagination-btn--active):not(
     .ds-pagination-ellipsis
   ) {
-  border-color: #000;
+  border-color: var(--border-strong);
 }
 
 .ds-pagination-btn--active {
-  background: #000;
-  color: #fff;
-  border-color: #000;
+  background: var(--color-black);
+  color: var(--color-white);
+  border-color: var(--color-black);
 }
 
 .ds-pagination-btn:disabled {
@@ -168,28 +171,10 @@ const changePage = (page) => {
   background: transparent;
 }
 
-/* Dark mode support */
-:global(.dark) .ds-pagination-btn {
-  background: #1a1a1a;
-  border-color: #2c2c2c;
-  color: #fff;
-}
-
-:global(.dark)
-  .ds-pagination-btn:hover:not(:disabled):not(.ds-pagination-btn--active):not(
-    .ds-pagination-ellipsis
-  ) {
-  border-color: #fff;
-}
-
-:global(.dark) .ds-pagination-btn--active {
-  background: #fff;
-  color: #000;
-  border-color: #fff;
-}
-
-:global(.dark) .ds-pagination-ellipsis {
-  background: transparent;
-  border-color: transparent;
+/* Dark mode: invert active button like Vercel */
+::global(.dark) .ds-pagination-btn--active {
+  background: var(--color-white);
+  color: var(--color-black);
+  border-color: var(--color-white);
 }
 </style>

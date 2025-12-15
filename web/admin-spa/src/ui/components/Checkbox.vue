@@ -99,23 +99,29 @@ const handleChange = (event) => {
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
-  font-size: 0.875rem;
-  color: #000;
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
   margin-bottom: 0;
   user-select: none;
 }
 
 .ds-checkbox-label--disabled {
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 .ds-checkbox {
   width: 1.125rem;
   height: 1.125rem;
   cursor: pointer;
-  accent-color: #000;
+  accent-color: var(--text-primary);
   flex-shrink: 0;
+}
+
+.ds-checkbox:focus-visible {
+  outline: none;
+  box-shadow: var(--ds-focus-ring);
+  border-radius: 3px;
 }
 
 .ds-checkbox:disabled {
@@ -124,14 +130,5 @@ const handleChange = (event) => {
 
 .ds-checkbox-text {
   line-height: 1.5;
-}
-
-/* Dark mode support */
-:global(.dark) .ds-checkbox-label {
-  color: #fff;
-}
-
-:global(.dark) .ds-checkbox {
-  accent-color: #fff;
 }
 </style>

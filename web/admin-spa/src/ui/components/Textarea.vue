@@ -64,71 +64,61 @@ defineProps({
 
 .ds-textarea {
   width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #eaeaea;
-  border-radius: 5px;
-  font-size: 0.875rem;
-  color: #000;
-  transition: all 0.2s;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
-    sans-serif;
-  background: #fff;
+  padding: var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-input);
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
+  transition: var(--transition-colors);
+  font-family: inherit;
+  background: var(--bg-secondary);
   resize: vertical;
   min-height: 100px;
 }
 
+.ds-textarea::placeholder {
+  color: var(--text-muted);
+}
+
 .ds-textarea:focus {
   outline: none;
-  border-color: #000;
+  border-color: var(--border-strong);
+}
+
+.ds-textarea:focus-visible {
+  box-shadow: var(--ds-focus-ring);
 }
 
 .ds-textarea:disabled {
-  background: #fafafa;
-  color: #999;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
   cursor: not-allowed;
   resize: none;
 }
 
 /* Sizes */
 .ds-textarea--sm {
-  padding: 0.5rem 0.75rem;
-  font-size: 0.8125rem;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-sm);
   min-height: 80px;
 }
 
 .ds-textarea--lg {
-  padding: 1rem;
-  font-size: 1rem;
+  padding: var(--space-4);
+  font-size: var(--font-size-lg);
   min-height: 120px;
 }
 
 /* Error state */
 .ds-textarea--error {
-  border-color: #e00;
+  border-color: var(--color-red);
 }
 
 .ds-textarea--error:focus {
-  border-color: #e00;
+  border-color: var(--color-red);
 }
 
-/* Dark mode support */
-:global(.dark) .ds-textarea {
-  background: #1a1a1a;
-  border-color: #2c2c2c;
-  color: #fff;
-}
-
-:global(.dark) .ds-textarea:focus {
-  border-color: #fff;
-}
-
-:global(.dark) .ds-textarea:disabled {
-  background: #0a0a0a;
-  color: #666;
-}
-
-:global(.dark) .ds-textarea--error {
-  border-color: #e00;
+.ds-textarea--error:focus-visible {
+  box-shadow: var(--ds-focus-ring-error);
 }
 </style>

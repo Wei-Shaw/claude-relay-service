@@ -88,6 +88,12 @@ defineProps({
   opacity: 1;
 }
 
+.ds-alert__close:focus-visible {
+  outline: 2px solid #0070f3;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 /* Variants */
 .ds-alert--success {
   background: #f0f9ff;

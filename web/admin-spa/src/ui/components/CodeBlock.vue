@@ -24,14 +24,14 @@ defineProps({
  */
 
 .ds-code-block {
-  background: #000;
-  color: #fff;
-  padding: 1.5rem;
-  border-radius: 5px;
+  background: var(--color-black);
+  color: var(--color-white);
+  padding: var(--card-padding);
+  border-radius: var(--radius-button);
   overflow-x: auto;
   font-family: 'Monaco', 'Menlo', 'Consolas', 'Courier New', monospace;
-  font-size: 0.875rem;
-  line-height: 1.6;
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-relaxed);
   margin: 0;
 }
 
@@ -49,22 +49,16 @@ defineProps({
 .ds-code-block--inline {
   display: inline;
   padding: 0.125rem 0.375rem;
-  background: #fafafa;
-  color: #000;
-  border: 1px solid #eaeaea;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
   border-radius: 3px;
   font-size: 0.875em;
 }
 
 /* Dark mode support */
-:global(.dark) .ds-code-block {
-  background: #fff;
-  color: #000;
-}
-
-:global(.dark) .ds-code-block--inline {
-  background: #1a1a1a;
-  color: #fff;
-  border-color: #2c2c2c;
+::global(.dark) .ds-code-block {
+  background: #0a0a0a;
+  color: var(--color-white);
 }
 </style>

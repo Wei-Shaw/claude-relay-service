@@ -47,7 +47,7 @@ defineProps({
 .ds-tabs {
   display: flex;
   gap: 0;
-  border-bottom: 1px solid #eaeaea;
+  border-bottom: 1px solid var(--border-default);
 }
 
 .ds-tab {
@@ -55,45 +55,31 @@ defineProps({
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
-  font-size: 0.875rem;
-  font-weight: 500;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: all 0.2s;
-  color: #666;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
-    sans-serif;
+  transition: var(--transition-colors);
+  color: var(--text-secondary);
+  font-family: inherit;
+}
+
+.ds-tab:focus-visible {
+  outline: none;
+  box-shadow: var(--ds-focus-ring);
+  border-radius: var(--radius-button);
 }
 
 .ds-tab:hover:not(:disabled) {
-  color: #000;
+  color: var(--text-primary);
 }
 
 .ds-tab--active {
-  color: #000;
-  border-bottom-color: #000;
+  color: var(--text-primary);
+  border-bottom-color: var(--text-primary);
 }
 
 .ds-tab:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-/* Dark mode support */
-:global(.dark) .ds-tabs {
-  border-bottom-color: #2c2c2c;
-}
-
-:global(.dark) .ds-tab {
-  color: #b3b3b3;
-}
-
-:global(.dark) .ds-tab:hover:not(:disabled) {
-  color: #fff;
-}
-
-:global(.dark) .ds-tab--active {
-  color: #fff;
-  border-bottom-color: #fff;
 }
 </style>

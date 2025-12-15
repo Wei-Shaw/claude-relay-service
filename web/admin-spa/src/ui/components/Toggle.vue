@@ -74,8 +74,8 @@ const handleChange = (event) => {
   align-items: center;
   gap: 0.75rem;
   cursor: pointer;
-  font-size: 0.875rem;
-  color: #000;
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
   margin-bottom: 0;
   user-select: none;
 }
@@ -97,10 +97,15 @@ const handleChange = (event) => {
   position: relative;
   width: 3rem;
   height: 1.5rem;
-  background: #eaeaea;
+  background: var(--border-default);
   border-radius: 1.5rem;
-  transition: all 0.2s;
+  transition: var(--transition-colors);
   flex-shrink: 0;
+}
+
+.ds-toggle-input:focus-visible + .ds-toggle-slider {
+  outline: none;
+  box-shadow: var(--ds-focus-ring);
 }
 
 .ds-toggle-slider::before {
@@ -110,13 +115,13 @@ const handleChange = (event) => {
   height: 1.25rem;
   left: 0.125rem;
   top: 0.125rem;
-  background: #fff;
+  background: var(--color-white);
   border-radius: 50%;
-  transition: all 0.2s;
+  transition: var(--transition-transform);
 }
 
 .ds-toggle-input:checked + .ds-toggle-slider {
-  background: #000;
+  background: var(--color-black);
 }
 
 .ds-toggle-input:checked + .ds-toggle-slider::before {
@@ -127,24 +132,16 @@ const handleChange = (event) => {
   line-height: 1.5;
 }
 
-/* Dark mode support */
-:global(.dark) .ds-toggle-label {
-  color: #fff;
+/* Dark mode tweaks (keep the same Vercel-like “invert” behavior) */
+::global(.dark) .ds-toggle-slider::before {
+  background: var(--color-gray-700);
 }
 
-:global(.dark) .ds-toggle-slider {
-  background: #2c2c2c;
+::global(.dark) .ds-toggle-input:checked + .ds-toggle-slider {
+  background: var(--color-white);
 }
 
-:global(.dark) .ds-toggle-slider::before {
-  background: #666;
-}
-
-:global(.dark) .ds-toggle-input:checked + .ds-toggle-slider {
-  background: #fff;
-}
-
-:global(.dark) .ds-toggle-input:checked + .ds-toggle-slider::before {
-  background: #000;
+::global(.dark) .ds-toggle-input:checked + .ds-toggle-slider::before {
+  background: var(--color-black);
 }
 </style>
