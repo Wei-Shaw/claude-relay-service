@@ -11,6 +11,7 @@ const {
 } = require('../utils/errorSanitizer')
 const userMessageQueueService = require('./userMessageQueueService')
 const { isStreamWritable } = require('../utils/streamHelper')
+const { filterForClaude } = require('../utils/headerFilter')
 
 class ClaudeConsoleRelayService {
   constructor() {
@@ -1302,30 +1303,9 @@ class ClaudeConsoleRelayService {
 
   // 🔧 过滤客户端请求头
   _filterClientHeaders(clientHeaders) {
-    const sensitiveHeaders = [
-      'content-type',
-      'user-agent',
-      'authorization',
-      'x-api-key',
-      'host',
-      'content-length',
-      'connection',
-      'proxy-authorization',
-      'content-encoding',
-      'transfer-encoding',
-      'anthropic-version'
-    ]
-
-    const filteredHeaders = {}
-
-    Object.keys(clientHeaders || {}).forEach((key) => {
-      const lowerKey = key.toLowerCase()
-      if (!sensitiveHeaders.includes(lowerKey)) {
-        filteredHeaders[key] = clientHeaders[key]
-      }
-    })
-
-    return filteredHeaders
+    // 使用统一的 headerFilter 工具类（白名单模式）
+    // 与 claudeRelayService 保持一致，避免透传 CDN headers 触发上游 API 安全检查
+    return filterForClaude(clientHeaders)
   }
 
   // 🕐 更新最后使用时间
