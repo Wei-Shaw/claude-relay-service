@@ -38,7 +38,7 @@
               id="username"
               v-model="loginForm.username"
               autocomplete="username"
-              class="vercel-input"
+              class="login-input"
               name="username"
               placeholder="用户名"
               required
@@ -51,7 +51,7 @@
               id="password"
               v-model="loginForm.password"
               autocomplete="current-password"
-              class="vercel-input"
+              class="login-input"
               name="password"
               placeholder="密码"
               required
@@ -59,7 +59,7 @@
             />
           </div>
 
-          <button class="vercel-button" :disabled="authStore.loginLoading" type="submit">
+          <button class="login-button" :disabled="authStore.loginLoading" type="submit">
             <span v-if="authStore.loginLoading" class="button-spinner"></span>
             {{ authStore.loginLoading ? '登录中...' : '登录' }}
           </button>
@@ -103,7 +103,7 @@ const handleLogin = async () => {
 </script>
 
 <style scoped>
-/* Vercel-inspired Login Page */
+/* Modern Login Page */
 .login-page {
   min-height: 100vh;
   display: flex;
@@ -191,8 +191,8 @@ const handleLogin = async () => {
   flex-direction: column;
 }
 
-/* Vercel-style Input */
-.vercel-input {
+/* Modern Input Style */
+.login-input {
   width: 100%;
   height: 48px;
   padding: 0 1rem;
@@ -207,40 +207,40 @@ const handleLogin = async () => {
   box-sizing: border-box;
 }
 
-.vercel-input::placeholder {
+.login-input::placeholder {
   color: #999;
 }
 
-.vercel-input:hover {
+.login-input:hover {
   border-color: #000;
 }
 
-.vercel-input:focus {
+.login-input:focus {
   border-color: #000;
   box-shadow: 0 0 0 1px #000;
 }
 
-.login-page.dark .vercel-input {
+.login-page.dark .login-input {
   color: #fff;
   background: #000;
   border-color: #333;
 }
 
-.login-page.dark .vercel-input::placeholder {
+.login-page.dark .login-input::placeholder {
   color: #666;
 }
 
-.login-page.dark .vercel-input:hover {
+.login-page.dark .login-input:hover {
   border-color: #fff;
 }
 
-.login-page.dark .vercel-input:focus {
+.login-page.dark .login-input:focus {
   border-color: #fff;
   box-shadow: 0 0 0 1px #fff;
 }
 
-/* Vercel-style Button */
-.vercel-button {
+/* Modern Button Style */
+.login-button {
   width: 100%;
   height: 48px;
   padding: 0 1.5rem;
@@ -261,33 +261,33 @@ const handleLogin = async () => {
   box-sizing: border-box;
 }
 
-.vercel-button:hover:not(:disabled) {
+.login-button:hover:not(:disabled) {
   background: #333;
   border-color: #333;
 }
 
-.vercel-button:active:not(:disabled) {
+.login-button:active:not(:disabled) {
   background: #000;
   transform: scale(0.98);
 }
 
-.vercel-button:disabled {
+.login-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.login-page.dark .vercel-button {
+.login-page.dark .login-button {
   color: #000;
   background: #fff;
   border-color: #fff;
 }
 
-.login-page.dark .vercel-button:hover:not(:disabled) {
+.login-page.dark .login-button:hover:not(:disabled) {
   background: #e5e5e5;
   border-color: #e5e5e5;
 }
 
-.login-page.dark .vercel-button:active:not(:disabled) {
+.login-page.dark .login-button:active:not(:disabled) {
   background: #fff;
 }
 

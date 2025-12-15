@@ -22,7 +22,7 @@ defineProps({
 <style scoped>
 /**
  * InputGroup Component Styles
- * Based on Vercel Design System Demo
+ * Modern design system implementation
  * Wraps input with icon
  */
 

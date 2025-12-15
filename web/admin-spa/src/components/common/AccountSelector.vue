@@ -696,7 +696,7 @@ watch(showDropdown, (newVal) => {
 </script>
 
 <style scoped>
-/* Vercel-style scrollbar */
+/* Custom scrollbar */
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: #eaeaea #fafafa;

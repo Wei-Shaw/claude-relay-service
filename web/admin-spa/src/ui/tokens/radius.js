@@ -1,6 +1,6 @@
 /**
  * Design System - Border Radius Tokens
- * Based on Vercel-inspired Design System Demo
+ * Modern design system implementation
  * DO NOT modify without design approval
  */
 
@@ -20,7 +20,7 @@ export const radius = {
 export const componentRadius = {
   button: '5px',
   input: '5px',
-  card: '0', // Sharp edges per Vercel design
+  card: '0', // Sharp edges for modern flat design
   badge: '4px',
   alert: '5px',
   progressBar: '4px',

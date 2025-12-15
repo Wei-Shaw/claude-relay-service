@@ -19,7 +19,7 @@ body {
   transition: var(--transition-colors);
 }
 
-/* Element Plus 主题覆盖 - Vercel扁平风格 */
+/* Element Plus 主题覆盖 - 扁平风格 */
 .el-button--primary {
   background: #000;
   border-color: #000;
@@ -32,7 +32,7 @@ body {
   border-color: #333;
 }
 
-/* 自定义滚动条样式 - Vercel扁平风格 */
+/* 自定义滚动条样式 - 扁平风格 */
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: #eaeaea #fafafa;

@@ -51,7 +51,7 @@ defineProps({
 <style scoped>
 /**
  * Select Component Styles
- * Based on Vercel Design System Demo
+ * Modern design system implementation
  * DO NOT add Tailwind classes here - all styles are token-based
  */
 

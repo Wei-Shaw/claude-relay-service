@@ -58,7 +58,7 @@ const handleLogoError = (e) => {
 
 <style scoped>
 /* ============================================
-   VERCEL LOGO TITLE COMPONENT - DARK MODE READY
+   LOGO TITLE COMPONENT - DARK MODE READY
    ============================================ */
 .logo-title-wrapper {
   display: flex;

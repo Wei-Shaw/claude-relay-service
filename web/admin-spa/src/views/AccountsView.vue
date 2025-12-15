@@ -4532,7 +4532,7 @@ onUnmounted(() => {
   background-color: rgba(255, 255, 255, 0.02);
 }
 
-/* 表头左侧固定列背景 - 使用纯色避免滚动时重叠 (Vercel flat design) */
+/* 表头左侧固定列背景 - 使用纯色避免滚动时重叠 (flat design) */
 .table-container thead .checkbox-column,
 .table-container thead .name-column {
   z-index: 30;
@@ -4544,7 +4544,7 @@ onUnmounted(() => {
   background: #1f2937;
 }
 
-/* 表头右侧操作列背景 - 使用纯色避免滚动时重叠 (Vercel flat design) */
+/* 表头右侧操作列背景 - 使用纯色避免滚动时重叠 (flat design) */
 .table-container thead .operations-column {
   z-index: 30;
   background: #fafafa;

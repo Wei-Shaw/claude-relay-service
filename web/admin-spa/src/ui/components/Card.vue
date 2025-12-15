@@ -56,14 +56,14 @@ defineProps({
 <style scoped>
 /**
  * Card Component Styles
- * Based on Vercel Design System Demo
+ * Modern design system implementation
  * DO NOT add Tailwind classes here - all styles are token-based
  */
 
 .ds-card {
   background: #fff;
   border: 1px solid #eaeaea;
-  border-radius: 0; /* Sharp edges per Vercel design */
+  border-radius: 0; /* Sharp edges for modern flat design */
   transition: all 0.2s;
   font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',

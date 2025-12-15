@@ -1,6 +1,6 @@
 /**
  * Design System - Spacing Tokens
- * Based on Vercel-inspired Design System Demo
+ * Modern design system implementation
  * DO NOT modify without design approval
  */
 

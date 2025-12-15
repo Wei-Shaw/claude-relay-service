@@ -1,5 +1,5 @@
 /* ============================================
-   Vercel-Inspired Design System Variables
+   Modern Design System Variables
    Bold contrast, black and white focus
    ============================================ */
 
@@ -26,7 +26,7 @@
   --color-red: #e00;
   --color-red-dark: #c00;
   --color-orange: #f5a623;
-  --color-green: #0070f3; /* Using blue for success in Vercel style */
+  --color-green: #0070f3; /* Using blue for success */
 
   /* Functional Colors - Light Mode */
   --bg-primary: #fafafa;

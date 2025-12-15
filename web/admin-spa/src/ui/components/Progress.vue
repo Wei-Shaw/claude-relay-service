@@ -63,7 +63,7 @@ const clampedValue = computed(() => Math.max(0, Math.min(100, props.value)))
 <style scoped>
 /**
  * Progress Component Styles
- * Based on Vercel Design System Demo
+ * Modern design system implementation
  * DO NOT add Tailwind classes here - all styles are token-based
  */
 

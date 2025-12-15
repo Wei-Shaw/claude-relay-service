@@ -15,14 +15,14 @@
         <!-- Buttons -->
         <div class="dialog-actions">
           <button
-            class="vercel-button cancel-button"
+            class="dialog-button cancel-button"
             :disabled="isProcessing"
             @click="handleCancel"
           >
             {{ cancelText }}
           </button>
           <button
-            class="vercel-button confirm-button"
+            class="dialog-button confirm-button"
             :disabled="isProcessing"
             @click="handleConfirm"
           >
@@ -124,7 +124,7 @@ defineExpose({
 </script>
 
 <style scoped>
-/* Vercel-inspired Confirm Dialog */
+/* Modern Confirm Dialog */
 
 /* Overlay */
 .confirm-overlay {
@@ -209,8 +209,8 @@ defineExpose({
   justify-content: flex-end;
 }
 
-/* Vercel-style Button Base */
-.vercel-button {
+/* Modern Button Base */
+.dialog-button {
   height: 40px;
   padding: 0 1.25rem;
   font-size: 0.875rem;
@@ -228,7 +228,7 @@ defineExpose({
   box-sizing: border-box;
 }
 
-.vercel-button:disabled {
+.dialog-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -328,7 +328,7 @@ defineExpose({
     flex-direction: column;
   }
 
-  .vercel-button {
+  .dialog-button {
     width: 100%;
   }
 }

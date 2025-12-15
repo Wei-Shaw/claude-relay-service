@@ -91,7 +91,7 @@ defineProps({
 <style scoped>
 /**
  * Button Component Styles
- * Based on Vercel Design System with proper hover effects
+ * Modern design system with proper hover effects
  * DO NOT add Tailwind classes here - all styles are token-based
  */
 
@@ -131,7 +131,7 @@ defineProps({
   background: var(--ds-button-bg, #fff);
   box-shadow: var(--ds-button-shadow, 0 0 0 1px #eaeaea);
 
-  /* Smooth transitions matching Vercel */
+  /* Smooth transitions for modern UI */
   transition-property: border-color, background, color, transform, box-shadow;
   transition-duration: 0.15s;
   transition-timing-function: ease;
@@ -203,7 +203,7 @@ defineProps({
 }
 
 /* ============================================
-   SECONDARY VARIANT (Vercel-style)
+   SECONDARY VARIANT
    ============================================ */
 
 .ds-button--secondary {

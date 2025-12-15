@@ -239,7 +239,7 @@ const handleDirectClose = async () => {
 </script>
 
 <style scoped>
-/* Vercel-inspired API Key Modal */
+/* Modern API Key Modal */
 
 .api-key-modal-overlay {
   position: fixed;

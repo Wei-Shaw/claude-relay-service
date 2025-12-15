@@ -2380,7 +2380,7 @@ html.dark :deep(.border-purple-200) {
   border-color: rgba(168, 85, 247, 0.5) !important;
 }
 
-/* Vercel flat design - no gradients */
+/* Flat design - no gradients */
 
 /* 文字对比度优化 - 提高可读性 */
 html.dark :deep(.text-gray-400) {
