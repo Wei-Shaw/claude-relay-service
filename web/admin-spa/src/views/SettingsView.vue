@@ -12,42 +12,27 @@
       <!-- 设置分类导航 -->
       <div class="mb-6">
         <nav class="flex space-x-8">
-          <button
-            :class="[
-              'border-b-2 pb-2 text-sm font-medium transition-colors',
-              activeSection === 'branding'
-                ? 'border-gray-900 text-gray-900 dark:border-white dark:text-white'
-                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-            ]"
+          <Button
+            :variant="activeSection === 'branding' ? 'primary' : 'ghost'"
             @click="activeSection = 'branding'"
           >
             <i class="fas fa-palette mr-2"></i>
             品牌设置
-          </button>
-          <button
-            :class="[
-              'border-b-2 pb-2 text-sm font-medium transition-colors',
-              activeSection === 'webhook'
-                ? 'border-gray-900 text-gray-900 dark:border-white dark:text-white'
-                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-            ]"
+          </Button>
+          <Button
+            :variant="activeSection === 'webhook' ? 'primary' : 'ghost'"
             @click="activeSection = 'webhook'"
           >
             <i class="fas fa-bell mr-2"></i>
             通知设置
-          </button>
-          <button
-            :class="[
-              'border-b-2 pb-2 text-sm font-medium transition-colors',
-              activeSection === 'claude'
-                ? 'border-gray-900 text-gray-900 dark:border-white dark:text-white'
-                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-            ]"
+          </Button>
+          <Button
+            :variant="activeSection === 'claude' ? 'primary' : 'ghost'"
             @click="activeSection = 'claude'"
           >
             <i class="fas fa-robot mr-2"></i>
             Claude 转发
-          </button>
+          </Button>
         </nav>
       </div>
 
@@ -127,12 +112,13 @@
                           @error="handleIconError"
                         />
                         <span class="text-sm text-gray-600 dark:text-gray-400">当前图标</span>
-                        <button
-                          class="rounded-lg px-3 py-1 font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-900"
+                        <Button
+                          variant="danger-outline"
+                          size="sm"
                           @click="removeIcon"
                         >
                           <i class="fas fa-trash mr-1" />删除
-                        </button>
+                        </Button>
                       </div>
 
                       <!-- 文件上传 -->
@@ -144,13 +130,13 @@
                           type="file"
                           @change="handleIconUpload"
                         />
-                        <button
-                          class="btn btn-success px-4 py-2"
+                        <Button
+                          variant="secondary"
                           @click="$refs.iconFileInput.click()"
                         >
                           <i class="fas fa-upload mr-2" />
                           上传图标
-                        </button>
+                        </Button>
                         <span class="ml-3 text-xs text-gray-500 dark:text-gray-400"
                           >支持 .ico, .png, .jpg, .svg 格式，最大 350KB</span
                         >
@@ -199,25 +185,24 @@
                   <td class="px-6 py-6" colspan="2">
                     <div class="flex items-center justify-between">
                       <div class="flex gap-3">
-                        <button
-                          class="btn btn-primary px-6 py-3"
-                          :class="{ 'cursor-not-allowed opacity-50': saving }"
+                        <Button
+                          variant="primary"
                           :disabled="saving"
+                          :loading="saving"
                           @click="saveOemSettings"
                         >
-                          <div v-if="saving" class="loading-spinner mr-2"></div>
-                          <i v-else class="fas fa-save mr-2" />
+                          <i v-if="!saving" class="fas fa-save mr-2" />
                           {{ saving ? '保存中...' : '保存设置' }}
-                        </button>
+                        </Button>
 
-                        <button
-                          class="btn bg-gray-100 px-6 py-3 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                        <Button
+                          variant="secondary"
                           :disabled="saving"
                           @click="resetOemSettings"
                         >
                           <i class="fas fa-undo mr-2" />
                           重置为默认
-                        </button>
+                        </Button>
                       </div>
 
                       <div
@@ -286,12 +271,13 @@
                     @error="handleIconError"
                   />
                   <span class="text-sm text-gray-600 dark:text-gray-400">当前图标</span>
-                  <button
-                    class="rounded-lg px-3 py-1 font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-900"
+                  <Button
+                    variant="danger-outline"
+                    size="sm"
                     @click="removeIcon"
                   >
                     删除
-                  </button>
+                  </Button>
                 </div>
 
                 <!-- 上传按钮 -->
@@ -303,13 +289,13 @@
                     type="file"
                     @change="handleIconUpload"
                   />
-                  <button
-                    class="btn btn-success px-4 py-2"
+                  <Button
+                    variant="secondary"
                     @click="$refs.iconFileInputMobile.click()"
                   >
                     <i class="fas fa-upload mr-2" />
                     上传图标
-                  </button>
+                  </Button>
                   <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                     支持 .ico, .png, .jpg, .svg 格式，最大 350KB
                   </p>
@@ -349,25 +335,26 @@
             <!-- 操作按钮卡片 -->
             <div class="glass-card p-4">
               <div class="flex flex-col gap-3">
-                <button
-                  class="btn btn-primary w-full px-6 py-3"
-                  :class="{ 'cursor-not-allowed opacity-50': saving }"
+                <Button
+                  variant="primary"
+                  block
                   :disabled="saving"
+                  :loading="saving"
                   @click="saveOemSettings"
                 >
-                  <div v-if="saving" class="loading-spinner mr-2"></div>
-                  <i v-else class="fas fa-save mr-2" />
+                  <i v-if="!saving" class="fas fa-save mr-2" />
                   {{ saving ? '保存中...' : '保存设置' }}
-                </button>
+                </Button>
 
-                <button
-                  class="btn w-full bg-gray-100 px-6 py-3 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                <Button
+                  variant="secondary"
+                  block
                   :disabled="saving"
                   @click="resetOemSettings"
                 >
                   <i class="fas fa-undo mr-2" />
                   重置为默认
-                </button>
+                </Button>
 
                 <div
                   v-if="oemSettings.updatedAt"
@@ -442,13 +429,14 @@
           <div class="mb-6 rounded-lg bg-white/80 p-6 dark:bg-gray-800/80">
             <div class="mb-4 flex items-center justify-between">
               <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">通知平台</h2>
-              <button
-                class="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+              <Button
+                variant="primary"
+                size="sm"
                 @click="showAddPlatformModal = true"
               >
                 <i class="fas fa-plus mr-2"></i>
                 添加平台
-              </button>
+              </Button>
             </div>
 
             <!-- 平台卡片列表 -->
@@ -1583,7 +1571,7 @@ import { storeToRefs } from 'pinia'
 import { showToast } from '@/utils/toast'
 import { useSettingsStore } from '@/stores/settings'
 import { apiClient } from '@/config/api'
-import { Badge } from '@/ui'
+import { Badge, Button } from '@/ui'
 
 // 定义组件名称，用于keep-alive排除
 defineOptions({

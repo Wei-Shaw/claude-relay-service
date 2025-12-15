@@ -85,13 +85,13 @@
             <!-- 账户统计按钮 -->
             <div class="relative">
               <el-tooltip content="查看账户统计汇总" effect="dark" placement="bottom">
-                <button
-                  class="relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-all duration-200 hover:border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 sm:w-auto"
+                <Button
+                  variant="secondary"
                   @click="showAccountStatsModal = true"
                 >
                   <i class="fas fa-chart-bar text-violet-500" />
                   <span>统计</span>
-                </button>
+                </Button>
               </el-tooltip>
             </div>
 
@@ -102,51 +102,47 @@
                 effect="dark"
                 placement="bottom"
               >
-                <button
-                  class="relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 sm:w-auto"
+                <Button
+                  variant="secondary"
                   :disabled="accountsLoading"
+                  :loading="accountsLoading"
                   @click.ctrl.exact="loadAccounts(true)"
                   @click.exact="loadAccounts(false)"
                   @click.meta.exact="loadAccounts(true)"
                 >
-                  <i
-                    :class="[
-                      'fas text-green-500',
-                      accountsLoading ? 'fa-spinner fa-spin' : 'fa-sync-alt'
-                    ]"
-                  />
+                  <i v-if="!accountsLoading" class="fas fa-sync-alt text-green-500" />
                   <span>刷新</span>
-                </button>
+                </Button>
               </el-tooltip>
             </div>
 
             <!-- 选择/取消选择按钮 -->
-            <button
-              class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            <Button
+              variant="secondary"
               @click="toggleSelectionMode"
             >
               <i :class="showCheckboxes ? 'fas fa-times' : 'fas fa-check-square'"></i>
               <span>{{ showCheckboxes ? '取消选择' : '选择' }}</span>
-            </button>
+            </Button>
 
             <!-- 批量删除按钮 -->
-            <button
+            <Button
               v-if="selectedAccounts.length > 0"
-              class="relative flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 transition-all duration-200 hover:border-red-300 hover:bg-red-100 dark:border-red-700 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50 sm:w-auto"
+              variant="danger"
               @click="batchDeleteAccounts"
             >
-              <i class="fas fa-trash text-red-600 dark:text-red-400" />
+              <i class="fas fa-trash" />
               <span>删除选中 ({{ selectedAccounts.length }})</span>
-            </button>
+            </Button>
 
             <!-- 添加账户按钮 -->
-            <button
-              class="flex w-full items-center justify-center gap-2 rounded-lg bg-black px-5 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-100 sm:w-auto"
+            <Button
+              variant="primary"
               @click.stop="openCreateAccountModal"
             >
               <i class="fas fa-plus"></i>
               <span>添加账户</span>
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -1930,7 +1926,7 @@ import AccountTestModal from '@/components/accounts/AccountTestModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 import ActionDropdown from '@/components/common/ActionDropdown.vue'
-import { Progress, Badge, Checkbox } from '@/ui'
+import { Progress, Badge, Checkbox, Button } from '@/ui'
 
 // 使用确认弹窗
 const { showConfirmModal, confirmOptions, showConfirm, handleConfirm, handleCancel } = useConfirm()

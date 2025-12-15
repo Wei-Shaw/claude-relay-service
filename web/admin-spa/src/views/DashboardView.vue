@@ -480,15 +480,16 @@
             </div>
 
             <!-- 刷新按钮 -->
-            <button
-              class="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-gray-900 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700 sm:gap-2"
+            <Button
+              variant="secondary"
+              size="sm"
               :disabled="isRefreshing"
               title="立即刷新数据"
               @click="refreshAllData()"
             >
-              <i :class="['fas fa-sync-alt text-xs', { 'animate-spin': isRefreshing }]" />
+              <i :class="['fas fa-sync-alt', { 'animate-spin': isRefreshing }]" />
               <span class="hidden sm:inline">{{ isRefreshing ? '刷新中' : '刷新' }}</span>
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -700,7 +701,7 @@ import { storeToRefs } from 'pinia'
 import { useDashboardStore } from '@/stores/dashboard'
 import { useThemeStore } from '@/stores/theme'
 import Chart from 'chart.js/auto'
-import { Badge } from '@/ui'
+import { Badge, Button } from '@/ui'
 
 const dashboardStore = useDashboardStore()
 const themeStore = useThemeStore()

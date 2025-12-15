@@ -279,6 +279,310 @@ const tabs = [
 </script>
 ```
 
+### Textarea Component
+
+```vue
+<template>
+  <Textarea v-model="description" :rows="6" placeholder="Enter description..." />
+
+  <!-- With error -->
+  <Textarea v-model="content" :error="hasError" />
+</template>
+
+<script setup>
+import { ref } from 'vue'
+import { Textarea } from '@/ui'
+
+const description = ref('')
+</script>
+```
+
+**Props:**
+
+- `size`: `sm`, `md`, `lg`
+- `rows`: Number of visible rows (default: 4)
+- `error`: Boolean
+- `disabled`: Boolean
+
+### Select Component
+
+```vue
+<template>
+  <Select v-model="selectedOption">
+    <option value="">Select an option...</option>
+    <option value="1">Option 1</option>
+    <option value="2">Option 2</option>
+    <option value="3">Option 3</option>
+  </Select>
+</template>
+
+<script setup>
+import { ref } from 'vue'
+import { Select } from '@/ui'
+
+const selectedOption = ref('')
+</script>
+```
+
+**Props:**
+
+- `size`: `sm`, `md`, `lg`
+- `error`: Boolean
+- `disabled`: Boolean
+
+### Radio Component
+
+```vue
+<template>
+  <Radio v-model="selectedValue" name="option" value="1" label="Option 1" />
+  <Radio v-model="selectedValue" name="option" value="2" label="Option 2" />
+  <Radio v-model="selectedValue" name="option" value="3" label="Option 3" />
+</template>
+
+<script setup>
+import { ref } from 'vue'
+import { Radio } from '@/ui'
+
+const selectedValue = ref('1')
+</script>
+```
+
+**Props:**
+
+- `modelValue`: Current selected value (v-model)
+- `value`: Radio value (required)
+- `name`: Radio group name (required)
+- `label`: Label text
+- `disabled`: Boolean
+
+### Toggle Component
+
+```vue
+<template>
+  <Toggle v-model="isEnabled" label="Enable notifications" />
+  <Toggle v-model="darkMode" label="Dark mode" />
+</template>
+
+<script setup>
+import { ref } from 'vue'
+import { Toggle } from '@/ui'
+
+const isEnabled = ref(true)
+const darkMode = ref(false)
+</script>
+```
+
+**Props:**
+
+- `modelValue`: Boolean (v-model)
+- `label`: Label text
+- `disabled`: Boolean
+
+### InputGroup Component
+
+```vue
+<template>
+  <InputGroup icon="🔍">
+    <Input placeholder="Search..." has-icon />
+  </InputGroup>
+
+  <!-- Custom icon slot -->
+  <InputGroup>
+    <template #icon>
+      <i class="fas fa-envelope" />
+    </template>
+    <Input type="email" placeholder="email@example.com" has-icon />
+  </InputGroup>
+</template>
+
+<script setup>
+import { InputGroup, Input } from '@/ui'
+</script>
+```
+
+**Props:**
+
+- `icon`: Icon text/emoji (alternative to icon slot)
+
+### Skeleton Component
+
+```vue
+<template>
+  <!-- Text skeletons -->
+  <Skeleton variant="text" />
+  <Skeleton variant="text" width="60%" />
+  <Skeleton variant="text" width="80%" />
+
+  <!-- Rectangle skeleton -->
+  <Skeleton variant="rect" height="200px" />
+
+  <!-- Circle skeleton -->
+  <Skeleton variant="circle" />
+
+  <!-- Loading card example -->
+  <Card>
+    <Skeleton variant="text" width="40%" />
+    <Skeleton variant="text" />
+    <Skeleton variant="text" width="80%" />
+  </Card>
+</template>
+
+<script setup>
+import { Skeleton, Card } from '@/ui'
+</script>
+```
+
+**Props:**
+
+- `variant`: `text`, `rect`, `circle`
+- `width`: CSS width value
+- `height`: CSS height value
+- `animated`: Boolean (default: true)
+
+### Breadcrumbs Component
+
+```vue
+<template>
+  <Breadcrumbs :items="breadcrumbItems" @click="handleBreadcrumbClick" />
+
+  <!-- Custom separator -->
+  <Breadcrumbs :items="breadcrumbItems" separator="/" />
+</template>
+
+<script setup>
+import { Breadcrumbs } from '@/ui'
+
+const breadcrumbItems = [
+  { label: 'Dashboard', href: '/dashboard' },
+  { label: 'API Keys', href: '/api-keys' },
+  { label: 'Details' } // Active item (no href)
+]
+
+const handleBreadcrumbClick = (item, event) => {
+  console.log('Clicked:', item.label)
+}
+</script>
+```
+
+**Props:**
+
+- `items`: Array of `{ label, href? }` (required)
+- `separator`: Separator character (default: '›')
+
+### Pagination Component
+
+```vue
+<template>
+  <Pagination v-model="currentPage" :total-pages="totalPages" @change="handlePageChange" />
+</template>
+
+<script setup>
+import { ref } from 'vue'
+import { Pagination } from '@/ui'
+
+const currentPage = ref(1)
+const totalPages = ref(10)
+
+const handlePageChange = (page) => {
+  console.log('Page changed to:', page)
+  // Fetch data for the new page
+}
+</script>
+```
+
+**Props:**
+
+- `modelValue`: Current page number (v-model)
+- `totalPages`: Total number of pages (required)
+- `maxVisible`: Maximum visible page buttons (default: 7)
+
+### Divider Component
+
+```vue
+<template>
+  <!-- Simple divider -->
+  <Divider />
+
+  <!-- Divider with text -->
+  <Divider with-text text="OR" />
+
+  <!-- Strong divider -->
+  <Divider variant="strong" />
+
+  <!-- Divider with slot -->
+  <Divider with-text>
+    <span>Continue with</span>
+  </Divider>
+</template>
+
+<script setup>
+import { Divider } from '@/ui'
+</script>
+```
+
+**Props:**
+
+- `text`: Text content (alternative to slot)
+- `withText`: Show divider with text (default: false)
+- `variant`: `default`, `strong`
+
+### CodeBlock Component
+
+```vue
+<template>
+  <!-- Code block -->
+  <CodeBlock>
+{
+  "api_key": "cr_1234567890",
+  "name": "Production Key",
+  "status": "active"
+}
+  </CodeBlock>
+
+  <!-- Inline code -->
+  <p>Use <CodeBlock variant="inline">npm install</CodeBlock> to install packages.</p>
+</template>
+
+<script setup>
+import { CodeBlock } from '@/ui'
+</script>
+```
+
+**Props:**
+
+- `variant`: `default`, `inline`
+
+### Tooltip Component
+
+```vue
+<template>
+  <!-- Simple tooltip -->
+  <Tooltip content="This is a helpful tooltip">
+    <Button variant="secondary">Hover me</Button>
+  </Tooltip>
+
+  <!-- Custom content -->
+  <Tooltip placement="bottom">
+    <template #content>
+      <div>
+        <strong>Pro Tip:</strong> Use keyboard shortcuts
+      </div>
+    </template>
+    <Button variant="ghost" icon-only>?</Button>
+  </Tooltip>
+</template>
+
+<script setup>
+import { Tooltip, Button } from '@/ui'
+</script>
+```
+
+**Props:**
+
+- `content`: Tooltip text (alternative to content slot)
+- `placement`: `top`, `bottom`, `left`, `right` (default: 'top')
+- `delay`: Delay before showing in ms (default: 200)
+
 ---
 
 ## Composition Patterns

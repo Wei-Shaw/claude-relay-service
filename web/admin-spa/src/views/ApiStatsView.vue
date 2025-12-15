@@ -24,19 +24,23 @@
             <ThemeToggle />
 
             <!-- 用户登录按钮 -->
-            <router-link v-if="oemSettings.ldapEnabled" class="btn btn-secondary" to="/user-login">
-              <i class="fas fa-user" />
-              <span>用户登录</span>
+            <router-link v-if="oemSettings.ldapEnabled" to="/user-login" style="text-decoration: none">
+              <Button variant="secondary">
+                <i class="fas fa-user" />
+                <span>用户登录</span>
+              </Button>
             </router-link>
 
             <!-- 管理后台按钮 -->
             <router-link
               v-if="oemSettings.showAdminButton !== false"
-              class="btn btn-primary"
               to="/dashboard"
+              style="text-decoration: none"
             >
-              <i class="fas fa-shield-alt" />
-              <span>管理后台</span>
+              <Button variant="primary">
+                <i class="fas fa-shield-alt" />
+                <span>管理后台</span>
+              </Button>
             </router-link>
           </div>
         </div>
@@ -47,20 +51,22 @@
     <div class="tabs-section">
       <div class="container">
         <div class="tabs-wrapper">
-          <button
-            :class="['tab-button', { active: currentTab === 'stats' }]"
+          <Button
+            :variant="currentTab === 'stats' ? 'primary' : 'ghost'"
+            class="tab-button-wrapper"
             @click="currentTab = 'stats'"
           >
             <i class="fas fa-chart-line" />
             <span>统计查询</span>
-          </button>
-          <button
-            :class="['tab-button', { active: currentTab === 'tutorial' }]"
+          </Button>
+          <Button
+            :variant="currentTab === 'tutorial' ? 'primary' : 'ghost'"
+            class="tab-button-wrapper"
             @click="currentTab = 'tutorial'"
           >
             <i class="fas fa-graduation-cap" />
             <span>使用教程</span>
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -87,32 +93,35 @@
               <span>统计时间范围</span>
             </div>
             <div class="period-buttons">
-              <button
-                :class="['period-btn', { active: statsPeriod === 'daily' }]"
+              <Button
+                :variant="statsPeriod === 'daily' ? 'primary' : 'secondary'"
                 :disabled="loading || modelStatsLoading"
+                size="sm"
                 @click="switchPeriod('daily')"
               >
                 <i class="fas fa-calendar-day" />
                 <span>今日</span>
-              </button>
-              <button
-                :class="['period-btn', { active: statsPeriod === 'monthly' }]"
+              </Button>
+              <Button
+                :variant="statsPeriod === 'monthly' ? 'primary' : 'secondary'"
                 :disabled="loading || modelStatsLoading"
+                size="sm"
                 @click="switchPeriod('monthly')"
               >
                 <i class="fas fa-calendar-alt" />
                 <span>本月</span>
-              </button>
+              </Button>
               <!-- 测试按钮 -->
-              <button
+              <Button
                 v-if="!multiKeyMode"
-                class="test-btn"
+                variant="primary"
+                size="sm"
                 :disabled="loading"
                 @click="openTestModal"
               >
                 <i class="fas fa-vial" />
                 <span>测试</span>
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -169,6 +178,7 @@ import AggregatedStatsCard from '@/components/apistats/AggregatedStatsCard.vue'
 import ModelUsageStats from '@/components/apistats/ModelUsageStats.vue'
 import TutorialView from './TutorialView.vue'
 import ApiKeyTestModal from '@/components/apikeys/ApiKeyTestModal.vue'
+import { Button } from '@/ui'
 
 const route = useRoute()
 const apiStatsStore = useApiStatsStore()

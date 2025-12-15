@@ -176,66 +176,66 @@
             <!-- 右侧：操作按钮组 -->
             <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
               <!-- 刷新按钮 -->
-              <button
-                class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-all duration-200 hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-500 sm:w-auto"
+              <Button
+                variant="secondary"
                 :disabled="apiKeysLoading"
                 @click="loadApiKeys()"
               >
                 <i
                   :class="[
-                    'fas relative text-green-500',
+                    'fas text-green-500',
                     apiKeysLoading ? 'fa-spinner fa-spin' : 'fa-sync-alt'
                   ]"
                 />
-                <span class="relative">刷新</span>
-              </button>
+                <span>刷新</span>
+              </Button>
 
               <!-- 选择/取消选择按钮 -->
-              <button
-                class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+              <Button
+                variant="secondary"
                 @click="toggleSelectionMode"
               >
                 <i :class="showCheckboxes ? 'fas fa-times' : 'fas fa-check-square'"></i>
                 <span>{{ showCheckboxes ? '取消选择' : '选择' }}</span>
-              </button>
+              </Button>
 
               <!-- 导出数据按钮 -->
-              <button
-                class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-500 sm:w-auto"
+              <Button
+                variant="secondary"
                 @click="exportToExcel"
               >
-                <i class="fas fa-file-excel relative text-emerald-500" />
-                <span class="relative">导出数据</span>
-              </button>
+                <i class="fas fa-file-excel text-emerald-500" />
+                <span>导出数据</span>
+              </Button>
 
               <!-- 批量编辑按钮 - 移到刷新按钮旁边 -->
-              <button
+              <Button
                 v-if="selectedApiKeys.length > 0"
-                class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 transition-all duration-200 hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700 sm:w-auto"
+                variant="secondary"
                 @click="openBatchEditModal()"
               >
-                <i class="fas fa-edit relative text-gray-700 dark:text-gray-300" />
-                <span class="relative">编辑选中 ({{ selectedApiKeys.length }})</span>
-              </button>
+                <i class="fas fa-edit text-gray-700 dark:text-gray-300" />
+                <span>编辑选中 ({{ selectedApiKeys.length }})</span>
+              </Button>
 
               <!-- 批量删除按钮 - 移到刷新按钮旁边 -->
-              <button
+              <Button
                 v-if="selectedApiKeys.length > 0"
-                class="group relative flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 transition-all duration-200 hover:border-red-300 hover:bg-red-100 dark:border-red-700 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50 sm:w-auto"
+                variant="danger"
                 @click="batchDeleteApiKeys()"
               >
-                <i class="fas fa-trash relative text-red-600 dark:text-red-400" />
-                <span class="relative">删除选中 ({{ selectedApiKeys.length }})</span>
-              </button>
+                <i class="fas fa-trash text-red-600 dark:text-red-400" />
+                <span>删除选中 ({{ selectedApiKeys.length }})</span>
+              </Button>
 
               <!-- 创建按钮 -->
-              <button
-                class="flex w-full items-center justify-center gap-2 rounded-lg bg-black px-5 py-2 text-sm font-medium text-white transition-all duration-200 hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-100 sm:w-auto"
+              <Button
+                variant="primary"
                 @click.stop="openCreateApiKeyModal"
               >
                 <i class="fas fa-plus"></i>
                 <span>创建新 Key</span>
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -2094,7 +2094,7 @@ import UsageDetailModal from '@/components/apikeys/UsageDetailModal.vue'
 import LimitProgressBar from '@/components/apikeys/LimitProgressBar.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 import ActionDropdown from '@/components/common/ActionDropdown.vue'
-import { Progress, Badge, Checkbox } from '@/ui'
+import { Progress, Badge, Checkbox, Button } from '@/ui'
 
 // 响应式数据
 const router = useRouter()
