@@ -9,6 +9,26 @@ class UnifiedOpenAIScheduler {
     this.SESSION_MAPPING_PREFIX = 'unified_openai_session_mapping:'
   }
 
+  // 🔢 按优先级和最后使用时间排序账户（与 Claude/Gemini 调度保持一致）
+  _sortAccountsByPriority(accounts) {
+    return accounts.sort((a, b) => {
+      const aPriority = Number.parseInt(a.priority, 10)
+      const bPriority = Number.parseInt(b.priority, 10)
+      const normalizedAPriority = Number.isFinite(aPriority) ? aPriority : 50
+      const normalizedBPriority = Number.isFinite(bPriority) ? bPriority : 50
+
+      // 首先按优先级排序（数字越小优先级越高）
+      if (normalizedAPriority !== normalizedBPriority) {
+        return normalizedAPriority - normalizedBPriority
+      }
+
+      // 优先级相同时，按最后使用时间排序（最久未使用的优先）
+      const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
+      const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
+      return aLastUsed - bLastUsed
+    })
+  }
+
   // 🔧 辅助方法：检查账户是否可调度（兼容字符串和布尔值）
   _isSchedulable(schedulable) {
     // 如果是 undefined 或 null，默认为可调度
@@ -244,13 +264,7 @@ class UnifiedOpenAIScheduler {
             `🎯 Using bound dedicated ${accountType} account: ${boundAccount.name} (${boundAccount.id}) for API key ${apiKeyData.name}`
           )
           // 更新账户的最后使用时间
-          if (accountType === 'openai') {
-            await openaiAccountService.recordUsage(boundAccount.id, 0)
-          } else {
-            await openaiResponsesAccountService.updateAccount(boundAccount.id, {
-              lastUsedAt: new Date().toISOString()
-            })
-          }
+          await this.updateAccountLastUsed(boundAccount.id, accountType)
           return {
             accountId: boundAccount.id,
             accountType
@@ -292,7 +306,7 @@ class UnifiedOpenAIScheduler {
               `🎯 Using sticky session account: ${mappedAccount.accountId} (${mappedAccount.accountType}) for session ${sessionHash}`
             )
             // 更新账户的最后使用时间
-            await openaiAccountService.recordUsage(mappedAccount.accountId, 0)
+            await this.updateAccountLastUsed(mappedAccount.accountId, mappedAccount.accountType)
             return mappedAccount
           } else {
             logger.warn(
@@ -321,12 +335,8 @@ class UnifiedOpenAIScheduler {
         }
       }
 
-      // 按最后使用时间排序（最久未使用的优先，与 Claude 保持一致）
-      const sortedAccounts = availableAccounts.sort((a, b) => {
-        const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
-        const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
-        return aLastUsed - bLastUsed // 最久未使用的优先
-      })
+      // 按优先级和最后使用时间排序（与 Claude/Gemini 调度保持一致）
+      const sortedAccounts = this._sortAccountsByPriority(availableAccounts)
 
       // 选择第一个账户
       const selectedAccount = sortedAccounts[0]
@@ -344,11 +354,11 @@ class UnifiedOpenAIScheduler {
       }
 
       logger.info(
-        `🎯 Selected account: ${selectedAccount.name} (${selectedAccount.accountId}, ${selectedAccount.accountType}) for API key ${apiKeyData.name}`
+        `🎯 Selected account: ${selectedAccount.name} (${selectedAccount.accountId}, ${selectedAccount.accountType}, priority: ${selectedAccount.priority || 50}) for API key ${apiKeyData.name}`
       )
 
       // 更新账户的最后使用时间
-      await openaiAccountService.recordUsage(selectedAccount.accountId, 0)
+      await this.updateAccountLastUsed(selectedAccount.accountId, selectedAccount.accountType)
 
       return {
         accountId: selectedAccount.accountId,
@@ -493,21 +503,6 @@ class UnifiedOpenAIScheduler {
 
     return availableAccounts
   }
-
-  // 🔢 按优先级和最后使用时间排序账户（已废弃，改为与 Claude 保持一致，只按最后使用时间排序）
-  // _sortAccountsByPriority(accounts) {
-  //   return accounts.sort((a, b) => {
-  //     // 首先按优先级排序（数字越小优先级越高）
-  //     if (a.priority !== b.priority) {
-  //       return a.priority - b.priority
-  //     }
-
-  //     // 优先级相同时，按最后使用时间排序（最久未使用的优先）
-  //     const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
-  //     const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
-  //     return aLastUsed - bLastUsed
-  //   })
-  // }
 
   // 🔍 检查账户是否可用
   async _isAccountAvailable(accountId, accountType) {
@@ -817,7 +812,7 @@ class UnifiedOpenAIScheduler {
                 `🎯 Using sticky session account from group: ${mappedAccount.accountId} (${mappedAccount.accountType})`
               )
               // 更新账户的最后使用时间
-              await openaiAccountService.recordUsage(mappedAccount.accountId, 0)
+              await this.updateAccountLastUsed(mappedAccount.accountId, mappedAccount.accountType)
               return mappedAccount
             }
           }
@@ -909,12 +904,8 @@ class UnifiedOpenAIScheduler {
         throw error
       }
 
-      // 按最后使用时间排序（最久未使用的优先，与 Claude 保持一致）
-      const sortedAccounts = availableAccounts.sort((a, b) => {
-        const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
-        const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
-        return aLastUsed - bLastUsed // 最久未使用的优先
-      })
+      // 按优先级和最后使用时间排序（与 Claude/Gemini 调度保持一致）
+      const sortedAccounts = this._sortAccountsByPriority(availableAccounts)
 
       // 选择第一个账户
       const selectedAccount = sortedAccounts[0]
@@ -932,11 +923,11 @@ class UnifiedOpenAIScheduler {
       }
 
       logger.info(
-        `🎯 Selected account from group: ${selectedAccount.name} (${selectedAccount.accountId})`
+        `🎯 Selected account from group: ${selectedAccount.name} (${selectedAccount.accountId}, ${selectedAccount.accountType}, priority: ${selectedAccount.priority || 50})`
       )
 
       // 更新账户的最后使用时间
-      await openaiAccountService.recordUsage(selectedAccount.accountId, 0)
+      await this.updateAccountLastUsed(selectedAccount.accountId, selectedAccount.accountType)
 
       return {
         accountId: selectedAccount.accountId,
@@ -958,9 +949,12 @@ class UnifiedOpenAIScheduler {
   async updateAccountLastUsed(accountId, accountType) {
     try {
       if (accountType === 'openai') {
-        await openaiAccountService.updateAccount(accountId, {
-          lastUsedAt: new Date().toISOString()
-        })
+        await openaiAccountService.recordUsage(accountId, 0)
+        return
+      }
+
+      if (accountType === 'openai-responses') {
+        await openaiResponsesAccountService.recordUsage(accountId, 0)
       }
     } catch (error) {
       logger.warn(`⚠️ Failed to update last used time for account ${accountId}:`, error)
