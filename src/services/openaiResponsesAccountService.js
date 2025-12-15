@@ -3,6 +3,7 @@ const crypto = require('crypto')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
+const postgresStore = require('../models/postgresStore')
 const LRUCache = require('../utils/lruCache')
 
 class OpenAIResponsesAccountService {
@@ -111,7 +112,15 @@ class OpenAIResponsesAccountService {
   async getAccount(accountId) {
     const client = redis.getClientSafe()
     const key = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
-    const accountData = await client.hgetall(key)
+    let accountData = await client.hgetall(key)
+
+    if ((!accountData || !accountData.id) && config.postgres?.enabled) {
+      try {
+        accountData = await postgresStore.getAccount('openai-responses', accountId)
+      } catch (error) {
+        logger.warn(`⚠️ Failed to read OpenAI-Responses account from PostgreSQL: ${error.message}`)
+      }
+    }
 
     if (!accountData || !accountData.id) {
       return null
@@ -167,6 +176,20 @@ class OpenAIResponsesAccountService {
     const key = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
     await client.hset(key, updates)
 
+    // ✅ 双写到 PostgreSQL（best effort）：写入“完整存储态”数据
+    if (config.postgres?.enabled) {
+      try {
+        const stored = await client.hgetall(key)
+        if (stored && stored.id) {
+          await postgresStore.upsertAccount('openai-responses', accountId, stored)
+        }
+      } catch (error) {
+        logger.warn(
+          `⚠️ Failed to upsert OpenAI-Responses account into PostgreSQL: ${error.message}`
+        )
+      }
+    }
+
     logger.info(`📝 Updated OpenAI-Responses account: ${account.name}`)
 
     return { success: true }
@@ -183,6 +206,17 @@ class OpenAIResponsesAccountService {
     // 删除账户数据
     await client.del(key)
 
+    // ✅ 删除 PostgreSQL（best effort）
+    if (config.postgres?.enabled) {
+      try {
+        await postgresStore.deleteAccount('openai-responses', accountId)
+      } catch (error) {
+        logger.warn(
+          `⚠️ Failed to delete OpenAI-Responses account from PostgreSQL: ${error.message}`
+        )
+      }
+    }
+
     logger.info(`🗑️ Deleted OpenAI-Responses account: ${accountId}`)
 
     return { success: true }
@@ -194,8 +228,77 @@ class OpenAIResponsesAccountService {
     const keys = await redis.scanKeys(`${this.ACCOUNT_KEY_PREFIX}*`)
     const accounts = []
 
-    if (!keys || keys.length === 0) {
-      return accounts
+    const formatAccount = (rawAccount) => {
+      if (!rawAccount || !rawAccount.id) {
+        return null
+      }
+
+      const accountData = { ...rawAccount }
+
+      // 过滤非活跃账户
+      if (!includeInactive && accountData.isActive !== 'true' && accountData.isActive !== true) {
+        return null
+      }
+
+      // 隐藏敏感信息
+      accountData.apiKey = '***'
+
+      // 解析 JSON 字段
+      if (accountData.proxy) {
+        try {
+          accountData.proxy = JSON.parse(accountData.proxy)
+        } catch (e) {
+          accountData.proxy = null
+        }
+      }
+
+      // 获取限流状态信息（与普通OpenAI账号保持一致的格式）
+      const rateLimitInfo = this._getRateLimitInfo(accountData)
+
+      // 格式化 rateLimitStatus 为对象（与普通 OpenAI 账号一致）
+      accountData.rateLimitStatus = rateLimitInfo.isRateLimited
+        ? {
+            isRateLimited: true,
+            rateLimitedAt: accountData.rateLimitedAt || null,
+            minutesRemaining: rateLimitInfo.remainingMinutes || 0
+          }
+        : {
+            isRateLimited: false,
+            rateLimitedAt: null,
+            minutesRemaining: 0
+          }
+
+      // 转换 schedulable 字段为布尔值（前端需要布尔值来判断）
+      accountData.schedulable =
+        accountData.schedulable !== 'false' && accountData.schedulable !== false
+      // 转换 isActive 字段为布尔值
+      accountData.isActive = accountData.isActive === 'true' || accountData.isActive === true
+
+      // ✅ 前端显示订阅过期时间（业务字段）
+      accountData.expiresAt = accountData.subscriptionExpiresAt || null
+      accountData.platform = accountData.platform || 'openai-responses'
+
+      return accountData
+    }
+
+    if ((!keys || keys.length === 0) && config.postgres?.enabled) {
+      try {
+        const pgAccounts = await postgresStore.listAccounts('openai-responses')
+        if (!Array.isArray(pgAccounts)) {
+          return accounts
+        }
+
+        for (const pgAccount of pgAccounts) {
+          const formatted = formatAccount(pgAccount)
+          if (formatted) {
+            accounts.push(formatted)
+          }
+        }
+
+        return accounts
+      } catch (error) {
+        logger.warn(`⚠️ Failed to list OpenAI-Responses accounts from PostgreSQL: ${error.message}`)
+      }
     }
 
     const chunkSize = 500
@@ -207,53 +310,13 @@ class OpenAIResponsesAccountService {
 
       for (let i = 0; i < chunkKeys.length; i++) {
         const accountData = results?.[i]?.[1]
-        if (!accountData || !accountData.id) {
+        if (!accountData) {
           continue
         }
-
-        // 过滤非活跃账户
-        if (!includeInactive && accountData.isActive !== 'true') {
-          continue
+        const formatted = formatAccount(accountData)
+        if (formatted) {
+          accounts.push(formatted)
         }
-
-        // 隐藏敏感信息
-        accountData.apiKey = '***'
-
-        // 解析 JSON 字段
-        if (accountData.proxy) {
-          try {
-            accountData.proxy = JSON.parse(accountData.proxy)
-          } catch (e) {
-            accountData.proxy = null
-          }
-        }
-
-        // 获取限流状态信息（与普通OpenAI账号保持一致的格式）
-        const rateLimitInfo = this._getRateLimitInfo(accountData)
-
-        // 格式化 rateLimitStatus 为对象（与普通 OpenAI 账号一致）
-        accountData.rateLimitStatus = rateLimitInfo.isRateLimited
-          ? {
-              isRateLimited: true,
-              rateLimitedAt: accountData.rateLimitedAt || null,
-              minutesRemaining: rateLimitInfo.remainingMinutes || 0
-            }
-          : {
-              isRateLimited: false,
-              rateLimitedAt: null,
-              minutesRemaining: 0
-            }
-
-        // 转换 schedulable 字段为布尔值（前端需要布尔值来判断）
-        accountData.schedulable = accountData.schedulable !== 'false'
-        // 转换 isActive 字段为布尔值
-        accountData.isActive = accountData.isActive === 'true'
-
-        // ✅ 前端显示订阅过期时间（业务字段）
-        accountData.expiresAt = accountData.subscriptionExpiresAt || null
-        accountData.platform = accountData.platform || 'openai-responses'
-
-        accounts.push(accountData)
       }
     }
 
@@ -639,6 +702,20 @@ class OpenAIResponsesAccountService {
     // 添加到共享账户列表
     if (accountData.accountType === 'shared') {
       await client.sadd(this.SHARED_ACCOUNTS_KEY, accountId)
+    }
+
+    // ✅ 双写到 PostgreSQL（best effort）
+    if (config.postgres?.enabled) {
+      try {
+        await postgresStore.upsertAccount('openai-responses', accountId, {
+          id: accountId,
+          ...accountData
+        })
+      } catch (error) {
+        logger.warn(
+          `⚠️ Failed to upsert OpenAI-Responses account into PostgreSQL: ${error.message}`
+        )
+      }
     }
   }
 }

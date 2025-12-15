@@ -4,6 +4,7 @@ const crypto = require('crypto')
 const https = require('https')
 const config = require('../../config/config')
 const logger = require('../utils/logger')
+const postgresStore = require('../models/postgresStore')
 const { OAuth2Client } = require('google-auth-library')
 const { maskToken } = require('../utils/tokenMask')
 const ProxyHelper = require('../utils/proxyHelper')
@@ -432,6 +433,15 @@ async function createAccount(accountData) {
     await client.sadd(SHARED_GEMINI_ACCOUNTS_KEY, id)
   }
 
+  // ✅ 双写到 PostgreSQL（best effort）
+  if (config.postgres?.enabled) {
+    try {
+      await postgresStore.upsertAccount('gemini', id, account)
+    } catch (error) {
+      logger.warn(`⚠️ Failed to upsert Gemini account into PostgreSQL: ${error.message}`)
+    }
+  }
+
   logger.info(`Created Gemini account: ${id}`)
 
   // 返回时解析代理配置
@@ -450,7 +460,15 @@ async function createAccount(accountData) {
 // 获取账户
 async function getAccount(accountId) {
   const client = redisClient.getClientSafe()
-  const accountData = await client.hgetall(`${GEMINI_ACCOUNT_KEY_PREFIX}${accountId}`)
+  let accountData = await client.hgetall(`${GEMINI_ACCOUNT_KEY_PREFIX}${accountId}`)
+
+  if ((!accountData || Object.keys(accountData).length === 0) && config.postgres?.enabled) {
+    try {
+      accountData = await postgresStore.getAccount('gemini', accountId)
+    } catch (error) {
+      logger.warn(`⚠️ Failed to read Gemini account from PostgreSQL: ${error.message}`)
+    }
+  }
 
   if (!accountData || Object.keys(accountData).length === 0) {
     return null
@@ -596,6 +614,18 @@ async function updateAccount(accountId, updates) {
 
   await client.hset(`${GEMINI_ACCOUNT_KEY_PREFIX}${accountId}`, updates)
 
+  // ✅ 双写到 PostgreSQL（best effort）：写入“完整存储态”数据
+  if (config.postgres?.enabled) {
+    try {
+      const stored = await client.hgetall(`${GEMINI_ACCOUNT_KEY_PREFIX}${accountId}`)
+      if (stored && Object.keys(stored).length > 0) {
+        await postgresStore.upsertAccount('gemini', accountId, stored)
+      }
+    } catch (error) {
+      logger.warn(`⚠️ Failed to upsert Gemini account into PostgreSQL: ${error.message}`)
+    }
+  }
+
   logger.info(`Updated Gemini account: ${accountId}`)
 
   // 合并更新后的账户数据
@@ -624,6 +654,15 @@ async function deleteAccount(accountId) {
   const client = redisClient.getClientSafe()
   await client.del(`${GEMINI_ACCOUNT_KEY_PREFIX}${accountId}`)
 
+  // ✅ 删除 PostgreSQL（best effort）
+  if (config.postgres?.enabled) {
+    try {
+      await postgresStore.deleteAccount('gemini', accountId)
+    } catch (error) {
+      logger.warn(`⚠️ Failed to delete Gemini account from PostgreSQL: ${error.message}`)
+    }
+  }
+
   // 从共享账户集合中移除
   if (account.accountType === 'shared') {
     await client.srem(SHARED_GEMINI_ACCOUNTS_KEY, accountId)
@@ -648,6 +687,107 @@ async function getAllAccounts() {
   const keys = await redisClient.scanKeys(`${GEMINI_ACCOUNT_KEY_PREFIX}*`)
   const accounts = []
 
+  const normalizeBoolean = (value) => value === true || value === 'true'
+  const formatAccount = (rawAccount) => {
+    if (!rawAccount || Object.keys(rawAccount).length === 0) {
+      return null
+    }
+
+    const accountData = { ...rawAccount }
+
+    // 获取限流状态信息（从 accountData 直接计算，避免重复读取）
+    const rateLimitInfo = (() => {
+      if (accountData.rateLimitStatus === 'limited' && accountData.rateLimitedAt) {
+        const rateLimitedAt = new Date(accountData.rateLimitedAt)
+        const now = new Date()
+        const minutesSinceRateLimit = Math.floor((now - rateLimitedAt) / (1000 * 60))
+
+        // Gemini 限流持续时间为 1 小时
+        const minutesRemaining = Math.max(0, 60 - minutesSinceRateLimit)
+
+        return {
+          isRateLimited: minutesRemaining > 0,
+          rateLimitedAt: accountData.rateLimitedAt,
+          minutesRemaining
+        }
+      }
+
+      return {
+        isRateLimited: false,
+        rateLimitedAt: null,
+        minutesRemaining: 0
+      }
+    })()
+
+    // 解析代理配置
+    if (accountData.proxy) {
+      try {
+        accountData.proxy = JSON.parse(accountData.proxy)
+      } catch (e) {
+        // 如果解析失败，设置为null
+        accountData.proxy = null
+      }
+    }
+
+    // 转换 schedulable 字符串为布尔值（与 getAccount 保持一致）
+    accountData.schedulable =
+      accountData.schedulable !== 'false' && accountData.schedulable !== false
+
+    const tokenExpiresAt = accountData.expiresAt || null
+    const subscriptionExpiresAt =
+      accountData.subscriptionExpiresAt && accountData.subscriptionExpiresAt !== ''
+        ? accountData.subscriptionExpiresAt
+        : null
+
+    const rawScopes = accountData.scopes
+    const scopes = Array.isArray(rawScopes)
+      ? rawScopes
+      : rawScopes && rawScopes.trim()
+        ? rawScopes.split(' ')
+        : []
+
+    // 不解密敏感字段，只返回基本信息
+    return {
+      ...accountData,
+      isActive: normalizeBoolean(accountData.isActive),
+      geminiOauth: accountData.geminiOauth ? '[ENCRYPTED]' : '',
+      accessToken: accountData.accessToken ? '[ENCRYPTED]' : '',
+      refreshToken: accountData.refreshToken ? '[ENCRYPTED]' : '',
+
+      // ✅ 前端显示订阅过期时间（业务字段）
+      // 注意：前端看到的 expiresAt 实际上是 subscriptionExpiresAt
+      tokenExpiresAt,
+      subscriptionExpiresAt,
+      expiresAt: subscriptionExpiresAt,
+
+      scopes,
+      // 添加 hasRefreshToken 标记
+      hasRefreshToken: !!accountData.refreshToken,
+      // 添加限流状态信息（统一格式）
+      rateLimitStatus: rateLimitInfo
+    }
+  }
+
+  if ((!keys || keys.length === 0) && config.postgres?.enabled) {
+    try {
+      const pgAccounts = await postgresStore.listAccounts('gemini')
+      if (!Array.isArray(pgAccounts)) {
+        return []
+      }
+
+      for (const pgAccount of pgAccounts) {
+        const formatted = formatAccount(pgAccount)
+        if (formatted) {
+          accounts.push(formatted)
+        }
+      }
+
+      return accounts
+    } catch (error) {
+      logger.warn(`⚠️ Failed to list Gemini accounts from PostgreSQL: ${error.message}`)
+    }
+  }
+
   const chunkSize = 200
   for (let offset = 0; offset < keys.length; offset += chunkSize) {
     const chunkKeys = keys.slice(offset, offset + chunkSize)
@@ -660,71 +800,10 @@ async function getAllAccounts() {
         continue
       }
 
-      // 获取限流状态信息（从 accountData 直接计算，避免重复读取）
-      const rateLimitInfo = (() => {
-        if (accountData.rateLimitStatus === 'limited' && accountData.rateLimitedAt) {
-          const rateLimitedAt = new Date(accountData.rateLimitedAt)
-          const now = new Date()
-          const minutesSinceRateLimit = Math.floor((now - rateLimitedAt) / (1000 * 60))
-
-          // Gemini 限流持续时间为 1 小时
-          const minutesRemaining = Math.max(0, 60 - minutesSinceRateLimit)
-
-          return {
-            isRateLimited: minutesRemaining > 0,
-            rateLimitedAt: accountData.rateLimitedAt,
-            minutesRemaining
-          }
-        }
-
-        return {
-          isRateLimited: false,
-          rateLimitedAt: null,
-          minutesRemaining: 0
-        }
-      })()
-
-      // 解析代理配置
-      if (accountData.proxy) {
-        try {
-          accountData.proxy = JSON.parse(accountData.proxy)
-        } catch (e) {
-          // 如果解析失败，设置为null
-          accountData.proxy = null
-        }
+      const formatted = formatAccount(accountData)
+      if (formatted) {
+        accounts.push(formatted)
       }
-
-      // 转换 schedulable 字符串为布尔值（与 getAccount 保持一致）
-      accountData.schedulable = accountData.schedulable !== 'false' // 默认为true，只有明确设置为'false'才为false
-
-      const tokenExpiresAt = accountData.expiresAt || null
-      const subscriptionExpiresAt =
-        accountData.subscriptionExpiresAt && accountData.subscriptionExpiresAt !== ''
-          ? accountData.subscriptionExpiresAt
-          : null
-
-      // 不解密敏感字段，只返回基本信息
-      accounts.push({
-        ...accountData,
-        geminiOauth: accountData.geminiOauth ? '[ENCRYPTED]' : '',
-        accessToken: accountData.accessToken ? '[ENCRYPTED]' : '',
-        refreshToken: accountData.refreshToken ? '[ENCRYPTED]' : '',
-
-        // ✅ 前端显示订阅过期时间（业务字段）
-        // 注意：前端看到的 expiresAt 实际上是 subscriptionExpiresAt
-        tokenExpiresAt,
-        subscriptionExpiresAt,
-        expiresAt: subscriptionExpiresAt,
-
-        // 添加 scopes 字段用于判断认证方式
-        // 处理空字符串和默认值的情况
-        scopes:
-          accountData.scopes && accountData.scopes.trim() ? accountData.scopes.split(' ') : [],
-        // 添加 hasRefreshToken 标记
-        hasRefreshToken: !!accountData.refreshToken,
-        // 添加限流状态信息（统一格式）
-        rateLimitStatus: rateLimitInfo
-      })
     }
   }
 
@@ -748,7 +827,7 @@ async function selectAvailableAccount(apiKeyId, sessionHash = null) {
   }
 
   // 获取 API Key 信息
-  const apiKeyData = await client.hgetall(`api_key:${apiKeyId}`)
+  const apiKeyData = (await redisClient.getApiKey(apiKeyId)) || {}
 
   // 检查是否绑定了 Gemini 账户
   if (apiKeyData.geminiAccountId) {

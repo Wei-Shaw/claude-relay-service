@@ -2,6 +2,7 @@ const redis = require('../models/redis')
 const crypto = require('crypto')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
+const postgresStore = require('../models/postgresStore')
 
 class UserService {
   constructor() {
@@ -75,6 +76,15 @@ class UserService {
       await redis.set(`${this.userPrefix}${user.id}`, JSON.stringify(user))
       await redis.set(`${this.usernamePrefix}${username}`, user.id)
 
+      // ✅ 双写到 PostgreSQL（best effort，不影响主流程）
+      if (config.postgres?.enabled) {
+        try {
+          await postgresStore.upsertUser(user)
+        } catch (error) {
+          logger.warn(`⚠️ Failed to upsert user into PostgreSQL: ${error.message}`)
+        }
+      }
+
       // 如果是新用户，尝试转移匹配的API Keys
       if (isNewUser) {
         await this.transferMatchingApiKeys(user)
@@ -93,11 +103,30 @@ class UserService {
     try {
       const userId = await redis.get(`${this.usernamePrefix}${username}`)
       if (!userId) {
+        if (config.postgres?.enabled) {
+          try {
+            return await postgresStore.getUserByUsername(username)
+          } catch (error) {
+            logger.warn(`⚠️ Failed to read user from PostgreSQL: ${error.message}`)
+          }
+        }
         return null
       }
 
       const userData = await redis.get(`${this.userPrefix}${userId}`)
-      return userData ? JSON.parse(userData) : null
+      if (userData) {
+        return JSON.parse(userData)
+      }
+
+      if (config.postgres?.enabled) {
+        try {
+          return await postgresStore.getUserById(userId)
+        } catch (error) {
+          logger.warn(`⚠️ Failed to read user from PostgreSQL: ${error.message}`)
+        }
+      }
+
+      return null
     } catch (error) {
       logger.error('❌ Error getting user by username:', error)
       throw error
@@ -109,35 +138,56 @@ class UserService {
     try {
       const userData = await redis.get(`${this.userPrefix}${userId}`)
       if (!userData) {
+        if (config.postgres?.enabled) {
+          try {
+            const pgUser = await postgresStore.getUserById(userId)
+            if (pgUser) {
+              // 注意：PG 返回已是对象，不需要 JSON.parse
+              return await this._attachUsageToUser(pgUser, calculateUsage)
+            }
+          } catch (error) {
+            logger.warn(`⚠️ Failed to read user from PostgreSQL: ${error.message}`)
+          }
+        }
         return null
       }
 
       const user = JSON.parse(userData)
 
       // Calculate totalUsage by aggregating user's API keys usage (if requested)
-      if (calculateUsage) {
-        try {
-          const usageStats = await this.calculateUserUsageStats(userId)
-          user.totalUsage = usageStats.totalUsage
-          user.apiKeyCount = usageStats.apiKeyCount
-        } catch (error) {
-          logger.error('❌ Error calculating user usage stats:', error)
-          // Fallback to stored values if calculation fails
-          user.totalUsage = user.totalUsage || {
-            requests: 0,
-            inputTokens: 0,
-            outputTokens: 0,
-            totalCost: 0
-          }
-          user.apiKeyCount = user.apiKeyCount || 0
-        }
-      }
-
-      return user
+      return await this._attachUsageToUser(user, calculateUsage)
     } catch (error) {
       logger.error('❌ Error getting user by ID:', error)
       throw error
     }
+  }
+
+  async _attachUsageToUser(user, calculateUsage) {
+    const resolvedUser = user ? { ...user } : null
+    if (!resolvedUser) {
+      return null
+    }
+
+    if (!calculateUsage) {
+      return resolvedUser
+    }
+
+    try {
+      const usageStats = await this.calculateUserUsageStats(resolvedUser.id)
+      resolvedUser.totalUsage = usageStats.totalUsage
+      resolvedUser.apiKeyCount = usageStats.apiKeyCount
+    } catch (error) {
+      logger.error('❌ Error calculating user usage stats:', error)
+      resolvedUser.totalUsage = resolvedUser.totalUsage || {
+        requests: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        totalCost: 0
+      }
+      resolvedUser.apiKeyCount = resolvedUser.apiKeyCount || 0
+    }
+
+    return resolvedUser
   }
 
   // 📊 计算用户使用统计（通过聚合API Keys）
@@ -193,41 +243,58 @@ class UserService {
     try {
       const client = redis.getClientSafe()
       const { page = 1, limit = 20, role, isActive } = options
+      const usersById = new Map()
+
+      if (config.postgres?.enabled) {
+        try {
+          const pgUsers = await postgresStore.listUsers()
+          if (Array.isArray(pgUsers)) {
+            for (const user of pgUsers) {
+              if (user?.id) {
+                usersById.set(user.id, user)
+              }
+            }
+          }
+        } catch (error) {
+          logger.warn(`⚠️ Failed to list users from PostgreSQL: ${error.message}`)
+        }
+      }
+
       const pattern = `${this.userPrefix}*`
       const keys = await redis.scanKeys(pattern)
-
-      const users = []
       for (const key of keys) {
         const userData = await client.get(key)
-        if (userData) {
+        if (!userData) {
+          continue
+        }
+
+        try {
           const user = JSON.parse(userData)
-
-          // 应用过滤条件
-          if (role && user.role !== role) {
-            continue
+          if (user?.id && !usersById.has(user.id)) {
+            usersById.set(user.id, user)
           }
-          if (typeof isActive === 'boolean' && user.isActive !== isActive) {
-            continue
-          }
+        } catch (error) {
+          logger.warn(`⚠️ Failed to parse user data from Redis for key ${key}: ${error.message}`)
+        }
+      }
 
-          // Calculate dynamic usage stats for each user
-          try {
-            const usageStats = await this.calculateUserUsageStats(user.id)
-            user.totalUsage = usageStats.totalUsage
-            user.apiKeyCount = usageStats.apiKeyCount
-          } catch (error) {
-            logger.error(`❌ Error calculating usage for user ${user.id}:`, error)
-            // Fallback to stored values
-            user.totalUsage = user.totalUsage || {
-              requests: 0,
-              inputTokens: 0,
-              outputTokens: 0,
-              totalCost: 0
-            }
-            user.apiKeyCount = user.apiKeyCount || 0
-          }
+      const users = []
+      for (const user of usersById.values()) {
+        if (!user) {
+          continue
+        }
 
-          users.push(user)
+        // 应用过滤条件
+        if (role && user.role !== role) {
+          continue
+        }
+        if (typeof isActive === 'boolean' && user.isActive !== isActive) {
+          continue
+        }
+
+        const resolvedUser = await this._attachUsageToUser(user, true)
+        if (resolvedUser) {
+          users.push(resolvedUser)
         }
       }
 

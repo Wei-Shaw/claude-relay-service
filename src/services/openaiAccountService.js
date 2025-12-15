@@ -5,6 +5,7 @@ const axios = require('axios')
 const ProxyHelper = require('../utils/proxyHelper')
 const config = require('../../config/config')
 const logger = require('../utils/logger')
+const postgresStore = require('../models/postgresStore')
 // const { maskToken } = require('../utils/tokenMask')
 const {
   logRefreshStart,
@@ -595,14 +596,22 @@ async function createAccount(accountData) {
     await client.sadd(SHARED_OPENAI_ACCOUNTS_KEY, accountId)
   }
 
+  // ✅ 双写到 PostgreSQL（best effort）
+  if (config.postgres?.enabled) {
+    try {
+      await postgresStore.upsertAccount('openai', accountId, account)
+    } catch (error) {
+      logger.warn(`⚠️ Failed to upsert OpenAI account into PostgreSQL: ${error.message}`)
+    }
+  }
+
   logger.info(`Created OpenAI account: ${accountId}`)
   return account
 }
 
 // 获取账户
 async function getAccount(accountId) {
-  const client = redisClient.getClientSafe()
-  const accountData = await client.hgetall(`${OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`)
+  const accountData = await redisClient.getOpenAiAccount(accountId)
 
   if (!accountData || Object.keys(accountData).length === 0) {
     return null
@@ -696,6 +705,18 @@ async function updateAccount(accountId, updates) {
 
   await client.hset(`${OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`, updates)
 
+  // ✅ 双写到 PostgreSQL（best effort）：写入“完整存储态”数据，避免覆盖成半截更新
+  if (config.postgres?.enabled) {
+    try {
+      const stored = await client.hgetall(`${OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`)
+      if (stored && Object.keys(stored).length > 0) {
+        await postgresStore.upsertAccount('openai', accountId, stored)
+      }
+    } catch (error) {
+      logger.warn(`⚠️ Failed to upsert OpenAI account into PostgreSQL: ${error.message}`)
+    }
+  }
+
   logger.info(`Updated OpenAI account: ${accountId}`)
 
   // 合并更新后的账户数据
@@ -724,6 +745,15 @@ async function deleteAccount(accountId) {
   const client = redisClient.getClientSafe()
   await client.del(`${OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`)
 
+  // ✅ 删除 PostgreSQL（best effort）
+  if (config.postgres?.enabled) {
+    try {
+      await postgresStore.deleteAccount('openai', accountId)
+    } catch (error) {
+      logger.warn(`⚠️ Failed to delete OpenAI account from PostgreSQL: ${error.message}`)
+    }
+  }
+
   // 从共享账户集合中移除
   if (account.accountType === 'shared') {
     await client.srem(SHARED_OPENAI_ACCOUNTS_KEY, accountId)
@@ -744,131 +774,120 @@ async function deleteAccount(accountId) {
 
 // 获取所有账户
 async function getAllAccounts() {
-  const client = redisClient.getClientSafe()
-  const keys = await redisClient.scanKeys(`${OPENAI_ACCOUNT_KEY_PREFIX}*`)
+  const rawAccounts = await redisClient.getAllOpenAIAccounts()
   const accounts = []
 
-  const chunkSize = 200
-  for (let offset = 0; offset < keys.length; offset += chunkSize) {
-    const chunkKeys = keys.slice(offset, offset + chunkSize)
-    const pipeline = client.pipeline()
-    chunkKeys.forEach((key) => pipeline.hgetall(key))
+  for (const accountData of rawAccounts) {
+    if (!accountData || Object.keys(accountData).length === 0) {
+      continue
+    }
 
-    const results = await pipeline.exec()
-    for (let i = 0; i < results.length; i++) {
-      const [err, accountData] = results[i]
-      if (err || !accountData || Object.keys(accountData).length === 0) {
-        continue
-      }
+    const codexUsage = buildCodexUsageSnapshot(accountData)
 
-      const codexUsage = buildCodexUsageSnapshot(accountData)
+    // 解密敏感数据（但不返回给前端）
+    if (accountData.email) {
+      accountData.email = decrypt(accountData.email)
+    }
 
-      // 解密敏感数据（但不返回给前端）
-      if (accountData.email) {
-        accountData.email = decrypt(accountData.email)
-      }
+    // 先保存 refreshToken 是否存在的标记
+    const hasRefreshTokenFlag = !!accountData.refreshToken
+    const maskedAccessToken = accountData.accessToken ? '[ENCRYPTED]' : ''
+    const maskedRefreshToken = accountData.refreshToken ? '[ENCRYPTED]' : ''
+    const maskedOauth = accountData.openaiOauth ? '[ENCRYPTED]' : ''
 
-      // 先保存 refreshToken 是否存在的标记
-      const hasRefreshTokenFlag = !!accountData.refreshToken
-      const maskedAccessToken = accountData.accessToken ? '[ENCRYPTED]' : ''
-      const maskedRefreshToken = accountData.refreshToken ? '[ENCRYPTED]' : ''
-      const maskedOauth = accountData.openaiOauth ? '[ENCRYPTED]' : ''
+    // 屏蔽敏感信息（token等不应该返回给前端）
+    delete accountData.idToken
+    delete accountData.accessToken
+    delete accountData.refreshToken
+    delete accountData.openaiOauth
+    delete accountData.codexPrimaryUsedPercent
+    delete accountData.codexPrimaryResetAfterSeconds
+    delete accountData.codexPrimaryWindowMinutes
+    delete accountData.codexSecondaryUsedPercent
+    delete accountData.codexSecondaryResetAfterSeconds
+    delete accountData.codexSecondaryWindowMinutes
+    delete accountData.codexPrimaryOverSecondaryLimitPercent
+    // 时间戳改由 codexUsage.updatedAt 暴露
+    delete accountData.codexUsageUpdatedAt
 
-      // 屏蔽敏感信息（token等不应该返回给前端）
-      delete accountData.idToken
-      delete accountData.accessToken
-      delete accountData.refreshToken
-      delete accountData.openaiOauth
-      delete accountData.codexPrimaryUsedPercent
-      delete accountData.codexPrimaryResetAfterSeconds
-      delete accountData.codexPrimaryWindowMinutes
-      delete accountData.codexSecondaryUsedPercent
-      delete accountData.codexSecondaryResetAfterSeconds
-      delete accountData.codexSecondaryWindowMinutes
-      delete accountData.codexPrimaryOverSecondaryLimitPercent
-      // 时间戳改由 codexUsage.updatedAt 暴露
-      delete accountData.codexUsageUpdatedAt
+    // 获取限流状态信息（从 accountData 直接计算，避免重复读取）
+    const rateLimitInfo = (() => {
+      const status = accountData.rateLimitStatus || 'normal'
+      const rateLimitedAt = accountData.rateLimitedAt || null
+      const rateLimitResetAt = accountData.rateLimitResetAt || null
 
-      // 获取限流状态信息（从 accountData 直接计算，避免重复读取）
-      const rateLimitInfo = (() => {
-        const status = accountData.rateLimitStatus || 'normal'
-        const rateLimitedAt = accountData.rateLimitedAt || null
-        const rateLimitResetAt = accountData.rateLimitResetAt || null
-
-        if (status !== 'limited') {
-          return {
-            status,
-            isRateLimited: false,
-            rateLimitedAt,
-            rateLimitResetAt,
-            minutesRemaining: 0
-          }
-        }
-
-        const now = Date.now()
-        let remainingTime = 0
-
-        if (rateLimitResetAt) {
-          const resetAt = new Date(rateLimitResetAt).getTime()
-          remainingTime = Math.max(0, resetAt - now)
-        } else if (rateLimitedAt) {
-          const limitedAt = new Date(rateLimitedAt).getTime()
-          const limitDuration = 60 * 60 * 1000 // 默认1小时
-          remainingTime = Math.max(0, limitedAt + limitDuration - now)
-        }
-
-        const minutesRemaining = remainingTime > 0 ? Math.ceil(remainingTime / (60 * 1000)) : 0
-
+      if (status !== 'limited') {
         return {
           status,
-          isRateLimited: minutesRemaining > 0,
+          isRateLimited: false,
           rateLimitedAt,
           rateLimitResetAt,
-          minutesRemaining
-        }
-      })()
-
-      // 解析代理配置
-      if (accountData.proxy) {
-        try {
-          accountData.proxy = JSON.parse(accountData.proxy)
-        } catch (e) {
-          // 如果解析失败，设置为null
-          accountData.proxy = null
+          minutesRemaining: 0
         }
       }
 
-      const tokenExpiresAt = accountData.expiresAt || null
-      const subscriptionExpiresAt =
-        accountData.subscriptionExpiresAt && accountData.subscriptionExpiresAt !== ''
-          ? accountData.subscriptionExpiresAt
-          : null
+      const now = Date.now()
+      let remainingTime = 0
 
-      // 不解密敏感字段，只返回基本信息
-      accounts.push({
-        ...accountData,
-        isActive: accountData.isActive === 'true',
-        schedulable: accountData.schedulable !== 'false',
-        openaiOauth: maskedOauth,
-        accessToken: maskedAccessToken,
-        refreshToken: maskedRefreshToken,
+      if (rateLimitResetAt) {
+        const resetAt = new Date(rateLimitResetAt).getTime()
+        remainingTime = Math.max(0, resetAt - now)
+      } else if (rateLimitedAt) {
+        const limitedAt = new Date(rateLimitedAt).getTime()
+        const limitDuration = 60 * 60 * 1000 // 默认1小时
+        remainingTime = Math.max(0, limitedAt + limitDuration - now)
+      }
 
-        // ✅ 前端显示订阅过期时间（业务字段）
-        tokenExpiresAt,
-        subscriptionExpiresAt,
-        expiresAt: subscriptionExpiresAt,
+      const minutesRemaining = remainingTime > 0 ? Math.ceil(remainingTime / (60 * 1000)) : 0
 
-        // 添加 scopes 字段用于判断认证方式
-        // 处理空字符串的情况
-        scopes:
-          accountData.scopes && accountData.scopes.trim() ? accountData.scopes.split(' ') : [],
-        // 添加 hasRefreshToken 标记
-        hasRefreshToken: hasRefreshTokenFlag,
-        // 添加限流状态信息（统一格式）
-        rateLimitStatus: rateLimitInfo,
-        codexUsage
-      })
+      return {
+        status,
+        isRateLimited: minutesRemaining > 0,
+        rateLimitedAt,
+        rateLimitResetAt,
+        minutesRemaining
+      }
+    })()
+
+    // 解析代理配置
+    if (accountData.proxy) {
+      try {
+        accountData.proxy = JSON.parse(accountData.proxy)
+      } catch (e) {
+        // 如果解析失败，设置为null
+        accountData.proxy = null
+      }
     }
+
+    const tokenExpiresAt = accountData.expiresAt || null
+    const subscriptionExpiresAt =
+      accountData.subscriptionExpiresAt && accountData.subscriptionExpiresAt !== ''
+        ? accountData.subscriptionExpiresAt
+        : null
+
+    // 不解密敏感字段，只返回基本信息
+    accounts.push({
+      ...accountData,
+      isActive: accountData.isActive === 'true',
+      schedulable: accountData.schedulable !== 'false',
+      openaiOauth: maskedOauth,
+      accessToken: maskedAccessToken,
+      refreshToken: maskedRefreshToken,
+
+      // ✅ 前端显示订阅过期时间（业务字段）
+      tokenExpiresAt,
+      subscriptionExpiresAt,
+      expiresAt: subscriptionExpiresAt,
+
+      // 添加 scopes 字段用于判断认证方式
+      // 处理空字符串的情况
+      scopes: accountData.scopes && accountData.scopes.trim() ? accountData.scopes.split(' ') : [],
+      // 添加 hasRefreshToken 标记
+      hasRefreshToken: hasRefreshTokenFlag,
+      // 添加限流状态信息（统一格式）
+      rateLimitStatus: rateLimitInfo,
+      codexUsage
+    })
   }
 
   return accounts
@@ -932,7 +951,7 @@ async function selectAvailableAccount(apiKeyId, sessionHash = null) {
   }
 
   // 获取 API Key 信息
-  const apiKeyData = await client.hgetall(`api_key:${apiKeyId}`)
+  const apiKeyData = (await redisClient.getApiKey(apiKeyId)) || {}
 
   // 检查是否绑定了 OpenAI 账户
   if (apiKeyData.openaiAccountId) {

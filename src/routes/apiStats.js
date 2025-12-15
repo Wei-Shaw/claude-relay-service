@@ -475,6 +475,47 @@ router.post('/api/merge-renewal', async (req, res) => {
           continue
         }
 
+        // ✅ 双写：同步 PostgreSQL（best effort，不影响主流程）
+        try {
+          const postgresStore = require('../models/postgresStore')
+
+          const targetUpdated = { ...freshTarget }
+          if (newExpiresAt) {
+            targetUpdated.expiresAt = newExpiresAt
+          } else {
+            targetUpdated.activationDays = String(newActivationValue)
+            targetUpdated.activationUnit = newActivationUnit
+          }
+          targetUpdated.updatedAt = nowIso
+
+          if (targetUpdated.apiKey) {
+            await postgresStore.upsertApiKey(targetKeyData.id, targetUpdated.apiKey, {
+              id: targetKeyData.id,
+              ...targetUpdated
+            })
+          }
+
+          const renewUpdated = {
+            ...freshRenew,
+            isDeleted: 'true',
+            deletedAt: nowIso,
+            deletedBy: `merge-renewal:${targetKeyData.id}`,
+            deletedByType: 'system',
+            isActive: 'false',
+            mergedToKeyId: targetKeyData.id,
+            mergedAt: nowIso
+          }
+
+          if (renewUpdated.apiKey) {
+            await postgresStore.upsertApiKey(renewKeyData.id, renewUpdated.apiKey, {
+              id: renewKeyData.id,
+              ...renewUpdated
+            })
+          }
+        } catch (error) {
+          logger.warn(`⚠️ Failed to sync renewal merge to PostgreSQL: ${error.message}`)
+        }
+
         // best effort: 从费用索引中移除（不影响主流程）
         try {
           const costRankService = require('../services/costRankService')

@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid')
 const crypto = require('crypto')
 const config = require('../../config/config')
 const logger = require('../utils/logger')
+const postgresStore = require('../models/postgresStore')
 
 // 加密相关常量
 const ALGORITHM = 'aes-256-cbc'
@@ -156,6 +157,15 @@ async function createAccount(accountData) {
     await client.sadd(SHARED_AZURE_OPENAI_ACCOUNTS_KEY, accountId)
   }
 
+  // ✅ 双写到 PostgreSQL（best effort）
+  if (config.postgres?.enabled) {
+    try {
+      await postgresStore.upsertAccount('azure-openai', accountId, account)
+    } catch (error) {
+      logger.warn(`⚠️ Failed to upsert Azure OpenAI account into PostgreSQL: ${error.message}`)
+    }
+  }
+
   logger.info(`Created Azure OpenAI account: ${accountId}`)
   return account
 }
@@ -163,7 +173,15 @@ async function createAccount(accountData) {
 // 获取账户
 async function getAccount(accountId) {
   const client = redisClient.getClientSafe()
-  const accountData = await client.hgetall(`${AZURE_OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`)
+  let accountData = await client.hgetall(`${AZURE_OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`)
+
+  if ((!accountData || Object.keys(accountData).length === 0) && config.postgres?.enabled) {
+    try {
+      accountData = await postgresStore.getAccount('azure-openai', accountId)
+    } catch (error) {
+      logger.warn(`⚠️ Failed to read Azure OpenAI account from PostgreSQL: ${error.message}`)
+    }
+  }
 
   if (!accountData || Object.keys(accountData).length === 0) {
     return null
@@ -241,6 +259,18 @@ async function updateAccount(accountId, updates) {
 
   await client.hset(`${AZURE_OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`, updates)
 
+  // ✅ 双写到 PostgreSQL（best effort）：写入“完整存储态”数据
+  if (config.postgres?.enabled) {
+    try {
+      const stored = await client.hgetall(`${AZURE_OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`)
+      if (stored && Object.keys(stored).length > 0) {
+        await postgresStore.upsertAccount('azure-openai', accountId, stored)
+      }
+    } catch (error) {
+      logger.warn(`⚠️ Failed to upsert Azure OpenAI account into PostgreSQL: ${error.message}`)
+    }
+  }
+
   logger.info(`Updated Azure OpenAI account: ${accountId}`)
 
   // 合并更新后的账户数据
@@ -273,6 +303,15 @@ async function deleteAccount(accountId) {
   // 从共享账户集合中移除
   await client.srem(SHARED_AZURE_OPENAI_ACCOUNTS_KEY, accountId)
 
+  // ✅ 删除 PostgreSQL（best effort）
+  if (config.postgres?.enabled) {
+    try {
+      await postgresStore.deleteAccount('azure-openai', accountId)
+    } catch (error) {
+      logger.warn(`⚠️ Failed to delete Azure OpenAI account from PostgreSQL: ${error.message}`)
+    }
+  }
+
   logger.info(`Deleted Azure OpenAI account: ${accountId}`)
   return true
 }
@@ -282,11 +321,73 @@ async function getAllAccounts() {
   const client = redisClient.getClientSafe()
   const keys = await redisClient.scanKeys(`${AZURE_OPENAI_ACCOUNT_KEY_PREFIX}*`)
 
+  const accounts = []
+  const normalizeBoolean = (value) => value === true || value === 'true'
+  const formatAccount = (rawAccount) => {
+    if (!rawAccount || Object.keys(rawAccount).length === 0) {
+      return null
+    }
+
+    const accountData = { ...rawAccount }
+
+    // 不返回敏感数据给前端
+    delete accountData.apiKey
+
+    // 解析代理配置
+    if (accountData.proxy && typeof accountData.proxy === 'string') {
+      try {
+        accountData.proxy = JSON.parse(accountData.proxy)
+      } catch (e) {
+        accountData.proxy = null
+      }
+    }
+
+    // 解析支持的模型
+    if (accountData.supportedModels && typeof accountData.supportedModels === 'string') {
+      try {
+        accountData.supportedModels = JSON.parse(accountData.supportedModels)
+      } catch (e) {
+        accountData.supportedModels = ['gpt-4', 'gpt-35-turbo']
+      }
+    }
+
+    return {
+      ...accountData,
+      isActive: normalizeBoolean(accountData.isActive),
+      schedulable: accountData.schedulable !== 'false' && accountData.schedulable !== false,
+
+      // ✅ 前端显示订阅过期时间（业务字段）
+      expiresAt: accountData.subscriptionExpiresAt || null,
+      platform: 'azure-openai'
+    }
+  }
+
+  if ((!keys || keys.length === 0) && config.postgres?.enabled) {
+    try {
+      const pgAccounts = await postgresStore.listAccounts('azure-openai')
+      if (!Array.isArray(pgAccounts)) {
+        return []
+      }
+
+      for (const pgAccount of pgAccounts) {
+        const formatted = formatAccount(pgAccount)
+        if (formatted) {
+          accounts.push(formatted)
+        }
+      }
+
+      return accounts
+    } catch (error) {
+      logger.warn(`⚠️ Failed to list Azure OpenAI accounts from PostgreSQL: ${error.message}`)
+    }
+
+    return []
+  }
+
   if (!keys || keys.length === 0) {
     return []
   }
 
-  const accounts = []
   const chunkSize = 500
   for (let offset = 0; offset < keys.length; offset += chunkSize) {
     const chunkKeys = keys.slice(offset, offset + chunkSize)
@@ -296,40 +397,10 @@ async function getAllAccounts() {
 
     for (let i = 0; i < chunkKeys.length; i++) {
       const accountData = results?.[i]?.[1]
-      if (!accountData || Object.keys(accountData).length === 0) {
-        continue
+      const formatted = formatAccount(accountData)
+      if (formatted) {
+        accounts.push(formatted)
       }
-
-      // 不返回敏感数据给前端
-      delete accountData.apiKey
-
-      // 解析代理配置
-      if (accountData.proxy && typeof accountData.proxy === 'string') {
-        try {
-          accountData.proxy = JSON.parse(accountData.proxy)
-        } catch (e) {
-          accountData.proxy = null
-        }
-      }
-
-      // 解析支持的模型
-      if (accountData.supportedModels && typeof accountData.supportedModels === 'string') {
-        try {
-          accountData.supportedModels = JSON.parse(accountData.supportedModels)
-        } catch (e) {
-          accountData.supportedModels = ['gpt-4', 'gpt-35-turbo']
-        }
-      }
-
-      accounts.push({
-        ...accountData,
-        isActive: accountData.isActive === 'true',
-        schedulable: accountData.schedulable !== 'false',
-
-        // ✅ 前端显示订阅过期时间（业务字段）
-        expiresAt: accountData.subscriptionExpiresAt || null,
-        platform: 'azure-openai'
-      })
     }
   }
 
@@ -498,15 +569,19 @@ async function toggleSchedulable(accountId) {
 
 // 迁移 API Keys 以支持 Azure OpenAI
 async function migrateApiKeysForAzureSupport() {
-  const client = redisClient.getClientSafe()
-  const apiKeyIds = await client.smembers('api_keys')
+  const apiKeyIds = await redisClient.scanApiKeyIds()
 
   let migratedCount = 0
   for (const keyId of apiKeyIds) {
-    const keyData = await client.hgetall(`api_key:${keyId}`)
-    if (keyData && !keyData.azureOpenaiAccountId) {
+    const keyData = await redisClient.getApiKey(keyId)
+    if (!keyData) {
+      continue
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(keyData, 'azureOpenaiAccountId')) {
       // 添加 Azure OpenAI 账户ID字段（初始为空）
-      await client.hset(`api_key:${keyId}`, 'azureOpenaiAccountId', '')
+      keyData.azureOpenaiAccountId = ''
+      await redisClient.setApiKey(keyId, keyData)
       migratedCount++
     }
   }

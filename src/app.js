@@ -9,6 +9,8 @@ const bcrypt = require('bcryptjs')
 const config = require('../config/config')
 const logger = require('./utils/logger')
 const redis = require('./models/redis')
+const postgres = require('./models/postgres')
+const postgresStore = require('./models/postgresStore')
 const pricingService = require('./services/pricingService')
 const cacheMonitor = require('./utils/cacheMonitor')
 
@@ -52,6 +54,13 @@ class Application {
       logger.info('🔄 Connecting to Redis...')
       await redis.connect()
       logger.success('✅ Redis connected successfully')
+
+      // 🐘 连接 PostgreSQL（可选，失败自动回退 Redis）
+      logger.info('🔄 Connecting to PostgreSQL...')
+      await postgres.connect()
+      if (postgres.isConnected) {
+        await postgresStore.ensureSchema()
+      }
 
       // 💰 初始化价格服务
       logger.info('🔄 Initializing pricing service...')
@@ -323,6 +332,7 @@ class Application {
             this.checkRedisHealth(),
             this.checkLoggerHealth()
           ])
+          const postgresHealth = await this.checkPostgresHealth()
 
           const memory = process.memoryUsage()
 
@@ -360,6 +370,7 @@ class Application {
             },
             components: {
               redis: redisHealth,
+              postgres: postgresHealth,
               logger: loggerHealth
             },
             stats: logger.getStats()
@@ -469,6 +480,35 @@ class Application {
       return {
         status: 'unhealthy',
         connected: false,
+        error: error.message
+      }
+    }
+  }
+
+  // 🐘 PostgreSQL 健康检查（可选）
+  async checkPostgresHealth() {
+    try {
+      if (!postgres.isEnabled()) {
+        return { status: 'disabled' }
+      }
+
+      const start = Date.now()
+      await postgres.connect()
+      if (!postgres.isConnected) {
+        return {
+          status: 'unhealthy',
+          error: 'PostgreSQL not connected'
+        }
+      }
+
+      await postgres.query('SELECT 1')
+      return {
+        status: 'healthy',
+        latency: `${Date.now() - start}ms`
+      }
+    } catch (error) {
+      return {
+        status: 'unhealthy',
         error: error.message
       }
     }

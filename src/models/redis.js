@@ -1,6 +1,7 @@
 const Redis = require('ioredis')
 const config = require('../../config/config')
 const logger = require('../utils/logger')
+const postgresStore = require('./postgresStore')
 
 // 时区辅助函数
 // 注意：这个函数的目的是获取某个时间点在目标时区的"本地"表示
@@ -200,24 +201,76 @@ class RedisClient {
 
     await client.hset(key, keyData)
     await client.expire(key, 86400 * 365) // 1年过期
+
+    // ✅ 双写到 PostgreSQL（失败自动回退，不影响主流程）
+    if (config.postgres?.enabled && resolvedHashedKey) {
+      try {
+        await postgresStore.upsertApiKey(keyId, resolvedHashedKey, { id: keyId, ...keyData })
+      } catch (error) {
+        logger.warn(`⚠️ Failed to upsert API key into PostgreSQL: ${error.message}`)
+      }
+    }
   }
 
   async getApiKey(keyId) {
+    // ✅ 读路径：优先 Redis（现网兼容）→ Redis miss 时回退 PostgreSQL
+    // 注意：这里保持 Redis 为主读取来源，降低引入 PG 后的风险
+    const client = this.getClientSafe()
     const key = `apikey:${keyId}`
-    return await this.client.hgetall(key)
+
+    const data = await client.hgetall(key)
+    if (data && Object.keys(data).length > 0) {
+      return data
+    }
+
+    // 兼容历史前缀
+    const legacy = await client.hgetall(`api_key:${keyId}`)
+    if (legacy && Object.keys(legacy).length > 0) {
+      return legacy
+    }
+
+    if (config.postgres?.enabled) {
+      try {
+        const pgData = await postgresStore.getApiKeyById(keyId)
+        if (pgData) {
+          return pgData
+        }
+      } catch (error) {
+        logger.warn(`⚠️ Failed to read API key from PostgreSQL: ${error.message}`)
+      }
+    }
+
+    return null
   }
 
   async deleteApiKey(keyId) {
+    const client = this.getClientSafe()
     const key = `apikey:${keyId}`
+    const legacyKey = `api_key:${keyId}`
 
     // 获取要删除的API Key哈希值，以便从映射表中移除
-    const keyData = await this.client.hgetall(key)
-    if (keyData && keyData.apiKey) {
-      // keyData.apiKey现在存储的是哈希值，直接从映射表删除
-      await this.client.hdel('apikey:hash_map', keyData.apiKey)
+    let keyData = await client.hgetall(key)
+    if (!keyData || Object.keys(keyData).length === 0) {
+      keyData = await client.hgetall(legacyKey)
     }
 
-    return await this.client.del(key)
+    if (keyData && keyData.apiKey) {
+      // keyData.apiKey 现在存储的是哈希值，直接从映射表删除
+      await client.hdel('apikey:hash_map', keyData.apiKey)
+    }
+
+    const deletedRedis = (await client.del(key)) + (await client.del(legacyKey))
+
+    let deletedPostgres = 0
+    if (config.postgres?.enabled) {
+      try {
+        deletedPostgres = (await postgresStore.deleteApiKeyById(keyId)) ? 1 : 0
+      } catch (error) {
+        logger.warn(`⚠️ Failed to delete API key from PostgreSQL: ${error.message}`)
+      }
+    }
+
+    return deletedRedis + deletedPostgres
   }
 
   async getAllApiKeys() {
@@ -232,12 +285,25 @@ class RedisClient {
   async scanApiKeyIds() {
     const client = this.getClientSafe()
 
+    // ✅ PostgreSQL（可选）：优先取一份 keyIds，兼容 Redis flush/迁移场景
+    const keyIdSet = new Set()
+    if (config.postgres?.enabled) {
+      try {
+        const pgIds = await postgresStore.listApiKeyIds()
+        if (Array.isArray(pgIds)) {
+          pgIds.filter(Boolean).forEach((id) => keyIdSet.add(String(id)))
+        }
+      } catch (error) {
+        logger.warn(`⚠️ Failed to list API keys from PostgreSQL: ${error.message}`)
+      }
+    }
+
     // 🚀 优先使用 hash_map 获取 keyIds（避免在大 keyspace 下全量 SCAN 带来的超高 RTT）
     // hash_map: hashedKey -> keyId，单次 HVALS 就能拿到全部 keyId（去重后返回）
     try {
       const mappedIds = await client.hvals('apikey:hash_map')
       if (Array.isArray(mappedIds) && mappedIds.length > 0) {
-        return [...new Set(mappedIds.filter(Boolean))]
+        mappedIds.filter(Boolean).forEach((id) => keyIdSet.add(String(id)))
       }
     } catch (error) {
       // hash_map 不可用时回退到 SCAN
@@ -257,7 +323,19 @@ class RedisClient {
       }
     } while (cursor !== '0')
 
-    return keyIds
+    // 兼容历史前缀（仅用于读取/迁移，不作为主路径）
+    cursor = '0'
+    do {
+      const [newCursor, keys] = await client.scan(cursor, 'MATCH', 'api_key:*', 'COUNT', 20000)
+      cursor = newCursor
+      for (const key of keys) {
+        keyIds.push(key.replace('api_key:', ''))
+      }
+    } while (cursor !== '0')
+
+    keyIds.filter(Boolean).forEach((id) => keyIdSet.add(String(id)))
+
+    return [...keyIdSet]
   }
 
   /**
@@ -277,7 +355,10 @@ class RedisClient {
 
     for (let offset = 0; offset < keyIds.length; offset += chunkSize) {
       const chunkIds = keyIds.slice(offset, offset + chunkSize)
-      const pipeline = this.client.pipeline()
+      const client = this.getClientSafe()
+
+      // 先从 Redis 批量获取（现网兼容）；缺失时再按需回退 PostgreSQL
+      const pipeline = client.pipeline()
       for (const keyId of chunkIds) {
         if (useFields) {
           pipeline.hmget(`apikey:${keyId}`, ...fields)
@@ -285,11 +366,15 @@ class RedisClient {
           pipeline.hgetall(`apikey:${keyId}`)
         }
       }
-
       const results = await pipeline.exec()
+
+      const missingIds = []
+      const redisDataById = new Map()
+
       for (let i = 0; i < results.length; i++) {
         const [err, data] = results[i]
         if (err) {
+          missingIds.push(chunkIds[i])
           continue
         }
 
@@ -302,17 +387,67 @@ class RedisClient {
               mapped[fields[j]] = value
             }
           }
+          if (Object.keys(mapped).length === 0) {
+            missingIds.push(chunkIds[i])
+          }
+          redisDataById.set(chunkIds[i], mapped)
+          continue
+        }
 
+        if (data && Object.keys(data).length > 0) {
+          redisDataById.set(chunkIds[i], data)
+        } else {
+          missingIds.push(chunkIds[i])
+        }
+      }
+
+      let pgDataById = new Map()
+      if (config.postgres?.enabled && missingIds.length > 0) {
+        try {
+          const pgRows = await postgresStore.getApiKeysByIds(missingIds)
+          if (Array.isArray(pgRows)) {
+            pgDataById = new Map(
+              pgRows
+                .filter((row) => row && row.id && row.data)
+                .map((row) => [String(row.id), row.data])
+            )
+          }
+        } catch (error) {
+          logger.warn(`⚠️ Failed to batch read API keys from PostgreSQL: ${error.message}`)
+        }
+      }
+
+      for (const keyId of chunkIds) {
+        let data = redisDataById.get(keyId) || null
+
+        if ((!data || Object.keys(data).length === 0) && pgDataById.has(String(keyId))) {
+          const pgFull = pgDataById.get(String(keyId))
+
+          if (useFields) {
+            const mapped = {}
+            for (const field of fields) {
+              const value = pgFull?.[field]
+              if (value !== null && value !== undefined) {
+                mapped[field] = value
+              }
+            }
+            data = mapped
+          } else {
+            data = pgFull
+          }
+        }
+
+        if (useFields) {
           apiKeys.push({
-            id: chunkIds[i],
-            ...(parse ? this._parseApiKeyData(mapped) : mapped)
+            id: keyId,
+            ...(parse ? this._parseApiKeyData(data || {}) : data || {})
           })
           continue
         }
 
         if (data && Object.keys(data).length > 0) {
           apiKeys.push({
-            id: chunkIds[i],
+            id: keyId,
             ...(parse ? this._parseApiKeyData(data) : data)
           })
         }
@@ -600,16 +735,62 @@ class RedisClient {
       const metaResults = results.slice(0, chunkIds.length)
       const usageResults = results.slice(chunkIds.length)
 
+      let pgDataById = new Map()
+      if (config.postgres?.enabled) {
+        const missingIds = []
+        for (let i = 0; i < chunkIds.length; i++) {
+          const metaValues = metaResults[i]?.[1]
+          const isDeletedVal = Array.isArray(metaValues) ? metaValues[0] : null
+          const isActiveVal = Array.isArray(metaValues) ? metaValues[1] : null
+          if (
+            isDeletedVal === null ||
+            isDeletedVal === undefined ||
+            isActiveVal === null ||
+            isActiveVal === undefined
+          ) {
+            missingIds.push(chunkIds[i])
+          }
+        }
+
+        if (missingIds.length > 0) {
+          try {
+            const pgRows = await postgresStore.getApiKeysByIds(missingIds)
+            if (Array.isArray(pgRows)) {
+              pgDataById = new Map(
+                pgRows
+                  .filter((row) => row && row.id && row.data)
+                  .map((row) => [String(row.id), row.data])
+              )
+            }
+          } catch (error) {
+            logger.warn(
+              `⚠️ Failed to batch read API key overview meta from PostgreSQL: ${error.message}`
+            )
+          }
+        }
+      }
+
+      const normalizeBoolean = (value) => value === true || value === 'true'
+
       for (let i = 0; i < chunkIds.length; i++) {
         const metaValues = metaResults[i]?.[1]
-        const isDeleted = Array.isArray(metaValues) && metaValues[0] === 'true'
+        const pgData = pgDataById.get(String(chunkIds[i]))
+        const rawIsDeleted =
+          Array.isArray(metaValues) && metaValues[0] !== null && metaValues[0] !== undefined
+            ? metaValues[0]
+            : pgData?.isDeleted
+        const isDeleted = normalizeBoolean(rawIsDeleted)
         if (excludeDeleted && isDeleted) {
           continue
         }
 
         totalApiKeys++
 
-        const isActive = Array.isArray(metaValues) && metaValues[1] === 'true'
+        const rawIsActive =
+          Array.isArray(metaValues) && metaValues[1] !== null && metaValues[1] !== undefined
+            ? metaValues[1]
+            : pgData?.isActive
+        const isActive = normalizeBoolean(rawIsActive)
         if (isActive) {
           activeApiKeys++
         }
@@ -754,19 +935,33 @@ class RedisClient {
 
   // 🔍 通过哈希值查找API Key（性能优化）
   async findApiKeyByHash(hashedKey) {
-    // 使用反向映射表：hash -> keyId
-    const keyId = await this.client.hget('apikey:hash_map', hashedKey)
-    if (!keyId) {
-      return null
+    const client = this.getClientSafe()
+
+    // 1) Redis 快速路径：hash_map -> keyId -> apikey:{id}
+    const keyId = await client.hget('apikey:hash_map', hashedKey)
+    if (keyId) {
+      const keyData = await client.hgetall(`apikey:${keyId}`)
+      if (keyData && Object.keys(keyData).length > 0) {
+        return { id: keyId, ...keyData }
+      }
+
+      // 如果数据不存在，清理映射表（避免脏映射导致永远 miss）
+      await client.hdel('apikey:hash_map', hashedKey)
     }
 
-    const keyData = await this.client.hgetall(`apikey:${keyId}`)
-    if (keyData && Object.keys(keyData).length > 0) {
-      return { id: keyId, ...keyData }
+    // 2) PostgreSQL 回退：直接按 hashed_key 查询（用于 Redis flush/迁移场景）
+    if (config.postgres?.enabled) {
+      try {
+        const pgData = await postgresStore.getApiKeyByHashedKey(hashedKey)
+        if (pgData) {
+          const resolvedId = pgData.id || keyId
+          return resolvedId ? { id: resolvedId, ...pgData } : pgData
+        }
+      } catch (error) {
+        logger.warn(`⚠️ Failed to find API key in PostgreSQL: ${error.message}`)
+      }
     }
 
-    // 如果数据不存在，清理映射表
-    await this.client.hdel('apikey:hash_map', hashedKey)
     return null
   }
 
@@ -1834,7 +2029,7 @@ class RedisClient {
         const keyData = await client.hgetall(`apikey:${keyId}`)
         if (keyData && Object.keys(keyData).length > 0) {
           keyData.lastUsedAt = ''
-          await client.hset(`apikey:${keyId}`, keyData)
+          await this.setApiKey(keyId, keyData)
           stats.resetApiKeys++
         }
       }
@@ -1854,17 +2049,44 @@ class RedisClient {
 
   // 🏢 Claude 账户管理
   async setClaudeAccount(accountId, accountData) {
+    const client = this.getClientSafe()
     const key = `claude:account:${accountId}`
-    await this.client.hset(key, accountData)
+    await client.hset(key, accountData)
+
+    if (config.postgres?.enabled) {
+      try {
+        await postgresStore.upsertAccount('claude', accountId, { id: accountId, ...accountData })
+      } catch (error) {
+        logger.warn(`⚠️ Failed to upsert Claude account into PostgreSQL: ${error.message}`)
+      }
+    }
   }
 
   async getClaudeAccount(accountId) {
+    const client = this.getClientSafe()
     const key = `claude:account:${accountId}`
-    return await this.client.hgetall(key)
+    const data = await client.hgetall(key)
+    if (data && Object.keys(data).length > 0) {
+      return data
+    }
+
+    if (config.postgres?.enabled) {
+      try {
+        const pgData = await postgresStore.getAccount('claude', accountId)
+        if (pgData) {
+          return pgData
+        }
+      } catch (error) {
+        logger.warn(`⚠️ Failed to read Claude account from PostgreSQL: ${error.message}`)
+      }
+    }
+
+    return {}
   }
 
   async getAllClaudeAccounts() {
     const keys = await this.scanKeys('claude:account:*')
+
     const accounts = []
     const chunkSize = 300
 
@@ -1883,27 +2105,86 @@ class RedisClient {
       }
     }
 
+    if (config.postgres?.enabled) {
+      try {
+        const pgAccounts = await postgresStore.listAccounts('claude')
+        if (Array.isArray(pgAccounts) && pgAccounts.length > 0) {
+          const merged = new Map(accounts.map((account) => [String(account.id), account]))
+          for (const account of pgAccounts) {
+            const id = account?.id || account?.accountId
+            if (!id) {
+              continue
+            }
+            const stringId = String(id)
+            if (!merged.has(stringId)) {
+              merged.set(stringId, { id: stringId, ...account })
+            }
+          }
+          return [...merged.values()]
+        }
+      } catch (error) {
+        logger.warn(`⚠️ Failed to list Claude accounts from PostgreSQL: ${error.message}`)
+      }
+    }
+
     return accounts
   }
 
   async deleteClaudeAccount(accountId) {
+    const client = this.getClientSafe()
     const key = `claude:account:${accountId}`
-    return await this.client.del(key)
+    const deletedRedis = await client.del(key)
+    let deletedPostgres = 0
+    if (config.postgres?.enabled) {
+      try {
+        deletedPostgres = (await postgresStore.deleteAccount('claude', accountId)) ? 1 : 0
+      } catch (error) {
+        logger.warn(`⚠️ Failed to delete Claude account from PostgreSQL: ${error.message}`)
+      }
+    }
+    return deletedRedis + deletedPostgres
   }
 
   // 🤖 Droid 账户相关操作
   async setDroidAccount(accountId, accountData) {
+    const client = this.getClientSafe()
     const key = `droid:account:${accountId}`
-    await this.client.hset(key, accountData)
+    await client.hset(key, accountData)
+
+    if (config.postgres?.enabled) {
+      try {
+        await postgresStore.upsertAccount('droid', accountId, { id: accountId, ...accountData })
+      } catch (error) {
+        logger.warn(`⚠️ Failed to upsert Droid account into PostgreSQL: ${error.message}`)
+      }
+    }
   }
 
   async getDroidAccount(accountId) {
+    const client = this.getClientSafe()
     const key = `droid:account:${accountId}`
-    return await this.client.hgetall(key)
+    const data = await client.hgetall(key)
+    if (data && Object.keys(data).length > 0) {
+      return data
+    }
+
+    if (config.postgres?.enabled) {
+      try {
+        const pgData = await postgresStore.getAccount('droid', accountId)
+        if (pgData) {
+          return pgData
+        }
+      } catch (error) {
+        logger.warn(`⚠️ Failed to read Droid account from PostgreSQL: ${error.message}`)
+      }
+    }
+
+    return {}
   }
 
   async getAllDroidAccounts() {
     const keys = await this.scanKeys('droid:account:*')
+
     const accounts = []
     const chunkSize = 300
 
@@ -1922,29 +2203,98 @@ class RedisClient {
       }
     }
 
+    if (config.postgres?.enabled) {
+      try {
+        const pgAccounts = await postgresStore.listAccounts('droid')
+        if (Array.isArray(pgAccounts) && pgAccounts.length > 0) {
+          const merged = new Map(accounts.map((account) => [String(account.id), account]))
+          for (const account of pgAccounts) {
+            const id = account?.id || account?.accountId
+            if (!id) {
+              continue
+            }
+            const stringId = String(id)
+            if (!merged.has(stringId)) {
+              merged.set(stringId, { id: stringId, ...account })
+            }
+          }
+          return [...merged.values()]
+        }
+      } catch (error) {
+        logger.warn(`⚠️ Failed to list Droid accounts from PostgreSQL: ${error.message}`)
+      }
+    }
+
     return accounts
   }
 
   async deleteDroidAccount(accountId) {
+    const client = this.getClientSafe()
     const key = `droid:account:${accountId}`
-    return await this.client.del(key)
+    const deletedRedis = await client.del(key)
+    let deletedPostgres = 0
+    if (config.postgres?.enabled) {
+      try {
+        deletedPostgres = (await postgresStore.deleteAccount('droid', accountId)) ? 1 : 0
+      } catch (error) {
+        logger.warn(`⚠️ Failed to delete Droid account from PostgreSQL: ${error.message}`)
+      }
+    }
+    return deletedRedis + deletedPostgres
   }
 
   async setOpenAiAccount(accountId, accountData) {
+    const client = this.getClientSafe()
     const key = `openai:account:${accountId}`
-    await this.client.hset(key, accountData)
+    await client.hset(key, accountData)
+
+    if (config.postgres?.enabled) {
+      try {
+        await postgresStore.upsertAccount('openai', accountId, { id: accountId, ...accountData })
+      } catch (error) {
+        logger.warn(`⚠️ Failed to upsert OpenAI account into PostgreSQL: ${error.message}`)
+      }
+    }
   }
   async getOpenAiAccount(accountId) {
+    const client = this.getClientSafe()
     const key = `openai:account:${accountId}`
-    return await this.client.hgetall(key)
+    const data = await client.hgetall(key)
+    if (data && Object.keys(data).length > 0) {
+      return data
+    }
+
+    if (config.postgres?.enabled) {
+      try {
+        const pgData = await postgresStore.getAccount('openai', accountId)
+        if (pgData) {
+          return pgData
+        }
+      } catch (error) {
+        logger.warn(`⚠️ Failed to read OpenAI account from PostgreSQL: ${error.message}`)
+      }
+    }
+
+    return {}
   }
   async deleteOpenAiAccount(accountId) {
+    const client = this.getClientSafe()
     const key = `openai:account:${accountId}`
-    return await this.client.del(key)
+    const deletedRedis = await client.del(key)
+    let deletedPostgres = 0
+    if (config.postgres?.enabled) {
+      try {
+        deletedPostgres = (await postgresStore.deleteAccount('openai', accountId)) ? 1 : 0
+      } catch (error) {
+        logger.warn(`⚠️ Failed to delete OpenAI account from PostgreSQL: ${error.message}`)
+      }
+    }
+    return deletedRedis + deletedPostgres
   }
 
   async getAllOpenAIAccounts() {
     const keys = await this.scanKeys('openai:account:*')
+
     const accounts = []
     const chunkSize = 300
 
@@ -1960,6 +2310,28 @@ class RedisClient {
           const key = chunkKeys[i]
           accounts.push({ id: key.replace('openai:account:', ''), ...accountData })
         }
+      }
+    }
+
+    if (config.postgres?.enabled) {
+      try {
+        const pgAccounts = await postgresStore.listAccounts('openai')
+        if (Array.isArray(pgAccounts) && pgAccounts.length > 0) {
+          const merged = new Map(accounts.map((account) => [String(account.id), account]))
+          for (const account of pgAccounts) {
+            const id = account?.id || account?.accountId
+            if (!id) {
+              continue
+            }
+            const stringId = String(id)
+            if (!merged.has(stringId)) {
+              merged.set(stringId, { id: stringId, ...account })
+            }
+          }
+          return [...merged.values()]
+        }
+      } catch (error) {
+        logger.warn(`⚠️ Failed to list OpenAI accounts from PostgreSQL: ${error.message}`)
       }
     }
 

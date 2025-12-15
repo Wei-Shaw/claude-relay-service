@@ -2,6 +2,8 @@ const { v4: uuidv4 } = require('uuid')
 const logger = require('../utils/logger')
 const redis = require('../models/redis')
 const ProxyHelper = require('../utils/proxyHelper')
+const config = require('../../config/config')
+const postgresStore = require('../models/postgresStore')
 
 class AccountGroupService {
   constructor() {
@@ -121,6 +123,15 @@ class AccountGroupService {
       // 添加到分组集合
       await client.sadd(this.GROUPS_KEY, groupId)
 
+      // ✅ 双写到 PostgreSQL（best effort，不影响主流程）
+      if (config.postgres?.enabled) {
+        try {
+          await postgresStore.upsertAccountGroup(groupId, group)
+        } catch (error) {
+          logger.warn(`⚠️ Failed to upsert account group into PostgreSQL: ${error.message}`)
+        }
+      }
+
       this._clearGroupsSnapshotCache()
       logger.success(`✅ 创建账户分组成功: ${name} (${platform})`)
 
@@ -203,6 +214,15 @@ class AccountGroupService {
       // 返回更新后的完整数据
       const updatedGroup = await client.hgetall(groupKey)
 
+      // ✅ 双写到 PostgreSQL（best effort，不影响主流程）
+      if (config.postgres?.enabled) {
+        try {
+          await postgresStore.upsertAccountGroup(groupId, updatedGroup)
+        } catch (error) {
+          logger.warn(`⚠️ Failed to upsert account group into PostgreSQL: ${error.message}`)
+        }
+      }
+
       this._clearGroupsSnapshotCache()
       logger.success(`✅ 更新账户分组成功: ${updatedGroup.name}`)
 
@@ -246,6 +266,15 @@ class AccountGroupService {
       // 从分组集合中移除
       await client.srem(this.GROUPS_KEY, groupId)
 
+      // ✅ 同步删除 PostgreSQL（best effort，不影响主流程）
+      if (config.postgres?.enabled) {
+        try {
+          await postgresStore.deleteAccountGroup(groupId)
+        } catch (error) {
+          logger.warn(`⚠️ Failed to delete account group from PostgreSQL: ${error.message}`)
+        }
+      }
+
       this._clearGroupsSnapshotCache()
       logger.success(`✅ 删除账户分组成功: ${group.name}`)
     } catch (error) {
@@ -265,6 +294,25 @@ class AccountGroupService {
       const groupData = await client.hgetall(`${this.GROUP_PREFIX}${groupId}`)
 
       if (!groupData || Object.keys(groupData).length === 0) {
+        if (config.postgres?.enabled) {
+          try {
+            const pgGroup = await postgresStore.getAccountGroup(groupId)
+            if (!pgGroup) {
+              return null
+            }
+
+            const members = await postgresStore.listAccountGroupMembers(groupId)
+            const memberCount = Array.isArray(members) ? members.length : 0
+
+            return {
+              ...this._formatGroupData(pgGroup),
+              memberCount
+            }
+          } catch (error) {
+            logger.warn(`⚠️ Failed to read group from PostgreSQL: ${error.message}`)
+          }
+        }
+
         return null
       }
 
@@ -292,6 +340,44 @@ class AccountGroupService {
       const groupIds = await client.smembers(this.GROUPS_KEY)
 
       if (!groupIds || groupIds.length === 0) {
+        if (config.postgres?.enabled) {
+          try {
+            const pgGroups = await postgresStore.listAccountGroups()
+            if (!Array.isArray(pgGroups) || pgGroups.length === 0) {
+              return []
+            }
+
+            const groups = []
+            for (const groupData of pgGroups) {
+              if (!groupData || Object.keys(groupData).length === 0) {
+                continue
+              }
+
+              if (platform && groupData.platform !== platform) {
+                continue
+              }
+
+              let memberCount = 0
+              try {
+                const members = await postgresStore.listAccountGroupMembers(groupData.id)
+                memberCount = Array.isArray(members) ? members.length : 0
+              } catch (error) {
+                memberCount = 0
+              }
+
+              groups.push({
+                ...this._formatGroupData(groupData),
+                memberCount
+              })
+            }
+
+            groups.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+            return groups
+          } catch (error) {
+            logger.warn(`⚠️ Failed to list groups from PostgreSQL: ${error.message}`)
+          }
+        }
+
         return []
       }
 
@@ -358,6 +444,15 @@ class AccountGroupService {
       // 添加到分组成员集合
       await client.sadd(`${this.GROUP_MEMBERS_PREFIX}${groupId}`, accountId)
 
+      // ✅ 双写到 PostgreSQL（best effort，不影响主流程）
+      if (config.postgres?.enabled) {
+        try {
+          await postgresStore.addAccountGroupMember(groupId, accountId)
+        } catch (error) {
+          logger.warn(`⚠️ Failed to add group member into PostgreSQL: ${error.message}`)
+        }
+      }
+
       this._clearGroupsSnapshotCache()
       logger.success(`✅ 添加账户到分组成功: ${accountId} -> ${group.name}`)
     } catch (error) {
@@ -378,6 +473,15 @@ class AccountGroupService {
       // 从分组成员集合中移除
       await client.srem(`${this.GROUP_MEMBERS_PREFIX}${groupId}`, accountId)
 
+      // ✅ 双写到 PostgreSQL（best effort，不影响主流程）
+      if (config.postgres?.enabled) {
+        try {
+          await postgresStore.removeAccountGroupMember(groupId, accountId)
+        } catch (error) {
+          logger.warn(`⚠️ Failed to remove group member from PostgreSQL: ${error.message}`)
+        }
+      }
+
       this._clearGroupsSnapshotCache()
       logger.success(`✅ 从分组移除账户成功: ${accountId}`)
     } catch (error) {
@@ -395,7 +499,21 @@ class AccountGroupService {
     try {
       const client = redis.getClientSafe()
       const members = await client.smembers(`${this.GROUP_MEMBERS_PREFIX}${groupId}`)
-      return members || []
+      const list = members || []
+      if (list.length > 0) {
+        return list
+      }
+
+      if (config.postgres?.enabled) {
+        try {
+          const pgMembers = await postgresStore.listAccountGroupMembers(groupId)
+          return Array.isArray(pgMembers) ? pgMembers : []
+        } catch (error) {
+          logger.warn(`⚠️ Failed to read group members from PostgreSQL: ${error.message}`)
+        }
+      }
+
+      return []
     } catch (error) {
       logger.error('❌ 获取分组成员失败:', error)
       throw error
@@ -424,27 +542,37 @@ class AccountGroupService {
    */
   async getApiKeysUsingGroup(groupId) {
     try {
-      const client = redis.getClientSafe()
       const groupKey = `group:${groupId}`
 
-      // 获取所有API Key
-      const apiKeyIds = await client.smembers('api_keys')
+      // 获取所有 API Key（兼容 Redis / PostgreSQL）
+      const apiKeyIds = await redis.scanApiKeyIds()
       const boundApiKeys = []
 
-      for (const keyId of apiKeyIds) {
-        const keyData = await client.hgetall(`api_key:${keyId}`)
-        if (
-          keyData &&
-          (keyData.claudeAccountId === groupKey ||
-            keyData.geminiAccountId === groupKey ||
-            keyData.openaiAccountId === groupKey ||
-            keyData.droidAccountId === groupKey)
-        ) {
-          boundApiKeys.push({
-            id: keyId,
-            name: keyData.name
-          })
+      // 只取必要字段，避免全量拉取大字段
+      const apiKeys = await redis.batchGetApiKeys(apiKeyIds, {
+        parse: false,
+        fields: ['name', 'claudeAccountId', 'geminiAccountId', 'openaiAccountId', 'droidAccountId']
+      })
+
+      for (const keyData of apiKeys) {
+        if (!keyData) {
+          continue
         }
+
+        const hit =
+          keyData.claudeAccountId === groupKey ||
+          keyData.geminiAccountId === groupKey ||
+          keyData.openaiAccountId === groupKey ||
+          keyData.droidAccountId === groupKey
+
+        if (!hit) {
+          continue
+        }
+
+        boundApiKeys.push({
+          id: keyData.id,
+          name: keyData.name
+        })
       }
 
       return boundApiKeys
@@ -604,6 +732,15 @@ class AccountGroupService {
 
       for (const groupId of allGroupIds) {
         await client.srem(`${this.GROUP_MEMBERS_PREFIX}${groupId}`, accountId)
+      }
+
+      // ✅ 同步 PostgreSQL（best effort，不影响主流程）
+      if (config.postgres?.enabled) {
+        try {
+          await postgresStore.removeAccountFromAllGroups(accountId)
+        } catch (error) {
+          logger.warn(`⚠️ Failed to remove account from all groups in PostgreSQL: ${error.message}`)
+        }
       }
 
       this._clearGroupsSnapshotCache()

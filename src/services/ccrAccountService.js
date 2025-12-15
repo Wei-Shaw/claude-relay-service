@@ -4,6 +4,7 @@ const ProxyHelper = require('../utils/proxyHelper')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
+const postgresStore = require('../models/postgresStore')
 const LRUCache = require('../utils/lruCache')
 
 class CcrAccountService {
@@ -112,6 +113,15 @@ class CcrAccountService {
       await client.sadd(this.SHARED_ACCOUNTS_KEY, accountId)
     }
 
+    // ✅ 双写到 PostgreSQL（best effort）
+    if (config.postgres?.enabled) {
+      try {
+        await postgresStore.upsertAccount('ccr', accountId, accountData)
+      } catch (error) {
+        logger.warn(`⚠️ Failed to upsert CCR account into PostgreSQL: ${error.message}`)
+      }
+    }
+
     logger.success(`🏢 Created CCR account: ${name} (${accountId})`)
 
     return {
@@ -143,6 +153,104 @@ class CcrAccountService {
       const keys = await redis.scanKeys(`${this.ACCOUNT_KEY_PREFIX}*`)
       const accounts = []
 
+      const normalizeBoolean = (value) => value === true || value === 'true'
+      const parseJsonArray = (value, fallback = []) => {
+        if (!value) {
+          return fallback
+        }
+        if (Array.isArray(value)) {
+          return value
+        }
+        if (typeof value !== 'string') {
+          return fallback
+        }
+        try {
+          const parsed = JSON.parse(value)
+          return Array.isArray(parsed) ? parsed : fallback
+        } catch (error) {
+          return fallback
+        }
+      }
+
+      const parseJsonObjectOrNull = (value) => {
+        if (!value) {
+          return null
+        }
+        if (typeof value === 'object') {
+          return value
+        }
+        if (typeof value !== 'string') {
+          return null
+        }
+        try {
+          return JSON.parse(value)
+        } catch (error) {
+          return null
+        }
+      }
+
+      const formatAccountSummary = (raw) => {
+        if (!raw || Object.keys(raw).length === 0) {
+          return null
+        }
+
+        const accountData = { ...raw }
+        const rateLimitInfo = this._getRateLimitInfo(accountData)
+
+        return {
+          id: accountData.id,
+          platform: accountData.platform,
+          name: accountData.name,
+          description: accountData.description,
+          apiUrl: accountData.apiUrl,
+          priority: parseInt(accountData.priority) || 50,
+          supportedModels: parseJsonArray(accountData.supportedModels, []),
+          userAgent: accountData.userAgent,
+          rateLimitDuration: Number.isNaN(parseInt(accountData.rateLimitDuration))
+            ? 60
+            : parseInt(accountData.rateLimitDuration),
+          isActive: normalizeBoolean(accountData.isActive),
+          proxy: parseJsonObjectOrNull(accountData.proxy),
+          accountType: accountData.accountType || 'shared',
+          createdAt: accountData.createdAt,
+          lastUsedAt: accountData.lastUsedAt,
+          status: accountData.status || 'active',
+          errorMessage: accountData.errorMessage,
+          rateLimitInfo,
+          schedulable: accountData.schedulable !== 'false' && accountData.schedulable !== false,
+
+          // ✅ 前端显示订阅过期时间（业务字段）
+          expiresAt: accountData.subscriptionExpiresAt || null,
+
+          // 额度管理相关
+          dailyQuota: parseFloat(accountData.dailyQuota || '0'),
+          dailyUsage: parseFloat(accountData.dailyUsage || '0'),
+          lastResetDate: accountData.lastResetDate || '',
+          quotaResetTime: accountData.quotaResetTime || '00:00',
+          quotaStoppedAt: accountData.quotaStoppedAt || null
+        }
+      }
+
+      if ((!keys || keys.length === 0) && config.postgres?.enabled) {
+        try {
+          const pgAccounts = await postgresStore.listAccounts('ccr')
+          if (!Array.isArray(pgAccounts)) {
+            return accounts
+          }
+
+          for (const pgAccount of pgAccounts) {
+            const formatted = formatAccountSummary(pgAccount)
+            if (formatted) {
+              accounts.push(formatted)
+            }
+          }
+
+          return accounts
+        } catch (error) {
+          logger.warn(`⚠️ Failed to list CCR accounts from PostgreSQL: ${error.message}`)
+        }
+      }
+
       const chunkSize = 200
       for (let offset = 0; offset < keys.length; offset += chunkSize) {
         const chunkKeys = keys.slice(offset, offset + chunkSize)
@@ -155,41 +263,10 @@ class CcrAccountService {
             continue
           }
 
-          // 获取限流状态信息
-          const rateLimitInfo = this._getRateLimitInfo(accountData)
-
-          accounts.push({
-            id: accountData.id,
-            platform: accountData.platform,
-            name: accountData.name,
-            description: accountData.description,
-            apiUrl: accountData.apiUrl,
-            priority: parseInt(accountData.priority) || 50,
-            supportedModels: JSON.parse(accountData.supportedModels || '[]'),
-            userAgent: accountData.userAgent,
-            rateLimitDuration: Number.isNaN(parseInt(accountData.rateLimitDuration))
-              ? 60
-              : parseInt(accountData.rateLimitDuration),
-            isActive: accountData.isActive === 'true',
-            proxy: accountData.proxy ? JSON.parse(accountData.proxy) : null,
-            accountType: accountData.accountType || 'shared',
-            createdAt: accountData.createdAt,
-            lastUsedAt: accountData.lastUsedAt,
-            status: accountData.status || 'active',
-            errorMessage: accountData.errorMessage,
-            rateLimitInfo,
-            schedulable: accountData.schedulable !== 'false', // 默认为true，只有明确设置为false才不可调度
-
-            // ✅ 前端显示订阅过期时间（业务字段）
-            expiresAt: accountData.subscriptionExpiresAt || null,
-
-            // 额度管理相关
-            dailyQuota: parseFloat(accountData.dailyQuota || '0'),
-            dailyUsage: parseFloat(accountData.dailyUsage || '0'),
-            lastResetDate: accountData.lastResetDate || '',
-            quotaResetTime: accountData.quotaResetTime || '00:00',
-            quotaStoppedAt: accountData.quotaStoppedAt || null
-          })
+          const formatted = formatAccountSummary(accountData)
+          if (formatted) {
+            accounts.push(formatted)
+          }
         }
       }
 
@@ -204,7 +281,15 @@ class CcrAccountService {
   async getAccount(accountId) {
     const client = redis.getClientSafe()
     logger.debug(`[DEBUG] Getting CCR account data for ID: ${accountId}`)
-    const accountData = await client.hgetall(`${this.ACCOUNT_KEY_PREFIX}${accountId}`)
+    let accountData = await client.hgetall(`${this.ACCOUNT_KEY_PREFIX}${accountId}`)
+
+    if ((!accountData || Object.keys(accountData).length === 0) && config.postgres?.enabled) {
+      try {
+        accountData = await postgresStore.getAccount('ccr', accountId)
+      } catch (error) {
+        logger.warn(`⚠️ Failed to read CCR account from PostgreSQL: ${error.message}`)
+      }
+    }
 
     if (!accountData || Object.keys(accountData).length === 0) {
       logger.debug(`[DEBUG] No CCR account data found for ID: ${accountId}`)
@@ -223,7 +308,16 @@ class CcrAccountService {
     accountData.apiKey = decryptedKey
 
     // 解析JSON字段
-    const parsedModels = JSON.parse(accountData.supportedModels || '[]')
+    const parsedModels = (() => {
+      if (Array.isArray(accountData.supportedModels)) {
+        return accountData.supportedModels
+      }
+      try {
+        return JSON.parse(accountData.supportedModels || '[]')
+      } catch (error) {
+        return []
+      }
+    })()
     logger.debug(`[DEBUG] Parsed supportedModels: ${JSON.stringify(parsedModels)}`)
 
     accountData.supportedModels = parsedModels
@@ -232,11 +326,16 @@ class CcrAccountService {
       const _parsedDuration = parseInt(accountData.rateLimitDuration)
       accountData.rateLimitDuration = Number.isNaN(_parsedDuration) ? 60 : _parsedDuration
     }
-    accountData.isActive = accountData.isActive === 'true'
-    accountData.schedulable = accountData.schedulable !== 'false' // 默认为true
+    accountData.isActive = accountData.isActive === 'true' || accountData.isActive === true
+    accountData.schedulable =
+      accountData.schedulable !== 'false' && accountData.schedulable !== false // 默认为true
 
     if (accountData.proxy) {
-      accountData.proxy = JSON.parse(accountData.proxy)
+      if (typeof accountData.proxy === 'object') {
+        // noop
+      } else {
+        accountData.proxy = JSON.parse(accountData.proxy)
+      }
     }
 
     logger.debug(
@@ -314,6 +413,18 @@ class CcrAccountService {
 
       await client.hset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, updatedData)
 
+      // ✅ 双写到 PostgreSQL（best effort）：写入“完整存储态”数据
+      if (config.postgres?.enabled) {
+        try {
+          const stored = await client.hgetall(`${this.ACCOUNT_KEY_PREFIX}${accountId}`)
+          if (stored && Object.keys(stored).length > 0) {
+            await postgresStore.upsertAccount('ccr', accountId, stored)
+          }
+        } catch (error) {
+          logger.warn(`⚠️ Failed to upsert CCR account into PostgreSQL: ${error.message}`)
+        }
+      }
+
       // 处理共享账户集合变更
       if (updates.accountType !== undefined) {
         updatedData.accountType = updates.accountType
@@ -345,6 +456,15 @@ class CcrAccountService {
 
       if (result === 0) {
         throw new Error('CCR Account not found or already deleted')
+      }
+
+      // ✅ 删除 PostgreSQL（best effort）
+      if (config.postgres?.enabled) {
+        try {
+          await postgresStore.deleteAccount('ccr', accountId)
+        } catch (error) {
+          logger.warn(`⚠️ Failed to delete CCR account from PostgreSQL: ${error.message}`)
+        }
       }
 
       logger.success(`🗑️ Deleted CCR account: ${accountId}`)

@@ -3,6 +3,7 @@ const crypto = require('crypto')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
+const postgresStore = require('../models/postgresStore')
 const LRUCache = require('../utils/lruCache')
 
 class GeminiApiAccountService {
@@ -97,7 +98,15 @@ class GeminiApiAccountService {
   async getAccount(accountId) {
     const client = redis.getClientSafe()
     const key = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
-    const accountData = await client.hgetall(key)
+    let accountData = await client.hgetall(key)
+
+    if ((!accountData || !accountData.id) && config.postgres?.enabled) {
+      try {
+        accountData = await postgresStore.getAccount('gemini-api', accountId)
+      } catch (error) {
+        logger.warn(`⚠️ Failed to read Gemini-API account from PostgreSQL: ${error.message}`)
+      }
+    }
 
     if (!accountData || !accountData.id) {
       return null
@@ -159,6 +168,18 @@ class GeminiApiAccountService {
     const key = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
     await client.hset(key, updates)
 
+    // ✅ 双写到 PostgreSQL（best effort）：写入“完整存储态”数据
+    if (config.postgres?.enabled) {
+      try {
+        const stored = await client.hgetall(key)
+        if (stored && stored.id) {
+          await postgresStore.upsertAccount('gemini-api', accountId, stored)
+        }
+      } catch (error) {
+        logger.warn(`⚠️ Failed to upsert Gemini-API account into PostgreSQL: ${error.message}`)
+      }
+    }
+
     logger.info(`📝 Updated Gemini-API account: ${account.name}`)
 
     return { success: true }
@@ -175,6 +196,15 @@ class GeminiApiAccountService {
     // 删除账户数据
     await client.del(key)
 
+    // ✅ 删除 PostgreSQL（best effort）
+    if (config.postgres?.enabled) {
+      try {
+        await postgresStore.deleteAccount('gemini-api', accountId)
+      } catch (error) {
+        logger.warn(`⚠️ Failed to delete Gemini-API account from PostgreSQL: ${error.message}`)
+      }
+    }
+
     logger.info(`🗑️ Deleted Gemini-API account: ${accountId}`)
 
     return { success: true }
@@ -188,6 +218,85 @@ class GeminiApiAccountService {
     const keys = await redis.scanKeys(`${this.ACCOUNT_KEY_PREFIX}*`)
     const chunkSize = 200
 
+    const formatAccount = (rawAccount) => {
+      if (!rawAccount || !rawAccount.id) {
+        return null
+      }
+
+      const accountData = { ...rawAccount }
+
+      // 过滤非活跃账户
+      if (!includeInactive && accountData.isActive !== 'true' && accountData.isActive !== true) {
+        return null
+      }
+
+      // 隐藏敏感信息
+      accountData.apiKey = '***'
+
+      // 解析 JSON 字段
+      if (accountData.proxy) {
+        try {
+          accountData.proxy = JSON.parse(accountData.proxy)
+        } catch (e) {
+          accountData.proxy = null
+        }
+      }
+
+      if (accountData.supportedModels) {
+        try {
+          accountData.supportedModels = JSON.parse(accountData.supportedModels)
+        } catch (e) {
+          accountData.supportedModels = []
+        }
+      }
+
+      // 获取限流状态信息
+      const rateLimitInfo = this._getRateLimitInfo(accountData)
+
+      // 格式化 rateLimitStatus 为对象
+      accountData.rateLimitStatus = rateLimitInfo.isRateLimited
+        ? {
+            isRateLimited: true,
+            rateLimitedAt: accountData.rateLimitedAt || null,
+            minutesRemaining: rateLimitInfo.remainingMinutes || 0
+          }
+        : {
+            isRateLimited: false,
+            rateLimitedAt: null,
+            minutesRemaining: 0
+          }
+
+      // 转换 schedulable 字段为布尔值
+      accountData.schedulable =
+        accountData.schedulable !== 'false' && accountData.schedulable !== false
+      // 转换 isActive 字段为布尔值
+      accountData.isActive = accountData.isActive === 'true' || accountData.isActive === true
+
+      accountData.platform = accountData.platform || 'gemini-api'
+
+      return accountData
+    }
+
+    if ((!keys || keys.length === 0) && config.postgres?.enabled) {
+      try {
+        const pgAccounts = await postgresStore.listAccounts('gemini-api')
+        if (!Array.isArray(pgAccounts)) {
+          return []
+        }
+
+        for (const pgAccount of pgAccounts) {
+          const formatted = formatAccount(pgAccount)
+          if (formatted) {
+            accounts.push(formatted)
+          }
+        }
+
+        return accounts
+      } catch (error) {
+        logger.warn(`⚠️ Failed to list Gemini-API accounts from PostgreSQL: ${error.message}`)
+      }
+    }
+
     for (let offset = 0; offset < keys.length; offset += chunkSize) {
       const chunkKeys = keys.slice(offset, offset + chunkSize)
       const pipeline = client.pipeline()
@@ -195,59 +304,13 @@ class GeminiApiAccountService {
       const results = await pipeline.exec()
 
       for (const [err, accountData] of results) {
-        if (err || !accountData || !accountData.id) {
+        if (err) {
           continue
         }
-
-        // 过滤非活跃账户
-        if (!includeInactive && accountData.isActive !== 'true') {
-          continue
+        const formatted = formatAccount(accountData)
+        if (formatted) {
+          accounts.push(formatted)
         }
-
-        // 隐藏敏感信息
-        accountData.apiKey = '***'
-
-        // 解析 JSON 字段
-        if (accountData.proxy) {
-          try {
-            accountData.proxy = JSON.parse(accountData.proxy)
-          } catch (e) {
-            accountData.proxy = null
-          }
-        }
-
-        if (accountData.supportedModels) {
-          try {
-            accountData.supportedModels = JSON.parse(accountData.supportedModels)
-          } catch (e) {
-            accountData.supportedModels = []
-          }
-        }
-
-        // 获取限流状态信息
-        const rateLimitInfo = this._getRateLimitInfo(accountData)
-
-        // 格式化 rateLimitStatus 为对象
-        accountData.rateLimitStatus = rateLimitInfo.isRateLimited
-          ? {
-              isRateLimited: true,
-              rateLimitedAt: accountData.rateLimitedAt || null,
-              minutesRemaining: rateLimitInfo.remainingMinutes || 0
-            }
-          : {
-              isRateLimited: false,
-              rateLimitedAt: null,
-              minutesRemaining: 0
-            }
-
-        // 转换 schedulable 字段为布尔值
-        accountData.schedulable = accountData.schedulable !== 'false'
-        // 转换 isActive 字段为布尔值
-        accountData.isActive = accountData.isActive === 'true'
-
-        accountData.platform = accountData.platform || 'gemini-api'
-
-        accounts.push(accountData)
       }
     }
 
@@ -568,6 +631,18 @@ class GeminiApiAccountService {
     // 添加到共享账户列表
     if (accountData.accountType === 'shared') {
       await client.sadd(this.SHARED_ACCOUNTS_KEY, accountId)
+    }
+
+    // ✅ 双写到 PostgreSQL（best effort）
+    if (config.postgres?.enabled) {
+      try {
+        await postgresStore.upsertAccount('gemini-api', accountId, {
+          id: accountId,
+          ...accountData
+        })
+      } catch (error) {
+        logger.warn(`⚠️ Failed to upsert Gemini-API account into PostgreSQL: ${error.message}`)
+      }
     }
   }
 }

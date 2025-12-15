@@ -3,6 +3,7 @@ const crypto = require('crypto')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
+const postgresStore = require('../models/postgresStore')
 const bedrockRelayService = require('./bedrockRelayService')
 const LRUCache = require('../utils/lruCache')
 
@@ -74,6 +75,15 @@ class BedrockAccountService {
     const client = redis.getClientSafe()
     await client.set(`bedrock_account:${accountId}`, JSON.stringify(accountData))
 
+    // ✅ 双写到 PostgreSQL（best effort）
+    if (config.postgres?.enabled) {
+      try {
+        await postgresStore.upsertAccount('bedrock', accountId, accountData)
+      } catch (error) {
+        logger.warn(`⚠️ Failed to upsert Bedrock account into PostgreSQL: ${error.message}`)
+      }
+    }
+
     logger.info(`✅ 创建Bedrock账户成功 - ID: ${accountId}, 名称: ${name}, 区域: ${region}`)
 
     return {
@@ -99,7 +109,19 @@ class BedrockAccountService {
   async getAccount(accountId) {
     try {
       const client = redis.getClientSafe()
-      const accountData = await client.get(`bedrock_account:${accountId}`)
+      let accountData = await client.get(`bedrock_account:${accountId}`)
+
+      if (!accountData && config.postgres?.enabled) {
+        try {
+          const pgAccount = await postgresStore.getAccount('bedrock', accountId)
+          if (pgAccount) {
+            accountData = JSON.stringify(pgAccount)
+          }
+        } catch (error) {
+          logger.warn(`⚠️ Failed to read Bedrock account from PostgreSQL: ${error.message}`)
+        }
+      }
+
       if (!accountData) {
         return { success: false, error: 'Account not found' }
       }
@@ -129,6 +151,42 @@ class BedrockAccountService {
       const client = redis.getClientSafe()
       const keys = await redis.scanKeys('bedrock_account:*')
       const accounts = []
+
+      if ((!keys || keys.length === 0) && config.postgres?.enabled) {
+        try {
+          const pgAccounts = await postgresStore.listAccounts('bedrock')
+          if (Array.isArray(pgAccounts) && pgAccounts.length > 0) {
+            for (const account of pgAccounts) {
+              if (!account || !account.id) {
+                continue
+              }
+              accounts.push({
+                id: account.id,
+                name: account.name,
+                description: account.description,
+                region: account.region,
+                defaultModel: account.defaultModel,
+                isActive: account.isActive,
+                accountType: account.accountType,
+                priority: account.priority,
+                schedulable: account.schedulable,
+                credentialType: account.credentialType,
+
+                // ✅ 前端显示订阅过期时间（业务字段）
+                expiresAt: account.subscriptionExpiresAt || null,
+
+                createdAt: account.createdAt,
+                updatedAt: account.updatedAt,
+                type: 'bedrock',
+                platform: 'bedrock',
+                hasCredentials: !!account.awsCredentials
+              })
+            }
+          }
+        } catch (error) {
+          logger.warn(`⚠️ Failed to list Bedrock accounts from PostgreSQL: ${error.message}`)
+        }
+      }
 
       if (keys.length > 0) {
         const chunkSize = 500
@@ -257,6 +315,15 @@ class BedrockAccountService {
 
       await client.set(`bedrock_account:${accountId}`, JSON.stringify(account))
 
+      // ✅ 双写到 PostgreSQL（best effort）
+      if (config.postgres?.enabled) {
+        try {
+          await postgresStore.upsertAccount('bedrock', accountId, account)
+        } catch (error) {
+          logger.warn(`⚠️ Failed to upsert Bedrock account into PostgreSQL: ${error.message}`)
+        }
+      }
+
       logger.info(`✅ 更新Bedrock账户成功 - ID: ${accountId}, 名称: ${account.name}`)
 
       return {
@@ -292,6 +359,15 @@ class BedrockAccountService {
 
       const client = redis.getClientSafe()
       await client.del(`bedrock_account:${accountId}`)
+
+      // ✅ 删除 PostgreSQL（best effort）
+      if (config.postgres?.enabled) {
+        try {
+          await postgresStore.deleteAccount('bedrock', accountId)
+        } catch (error) {
+          logger.warn(`⚠️ Failed to delete Bedrock account from PostgreSQL: ${error.message}`)
+        }
+      }
 
       logger.info(`✅ 删除Bedrock账户成功 - ID: ${accountId}`)
 
