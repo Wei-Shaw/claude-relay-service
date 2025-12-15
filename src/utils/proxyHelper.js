@@ -2,6 +2,7 @@ const { SocksProxyAgent } = require('socks-proxy-agent')
 const { HttpsProxyAgent } = require('https-proxy-agent')
 const logger = require('./logger')
 const config = require('../../config/config')
+const LRUCache = require('./lruCache')
 
 /**
  * 统一的代理创建工具
@@ -9,7 +10,9 @@ const config = require('../../config/config')
  */
 class ProxyHelper {
   // 缓存代理 Agent，避免重复创建浪费连接
-  static _agentCache = new Map()
+  // 修复：使用 LRU 缓存替代无限制的 Map，防止内存泄漏
+  // 限制为 100 个代理配置（对于大多数场景已足够）
+  static _agentCache = new LRUCache(100)
 
   /**
    * 创建代理 Agent
@@ -267,6 +270,20 @@ class ProxyHelper {
     logger.warn('⚠️ ProxyHelper.createProxy is deprecated, use createProxyAgent instead')
     return ProxyHelper.createProxyAgent(proxyConfig, { useIPv4 })
   }
+
+  /**
+   * 清理所有缓存的代理 Agent
+   * 修复：添加清理方法以防止资源泄漏
+   */
+  static clearCache() {
+    ProxyHelper._agentCache.clear()
+    logger.info('🧹 Proxy agent cache cleared')
+  }
 }
+
+// 修复：进程退出时清理代理 Agent 缓存
+process.on('exit', () => {
+  ProxyHelper.clearCache()
+})
 
 module.exports = ProxyHelper

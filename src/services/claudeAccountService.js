@@ -60,14 +60,20 @@ class ClaudeAccountService {
     // 🔄 解密结果缓存，提高解密性能
     this._decryptCache = new LRUCache(500)
 
-    // 🧹 定期清理缓存（每10分钟）
-    setInterval(
+    // 🧹 定期清理缓存（每1分钟）- 修复：原来10分钟太长，会导致内存泄漏
+    // 高流量场景下 (1000 req/s × 60s × 3 tokens = 180k entries)，1分钟清理更安全
+    const cleanupInterval = setInterval(
       () => {
         this._decryptCache.cleanup()
         logger.info('🧹 Claude decrypt cache cleanup completed', this._decryptCache.getStats())
       },
-      10 * 60 * 1000
+      60 * 1000 // 1分钟
     )
+
+    // 防止定时器阻止进程退出
+    if (cleanupInterval.unref) {
+      cleanupInterval.unref()
+    }
   }
 
   // 🏢 创建Claude账户
@@ -247,21 +253,37 @@ class ClaudeAccountService {
         )
         logRefreshSkipped(accountId, accountData.name, 'claude', 'already_locked')
 
-        // 等待一段时间后返回，期望其他进程已完成刷新
-        await new Promise((resolve) => setTimeout(resolve, 2000))
+        // 使用指数退避策略等待其他进程完成刷新
+        const maxWaitMs = 10000 // 最多等待 10 秒
+        const startTime = Date.now()
+        let waitMs = 500 // 初始等待 500ms
 
-        // 重新获取账户数据（可能已被其他进程刷新）
-        const updatedData = await redis.getClaudeAccount(accountId)
-        if (updatedData && updatedData.accessToken) {
-          const accessToken = this._decryptSensitiveData(updatedData.accessToken)
-          return {
-            success: true,
-            accessToken,
-            expiresAt: updatedData.expiresAt
+        while (Date.now() - startTime < maxWaitMs) {
+          await new Promise((resolve) => setTimeout(resolve, waitMs))
+
+          // 重新获取账户数据，检查是否已被其他进程刷新
+          const updatedData = await redis.getClaudeAccount(accountId)
+          if (updatedData && updatedData.accessToken) {
+            const expiresAt = parseInt(updatedData.expiresAt)
+            // 检查 token 是否有效（至少还有 1 分钟有效期）
+            if (Date.now() < expiresAt - 60000) {
+              const accessToken = this._decryptSensitiveData(updatedData.accessToken)
+              logger.info(
+                `✅ Token refresh completed by another process for: ${accountData.name} (${accountId})`
+              )
+              return {
+                success: true,
+                accessToken,
+                expiresAt: updatedData.expiresAt
+              }
+            }
           }
+
+          // 指数退避，但不超过 2 秒
+          waitMs = Math.min(waitMs * 1.5, 2000)
         }
 
-        throw new Error('Token refresh in progress by another process')
+        throw new Error('Token refresh timeout: waiting for another process to complete')
       }
 
       // 记录开始刷新
