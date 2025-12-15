@@ -1,47 +1,51 @@
 <template>
-  <div class="aggregated-card">
-    <h3 class="card-title">
-      <span class="title-text">
-        <i class="fas fa-chart-pie title-icon" />
-        使用占比
-      </span>
-      <span class="title-period">({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span>
-    </h3>
+  <div class="flex h-full flex-col">
+    <div class="aggregated-card">
+      <h3 class="card-title">
+        <span class="title-text">
+          <i class="fas fa-chart-pie title-icon" />
+          使用占比
+        </span>
+        <span class="title-period">({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span>
+      </h3>
 
-    <div v-if="aggregatedStats && individualStats.length > 0" class="keys-list">
-      <!-- 各Key使用占比列表 -->
-      <div v-for="(stat, index) in topKeys" :key="stat.apiId" class="key-item">
-        <div class="key-header">
-          <span class="key-name">{{ stat.name || `Key ${index + 1}` }}</span>
-          <span class="key-percentage">{{ calculatePercentage(stat) }}%</span>
+      <div v-if="aggregatedStats && individualStats.length > 0" class="keys-list">
+        <!-- 各Key使用占比列表 -->
+        <div v-for="(stat, index) in topKeys" :key="stat.apiId" class="key-item">
+          <div class="key-header">
+            <span class="key-name">{{ stat.name || `Key ${index + 1}` }}</span>
+            <span class="key-percentage">{{ calculatePercentage(stat) }}%</span>
+          </div>
+          <Progress
+            size="md"
+            :value="calculatePercentage(stat)"
+            :variant="getProgressVariant(index)"
+          />
+          <div class="key-stats">
+            <span class="key-requests"
+              >{{ formatNumber(getStatUsage(stat)?.requests || 0) }}次</span
+            >
+            <span class="key-cost">{{ getStatUsage(stat)?.formattedCost || '$0.00' }}</span>
+          </div>
         </div>
-        <Progress
-          size="md"
-          :value="calculatePercentage(stat)"
-          :variant="getProgressVariant(index)"
-        />
-        <div class="key-stats">
-          <span class="key-requests">{{ formatNumber(getStatUsage(stat)?.requests || 0) }}次</span>
-          <span class="key-cost">{{ getStatUsage(stat)?.formattedCost || '$0.00' }}</span>
+
+        <!-- 其他Keys汇总 -->
+        <div v-if="otherKeysCount > 0" class="other-keys">
+          <span class="other-label">其他 {{ otherKeysCount }} 个Keys</span>
+          <span class="other-percentage">{{ otherPercentage }}%</span>
         </div>
       </div>
 
-      <!-- 其他Keys汇总 -->
-      <div v-if="otherKeysCount > 0" class="other-keys">
-        <span class="other-label">其他 {{ otherKeysCount }} 个Keys</span>
-        <span class="other-percentage">{{ otherPercentage }}%</span>
+      <!-- 单个Key模式提示 -->
+      <div v-else-if="!multiKeyMode" class="empty-state">
+        <i class="fas fa-chart-pie empty-icon" />
+        <p class="empty-text">使用占比仅在多Key查询时显示</p>
       </div>
-    </div>
 
-    <!-- 单个Key模式提示 -->
-    <div v-else-if="!multiKeyMode" class="empty-state">
-      <i class="fas fa-chart-pie empty-icon" />
-      <p class="empty-text">使用占比仅在多Key查询时显示</p>
-    </div>
-
-    <div v-else class="empty-state">
-      <i class="fas fa-chart-pie empty-icon" />
-      <span class="empty-text">暂无数据</span>
+      <div v-else class="empty-state">
+        <i class="fas fa-chart-pie empty-icon" />
+        <span class="empty-text">暂无数据</span>
+      </div>
     </div>
   </div>
 </template>
@@ -148,7 +152,6 @@ const formatNumber = (num) => {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-card);
   padding: var(--card-padding);
-  height: 100%;
   display: flex;
   flex-direction: column;
   gap: var(--card-gap);

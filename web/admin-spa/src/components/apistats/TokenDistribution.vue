@@ -1,46 +1,48 @@
 <template>
-  <div class="token-card">
-    <h3 class="card-title">
-      <span class="title-text">
-        <i class="fas fa-coins title-icon" />
-        Token 使用分布
-      </span>
-      <span class="title-period">({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span>
-    </h3>
-    <div class="token-list">
-      <div class="token-item">
-        <span class="token-label">
-          <i class="fas fa-arrow-right token-icon token-icon-green" />
-          输入 Token
+  <div class="flex h-full flex-col">
+    <div class="token-card">
+      <h3 class="card-title">
+        <span class="title-text">
+          <i class="fas fa-coins title-icon" />
+          Token 使用分布
         </span>
-        <span class="token-value">{{ formatNumber(currentPeriodData.inputTokens) }}</span>
+        <span class="title-period">({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span>
+      </h3>
+      <div class="token-list">
+        <div class="token-item">
+          <span class="token-label">
+            <i class="fas fa-arrow-right token-icon token-icon-green" />
+            输入 Token
+          </span>
+          <span class="token-value">{{ formatNumber(currentPeriodData.inputTokens) }}</span>
+        </div>
+        <div class="token-item">
+          <span class="token-label">
+            <i class="fas fa-arrow-left token-icon token-icon-blue" />
+            输出 Token
+          </span>
+          <span class="token-value">{{ formatNumber(currentPeriodData.outputTokens) }}</span>
+        </div>
+        <div class="token-item">
+          <span class="token-label">
+            <i class="fas fa-save token-icon token-icon-purple" />
+            缓存创建 Token
+          </span>
+          <span class="token-value">{{ formatNumber(currentPeriodData.cacheCreateTokens) }}</span>
+        </div>
+        <div class="token-item">
+          <span class="token-label">
+            <i class="fas fa-download token-icon token-icon-orange" />
+            缓存读取 Token
+          </span>
+          <span class="token-value">{{ formatNumber(currentPeriodData.cacheReadTokens) }}</span>
+        </div>
       </div>
-      <div class="token-item">
-        <span class="token-label">
-          <i class="fas fa-arrow-left token-icon token-icon-blue" />
-          输出 Token
-        </span>
-        <span class="token-value">{{ formatNumber(currentPeriodData.outputTokens) }}</span>
-      </div>
-      <div class="token-item">
-        <span class="token-label">
-          <i class="fas fa-save token-icon token-icon-purple" />
-          缓存创建 Token
-        </span>
-        <span class="token-value">{{ formatNumber(currentPeriodData.cacheCreateTokens) }}</span>
-      </div>
-      <div class="token-item">
-        <span class="token-label">
-          <i class="fas fa-download token-icon token-icon-orange" />
-          缓存读取 Token
-        </span>
-        <span class="token-value">{{ formatNumber(currentPeriodData.cacheReadTokens) }}</span>
-      </div>
-    </div>
-    <div class="card-footer">
-      <div class="footer-content">
-        <span class="footer-label">{{ statsPeriod === 'daily' ? '今日' : '本月' }}总计</span>
-        <span class="footer-value">{{ formatNumber(currentPeriodData.allTokens) }}</span>
+      <div class="card-footer">
+        <div class="footer-content">
+          <span class="footer-label">{{ statsPeriod === 'daily' ? '今日' : '本月' }}总计</span>
+          <span class="footer-value">{{ formatNumber(currentPeriodData.allTokens) }}</span>
+        </div>
       </div>
     </div>
   </div>
@@ -78,7 +80,6 @@ const formatNumber = (num) => {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-card);
   padding: var(--card-padding);
-  height: 100%;
   display: flex;
   flex-direction: column;
   gap: var(--card-gap);

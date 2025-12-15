@@ -1,5 +1,5 @@
 <template>
-  <nav class="ds-pagination" aria-label="Pagination">
+  <nav aria-label="Pagination" class="ds-pagination">
     <button
       class="ds-pagination-btn"
       :disabled="modelValue <= 1"
@@ -145,7 +145,9 @@ const changePage = (page) => {
   user-select: none;
 }
 
-.ds-pagination-btn:hover:not(:disabled):not(.ds-pagination-btn--active):not(.ds-pagination-ellipsis) {
+.ds-pagination-btn:hover:not(:disabled):not(.ds-pagination-btn--active):not(
+    .ds-pagination-ellipsis
+  ) {
   border-color: #000;
 }
 
@@ -173,7 +175,10 @@ const changePage = (page) => {
   color: #fff;
 }
 
-:global(.dark) .ds-pagination-btn:hover:not(:disabled):not(.ds-pagination-btn--active):not(.ds-pagination-ellipsis) {
+:global(.dark)
+  .ds-pagination-btn:hover:not(:disabled):not(.ds-pagination-btn--active):not(
+    .ds-pagination-ellipsis
+  ) {
   border-color: #fff;
 }
 

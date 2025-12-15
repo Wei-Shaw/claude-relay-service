@@ -481,10 +481,10 @@
 
             <!-- 刷新按钮 -->
             <Button
-              variant="secondary"
-              size="sm"
               :disabled="isRefreshing"
+              size="sm"
               title="立即刷新数据"
+              variant="secondary"
               @click="refreshAllData()"
             >
               <i :class="['fas fa-sync-alt', { 'animate-spin': isRefreshing }]" />

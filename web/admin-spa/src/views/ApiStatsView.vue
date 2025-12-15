@@ -24,7 +24,11 @@
             <ThemeToggle />
 
             <!-- 用户登录按钮 -->
-            <router-link v-if="oemSettings.ldapEnabled" to="/user-login" style="text-decoration: none">
+            <router-link
+              v-if="oemSettings.ldapEnabled"
+              style="text-decoration: none"
+              to="/user-login"
+            >
               <Button variant="secondary">
                 <i class="fas fa-user" />
                 <span>用户登录</span>
@@ -34,8 +38,8 @@
             <!-- 管理后台按钮 -->
             <router-link
               v-if="oemSettings.showAdminButton !== false"
-              to="/dashboard"
               style="text-decoration: none"
+              to="/dashboard"
             >
               <Button variant="primary">
                 <i class="fas fa-shield-alt" />
@@ -52,16 +56,16 @@
       <div class="container">
         <div class="tabs-wrapper">
           <Button
-            :variant="currentTab === 'stats' ? 'primary' : 'ghost'"
             class="tab-button-wrapper"
+            :variant="currentTab === 'stats' ? 'primary' : 'ghost'"
             @click="currentTab = 'stats'"
           >
             <i class="fas fa-chart-line" />
             <span>统计查询</span>
           </Button>
           <Button
-            :variant="currentTab === 'tutorial' ? 'primary' : 'ghost'"
             class="tab-button-wrapper"
+            :variant="currentTab === 'tutorial' ? 'primary' : 'ghost'"
             @click="currentTab = 'tutorial'"
           >
             <i class="fas fa-graduation-cap" />
@@ -94,18 +98,18 @@
             </div>
             <div class="period-buttons">
               <Button
-                :variant="statsPeriod === 'daily' ? 'primary' : 'secondary'"
                 :disabled="loading || modelStatsLoading"
                 size="sm"
+                :variant="statsPeriod === 'daily' ? 'primary' : 'secondary'"
                 @click="switchPeriod('daily')"
               >
                 <i class="fas fa-calendar-day" />
                 <span>今日</span>
               </Button>
               <Button
-                :variant="statsPeriod === 'monthly' ? 'primary' : 'secondary'"
                 :disabled="loading || modelStatsLoading"
                 size="sm"
+                :variant="statsPeriod === 'monthly' ? 'primary' : 'secondary'"
                 @click="switchPeriod('monthly')"
               >
                 <i class="fas fa-calendar-alt" />
@@ -114,9 +118,9 @@
               <!-- 测试按钮 -->
               <Button
                 v-if="!multiKeyMode"
-                variant="primary"
-                size="sm"
                 :disabled="loading"
+                size="sm"
+                variant="primary"
                 @click="openTestModal"
               >
                 <i class="fas fa-vial" />

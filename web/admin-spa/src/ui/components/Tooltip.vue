@@ -3,10 +3,10 @@
     <div
       ref="triggerRef"
       class="ds-tooltip-trigger"
+      @blur="hide"
+      @focus="show"
       @mouseenter="show"
       @mouseleave="hide"
-      @focus="show"
-      @blur="hide"
     >
       <slot />
     </div>
@@ -15,8 +15,8 @@
         v-if="isVisible"
         ref="tooltipRef"
         :class="['ds-tooltip', `ds-tooltip--${placement}`]"
-        :style="tooltipStyle"
         role="tooltip"
+        :style="tooltipStyle"
       >
         <slot name="content">{{ content }}</slot>
       </div>
@@ -25,7 +25,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 
 const props = defineProps({
   /**

@@ -1,5 +1,5 @@
 <template>
-  <nav class="ds-breadcrumbs" aria-label="Breadcrumb">
+  <nav aria-label="Breadcrumb" class="ds-breadcrumbs">
     <template v-for="(item, index) in items" :key="index">
       <component
         :is="item.href ? 'a' : 'span'"

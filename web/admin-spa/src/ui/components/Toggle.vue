@@ -9,8 +9,8 @@
   >
     <input
       :checked="modelValue"
-      :disabled="disabled"
       class="ds-toggle-input"
+      :disabled="disabled"
       type="checkbox"
       v-bind="$attrs"
       @change="handleChange"

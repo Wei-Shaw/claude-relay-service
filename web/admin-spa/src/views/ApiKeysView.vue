@@ -176,11 +176,7 @@
             <!-- 右侧：操作按钮组 -->
             <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
               <!-- 刷新按钮 -->
-              <Button
-                variant="secondary"
-                :disabled="apiKeysLoading"
-                @click="loadApiKeys()"
-              >
+              <Button :disabled="apiKeysLoading" variant="secondary" @click="loadApiKeys()">
                 <i
                   :class="[
                     'fas text-green-500',
@@ -191,19 +187,13 @@
               </Button>
 
               <!-- 选择/取消选择按钮 -->
-              <Button
-                variant="secondary"
-                @click="toggleSelectionMode"
-              >
+              <Button variant="secondary" @click="toggleSelectionMode">
                 <i :class="showCheckboxes ? 'fas fa-times' : 'fas fa-check-square'"></i>
                 <span>{{ showCheckboxes ? '取消选择' : '选择' }}</span>
               </Button>
 
               <!-- 导出数据按钮 -->
-              <Button
-                variant="secondary"
-                @click="exportToExcel"
-              >
+              <Button variant="secondary" @click="exportToExcel">
                 <i class="fas fa-file-excel text-emerald-500" />
                 <span>导出数据</span>
               </Button>
@@ -229,10 +219,7 @@
               </Button>
 
               <!-- 创建按钮 -->
-              <Button
-                variant="primary"
-                @click.stop="openCreateApiKeyModal"
-              >
+              <Button variant="primary" @click.stop="openCreateApiKeyModal">
                 <i class="fas fa-plus"></i>
                 <span>创建新 Key</span>
               </Button>

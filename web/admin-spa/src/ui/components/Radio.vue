@@ -12,8 +12,8 @@
       :class="'ds-radio'"
       :disabled="disabled"
       :name="name"
-      :value="value"
       type="radio"
+      :value="value"
       v-bind="$attrs"
       @change="handleChange"
     />

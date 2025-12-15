@@ -84,43 +84,29 @@
           <div class="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
             <!-- 账户统计按钮 -->
             <div class="relative">
-              <el-tooltip content="查看账户统计汇总" effect="dark" placement="bottom">
-                <Button
-                  variant="secondary"
-                  @click="showAccountStatsModal = true"
-                >
-                  <i class="fas fa-chart-bar text-violet-500" />
-                  <span>统计</span>
-                </Button>
-              </el-tooltip>
+              <Button variant="secondary" @click="showAccountStatsModal = true">
+                <i class="fas fa-chart-bar text-violet-500" />
+                <span>统计</span>
+              </Button>
             </div>
 
             <!-- 刷新按钮 -->
             <div class="relative">
-              <el-tooltip
-                content="刷新数据 (Ctrl/⌘+点击强制刷新所有缓存)"
-                effect="dark"
-                placement="bottom"
+              <Button
+                :disabled="accountsLoading"
+                :loading="accountsLoading"
+                variant="secondary"
+                @click.ctrl.exact="loadAccounts(true)"
+                @click.exact="loadAccounts(false)"
+                @click.meta.exact="loadAccounts(true)"
               >
-                <Button
-                  variant="secondary"
-                  :disabled="accountsLoading"
-                  :loading="accountsLoading"
-                  @click.ctrl.exact="loadAccounts(true)"
-                  @click.exact="loadAccounts(false)"
-                  @click.meta.exact="loadAccounts(true)"
-                >
-                  <i v-if="!accountsLoading" class="fas fa-sync-alt text-green-500" />
-                  <span>刷新</span>
-                </Button>
-              </el-tooltip>
+                <i v-if="!accountsLoading" class="fas fa-sync-alt text-green-500" />
+                <span>刷新</span>
+              </Button>
             </div>
 
             <!-- 选择/取消选择按钮 -->
-            <Button
-              variant="secondary"
-              @click="toggleSelectionMode"
-            >
+            <Button variant="secondary" @click="toggleSelectionMode">
               <i :class="showCheckboxes ? 'fas fa-times' : 'fas fa-check-square'"></i>
               <span>{{ showCheckboxes ? '取消选择' : '选择' }}</span>
             </Button>
@@ -136,10 +122,7 @@
             </Button>
 
             <!-- 添加账户按钮 -->
-            <Button
-              variant="primary"
-              @click.stop="openCreateAccountModal"
-            >
+            <Button variant="primary" @click.stop="openCreateAccountModal">
               <i class="fas fa-plus"></i>
               <span>添加账户</span>
             </Button>

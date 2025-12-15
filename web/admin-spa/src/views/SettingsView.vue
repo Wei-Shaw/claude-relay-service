@@ -112,11 +112,7 @@
                           @error="handleIconError"
                         />
                         <span class="text-sm text-gray-600 dark:text-gray-400">当前图标</span>
-                        <Button
-                          variant="danger-outline"
-                          size="sm"
-                          @click="removeIcon"
-                        >
+                        <Button size="sm" variant="danger-outline" @click="removeIcon">
                           <i class="fas fa-trash mr-1" />删除
                         </Button>
                       </div>
@@ -130,10 +126,7 @@
                           type="file"
                           @change="handleIconUpload"
                         />
-                        <Button
-                          variant="secondary"
-                          @click="$refs.iconFileInput.click()"
-                        >
+                        <Button variant="secondary" @click="$refs.iconFileInput.click()">
                           <i class="fas fa-upload mr-2" />
                           上传图标
                         </Button>
@@ -186,20 +179,16 @@
                     <div class="flex items-center justify-between">
                       <div class="flex gap-3">
                         <Button
-                          variant="primary"
                           :disabled="saving"
                           :loading="saving"
+                          variant="primary"
                           @click="saveOemSettings"
                         >
                           <i v-if="!saving" class="fas fa-save mr-2" />
                           {{ saving ? '保存中...' : '保存设置' }}
                         </Button>
 
-                        <Button
-                          variant="secondary"
-                          :disabled="saving"
-                          @click="resetOemSettings"
-                        >
+                        <Button :disabled="saving" variant="secondary" @click="resetOemSettings">
                           <i class="fas fa-undo mr-2" />
                           重置为默认
                         </Button>
@@ -271,13 +260,7 @@
                     @error="handleIconError"
                   />
                   <span class="text-sm text-gray-600 dark:text-gray-400">当前图标</span>
-                  <Button
-                    variant="danger-outline"
-                    size="sm"
-                    @click="removeIcon"
-                  >
-                    删除
-                  </Button>
+                  <Button size="sm" variant="danger-outline" @click="removeIcon"> 删除 </Button>
                 </div>
 
                 <!-- 上传按钮 -->
@@ -289,10 +272,7 @@
                     type="file"
                     @change="handleIconUpload"
                   />
-                  <Button
-                    variant="secondary"
-                    @click="$refs.iconFileInputMobile.click()"
-                  >
+                  <Button variant="secondary" @click="$refs.iconFileInputMobile.click()">
                     <i class="fas fa-upload mr-2" />
                     上传图标
                   </Button>
@@ -336,22 +316,17 @@
             <div class="glass-card p-4">
               <div class="flex flex-col gap-3">
                 <Button
-                  variant="primary"
                   block
                   :disabled="saving"
                   :loading="saving"
+                  variant="primary"
                   @click="saveOemSettings"
                 >
                   <i v-if="!saving" class="fas fa-save mr-2" />
                   {{ saving ? '保存中...' : '保存设置' }}
                 </Button>
 
-                <Button
-                  variant="secondary"
-                  block
-                  :disabled="saving"
-                  @click="resetOemSettings"
-                >
+                <Button block :disabled="saving" variant="secondary" @click="resetOemSettings">
                   <i class="fas fa-undo mr-2" />
                   重置为默认
                 </Button>
@@ -429,11 +404,7 @@
           <div class="mb-6 rounded-lg bg-white/80 p-6 dark:bg-gray-800/80">
             <div class="mb-4 flex items-center justify-between">
               <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">通知平台</h2>
-              <Button
-                variant="primary"
-                size="sm"
-                @click="showAddPlatformModal = true"
-              >
+              <Button size="sm" variant="primary" @click="showAddPlatformModal = true">
                 <i class="fas fa-plus mr-2"></i>
                 添加平台
               </Button>

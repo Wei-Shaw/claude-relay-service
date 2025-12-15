@@ -46,7 +46,7 @@
         <!-- 用户菜单 -->
         <div class="user-menu-container relative">
           <button
-            class="user-menu-button flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-all duration-200 hover:bg-gray-50 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 dark:hover:shadow-lg sm:px-4 sm:py-2.5"
+            class="user-menu-button flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition-all duration-200 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 sm:px-4 sm:py-2.5"
             @click="userMenuOpen = !userMenuOpen"
           >
             <i class="fas fa-user-circle text-sm text-gray-600 dark:text-gray-400 sm:text-base" />
