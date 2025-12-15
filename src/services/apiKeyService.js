@@ -1445,10 +1445,7 @@ class ApiKeyService {
   // 🔒 哈希API Key
   // 修复：使用 HMAC 替代简单的哈希拼接，防止长度扩展攻击
   _hashApiKey(apiKey) {
-    return crypto
-      .createHmac('sha256', config.security.encryptionKey)
-      .update(apiKey)
-      .digest('hex')
+    return crypto.createHmac('sha256', config.security.encryptionKey).update(apiKey).digest('hex')
   }
 
   // 📈 获取使用统计
@@ -1775,10 +1772,7 @@ class ApiKeyService {
           )
         } catch (error) {
           results.failed.push({ keyId: key.id, name: key.name, error: error.message })
-          logger.error(
-            `❌ 解绑 API Key ${key.id} (${key.name}) 失败:`,
-            error
-          )
+          logger.error(`❌ 解绑 API Key ${key.id} (${key.name}) 失败:`, error)
         }
       }
 
@@ -1789,9 +1783,7 @@ class ApiKeyService {
       }
 
       if (results.failed.length > 0) {
-        logger.warn(
-          `⚠️ ${results.failed.length} 个 API Key 解绑失败，请检查日志`
-        )
+        logger.warn(`⚠️ ${results.failed.length} 个 API Key 解绑失败，请检查日志`)
       }
 
       // 修复：返回详细结果对象而不是简单的成功数量
