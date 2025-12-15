@@ -1,7 +1,7 @@
 <template>
   <div class="flex h-full flex-col gap-4 md:gap-6">
     <!-- 限制配置 / 聚合模式提示 -->
-    <div class="card flex h-full flex-col p-4 md:p-6">
+    <div ref="limitCardEl" class="card flex h-full flex-col p-4 md:p-6">
       <h3
         class="mb-3 flex items-center text-lg font-bold text-gray-900 dark:text-gray-100 md:mb-4 md:text-xl"
       >
@@ -271,7 +271,7 @@
     </div>
 
     <!-- 详细限制信息 -->
-    <div v-if="hasModelRestrictions" class="card !overflow-visible p-4 md:p-6">
+    <div v-if="hasModelRestrictions" ref="detailCardEl" class="card !overflow-visible p-4 md:p-6">
       <h3
         class="mb-3 flex items-center text-lg font-bold text-gray-900 dark:text-gray-100 md:mb-4 md:text-xl"
       >
@@ -308,7 +308,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
 import WindowCountdown from '@/components/apikeys/WindowCountdown.vue'
@@ -316,6 +316,58 @@ import { Progress } from '@/ui'
 
 const apiStatsStore = useApiStatsStore()
 const { statsData, multiKeyMode, aggregatedStats, invalidKeys } = storeToRefs(apiStatsStore)
+
+const limitCardEl = ref(null)
+const detailCardEl = ref(null)
+
+const attachStyleDebugLogs = (el, tag) => {
+  if (!el) return () => {}
+
+  const emit = (eventName) => {
+    const cs = window.getComputedStyle(el)
+    const rect = el.getBoundingClientRect()
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/505c3121-92ef-4065-960e-e40e247b44f0', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        location: 'LimitConfig.vue:style-debug',
+        message: 'LimitConfig card computed style snapshot',
+        data: {
+          tag,
+          eventName,
+          className: el.className,
+          boxShadow: cs.boxShadow,
+          transform: cs.transform,
+          position: cs.position,
+          zIndex: cs.zIndex,
+          backgroundColor: cs.backgroundColor,
+          borderRadius: cs.borderRadius,
+          rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height }
+        },
+        timestamp: Date.now(),
+        sessionId: 'debug-session',
+        runId: 'pre-fix',
+        hypothesisId: 'A'
+      })
+    }).catch(() => {})
+    // #endregion
+  }
+
+  const onEnter = () => emit('mouseenter')
+  const onLeave = () => emit('mouseleave')
+
+  el.addEventListener('mouseenter', onEnter)
+  el.addEventListener('mouseleave', onLeave)
+
+  // initial snapshot
+  emit('mounted')
+
+  return () => {
+    el.removeEventListener('mouseenter', onEnter)
+    el.removeEventListener('mouseleave', onLeave)
+  }
+}
 
 const hasModelRestrictions = computed(() => {
   const restriction = statsData.value?.restrictions
@@ -335,6 +387,20 @@ const hasClientRestrictions = computed(() => {
     Array.isArray(restriction.allowedClients) &&
     restriction.allowedClients.length > 0
   )
+})
+
+let detachLimitCardLogs = null
+let detachDetailCardLogs = null
+
+onMounted(async () => {
+  await nextTick()
+  detachLimitCardLogs = attachStyleDebugLogs(limitCardEl.value, 'limit-config')
+  detachDetailCardLogs = attachStyleDebugLogs(detailCardEl.value, 'detail-restrictions')
+})
+
+onUnmounted(() => {
+  if (typeof detachLimitCardLogs === 'function') detachLimitCardLogs()
+  if (typeof detachDetailCardLogs === 'function') detachDetailCardLogs()
 })
 
 // 获取每日费用进度
@@ -411,39 +477,13 @@ const formatNumber = (num) => {
 </script>
 
 <style scoped>
-/* 卡片样式 - 使用CSS变量 */
+/* 卡片样式 - 与 Stats 页面其它卡片保持一致（token-based） */
 .card {
-  background: var(--surface-color);
-  border-radius: 16px;
-  border: 1px solid var(--border-color);
-  box-shadow:
-    0 10px 15px -3px rgba(0, 0, 0, 0.1),
-    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
   overflow: hidden;
-  position: relative;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: #eaeaea;
-}
-
-.card:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 20px 25px -5px rgba(0, 0, 0, 0.15),
-    0 10px 10px -5px rgba(0, 0, 0, 0.08);
-}
-
-:global(.dark) .card:hover {
-  box-shadow:
-    0 20px 25px -5px rgba(0, 0, 0, 0.5),
-    0 10px 10px -5px rgba(0, 0, 0, 0.35);
+  transition: var(--transition-all);
 }
 </style>

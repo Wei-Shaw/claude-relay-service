@@ -1,7 +1,7 @@
-import { toast } from 'sonner'
+import { toast } from 'vue-sonner'
 
 /**
- * Toast notification composable using Sonner
+ * Toast notification composable using Vue Sonner
  * Compatible with the old showToast API
  */
 export function useToast() {

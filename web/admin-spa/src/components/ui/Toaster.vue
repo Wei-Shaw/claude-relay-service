@@ -42,7 +42,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { Toaster as Sonner } from 'sonner'
+import { Toaster as Sonner } from 'vue-sonner'
 import { useThemeStore } from '@/stores/theme'
 
 const themeStore = useThemeStore()

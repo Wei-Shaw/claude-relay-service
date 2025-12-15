@@ -1,7 +1,7 @@
 // 应用配置
 export const APP_CONFIG = {
   // 应用基础路径
-  basePath: import.meta.env.VITE_APP_BASE_URL || (import.meta.env.DEV ? '/admin/' : '/web/admin/'),
+  basePath: import.meta.env.VITE_APP_BASE_URL || (import.meta.env.DEV ? '/admin/' : '/admin-next/'),
 
   // 应用标题
   title: import.meta.env.VITE_APP_TITLE || 'Claude Relay Service - 管理后台',

@@ -1,8 +1,8 @@
 /**
- * Toast notification utility using Sonner
+ * Toast notification utility using Vue Sonner
  * This file provides backward compatibility with the old toast API
  */
-import { toast } from 'sonner'
+import { toast } from 'vue-sonner'
 
 /**
  * Show a toast notification
