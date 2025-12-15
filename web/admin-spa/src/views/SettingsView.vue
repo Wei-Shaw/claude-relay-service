@@ -1,1072 +1,756 @@
 <template>
   <div class="settings-container">
-    <div class="card p-4 sm:p-6">
-      <!-- 页面标题 -->
-      <div class="mb-4 sm:mb-6">
-        <h3 class="mb-1 text-lg font-bold text-gray-900 dark:text-gray-100 sm:mb-2 sm:text-xl">
-          系统设置
-        </h3>
-        <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-base">网站定制和通知配置</p>
-      </div>
+    <!-- Page Header -->
+    <div class="mb-6">
+      <h3 class="mb-2 text-2xl font-bold text-gray-900 dark:text-gray-100">系统设置</h3>
+      <p class="text-base text-gray-600 dark:text-gray-400">网站定制和通知配置</p>
+    </div>
 
-      <!-- 设置分类导航 -->
-      <div class="mb-6">
-        <nav class="flex space-x-8">
-          <Button
-            :variant="activeSection === 'branding' ? 'primary' : 'ghost'"
-            @click="activeSection = 'branding'"
-          >
-            <i class="fas fa-palette mr-2"></i>
-            品牌设置
-          </Button>
-          <Button
-            :variant="activeSection === 'webhook' ? 'primary' : 'ghost'"
-            @click="activeSection = 'webhook'"
-          >
-            <i class="fas fa-bell mr-2"></i>
-            通知设置
-          </Button>
-          <Button
-            :variant="activeSection === 'claude' ? 'primary' : 'ghost'"
-            @click="activeSection = 'claude'"
-          >
-            <i class="fas fa-robot mr-2"></i>
-            Claude 转发
-          </Button>
-        </nav>
-      </div>
+    <!-- Loading State -->
+    <div v-if="loading" class="flex items-center justify-center py-20">
+      <Spinner size="lg" />
+      <span class="ml-3 text-gray-500 dark:text-gray-400">正在加载设置...</span>
+    </div>
 
-      <!-- 加载状态 -->
-      <div v-if="loading" class="py-12 text-center">
-        <div class="loading-spinner mx-auto mb-4"></div>
-        <p class="text-gray-500 dark:text-gray-400">正在加载设置...</p>
-      </div>
+    <!-- Settings Content -->
+    <div v-else>
+      <!-- Settings Tabs -->
+      <Tabs
+        v-model="activeSection"
+        class="mb-6"
+        :tabs="[
+          { value: 'branding', label: '品牌设置' },
+          { value: 'webhook', label: '通知设置' },
+          { value: 'claude', label: 'Claude 转发' }
+        ]"
+      />
 
-      <!-- 内容区域 -->
-      <div v-else>
-        <!-- 品牌设置部分 -->
-        <div v-show="activeSection === 'branding'">
-          <!-- 桌面端表格视图 -->
-          <div class="table-container hidden sm:block">
-            <table class="min-w-full">
-              <tbody class="divide-y divide-gray-200/50 dark:divide-gray-600/50">
-                <!-- 网站名称 -->
-                <tr class="table-row">
-                  <td class="w-48 whitespace-nowrap px-6 py-4">
-                    <div class="flex items-center">
-                      <div
-                        class="mr-3 flex h-8 w-8 items-center justify-center rounded-lg bg-gray-700 dark:bg-gray-600"
-                      >
-                        <i class="fas fa-font text-xs text-white" />
-                      </div>
-                      <div>
-                        <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                          网站名称
-                        </div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400">品牌标识</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td class="px-6 py-4">
-                    <input
-                      v-model="oemSettings.siteName"
-                      class="form-input w-full max-w-md dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                      maxlength="100"
-                      placeholder="Claude Relay Service"
-                      type="text"
-                    />
-                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      将显示在浏览器标题和页面头部
-                    </p>
-                  </td>
-                </tr>
-
-                <!-- 网站图标 -->
-                <tr class="table-row">
-                  <td class="w-48 whitespace-nowrap px-6 py-4">
-                    <div class="flex items-center">
-                      <div
-                        class="mr-3 flex h-8 w-8 items-center justify-center rounded-lg bg-gray-700 dark:bg-gray-600"
-                      >
-                        <i class="fas fa-image text-xs text-white" />
-                      </div>
-                      <div>
-                        <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                          网站图标
-                        </div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400">Favicon</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td class="px-6 py-4">
-                    <div class="space-y-3">
-                      <!-- 图标预览 -->
-                      <div
-                        v-if="oemSettings.siteIconData || oemSettings.siteIcon"
-                        class="inline-flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-700"
-                      >
-                        <img
-                          alt="图标预览"
-                          class="h-8 w-8"
-                          :src="oemSettings.siteIconData || oemSettings.siteIcon"
-                          @error="handleIconError"
-                        />
-                        <span class="text-sm text-gray-600 dark:text-gray-400">当前图标</span>
-                        <Button size="sm" variant="danger-outline" @click="removeIcon">
-                          <i class="fas fa-trash mr-1" />删除
-                        </Button>
-                      </div>
-
-                      <!-- 文件上传 -->
-                      <div>
-                        <input
-                          ref="iconFileInput"
-                          accept=".ico,.png,.jpg,.jpeg,.svg"
-                          class="hidden"
-                          type="file"
-                          @change="handleIconUpload"
-                        />
-                        <Button variant="secondary" @click="$refs.iconFileInput.click()">
-                          <i class="fas fa-upload mr-2" />
-                          上传图标
-                        </Button>
-                        <span class="ml-3 text-xs text-gray-500 dark:text-gray-400"
-                          >支持 .ico, .png, .jpg, .svg 格式，最大 350KB</span
-                        >
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-
-                <!-- 管理后台按钮显示控制 -->
-                <tr class="table-row">
-                  <td class="w-48 whitespace-nowrap px-6 py-4">
-                    <div class="flex items-center">
-                      <div
-                        class="mr-3 flex h-8 w-8 items-center justify-center rounded-lg bg-gray-700 dark:bg-gray-600"
-                      >
-                        <i class="fas fa-eye-slash text-xs text-white" />
-                      </div>
-                      <div>
-                        <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                          管理入口
-                        </div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400">登录按钮显示</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td class="px-6 py-4">
-                    <div class="flex items-center">
-                      <label class="inline-flex cursor-pointer items-center">
-                        <input v-model="hideAdminButton" class="peer sr-only" type="checkbox" />
-                        <div
-                          class="peer relative h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-400 dark:border-gray-600 dark:bg-gray-700 dark:peer-checked:bg-white dark:peer-focus:ring-gray-500"
-                        ></div>
-                        <span class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300">{{
-                          hideAdminButton ? '隐藏登录按钮' : '显示登录按钮'
-                        }}</span>
-                      </label>
-                    </div>
-                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      隐藏后，用户需要直接访问 /admin/login 页面登录
-                    </p>
-                  </td>
-                </tr>
-
-                <!-- 操作按钮 -->
-                <tr>
-                  <td class="px-6 py-6" colspan="2">
-                    <div class="flex items-center justify-between">
-                      <div class="flex gap-3">
-                        <Button
-                          :disabled="saving"
-                          :loading="saving"
-                          variant="primary"
-                          @click="saveOemSettings"
-                        >
-                          <i v-if="!saving" class="fas fa-save mr-2" />
-                          {{ saving ? '保存中...' : '保存设置' }}
-                        </Button>
-
-                        <Button :disabled="saving" variant="secondary" @click="resetOemSettings">
-                          <i class="fas fa-undo mr-2" />
-                          重置为默认
-                        </Button>
-                      </div>
-
-                      <div
-                        v-if="oemSettings.updatedAt"
-                        class="text-sm text-gray-500 dark:text-gray-400"
-                      >
-                        <i class="fas fa-clock mr-1" />
-                        最后更新：{{ formatDateTime(oemSettings.updatedAt) }}
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- 移动端卡片视图 -->
-          <div class="space-y-4 sm:hidden">
-            <!-- 站点名称卡片 -->
-            <div class="glass-card p-4">
-              <div class="mb-3 flex items-center gap-3">
-                <div
-                  class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded bg-gray-700 text-white dark:bg-gray-600"
-                >
-                  <i class="fas fa-tag"></i>
-                </div>
-                <div>
-                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">站点名称</h3>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">自定义您的站点品牌名称</p>
-                </div>
+      <!-- Branding Settings -->
+      <div v-show="activeSection === 'branding'" class="space-y-6">
+        <!-- Site Name -->
+        <Card>
+          <template #header>
+            <div class="flex items-center">
+              <div
+                class="mr-3 flex h-10 w-10 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100"
+              >
+                <i class="fas fa-font text-white dark:text-gray-900"></i>
               </div>
+              <div>
+                <h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100">网站名称</h4>
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                  品牌标识，显示在浏览器标题和页面头部
+                </p>
+              </div>
+            </div>
+          </template>
+          <Input
+            v-model="oemSettings.siteName"
+            maxlength="100"
+            placeholder="Claude Relay Service"
+          />
+        </Card>
+
+        <!-- Site Icon -->
+        <Card>
+          <template #header>
+            <div class="flex items-center">
+              <div
+                class="mr-3 flex h-10 w-10 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100"
+              >
+                <i class="fas fa-image text-white dark:text-gray-900"></i>
+              </div>
+              <div>
+                <h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100">网站图标</h4>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Favicon，显示在浏览器标签页</p>
+              </div>
+            </div>
+          </template>
+
+          <div class="space-y-4">
+            <!-- Icon Preview -->
+            <div
+              v-if="oemSettings.siteIconData || oemSettings.siteIcon"
+              class="inline-flex items-center gap-3 rounded-lg bg-gray-50 p-4 dark:bg-gray-800"
+            >
+              <img
+                alt="图标预览"
+                class="h-10 w-10"
+                :src="oemSettings.siteIconData || oemSettings.siteIcon"
+                @error="handleIconError"
+              />
+              <span class="text-sm text-gray-600 dark:text-gray-400">当前图标</span>
+              <Button size="sm" variant="danger-outline" @click="removeIcon">
+                <i class="fas fa-trash mr-1"></i>
+                删除
+              </Button>
+            </div>
+
+            <!-- Upload Button -->
+            <div>
               <input
-                v-model="oemSettings.siteName"
-                class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                maxlength="100"
-                placeholder="Claude Relay Service"
-                type="text"
+                ref="iconFileInput"
+                accept=".ico,.png,.jpg,.jpeg,.svg"
+                class="hidden"
+                type="file"
+                @change="handleIconUpload"
+              />
+              <Button variant="secondary" @click="$refs.iconFileInput.click()">
+                <i class="fas fa-upload mr-2"></i>
+                上传图标
+              </Button>
+              <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                支持 .ico, .png, .jpg, .svg 格式，最大 350KB
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        <!-- Admin Button Visibility -->
+        <Card>
+          <template #header>
+            <div class="flex items-center">
+              <div
+                class="mr-3 flex h-10 w-10 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100"
+              >
+                <i class="fas fa-eye-slash text-white dark:text-gray-900"></i>
+              </div>
+              <div>
+                <h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100">管理入口</h4>
+                <p class="text-sm text-gray-600 dark:text-gray-400">控制登录按钮在首页的显示</p>
+              </div>
+            </div>
+          </template>
+
+          <div class="space-y-2">
+            <Toggle v-model="hideAdminButton" label="" />
+            <div
+              class="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-gray-100"
+            >
+              <span>{{ hideAdminButton ? '隐藏登录按钮' : '显示登录按钮' }}</span>
+            </div>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              隐藏后，用户需要直接访问 /admin/login 页面登录
+            </p>
+          </div>
+        </Card>
+
+        <!-- Action Buttons -->
+        <Card>
+          <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div class="flex flex-col gap-3 sm:flex-row">
+              <Button
+                :disabled="saving"
+                :loading="saving"
+                variant="primary"
+                @click="saveOemSettings"
+              >
+                <i v-if="!saving" class="fas fa-save mr-2"></i>
+                {{ saving ? '保存中...' : '保存设置' }}
+              </Button>
+              <Button :disabled="saving" variant="secondary" @click="resetOemSettings">
+                <i class="fas fa-undo mr-2"></i>
+                重置为默认
+              </Button>
+            </div>
+            <div
+              v-if="oemSettings.updatedAt"
+              class="text-sm text-gray-500 dark:text-gray-400 md:text-right"
+            >
+              <i class="fas fa-clock mr-1"></i>
+              最后更新：{{ formatDateTime(oemSettings.updatedAt) }}
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      <!-- Webhook Settings -->
+      <div v-show="activeSection === 'webhook'" class="space-y-6">
+        <!-- Enable Notifications -->
+        <Card>
+          <div class="flex items-center justify-between">
+            <div>
+              <h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100">启用通知</h4>
+              <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                开启后，系统将按配置发送通知到指定平台
+              </p>
+            </div>
+            <Toggle v-model="webhookConfig.enabled" @update:model-value="saveWebhookConfig" />
+          </div>
+        </Card>
+
+        <!-- Notification Types -->
+        <Card>
+          <template #header>
+            <h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100">通知类型</h4>
+          </template>
+
+          <div class="space-y-4">
+            <div
+              v-for="(enabled, type) in webhookConfig.notificationTypes"
+              :key="type"
+              class="flex items-center justify-between rounded-lg border border-gray-200 p-4 dark:border-gray-700"
+            >
+              <div>
+                <span class="font-medium text-gray-900 dark:text-gray-100">
+                  {{ getNotificationTypeName(type) }}
+                </span>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  {{ getNotificationTypeDescription(type) }}
+                </p>
+              </div>
+              <Toggle
+                v-model="webhookConfig.notificationTypes[type]"
+                @update:model-value="saveWebhookConfig"
               />
             </div>
-
-            <!-- 站点图标卡片 -->
-            <div class="glass-card p-4">
-              <div class="mb-3 flex items-center gap-3">
-                <div
-                  class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded bg-gray-700 text-white dark:bg-gray-600"
-                >
-                  <i class="fas fa-image"></i>
-                </div>
-                <div>
-                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">站点图标</h3>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">
-                    上传自定义图标或输入图标URL
-                  </p>
-                </div>
-              </div>
-              <div class="space-y-3">
-                <!-- 图标预览 -->
-                <div
-                  v-if="oemSettings.siteIconData || oemSettings.siteIcon"
-                  class="inline-flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-700"
-                >
-                  <img
-                    alt="图标预览"
-                    class="h-8 w-8"
-                    :src="oemSettings.siteIconData || oemSettings.siteIcon"
-                    @error="handleIconError"
-                  />
-                  <span class="text-sm text-gray-600 dark:text-gray-400">当前图标</span>
-                  <Button size="sm" variant="danger-outline" @click="removeIcon"> 删除 </Button>
-                </div>
-
-                <!-- 上传按钮 -->
-                <div>
-                  <input
-                    ref="iconFileInputMobile"
-                    accept=".ico,.png,.jpg,.jpeg,.svg"
-                    class="hidden"
-                    type="file"
-                    @change="handleIconUpload"
-                  />
-                  <Button variant="secondary" @click="$refs.iconFileInputMobile.click()">
-                    <i class="fas fa-upload mr-2" />
-                    上传图标
-                  </Button>
-                  <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                    支持 .ico, .png, .jpg, .svg 格式，最大 350KB
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <!-- 管理后台按钮显示控制卡片 -->
-            <div class="glass-card p-4">
-              <div class="mb-3 flex items-center gap-3">
-                <div
-                  class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded bg-gray-700 text-white dark:bg-gray-600"
-                >
-                  <i class="fas fa-eye-slash"></i>
-                </div>
-                <div>
-                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">管理入口</h3>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">控制登录按钮在首页的显示</p>
-                </div>
-              </div>
-              <div class="space-y-2">
-                <label class="inline-flex cursor-pointer items-center">
-                  <input v-model="hideAdminButton" class="peer sr-only" type="checkbox" />
-                  <div
-                    class="peer relative h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-400 dark:border-gray-600 dark:bg-gray-600 dark:bg-gray-700 dark:peer-focus:ring-gray-500"
-                  ></div>
-                  <span class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300">{{
-                    hideAdminButton ? '隐藏登录按钮' : '显示登录按钮'
-                  }}</span>
-                </label>
-                <p class="text-xs text-gray-500 dark:text-gray-400">
-                  隐藏后，用户需要直接访问 /admin/login 页面登录
-                </p>
-              </div>
-            </div>
-
-            <!-- 操作按钮卡片 -->
-            <div class="glass-card p-4">
-              <div class="flex flex-col gap-3">
-                <Button
-                  block
-                  :disabled="saving"
-                  :loading="saving"
-                  variant="primary"
-                  @click="saveOemSettings"
-                >
-                  <i v-if="!saving" class="fas fa-save mr-2" />
-                  {{ saving ? '保存中...' : '保存设置' }}
-                </Button>
-
-                <Button block :disabled="saving" variant="secondary" @click="resetOemSettings">
-                  <i class="fas fa-undo mr-2" />
-                  重置为默认
-                </Button>
-
-                <div
-                  v-if="oemSettings.updatedAt"
-                  class="text-center text-sm text-gray-500 dark:text-gray-400"
-                >
-                  <i class="fas fa-clock mr-1" />
-                  上次更新: {{ formatDateTime(oemSettings.updatedAt) }}
-                </div>
-              </div>
-            </div>
           </div>
-        </div>
+        </Card>
 
-        <!-- Webhook 设置部分 -->
-        <div v-show="activeSection === 'webhook'">
-          <!-- 主开关 -->
-          <div class="mb-6 rounded-lg bg-white/80 p-6 dark:bg-gray-800/80">
+        <!-- Platforms -->
+        <Card>
+          <template #header>
             <div class="flex items-center justify-between">
-              <div>
-                <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">启用通知</h2>
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                  开启后，系统将按配置发送通知到指定平台
-                </p>
-              </div>
-              <label class="relative inline-flex cursor-pointer items-center">
-                <input
-                  v-model="webhookConfig.enabled"
-                  class="peer sr-only"
-                  type="checkbox"
-                  @change="saveWebhookConfig"
-                />
-                <div
-                  class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-400 dark:border-gray-600 dark:bg-gray-600 dark:bg-gray-700 dark:peer-focus:ring-gray-500"
-                ></div>
-              </label>
-            </div>
-          </div>
-
-          <!-- 通知类型设置 -->
-          <div class="mb-6 rounded-lg bg-white/80 p-6 dark:bg-gray-800/80">
-            <h2 class="mb-4 text-lg font-semibold text-gray-800 dark:text-gray-200">通知类型</h2>
-            <div class="space-y-3">
-              <div
-                v-for="(enabled, type) in webhookConfig.notificationTypes"
-                :key="type"
-                class="flex items-center justify-between"
-              >
-                <div>
-                  <span class="font-medium text-gray-700 dark:text-gray-300">
-                    {{ getNotificationTypeName(type) }}
-                  </span>
-                  <span class="ml-2 text-sm text-gray-500 dark:text-gray-400">
-                    {{ getNotificationTypeDescription(type) }}
-                  </span>
-                </div>
-                <label class="relative inline-flex cursor-pointer items-center">
-                  <input
-                    v-model="webhookConfig.notificationTypes[type]"
-                    class="peer sr-only"
-                    type="checkbox"
-                    @change="saveWebhookConfig"
-                  />
-                  <div
-                    class="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white dark:border-gray-600 dark:bg-gray-700 dark:peer-checked:bg-white"
-                  ></div>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <!-- 平台列表 -->
-          <div class="mb-6 rounded-lg bg-white/80 p-6 dark:bg-gray-800/80">
-            <div class="mb-4 flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">通知平台</h2>
+              <h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100">通知平台</h4>
               <Button size="sm" variant="primary" @click="showAddPlatformModal = true">
                 <i class="fas fa-plus mr-2"></i>
                 添加平台
               </Button>
             </div>
+          </template>
 
-            <!-- 平台卡片列表 -->
+          <!-- Platform List -->
+          <div
+            v-if="webhookConfig.platforms && webhookConfig.platforms.length > 0"
+            class="space-y-4"
+          >
             <div
-              v-if="webhookConfig.platforms && webhookConfig.platforms.length > 0"
-              class="space-y-4"
+              v-for="platform in webhookConfig.platforms"
+              :key="platform.id"
+              class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
             >
-              <div
-                v-for="platform in webhookConfig.platforms"
-                :key="platform.id"
-                class="rounded-lg border border-gray-200 p-4 dark:border-gray-700"
-              >
-                <div class="flex items-start justify-between">
-                  <div class="flex-1">
-                    <div class="flex items-center">
-                      <i class="mr-3 text-xl" :class="getPlatformIcon(platform.type)"></i>
-                      <div>
-                        <h3 class="font-semibold text-gray-800 dark:text-gray-200">
-                          {{ platform.name || getPlatformName(platform.type) }}
-                        </h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">
-                          {{ getPlatformName(platform.type) }}
-                        </p>
-                      </div>
-                    </div>
-                    <div class="mt-3 space-y-1 text-sm">
-                      <div
-                        v-if="platform.type !== 'smtp' && platform.type !== 'telegram'"
-                        class="flex items-center text-gray-600 dark:text-gray-400"
-                      >
-                        <i class="fas fa-link mr-2"></i>
-                        <span class="truncate">{{ platform.url }}</span>
-                      </div>
-                      <div
-                        v-if="platform.type === 'telegram'"
-                        class="flex items-center text-gray-600 dark:text-gray-400"
-                      >
-                        <i class="fas fa-comments mr-2"></i>
-                        <span class="truncate">Chat ID: {{ platform.chatId || '未配置' }}</span>
-                      </div>
-                      <div
-                        v-if="platform.type === 'telegram' && platform.botToken"
-                        class="flex items-center text-gray-600 dark:text-gray-400"
-                      >
-                        <i class="fas fa-key mr-2"></i>
-                        <span class="truncate"
-                          >Token: {{ formatTelegramToken(platform.botToken) }}</span
-                        >
-                      </div>
-                      <div
-                        v-if="platform.type === 'telegram' && platform.apiBaseUrl"
-                        class="flex items-center text-gray-600 dark:text-gray-400"
-                      >
-                        <i class="fas fa-globe mr-2"></i>
-                        <span class="truncate">API: {{ platform.apiBaseUrl }}</span>
-                      </div>
-                      <div
-                        v-if="platform.type === 'telegram' && platform.proxyUrl"
-                        class="flex items-center text-gray-600 dark:text-gray-400"
-                      >
-                        <i class="fas fa-route mr-2"></i>
-                        <span class="truncate">代理: {{ platform.proxyUrl }}</span>
-                      </div>
-                      <div
-                        v-if="platform.type === 'smtp' && platform.to"
-                        class="flex items-center text-gray-600 dark:text-gray-400"
-                      >
-                        <i class="fas fa-envelope mr-2"></i>
-                        <span class="truncate">{{
-                          Array.isArray(platform.to) ? platform.to.join(', ') : platform.to
-                        }}</span>
-                      </div>
-                      <div
-                        v-if="platform.enableSign"
-                        class="flex items-center text-gray-600 dark:text-gray-400"
-                      >
-                        <i class="fas fa-shield-alt mr-2"></i>
-                        <span>已启用签名验证</span>
-                      </div>
+              <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div class="min-w-0 flex-1">
+                  <div class="mb-3 flex items-center">
+                    <i
+                      class="mr-3 flex-shrink-0 text-2xl"
+                      :class="getPlatformIcon(platform.type)"
+                    ></i>
+                    <div class="min-w-0">
+                      <h5 class="truncate font-semibold text-gray-900 dark:text-gray-100">
+                        {{ platform.name || getPlatformName(platform.type) }}
+                      </h5>
+                      <p class="text-sm text-gray-500 dark:text-gray-400">
+                        {{ getPlatformName(platform.type) }}
+                      </p>
                     </div>
                   </div>
-                  <div class="ml-4 flex items-center space-x-2">
-                    <!-- 启用/禁用开关 -->
-                    <label class="relative inline-flex cursor-pointer items-center">
-                      <input
-                        :checked="platform.enabled"
-                        class="peer sr-only"
-                        type="checkbox"
-                        @change="togglePlatform(platform.id)"
-                      />
-                      <div
-                        class="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-green-600 peer-checked:after:translate-x-full peer-checked:after:border-white dark:border-gray-600 dark:bg-gray-700"
-                      ></div>
-                    </label>
-                    <!-- 测试按钮 -->
-                    <button
-                      class="rounded-lg bg-gray-100 p-2 text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                      title="测试连接"
-                      @click="testPlatform(platform)"
+                  <div class="space-y-2 text-sm">
+                    <div
+                      v-if="platform.type !== 'smtp' && platform.type !== 'telegram'"
+                      class="flex items-center text-gray-600 dark:text-gray-400"
                     >
-                      <i class="fas fa-vial"></i>
-                    </button>
-                    <!-- 编辑按钮 -->
-                    <button
-                      class="rounded-lg bg-gray-100 p-2 text-gray-600 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600"
-                      title="编辑"
-                      @click="editPlatform(platform)"
+                      <i class="fas fa-link mr-2 w-4 flex-shrink-0"></i>
+                      <span class="truncate">{{ platform.url }}</span>
+                    </div>
+                    <div
+                      v-if="platform.type === 'telegram'"
+                      class="flex items-center text-gray-600 dark:text-gray-400"
                     >
-                      <i class="fas fa-edit"></i>
-                    </button>
-                    <!-- 删除按钮 -->
-                    <button
-                      class="rounded-lg bg-red-100 p-2 text-red-600 transition-colors hover:bg-red-200 dark:bg-red-900 dark:text-red-400 dark:hover:bg-red-800"
-                      title="删除"
-                      @click="deletePlatform(platform.id)"
+                      <i class="fas fa-comments mr-2 w-4 flex-shrink-0"></i>
+                      <span class="truncate">Chat ID: {{ platform.chatId || '未配置' }}</span>
+                    </div>
+                    <div
+                      v-if="platform.type === 'smtp' && platform.to"
+                      class="flex items-center text-gray-600 dark:text-gray-400"
                     >
-                      <i class="fas fa-trash"></i>
-                    </button>
+                      <i class="fas fa-envelope mr-2 w-4 flex-shrink-0"></i>
+                      <span class="truncate">{{
+                        Array.isArray(platform.to) ? platform.to.join(', ') : platform.to
+                      }}</span>
+                    </div>
+                    <div
+                      v-if="platform.enableSign"
+                      class="flex items-center text-gray-600 dark:text-gray-400"
+                    >
+                      <i class="fas fa-shield-alt mr-2 w-4 flex-shrink-0"></i>
+                      <span>已启用签名验证</span>
+                    </div>
                   </div>
+                </div>
+                <div class="flex flex-shrink-0 items-center gap-2 sm:ml-4">
+                  <Toggle
+                    :model-value="platform.enabled"
+                    @update:model-value="togglePlatform(platform.id)"
+                  />
+                  <Button
+                    size="sm"
+                    title="测试连接"
+                    variant="ghost"
+                    @click="testPlatform(platform)"
+                  >
+                    <i class="fas fa-vial"></i>
+                  </Button>
+                  <Button size="sm" title="编辑" variant="ghost" @click="editPlatform(platform)">
+                    <i class="fas fa-edit"></i>
+                  </Button>
+                  <Button
+                    size="sm"
+                    title="删除"
+                    variant="danger-ghost"
+                    @click="deletePlatform(platform.id)"
+                  >
+                    <i class="fas fa-trash"></i>
+                  </Button>
                 </div>
               </div>
             </div>
-            <div v-else class="py-8 text-center text-gray-500 dark:text-gray-400">
-              暂无配置的通知平台，请点击"添加平台"按钮添加
+          </div>
+          <div v-else class="py-12 text-center text-gray-500 dark:text-gray-400">
+            暂无配置的通知平台，请点击"添加平台"按钮添加
+          </div>
+        </Card>
+
+        <!-- Advanced Settings -->
+        <Card>
+          <template #header>
+            <h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100">高级设置</h4>
+          </template>
+
+          <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                最大重试次数
+              </label>
+              <Input
+                v-model.number="webhookConfig.retrySettings.maxRetries"
+                max="10"
+                min="0"
+                type="number"
+                @change="saveWebhookConfig"
+              />
+            </div>
+            <div>
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                重试延迟 (毫秒)
+              </label>
+              <Input
+                v-model.number="webhookConfig.retrySettings.retryDelay"
+                max="10000"
+                min="100"
+                step="100"
+                type="number"
+                @change="saveWebhookConfig"
+              />
+            </div>
+            <div class="sm:col-span-2 lg:col-span-1">
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                超时时间 (毫秒)
+              </label>
+              <Input
+                v-model.number="webhookConfig.retrySettings.timeout"
+                max="30000"
+                min="1000"
+                step="1000"
+                type="number"
+                @change="saveWebhookConfig"
+              />
             </div>
           </div>
+        </Card>
 
-          <!-- 高级设置 -->
-          <div class="rounded-lg bg-white/80 p-6 dark:bg-gray-800/80">
-            <h2 class="mb-4 text-lg font-semibold text-gray-800 dark:text-gray-200">高级设置</h2>
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <!-- Test Notification -->
+        <div class="text-center">
+          <Button variant="primary" @click="sendTestNotification">
+            <i class="fas fa-paper-plane mr-2"></i>
+            发送测试通知
+          </Button>
+        </div>
+      </div>
+
+      <!-- Claude Settings -->
+      <div v-show="activeSection === 'claude'" class="space-y-6">
+        <!-- Loading State -->
+        <div v-if="claudeConfigLoading" class="flex items-center justify-center py-20">
+          <Spinner size="lg" />
+          <span class="ml-3 text-gray-500 dark:text-gray-400">正在加载配置...</span>
+        </div>
+
+        <template v-else>
+          <!-- Claude Code Only -->
+          <Card>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center">
+                <div
+                  class="mr-4 flex h-12 w-12 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100"
+                >
+                  <i class="fas fa-terminal text-xl text-white dark:text-gray-900"></i>
+                </div>
+                <div>
+                  <h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    仅允许 Claude Code 客户端
+                  </h4>
+                  <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    启用后，所有
+                    <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">/api/v1/messages</code>
+                    和
+                    <code class="rounded bg-gray-100 px-1 dark:bg-gray-800"
+                      >/claude/v1/messages</code
+                    >
+                    端点将强制验证 Claude Code CLI 客户端
+                  </p>
+                </div>
+              </div>
+              <Toggle
+                v-model="claudeConfig.claudeCodeOnlyEnabled"
+                @update:model-value="saveClaudeConfig"
+              />
+            </div>
+            <Alert class="mt-4" variant="warning">
+              <i class="fas fa-info-circle mr-2"></i>
+              此设置与 API Key 级别的客户端限制是 <strong>OR 逻辑</strong>：全局启用或 API Key
+              设置中启用，都会执行 Claude Code 验证。
+            </Alert>
+          </Card>
+
+          <!-- Session Binding -->
+          <Card>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center">
+                <div
+                  class="mr-4 flex h-12 w-12 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100"
+                >
+                  <i class="fas fa-link text-xl text-white dark:text-gray-900"></i>
+                </div>
+                <div>
+                  <h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    强制会话绑定
+                  </h4>
+                  <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    启用后，系统会将原始会话 ID 绑定到首次使用的账户，确保上下文的一致性
+                  </p>
+                </div>
+              </div>
+              <Toggle
+                v-model="claudeConfig.globalSessionBindingEnabled"
+                @update:model-value="saveClaudeConfig"
+              />
+            </div>
+
+            <!-- Session Binding Details -->
+            <div v-if="claudeConfig.globalSessionBindingEnabled" class="mt-6 space-y-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  最大重试次数
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <i class="fas fa-clock mr-2 text-gray-400"></i>
+                  绑定有效期（天）
                 </label>
-                <input
-                  v-model.number="webhookConfig.retrySettings.maxRetries"
-                  class="mt-1 block w-full rounded-lg border-gray-300 focus:border-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white sm:text-sm"
+                <Input
+                  v-model.number="claudeConfig.sessionBindingTtlDays"
+                  max="365"
+                  min="1"
+                  placeholder="30"
+                  type="number"
+                  @change="saveClaudeConfig"
+                />
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  会话绑定到账户后的有效时间，过期后会自动解除绑定
+                </p>
+              </div>
+
+              <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <i class="fas fa-exclamation-triangle mr-2 text-gray-400"></i>
+                  旧会话污染提示
+                </label>
+                <Textarea
+                  v-model="claudeConfig.sessionBindingErrorMessage"
+                  placeholder="你的本地session已污染，请清理后使用。"
+                  rows="2"
+                  @change="saveClaudeConfig"
+                />
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  当检测到为旧的sessionId且未在系统中有调度记录时提示，返回给客户端的错误消息
+                </p>
+              </div>
+            </div>
+
+            <Alert class="mt-4" variant="info">
+              <i class="fas fa-lightbulb mr-2"></i>
+              <div>
+                <p class="mb-2">
+                  <strong>工作原理：</strong>系统会提取请求中的原始 session ID（来自
+                  <code class="rounded bg-blue-100 px-1 dark:bg-blue-900">metadata.user_id</code
+                  >）， 并将其与首次调度的账户绑定。后续使用相同 session ID
+                  的请求将自动路由到同一账户。
+                </p>
+                <p>
+                  <strong>新会话识别：</strong>如果绑定会话历史中没有该sessionId但请求中
+                  <code class="rounded bg-blue-100 px-1 dark:bg-blue-900">messages.length > 1</code
+                  >， 系统会认为这是一个污染的会话并拒绝请求。
+                </p>
+              </div>
+            </Alert>
+          </Card>
+
+          <!-- User Message Queue -->
+          <Card>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center">
+                <div
+                  class="mr-4 flex h-12 w-12 items-center justify-center rounded-lg bg-teal-500 dark:bg-teal-600"
+                >
+                  <i class="fas fa-list-ol text-xl text-white"></i>
+                </div>
+                <div>
+                  <h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    用户消息串行队列
+                  </h4>
+                  <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    启用后，同一账户的用户消息请求将串行执行，并在请求之间添加延迟，防止触发上游限流
+                  </p>
+                </div>
+              </div>
+              <Toggle
+                v-model="claudeConfig.userMessageQueueEnabled"
+                @update:model-value="saveClaudeConfig"
+              />
+            </div>
+
+            <!-- Queue Details -->
+            <div v-if="claudeConfig.userMessageQueueEnabled" class="mt-6 space-y-4">
+              <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <i class="fas fa-hourglass-half mr-2 text-gray-400"></i>
+                  请求间隔（毫秒）
+                </label>
+                <Input
+                  v-model.number="claudeConfig.userMessageQueueDelayMs"
+                  max="10000"
+                  min="0"
+                  placeholder="200"
+                  type="number"
+                  @change="saveClaudeConfig"
+                />
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  同一账户的用户消息请求之间的最小间隔时间（0-10000毫秒）
+                </p>
+              </div>
+
+              <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <i class="fas fa-stopwatch mr-2 text-gray-400"></i>
+                  队列超时（毫秒）
+                </label>
+                <Input
+                  v-model.number="claudeConfig.userMessageQueueTimeoutMs"
+                  max="300000"
+                  min="1000"
+                  placeholder="30000"
+                  type="number"
+                  @change="saveClaudeConfig"
+                />
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  请求在队列中等待的最大时间，超时将返回 503 错误（1000-300000毫秒）
+                </p>
+              </div>
+            </div>
+
+            <Alert class="mt-4" variant="info">
+              <i class="fas fa-info-circle mr-2"></i>
+              <strong>工作原理：</strong>系统检测请求中最后一条消息的
+              <code class="rounded bg-blue-100 px-1 dark:bg-blue-900">role</code>
+              是否为
+              <code class="rounded bg-blue-100 px-1 dark:bg-blue-900">user</code
+              >。用户消息请求需要排队串行执行，而工具调用结果、助手消息续传等不受此限制。
+            </Alert>
+          </Card>
+
+          <!-- Concurrent Request Queue -->
+          <Card>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center">
+                <div
+                  class="mr-4 flex h-12 w-12 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100"
+                >
+                  <i class="fas fa-layer-group text-xl text-white dark:text-gray-900"></i>
+                </div>
+                <div>
+                  <h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    并发请求排队
+                  </h4>
+                  <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    当 API Key 并发请求超限时进入队列等待，而非直接拒绝
+                  </p>
+                </div>
+              </div>
+              <Toggle
+                v-model="claudeConfig.concurrentRequestQueueEnabled"
+                @update:model-value="saveClaudeConfig"
+              />
+            </div>
+
+            <!-- Queue Config Details -->
+            <div v-if="claudeConfig.concurrentRequestQueueEnabled" class="mt-6 space-y-4">
+              <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <i class="fas fa-list-ol mr-2 text-gray-400"></i>
+                  固定最小排队数
+                </label>
+                <Input
+                  v-model.number="claudeConfig.concurrentRequestQueueMaxSize"
+                  max="100"
+                  min="1"
+                  placeholder="3"
+                  type="number"
+                  @change="saveClaudeConfig"
+                />
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  最大排队数的固定最小值（1-100）
+                </p>
+              </div>
+
+              <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <i class="fas fa-times mr-2 text-gray-400"></i>
+                  排队数倍数
+                </label>
+                <Input
+                  v-model.number="claudeConfig.concurrentRequestQueueMaxSizeMultiplier"
                   max="10"
                   min="0"
+                  placeholder="1"
+                  step="0.5"
                   type="number"
-                  @change="saveWebhookConfig"
+                  @change="saveClaudeConfig"
                 />
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  最大排队数 = MAX(倍数 × 并发限制, 固定值)，设为 0 则仅使用固定值
+                </p>
               </div>
+
               <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  重试延迟 (毫秒)
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <i class="fas fa-stopwatch mr-2 text-gray-400"></i>
+                  排队超时时间（毫秒）
                 </label>
-                <input
-                  v-model.number="webhookConfig.retrySettings.retryDelay"
-                  class="mt-1 block w-full rounded-lg border-gray-300 focus:border-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white sm:text-sm"
-                  max="10000"
-                  min="100"
-                  step="100"
+                <Input
+                  v-model.number="claudeConfig.concurrentRequestQueueTimeoutMs"
+                  max="300000"
+                  min="5000"
+                  placeholder="10000"
                   type="number"
-                  @change="saveWebhookConfig"
+                  @change="saveClaudeConfig"
                 />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  超时时间 (毫秒)
-                </label>
-                <input
-                  v-model.number="webhookConfig.retrySettings.timeout"
-                  class="mt-1 block w-full rounded-lg border-gray-300 focus:border-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white sm:text-sm"
-                  max="30000"
-                  min="1000"
-                  step="1000"
-                  type="number"
-                  @change="saveWebhookConfig"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- 测试通知按钮 -->
-          <div class="mt-6 text-center">
-            <button
-              class="rounded-lg bg-gray-900 px-6 py-3 text-white transition-all hover:bg-gray-700 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
-              @click="sendTestNotification"
-            >
-              <i class="fas fa-paper-plane mr-2"></i>
-              发送测试通知
-            </button>
-          </div>
-        </div>
-
-        <!-- Claude 转发配置部分 -->
-        <div v-show="activeSection === 'claude'">
-          <!-- 加载状态 -->
-          <div v-if="claudeConfigLoading" class="py-12 text-center">
-            <div class="loading-spinner mx-auto mb-4"></div>
-            <p class="text-gray-500 dark:text-gray-400">正在加载配置...</p>
-          </div>
-
-          <div v-else>
-            <!-- Claude Code 客户端限制 -->
-            <div class="mb-6 rounded-lg bg-white/80 p-6 dark:bg-gray-800/80">
-              <div class="flex items-center justify-between">
-                <div>
-                  <div class="flex items-center">
-                    <div
-                      class="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-gray-700 text-white dark:bg-gray-600"
-                    >
-                      <i class="fas fa-terminal"></i>
-                    </div>
-                    <div>
-                      <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                        仅允许 Claude Code 客户端
-                      </h2>
-                      <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        启用后，所有
-                        <code class="rounded bg-gray-100 px-1 dark:bg-gray-700"
-                          >/api/v1/messages</code
-                        >
-                        和
-                        <code class="rounded bg-gray-100 px-1 dark:bg-gray-700"
-                          >/claude/v1/messages</code
-                        >
-                        端点将强制验证 Claude Code CLI 客户端
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <label class="relative inline-flex cursor-pointer items-center">
-                  <input
-                    v-model="claudeConfig.claudeCodeOnlyEnabled"
-                    class="peer sr-only"
-                    type="checkbox"
-                    @change="saveClaudeConfig"
-                  />
-                  <div
-                    class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-400 dark:border-gray-600 dark:bg-gray-700 dark:peer-checked:bg-white dark:peer-focus:ring-gray-500"
-                  ></div>
-                </label>
-              </div>
-              <div class="mt-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
-                <div class="flex">
-                  <i class="fas fa-info-circle mt-0.5 text-amber-500"></i>
-                  <div class="ml-3">
-                    <p class="text-sm text-amber-700 dark:text-amber-300">
-                      此设置与 API Key 级别的客户端限制是 <strong>OR 逻辑</strong>：全局启用或 API
-                      Key 设置中启用，都会执行 Claude Code 验证。
-                    </p>
-                  </div>
-                </div>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  请求在排队中等待的最大时间，超时将返回 429 错误（5秒-5分钟，默认10秒）
+                </p>
               </div>
             </div>
 
-            <!-- 全局会话绑定 -->
-            <div class="mb-6 rounded-lg bg-white/80 p-6 dark:bg-gray-800/80">
-              <div class="flex items-center justify-between">
-                <div>
-                  <div class="flex items-center">
-                    <div
-                      class="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-gray-700 text-white dark:bg-gray-600"
-                    >
-                      <i class="fas fa-link"></i>
-                    </div>
-                    <div>
-                      <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                        强制会话绑定
-                      </h2>
-                      <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        启用后，系统会将原始会话 ID 绑定到首次使用的账户，确保上下文的一致性
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <label class="relative inline-flex cursor-pointer items-center">
-                  <input
-                    v-model="claudeConfig.globalSessionBindingEnabled"
-                    class="peer sr-only"
-                    type="checkbox"
-                    @change="saveClaudeConfig"
-                  />
-                  <div
-                    class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-400 dark:border-gray-600 dark:bg-gray-700 dark:peer-checked:bg-white dark:peer-focus:ring-gray-500"
-                  ></div>
-                </label>
-              </div>
+            <Alert class="mt-4" variant="info">
+              <i class="fas fa-info-circle mr-2"></i>
+              <strong>工作原理：</strong>当 API Key 的并发请求超过
+              <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">concurrencyLimit</code>
+              时，超限请求会进入队列等待而非直接返回 429。适合 Claude Code Agent 并行工具调用场景。
+            </Alert>
+          </Card>
 
-              <!-- 绑定配置详情（仅在启用时显示） -->
-              <div v-if="claudeConfig.globalSessionBindingEnabled" class="mt-6 space-y-4">
-                <!-- 绑定有效期 -->
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    <i class="fas fa-clock mr-2 text-gray-400"></i>
-                    绑定有效期（天）
-                  </label>
-                  <input
-                    v-model.number="claudeConfig.sessionBindingTtlDays"
-                    class="mt-1 block w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 dark:border-gray-500 dark:bg-gray-700 dark:text-white sm:text-sm"
-                    max="365"
-                    min="1"
-                    placeholder="30"
-                    type="number"
-                    @change="saveClaudeConfig"
-                  />
-                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    会话绑定到账户后的有效时间，过期后会自动解除绑定
-                  </p>
-                </div>
-
-                <!-- 错误提示消息 -->
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    <i class="fas fa-exclamation-triangle mr-2 text-gray-400"></i>
-                    旧会话污染提示
-                  </label>
-                  <textarea
-                    v-model="claudeConfig.sessionBindingErrorMessage"
-                    class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 dark:border-gray-500 dark:bg-gray-700 dark:text-white sm:text-sm"
-                    placeholder="你的本地session已污染，请清理后使用。"
-                    rows="2"
-                    @change="saveClaudeConfig"
-                  ></textarea>
-                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    当检测到为旧的sessionId且未在系统中有调度记录时提示，返回给客户端的错误消息
-                  </p>
-                </div>
-              </div>
-
-              <div class="mt-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
-                <div class="flex">
-                  <i class="fas fa-lightbulb mt-0.5 text-purple-500"></i>
-                  <div class="ml-3">
-                    <p class="text-sm text-purple-700 dark:text-purple-300">
-                      <strong>工作原理：</strong>系统会提取请求中的原始 session ID （来自
-                      <code class="rounded bg-gray-100 px-1 dark:bg-gray-700">metadata.user_id</code
-                      >）， 并将其与首次调度的账户绑定。后续使用相同 session ID
-                      的请求将自动路由到同一账户。
-                    </p>
-                    <p class="mt-2 text-sm text-purple-700 dark:text-purple-300">
-                      <strong>新会话识别：</strong>如果绑定会话历史中没有该sessionId但请求中
-                      <code class="rounded bg-gray-100 px-1 dark:bg-gray-700"
-                        >messages.length > 1</code
-                      >， 系统会认为这是一个污染的会话并拒绝请求。
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 用户消息串行队列 -->
-            <div class="mb-6 rounded-lg bg-white/80 p-6 dark:bg-gray-800/80">
-              <div class="flex items-center justify-between">
-                <div>
-                  <div class="flex items-center">
-                    <div
-                      class="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-gray-700 text-white dark:bg-gray-600"
-                    >
-                      <i class="fas fa-list-ol"></i>
-                    </div>
-                    <div>
-                      <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                        用户消息串行队列
-                      </h2>
-                      <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        启用后，同一账户的用户消息请求将串行执行，并在请求之间添加延迟，防止触发上游限流
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <label class="relative inline-flex cursor-pointer items-center">
-                  <input
-                    v-model="claudeConfig.userMessageQueueEnabled"
-                    class="peer sr-only"
-                    type="checkbox"
-                    @change="saveClaudeConfig"
-                  />
-                  <div
-                    class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-teal-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-teal-800"
-                  ></div>
-                </label>
-              </div>
-
-              <!-- 队列配置详情（仅在启用时显示） -->
-              <div v-if="claudeConfig.userMessageQueueEnabled" class="mt-6 space-y-4">
-                <!-- 请求间隔 -->
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    <i class="fas fa-hourglass-half mr-2 text-gray-400"></i>
-                    请求间隔（毫秒）
-                  </label>
-                  <input
-                    v-model.number="claudeConfig.userMessageQueueDelayMs"
-                    class="mt-1 block w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-gray-500 dark:bg-gray-700 dark:text-white sm:text-sm"
-                    max="10000"
-                    min="0"
-                    placeholder="200"
-                    type="number"
-                    @change="saveClaudeConfig"
-                  />
-                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    同一账户的用户消息请求之间的最小间隔时间（0-10000毫秒）
-                  </p>
-                </div>
-
-                <!-- 队列超时 -->
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    <i class="fas fa-stopwatch mr-2 text-gray-400"></i>
-                    队列超时（毫秒）
-                  </label>
-                  <input
-                    v-model.number="claudeConfig.userMessageQueueTimeoutMs"
-                    class="mt-1 block w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-gray-500 dark:bg-gray-700 dark:text-white sm:text-sm"
-                    max="300000"
-                    min="1000"
-                    placeholder="30000"
-                    type="number"
-                    @change="saveClaudeConfig"
-                  />
-                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    请求在队列中等待的最大时间，超时将返回 503 错误（1000-300000毫秒）
-                  </p>
-                </div>
-              </div>
-
-              <div class="mt-4 rounded-lg bg-teal-50 p-4 dark:bg-teal-900/20">
-                <div class="flex">
-                  <i class="fas fa-info-circle mt-0.5 text-teal-500"></i>
-                  <div class="ml-3">
-                    <p class="text-sm text-teal-700 dark:text-teal-300">
-                      <strong>工作原理：</strong>系统检测请求中最后一条消息的
-                      <code class="rounded bg-teal-100 px-1 dark:bg-teal-800">role</code>
-                      是否为
-                      <code class="rounded bg-teal-100 px-1 dark:bg-teal-800">user</code
-                      >。用户消息请求需要排队串行执行，而工具调用结果、助手消息续传等不受此限制。
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 并发请求排队 -->
-            <div class="mb-6 rounded-lg bg-white/80 p-6 dark:bg-gray-800/80">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center">
-                  <div
-                    class="flex h-12 w-12 items-center justify-center rounded-lg bg-gray-700 text-white dark:bg-gray-600"
-                  >
-                    <i class="fas fa-layer-group text-xl"></i>
-                  </div>
-                  <div class="ml-4">
-                    <h4 class="text-lg font-semibold text-gray-900 dark:text-white">
-                      并发请求排队
-                    </h4>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">
-                      当 API Key 并发请求超限时进入队列等待，而非直接拒绝
-                    </p>
-                  </div>
-                </div>
-                <label class="relative inline-flex cursor-pointer items-center">
-                  <input
-                    v-model="claudeConfig.concurrentRequestQueueEnabled"
-                    class="peer sr-only"
-                    type="checkbox"
-                    @change="saveClaudeConfig"
-                  />
-                  <div
-                    class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-gray-900 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-400 dark:border-gray-600 dark:bg-gray-700 dark:peer-checked:bg-white dark:peer-focus:ring-gray-500"
-                  ></div>
-                </label>
-              </div>
-
-              <!-- 排队配置详情（仅在启用时显示） -->
-              <div v-if="claudeConfig.concurrentRequestQueueEnabled" class="mt-6 space-y-4">
-                <!-- 固定最小排队数 -->
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    <i class="fas fa-list-ol mr-2 text-gray-400"></i>
-                    固定最小排队数
-                  </label>
-                  <input
-                    v-model.number="claudeConfig.concurrentRequestQueueMaxSize"
-                    class="mt-1 block w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-500 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white/20 sm:text-sm"
-                    max="100"
-                    min="1"
-                    placeholder="3"
-                    type="number"
-                    @change="saveClaudeConfig"
-                  />
-                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    最大排队数的固定最小值（1-100）
-                  </p>
-                </div>
-
-                <!-- 排队数倍数 -->
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    <i class="fas fa-times mr-2 text-gray-400"></i>
-                    排队数倍数
-                  </label>
-                  <input
-                    v-model.number="claudeConfig.concurrentRequestQueueMaxSizeMultiplier"
-                    class="mt-1 block w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-500 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white/20 sm:text-sm"
-                    max="10"
-                    min="0"
-                    placeholder="1"
-                    step="0.5"
-                    type="number"
-                    @change="saveClaudeConfig"
-                  />
-                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    最大排队数 = MAX(倍数 × 并发限制, 固定值)，设为 0 则仅使用固定值
-                  </p>
-                </div>
-
-                <!-- 排队超时时间 -->
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    <i class="fas fa-stopwatch mr-2 text-gray-400"></i>
-                    排队超时时间（毫秒）
-                  </label>
-                  <input
-                    v-model.number="claudeConfig.concurrentRequestQueueTimeoutMs"
-                    class="mt-1 block w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-500 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white/20 sm:text-sm"
-                    max="300000"
-                    min="5000"
-                    placeholder="10000"
-                    type="number"
-                    @change="saveClaudeConfig"
-                  />
-                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    请求在排队中等待的最大时间，超时将返回 429 错误（5秒-5分钟，默认10秒）
-                  </p>
-                </div>
-              </div>
-
-              <div class="mt-4 rounded-lg bg-gray-100 p-4 dark:bg-gray-700">
-                <div class="flex">
-                  <i class="fas fa-info-circle mt-0.5 text-gray-600 dark:text-gray-400"></i>
-                  <div class="ml-3">
-                    <p class="text-sm text-gray-700 dark:text-gray-300">
-                      <strong>工作原理：</strong>当 API Key 的并发请求超过
-                      <code class="rounded bg-gray-200 px-1 dark:bg-gray-600"
-                        >concurrencyLimit</code
-                      >
-                      时，超限请求会进入队列等待而非直接返回 429。适合 Claude Code Agent
-                      并行工具调用场景。
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 配置更新信息 -->
+          <!-- Update Info -->
+          <Card v-if="claudeConfig.updatedAt">
             <div
-              v-if="claudeConfig.updatedAt"
-              class="rounded-lg bg-gray-50 p-4 text-sm text-gray-500 dark:bg-gray-700/50 dark:text-gray-400"
+              class="flex flex-col gap-2 text-sm text-gray-500 dark:text-gray-400 sm:flex-row sm:items-center"
             >
-              <i class="fas fa-history mr-2"></i>
-              最后更新：{{ formatDateTime(claudeConfig.updatedAt) }}
-              <span v-if="claudeConfig.updatedBy" class="ml-2">
-                由 <strong>{{ claudeConfig.updatedBy }}</strong> 修改
+              <div>
+                <i class="fas fa-history mr-2"></i>
+                最后更新：{{ formatDateTime(claudeConfig.updatedAt) }}
+              </div>
+              <span v-if="claudeConfig.updatedBy" class="sm:ml-2">
+                由
+                <strong class="text-gray-700 dark:text-gray-300">{{
+                  claudeConfig.updatedBy
+                }}</strong>
+                修改
               </span>
             </div>
-          </div>
-        </div>
+          </Card>
+        </template>
       </div>
     </div>
   </div>
 
-  <!-- 添加/编辑平台模态框 -->
+  <!-- Add/Edit Platform Modal -->
   <div
     v-if="showAddPlatformModal"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 transition-all duration-300 ease-out"
+    class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-4"
     @click="closePlatformModal"
   >
     <div
-      class="relative mx-4 w-full max-w-2xl overflow-hidden rounded bg-white transition-all duration-300 ease-out dark:bg-gray-800"
+      class="relative my-8 w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-xl dark:bg-gray-800"
       @click.stop
     >
-      <!-- 头部 -->
+      <!-- Modal Header -->
       <div
-        class="relative border-b border-gray-200 bg-gray-50 px-6 py-5 dark:border-gray-700 dark:bg-gray-800"
+        class="border-b border-gray-200 bg-gray-50 px-4 py-4 dark:border-gray-700 dark:bg-gray-900 sm:px-6 sm:py-5"
       >
-        <div class="flex items-center justify-between">
-          <div class="flex items-center space-x-3">
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex min-w-0 flex-1 items-start gap-3">
             <div
-              class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-700 text-white dark:bg-gray-600"
+              class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100"
             >
-              <i class="fas fa-bell"></i>
+              <i class="fas fa-bell text-white dark:text-gray-900"></i>
             </div>
-            <div>
-              <h3 class="text-xl font-semibold text-gray-900 dark:text-white">
+            <div class="min-w-0 flex-1">
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-white sm:text-xl">
                 {{ editingPlatform ? '编辑' : '添加' }}通知平台
               </h3>
-              <p class="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
+              <p class="text-sm text-gray-600 dark:text-gray-400">
                 配置{{ editingPlatform ? '并更新' : '新的' }}Webhook通知渠道
               </p>
             </div>
           </div>
-          <button
-            class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
-            @click="closePlatformModal"
-          >
+          <Button class="flex-shrink-0" size="sm" variant="ghost" @click="closePlatformModal">
             <i class="fas fa-times text-lg"></i>
-          </button>
+          </Button>
         </div>
       </div>
 
-      <!-- 内容区域 -->
-      <div class="p-6">
+      <!-- Modal Body -->
+      <div class="max-h-[calc(100vh-16rem)] overflow-y-auto p-4 sm:p-6">
         <div class="space-y-5">
-          <!-- 平台类型选择 -->
+          <!-- Platform Type -->
           <div>
-            <label
-              class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
+            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
               <i class="fas fa-layer-group mr-2 text-gray-400"></i>
               平台类型
             </label>
-            <div class="relative">
-              <select
-                v-model="platformForm.type"
-                class="w-full appearance-none rounded border border-gray-300 bg-white px-4 py-3 pr-10 text-gray-900 transition-all focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white/20"
-                :disabled="editingPlatform"
-              >
-                <option value="wechat_work">🟢 企业微信</option>
-                <option value="dingtalk">🔵 钉钉</option>
-                <option value="feishu">🟦 飞书</option>
-                <option value="slack">🟣 Slack</option>
-                <option value="discord">🟪 Discord</option>
-                <option value="telegram">✈️ Telegram</option>
-                <option value="bark">🔔 Bark</option>
-                <option value="smtp">📧 邮件通知</option>
-                <option value="custom">⚙️ 自定义</option>
-              </select>
-              <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                <i class="fas fa-chevron-down text-gray-400"></i>
-              </div>
-            </div>
+            <Select v-model="platformForm.type" :disabled="editingPlatform">
+              <option value="wechat_work">🟢 企业微信</option>
+              <option value="dingtalk">🔵 钉钉</option>
+              <option value="feishu">🟦 飞书</option>
+              <option value="slack">🟣 Slack</option>
+              <option value="discord">🟪 Discord</option>
+              <option value="telegram">✈️ Telegram</option>
+              <option value="bark">🔔 Bark</option>
+              <option value="smtp">📧 邮件通知</option>
+              <option value="custom">⚙️ 自定义</option>
+            </Select>
             <p v-if="editingPlatform" class="mt-1 text-xs text-amber-600 dark:text-amber-400">
               <i class="fas fa-info-circle mr-1"></i>
               编辑模式下不能更改平台类型
             </p>
           </div>
 
-          <!-- 平台名称 -->
+          <!-- Platform Name -->
           <div>
-            <label
-              class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
+            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
               <i class="fas fa-tag mr-2 text-gray-400"></i>
               名称
-              <span class="ml-2 text-xs text-gray-500">(可选)</span>
+              <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(可选)</span>
             </label>
-            <input
-              v-model="platformForm.name"
-              class="w-full rounded border border-gray-300 bg-white px-4 py-3 text-gray-900 transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
-              placeholder="例如：运维群通知、开发测试群"
-              type="text"
-            />
+            <Input v-model="platformForm.name" placeholder="例如：运维群通知、开发测试群" />
           </div>
 
-          <!-- Webhook URL (非Bark和SMTP平台) -->
+          <!-- Webhook URL (for most platforms) -->
           <div
             v-if="
               platformForm.type !== 'bark' &&
@@ -1074,60 +758,40 @@
               platformForm.type !== 'telegram'
             "
           >
-            <label
-              class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
+            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
               <i class="fas fa-link mr-2 text-gray-400"></i>
               Webhook URL
-              <span class="ml-1 text-xs text-red-500">*</span>
+              <span class="ml-1 text-xs text-red-500 dark:text-red-400">*</span>
             </label>
-            <div class="relative">
-              <input
-                v-model="platformForm.url"
-                class="w-full rounded border border-gray-300 bg-white px-4 py-3 pr-10 font-mono text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
-                :class="{
-                  'border-red-500 focus:border-red-500 focus:ring-red-500/20': urlError,
-                  'border-green-500 focus:border-green-500 focus:ring-green-500/20': urlValid
-                }"
-                placeholder="https://..."
-                required
-                type="url"
-                @input="validateUrl"
-              />
-              <div v-if="urlValid" class="absolute inset-y-0 right-0 flex items-center pr-3">
-                <i class="fas fa-check-circle text-green-500"></i>
-              </div>
-              <div v-if="urlError" class="absolute inset-y-0 right-0 flex items-center pr-3">
-                <i class="fas fa-exclamation-circle text-red-500"></i>
-              </div>
-            </div>
-            <div
-              v-if="getWebhookHint(platformForm.type)"
-              class="mt-2 flex items-start rounded-lg bg-gray-100 p-3 dark:bg-gray-700"
-            >
-              <i class="fas fa-info-circle mr-2 mt-0.5 text-gray-600 dark:text-gray-400"></i>
-              <p class="text-sm text-gray-700 dark:text-gray-300">
-                {{ getWebhookHint(platformForm.type) }}
-              </p>
-            </div>
+            <Input
+              v-model="platformForm.url"
+              :class="{
+                'border-red-500': urlError,
+                'border-green-500': urlValid
+              }"
+              placeholder="https://..."
+              required
+              type="url"
+              @input="validateUrl"
+            />
+            <Alert v-if="getWebhookHint(platformForm.type)" class="mt-2" variant="info">
+              <i class="fas fa-info-circle mr-2"></i>
+              {{ getWebhookHint(platformForm.type) }}
+            </Alert>
           </div>
 
-          <!-- Telegram 平台特有字段 -->
+          <!-- Telegram Fields -->
           <div v-if="platformForm.type === 'telegram'" class="space-y-5">
             <div>
-              <label
-                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 <i class="fas fa-robot mr-2 text-gray-400"></i>
                 Bot Token
-                <span class="ml-1 text-xs text-red-500">*</span>
+                <span class="ml-1 text-xs text-red-500 dark:text-red-400">*</span>
               </label>
-              <input
+              <Input
                 v-model="platformForm.botToken"
-                class="w-full rounded border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
                 placeholder="例如：123456789:ABCDEFghijk-xyz"
                 required
-                type="text"
               />
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 在 Telegram 的 @BotFather 中创建机器人后获得的 Token
@@ -1135,19 +799,15 @@
             </div>
 
             <div>
-              <label
-                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 <i class="fas fa-comments mr-2 text-gray-400"></i>
                 Chat ID
-                <span class="ml-1 text-xs text-red-500">*</span>
+                <span class="ml-1 text-xs text-red-500 dark:text-red-400">*</span>
               </label>
-              <input
+              <Input
                 v-model="platformForm.chatId"
-                class="w-full rounded border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
                 placeholder="例如：123456789 或 -1001234567890"
                 required
-                type="text"
               />
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 可使用 @userinfobot、@RawDataBot 或 API 获取聊天/频道的 Chat ID
@@ -1155,16 +815,13 @@
             </div>
 
             <div>
-              <label
-                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 <i class="fas fa-globe mr-2 text-gray-400"></i>
                 API 基础地址
-                <span class="ml-2 text-xs text-gray-500">(可选)</span>
+                <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(可选)</span>
               </label>
-              <input
+              <Input
                 v-model="platformForm.apiBaseUrl"
-                class="w-full rounded border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
                 placeholder="默认: https://api.telegram.org"
                 type="url"
               />
@@ -1174,104 +831,77 @@
             </div>
 
             <div>
-              <label
-                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 <i class="fas fa-route mr-2 text-gray-400"></i>
                 代理地址
-                <span class="ml-2 text-xs text-gray-500">(可选)</span>
+                <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(可选)</span>
               </label>
-              <input
+              <Input
                 v-model="platformForm.proxyUrl"
-                class="w-full rounded border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
                 placeholder="例如：socks5://user:pass@127.0.0.1:1080"
-                type="text"
               />
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 支持 http、https、socks4/4a/5 代理，留空则直接连接 Telegram 官方 API
               </p>
             </div>
 
-            <div
-              class="flex items-start rounded-lg bg-gray-100 p-3 text-sm text-gray-700 dark:bg-gray-700 dark:text-gray-300"
-            >
-              <i class="fas fa-info-circle mr-2 mt-0.5"></i>
-              <div>机器人需先加入对应群组或频道并授予发送消息权限，通知会以纯文本方式发送。</div>
-            </div>
+            <Alert variant="info">
+              <i class="fas fa-info-circle mr-2"></i>
+              机器人需先加入对应群组或频道并授予发送消息权限，通知会以纯文本方式发送。
+            </Alert>
           </div>
 
-          <!-- Bark 平台特有字段 -->
+          <!-- Bark Fields -->
           <div v-if="platformForm.type === 'bark'" class="space-y-5">
-            <!-- 设备密钥 -->
             <div>
-              <label
-                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 <i class="fas fa-key mr-2 text-gray-400"></i>
                 设备密钥 (Device Key)
-                <span class="ml-1 text-xs text-red-500">*</span>
+                <span class="ml-1 text-xs text-red-500 dark:text-red-400">*</span>
               </label>
-              <input
+              <Input
                 v-model="platformForm.deviceKey"
-                class="w-full rounded border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
                 placeholder="例如：aBcDeFgHiJkLmNoPqRsTuVwX"
                 required
-                type="text"
               />
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 在Bark App中查看您的推送密钥
               </p>
             </div>
 
-            <!-- 服务器URL（可选） -->
             <div>
-              <label
-                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 <i class="fas fa-server mr-2 text-gray-400"></i>
                 服务器地址
-                <span class="ml-2 text-xs text-gray-500">(可选)</span>
+                <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(可选)</span>
               </label>
-              <input
+              <Input
                 v-model="platformForm.serverUrl"
-                class="w-full rounded border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
                 placeholder="默认: https://api.day.app/push"
                 type="url"
               />
             </div>
 
-            <!-- 通知级别 -->
             <div>
-              <label
-                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 <i class="fas fa-flag mr-2 text-gray-400"></i>
                 通知级别
               </label>
-              <select
-                v-model="platformForm.level"
-                class="w-full appearance-none rounded border border-gray-300 bg-white px-4 py-3 pr-10 text-gray-900 transition-all focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white/20"
-              >
+              <Select v-model="platformForm.level">
                 <option value="">自动（根据通知类型）</option>
                 <option value="passive">被动</option>
                 <option value="active">默认</option>
                 <option value="timeSensitive">时效性</option>
                 <option value="critical">紧急</option>
-              </select>
+              </Select>
             </div>
 
-            <!-- 通知声音 -->
             <div>
-              <label
-                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 <i class="fas fa-volume-up mr-2 text-gray-400"></i>
                 通知声音
               </label>
-              <select
-                v-model="platformForm.sound"
-                class="w-full appearance-none rounded border border-gray-300 bg-white px-4 py-3 pr-10 text-gray-900 transition-all focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white/20"
-              >
+              <Select v-model="platformForm.sound">
                 <option value="">自动（根据通知类型）</option>
                 <option value="default">默认</option>
                 <option value="alarm">警报</option>
@@ -1281,69 +911,47 @@
                 <option value="glass">玻璃</option>
                 <option value="horn">喇叭</option>
                 <option value="silence">静音</option>
-              </select>
+              </Select>
             </div>
 
-            <!-- 分组 -->
             <div>
-              <label
-                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 <i class="fas fa-folder mr-2 text-gray-400"></i>
                 通知分组
-                <span class="ml-2 text-xs text-gray-500">(可选)</span>
+                <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(可选)</span>
               </label>
-              <input
-                v-model="platformForm.group"
-                class="w-full rounded border border-gray-300 bg-white px-4 py-3 text-gray-900 transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
-                placeholder="默认: claude-relay"
-                type="text"
-              />
+              <Input v-model="platformForm.group" placeholder="默认: claude-relay" />
             </div>
 
-            <!-- 提示信息 -->
-            <div class="mt-2 flex items-start rounded-lg bg-gray-100 p-3 dark:bg-gray-700">
-              <i class="fas fa-info-circle mr-2 mt-0.5 text-gray-600 dark:text-gray-400"></i>
-              <div class="text-sm text-gray-700 dark:text-gray-300">
+            <Alert variant="info">
+              <i class="fas fa-info-circle mr-2"></i>
+              <div>
                 <p>1. 在iPhone上安装Bark App</p>
                 <p>2. 打开App获取您的设备密钥</p>
                 <p>3. 将密钥粘贴到上方输入框</p>
               </div>
-            </div>
+            </Alert>
           </div>
 
-          <!-- SMTP 平台特有字段 -->
+          <!-- SMTP Fields -->
           <div v-if="platformForm.type === 'smtp'" class="space-y-5">
-            <!-- SMTP 主机 -->
             <div>
-              <label
-                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 <i class="fas fa-server mr-2 text-gray-400"></i>
                 SMTP 服务器
-                <span class="ml-1 text-xs text-red-500">*</span>
+                <span class="ml-1 text-xs text-red-500 dark:text-red-400">*</span>
               </label>
-              <input
-                v-model="platformForm.host"
-                class="w-full rounded border border-gray-300 bg-white px-4 py-3 text-gray-900 transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
-                placeholder="例如: smtp.gmail.com"
-                required
-                type="text"
-              />
+              <Input v-model="platformForm.host" placeholder="例如: smtp.gmail.com" required />
             </div>
 
-            <!-- SMTP 端口和安全设置 -->
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label
-                  class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   <i class="fas fa-plug mr-2 text-gray-400"></i>
                   端口
                 </label>
-                <input
+                <Input
                   v-model.number="platformForm.port"
-                  class="w-full rounded border border-gray-300 bg-white px-4 py-3 text-gray-900 transition-all focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white/20"
                   max="65535"
                   min="1"
                   placeholder="587"
@@ -1355,52 +963,39 @@
               </div>
 
               <div>
-                <label
-                  class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   <i class="fas fa-shield-alt mr-2 text-gray-400"></i>
                   加密方式
                 </label>
-                <select
-                  v-model="platformForm.secure"
-                  class="w-full appearance-none rounded border border-gray-300 bg-white px-4 py-3 pr-10 text-gray-900 transition-all focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-white dark:focus:ring-white/20"
-                >
+                <Select v-model="platformForm.secure">
                   <option :value="false">STARTTLS (端口587)</option>
                   <option :value="true">SSL/TLS (端口465)</option>
-                </select>
+                </Select>
               </div>
             </div>
 
-            <!-- 用户名 -->
             <div>
-              <label
-                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 <i class="fas fa-user mr-2 text-gray-400"></i>
                 用户名
-                <span class="ml-1 text-xs text-red-500">*</span>
+                <span class="ml-1 text-xs text-red-500 dark:text-red-400">*</span>
               </label>
-              <input
+              <Input
                 v-model="platformForm.user"
-                class="w-full rounded border border-gray-300 bg-white px-4 py-3 text-gray-900 transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
                 placeholder="user@example.com"
                 required
                 type="email"
               />
             </div>
 
-            <!-- 密码 -->
             <div>
-              <label
-                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 <i class="fas fa-lock mr-2 text-gray-400"></i>
                 密码 / 应用密码
-                <span class="ml-1 text-xs text-red-500">*</span>
+                <span class="ml-1 text-xs text-red-500 dark:text-red-400">*</span>
               </label>
-              <input
+              <Input
                 v-model="platformForm.pass"
-                class="w-full rounded border border-gray-300 bg-white px-4 py-3 text-gray-900 transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
                 placeholder="邮箱密码或应用专用密码"
                 required
                 type="password"
@@ -1410,35 +1005,23 @@
               </p>
             </div>
 
-            <!-- 发件人邮箱 -->
             <div>
-              <label
-                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 <i class="fas fa-paper-plane mr-2 text-gray-400"></i>
                 发件人邮箱
-                <span class="ml-2 text-xs text-gray-500">(可选)</span>
+                <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(可选)</span>
               </label>
-              <input
-                v-model="platformForm.from"
-                class="w-full rounded border border-gray-300 bg-white px-4 py-3 text-gray-900 transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
-                placeholder="默认使用用户名邮箱"
-                type="email"
-              />
+              <Input v-model="platformForm.from" placeholder="默认使用用户名邮箱" type="email" />
             </div>
 
-            <!-- 收件人邮箱 -->
             <div>
-              <label
-                class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 <i class="fas fa-envelope mr-2 text-gray-400"></i>
                 收件人邮箱
-                <span class="ml-1 text-xs text-red-500">*</span>
+                <span class="ml-1 text-xs text-red-500 dark:text-red-400">*</span>
               </label>
-              <input
+              <Input
                 v-model="platformForm.to"
-                class="w-full rounded border border-gray-300 bg-white px-4 py-3 text-gray-900 transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
                 placeholder="admin@example.com"
                 required
                 type="email"
@@ -1447,88 +1030,69 @@
             </div>
           </div>
 
-          <!-- 签名设置（钉钉/飞书） -->
+          <!-- Sign Settings (DingTalk/Feishu) -->
           <div
             v-if="platformForm.type === 'dingtalk' || platformForm.type === 'feishu'"
-            class="rounded border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/50"
+            class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900"
           >
-            <div class="space-y-4">
-              <div class="flex items-center justify-between">
-                <label class="flex cursor-pointer items-center" for="enableSign">
-                  <input
-                    id="enableSign"
-                    v-model="platformForm.enableSign"
-                    class="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-2 focus:ring-gray-900 focus:ring-offset-0 dark:border-gray-600 dark:text-white dark:focus:ring-white"
-                    type="checkbox"
-                  />
-                  <span
-                    class="ml-3 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
-                  >
-                    <i class="fas fa-shield-alt mr-2 text-gray-400"></i>
-                    启用签名验证
-                  </span>
-                </label>
-                <Badge v-if="platformForm.enableSign" size="sm" variant="success"> 已启用 </Badge>
-              </div>
-              <div v-if="platformForm.enableSign">
-                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  签名密钥
-                </label>
-                <input
-                  v-model="platformForm.secret"
-                  class="w-full rounded border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 transition-all placeholder:text-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-white dark:focus:ring-white/20"
-                  placeholder="SEC..."
-                  type="text"
-                />
-              </div>
+            <div class="mb-4 flex items-center justify-between">
+              <label class="flex items-center">
+                <Checkbox v-model="platformForm.enableSign" />
+                <span class="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <i class="fas fa-shield-alt mr-2 text-gray-400"></i>
+                  启用签名验证
+                </span>
+              </label>
+              <Badge v-if="platformForm.enableSign" size="sm" variant="success">已启用</Badge>
+            </div>
+            <div v-if="platformForm.enableSign">
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                签名密钥
+              </label>
+              <Input v-model="platformForm.secret" placeholder="SEC..." />
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 底部按钮 -->
+      <!-- Modal Footer -->
       <div
-        class="border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-gray-700 dark:bg-gray-900/50"
+        class="border-t border-gray-200 bg-gray-50 px-4 py-4 dark:border-gray-700 dark:bg-gray-900 sm:px-6"
       >
-        <div class="flex items-center justify-between">
-          <div class="text-xs text-gray-500 dark:text-gray-400">
-            <i class="fas fa-asterisk mr-1 text-red-500"></i>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div class="order-2 text-xs text-gray-500 dark:text-gray-400 sm:order-1">
+            <i class="fas fa-asterisk mr-1 text-red-500 dark:text-red-400"></i>
             必填项
           </div>
-          <div class="flex space-x-3">
-            <button
-              class="group flex items-center rounded border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-all hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-              @click="closePlatformModal"
-            >
-              <i class="fas fa-times mr-2 transition-transform group-hover:scale-110"></i>
+          <div class="order-1 flex flex-col gap-2 sm:order-2 sm:flex-row sm:gap-3">
+            <Button class="w-full sm:w-auto" variant="ghost" @click="closePlatformModal">
+              <i class="fas fa-times mr-2"></i>
               取消
-            </button>
-            <button
-              class="group flex items-center rounded border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-all hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            </Button>
+            <Button
+              class="w-full sm:w-auto"
               :disabled="testingConnection"
+              variant="secondary"
               @click="testPlatformForm"
             >
               <i
-                class="mr-2 transition-transform"
-                :class="
-                  testingConnection ? 'fas fa-spinner fa-spin' : 'fas fa-vial group-hover:scale-110'
-                "
+                class="mr-2"
+                :class="testingConnection ? 'fas fa-spinner fa-spin' : 'fas fa-vial'"
               ></i>
               {{ testingConnection ? '测试中...' : '测试连接' }}
-            </button>
-            <button
-              class="group flex items-center rounded bg-black px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-400 dark:bg-white dark:text-black dark:hover:bg-gray-100"
+            </Button>
+            <Button
+              class="w-full sm:w-auto"
               :disabled="!isPlatformFormValid || savingPlatform"
+              variant="primary"
               @click="savePlatform"
             >
               <i
-                class="mr-2 transition-transform"
-                :class="
-                  savingPlatform ? 'fas fa-spinner fa-spin' : 'fas fa-save group-hover:scale-110'
-                "
+                class="mr-2"
+                :class="savingPlatform ? 'fas fa-spinner fa-spin' : 'fas fa-save'"
               ></i>
               {{ savingPlatform ? '保存中...' : editingPlatform ? '保存修改' : '添加平台' }}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -1542,30 +1106,42 @@ import { storeToRefs } from 'pinia'
 import { showToast } from '@/utils/toast'
 import { useSettingsStore } from '@/stores/settings'
 import { apiClient } from '@/config/api'
-import { Badge, Button } from '@/ui'
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  Input,
+  Select,
+  Spinner,
+  Tabs,
+  Textarea,
+  Toggle
+} from '@/ui'
 
-// 定义组件名称，用于keep-alive排除
+// Define component name for keep-alive exclusion
 defineOptions({
   name: 'SettingsView'
 })
 
-// 使用settings store
+// Use settings store
 const settingsStore = useSettingsStore()
 const { loading, saving, oemSettings } = storeToRefs(settingsStore)
 
-// 组件refs
+// Component refs
 const iconFileInput = ref()
 
-// 当前激活的设置部分
+// Current active settings section
 const activeSection = ref('branding')
 
-// 组件挂载状态
+// Component mount state
 const isMounted = ref(true)
 
-// API请求取消控制器
+// API request abort controller
 const abortController = ref(new AbortController())
 
-// 计算属性：隐藏管理后台按钮（反转 showAdminButton 的值）
+// Computed property: Hide admin button (inverts showAdminButton value)
 const hideAdminButton = computed({
   get() {
     return !oemSettings.value.showAdminButton
@@ -1575,13 +1151,13 @@ const hideAdminButton = computed({
   }
 })
 
-// URL 验证状态
+// URL validation state
 const urlError = ref(false)
 const urlValid = ref(false)
 const testingConnection = ref(false)
 const savingPlatform = ref(false)
 
-// Webhook 配置
+// Webhook configuration
 const DEFAULT_WEBHOOK_NOTIFICATION_TYPES = {
   accountAnomaly: true,
   quotaWarning: true,
@@ -1601,16 +1177,16 @@ const webhookConfig = ref({
   }
 })
 
-// Claude 转发配置
+// Claude relay configuration
 const claudeConfigLoading = ref(false)
 const claudeConfig = ref({
   claudeCodeOnlyEnabled: false,
   globalSessionBindingEnabled: false,
   sessionBindingErrorMessage: '你的本地session已污染，请清理后使用。',
   sessionBindingTtlDays: 30,
-  userMessageQueueEnabled: false, // 与后端默认值保持一致
+  userMessageQueueEnabled: false,
   userMessageQueueDelayMs: 200,
-  userMessageQueueTimeoutMs: 5000, // 与后端默认值保持一致（优化后锁持有时间短无需长等待）
+  userMessageQueueTimeoutMs: 5000,
   concurrentRequestQueueEnabled: false,
   concurrentRequestQueueMaxSize: 3,
   concurrentRequestQueueMaxSizeMultiplier: 0,
@@ -1619,7 +1195,7 @@ const claudeConfig = ref({
   updatedBy: null
 })
 
-// 平台表单相关
+// Platform form related
 const showAddPlatformModal = ref(false)
 const editingPlatform = ref(null)
 const platformForm = ref({
@@ -1628,18 +1204,18 @@ const platformForm = ref({
   url: '',
   enableSign: false,
   secret: '',
-  // Telegram特有字段
+  // Telegram specific fields
   botToken: '',
   chatId: '',
   apiBaseUrl: '',
   proxyUrl: '',
-  // Bark特有字段
+  // Bark specific fields
   deviceKey: '',
   serverUrl: '',
   level: '',
   sound: '',
   group: '',
-  // SMTP特有字段
+  // SMTP specific fields
   host: '',
   port: null,
   secure: false,
@@ -1651,7 +1227,7 @@ const platformForm = ref({
   ignoreTLS: false
 })
 
-// 监听activeSection变化，加载对应配置
+// Watch activeSection changes to load corresponding configuration
 const sectionWatcher = watch(activeSection, async (newSection) => {
   if (!isMounted.value) return
   if (newSection === 'webhook') {
@@ -1661,27 +1237,22 @@ const sectionWatcher = watch(activeSection, async (newSection) => {
   }
 })
 
-// 监听平台类型变化，重置验证状态
+// Watch platform type changes to reset validation state
 const platformTypeWatcher = watch(
   () => platformForm.value.type,
   (newType) => {
-    // 切换平台类型时重置验证状态
     urlError.value = false
     urlValid.value = false
 
-    // 如果不是编辑模式，清空相关字段
     if (!editingPlatform.value) {
       if (newType === 'bark') {
-        // 切换到Bark时，清空URL和SMTP相关字段
         platformForm.value.url = ''
         platformForm.value.enableSign = false
         platformForm.value.secret = ''
-        // 清空Telegram字段
         platformForm.value.botToken = ''
         platformForm.value.chatId = ''
         platformForm.value.apiBaseUrl = ''
         platformForm.value.proxyUrl = ''
-        // 清空SMTP字段
         platformForm.value.host = ''
         platformForm.value.port = null
         platformForm.value.secure = false
@@ -1692,17 +1263,14 @@ const platformTypeWatcher = watch(
         platformForm.value.timeout = null
         platformForm.value.ignoreTLS = false
       } else if (newType === 'smtp') {
-        // 切换到SMTP时，清空URL和Bark相关字段
         platformForm.value.url = ''
         platformForm.value.enableSign = false
         platformForm.value.secret = ''
-        // 清空Bark字段
         platformForm.value.deviceKey = ''
         platformForm.value.serverUrl = ''
         platformForm.value.level = ''
         platformForm.value.sound = ''
         platformForm.value.group = ''
-        // 清空Telegram字段
         platformForm.value.botToken = ''
         platformForm.value.chatId = ''
         platformForm.value.apiBaseUrl = ''
@@ -1725,18 +1293,12 @@ const platformTypeWatcher = watch(
         platformForm.value.to = ''
         platformForm.value.timeout = null
         platformForm.value.ignoreTLS = false
-        platformForm.value.botToken = ''
-        platformForm.value.chatId = ''
-        platformForm.value.apiBaseUrl = ''
-        platformForm.value.proxyUrl = ''
       } else {
-        // 切换到其他平台时，清空Bark和SMTP相关字段
         platformForm.value.deviceKey = ''
         platformForm.value.serverUrl = ''
         platformForm.value.level = ''
         platformForm.value.sound = ''
         platformForm.value.group = ''
-        // SMTP 字段
         platformForm.value.host = ''
         platformForm.value.port = null
         platformForm.value.secure = false
@@ -1746,7 +1308,6 @@ const platformTypeWatcher = watch(
         platformForm.value.to = ''
         platformForm.value.timeout = null
         platformForm.value.ignoreTLS = false
-        // Telegram 字段
         platformForm.value.botToken = ''
         platformForm.value.chatId = ''
         platformForm.value.apiBaseUrl = ''
@@ -1756,16 +1317,13 @@ const platformTypeWatcher = watch(
   }
 )
 
-// 计算属性：判断平台表单是否有效
+// Computed property: Check if platform form is valid
 const isPlatformFormValid = computed(() => {
   if (platformForm.value.type === 'bark') {
-    // Bark平台需要deviceKey
     return !!platformForm.value.deviceKey
   } else if (platformForm.value.type === 'telegram') {
-    // Telegram需要机器人Token和Chat ID
     return !!(platformForm.value.botToken && platformForm.value.chatId)
   } else if (platformForm.value.type === 'smtp') {
-    // SMTP平台需要必要的配置
     return !!(
       platformForm.value.host &&
       platformForm.value.user &&
@@ -1773,12 +1331,11 @@ const isPlatformFormValid = computed(() => {
       platformForm.value.to
     )
   } else {
-    // 其他平台需要URL且URL格式正确
     return !!platformForm.value.url && !urlError.value
   }
 })
 
-// 页面加载时获取设置
+// Load settings on mount
 onMounted(async () => {
   try {
     await settingsStore.loadOemSettings()
@@ -1790,117 +1347,55 @@ onMounted(async () => {
   }
 })
 
-// 组件卸载前清理
+// Cleanup before unmount
 onBeforeUnmount(() => {
-  // 设置组件未挂载状态
   isMounted.value = false
-
-  // 取消所有API请求
   if (abortController.value) {
     abortController.value.abort()
   }
-
-  // 停止watch监听器
-  if (sectionWatcher) {
-    sectionWatcher()
-  }
-  if (platformTypeWatcher) {
-    platformTypeWatcher()
-  }
-
-  // 安全关闭模态框
-  if (showAddPlatformModal.value) {
-    showAddPlatformModal.value = false
-    editingPlatform.value = null
-  }
+  if (sectionWatcher) sectionWatcher()
+  if (platformTypeWatcher) platformTypeWatcher()
 })
 
-// Webhook 相关函数
-
-// 获取webhook配置
+// Load webhook config
 const loadWebhookConfig = async () => {
   if (!isMounted.value) return
   try {
-    const response = await apiClient.get('/admin/webhook/config', {
+    const response = await apiClient.get('/admin/webhook', {
       signal: abortController.value.signal
     })
-    if (response.success && isMounted.value) {
-      const config = response.config || {}
+    if (response.config && isMounted.value) {
       webhookConfig.value = {
-        ...config,
+        ...webhookConfig.value,
+        ...response.config,
         notificationTypes: {
           ...DEFAULT_WEBHOOK_NOTIFICATION_TYPES,
-          ...(config.notificationTypes || {})
+          ...(response.config.notificationTypes || {})
         }
       }
     }
   } catch (error) {
     if (error.name === 'AbortError') return
     if (!isMounted.value) return
-    showToast('获取webhook配置失败', 'error')
-    console.error(error)
+    console.error('Failed to load webhook config:', error)
   }
 }
 
-// 保存webhook配置
-const saveWebhookConfig = async () => {
-  if (!isMounted.value) return
-  try {
-    const payload = {
-      ...webhookConfig.value,
-      notificationTypes: {
-        ...DEFAULT_WEBHOOK_NOTIFICATION_TYPES,
-        ...(webhookConfig.value.notificationTypes || {})
-      }
-    }
-
-    const response = await apiClient.post('/admin/webhook/config', payload, {
-      signal: abortController.value.signal
-    })
-    if (response.success && isMounted.value) {
-      webhookConfig.value = payload
-      showToast('配置已保存', 'success')
-    }
-  } catch (error) {
-    if (error.name === 'AbortError') return
-    if (!isMounted.value) return
-    showToast('保存配置失败', 'error')
-    console.error(error)
-  }
-}
-
-// 加载 Claude 转发配置
+// Load Claude config
 const loadClaudeConfig = async () => {
   if (!isMounted.value) return
   claudeConfigLoading.value = true
   try {
-    const response = await apiClient.get('/admin/claude-relay-config', {
+    const response = await apiClient.get('/admin/settings/claude', {
       signal: abortController.value.signal
     })
-    if (response.success && isMounted.value) {
-      claudeConfig.value = {
-        claudeCodeOnlyEnabled: response.config?.claudeCodeOnlyEnabled ?? false,
-        globalSessionBindingEnabled: response.config?.globalSessionBindingEnabled ?? false,
-        sessionBindingErrorMessage:
-          response.config?.sessionBindingErrorMessage || '你的本地session已污染，请清理后使用。',
-        sessionBindingTtlDays: response.config?.sessionBindingTtlDays ?? 30,
-        userMessageQueueEnabled: response.config?.userMessageQueueEnabled ?? false, // 与后端默认值保持一致
-        userMessageQueueDelayMs: response.config?.userMessageQueueDelayMs ?? 200,
-        userMessageQueueTimeoutMs: response.config?.userMessageQueueTimeoutMs ?? 5000, // 与后端默认值保持一致
-        concurrentRequestQueueEnabled: response.config?.concurrentRequestQueueEnabled ?? false,
-        concurrentRequestQueueMaxSize: response.config?.concurrentRequestQueueMaxSize ?? 3,
-        concurrentRequestQueueMaxSizeMultiplier:
-          response.config?.concurrentRequestQueueMaxSizeMultiplier ?? 0,
-        concurrentRequestQueueTimeoutMs: response.config?.concurrentRequestQueueTimeoutMs ?? 10000,
-        updatedAt: response.config?.updatedAt || null,
-        updatedBy: response.config?.updatedBy || null
-      }
+    if (response.config && isMounted.value) {
+      claudeConfig.value = { ...claudeConfig.value, ...response.config }
     }
   } catch (error) {
     if (error.name === 'AbortError') return
     if (!isMounted.value) return
-    showToast('获取 Claude 转发配置失败', 'error')
-    console.error(error)
+    showToast(error.error || error.message || '加载Claude配置失败', 'error')
   } finally {
     if (isMounted.value) {
       claudeConfigLoading.value = false
@@ -1908,177 +1403,145 @@ const loadClaudeConfig = async () => {
   }
 }
 
-// 保存 Claude 转发配置
-const saveClaudeConfig = async () => {
+// Save webhook config
+const saveWebhookConfig = async () => {
   if (!isMounted.value) return
   try {
-    const payload = {
-      claudeCodeOnlyEnabled: claudeConfig.value.claudeCodeOnlyEnabled,
-      globalSessionBindingEnabled: claudeConfig.value.globalSessionBindingEnabled,
-      sessionBindingErrorMessage: claudeConfig.value.sessionBindingErrorMessage,
-      sessionBindingTtlDays: claudeConfig.value.sessionBindingTtlDays,
-      userMessageQueueEnabled: claudeConfig.value.userMessageQueueEnabled,
-      userMessageQueueDelayMs: claudeConfig.value.userMessageQueueDelayMs,
-      userMessageQueueTimeoutMs: claudeConfig.value.userMessageQueueTimeoutMs,
-      concurrentRequestQueueEnabled: claudeConfig.value.concurrentRequestQueueEnabled,
-      concurrentRequestQueueMaxSize: claudeConfig.value.concurrentRequestQueueMaxSize,
-      concurrentRequestQueueMaxSizeMultiplier:
-        claudeConfig.value.concurrentRequestQueueMaxSizeMultiplier,
-      concurrentRequestQueueTimeoutMs: claudeConfig.value.concurrentRequestQueueTimeoutMs
-    }
-
-    const response = await apiClient.put('/admin/claude-relay-config', payload, {
+    const response = await apiClient.put('/admin/webhook', webhookConfig.value, {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
-      claudeConfig.value = {
-        ...claudeConfig.value,
-        updatedAt: response.config?.updatedAt || new Date().toISOString(),
-        updatedBy: response.config?.updatedBy || null
-      }
-      showToast('Claude 转发配置已保存', 'success')
+      showToast('保存成功', 'success')
     }
   } catch (error) {
     if (error.name === 'AbortError') return
     if (!isMounted.value) return
-    showToast('保存 Claude 转发配置失败', 'error')
-    console.error(error)
+    showToast(error.error || error.message || '保存失败', 'error')
   }
 }
 
-// 验证 URL
-const validateUrl = () => {
-  // Bark和SMTP平台不需要验证URL
-  if (['bark', 'smtp', 'telegram'].includes(platformForm.value.type)) {
-    urlError.value = false
-    urlValid.value = false
-    return
+// Save Claude config
+const saveClaudeConfig = async () => {
+  if (!isMounted.value) return
+  try {
+    const response = await apiClient.put('/admin/settings/claude', claudeConfig.value, {
+      signal: abortController.value.signal
+    })
+    if (response.success && isMounted.value) {
+      showToast('保存成功', 'success')
+      if (response.config) {
+        claudeConfig.value = { ...claudeConfig.value, ...response.config }
+      }
+    }
+  } catch (error) {
+    if (error.name === 'AbortError') return
+    if (!isMounted.value) return
+    showToast(error.error || error.message || '保存失败', 'error')
   }
+}
 
+// Validate URL
+const validateUrl = () => {
   const url = platformForm.value.url
   if (!url) {
     urlError.value = false
     urlValid.value = false
     return
   }
-
   try {
     new URL(url)
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      urlError.value = false
-      urlValid.value = true
-    } else {
-      urlError.value = true
-      urlValid.value = false
-    }
+    urlError.value = false
+    urlValid.value = true
   } catch {
     urlError.value = true
     urlValid.value = false
   }
 }
 
-// 验证平台配置
+// Validate platform form
 const validatePlatformForm = () => {
-  if (platformForm.value.type === 'bark') {
-    if (!platformForm.value.deviceKey) {
-      showToast('请输入Bark设备密钥', 'error')
-      return false
-    }
-  } else if (platformForm.value.type === 'telegram') {
-    if (!platformForm.value.botToken) {
-      showToast('请输入 Telegram 机器人 Token', 'error')
-      return false
-    }
-    if (!platformForm.value.chatId) {
-      showToast('请输入 Telegram Chat ID', 'error')
-      return false
-    }
-    if (platformForm.value.apiBaseUrl) {
-      try {
-        const parsed = new URL(platformForm.value.apiBaseUrl)
-        if (!['http:', 'https:'].includes(parsed.protocol)) {
-          showToast('Telegram API 基础地址仅支持 http 或 https', 'error')
-          return false
-        }
-      } catch (error) {
-        showToast('请输入有效的 Telegram API 基础地址', 'error')
-        return false
-      }
-    }
-    if (platformForm.value.proxyUrl) {
-      try {
-        const parsed = new URL(platformForm.value.proxyUrl)
-        const supportedProtocols = ['http:', 'https:', 'socks4:', 'socks4a:', 'socks5:']
-        if (!supportedProtocols.includes(parsed.protocol)) {
-          showToast('Telegram 代理仅支持 http/https/socks 协议', 'error')
-          return false
-        }
-      } catch (error) {
-        showToast('请输入有效的 Telegram 代理地址', 'error')
-        return false
-      }
-    }
-  } else if (platformForm.value.type === 'smtp') {
-    const requiredFields = [
-      { field: 'host', message: 'SMTP服务器' },
-      { field: 'user', message: '用户名' },
-      { field: 'pass', message: '密码' },
-      { field: 'to', message: '收件人邮箱' }
-    ]
-
-    for (const { field, message } of requiredFields) {
-      if (!platformForm.value[field]) {
-        showToast(`请输入${message}`, 'error')
-        return false
-      }
-    }
-  } else {
-    if (!platformForm.value.url) {
-      showToast('请输入Webhook URL', 'error')
-      return false
-    }
-    if (urlError.value) {
-      showToast('请输入有效的Webhook URL', 'error')
-      return false
-    }
+  if (!isPlatformFormValid.value) {
+    showToast('请填写必填项', 'error')
+    return false
   }
   return true
 }
 
-// 添加/更新平台
+// Toggle platform
+const togglePlatform = async (platformId) => {
+  if (!isMounted.value) return
+  try {
+    const response = await apiClient.patch(
+      `/admin/webhook/platforms/${platformId}/toggle`,
+      {},
+      {
+        signal: abortController.value.signal
+      }
+    )
+    if (response.success && isMounted.value) {
+      await loadWebhookConfig()
+      showToast('状态已更新', 'success')
+    }
+  } catch (error) {
+    if (error.name === 'AbortError') return
+    if (!isMounted.value) return
+    showToast(error.error || error.message || '操作失败', 'error')
+  }
+}
+
+// Edit platform
+const editPlatform = (platform) => {
+  if (!isMounted.value) return
+  editingPlatform.value = platform
+  platformForm.value = { ...platform }
+  showAddPlatformModal.value = true
+}
+
+// Delete platform
+const deletePlatform = async (platformId) => {
+  if (!isMounted.value) return
+  if (!confirm('确定要删除此平台吗？')) return
+
+  try {
+    const response = await apiClient.delete(`/admin/webhook/platforms/${platformId}`, {
+      signal: abortController.value.signal
+    })
+    if (response.success && isMounted.value) {
+      await loadWebhookConfig()
+      showToast('删除成功', 'success')
+    }
+  } catch (error) {
+    if (error.name === 'AbortError') return
+    if (!isMounted.value) return
+    showToast(error.error || error.message || '删除失败', 'error')
+  }
+}
+
+// Save platform
 const savePlatform = async () => {
   if (!isMounted.value) return
-
-  // 验证表单
   if (!validatePlatformForm()) return
 
   savingPlatform.value = true
   try {
-    let response
-    if (editingPlatform.value) {
-      // 更新平台
-      response = await apiClient.put(
-        `/admin/webhook/platforms/${editingPlatform.value.id}`,
-        platformForm.value,
-        { signal: abortController.value.signal }
-      )
-    } else {
-      // 添加平台
-      response = await apiClient.post('/admin/webhook/platforms', platformForm.value, {
-        signal: abortController.value.signal
-      })
-    }
+    const endpoint = editingPlatform.value
+      ? `/admin/webhook/platforms/${editingPlatform.value.id}`
+      : '/admin/webhook/platforms'
+    const method = editingPlatform.value ? 'put' : 'post'
+
+    const response = await apiClient[method](endpoint, platformForm.value, {
+      signal: abortController.value.signal
+    })
 
     if (response.success && isMounted.value) {
-      showToast(editingPlatform.value ? '平台已更新' : '平台已添加', 'success')
+      showToast(editingPlatform.value ? '更新成功' : '添加成功', 'success')
       await loadWebhookConfig()
       closePlatformModal()
     }
   } catch (error) {
     if (error.name === 'AbortError') return
     if (!isMounted.value) return
-    showToast(error.message || '操作失败', 'error')
-    console.error(error)
+    showToast(error.error || error.message || '保存失败', 'error')
   } finally {
     if (isMounted.value) {
       savingPlatform.value = false
@@ -2086,106 +1549,19 @@ const savePlatform = async () => {
   }
 }
 
-// 编辑平台
-const editPlatform = (platform) => {
-  editingPlatform.value = platform
-  platformForm.value = {
-    type: platform.type || 'wechat_work',
-    name: platform.name || '',
-    url: platform.url || '',
-    enableSign: platform.enableSign || false,
-    secret: platform.secret || '',
-    // Telegram特有字段
-    botToken: platform.botToken || '',
-    chatId: platform.chatId || '',
-    apiBaseUrl: platform.apiBaseUrl || '',
-    proxyUrl: platform.proxyUrl || '',
-    // Bark特有字段
-    deviceKey: platform.deviceKey || '',
-    serverUrl: platform.serverUrl || '',
-    level: platform.level || '',
-    sound: platform.sound || '',
-    group: platform.group || '',
-    // SMTP特有字段
-    host: platform.host || '',
-    port: platform.port ?? null,
-    secure: platform.secure || false,
-    user: platform.user || '',
-    pass: platform.pass || '',
-    from: platform.from || '',
-    to: Array.isArray(platform.to) ? platform.to.join(', ') : platform.to || '',
-    timeout: platform.timeout ?? null,
-    ignoreTLS: platform.ignoreTLS || false
-  }
-  showAddPlatformModal.value = true
-}
-
-// 删除平台
-const deletePlatform = async (id) => {
-  if (!isMounted.value) return
-
-  if (!confirm('确定要删除这个平台吗？')) {
-    return
-  }
-
-  try {
-    const response = await apiClient.delete(`/admin/webhook/platforms/${id}`, {
-      signal: abortController.value.signal
-    })
-    if (response.success && isMounted.value) {
-      showToast('平台已删除', 'success')
-      await loadWebhookConfig()
-    }
-  } catch (error) {
-    if (error.name === 'AbortError') return
-    if (!isMounted.value) return
-    showToast('删除失败', 'error')
-    console.error(error)
-  }
-}
-
-// 切换平台状态
-const togglePlatform = async (id) => {
-  if (!isMounted.value) return
-
-  try {
-    const response = await apiClient.post(
-      `/admin/webhook/platforms/${id}/toggle`,
-      {},
-      {
-        signal: abortController.value.signal
-      }
-    )
-    if (response.success && isMounted.value) {
-      showToast(response.message, 'success')
-      await loadWebhookConfig()
-    }
-  } catch (error) {
-    if (error.name === 'AbortError') return
-    if (!isMounted.value) return
-    showToast('操作失败', 'error')
-    console.error(error)
-  }
-}
-
-// 测试平台
+// Test platform
 const testPlatform = async (platform) => {
   if (!isMounted.value) return
-
   try {
     const testData = {
       type: platform.type,
-      secret: platform.secret,
-      enableSign: platform.enableSign
+      enableSign: platform.enableSign,
+      secret: platform.secret
     }
 
-    // 根据平台类型添加不同字段
     if (platform.type === 'bark') {
       testData.deviceKey = platform.deviceKey
       testData.serverUrl = platform.serverUrl
-      testData.level = platform.level
-      testData.sound = platform.sound
-      testData.group = platform.group
     } else if (platform.type === 'smtp') {
       testData.host = platform.host
       testData.port = platform.port
@@ -2194,7 +1570,6 @@ const testPlatform = async (platform) => {
       testData.pass = platform.pass
       testData.from = platform.from
       testData.to = platform.to
-      testData.ignoreTLS = platform.ignoreTLS
     } else if (platform.type === 'telegram') {
       testData.botToken = platform.botToken
       testData.chatId = platform.chatId
@@ -2218,11 +1593,9 @@ const testPlatform = async (platform) => {
   }
 }
 
-// 测试表单中的平台
+// Test platform form
 const testPlatformForm = async () => {
   if (!isMounted.value) return
-
-  // 验证表单
   if (!validatePlatformForm()) return
 
   testingConnection.value = true
@@ -2245,10 +1618,9 @@ const testPlatformForm = async () => {
   }
 }
 
-// 发送测试通知
+// Send test notification
 const sendTestNotification = async () => {
   if (!isMounted.value) return
-
   try {
     const response = await apiClient.post(
       '/admin/webhook/test-notification',
@@ -2270,13 +1642,10 @@ const sendTestNotification = async () => {
   }
 }
 
-// 关闭模态框
+// Close platform modal
 const closePlatformModal = () => {
   if (!isMounted.value) return
-
   showAddPlatformModal.value = false
-
-  // 使用 setTimeout 确保 DOM 更新完成后再重置状态
   setTimeout(() => {
     if (!isMounted.value) return
     editingPlatform.value = null
@@ -2286,18 +1655,15 @@ const closePlatformModal = () => {
       url: '',
       enableSign: false,
       secret: '',
-      // Telegram特有字段
       botToken: '',
       chatId: '',
       apiBaseUrl: '',
       proxyUrl: '',
-      // Bark特有字段
       deviceKey: '',
       serverUrl: '',
       level: '',
       sound: '',
       group: '',
-      // SMTP特有字段
       host: '',
       port: null,
       secure: false,
@@ -2315,7 +1681,7 @@ const closePlatformModal = () => {
   }, 0)
 }
 
-// 辅助函数
+// Helper functions
 const getPlatformName = (type) => {
   const names = {
     wechat_work: '企业微信',
@@ -2361,12 +1727,6 @@ const getWebhookHint = (type) => {
   return hints[type] || ''
 }
 
-const formatTelegramToken = (token) => {
-  if (!token) return ''
-  if (token.length <= 12) return token
-  return `${token.slice(0, 6)}...${token.slice(-4)}`
-}
-
 const getNotificationTypeName = (type) => {
   const names = {
     accountAnomaly: '账号异常',
@@ -2391,7 +1751,7 @@ const getNotificationTypeDescription = (type) => {
   return descriptions[type] || ''
 }
 
-// 保存OEM设置
+// Save OEM settings
 const saveOemSettings = async () => {
   try {
     const settings = {
@@ -2411,7 +1771,7 @@ const saveOemSettings = async () => {
   }
 }
 
-// 重置OEM设置
+// Reset OEM settings
 const resetOemSettings = async () => {
   if (!confirm('确定要重置为默认设置吗？\n\n这将清除所有自定义的网站名称和图标设置。')) return
 
@@ -2427,12 +1787,11 @@ const resetOemSettings = async () => {
   }
 }
 
-// 处理图标上传
+// Handle icon upload
 const handleIconUpload = async (event) => {
   const file = event.target.files[0]
   if (!file) return
 
-  // 验证文件
   const validation = settingsStore.validateIconFile(file)
   if (!validation.isValid) {
     validation.errors.forEach((error) => showToast(error, 'error'))
@@ -2440,87 +1799,32 @@ const handleIconUpload = async (event) => {
   }
 
   try {
-    // 转换为Base64
     const base64Data = await settingsStore.fileToBase64(file)
     oemSettings.value.siteIconData = base64Data
   } catch (error) {
     showToast('文件读取失败', 'error')
   }
 
-  // 清除input的值，允许重复选择同一文件
   event.target.value = ''
 }
 
-// 删除图标
+// Remove icon
 const removeIcon = () => {
   oemSettings.value.siteIcon = ''
   oemSettings.value.siteIconData = ''
 }
 
-// 处理图标加载错误
+// Handle icon error
 const handleIconError = () => {
   console.warn('Icon failed to load')
 }
 
-// 格式化日期时间
+// Format date time
 const formatDateTime = settingsStore.formatDateTime
 </script>
 
 <style scoped>
 .settings-container {
   min-height: calc(100vh - 300px);
-}
-
-.card {
-  background: white;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-}
-
-:root.dark .card {
-  background: #1f2937;
-  border: 1px solid #374151;
-}
-
-.table-container {
-  overflow: hidden;
-  border-radius: 8px;
-  border: 1px solid #f3f4f6;
-}
-
-:root.dark .table-container {
-  border: 1px solid #4b5563;
-}
-
-.table-row {
-  transition: background-color 0.2s ease;
-}
-
-.table-row:hover {
-  background-color: #f9fafb;
-}
-
-:root.dark .table-row:hover {
-  background-color: #374151;
-}
-
-.form-input {
-  @apply w-full rounded-lg border border-gray-300 px-4 py-2 transition-all duration-200 focus:border-transparent focus:ring-2 focus:ring-gray-900 dark:focus:ring-white;
-}
-
-.btn {
-  @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2;
-}
-
-.btn-primary {
-  @apply bg-gray-700 text-white hover:bg-gray-800 focus:ring-gray-700 dark:bg-gray-600 dark:hover:bg-gray-500 dark:focus:ring-gray-500;
-}
-
-.btn-success {
-  @apply bg-gray-900 text-white hover:bg-gray-700 focus:ring-gray-500 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200;
-}
-
-.loading-spinner {
-  @apply h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900 dark:border-t-white;
 }
 </style>

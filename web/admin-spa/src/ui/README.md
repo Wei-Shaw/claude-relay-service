@@ -532,11 +532,7 @@ import { Divider } from '@/ui'
 <template>
   <!-- Code block -->
   <CodeBlock>
-{
-  "api_key": "cr_1234567890",
-  "name": "Production Key",
-  "status": "active"
-}
+    { "api_key": "cr_1234567890", "name": "Production Key", "status": "active" }
   </CodeBlock>
 
   <!-- Inline code -->
@@ -564,9 +560,7 @@ import { CodeBlock } from '@/ui'
   <!-- Custom content -->
   <Tooltip placement="bottom">
     <template #content>
-      <div>
-        <strong>Pro Tip:</strong> Use keyboard shortcuts
-      </div>
+      <div><strong>Pro Tip:</strong> Use keyboard shortcuts</div>
     </template>
     <Button variant="ghost" icon-only>?</Button>
   </Tooltip>
