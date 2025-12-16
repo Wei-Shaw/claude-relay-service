@@ -1151,7 +1151,10 @@ const requestLogger = (req, res, next) => {
       )
     } else if (req.originalUrl !== '/health') {
       if (isDebugRoute) {
-        logger.debug(`🟢 ${req.method} ${req.originalUrl} - ${res.statusCode} (${duration}ms)`, logMetadata)
+        logger.debug(
+          `🟢 ${req.method} ${req.originalUrl} - ${res.statusCode} (${duration}ms)`,
+          logMetadata
+        )
       } else {
         logger.request(req.method, req.originalUrl, res.statusCode, duration, logMetadata)
       }
