@@ -1030,12 +1030,10 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
   const modelStatsMap = new Map()
   let totalRequests = 0
 
-  // 用于去重：只统计日数据，避免与月数据重复
+  // 用于去重：先统计月数据，避免与日数据重复
   const dailyKeyPattern = /usage:.+:model:daily:(.+):\d{4}-\d{2}-\d{2}$/
   const monthlyKeyPattern = /usage:.+:model:monthly:(.+):\d{4}-\d{2}$/
-
-  // 检查是否有日数据
-  const hasDailyData = uniqueKeys.some((key) => dailyKeyPattern.test(key))
+  const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
 
   for (let i = 0; i < results.length; i++) {
     const [err, data] = results[i]
@@ -1062,8 +1060,12 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
       continue
     }
 
-    // 如果有日数据，则跳过月数据以避免重复
-    if (hasDailyData && isMonthly) {
+    // 跳过当前月的月数据
+    if (isMonthly && key.includes(`:${currentMonth}`)) {
+      continue
+    }
+    // 跳过非当前月的日数据
+    if (!isMonthly && !key.includes(`:${currentMonth}-`)) {
       continue
     }
 
