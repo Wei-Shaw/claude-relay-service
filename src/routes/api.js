@@ -1362,5 +1362,10 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
   }
 })
 
+// Claude Code 客户端遥测端点 - 返回成功响应避免 404 日志
+router.post('/event_logging/batch', (req, res) => {
+  res.status(200).json({ success: true })
+})
+
 module.exports = router
 module.exports.handleMessagesRequest = handleMessagesRequest
